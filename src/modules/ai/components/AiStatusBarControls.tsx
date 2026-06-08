@@ -436,7 +436,7 @@ function ModelDropdown() {
                   showProviderIcon={activeProvider === null}
                   onPick={() => {
                     if (!isCompatModelId(m.id) && !hasKeyFor(m.provider)) {
-                      void openSettingsWindow("models");
+                      void openSettingsWindow();
                       return;
                     }
                     setSelected(m.id);
@@ -540,7 +540,7 @@ function ProviderConfigureCTA({ providerId }: { providerId: ProviderId }) {
   return (
     <button
       type="button"
-      onClick={() => void openSettingsWindow("models")}
+      onClick={() => void openSettingsWindow()}
       className="group mx-2 mb-1 flex w-[calc(100%-1rem)] items-center gap-2 rounded-md border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:border-border hover:bg-accent/40 hover:text-foreground"
     >
       <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={1.75} />

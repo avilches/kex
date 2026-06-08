@@ -302,7 +302,7 @@ export default function App() {
 
   const togglePanelAndFocus = useCallback(() => {
     if (!hasComposer) {
-      void openSettingsWindow("models");
+      void openSettingsWindow();
       return;
     }
     if (panelOpen) {
@@ -318,7 +318,7 @@ export default function App() {
   const handleAttachFileToAgent = useCallback(
     (path: string) => {
       if (!hasComposer) {
-        void openSettingsWindow("models");
+        void openSettingsWindow();
         return;
       }
       // Dispatch a window event the composer listens for. Same pattern as
@@ -334,7 +334,7 @@ export default function App() {
 
   const askFromSelection = useCallback(() => {
     if (!hasComposer) {
-      void openSettingsWindow("models");
+      void openSettingsWindow();
       return;
     }
     const selection = captureActiveSelection();
