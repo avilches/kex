@@ -93,6 +93,7 @@ export default function App() {
     setActiveWorkspaceId,
     activeWorkspace,
     addWorkspace,
+    reorderWorkspaces,
     splitPane,
     focusPane,
     setPaneDivider,
@@ -884,6 +885,7 @@ export default function App() {
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(inheritedCwd())}
+              onReorder={reorderWorkspaces}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
