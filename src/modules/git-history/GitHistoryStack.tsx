@@ -12,7 +12,7 @@ type CommitFileDiffOpenInput = {
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
+  activeId: string;
   onOpenCommitFile: (input: CommitFileDiffOpenInput) => void;
   onSearchHandle?: (handle: GitHistorySearchHandle | null) => void;
 };

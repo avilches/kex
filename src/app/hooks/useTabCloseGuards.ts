@@ -4,7 +4,7 @@ import type { Tab } from "@/modules/tabs";
 
 type Params = {
   tabs: Tab[];
-  disposeTab: (id: number) => void;
+  disposeTab: (id: string) => void;
 };
 
 /**
@@ -13,16 +13,16 @@ type Params = {
  * Owns the three pending-close states the dialogs render from.
  */
 export function useTabCloseGuards({ tabs, disposeTab }: Params) {
-  const [pendingCloseTab, setPendingCloseTab] = useState<number | null>(null);
+  const [pendingCloseTab, setPendingCloseTab] = useState<string | null>(null);
   const [pendingTerminalCloseTab, setPendingTerminalCloseTab] = useState<
-    number | null
+    string | null
   >(null);
-  const [pendingDeleteTabs, setPendingDeleteTabs] = useState<number[] | null>(
+  const [pendingDeleteTabs, setPendingDeleteTabs] = useState<string[] | null>(
     null,
   );
 
   const handleClose = useCallback(
-    async (id: number) => {
+    async (id: string) => {
       const t = tabs.find((x) => x.id === id);
       if (t?.kind === "editor" && t.dirty) {
         setPendingCloseTab(id);
@@ -74,7 +74,7 @@ export function useTabCloseGuards({ tabs, disposeTab }: Params) {
 
   const handlePathDeleted = useCallback(
     (path: string) => {
-      const dirty: number[] = [];
+      const dirty: string[] = [];
       for (const t of tabs) {
         if (t.kind !== "editor") continue;
         if (t.path !== path && !t.path.startsWith(`${path}/`)) continue;

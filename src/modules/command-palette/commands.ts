@@ -31,7 +31,7 @@ export const COMMAND_GROUPS = [
 
 export type CommandPaletteActionContext = {
   tabs: Tab[];
-  activeId: number;
+  activeId: string;
   searchTarget: SearchTarget;
   explorerRoot: string | null;
   home: string | null;

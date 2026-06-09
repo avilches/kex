@@ -4,7 +4,7 @@ import { MarkdownPreviewPane } from "./MarkdownPreviewPane";
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
+  activeId: string;
 };
 
 export function MarkdownStack({ tabs, activeId }: Props) {

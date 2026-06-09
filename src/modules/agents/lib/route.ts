@@ -15,7 +15,7 @@ type RouteArgs = {
   visible: boolean;
   /** Allow an in-app toast when focused but not looking at the agent. */
   allowToast: boolean;
-  tabId?: number;
+  tabId?: string;
   leafId?: number;
   onActivate: () => void;
 };
@@ -29,7 +29,7 @@ export function routeAgentNotification({
   focused,
   visible,
   allowToast,
-  tabId = 0,
+  tabId = "",
   leafId = 0,
   onActivate,
 }: RouteArgs): void {

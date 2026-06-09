@@ -3,7 +3,7 @@ import { AiDiffPane } from "./AiDiffPane";
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
+  activeId: string;
   onAccept: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
 };

@@ -19,7 +19,7 @@ import type { AgentNotification, AgentStatus } from "../lib/types";
 import { useAgentStore } from "../store/agentStore";
 
 type Props = {
-  onActivate: (tabId: number, leafId: number) => void;
+  onActivate: (tabId: string, leafId: number) => void;
 };
 
 function relativeTime(ts: number): string {
@@ -158,7 +158,7 @@ export function NotificationBell({ onActivate }: Props) {
     }
   };
 
-  const activate = (tabId: number, leafId: number) => {
+  const activate = (tabId: string, leafId: number) => {
     onActivate(tabId, leafId);
     setOpen(false);
   };

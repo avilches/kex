@@ -7,13 +7,13 @@ import { leafIds } from "./lib/panes";
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
+  activeId: string;
   /** Register/unregister handle by leaf id (not tab id). */
   registerHandle: (leafId: number, handle: TerminalPaneHandle | null) => void;
   onSearchReady: (leafId: number, addon: SearchAddon) => void;
   onCwd: (leafId: number, cwd: string) => void;
   onExit: (leafId: number, code: number) => void;
-  onFocusLeaf: (tabId: number, leafId: number) => void;
+  onFocusLeaf: (tabId: string, leafId: number) => void;
 };
 
 type Bundle = {

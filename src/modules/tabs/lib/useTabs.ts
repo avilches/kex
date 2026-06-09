@@ -17,7 +17,7 @@ import { disposeSession } from "@/modules/terminal/lib/useTerminalSession";
 export const MAX_PANES_PER_TAB = 4;
 
 export type TerminalTab = {
-  id: number;
+  id: string;
   kind: "terminal";
   title: string;
   cwd?: string;
@@ -31,7 +31,7 @@ export type TerminalTab = {
 };
 
 export type EditorTab = {
-  id: number;
+  id: string;
   kind: "editor";
   title: string;
   path: string;
@@ -45,14 +45,14 @@ export type EditorTab = {
 };
 
 export type PreviewTab = {
-  id: number;
+  id: string;
   kind: "preview";
   title: string;
   url: string;
 };
 
 export type MarkdownTab = {
-  id: number;
+  id: string;
   kind: "markdown";
   title: string;
   path: string;
@@ -61,7 +61,7 @@ export type MarkdownTab = {
 export type AiDiffStatus = "pending" | "approved" | "rejected";
 
 export type AiDiffTab = {
-  id: number;
+  id: string;
   kind: "ai-diff";
   title: string;
   path: string;
@@ -75,7 +75,7 @@ export type AiDiffTab = {
 };
 
 export type GitDiffTab = {
-  id: number;
+  id: string;
   kind: "git-diff";
   title: string;
   path: string;
@@ -85,14 +85,14 @@ export type GitDiffTab = {
 };
 
 export type GitHistoryTab = {
-  id: number;
+  id: string;
   kind: "git-history";
   title: string;
   repoRoot: string;
 };
 
 export type GitCommitFileDiffTab = {
-  id: number;
+  id: string;
   kind: "git-commit-file";
   title: string;
   repoRoot: string;
@@ -138,12 +138,12 @@ function titleFromUrl(url: string): string {
 }
 
 export function useTabs(initial?: Partial<TerminalTab>) {
+  const initialTabId = crypto.randomUUID();
   const [tabs, setTabs] = useState<Tab[]>(() => {
-    const tabId = 1;
     const leafId = 2;
     return [
       {
-        id: tabId,
+        id: initialTabId,
         kind: "terminal",
         title: initial?.title ?? "shell",
         cwd: initial?.cwd,
@@ -152,8 +152,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       },
     ];
   });
-  const [activeId, setActiveId] = useState(1);
-  const nextIdRef = useRef(3);
+  const [activeId, setActiveId] = useState<string>(initialTabId);
+  const nextPaneIdRef = useRef(3); // only for PaneNode IDs (leaves, splits)
   const tabsRef = useRef(tabs);
 
   useEffect(() => {
@@ -161,8 +161,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, [tabs]);
 
   const newTab = useCallback((cwd?: string) => {
-    const tabId = nextIdRef.current++;
-    const leafId = nextIdRef.current++;
+    const tabId = crypto.randomUUID();
+    const leafId = nextPaneIdRef.current++;
     setTabs((t) => [
       ...t,
       {
@@ -179,8 +179,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, []);
 
   const newBlockTab = useCallback((cwd?: string) => {
-    const tabId = nextIdRef.current++;
-    const leafId = nextIdRef.current++;
+    const tabId = crypto.randomUUID();
+    const leafId = nextPaneIdRef.current++;
     setTabs((t) => [
       ...t,
       {
@@ -200,14 +200,14 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   useEffect(() => {
     if (!import.meta.env?.DEV || typeof window === "undefined") return;
     (
-      window as unknown as { __teraxNewBlockTab?: (cwd?: string) => number }
+      window as unknown as { __teraxNewBlockTab?: (cwd?: string) => string }
     ).__teraxNewBlockTab = newBlockTab;
   }, [newBlockTab]);
 
   const newAgentTab = useCallback(
     (cwd: string | undefined, title: string) => {
-      const tabId = nextIdRef.current++;
-      const leafId = nextIdRef.current++;
+      const tabId = crypto.randomUUID();
+      const leafId = nextPaneIdRef.current++;
       setTabs((t) => [
         ...t,
         {
@@ -226,8 +226,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   );
 
   const newPrivateTab = useCallback((cwd?: string) => {
-    const tabId = nextIdRef.current++;
-    const leafId = nextIdRef.current++;
+    const tabId = crypto.randomUUID();
+    const leafId = nextPaneIdRef.current++;
     setTabs((t) => [
       ...t,
       {
@@ -255,7 +255,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
    *   otherwise the current preview slot is replaced with the new path.
    */
   const openFileTab = useCallback((path: string, pin = true) => {
-    let targetId: number | null = null;
+    let targetId: string | null = null;
     setTabs((curr) => {
       if (pin) {
         // Persistent open: find any existing editor tab, pin it if needed.
@@ -271,7 +271,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           }
           return curr;
         }
-        const id = nextIdRef.current++;
+        const id = crypto.randomUUID();
         targetId = id;
         return [
           ...curr,
@@ -307,7 +307,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         const previewIdx = curr.findIndex(
           (t) => t.kind === "editor" && (t as EditorTab).preview,
         );
-        const id = nextIdRef.current++;
+        const id = crypto.randomUUID();
         targetId = id;
         const tab: EditorTab = {
           id,
@@ -324,14 +324,14 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       }
     });
     if (targetId !== null) setActiveId(targetId);
-    return targetId as number | null;
+    return targetId as string | null;
   }, []);
 
   /**
    * Promotes a preview tab to a persistent one. Called on double-click of the
    * tab title in the tab bar. Dirty edits also auto-promote (see `updateTab`).
    */
-  const pinTab = useCallback((id: number) => {
+  const pinTab = useCallback((id: string) => {
     setTabs((curr) =>
       curr.map((t) =>
         t.id === id && t.kind === "editor" ? { ...t, preview: false } : t,
@@ -347,7 +347,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       approvalId: string;
       isNewFile: boolean;
     }) => {
-      let targetId: number | null = null;
+      let targetId: string | null = null;
       setTabs((curr) => {
         const existing = curr.find(
           (t) => t.kind === "ai-diff" && t.approvalId === input.approvalId,
@@ -356,7 +356,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           targetId = existing.id;
           return curr;
         }
-        const id = nextIdRef.current++;
+        const id = crypto.randomUUID();
         targetId = id;
         const title = `${basename(input.path)} (AI diff)`;
         return [
@@ -375,7 +375,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         ];
       });
       if (targetId !== null) setActiveId(targetId);
-      return targetId as number | null;
+      return targetId as string | null;
     },
     [],
   );
@@ -416,7 +416,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, []);
 
   const newPreviewTab = useCallback((url: string) => {
-    const id = nextIdRef.current++;
+    const id = crypto.randomUUID();
     setTabs((t) => [
       ...t,
       { id, kind: "preview", title: titleFromUrl(url), url },
@@ -426,7 +426,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, []);
 
   const newMarkdownTab = useCallback((path: string) => {
-    let targetId: number | null = null;
+    let targetId: string | null = null;
     setTabs((curr) => {
       const existing = curr.find(
         (t) => t.kind === "markdown" && t.path === path,
@@ -435,7 +435,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         targetId = existing.id;
         return curr;
       }
-      const id = nextIdRef.current++;
+      const id = crypto.randomUUID();
       targetId = id;
       return [...curr, { id, kind: "markdown", title: basename(path), path }];
     });
@@ -475,7 +475,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         return existing.id;
       }
 
-      const id = nextIdRef.current++;
+      const id = crypto.randomUUID();
       const nextTabs = [
         ...curr,
         {
@@ -514,7 +514,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         setActiveId(existing.id);
         return existing.id;
       }
-      const id = nextIdRef.current++;
+      const id = crypto.randomUUID();
       const nextTabs = [
         ...curr,
         {
@@ -566,7 +566,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         setActiveId(existing.id);
         return existing.id;
       }
-      const id = nextIdRef.current++;
+      const id = crypto.randomUUID();
       const nextTabs = [
         ...curr,
         {
@@ -589,7 +589,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     [],
   );
 
-  const closeTab = useCallback((id: number) => {
+  const closeTab = useCallback((id: string) => {
     let toDispose: number[] = [];
     setTabs((curr) => {
       if (curr.length <= 1) return curr;
@@ -607,7 +607,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     for (const lid of toDispose) disposeSession(lid);
   }, []);
 
-  const updateTab = useCallback((id: number, patch: TabPatch) => {
+  const updateTab = useCallback((id: string, patch: TabPatch) => {
     setTabs((t) =>
       t.map((x) => {
         if (x.id !== id) return x;
@@ -682,7 +682,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     });
   }, []);
 
-  const focusPane = useCallback((tabId: number, leafId: number) => {
+  const focusPane = useCallback((tabId: string, leafId: number) => {
     setTabs((curr) =>
       curr.map((t) => {
         if (t.id !== tabId || t.kind !== "terminal") return t;
@@ -698,7 +698,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     );
   }, []);
 
-  const focusNextPaneInTab = useCallback((tabId: number, delta: 1 | -1) => {
+  const focusNextPaneInTab = useCallback((tabId: string, delta: 1 | -1) => {
     setTabs((curr) =>
       curr.map((t) => {
         if (t.id !== tabId || t.kind !== "terminal") return t;
@@ -712,14 +712,14 @@ export function useTabs(initial?: Partial<TerminalTab>) {
 
   /** Split the active leaf of `tabId` along `dir`. Returns the new leaf id. */
   const splitActivePane = useCallback(
-    (tabId: number, dir: SplitDir): number | null => {
+    (tabId: string, dir: SplitDir): number | null => {
       let newLeafId: number | null = null;
       setTabs((curr) =>
         curr.map((t) => {
           if (t.id !== tabId || t.kind !== "terminal" || t.blocks) return t;
           if (leafIds(t.paneTree).length >= MAX_PANES_PER_TAB) return t;
-          const splitId = nextIdRef.current++;
-          const leafId = nextIdRef.current++;
+          const splitId = nextPaneIdRef.current++;
+          const leafId = nextPaneIdRef.current++;
           newLeafId = leafId;
           const paneTree = splitLeaf(
             t.paneTree,
@@ -771,7 +771,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     if (didRemove) disposeSession(leafId);
   }, []);
 
-  const closeActivePane = useCallback((tabId: number): boolean => {
+  const closeActivePane = useCallback((tabId: string): boolean => {
     let closedTab = false;
     let removedLeaf: number | null = null;
     setTabs((curr) => {
@@ -806,8 +806,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, []);
 
   const resetWorkspace = useCallback((cwd?: string) => {
-    const tabId = nextIdRef.current++;
-    const leafId = nextIdRef.current++;
+    const tabId = crypto.randomUUID();
+    const leafId = nextPaneIdRef.current++;
     let toDispose: number[] = [];
     setTabs((curr) => {
       toDispose = curr.flatMap((t) =>

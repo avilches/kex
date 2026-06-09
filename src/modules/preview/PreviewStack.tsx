@@ -5,9 +5,9 @@ import { PreviewPane, type PreviewPaneHandle } from "./PreviewPane";
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
-  onUrlChange: (id: number, url: string) => void;
-  registerHandle: (id: number, handle: PreviewPaneHandle | null) => void;
+  activeId: string;
+  onUrlChange: (id: string, url: string) => void;
+  registerHandle: (id: string, handle: PreviewPaneHandle | null) => void;
 };
 
 export function PreviewStack({
@@ -28,11 +28,11 @@ export function PreviewStack({
   }, [onUrlChange]);
 
   const refCallbacks = useRef(
-    new Map<number, (h: PreviewPaneHandle | null) => void>(),
+    new Map<string, (h: PreviewPaneHandle | null) => void>(),
   );
-  const urlCallbacks = useRef(new Map<number, (url: string) => void>());
+  const urlCallbacks = useRef(new Map<string, (url: string) => void>());
 
-  const getRefCallback = (id: number) => {
+  const getRefCallback = (id: string) => {
     let cb = refCallbacks.current.get(id);
     if (!cb) {
       cb = (h: PreviewPaneHandle | null) => registerRef.current(id, h);
@@ -40,7 +40,7 @@ export function PreviewStack({
     }
     return cb;
   };
-  const getUrlCallback = (id: number) => {
+  const getUrlCallback = (id: string) => {
     let cb = urlCallbacks.current.get(id);
     if (!cb) {
       cb = (url: string) => urlChangeRef.current(id, url);

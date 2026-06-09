@@ -19,22 +19,22 @@ import {
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
-  onSelect: (id: number) => void;
+  activeId: string;
+  onSelect: (id: string) => void;
   onNew: () => void;
   onNewBlock: () => void;
   onNewPrivate: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
   onNewGitGraph: () => void;
-  onClose: (id: number) => void;
+  onClose: (id: string) => void;
   /** Promote a preview (transient) tab to persistent. */
-  onPin: (id: number) => void;
+  onPin: (id: string) => void;
   /** Set a terminal tab's custom label; empty string resets to default. */
-  onRename: (id: number, title: string) => void;
+  onRename: (id: string, title: string) => void;
   onToggleSidebar: () => void;
   onOpenCommandPalette: () => void;
-  onActivateAgent: (tabId: number, leafId: number) => void;
+  onActivateAgent: (tabId: string, leafId: number) => void;
   onOpenSettings: () => void;
   searchTarget: SearchTarget;
   searchRef: RefObject<SearchInlineHandle | null>;

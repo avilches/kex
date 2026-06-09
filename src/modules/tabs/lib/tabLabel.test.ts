@@ -4,7 +4,7 @@ import type { TerminalTab } from "./useTabs";
 
 function terminalTab(over: Partial<TerminalTab> = {}): TerminalTab {
   return {
-    id: 1,
+    id: "00000000-0000-4000-8000-000000000001",
     kind: "terminal",
     title: "shell",
     paneTree: { kind: "leaf", id: 2 },

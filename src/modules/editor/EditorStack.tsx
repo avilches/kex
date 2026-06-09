@@ -5,10 +5,10 @@ import { EditorPane, type EditorPaneHandle } from "./EditorPane";
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
-  onDirtyChange: (id: number, dirty: boolean) => void;
-  registerHandle: (id: number, handle: EditorPaneHandle | null) => void;
-  onCloseTab: (id: number) => void;
+  activeId: string;
+  onDirtyChange: (id: string, dirty: boolean) => void;
+  registerHandle: (id: string, handle: EditorPaneHandle | null) => void;
+  onCloseTab: (id: string) => void;
 };
 
 export function EditorStack({
@@ -38,12 +38,12 @@ export function EditorStack({
   }, [onCloseTab]);
 
   const refCallbacks = useRef(
-    new Map<number, (h: EditorPaneHandle | null) => void>(),
+    new Map<string, (h: EditorPaneHandle | null) => void>(),
   );
-  const dirtyCallbacks = useRef(new Map<number, (dirty: boolean) => void>());
-  const closeCallbacks = useRef(new Map<number, () => void>());
+  const dirtyCallbacks = useRef(new Map<string, (dirty: boolean) => void>());
+  const closeCallbacks = useRef(new Map<string, () => void>());
 
-  const getRefCallback = (id: number) => {
+  const getRefCallback = (id: string) => {
     let cb = refCallbacks.current.get(id);
     if (!cb) {
       cb = (h: EditorPaneHandle | null) => registerRef.current(id, h);
@@ -51,7 +51,7 @@ export function EditorStack({
     }
     return cb;
   };
-  const getDirtyCallback = (id: number) => {
+  const getDirtyCallback = (id: string) => {
     let cb = dirtyCallbacks.current.get(id);
     if (!cb) {
       cb = (dirty: boolean) => dirtyRef.current(id, dirty);
@@ -59,7 +59,7 @@ export function EditorStack({
     }
     return cb;
   };
-  const getCloseCallback = (id: number) => {
+  const getCloseCallback = (id: string) => {
     let cb = closeCallbacks.current.get(id);
     if (!cb) {
       cb = () => closeRef.current(id);

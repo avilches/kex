@@ -117,8 +117,8 @@ export default function App() {
     useState<SearchAddon | null>(null);
   const searchInlineRef = useRef<SearchInlineHandle | null>(null);
   const terminalRefs = useRef<Map<number, TerminalPaneHandle>>(new Map());
-  const editorRefs = useRef<Map<number, EditorPaneHandle>>(new Map());
-  const previewRefs = useRef<Map<number, PreviewPaneHandle>>(new Map());
+  const editorRefs = useRef<Map<string, EditorPaneHandle>>(new Map());
+  const previewRefs = useRef<Map<string, PreviewPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] =
     useState<EditorPaneHandle | null>(null);
   const [gitHistoryHandle, setGitHistoryHandle] =
@@ -211,7 +211,7 @@ export default function App() {
   );
 
   const disposeTab = useCallback(
-    (id: number) => {
+    (id: string) => {
       // Terminal-leaf-keyed maps (terminalRefs/searchAddons) are pruned by
       // the effect below as the pane tree changes; only the tab-id-keyed
       // handles need explicit cleanup here.
@@ -508,7 +508,7 @@ export default function App() {
   );
 
   const registerEditorHandle = useCallback(
-    (id: number, h: EditorPaneHandle | null) => {
+    (id: string, h: EditorPaneHandle | null) => {
       if (h) {
         editorRefs.current.set(id, h);
         const line = pendingGotoLine.current.get(id);
@@ -525,7 +525,7 @@ export default function App() {
   );
 
   const registerPreviewHandle = useCallback(
-    (id: number, h: PreviewPaneHandle | null) => {
+    (id: string, h: PreviewPaneHandle | null) => {
       if (h) previewRefs.current.set(id, h);
       else previewRefs.current.delete(id);
     },
@@ -533,7 +533,7 @@ export default function App() {
   );
 
   const handlePreviewUrl = useCallback(
-    (id: number, url: string) => updateTab(id, { url }),
+    (id: string, url: string) => updateTab(id, { url }),
     [updateTab],
   );
 
@@ -552,12 +552,12 @@ export default function App() {
   );
 
   const handleFocusLeaf = useCallback(
-    (tabId: number, leafId: number) => focusPane(tabId, leafId),
+    (tabId: string, leafId: number) => focusPane(tabId, leafId),
     [focusPane],
   );
 
   const onActivateAgent = useCallback(
-    (tabId: number, leafId: number) => {
+    (tabId: string, leafId: number) => {
       setActiveId(tabId);
       focusPane(tabId, leafId);
     },
@@ -584,12 +584,12 @@ export default function App() {
   );
 
   const handleEditorDirty = useCallback(
-    (id: number, dirty: boolean) => updateTab(id, { dirty }),
+    (id: string, dirty: boolean) => updateTab(id, { dirty }),
     [updateTab],
   );
 
   const handleRenameTab = useCallback(
-    (id: number, title: string) => updateTab(id, { customTitle: title.trim() }),
+    (id: string, title: string) => updateTab(id, { customTitle: title.trim() }),
     [updateTab],
   );
 
@@ -668,7 +668,7 @@ export default function App() {
     ],
   );
 
-  const pendingGotoLine = useRef<Map<number, number>>(new Map());
+  const pendingGotoLine = useRef<Map<string, number>>(new Map());
   const openContentHit = useCallback(
     (path: string, line: number) => {
       const id = openFileTab(path, true);

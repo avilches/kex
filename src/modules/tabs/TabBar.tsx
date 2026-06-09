@@ -34,19 +34,19 @@ import type { EditorTab, Tab } from "./lib/useTabs";
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
-  onSelect: (id: number) => void;
+  activeId: string;
+  onSelect: (id: string) => void;
   onNew: () => void;
   onNewBlock: () => void;
   onNewPrivate: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
   onNewGitGraph: () => void;
-  onClose: (id: number) => void;
+  onClose: (id: string) => void;
   /** Pin (promote) a preview tab to persistent on double-click. */
-  onPin: (id: number) => void;
+  onPin: (id: string) => void;
   /** Set a terminal tab's custom label; empty string resets to default. */
-  onRename: (id: number, title: string) => void;
+  onRename: (id: string, title: string) => void;
   compact?: boolean;
 };
 
@@ -66,7 +66,7 @@ export function TabBar({
   compact,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Horizontal wheel scroll without holding shift.
   useEffect(() => {
@@ -98,8 +98,8 @@ export function TabBar({
     >
       <div className="flex w-max items-center gap-0.5">
         <Tabs
-          value={String(activeId)}
-          onValueChange={(v) => onSelect(Number(v))}
+          value={activeId}
+          onValueChange={(v) => onSelect(v)}
         >
           <TabsList className="h-7 w-max gap-0.5 bg-transparent p-0">
             {tabs.map((t) => {

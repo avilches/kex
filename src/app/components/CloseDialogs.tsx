@@ -12,13 +12,13 @@ import type { Tab } from "@/modules/tabs";
 
 type Props = {
   tabs: Tab[];
-  pendingCloseTab: number | null;
+  pendingCloseTab: string | null;
   onCancelClose: () => void;
   onConfirmClose: () => void;
-  pendingTerminalCloseTab: number | null;
+  pendingTerminalCloseTab: string | null;
   onCancelTerminalClose: () => void;
   onConfirmTerminalClose: () => void;
-  pendingDeleteTabs: number[] | null;
+  pendingDeleteTabs: string[] | null;
   onCancelDeleteClose: () => void;
   onConfirmDeleteClose: () => void;
 };

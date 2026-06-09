@@ -14,7 +14,7 @@ type GitHistoryStackProps = ComponentProps<typeof GitHistoryStack>;
 
 type Props = {
   tabs: Tab[];
-  activeId: number;
+  activeId: string;
   activeTab: Tab | undefined;
   registerTerminalHandle: TerminalStackProps["registerHandle"];
   onSearchReady: TerminalStackProps["onSearchReady"];

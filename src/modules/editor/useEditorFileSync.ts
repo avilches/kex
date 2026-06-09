@@ -12,7 +12,7 @@ import type { EditorPaneHandle } from "./EditorPane";
 type Params = {
   tabs: Tab[];
   tabsRef: RefObject<Tab[]>;
-  editorRefs: RefObject<Map<number, EditorPaneHandle>>;
+  editorRefs: RefObject<Map<string, EditorPaneHandle>>;
 };
 
 /**

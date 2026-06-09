@@ -7,10 +7,10 @@ import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
 
-type Activate = (tabId: number, leafId: number) => void;
+type Activate = (tabId: string, leafId: number) => void;
 type Ctx = {
   tabs: Tab[];
-  activeId: number;
+  activeId: string;
   focused: boolean;
   onActivate: Activate;
 };
@@ -18,7 +18,7 @@ type Ctx = {
 function tabInfo(
   tabs: Tab[],
   leafId: number,
-): { tabId: number; title: string } | null {
+): { tabId: string; title: string } | null {
   for (const t of tabs) {
     if (t.kind === "terminal" && hasLeaf(t.paneTree, leafId)) {
       return { tabId: t.id, title: t.title };
@@ -93,7 +93,7 @@ export function AgentNotificationsBridge({
   onActivate,
 }: {
   tabs: Tab[];
-  activeId: number;
+  activeId: string;
   onActivate: Activate;
 }) {
   const focused = useWindowFocus();
