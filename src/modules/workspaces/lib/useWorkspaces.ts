@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { arrayMove } from "@dnd-kit/sortable";
 import {
   allPaneIds,
   findPane,
   findPanelPane,
   firstPaneId,
+  movePanelBetweenPanes,
   removePaneFromTree,
   siblingPane,
   splitPaneInTree,
@@ -63,6 +65,15 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: { cw
     return ws.id;
   }, []);
 
+  const reorderWorkspaces = useCallback((fromId: string, toId: string) => {
+    setWorkspaces((prev) => {
+      const from = prev.findIndex((w) => w.id === fromId);
+      const to = prev.findIndex((w) => w.id === toId);
+      if (from === -1 || to === -1 || from === to) return prev;
+      return arrayMove(prev, from, to);
+    });
+  }, []);
+
   const closeWorkspace = useCallback((id: string) => {
     setWorkspaces((prev) => {
       if (prev.length <= 1) return prev; // never close last workspace
@@ -120,6 +131,47 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: { cw
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
         return { ...w, paneTree: updateDivider(w.paneTree, splitId, position) };
+      }),
+    );
+  }, []);
+
+  const movePanel = useCallback((workspaceId: string, panelId: string, targetPaneId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w;
+        const sourceResult = findPanelPane(w.paneTree, panelId);
+        if (!sourceResult || sourceResult.pane.id === targetPaneId) return w;
+        const newTree = movePanelBetweenPanes(w.paneTree, panelId, targetPaneId);
+        if (newTree === w.paneTree) return w;
+        return { ...w, paneTree: newTree, activePaneId: targetPaneId };
+      }),
+    );
+  }, []);
+
+  const splitPaneAndPlace = useCallback((
+    workspaceId: string,
+    targetPaneId: string,
+    direction: "left" | "right" | "top" | "bottom",
+    panelId: string,
+  ) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w;
+        const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
+        const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
+        const newPaneId = crypto.randomUUID();
+        const newSplitId = crypto.randomUUID();
+        const treeAfterSplit = splitPaneInTree(
+          w.paneTree,
+          targetPaneId,
+          newSplitId,
+          newPaneId,
+          orientation,
+          newPanePosition,
+        );
+        const treeAfterMove = movePanelBetweenPanes(treeAfterSplit, panelId, newPaneId);
+        if (treeAfterMove === w.paneTree) return w;
+        return { ...w, paneTree: treeAfterMove, activePaneId: newPaneId };
       }),
     );
   }, []);
@@ -251,10 +303,13 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: { cw
     activeWorkspace,
     addWorkspace,
     closeWorkspace,
+    reorderWorkspaces,
     splitPane,
     closePane,
     focusPane,
     setPaneDivider,
+    movePanel,
+    splitPaneAndPlace,
     openPanel,
     activatePanel,
     closePanel,
