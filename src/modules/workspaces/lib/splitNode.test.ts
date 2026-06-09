@@ -4,6 +4,7 @@ import {
   findPane,
   findPanelPane,
   firstPaneId,
+  movePanelBetweenPanes,
   removePaneFromTree,
   siblingPane,
   splitPaneInTree,
@@ -203,5 +204,90 @@ describe("updateDivider", () => {
   test("returns same reference when position unchanged", () => {
     const result = updateDivider(tree, "s0", 0.5);
     expect(result).toBe(tree);
+  });
+});
+
+describe("splitPaneInTree with newPanePosition", () => {
+  test("places new pane as first when newPanePosition='first'", () => {
+    const tree = makePane("p1");
+    const result = splitPaneInTree(tree, "p1", "s1", "p2", "horizontal", "first");
+    expect(result.kind).toBe("split");
+    if (result.kind === "split") {
+      expect(result.first).toEqual(makePane("p2"));
+      expect(result.second).toEqual(tree);
+    }
+  });
+
+  test("places new pane as second by default (backward compat)", () => {
+    const tree = makePane("p1");
+    const result = splitPaneInTree(tree, "p1", "s1", "p2", "horizontal");
+    if (result.kind === "split") {
+      expect(result.first).toEqual(tree);
+      expect(result.second).toEqual(makePane("p2"));
+    }
+  });
+});
+
+describe("movePanelBetweenPanes", () => {
+  test("moves panel from source pane to target pane, collapses empty source", () => {
+    const panel1 = { id: "panel1", kind: "terminal" as const };
+    const panel2 = { id: "panel2", kind: "terminal" as const };
+    const pane1: PaneNode = { kind: "pane", id: "p1", panels: [panel1], activePanelId: "panel1" };
+    const pane2: PaneNode = { kind: "pane", id: "p2", panels: [panel2], activePanelId: "panel2" };
+    const tree: SplitNode = { kind: "split", id: "s0", orientation: "horizontal", first: pane1, second: pane2, dividerPosition: 0.5 };
+
+    const result = movePanelBetweenPanes(tree, "panel1", "p2");
+    // Source pane (p1) had only 1 panel — it should be collapsed
+    expect(result.kind).toBe("pane");
+    if (result.kind === "pane") {
+      expect(result.id).toBe("p2");
+      expect(result.panels).toHaveLength(2);
+      expect(result.panels[1]?.id).toBe("panel1");
+      expect(result.activePanelId).toBe("panel1");
+    }
+  });
+
+  test("source pane stays when it has remaining panels", () => {
+    const panel1 = { id: "panel1", kind: "terminal" as const };
+    const panel2 = { id: "panel2", kind: "terminal" as const };
+    const panel3 = { id: "panel3", kind: "terminal" as const };
+    const pane1: PaneNode = { kind: "pane", id: "p1", panels: [panel1, panel2], activePanelId: "panel1" };
+    const pane2: PaneNode = { kind: "pane", id: "p2", panels: [panel3], activePanelId: "panel3" };
+    const tree: SplitNode = { kind: "split", id: "s0", orientation: "horizontal", first: pane1, second: pane2, dividerPosition: 0.5 };
+
+    const result = movePanelBetweenPanes(tree, "panel2", "p2");
+    expect(result.kind).toBe("split");
+    if (result.kind === "split") {
+      const newP1 = result.first as PaneNode;
+      const newP2 = result.second as PaneNode;
+      expect(newP1.panels).toHaveLength(1);
+      expect(newP2.panels).toHaveLength(2);
+    }
+  });
+
+  test("inserts at specified index", () => {
+    const panel1 = { id: "panel1", kind: "terminal" as const };
+    const panel2 = { id: "panel2", kind: "terminal" as const };
+    const panel3 = { id: "panel3", kind: "terminal" as const };
+    const pane1: PaneNode = { kind: "pane", id: "p1", panels: [panel1, panel2], activePanelId: "panel1" };
+    const pane2: PaneNode = { kind: "pane", id: "p2", panels: [panel3], activePanelId: "panel3" };
+    const tree: SplitNode = { kind: "split", id: "s0", orientation: "horizontal", first: pane1, second: pane2, dividerPosition: 0.5 };
+
+    const result = movePanelBetweenPanes(tree, "panel1", "p2", 0);
+    if (result.kind === "split") {
+      const newP2 = result.second as PaneNode;
+      expect(newP2.panels[0]?.id).toBe("panel1");
+    }
+  });
+
+  test("returns same tree if source and target pane are the same", () => {
+    const panel1 = { id: "panel1", kind: "terminal" as const };
+    const pane: PaneNode = { kind: "pane", id: "p1", panels: [panel1], activePanelId: "panel1" };
+    expect(movePanelBetweenPanes(pane, "panel1", "p1")).toBe(pane);
+  });
+
+  test("returns same tree if panel not found", () => {
+    const pane: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
+    expect(movePanelBetweenPanes(pane, "unknown", "p1")).toBe(pane);
   });
 });

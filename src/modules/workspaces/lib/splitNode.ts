@@ -47,16 +47,58 @@ export function splitPaneInTree(
   newSplitId: string,
   newPaneId: string,
   orientation: "horizontal" | "vertical",
+  newPanePosition: "first" | "second" = "second",
 ): SplitNode {
   if (tree.kind === "pane") {
     if (tree.id !== targetPaneId) return tree;
     const newPane: PaneNode = { kind: "pane", id: newPaneId, panels: [], activePanelId: null };
-    return { kind: "split", id: newSplitId, orientation, first: tree, second: newPane, dividerPosition: 0.5 };
+    const [first, second] = newPanePosition === "first" ? [newPane, tree] : [tree, newPane];
+    return { kind: "split", id: newSplitId, orientation, first, second, dividerPosition: 0.5 };
   }
-  const first = splitPaneInTree(tree.first, targetPaneId, newSplitId, newPaneId, orientation);
-  const second = splitPaneInTree(tree.second, targetPaneId, newSplitId, newPaneId, orientation);
+  const first = splitPaneInTree(tree.first, targetPaneId, newSplitId, newPaneId, orientation, newPanePosition);
+  const second = splitPaneInTree(tree.second, targetPaneId, newSplitId, newPaneId, orientation, newPanePosition);
   if (first === tree.first && second === tree.second) return tree;
   return { ...tree, first, second };
+}
+
+export function movePanelBetweenPanes(
+  tree: SplitNode,
+  panelId: string,
+  targetPaneId: string,
+  targetIndex?: number,
+): SplitNode {
+  const sourceResult = findPanelPane(tree, panelId);
+  if (!sourceResult) return tree;
+  if (sourceResult.pane.id === targetPaneId) return tree;
+
+  const { pane: sourcePane, panel } = sourceResult;
+
+  // Remove from source pane
+  let result = updatePane(tree, sourcePane.id, (p) => {
+    const remaining = p.panels.filter((x) => x.id !== panelId);
+    const newActive =
+      p.activePanelId === panelId
+        ? (remaining[remaining.length - 1]?.id ?? null)
+        : p.activePanelId;
+    return { ...p, panels: remaining, activePanelId: newActive };
+  });
+
+  // Insert into target pane
+  result = updatePane(result, targetPaneId, (p) => {
+    const idx = targetIndex !== undefined ? Math.min(targetIndex, p.panels.length) : p.panels.length;
+    const newPanels = [...p.panels];
+    newPanels.splice(idx, 0, panel);
+    return { ...p, panels: newPanels, activePanelId: panel.id };
+  });
+
+  // Auto-collapse source pane if now empty (never removes the last pane)
+  const updatedSource = findPane(result, sourcePane.id);
+  if (updatedSource && updatedSource.panels.length === 0) {
+    const collapsed = removePaneFromTree(result, sourcePane.id);
+    if (collapsed) return collapsed;
+  }
+
+  return result;
 }
 
 export function removePaneFromTree(tree: SplitNode, paneId: string): SplitNode | null {
