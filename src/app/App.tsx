@@ -77,7 +77,6 @@ export default function App() {
     newBlockTab,
     newPrivateTab,
     openFileTab,
-    pinTab,
     newPreviewTab,
     newMarkdownTab,
     openGitDiffTab,
@@ -585,11 +584,6 @@ export default function App() {
     [updateTab],
   );
 
-  const handleRenameTab = useCallback(
-    (id: string, title: string) => updateTab(id, { customTitle: title.trim() }),
-    [updateTab],
-  );
-
   const searchTarget = useMemo<SearchTarget>(() => {
     if (isTerminalTab && activeLeafId !== null && activeSearchAddon)
       return {
@@ -696,18 +690,6 @@ export default function App() {
         <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
           {!zenMode && (
             <Header
-              tabs={tabs}
-              activeId={activeId}
-              onSelect={setActiveId}
-              onNew={openNewTab}
-              onNewBlock={openNewBlockTab}
-              onNewPrivate={openNewPrivateTab}
-              onNewPreview={() => openPreviewTab("")}
-              onNewEditor={() => setNewEditorOpen(true)}
-              onNewGitGraph={openGitGraphFromContext}
-              onClose={handleClose}
-              onPin={pinTab}
-              onRename={handleRenameTab}
               onToggleSidebar={toggleSidebar}
               onOpenCommandPalette={() => openCommandPalette("commands")}
               onActivateAgent={onActivateAgent}

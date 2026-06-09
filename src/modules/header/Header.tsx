@@ -2,8 +2,6 @@ import { Button } from "@/components/ui/button";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
-import type { Tab } from "@/modules/tabs";
-import { TabBar } from "@/modules/tabs";
 import {
   CommandIcon,
   Settings01Icon,
@@ -18,20 +16,6 @@ import {
 } from "./SearchInline";
 
 type Props = {
-  tabs: Tab[];
-  activeId: string;
-  onSelect: (id: string) => void;
-  onNew: () => void;
-  onNewBlock: () => void;
-  onNewPrivate: () => void;
-  onNewPreview: () => void;
-  onNewEditor: () => void;
-  onNewGitGraph: () => void;
-  onClose: (id: string) => void;
-  /** Promote a preview (transient) tab to persistent. */
-  onPin: (id: string) => void;
-  /** Set a terminal tab's custom label; empty string resets to default. */
-  onRename: (id: string, title: string) => void;
   onToggleSidebar: () => void;
   onOpenCommandPalette: () => void;
   onActivateAgent: (tabId: string, leafId: number) => void;
@@ -43,18 +27,6 @@ type Props = {
 const COMPACT_WIDTH = 720;
 
 export function Header({
-  tabs,
-  activeId,
-  onSelect,
-  onNew,
-  onNewBlock,
-  onNewPrivate,
-  onNewPreview,
-  onNewEditor,
-  onNewGitGraph,
-  onClose,
-  onPin,
-  onRename,
   onToggleSidebar,
   onOpenCommandPalette,
   onActivateAgent,
@@ -134,27 +106,7 @@ export function Header({
 
       {IS_MAC && <span className="mr-1 h-full w-px shrink-0 bg-border" />}
 
-      <div
-        className="flex min-w-0 flex-1 items-center gap-2"
-        data-tauri-drag-region
-      >
-        <TabBar
-          tabs={tabs}
-          activeId={activeId}
-          onSelect={onSelect}
-          onNew={onNew}
-          onNewBlock={onNewBlock}
-          onNewPrivate={onNewPrivate}
-          onNewPreview={onNewPreview}
-          onNewEditor={onNewEditor}
-          onNewGitGraph={onNewGitGraph}
-          onClose={onClose}
-          onPin={onPin}
-          onRename={onRename}
-          compact={compact}
-        />
-        <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
-      </div>
+      <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
 
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
 
