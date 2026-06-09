@@ -669,7 +669,15 @@ export default function App() {
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
-      "tab.new": () => addWorkspace(inheritedCwd()),
+      "tab.new": () => {
+        if (!activeWorkspace) return;
+        openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+          id: crypto.randomUUID(),
+          kind: "terminal",
+          cwd: activeWorkspace.cwd,
+        });
+      },
+      "workspace.new": () => addWorkspace(inheritedCwd()),
       "tab.newPrivate": () => addWorkspace(inheritedCwd()),
       "tab.newPreview": () => openPreviewInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
@@ -681,10 +689,14 @@ export default function App() {
         if (idx >= 0 && idx < workspaces.length) setActiveWorkspaceId(workspaces[idx].id);
       },
       "pane.splitRight": () => {
-        if (activeWorkspace) splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "horizontal");
+        if (!activeWorkspace) return;
+        const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "horizontal");
+        openPanel(activeWorkspace.id, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeWorkspace.cwd });
       },
       "pane.splitDown": () => {
-        if (activeWorkspace) splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
+        if (!activeWorkspace) return;
+        const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
+        openPanel(activeWorkspace.id, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeWorkspace.cwd });
       },
       "pane.focusNext": () => {
         if (!activeWorkspace) return;
@@ -732,6 +744,8 @@ export default function App() {
       cycleWorkspace,
       handleCloseActivePanel,
       inheritedCwd,
+      addWorkspace,
+      openPanel,
       openPreviewInPanel,
       splitPane,
       focusPane,
@@ -789,7 +803,15 @@ export default function App() {
             searchTarget,
             explorerRoot,
             home,
-            openNewTab: () => addWorkspace(inheritedCwd()),
+            openNewTab: () => {
+              if (!activeWorkspace) return;
+              openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+                id: crypto.randomUUID(),
+                kind: "terminal",
+                cwd: activeWorkspace.cwd,
+              });
+            },
+            openNewWorkspace: () => addWorkspace(inheritedCwd()),
             openNewBlock: () => addWorkspace(inheritedCwd()),
             openNewPrivate: () => addWorkspace(inheritedCwd()),
             openNewEditor: () => setNewEditorOpen(true),
@@ -798,10 +820,14 @@ export default function App() {
             toggleSourceControl,
             closeActiveTabOrPane: handleCloseActivePanel,
             splitPaneRight: () => {
-              if (activeWorkspace) splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "horizontal");
+              if (!activeWorkspace) return;
+              const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "horizontal");
+              openPanel(activeWorkspace.id, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeWorkspace.cwd });
             },
             splitPaneDown: () => {
-              if (activeWorkspace) splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
+              if (!activeWorkspace) return;
+              const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
+              openPanel(activeWorkspace.id, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeWorkspace.cwd });
             },
             focusSearch: () => searchInlineRef.current?.focus(),
             focusExplorerSearch: () => rightPanelRef.current?.focusExplorer(),
@@ -819,6 +845,7 @@ export default function App() {
       explorerRoot,
       home,
       addWorkspace,
+      openPanel,
       inheritedCwd,
       openPreviewInPanel,
       openGitGraphFromContext,
