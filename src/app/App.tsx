@@ -97,6 +97,8 @@ export default function App() {
     splitPane,
     focusPane,
     setPaneDivider,
+    movePanel,
+    splitPaneAndPlace,
     openPanel,
     activatePanel,
     closePanel,
@@ -955,6 +957,8 @@ export default function App() {
                         });
                       }}
                       onDividerChange={(wsId, splitId, pos) => setPaneDivider(wsId, splitId, pos)}
+                      onMovePanel={movePanel}
+                      onSplitPaneAndPlace={splitPaneAndPlace}
                       callbacks={panelCallbacks}
                     />
                   </div>
