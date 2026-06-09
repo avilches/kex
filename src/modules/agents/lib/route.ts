@@ -29,7 +29,7 @@ export function routeAgentNotification({
   focused,
   visible,
   allowToast,
-  tabId = "",
+  tabId = "", // "" never matches a real UUID — same sentinel semantics as the old numeric 0
   leafId = 0,
   onActivate,
 }: RouteArgs): void {

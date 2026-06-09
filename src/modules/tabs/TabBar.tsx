@@ -135,7 +135,7 @@ export function TabBar({
               const trigger = (
                 <TabsTrigger
                   key={t.id}
-                  value={String(t.id)}
+                  value={t.id}
                   data-tab-id={t.id}
                   onDoubleClick={() => isPreview && onPin(t.id)}
                   onAuxClick={(e) => {

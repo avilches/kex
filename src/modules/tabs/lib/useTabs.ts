@@ -138,12 +138,12 @@ function titleFromUrl(url: string): string {
 }
 
 export function useTabs(initial?: Partial<TerminalTab>) {
-  const initialTabId = crypto.randomUUID();
+  const initialTabIdRef = useRef(crypto.randomUUID());
   const [tabs, setTabs] = useState<Tab[]>(() => {
     const leafId = 2;
     return [
       {
-        id: initialTabId,
+        id: initialTabIdRef.current,
         kind: "terminal",
         title: initial?.title ?? "shell",
         cwd: initial?.cwd,
@@ -152,7 +152,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       },
     ];
   });
-  const [activeId, setActiveId] = useState<string>(initialTabId);
+  const [activeId, setActiveId] = useState<string>(initialTabIdRef.current);
   const nextPaneIdRef = useRef(3); // only for PaneNode IDs (leaves, splits)
   const tabsRef = useRef(tabs);
 
