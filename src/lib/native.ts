@@ -123,6 +123,7 @@ export const native = {
       path,
       workspace: currentWorkspaceEnv(),
     }),
+  openMainWindow: () => invoke<void>("open_main_window"),
   readFile: (path: string) =>
     invoke<ReadResult>("fs_read_file", {
       path,
