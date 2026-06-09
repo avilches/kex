@@ -4,6 +4,8 @@ export { PanelContent, type PanelCallbacks } from "./PanelContent";
 export { PaneView } from "./PaneView";
 export { useWorkspaces, type UseWorkspacesReturn } from "./lib/useWorkspaces";
 export { panelTitle, panelIcon } from "./lib/panelTitle";
+export { SplitNodeView } from "./SplitNodeView";
+export { WorkspaceView } from "./WorkspaceView";
 export {
   allPaneIds,
   allPanes,
