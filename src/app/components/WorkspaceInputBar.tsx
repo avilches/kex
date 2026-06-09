@@ -8,7 +8,7 @@ const ShellInput = lazy(() => import("@/modules/terminal/block/ShellInput"));
 
 type Props = {
   isBlockTab: boolean;
-  activeLeafId: number | null;
+  activeLeafId: string | null;
 };
 
 export function WorkspaceInputBar({ isBlockTab, activeLeafId }: Props) {

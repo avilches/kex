@@ -61,27 +61,35 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
 
   switch (sig.kind) {
     case "started": {
+      // @ts-ignore -- agents updated in Task 6; leafId will be string then
       const info = tabInfo(ctx.tabs, leafId);
       if (!info) return;
+      // @ts-ignore -- agents updated in Task 6; leafId will be string then
       store.start(leafId, info.tabId, sig.agent ?? "agent");
       return;
     }
     case "working":
+      // @ts-ignore -- agents updated in Task 6; leafId will be string then
       store.setStatus(leafId, "working");
       return;
     case "attention": {
+      // @ts-ignore -- agents updated in Task 6; leafId will be string then
       store.setStatus(leafId, "waiting");
+      // @ts-ignore -- agents updated in Task 6; leafId will be string then
       const session = store.sessions[leafId];
       if (session) route(session, "attention", ctx);
       return;
     }
     case "finished": {
+      // @ts-ignore -- agents updated in Task 6; leafId will be string then
       store.setStatus(leafId, "waiting");
+      // @ts-ignore -- agents updated in Task 6; leafId will be string then
       const session = store.sessions[leafId];
       if (session) route(session, "finished", ctx);
       return;
     }
     case "exited":
+      // @ts-ignore -- agents updated in Task 6; leafId will be string then
       store.finish(leafId);
       return;
   }

@@ -80,19 +80,19 @@ type Session = {
   altScreenAtRelease: boolean;
 };
 
-const sessions = new Map<number, Session>();
+const sessions = new Map<string, Session>();
 
 // Block-overlay viewport listeners, keyed by leafId at module scope so the
 // overlay (a child) can subscribe before the parent effect creates the session.
-const blockViewportListeners = new Map<number, Set<() => void>>();
+const blockViewportListeners = new Map<string, Set<() => void>>();
 
-const readyLeaves = new Set<number>();
+const readyLeaves = new Set<string>();
 const readyWaiters = new Map<
-  number,
+  string,
   { resolve: () => void; timer: ReturnType<typeof setTimeout> }[]
 >();
 
-function markSessionReady(leafId: number): void {
+function markSessionReady(leafId: string): void {
   if (readyLeaves.has(leafId)) return;
   readyLeaves.add(leafId);
   const waiters = readyWaiters.get(leafId);
@@ -104,7 +104,7 @@ function markSessionReady(leafId: number): void {
   }
 }
 
-export function whenSessionReady(leafId: number, timeoutMs = 4000): Promise<void> {
+export function whenSessionReady(leafId: string, timeoutMs = 4000): Promise<void> {
   if (readyLeaves.has(leafId)) return Promise.resolve();
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -119,14 +119,14 @@ export function whenSessionReady(leafId: number, timeoutMs = 4000): Promise<void
   });
 }
 
-export function writeToSession(leafId: number, data: string): boolean {
+export function writeToSession(leafId: string, data: string): boolean {
   const s = sessions.get(leafId);
   if (!s || !s.pty) return false;
   void s.pty.write(data);
   return true;
 }
 
-export function submitToLeaf(leafId: number, text: string): void {
+export function submitToLeaf(leafId: string, text: string): void {
   const pty = sessions.get(leafId)?.pty;
   if (!pty) return;
   // Bracketed paste keeps a multiline command atomic; trailing CR runs it.
@@ -134,20 +134,20 @@ export function submitToLeaf(leafId: number, text: string): void {
   else pty.write(`${text}\r`);
 }
 
-export function interruptLeaf(leafId: number): void {
+export function interruptLeaf(leafId: string): void {
   sessions.get(leafId)?.pty?.write("\x03");
 }
 
-export function leafCwd(leafId: number): string | null {
+export function leafCwd(leafId: string): string | null {
   return sessions.get(leafId)?.lastCwd ?? null;
 }
 
-export function getLeafBlockMode(leafId: number): BlockMode {
+export function getLeafBlockMode(leafId: string): BlockMode {
   return sessions.get(leafId)?.blockMode ?? "prompt";
 }
 
 export function subscribeLeafBlockMode(
-  leafId: number,
+  leafId: string,
   cb: () => void,
 ): () => void {
   const s = sessions.get(leafId);
@@ -159,22 +159,22 @@ export function subscribeLeafBlockMode(
 }
 
 export function setLeafInputFocus(
-  leafId: number,
+  leafId: string,
   fn: (() => void) | null,
 ): void {
   const s = sessions.get(leafId);
   if (s) s.inputFocus = fn;
 }
 
-export function focusLeafInput(leafId: number): void {
+export function focusLeafInput(leafId: string): void {
   sessions.get(leafId)?.inputFocus?.();
 }
 
-export function getLeafDraft(leafId: number): string {
+export function getLeafDraft(leafId: string): string {
   return sessions.get(leafId)?.inputDraft ?? "";
 }
 
-export function setLeafDraft(leafId: number, text: string): void {
+export function setLeafDraft(leafId: string, text: string): void {
   const s = sessions.get(leafId);
   if (s) s.inputDraft = text;
 }
@@ -195,7 +195,7 @@ export function clearFocusedTerminal(): boolean {
   return false;
 }
 
-export function leafIdForPty(ptyId: number): number | null {
+export function leafIdForPty(ptyId: number): string | null {
   for (const [leafId, s] of sessions) {
     if (s.pty?.id === ptyId) return leafId;
   }
@@ -243,7 +243,7 @@ configureRendererPool({
 });
 
 function ensureSession(
-  leafId: number,
+  leafId: string,
   initialCwd?: string,
   blocks = false,
 ): Session {
@@ -287,7 +287,7 @@ function ensureSession(
   return session;
 }
 
-function deliverPtyBytes(leafId: number, bytes: Uint8Array): void {
+function deliverPtyBytes(leafId: string, bytes: Uint8Array): void {
   const s = sessions.get(leafId);
   if (!s) return;
   const slot = getSlotForLeaf(leafId);
@@ -296,7 +296,7 @@ function deliverPtyBytes(leafId: number, bytes: Uint8Array): void {
 }
 
 async function openPtyForSession(
-  leafId: number,
+  leafId: string,
   s: Session,
   cwd: string | undefined,
 ): Promise<PtySession> {
@@ -321,7 +321,7 @@ async function openPtyForSession(
   );
 }
 
-function applyBlockMode(leafId: number, mode: BlockMode): void {
+function applyBlockMode(leafId: string, mode: BlockMode): void {
   const s = sessions.get(leafId);
   if (!s) return;
   s.blockMode = mode;
@@ -337,7 +337,7 @@ function applyBlockMode(leafId: number, mode: BlockMode): void {
   for (const l of s.blockListeners) l();
 }
 
-function bindLeafToSlot(leafId: number, s: Session): void {
+function bindLeafToSlot(leafId: string, s: Session): void {
   if (!s.container) return;
   const altScreen = s.altScreenAtRelease;
   s.altScreenAtRelease = false;
@@ -410,7 +410,7 @@ function bindLeafToSlot(leafId: number, s: Session): void {
   }
 }
 
-function unbindLeafFromSlot(leafId: number, s: Session): void {
+function unbindLeafFromSlot(leafId: string, s: Session): void {
   if (!s.hasSlot) return;
   const out = releaseSlot(leafId);
   if (out) {
@@ -423,7 +423,7 @@ function unbindLeafFromSlot(leafId: number, s: Session): void {
 }
 
 function attachSession(
-  leafId: number,
+  leafId: string,
   container: HTMLDivElement,
   callbacks: Callbacks,
 ): void {
@@ -453,7 +453,7 @@ function attachSession(
   }
 }
 
-function detachSession(leafId: number): void {
+function detachSession(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
   unbindLeafFromSlot(leafId, s);
@@ -462,7 +462,7 @@ function detachSession(leafId: number): void {
 }
 
 export async function respawnSession(
-  leafId: number,
+  leafId: string,
   cwd?: string,
 ): Promise<void> {
   const s = sessions.get(leafId);
@@ -500,7 +500,7 @@ export async function respawnSession(
   if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
 }
 
-export async function leafHasForegroundProcess(leafId: number): Promise<boolean> {
+export async function leafHasForegroundProcess(leafId: string): Promise<boolean> {
   const s = sessions.get(leafId);
   if (!s?.pty || s.shellExited) return false;
   try {
@@ -512,7 +512,7 @@ export async function leafHasForegroundProcess(leafId: number): Promise<boolean>
   }
 }
 
-export function disposeSession(leafId: number): void {
+export function disposeSession(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
   s.disposed = true;
@@ -535,7 +535,7 @@ export function disposeSession(leafId: number): void {
 }
 
 type Options = {
-  leafId: number;
+  leafId: string;
   container: React.RefObject<HTMLDivElement | null>;
   visible: boolean;
   focused?: boolean;

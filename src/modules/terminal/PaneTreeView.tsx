@@ -49,8 +49,9 @@ export function PaneTreeView({
         data-pane-leaf={node.id}
         className="relative h-full w-full"
       >
+        {/* @ts-ignore -- PaneTreeView deleted in Task 7; node.id is number, panelId expects string */}
         <TerminalPane
-          leafId={node.id}
+          panelId={String(node.id)}
           visible={tabVisible}
           focused={focused}
           initialCwd={node.cwd}
@@ -60,7 +61,7 @@ export function PaneTreeView({
           onCwd={(_id, cwd) => b.onCwd(cwd)}
           onExit={(_id, code) => b.onExit(code)}
         />
-        <DropOverlay leafId={node.id} />
+        <DropOverlay leafId={String(node.id)} />
       </div>
     );
   }
@@ -88,7 +89,7 @@ export function PaneTreeView({
   );
 }
 
-function DropOverlay({ leafId }: { leafId: number }) {
+function DropOverlay({ leafId }: { leafId: string }) {
   const active = useTerminalDropStore((s) => s.targetLeafId === leafId);
   if (!active) return null;
   return (

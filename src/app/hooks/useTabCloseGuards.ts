@@ -30,6 +30,7 @@ export function useTabCloseGuards({ tabs, disposeTab }: Params) {
       }
       if (t?.kind === "terminal") {
         const leaves = leafIds(t.paneTree);
+        // @ts-ignore -- useTabCloseGuards updated in Task 6; leafId will be string then
         const checks = await Promise.all(leaves.map(leafHasForegroundProcess));
         if (checks.some(Boolean)) {
           setPendingTerminalCloseTab(id);

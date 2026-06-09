@@ -18,24 +18,24 @@ export type TerminalPaneHandle = {
 };
 
 type Props = {
-  /** Stable identifier for this leaf (passed back through callbacks). */
-  leafId: number;
+  /** Stable identifier for this panel (passed back through callbacks). */
+  panelId: string;
   /** Tab containing this pane is on screen. */
   visible: boolean;
-  /** This leaf is the active pane within its tab — receives auto-focus. */
+  /** This panel is the active pane within its tab — receives auto-focus. */
   focused?: boolean;
   initialCwd?: string;
   /** Enable command-block decorations (OSC 133) for this terminal. */
   blocks?: boolean;
-  onSearchReady?: (leafId: number, addon: SearchAddon) => void;
-  onExit?: (leafId: number, code: number) => void;
-  onCwd?: (leafId: number, cwd: string) => void;
+  onSearchReady?: (panelId: string, addon: SearchAddon) => void;
+  onExit?: (panelId: string, code: number) => void;
+  onCwd?: (panelId: string, cwd: string) => void;
 };
 
 export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
   function TerminalPane(
     {
-      leafId,
+      panelId,
       visible,
       focused = true,
       initialCwd,
@@ -51,15 +51,15 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const { resolvedMode, themeId, customThemes } = useTheme();
 
     const session = useTerminalSession({
-      leafId,
+      leafId: panelId,
       container: containerRef,
       visible,
       focused,
       initialCwd,
       blocks,
-      onSearchReady: (a) => onSearchReady?.(leafId, a),
-      onExit: (c) => onExit?.(leafId, c),
-      onCwd: (c) => onCwd?.(leafId, c),
+      onSearchReady: (a) => onSearchReady?.(panelId, a),
+      onExit: (c) => onExit?.(panelId, c),
+      onCwd: (c) => onCwd?.(panelId, c),
     });
 
     useEffect(() => {
@@ -122,7 +122,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
                   Math.abs(e.clientY - downYRef.current) > 4;
                 downYRef.current = null;
                 if (!moved) session.selectBlockAt(e.clientY);
-                if (session.blockMode === "prompt") focusLeafInput(leafId);
+                if (session.blockMode === "prompt") focusLeafInput(panelId);
               }}
               onMouseMove={(e) => {
                 cancelHideHover();

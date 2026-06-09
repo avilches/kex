@@ -21,10 +21,10 @@ const PTY_RESIZE_DEBOUNCE_MS = 256;
 const SNAPSHOT_SCROLLBACK_CAP = 5_000;
 
 export type SlotAdapter = {
-  resolveLeaf(leafId: number): LeafBridge | null;
-  evictLeaf(leafId: number): void;
-  isLeafFocused(leafId: number): boolean;
-  isLeafBlocks(leafId: number): boolean;
+  resolveLeaf(leafId: string): LeafBridge | null;
+  evictLeaf(leafId: string): void;
+  isLeafFocused(leafId: string): boolean;
+  isLeafBlocks(leafId: string): boolean;
 };
 
 export type LeafBridge = {
@@ -46,7 +46,7 @@ export type Slot = {
   readonly host: HTMLDivElement;
   webglAddon: WebglAddon | null;
   webglCanvases: HTMLCanvasElement[];
-  currentLeafId: number | null;
+  currentLeafId: string | null;
   oscDisposers: (() => void)[];
   observer: ResizeObserver | null;
   fitTimer: ReturnType<typeof setTimeout> | null;
@@ -107,7 +107,7 @@ export function poolSize(): number {
 
 export type PoolSlotStat = {
   id: number;
-  leafId: number | null;
+  leafId: string | null;
   cols: number;
   rows: number;
   bufferLines: number;
@@ -129,7 +129,7 @@ export function poolSlotStats(): PoolSlotStat[] {
 
 // Bracketed paste via xterm, so an app that enabled it (Claude Code) treats a
 // dropped path as a real paste while a plain shell gets the literal text.
-export function pasteIntoLeaf(leafId: number, text: string): boolean {
+export function pasteIntoLeaf(leafId: string, text: string): boolean {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return false;
   slot.term.paste(text);
@@ -294,7 +294,7 @@ function createSlot(): Slot {
   return slot;
 }
 
-type PickResult = { slot: Slot; previousLeafId: number | null };
+type PickResult = { slot: Slot; previousLeafId: string | null };
 
 function isAltScreen(s: Slot): boolean {
   try {
@@ -304,7 +304,7 @@ function isAltScreen(s: Slot): boolean {
   }
 }
 
-function pickSlotFor(leafId: number): PickResult {
+function pickSlotFor(leafId: string): PickResult {
   const free = slots.find((s) => s.currentLeafId === null);
   if (free) return { slot: free, previousLeafId: null };
   if (slots.length < POOL_MAX_SIZE)
@@ -335,7 +335,7 @@ function pickSlotFor(leafId: number): PickResult {
 }
 
 export type AcquireParams = {
-  leafId: number;
+  leafId: string;
   container: HTMLDivElement;
   snapshot: string | null;
   // True if the slot was in alt-screen mode (TUI like vim, htop, dofek)
@@ -539,7 +539,7 @@ export type SerializeOutput = {
   altScreen: boolean;
 };
 
-export function releaseSlot(leafId: number): SerializeOutput | null {
+export function releaseSlot(leafId: string): SerializeOutput | null {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return null;
   const out = serializeSlot(slot);
@@ -833,12 +833,12 @@ export function applyTheme(): void {
   }
 }
 
-export function focusSlot(leafId: number): void {
+export function focusSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   slot?.term.focus();
 }
 
-export function setSlotFocused(leafId: number, focused: boolean): void {
+export function setSlotFocused(leafId: string, focused: boolean): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return;
   applyCursorBlinkOnSlot(slot, focused);
@@ -861,21 +861,21 @@ function applyCursorBlinkOnSlot(slot: Slot, focused: boolean): void {
   slot.term.options.cursorBlink = desired;
 }
 
-export function getSlotForLeaf(leafId: number): Slot | null {
+export function getSlotForLeaf(leafId: string): Slot | null {
   return slots.find((s) => s.currentLeafId === leafId) ?? null;
 }
 
-export function isLeafAltScreen(leafId: number): boolean {
+export function isLeafAltScreen(leafId: string): boolean {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   return slot ? isAltScreen(slot) : false;
 }
 
-export function parkLeafSlot(leafId: number): void {
+export function parkLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (slot) disposeSlotWebgl(slot);
 }
 
-export function refreshLeafSlot(leafId: number): void {
+export function refreshLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return;
   if (usePreferencesStore.getState().terminalWebglEnabled && !slot.webglAddon) {
@@ -886,7 +886,7 @@ export function refreshLeafSlot(leafId: number): void {
   } catch {}
 }
 
-export function disposeLeafSlot(leafId: number): void {
+export function disposeLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (slot) disposeSlot(slot);
 }

@@ -6,7 +6,7 @@ import { pasteIntoLeaf } from "./rendererPool";
 
 // Tauri reports the drop point in physical pixels on some platforms and logical
 // on others; only scale down when it overflows the logical viewport.
-function leafIdAt(x: number, y: number): number | null {
+function leafIdAt(x: number, y: number): string | null {
   let lx = x;
   let ly = y;
   if (x > window.innerWidth || y > window.innerHeight) {
@@ -17,8 +17,8 @@ function leafIdAt(x: number, y: number): number | null {
   const el = document.elementFromPoint(lx, ly);
   const leafEl = el?.closest<HTMLElement>("[data-pane-leaf]");
   if (!leafEl) return null;
-  const id = Number(leafEl.dataset.paneLeaf);
-  return Number.isFinite(id) ? id : null;
+  const id = leafEl.dataset.paneLeaf;
+  return id ?? null;
 }
 
 /** Wires native OS file drops into the terminal pane under the cursor: shows a

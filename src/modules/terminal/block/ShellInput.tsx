@@ -19,7 +19,7 @@ import { createShellEditor, type ShellEditorHandle } from "./lib/shellEditor";
 
 type Props = {
   /** Active leaf the bar is driving; the editor retargets to it. */
-  leafId: number;
+  leafId: string;
   mode: BlockMode;
   focused: boolean;
   /** Changes when the active theme changes, so the editor re-themes. */

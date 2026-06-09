@@ -604,6 +604,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       );
       return next;
     });
+    // @ts-ignore -- useTabs replaced in Task 6; leafId will be string then
     for (const lid of toDispose) disposeSession(lid);
   }, []);
 
@@ -768,6 +769,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           : x,
       );
     });
+    // @ts-ignore -- useTabs replaced in Task 6; leafId will be string then
     if (didRemove) disposeSession(leafId);
   }, []);
 
@@ -825,6 +827,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       ];
     });
     setActiveId(tabId);
+    // @ts-ignore -- useTabs replaced in Task 6; leafId will be string then
     for (const lid of toDispose) disposeSession(lid);
   }, []);
 

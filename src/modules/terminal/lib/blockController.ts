@@ -16,7 +16,7 @@ export type BlockController = {
 };
 
 export function useBlockController(
-  leafId: number | null,
+  leafId: string | null,
 ): BlockController | null {
   const [blockMode, setBlockMode] = useState<BlockMode>("prompt");
 
