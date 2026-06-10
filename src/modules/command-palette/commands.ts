@@ -39,6 +39,7 @@ export type CommandPaletteActionContext = {
   explorerRoot: string | null;
   home: string | null;
   openNewTab: () => void;
+  openNewWorkspace: () => void;
   openNewBlock: () => void;
   openNewPrivate: () => void;
   openNewEditor: () => void;
@@ -98,12 +99,21 @@ export function createCommandItems(
     },
     {
       id: "tab.new",
-      title: "New terminal",
+      title: "New terminal tab",
       group: "Tabs",
-      keywords: ["shell", "terminal", "new tab"],
+      keywords: ["shell", "terminal", "new tab", "pane"],
       icon: TerminalIcon,
       shortcutId: "tab.new",
       run: ctx.openNewTab,
+    },
+    {
+      id: "workspace.new",
+      title: "New workspace",
+      group: "Tabs",
+      keywords: ["workspace", "sidebar", "new"],
+      icon: TerminalIcon,
+      shortcutId: "workspace.new",
+      run: ctx.openNewWorkspace,
     },
     {
       id: "tab.newBlock",

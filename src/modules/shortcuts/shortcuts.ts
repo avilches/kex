@@ -26,6 +26,7 @@ export type ShortcutId =
   | "explorer.search"
   | "rightPanel.toggle"
   | "window.new"
+  | "workspace.new"
   | "workspace.prev"
   | "workspace.next"
   | "view.zoomIn"
@@ -82,7 +83,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "tab.new",
-    label: "New tab",
+    label: "New terminal tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
   },
@@ -194,6 +195,12 @@ export const SHORTCUTS: Shortcut[] = [
       { [MOD_PROP]: true, key: "b" },
       { [MOD_PROP]: true, shift: true, key: "b" },
     ],
+  },
+  {
+    id: "workspace.new",
+    label: "New workspace",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, key: "n" }],
   },
   {
     id: "window.new",
