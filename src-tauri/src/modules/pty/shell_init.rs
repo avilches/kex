@@ -48,6 +48,7 @@ fn fish_init_script() -> &'static str {
 }
 
 pub fn build_command(
+    id: u32,
     cwd: Option<String>,
     workspace: WorkspaceEnv,
     blocks: bool,
@@ -55,11 +56,15 @@ pub fn build_command(
     #[cfg(unix)]
     {
         let _ = workspace;
-        unix::build(cwd, blocks)
+        let mut cmd = unix::build(cwd, blocks)?;
+        cmd.env("TERMINAL_ID", id.to_string());
+        Ok(cmd)
     }
     #[cfg(windows)]
     {
-        windows::build(cwd, workspace, blocks)
+        let mut cmd = windows::build(cwd, workspace, blocks)?;
+        cmd.env("TERMINAL_ID", id.to_string());
+        Ok(cmd)
     }
 }
 
