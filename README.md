@@ -2,7 +2,7 @@
   <img src="public/logo.png" width="144" height="144" alt="Terax" />
   <h1>Terax</h1>
 
-  <p><strong>Lightweight Terminal-first AI-native dev workspace.</strong></p>
+  <p><strong>Lightweight terminal-first dev workspace.</strong></p>
 
   <p>
     <img src="https://img.shields.io/github/v/release/crynta/terax-ai?label=version&color=blue" alt="version" />
@@ -21,21 +21,18 @@
 
 ---
 
-Terax is a lightweight open-source terminal (ADE) built on Tauri 2 + Rust and React 19. A native PTY backend with a WebGL renderer, an agentic AI side-panel that runs against your own keys or fully local models, plus a code editor, file explorer, source control with a git graph, and a web preview pane built in. About 7-8 MB on disk. No telemetry. No account.
+Terax is a lightweight open-source terminal emulator built on Tauri 2 + Rust and React 19. Native PTY backend with a WebGL renderer, workspace/pane layout with per-pane tab strips, code editor, file explorer, source control with a git graph, and a web preview pane. About 7-8 MB on disk. No telemetry. No account.
 
 ## Screenshots
 
 <table>
   <tr>
-    <td align="center"><img src="docs/terminal.png" alt="Terminal" /><br/><sub>Multi-tab terminal with WebGL rendering</sub></td>
+    <td align="center"><img src="docs/terminal.png" alt="Terminal" /><br/><sub>Multi-workspace terminal with WebGL rendering</sub></td>
     <td align="center"><img src="docs/themes.png" alt="Themes and background image" /><br/><sub>Custom themes, presets, and background images</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="docs/web-preview.png" alt="Web preview" /><br/><sub>Web preview of local dev servers</sub></td>
     <td align="center"><img src="docs/source-control.png" alt="Source control and git graph" /><br/><sub>Source control panel with git graph in history</sub></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><img src="docs/ai-workflow.png" alt="AI window" /><br/><sub>Agentic AI workflow with edit diffs in the code editor</sub></td>
   </tr>
 </table>
 
@@ -43,17 +40,16 @@ Terax is a lightweight open-source terminal (ADE) built on Tauri 2 + Rust and Re
 
 ### Terminal
 
-- xterm.js with WebGL renderer, multi-tab with background streaming
+- Workspace sidebar + binary split-pane layout with per-pane tab strips
+- xterm.js with WebGL renderer, panels keep streaming in the background when hidden
 - Native PTY backend via `portable-pty` (zsh, bash, pwsh, fish, cmd)
-- Split panels (horizontal and vertical)
+- Split panes (horizontal and vertical); layout persists across restarts
 - Inline search, link detection, true-color
-- Per-tab workspace environments on Windows (Local, or any installed WSL distro)
+- Per-workspace environments on Windows (Local, or any installed WSL distro)
 
 ### Code editor
 
-- CodeMirror 6 (supports all popular languages - TS/JS, Rust, Python, Go, C/C++, Java, HTML/CSS, JSON, Markdown, etc.)
-- Inline AI autocomplete with local model support
-- AI edit diffs, accept or reject hunk by hunk
+- CodeMirror 6 (TS/JS, Rust, Python, Go, C/C++, Java, HTML/CSS, JSON, Markdown, and more)
 - Vim mode
 - Ten built-in editor themes: Atom One, Aura, Copilot, GitHub Dark / Light, Gruvbox Dark, Nord, Tokyo Night, Xcode Dark / Light
 
@@ -68,7 +64,6 @@ Terax is a lightweight open-source terminal (ADE) built on Tauri 2 + Rust and Re
 
 - Catppuccin icon theme
 - Fuzzy search, keyboard navigation, inline rename, context actions
-- Attach files and selections directly to the AI side-panel
 
 ### Web preview
 
@@ -82,14 +77,11 @@ Terax is a lightweight open-source terminal (ADE) built on Tauri 2 + Rust and Re
 - Background images with adjustable opacity and blur
 - Editor theme is independent from the app theme
 
-### AI
+### Coding agent notifications
 
-- **BYOK providers:** OpenAI, Anthropic, Google (Gemini), Groq, xAI (Grok), Cerebras, OpenRouter, DeepSeek, Mistral, plus any OpenAI-compatible endpoint
-- **Local / offline:** LM Studio, MLX, Ollama
-- **Agentic workflow:** plans, sub-agents, project memory via `TERAX.md`, file read / write / edit / multi-edit / grep / glob, bash with approval gating, background processes
-- **Composer:** snippets via `#handle`, files via `@path`, slash commands, voice input, attach-to-agent from explorer or selection
-- **Custom agents** with their own system prompt and tool subset
-- **Plan mode** for multi-step work, generates and confirms before doing
+- Passive detection of Claude Code (and compatible agents) running in terminal tabs via OSC sequences
+- Notification bell in the header shows agent status: working / needs attention / done
+- OS notifications when the window is not focused; in-app toasts when it is
 
 ## Install
 
@@ -105,12 +97,6 @@ Latest installers are on the [Releases](https://github.com/crynta/terax-ai/relea
 
 - **Arch / AUR:** `yay -S terax-bin` (or `paru`, etc.). Tracks the latest release.
 - **AppImage:** needs FUSE. Without it: `./Terax_*.AppImage --appimage-extract-and-run`. On Wayland with rendering glitches, try `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Otherwise the `.deb` / `.rpm` packages link against the system GTK stack and tend to be smoother.
-
-## Configure AI
-
-1. Open **Settings -> AI**.
-2. Pick a provider and paste your API key. For local inference, point Terax at your LM Studio / MLX / Ollama endpoint.
-3. Keys are written to the OS keychain via `keyring`. They never touch disk or localStorage.
 
 ## Build from source
 
@@ -128,14 +114,16 @@ pnpm tauri build        # production bundle
 
 **Checks**
 ```bash
-pnpm exec tsc --noEmit                                            # frontend type-check
-cd src-tauri && cargo clippy --all-targets --locked -D warnings   # Rust lint (matches CI)
-cd src-tauri && cargo test --locked                               # Rust tests
+pnpm lint
+pnpm check-types
+pnpm test
+cd src-tauri && cargo clippy --all-targets --locked -D warnings
+cd src-tauri && cargo test --locked
 ```
 
 ## Tech stack
 
-Tauri 2, Rust, `portable-pty`, React 19, TypeScript, Vite, xterm.js, CodeMirror 6, Vercel AI SDK v6, Tailwind v4, shadcn/ui, Zustand.
+Tauri 2, Rust, `portable-pty`, React 19, TypeScript, Vite, xterm.js, CodeMirror 6, Tailwind v4, shadcn/ui, Zustand.
 
 ## Contributing
 
