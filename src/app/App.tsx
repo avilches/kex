@@ -39,6 +39,7 @@ import { StatusBar } from "@/modules/statusbar";
 import {
   clearFocusedTerminal,
   disposeSession,
+  terminalDebugStats,
   type TerminalPaneHandle,
   useTerminalFileDrop,
   writeToSession,
@@ -146,6 +147,51 @@ export default function App() {
   useEffect(() => {
     const activeIdx = workspaces.findIndex((w) => w.id === activeWorkspaceId);
     saveWorkspaceState(workspaces, activeIdx);
+  }, [workspaces, activeWorkspaceId]);
+
+  useEffect(() => {
+    const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
+    if (!ws) return;
+    const pane = findPane(ws.paneTree, ws.activePaneId);
+    if (!pane?.activePanelId) return;
+    const panelId = pane.activePanelId;
+    const raf = requestAnimationFrame(() => {
+      terminalHandles.current.get(panelId)?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Debug logging ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    console.group(`[terax:state] ${workspaces.length} workspace(s)`);
+    for (const ws of workspaces) {
+      const isActive = ws.id === activeWorkspaceId;
+      const panes = allPanes(ws.paneTree);
+      console.group(`${isActive ? "▶" : " "} ws=${ws.id.slice(-8)} "${ws.title}" activePaneId=…${ws.activePaneId.slice(-8)}`);
+      for (const pane of panes) {
+        const isActivePane = pane.id === ws.activePaneId;
+        console.group(`${isActivePane ? "▶" : " "} pane=${pane.id.slice(-8)} activePanelId=…${(pane.activePanelId ?? "null").slice(-8)}`);
+        for (const panel of pane.panels) {
+          const isActivePanel = panel.id === pane.activePanelId;
+          let extra = "";
+          if (panel.kind === "terminal") extra = ` cwd=${panel.cwd ?? "?"}`;
+          else if (panel.kind === "editor") extra = ` path=${panel.path}`;
+          else if (panel.kind === "preview") extra = ` url=${panel.url}`;
+          console.log(`  ${isActivePanel ? "▶" : " "} [${panel.kind}] panel=${panel.id.slice(-8)}${extra}`);
+        }
+        console.groupEnd();
+      }
+      console.groupEnd();
+    }
+    const dbg = terminalDebugStats();
+    console.group(`[terax:pool] sessions=${dbg.sessionCount} slots=${dbg.slots.length} webgl=${dbg.webglContexts} idle=${dbg.idleSlots}`);
+    for (const s of dbg.sessions) {
+      const slot = dbg.slots.find((sl) => sl.leafId === s.leafId);
+      console.log(`  session=…${s.leafId.slice(-8)} visible=${s.visible} hasSlot=${s.hasSlot} pty=${s.pty} exited=${s.shellExited}${slot ? ` [slot${slot.id}${slot.webgl ? " webgl" : ""}]` : ""}`);
+    }
+    console.groupEnd();
+    console.groupEnd();
   }, [workspaces, activeWorkspaceId]);
 
   const rightPanelRef = useRef<RightPanelHandle>(null);
