@@ -76,7 +76,7 @@ There are two separate WebView windows: the main window (`index.html`) and the s
 
 ### 3.1 Terminal
 
-**Multi-tab terminal with background streaming.** Tabs are never unmounted when you switch between them — each PTY keeps receiving output in the background. Switching to a tab that has been running a command shows you the complete, up-to-date buffer instantly.
+**Workspace/Pane/Panel model.** The center area uses a three-level hierarchy: Workspaces (listed in a 52px vertical sidebar on the left) contain a binary pane tree; each pane holds a tab strip of panels. Panels are never unmounted when you switch between them — each PTY keeps receiving output in the background. Switching to a panel that has been running a command shows you the complete, up-to-date buffer instantly.
 
 **Native PTY via `portable-pty`.** Not a wrapper around `script` or `expect`. Terax spawns a real pseudo-terminal, so TUI apps (vim, htop, tmux, lazygit, etc.) work correctly, including mouse input and true color.
 
@@ -87,7 +87,7 @@ There are two separate WebView windows: the main window (`index.html`) and the s
 
 Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), PowerShell 5.1 (full), cmd.exe (no integration — basic terminal only).
 
-**Split panes.** Terminals can be split horizontally and vertically within a tab. Each pane is an independent PTY.
+**Split panes.** Terminals can be split horizontally and vertically within a pane. Each panel is an independent PTY. Splitting a pane creates a second pane alongside it; each pane has its own panel tab strip.
 
 **Inline search.** `Cmd+F` / `Ctrl+F` opens an inline search bar that searches the xterm.js buffer. Matches are highlighted in the viewport and you can jump between them.
 
@@ -181,13 +181,13 @@ Sections: General, Themes, Shortcuts, About.
 
 ## 4. Technical decisions with user-visible effects
 
-### 4.1 Tabs are never unmounted
+### 4.1 Panels are never unmounted
 
-When you switch tabs, the outgoing tab is hidden with `invisible pointer-events-none` CSS classes. It is never unmounted from the React tree. This means:
+When you switch panels or panes, the outgoing panel is hidden with CSS classes. It is never unmounted from the React tree. This means:
 
-- PTY sessions keep streaming in the background. A running `npm run dev` in tab 2 continues while you are editing a file in tab 1.
-- Tab state (scroll position, xterm buffer, editor content, unsaved changes) is preserved exactly as you left it.
-- Memory usage is proportional to the number of open tabs, not just the visible one. Each tab holds a live xterm instance, and any mounted editor holds CodeMirror state. There is no "sleep" mechanism for idle tabs.
+- PTY sessions keep streaming in the background. A running `npm run dev` in one panel continues while you work in another.
+- Panel state (scroll position, xterm buffer, editor content, unsaved changes) is preserved exactly as you left it.
+- Memory usage is proportional to the total number of open panels across all workspaces and panes. Each terminal panel holds a live xterm instance; each editor panel holds CodeMirror state. There is no sleep mechanism for idle panels.
 
 ### 4.2 Workspace authorization
 
@@ -307,7 +307,7 @@ All modules live under `src/modules/`. Each is self-contained, exports a thin ba
 src/
 ├── app/
 │   ├── App.tsx                    — Root coordinator, wires all modules
-│   ├── components/                — WorkspaceSurface, WorkspaceInputBar, OsIcon…
+│   ├── components/                — WorkspaceSidebar, RightPanel, WorkspaceInputBar, OsIcon…
 │   └── hooks/                     — useTabCloseGuards, useWorkspaceSwitcher
 ├── components/
 │   └── ui/                        — shadcn primitives (do not hand-edit)
@@ -328,8 +328,9 @@ src/
     ├── git-history/               — Commit graph, per-file diffs
     ├── header/                    — Top bar, inline search
     ├── statusbar/                 — CWD breadcrumb, workspace env selector
-    ├── sidebar/                   — Activity bar, collapsible side panels
-    ├── tabs/                      — useTabs (source of truth), TabBar, useWorkspaceCwd
+    ├── workspaces/                — Workspace/Pane/Panel model; useWorkspaces (source of truth),
+    │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/PanelContent
+    ├── sidebar/                   — SidebarViewId type (residual; side panels moved to RightPanel)
     ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image
     ├── settings/                  — Settings store, preferences, window opener
@@ -340,11 +341,11 @@ src/
     └── command-palette/           — Fuzzy command/file/search palette
 ```
 
-### Tab kinds (tagged union)
+### Panel kinds (tagged union)
 
 `terminal` | `editor` | `preview` | `markdown` | `git-diff` | `git-history` | `git-commit-file`
 
-All tab kinds follow the same never-unmount rule.
+All panel kinds follow the same never-unmount rule. Panels live inside panes; panes are nodes of a binary split tree inside a workspace. The workspace sidebar (left, 52px) lists workspaces; the right panel holds Explorer, Source Control, and Git History.
 
 ### `src/lib/native.ts`
 
