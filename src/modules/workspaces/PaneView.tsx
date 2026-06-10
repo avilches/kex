@@ -11,6 +11,7 @@ type Props = {
   workspaceId: string;
   workspaceCwd?: string;
   focused: boolean;
+  isWorkspaceActive: boolean;
   onActivatePanel: (workspaceId: string, panelId: string) => void;
   onClosePanel: (workspaceId: string, panelId: string) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
@@ -26,7 +27,9 @@ function DropZone({ id, className }: { id: string; className: string }) {
       className={cn(
         "absolute transition-colors",
         className,
-        isOver ? "bg-primary/25 ring-1 ring-inset ring-primary/60" : "bg-transparent",
+        isOver
+          ? "bg-primary/25 ring-2 ring-inset ring-primary/60"
+          : "bg-primary/5 ring-1 ring-inset ring-border/40",
       )}
     />
   );
@@ -37,6 +40,7 @@ export function PaneView({
   workspaceId,
   workspaceCwd: _workspaceCwd,
   focused,
+  isWorkspaceActive,
   onActivatePanel,
   onClosePanel,
   onFocusPane,
@@ -57,13 +61,14 @@ export function PaneView({
 
   return (
     <div
-      className="relative flex h-full flex-col"
+      className="relative flex h-full flex-col overflow-hidden"
       onMouseDownCapture={handleFocus}
       onFocus={handleFocus}
     >
       <PaneTabBar
         panels={pane.panels}
         activePanelId={pane.activePanelId}
+        paneFocused={focused}
         onActivate={(panelId) => onActivatePanel(workspaceId, panelId)}
         onClose={(panelId) => onClosePanel(workspaceId, panelId)}
         onNewTerminal={() => onNewTerminal(workspaceId, pane.id)}
@@ -91,8 +96,8 @@ export function PaneView({
           </div>
         )}
 
-        {/* 5-zone drop overlay — only visible during an active panel drag */}
-        {isDragging && (
+        {/* 5-zone drop overlay — only register/show for the active workspace */}
+        {isDragging && isWorkspaceActive && (
           <div className="pointer-events-none absolute inset-0 z-40">
             <DropZone
               id={`zone:${pane.id}:top`}
