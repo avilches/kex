@@ -38,7 +38,7 @@ function DraggableTab({
       {...attributes}
       {...listeners}
       className={cn(
-        "group relative flex h-5 min-w-[100px] max-w-[200px] shrink-0 cursor-grab active:cursor-grabbing select-none items-center gap-1 rounded px-1.5 text-[11px] transition-colors",
+        "group relative flex h-5 min-w-[100px] max-w-[200px] shrink-0 cursor-grab active:cursor-grabbing select-none items-center gap-1 rounded px-1.5 text-[12px] transition-colors",
         active
           ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
