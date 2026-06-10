@@ -19,19 +19,31 @@ type Props = {
   callbacks: PanelCallbacks;
 };
 
-function DropZone({ id, className }: { id: string; className: string }) {
+function DropZone({
+  id,
+  hitClassName,
+  visualClassName,
+}: {
+  id: string;
+  hitClassName: string;
+  visualClassName: string;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        "absolute transition-colors",
-        className,
-        isOver
-          ? "bg-primary/25 ring-2 ring-inset ring-primary/60"
-          : "bg-primary/5 ring-1 ring-inset ring-border/40",
+    <>
+      <div
+        ref={setNodeRef}
+        className={cn("absolute cursor-grabbing", hitClassName)}
+      />
+      {isOver && (
+        <div
+          className={cn(
+            "pointer-events-none absolute bg-primary/25 ring-2 ring-inset ring-primary/60",
+            visualClassName,
+          )}
+        />
       )}
-    />
+    </>
   );
 }
 
@@ -102,23 +114,28 @@ export function PaneView({
           <div className="pointer-events-none absolute inset-0 z-40">
             <DropZone
               id={`zone:${pane.id}:top`}
-              className="pointer-events-auto left-0 right-0 top-0 h-1/4"
+              hitClassName="pointer-events-auto left-0 right-0 top-0 h-1/4"
+              visualClassName="left-0 right-0 top-0 h-1/2"
             />
             <DropZone
               id={`zone:${pane.id}:bottom`}
-              className="pointer-events-auto bottom-0 left-0 right-0 h-1/4"
+              hitClassName="pointer-events-auto bottom-0 left-0 right-0 h-1/4"
+              visualClassName="bottom-0 left-0 right-0 h-1/2"
             />
             <DropZone
               id={`zone:${pane.id}:left`}
-              className="pointer-events-auto bottom-1/4 left-0 top-1/4 w-1/4"
+              hitClassName="pointer-events-auto bottom-1/4 left-0 top-1/4 w-1/4"
+              visualClassName="bottom-0 left-0 top-0 w-1/2"
             />
             <DropZone
               id={`zone:${pane.id}:right`}
-              className="pointer-events-auto bottom-1/4 right-0 top-1/4 w-1/4"
+              hitClassName="pointer-events-auto bottom-1/4 right-0 top-1/4 w-1/4"
+              visualClassName="bottom-0 right-0 top-0 w-1/2"
             />
             <DropZone
               id={`zone:${pane.id}:center`}
-              className="pointer-events-auto bottom-1/4 left-1/4 right-1/4 top-1/4"
+              hitClassName="pointer-events-auto bottom-1/4 left-1/4 right-1/4 top-1/4"
+              visualClassName="inset-0 rounded-md"
             />
           </div>
         )}
