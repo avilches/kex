@@ -2,7 +2,7 @@
 
 Terax is a lightweight, open-source terminal emulator. ~7-8 MB on disk. No telemetry. No account.
 
-This document is the canonical reference for understanding how Terax works — both technically and from the user's perspective. It covers architecture, feature semantics, known limitations, and technical decisions that have observable effects on usage. Read `TERAX.md` before contributing; that file contains the living coding conventions.
+This document is the canonical reference for understanding how Terax works — both technically and from the user's perspective. It covers architecture, feature semantics, known limitations, and technical decisions that have observable effects on usage.
 
 ---
 
@@ -15,10 +15,9 @@ This document is the canonical reference for understanding how Terax works — b
 5. [Known limitations](#5-known-limitations)
 6. [Technology stack](#6-technology-stack)
 7. [Frontend module map](#7-frontend-module-map)
-8. [Backend IPC surface (Rust)](#8-backend-ipc-surface-rust)
-9. [Terminal agent notifications](#9-terminal-agent-notifications)
-10. [Security model](#10-security-model)
-11. [Build and packaging](#11-build-and-packaging)
+8. [Security model](#8-security-model)
+
+See also: [IPC.md](IPC.md) — Tauri command surface and agent notification protocol · [BUILD.md](BUILD.md) — build, packaging, and release
 
 ---
 
@@ -213,7 +212,7 @@ Terax's shell integration emits and parses OSC 7 (cwd) and OSC 133 (prompt/comma
 
 ### 4.6 Forward-slash canonical paths
 
-The frontend stores all paths in forward-slash form. OSC 7 on Windows emits `/C:/Users/foo`; Terax normalizes it to `C:/Users/foo` at parse time. `homeDir()` on Windows returns backslashes; `App.tsx` converts at the boundary. Any code consuming a path that might originate from the OS must normalize separators with `.split(/[\\/]/)`. This is documented in `TERAX.md` and enforced in code review.
+The frontend stores all paths in forward-slash form. OSC 7 on Windows emits `/C:/Users/foo`; Terax normalizes it to `C:/Users/foo` at parse time. `homeDir()` on Windows returns backslashes; `App.tsx` converts at the boundary. Any code consuming a path that might originate from the OS must normalize separators with `.split(/[\\/]/)`. This is documented in `AGENTS.md` and enforced in code review.
 
 The reason: consistent string equality for path comparison (e.g., preventing the file explorer from flashing when `tab.cwd` arrives). Using two representations and forgetting to normalize in one place causes subtle bugs.
 
@@ -353,136 +352,7 @@ Contains typed wrappers for all Tauri `invoke()` calls (`native.readFile`, `nati
 
 ---
 
-## 8. Backend IPC surface (Rust)
-
-All commands registered in `src-tauri/src/lib.rs` via `tauri::generate_handler![]`.
-
-### `pty::*` — PTY sessions
-State: `PtyState = RwLock<HashMap<id, Session>>`
-
-| Command | Description |
-|---|---|
-| `pty_open` | Spawn a new PTY session, returns a Tauri `Channel<PtyEvent>` for streaming output |
-| `pty_write` | Write bytes to a PTY (keyboard input) |
-| `pty_resize` | Resize PTY (columns / rows) |
-| `pty_close` | Close PTY and kill the shell process |
-| `pty_close_all` | Close all PTYs (used on app exit) |
-| `pty_has_foreground_process` | Whether a process other than the shell itself is in the foreground |
-| `pty_shell_name` | Detected shell name for the PTY session |
-
-The shell integration scripts (`scripts/`) are injected at spawn time. Platform detection happens in `pty/shell_init.rs` with `#[cfg(unix)]` / `#[cfg(windows)]` split.
-
-### `fs::*` — Filesystem
-| Command | Description |
-|---|---|
-| `fs_read_dir` | Directory listing (one level) |
-| `list_subdirs` | List only subdirectories (for the explorer tree) |
-| `fs_read_file` | Read file contents as UTF-8 string |
-| `fs_write_file` | Write file contents |
-| `fs_stat` | File metadata (size, mtime, is_dir) |
-| `fs_canonicalize` | Resolve symlinks and normalize path |
-| `fs_create_file` | Create a new file |
-| `fs_create_dir` | Create a new directory (recursive) |
-| `fs_rename` | Rename or move a file/directory |
-| `fs_delete` | Delete a file or directory |
-| `fs_watch_add` | Start watching a path for changes (emits Tauri events) |
-| `fs_watch_remove` | Stop watching a path |
-| `fs_search` | Fuzzy file name search via `nucleo-matcher` + `ignore` |
-| `fs_list_files` | List all files in a tree (respects `.gitignore`) |
-| `fs_grep` | Content search via `grep-*` crates |
-| `fs_grep_interactive` | Streaming grep for command palette content search |
-| `fs_glob` | Glob pattern matching |
-
-### `git::*` — Source control
-All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subprocess (not via `git2`).
-
-| Command | Description |
-|---|---|
-| `git_resolve_repo` | Find the git repo root for a given path |
-| `git_panel_snapshot` | Fast status snapshot for the source control panel |
-| `git_status` | Full porcelain status |
-| `git_diff` | Diff of staged or unstaged changes |
-| `git_diff_content` | Full diff content for a specific file |
-| `git_stage` / `git_unstage` | Stage/unstage a file |
-| `git_discard` | Discard unstaged changes for a file |
-| `git_commit` | Create a commit |
-| `git_fetch` | Fetch from remote |
-| `git_pull_ff_only` | Fast-forward pull |
-| `git_push` | Push to remote |
-| `git_log` | Commit history (used by git history pane) |
-| `git_show_commit` | Commit details and changed files |
-| `git_commit_files` | Files changed in a specific commit |
-| `git_commit_file_diff` | Diff of a specific file in a specific commit |
-| `git_remote_url` | Remote URL for the repo (used for remote links) |
-
-### `shell::*` — Command execution
-| Command | Description |
-|---|---|
-| `shell_run_command` | One-shot subshell exec. Unix: `$SHELL -lc`. Windows: `pwsh -NoProfile -Command` |
-| `shell_session_open` | Open a persistent named shell session (state across calls) |
-| `shell_session_run` | Run a command in an open session and return combined output |
-| `shell_session_close` | Close a persistent session |
-| `shell_bg_spawn` | Spawn a background process (dev server etc.), returns a handle |
-| `shell_bg_logs` | Read recent output from a background process's ring buffer |
-| `shell_bg_kill` | Kill a background process |
-| `shell_bg_list` | List all running background processes |
-
-### `workspace::*`
-| Command | Description |
-|---|---|
-| `workspace_authorize` | Grant access to a directory for git/shell operations |
-| `workspace_current_dir` | Query the authorized current directory |
-| `wsl_list_distros` | List installed WSL distributions (Windows only) |
-| `wsl_default_distro` | Get the default WSL distro |
-| `wsl_home` | Get the home directory of a WSL distro |
-
-### `history::*` — Shell history
-| Command | Description |
-|---|---|
-| `history_suggest` | Fuzzy-match a prefix against shell history |
-| `history_record` | Record a command execution to history |
-| `history_list` | Return recent history entries |
-| `history_commands` | Return all history entries |
-
-### Misc
-| Command | Description |
-|---|---|
-| `open_settings_window` | Open (or focus) the Settings window, optionally deep-linking a tab |
-| `get_launch_dir` | Return the CLI launch directory (drained on first call) |
-| `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks |
-| `agent_claude_hooks_status` | Query whether hooks are installed |
-
----
-
-## 9. Terminal agent notifications
-
-Terax passively monitors terminal tabs for coding agents (Claude Code, Codex, etc.) using OSC sequences. No configuration is required — the detection arms itself automatically once a compatible agent is detected.
-
-### How it works
-
-1. Claude Code (or a compatible agent) installs Terax hooks via `agent_enable_claude_hooks`. These hooks emit an `OSC 777` marker through the hook's `terminalSequence` field (hooks lost `/dev/tty` access in Claude Code v2.1.139).
-2. The OSC 777 marker self-arms `agent_detect.rs` in the PTY byte reader. The detector tracks the agent's state via subsequent OSC sequences.
-3. OSC 133;C (command prompt shown) arms the detector. Subsequent hook events transition the state machine: `started` / `working` / `attention` (needs user input) / `finished` / `exited`.
-4. The frontend `AgentNotificationsBridge.tsx` maps these state transitions to the notification router (`lib/route.ts`):
-   - Tab is focused and visible: suppress (user is already watching)
-   - Window is not focused: send an OS notification
-   - Window is focused but the tab is hidden: show a Sonner toast
-5. The `NotificationBell` in the header aggregates status across all active terminal agent sessions.
-
-### Zero cost when idle
-
-The detection logic runs entirely on the PTY byte filter. When no agent is running, no extra work is done. There are no polling timers or background requests.
-
-### Installing hooks
-
-Hooks can be installed from within the app (the notification bell popover shows a "Set up Claude Code" prompt if hooks are not yet installed). They can also be installed manually via the Tauri command `agent_enable_claude_hooks`, which is what the in-app prompt calls. The installer:
-- Reads the existing Claude Code `settings.json` atomically
-- Injects the `terax:agent-signal` hook entries without overwriting unrelated settings
-- Is idempotent — re-running it on an already-configured installation is safe
-
----
-
-## 10. Security model
+## 8. Security model
 
 **IPC boundary.** The WebView cannot access the filesystem, spawn processes, or make outbound HTTP requests directly. Every OS operation is an explicit `invoke()` call to a named Tauri command. The `capabilities/default.json` file is the allowlist — only commands listed there are available to the webview.
 
@@ -491,59 +361,3 @@ Hooks can be installed from within the app (the notification bell popover shows 
 **CSP.** The WebView has a strict Content Security Policy (see `tauri.conf.json`). `connect-src` allows `self`, Tauri IPC, and `https:` plus `http://localhost:*` (for local dev servers). `script-src` allows `wasm-unsafe-eval` (required for xterm.js WebGL). No `unsafe-eval`.
 
 **OSC trust.** Terax only processes OSC 7 and OSC 133 sequences from shell integration scripts. There is no OSC-based execution primitive (unlike iTerm2's proprietary sequences). The risk is cwd spoofing from maliciously crafted output, not code execution.
-
----
-
-## 11. Build and packaging
-
-### Development
-```bash
-pnpm install
-pnpm tauri dev         # frontend (Vite, port 1420) + Rust (cargo run)
-pnpm dev               # frontend only (no Rust)
-```
-
-### Quality checks
-```bash
-pnpm lint              # biome lint ./src
-pnpm check-types       # tsc --noEmit
-pnpm test              # vitest run
-cd src-tauri && cargo clippy --all-targets -- -D warnings
-cd src-tauri && cargo test
-```
-
-### Production build
-```bash
-pnpm tauri build
-```
-
-Artifacts land in `src-tauri/target/release/bundle/`.
-
-### Bundle chunk strategy (vite.config.ts)
-
-Manual `manualChunks` splits the bundle to keep the initial load fast:
-- `react` — React, ReactDOM, scheduler, clsx, tailwind-merge, cva, Vite preload helper
-- `radix` — all Radix UI primitives
-- `xterm` — xterm.js and addons
-- `codemirror` — CodeMirror core, themes, vim
-- `cm-lang-<name>` — each CodeMirror language pack (loaded on demand by `languageResolver.ts`)
-- `cm-legacy-<name>` — each legacy mode
-- `streamdown` — markdown streaming renderer
-
-### Rust release profile
-`codegen-units=1`, `lto=fat`, `opt-level=s` (size-optimized), `panic=abort`, `strip=true`. Result: ~7-8 MB binary.
-
-### Platform targets
-
-| Platform | Format | Notes |
-|---|---|---|
-| macOS | `.dmg` + `.app` | `minimumSystemVersion: 13.0`, `titleBarStyle: Overlay`, entitlements.plist |
-| Linux | `.deb`, `.rpm`, `.AppImage` | deb/rpm link against system webkit2gtk; AppImage bundles media framework |
-| Windows | NSIS `.exe` | `currentUser` mode (no admin required), WebView2 via `downloadBootstrapper` |
-| Arch Linux | AUR `terax-bin` | Tracks latest release |
-
-### Auto-updater
-
-Update manifest endpoint: `https://github.com/crynta/terax-ai/releases/latest/download/latest.json`
-
-Updates are signed with a minisign key. The public key is embedded in `tauri.conf.json`. The updater verifies the signature before applying an update.

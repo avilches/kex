@@ -125,9 +125,15 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 
 Two files must stay in sync with the codebase at all times. Update them in the same commit as the code change, never as a follow-up.
 
-### `docs/ARCHITECTURE.md`
+### `docs/ARCHITECTURE.md` · `docs/IPC.md` · `docs/BUILD.md`
 
-The canonical reference for how Terax works: module map, IPC surface, data model, technical decisions with user-visible effects, known limitations. Read it before touching any subsystem you have not fully explored. Update it whenever:
+Three complementary files — read the one that matches your task:
+
+- **`docs/ARCHITECTURE.md`** — design overview, Workspace/Pane/Panel model, technical decisions with user-visible effects, known limitations, tech stack, frontend module map, security model. Read this first whenever you touch any subsystem.
+- **`docs/IPC.md`** — full Tauri command surface (`pty::*`, `fs::*`, `git::*`, `shell::*`, `workspace::*`, `history::*`, misc) and the terminal agent notification protocol. Consult when adding, removing, or modifying Tauri commands.
+- **`docs/BUILD.md`** — dev setup, quality checks, production build, bundle strategy, platform targets, auto-updater. Consult when touching CI, packaging, or the Vite/Cargo build config.
+
+Update the relevant file(s) whenever:
 
 - A module is added, removed, or significantly restructured.
 - The Workspace/Pane/Panel data model changes.
