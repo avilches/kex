@@ -5,13 +5,9 @@
     "windows",
     "linux"
   ],
-  "windows": [
-    "main",
-    "settings"
-  ],
+  "windows": [],
   "permissions": [
     "autostart:default",
-    "window-state:default",
     "updater:default",
     "process:default"
   ]
