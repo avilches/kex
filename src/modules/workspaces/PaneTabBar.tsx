@@ -2,6 +2,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel } from "./lib/types";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 type Props = {
   panels: Panel[];
@@ -31,6 +32,8 @@ function DraggableTab({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: panel.id });
   const active = panel.id === activePanelId;
   const title = panelTitle(panel);
+  const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
+  const connected = tabBarStyle === "connected";
 
   return (
     <div
@@ -38,16 +41,26 @@ function DraggableTab({
       {...attributes}
       {...listeners}
       className={cn(
-        "group relative flex h-5 min-w-[100px] max-w-[200px] shrink-0 cursor-grab active:cursor-grabbing select-none items-center gap-1 rounded px-1.5 text-[11px] transition-colors",
-        active
-          ? "bg-muted text-foreground"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+        "group relative flex min-w-[100px] max-w-[200px] shrink-0 cursor-grab active:cursor-grabbing select-none items-center gap-1 px-1.5 text-[11px] transition-colors",
+        connected
+          ? [
+              "self-stretch border-r border-border/30",
+              active
+                ? "bg-background text-foreground"
+                : "border-b border-border/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            ]
+          : [
+              "h-5 rounded",
+              active
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            ],
         isDragging && "opacity-40",
       )}
       onClick={() => onActivate(panel.id)}
     >
       {active && paneFocused && (
-        <div className="absolute inset-x-0 top-0 h-0.5 rounded-t bg-primary" />
+        <div className={cn("absolute inset-x-0 top-0 bg-primary", connected ? "h-[1.5px]" : "h-0.5 rounded-t")} />
       )}
       <span className="shrink-0 opacity-70">{panelIcon(panel, workspaceId)}</span>
       <span
@@ -76,8 +89,14 @@ function DraggableTab({
 }
 
 export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, onActivate, onClose, onNewTerminal }: Props) {
+  const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   return (
-    <div className="flex h-7 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border/60 bg-card/60 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className={cn(
+      "flex h-7 shrink-0 items-center overflow-x-auto bg-card/60 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+      tabBarStyle === "connected"
+        ? "gap-0 border-t border-border/60"
+        : "gap-0.5 border-b border-border/60 px-1",
+    )}>
       {panels.map((p) => (
         <DraggableTab
           key={p.id}

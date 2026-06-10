@@ -4,6 +4,8 @@ import { LazyStore } from "@tauri-apps/plugin-store";
 
 export type ThemePref = "system" | "light" | "dark";
 
+export type TabBarStyle = "connected" | "pill";
+
 export const DEFAULT_THEME_ID = "terax-default";
 
 export type BackgroundKind = "none" | "image";
@@ -64,6 +66,7 @@ export type Preferences = {
   rightPanelWidth: number;
   rightPanelActiveTab: "explorer" | "git" | "history";
   rightPanelSide: "left" | "right";
+  tabBarStyle: TabBarStyle;
 };
 
 const STORE_PATH = "terax-settings.json";
@@ -95,6 +98,7 @@ const KEY_RIGHT_PANEL_OPEN = "rightPanelOpen";
 const KEY_RIGHT_PANEL_WIDTH = "rightPanelWidth";
 const KEY_RIGHT_PANEL_ACTIVE_TAB = "rightPanelActiveTab";
 const KEY_RIGHT_PANEL_SIDE = "rightPanelSide";
+const KEY_TAB_BAR_STYLE = "tabBarStyle";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -139,6 +143,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   rightPanelWidth: 240,
   rightPanelActiveTab: "explorer",
   rightPanelSide: "right",
+  tabBarStyle: "connected",
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -234,6 +239,10 @@ export async function loadPreferences(): Promise<Preferences> {
     rightPanelSide: (() => {
       const v = get<string>(KEY_RIGHT_PANEL_SIDE);
       return v === "left" || v === "right" ? v : DEFAULT_PREFERENCES.rightPanelSide;
+    })(),
+    tabBarStyle: (() => {
+      const v = get<string>(KEY_TAB_BAR_STYLE);
+      return v === "connected" || v === "pill" ? v : DEFAULT_PREFERENCES.tabBarStyle;
     })(),
   };
 }
@@ -389,6 +398,10 @@ export async function setRightPanelSide(value: "left" | "right"): Promise<void> 
   await writePref(KEY_RIGHT_PANEL_SIDE, value);
 }
 
+export async function setTabBarStyle(value: TabBarStyle): Promise<void> {
+  await writePref(KEY_TAB_BAR_STYLE, value);
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -423,6 +436,7 @@ export async function onPreferencesChange(
     [KEY_RIGHT_PANEL_WIDTH]: "rightPanelWidth",
     [KEY_RIGHT_PANEL_ACTIVE_TAB]: "rightPanelActiveTab",
     [KEY_RIGHT_PANEL_SIDE]: "rightPanelSide",
+    [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   };
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref().
