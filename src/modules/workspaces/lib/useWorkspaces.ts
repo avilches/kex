@@ -35,15 +35,14 @@ function newWorkspace(cwd?: string): Workspace {
   };
 }
 
-export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: { cwd?: string }[]; initialActiveIndex?: number }) {
+export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Workspace[]; initialActiveIndex?: number }) {
   // Pre-compute stable initial state once so both useState lazies share the same objects
   const initRef = useRef<{ workspaces: Workspace[]; activeId: string } | null>(null);
   if (initRef.current === null) {
-    const cwds = initial?.initialWorkspaces;
-    if (cwds && cwds.length > 0) {
-      const wsList = cwds.map((w) => newWorkspace(w.cwd));
-      const idx = Math.max(0, Math.min(initial?.initialActiveIndex ?? 0, wsList.length - 1));
-      initRef.current = { workspaces: wsList, activeId: wsList[idx]!.id };
+    const savedWs = initial?.initialWorkspaces;
+    if (savedWs && savedWs.length > 0) {
+      const idx = Math.max(0, Math.min(initial?.initialActiveIndex ?? 0, savedWs.length - 1));
+      initRef.current = { workspaces: savedWs, activeId: savedWs[idx]!.id };
     } else {
       const ws = newWorkspace(initial?.cwd);
       initRef.current = { workspaces: [ws], activeId: ws.id };
@@ -213,40 +212,54 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: { cw
   }, []);
 
   const closePanel = useCallback((workspaceId: string, panelId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((w) => {
-        if (w.id !== workspaceId) return w;
+    let workspaceRemoved = false;
+
+    setWorkspaces((prev) => {
+      const updated = prev.flatMap((w): Workspace[] => {
+        if (w.id !== workspaceId) return [w];
         const result = findPanelPane(w.paneTree, panelId);
-        if (!result) return w;
+        if (!result) return [w];
         const { pane } = result;
         const remaining = pane.panels.filter((p) => p.id !== panelId);
         if (remaining.length === 0) {
           // Last panel in pane — close the pane
           const newTree = removePaneFromTree(w.paneTree, pane.id);
-          if (!newTree) return w; // never remove last pane
+          if (!newTree) return []; // Last pane — would close workspace
           const sibling = siblingPane(w.paneTree, pane.id);
-          return {
+          return [{
             ...w,
             paneTree: newTree,
             activePaneId: w.activePaneId === pane.id
               ? (sibling?.id ?? firstPaneId(newTree))
               : w.activePaneId,
-          };
+          }];
         }
+        // Prefer the tab to the right; if none, the one to the left
+        const idx = pane.panels.findIndex((p) => p.id === panelId);
         const newActiveId =
           pane.activePanelId === panelId
-            ? (remaining[remaining.length - 1]?.id ?? null)
+            ? ((remaining[idx] ?? remaining[idx - 1])?.id ?? null)
             : pane.activePanelId;
-        return {
+        return [{
           ...w,
           paneTree: updatePane(w.paneTree, pane.id, (p) => ({
             ...p,
             panels: remaining,
             activePanelId: newActiveId,
           })),
-        };
-      }),
-    );
+        }];
+      });
+      if (updated.length === 0) return prev; // never close last workspace
+      workspaceRemoved = !updated.find((w) => w.id === workspaceId);
+      return updated;
+    });
+
+    // Only switch active workspace if this workspace was actually removed
+    setActiveWorkspaceId((prevId) => {
+      if (!workspaceRemoved || prevId !== workspaceId) return prevId;
+      const remaining = workspacesRef.current.filter((w) => w.id !== workspaceId);
+      return remaining[remaining.length - 1]?.id ?? prevId;
+    });
   }, []);
 
   const updatePanelData = useCallback((workspaceId: string, panelId: string, updater: (p: Panel) => Panel) => {
