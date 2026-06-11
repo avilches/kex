@@ -6,6 +6,8 @@ import { PanelContent } from "./PanelContent";
 import type { PanelCallbacks } from "./PanelContent";
 import type { PaneNode } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { poolSlotStats } from "@/modules/terminal/lib/rendererPool";
+import { useTheme } from "@/modules/theme";
 
 type Props = {
   pane: PaneNode;
@@ -79,11 +81,26 @@ export function PaneView({
   const tooNarrow = paneSize.w < splitLimit.width;
   const tooShort = paneSize.h < splitLimit.height;
 
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 500);
+    return () => clearInterval(id);
+  }, []);
+
+  const activePanel = pane.panels.find((p) => p.id === pane.activePanelId);
+  const isTerminal = activePanel?.kind === "terminal";
+  const hasGpu = isTerminal && poolSlotStats().some(
+    (s) => s.leafId === pane.activePanelId && s.webgl,
+  );
+
   useDndMonitor({
     onDragStart: () => setIsDragging(true),
     onDragEnd: () => setIsDragging(false),
     onDragCancel: () => setIsDragging(false),
   });
+
+  const { resolvedTheme } = useTheme();
+  const dimOpacity = focused ? 0 : (resolvedTheme.inactivePaneDim?.[activePanel?.kind ?? ""] ?? 0);
 
   const handleFocus = useCallback(() => {
     if (!focused) onFocusPane(workspaceId, pane.id);
@@ -113,6 +130,9 @@ export function PaneView({
       )}>
         {paneSize.w === Infinity ? "?" : `${paneSize.w}x${paneSize.h}`}
         {tooNarrow && tooShort ? " narrow+short" : tooNarrow ? " narrow" : tooShort ? " short" : " OK"}
+        {isTerminal && hasGpu && (
+          <span className="ml-1 rounded bg-yellow-400/90 px-1 text-black">GPU</span>
+        )}
       </div>
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (
@@ -135,6 +155,13 @@ export function PaneView({
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             Empty pane — click + to add a terminal
           </div>
+        )}
+
+        {dimOpacity > 0 && (
+          <div
+            className="pointer-events-none absolute inset-0 z-10 bg-black"
+            style={{ opacity: dimOpacity }}
+          />
         )}
 
         {/* drop overlay — only register/show for the active workspace */}
