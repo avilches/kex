@@ -12,6 +12,7 @@ import App from "./app/App";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 import { flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
+import { retryMissingWebgl } from "./modules/terminal/lib/rendererPool";
 
 if (USE_CUSTOM_WINDOW_CONTROLS) {
   document.documentElement.dataset.chrome = "borderless";
@@ -36,6 +37,11 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <App />,
 );
 
+// Restore window geometry (position + size) before showing.
+// Called here (on_window_ready equivalent) using physical pixels, matching
+// tauri-plugin-window-state behaviour which proved correct on macOS.
+await invoke("restore_window_geometry").catch(() => {});
+
 // Window starts hidden (per tauri.conf.json) so users never see a transparent
 // shadow-only frame before React paints. Use setTimeout — rAF is throttled
 // while the window is hidden and would never fire.
@@ -47,6 +53,10 @@ const showWindow = () => {
 setTimeout(showWindow, 50);
 // Safety net: if the first show somehow fails to take effect, force again.
 setTimeout(showWindow, 500);
+// At t=350ms the window has been visible for ~300ms -- enough for WKWebView's GPU
+// surface to initialize. Retries slots that missed WebGL at startup (rAFs throttled
+// while the window was hidden, GPU surface not yet ready at first scheduleUnhide).
+setTimeout(retryMissingWebgl, 350);
 
 // Flush pending workspace state before the window closes so the 800ms debounce
 // never loses changes. We prevent the close, save, then re-trigger the close.
