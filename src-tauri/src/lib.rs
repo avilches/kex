@@ -92,18 +92,15 @@ fn create_app_window(
                         size.height,
                         maximized,
                     );
+                    mgr.save();
                 }
             }
-            mgr.remove_window(&win_label);
-            mgr.save();
         }
         WindowEvent::Destroyed => {
-            let remaining = app_handle
-                .webview_windows()
-                .keys()
-                .filter(|l| l.starts_with("w-"))
-                .count();
-            if remaining == 0 {
+            let mgr = app_handle.state::<window_state::WindowStateManager>();
+            mgr.remove_window(&win_label);
+            mgr.save();
+            if mgr.window_order().is_empty() {
                 if let Some(s) = app_handle.get_webview_window("settings") {
                     let _ = s.close();
                 }
