@@ -5,7 +5,10 @@
     "windows",
     "linux"
   ],
-  "windows": [],
+  "windows": [
+    "w-*",
+    "settings"
+  ],
   "permissions": [
     "autostart:default",
     "updater:default",
