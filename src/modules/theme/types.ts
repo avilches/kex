@@ -28,6 +28,7 @@ export type ThemeColors = Partial<{
   sidebarBorder: string;
   sidebarRing: string;
   radius: string;
+  tabFocusIndicator: string;
 }>;
 
 export type TerminalPalette = Partial<{
@@ -60,6 +61,7 @@ export type Theme = {
     light?: string;
     dark?: string;
   };
+  inactivePaneDim?: Record<string, number>;
 };
 
 export const DEFAULT_THEME_ID = "terax-default";
