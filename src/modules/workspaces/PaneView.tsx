@@ -154,12 +154,12 @@ export function PaneView({
                     <DropZone
                       id={`zone:${pane.id}:top`}
                       hitClassName="pointer-events-auto left-0 right-0 top-0 h-1/4"
-                      visualClassName="left-0 right-0 top-0 h-1/2"
+                      visualClassName="left-0 right-0 top-0 h-1/2 rounded-t-md"
                     />
                     <DropZone
                       id={`zone:${pane.id}:bottom`}
                       hitClassName="pointer-events-auto bottom-0 left-0 right-0 h-1/4"
-                      visualClassName="bottom-0 left-0 right-0 h-1/2"
+                      visualClassName="bottom-0 left-0 right-0 h-1/2 rounded-b-md"
                     />
                   </>
                 )}
@@ -167,13 +167,19 @@ export function PaneView({
                   <>
                     <DropZone
                       id={`zone:${pane.id}:left`}
-                      hitClassName="pointer-events-auto bottom-1/4 left-0 top-1/4 w-1/4"
-                      visualClassName="bottom-0 left-0 top-0 w-1/2"
+                      hitClassName={cn(
+                        "pointer-events-auto left-0 w-1/4",
+                        tooShort ? "inset-y-0" : "bottom-1/4 top-1/4",
+                      )}
+                      visualClassName="bottom-0 left-0 top-0 w-1/2 rounded-l-md"
                     />
                     <DropZone
                       id={`zone:${pane.id}:right`}
-                      hitClassName="pointer-events-auto bottom-1/4 right-0 top-1/4 w-1/4"
-                      visualClassName="bottom-0 right-0 top-0 w-1/2"
+                      hitClassName={cn(
+                        "pointer-events-auto right-0 w-1/4",
+                        tooShort ? "inset-y-0" : "bottom-1/4 top-1/4",
+                      )}
+                      visualClassName="bottom-0 right-0 top-0 w-1/2 rounded-r-md"
                     />
                   </>
                 )}
