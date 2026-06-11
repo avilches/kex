@@ -1,12 +1,12 @@
 import { useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PaneTabBar } from "./PaneTabBar";
 import { PanelContent } from "./PanelContent";
 import type { PanelCallbacks } from "./PanelContent";
 import type { PaneNode } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { poolSlotStats } from "@/modules/terminal/lib/rendererPool";
+import { poolSlotStats, subscribeToPool } from "@/modules/terminal/lib/rendererPool";
 import { useTheme } from "@/modules/theme";
 
 type Props = {
@@ -81,15 +81,11 @@ export function PaneView({
   const tooNarrow = paneSize.w < splitLimit.width;
   const tooShort = paneSize.h < splitLimit.height;
 
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 500);
-    return () => clearInterval(id);
-  }, []);
+  const stats = useSyncExternalStore(subscribeToPool, poolSlotStats);
 
   const activePanel = pane.panels.find((p) => p.id === pane.activePanelId);
   const isTerminal = activePanel?.kind === "terminal";
-  const hasGpu = isTerminal && poolSlotStats().some(
+  const hasGpu = isTerminal && stats.some(
     (s) => s.leafId === pane.activePanelId && s.webgl,
   );
 

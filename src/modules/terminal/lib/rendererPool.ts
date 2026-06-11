@@ -114,8 +114,16 @@ export type PoolSlotStat = {
   canvases: number;
 };
 
-export function poolSlotStats(): PoolSlotStat[] {
-  return slots.map((s) => ({
+const poolSubscribers = new Set<() => void>();
+let poolSnapshot: PoolSlotStat[] = [];
+
+export function subscribeToPool(fn: () => void): () => void {
+  poolSubscribers.add(fn);
+  return () => { poolSubscribers.delete(fn); };
+}
+
+function notifyPool(): void {
+  poolSnapshot = slots.map((s) => ({
     id: s.id,
     leafId: s.currentLeafId,
     cols: s.term.cols,
@@ -124,7 +132,13 @@ export function poolSlotStats(): PoolSlotStat[] {
     webgl: !!s.webglAddon,
     canvases: s.webglCanvases.length,
   }));
+  for (const fn of poolSubscribers) fn();
 }
+
+export function poolSlotStats(): PoolSlotStat[] {
+  return poolSnapshot;
+}
+
 
 // Bracketed paste via xterm, so an app that enabled it (Claude Code) treats a
 // dropped path as a real paste while a plain shell gets the literal text.
@@ -424,6 +438,7 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
   }
 
   scheduleUnhide(slot, stale);
+  notifyPool();
 
   p.onSearchReady(slot.searchAddon);
 }
@@ -565,6 +580,7 @@ function detachSlotFromLeaf(slot: Slot): void {
 
   slot.currentLeafId = null;
   slot.lastUsedAt = performance.now();
+  notifyPool();
   scheduleWebglReap(slot);
   scheduleSlotReap(slot);
 }
@@ -679,6 +695,7 @@ function attachWebgl(slot: Slot): void {
       if (cur === webgl) {
         slot.webglAddon = null;
         slot.webglCanvases = [];
+        notifyPool();
       }
       try {
         webgl.dispose();
@@ -703,6 +720,7 @@ function attachWebgl(slot: Slot): void {
     for (const c of after) if (!before.has(c)) added.push(c);
     slot.webglAddon = webgl;
     slot.webglCanvases = added;
+    notifyPool();
   } catch (e) {
     console.warn("[terax-webgl] unavailable:", e);
   }
