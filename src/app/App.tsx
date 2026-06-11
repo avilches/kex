@@ -98,6 +98,7 @@ export default function App() {
     focusPane,
     setPaneDivider,
     movePanel,
+    reorderPanel,
     splitPaneAndPlace,
     openPanel,
     activatePanel,
@@ -1018,6 +1019,7 @@ export default function App() {
                       }}
                       onDividerChange={(wsId, splitId, pos) => setPaneDivider(wsId, splitId, pos)}
                       onMovePanel={movePanel}
+                      onReorderPanel={reorderPanel}
                       onSplitPaneAndPlace={splitPaneAndPlace}
                       callbacks={panelCallbacks}
                     />
