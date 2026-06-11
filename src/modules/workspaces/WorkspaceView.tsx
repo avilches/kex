@@ -78,6 +78,7 @@ export function WorkspaceView({
     document.body.style.cursor = "";
     setDraggingPanel(null);
     setDraggingWorkspaceId(null);
+    setTabInsertPaneId(null);
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -98,7 +99,7 @@ export function WorkspaceView({
       const sourcePaneId = sourceResult.pane.id;
       for (const pane of allPanes(ws.paneTree)) {
         if (pane.panels.some((p) => p.id === refPanelId)) {
-          // Only highlight the center zone when dragging to a different pane.
+          // Only set tabInsertPaneId when dragging to a different pane.
           setTabInsertPaneId(pane.id !== sourcePaneId ? pane.id : null);
           return;
         }
@@ -125,6 +126,7 @@ export function WorkspaceView({
       const refPanelId = parts[1];
       const side = parts[2];
       if (!refPanelId || !side) return;
+      if (side !== "before" && side !== "after") return;
 
       // Find source workspace and pane
       let sourceWorkspaceId: string | null = null;

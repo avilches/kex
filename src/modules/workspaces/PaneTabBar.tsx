@@ -82,7 +82,7 @@ function DraggableTab({
         isThisDragging && "opacity-40",
       )}
     >
-      {/* Droppable half-zones — registered but only active when a drag is in progress */}
+      {/* Droppable half-zones - registered but only active when a drag is in progress */}
       <div ref={setBeforeRef} className="absolute inset-y-0 left-0 w-1/2" />
       <div ref={setAfterRef} className="absolute inset-y-0 right-0 w-1/2" />
 
