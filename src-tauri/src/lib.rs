@@ -1,11 +1,10 @@
 pub mod modules;
 
-use modules::{agent, fs, git, history, pty, shell, workspace};
+use modules::{agent, fs, git, history, pty, shell, window_state, workspace};
 use std::sync::Mutex;
-use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 #[cfg(target_os = "macos")]
-use tauri::{PhysicalPosition, WindowEvent};
-use tauri_plugin_window_state::StateFlags;
+use tauri::PhysicalPosition;
 
 /// Drained on first read so HMR / re-mounts can't replay the launch dir.
 #[derive(Default)]
@@ -32,6 +31,92 @@ fn parse_launch_dir() -> Option<String> {
     None
 }
 
+fn create_app_window(
+    app: &tauri::AppHandle,
+    label: String,
+    entry: Option<&window_state::WindowEntry>,
+) -> Result<(), String> {
+    let (width, height) = entry
+        .map(|e| (e.geometry.width as f64, e.geometry.height as f64))
+        .unwrap_or((1280.0, 800.0));
+
+    let builder =
+        WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+            .title("Terax")
+            .inner_size(width, height)
+            .min_inner_size(640.0, 480.0)
+            .resizable(true)
+            .visible(false);
+
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true);
+
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    let builder = builder.decorations(false).transparent(true);
+
+    let window = builder.build().map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = window.set_decorations(false);
+    }
+
+    if let Some(e) = entry {
+        if e.geometry.x != 0 || e.geometry.y != 0 {
+            let _ = window.set_position(tauri::PhysicalPosition::new(
+                e.geometry.x,
+                e.geometry.y,
+            ));
+        }
+        if e.geometry.maximized {
+            let _ = window.maximize();
+        }
+    }
+
+    // Save geometry + remove from state on close; close settings when last window.
+    let app_handle = app.clone();
+    let win_label = label.clone();
+    window.on_window_event(move |event| match event {
+        WindowEvent::CloseRequested { .. } => {
+            let mgr = app_handle.state::<window_state::WindowStateManager>();
+            if let Some(w) = app_handle.get_webview_window(&win_label) {
+                if let (Ok(pos), Ok(size)) = (w.outer_position(), w.outer_size()) {
+                    let maximized = w.is_maximized().unwrap_or(false);
+                    mgr.update_geometry(
+                        &win_label,
+                        pos.x,
+                        pos.y,
+                        size.width,
+                        size.height,
+                        maximized,
+                    );
+                }
+            }
+            mgr.remove_window(&win_label);
+            mgr.save();
+        }
+        WindowEvent::Destroyed => {
+            let remaining = app_handle
+                .webview_windows()
+                .keys()
+                .filter(|l| l.starts_with("w-"))
+                .count();
+            if remaining == 0 {
+                if let Some(s) = app_handle.get_webview_window("settings") {
+                    let _ = s.close();
+                }
+            }
+        }
+        _ => {}
+    });
+
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Result<(), String> {
     let url_path = match tab.as_deref() {
@@ -44,8 +129,6 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         let _ = window.show();
         let _ = window.set_focus();
         if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
-            // emit() serializes via JSON — no string-escape footgun, unlike
-            // eval() with format!(). Frontend listens via Tauri event API.
             let _ = window.emit("terax:settings-tab", t);
         }
         return Ok(());
@@ -53,22 +136,23 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
     let builder = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url_path.into()))
         .title("Settings")
-        .inner_size(900.0, 700.0)
-        .min_inner_size(820.0, 620.0)
-        .resizable(true)
+        .inner_size(600.0, 700.0)
+        .resizable(false)
         .visible(false)
-        // Keep settings above the main app window so it doesn't get hidden
-        // when the user clicks back into the editor or terminal (#33).
         .always_on_top(true);
 
-    // Tie lifecycle to the main window so settings minimizes/closes with it.
-    // macOS: skip parent() — child + always_on_top leaves the settings webview
-    // behind the main window except while the parent is being dragged (#33).
+    // On non-macOS, set the active main window as parent so settings
+    // minimizes with it.
     #[cfg(not(target_os = "macos"))]
-    let builder = if let Some(main) = app.get_webview_window("main") {
-        builder.parent(&main).map_err(|e| e.to_string())?
-    } else {
-        builder
+    let builder = {
+        let parent_win = app
+            .webview_windows()
+            .into_values()
+            .find(|w| w.label().starts_with("w-"));
+        match parent_win {
+            Some(p) => builder.parent(&p).map_err(|e| e.to_string())?,
+            None => builder,
+        }
     };
 
     #[cfg(target_os = "macos")]
@@ -76,32 +160,34 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true);
 
-    // On Linux/Windows we render our own titlebar, so drop native chrome
-    // and make the window transparent.
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     let builder = builder.decorations(false).transparent(true);
 
     let window = builder.build().map_err(|e| e.to_string())?;
 
-    // Some Linux compositors (GNOME/Mutter with CSD-by-default) ignore the
-    // builder-time decorations flag — re-assert it after realize.
     #[cfg(target_os = "linux")]
     {
         let _ = window.set_decorations(false);
     }
 
     #[cfg(target_os = "macos")]
-    if let Some(main) = app.get_webview_window("main") {
-        if let (Ok(main_pos), Ok(main_size), Ok(settings_size)) = (
-            main.outer_position(),
-            main.outer_size(),
-            window.outer_size(),
-        ) {
-            let x = main_pos.x
-                + ((main_size.width as i32).saturating_sub(settings_size.width as i32)) / 2;
-            let y = main_pos.y
-                + ((main_size.height as i32).saturating_sub(settings_size.height as i32)) / 2;
-            let _ = window.set_position(PhysicalPosition::new(x, y));
+    {
+        let main_win = app
+            .webview_windows()
+            .into_values()
+            .find(|w| w.label().starts_with("w-"));
+        if let Some(main) = main_win {
+            if let (Ok(main_pos), Ok(main_size), Ok(settings_size)) =
+                (main.outer_position(), main.outer_size(), window.outer_size())
+            {
+                let x = main_pos.x
+                    + ((main_size.width as i32).saturating_sub(settings_size.width as i32)) / 2;
+                let y = main_pos.y
+                    + ((main_size.height as i32).saturating_sub(settings_size.height as i32)) / 2;
+                let _ = window.set_position(PhysicalPosition::new(x, y));
+            } else {
+                let _ = window.center();
+            }
         } else {
             let _ = window.center();
         }
@@ -112,42 +198,33 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
 #[tauri::command]
 async fn open_main_window(app: tauri::AppHandle) -> Result<(), String> {
-    let label = format!("main-{}", window_label_suffix());
-    let builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
-        .title("Terax")
-        .inner_size(1280.0, 800.0)
-        .min_inner_size(640.0, 480.0)
-        .resizable(true)
-        .visible(false);
-
-    #[cfg(target_os = "macos")]
-    let builder = builder
-        .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true);
-
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    let builder = builder.decorations(false).transparent(true);
-
-    let window = builder.build().map_err(|e| e.to_string())?;
-
-    #[cfg(target_os = "linux")]
+    let id = window_state::generate_window_id();
     {
-        let _ = window.set_decorations(false);
+        let mgr = app.state::<window_state::WindowStateManager>();
+        mgr.add_window(id.clone());
+        mgr.save();
     }
-
-    window.show().map_err(|e| e.to_string())?;
-    window.set_focus().map_err(|e| e.to_string())?;
-    Ok(())
+    create_app_window(&app, id, None)
 }
 
-/// Simple label suffix from current nanosecond timestamp.
-fn window_label_suffix() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    format!("{:08x}", nanos)
+#[tauri::command]
+fn window_get_state(
+    app: tauri::AppHandle,
+    label: String,
+) -> Option<window_state::WindowEntry> {
+    app.state::<window_state::WindowStateManager>().get_entry(&label)
+}
+
+#[tauri::command]
+fn window_save_workspace_state(
+    app: tauri::AppHandle,
+    label: String,
+    workspaces: serde_json::Value,
+    active_index: usize,
+) {
+    let mgr = app.state::<window_state::WindowStateManager>();
+    mgr.update_workspace(&label, workspaces, active_index);
+    mgr.save();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -158,14 +235,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        // Skip restoring VISIBLE — frontend calls window.show() after first
-        // paint so the user never sees a transparent window-shadow flash on
-        // Windows/Linux.
-        .plugin(
-            tauri_plugin_window_state::Builder::new()
-                .with_state_flags(StateFlags::all() & !StateFlags::VISIBLE)
-                .build(),
-        )
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_os::init())
@@ -176,22 +245,35 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
-        .setup(|_app| {
-            // macOS skips parent() for the settings window, so tie its lifecycle
-            // to the main window here instead. Other platforms keep parent().
-            #[cfg(target_os = "macos")]
-            if let Some(main) = _app.get_webview_window("main") {
-                let handle = _app.handle().clone();
-                main.on_window_event(move |event| {
-                    if matches!(
-                        event,
-                        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed
-                    ) {
-                        if let Some(settings) = handle.get_webview_window("settings") {
-                            let _ = settings.close();
-                        }
+        .setup(|app| {
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let state_path = data_dir.join("terax-windows.json");
+            let mgr = window_state::WindowStateManager::new(state_path);
+            mgr.load();
+            let order = mgr.window_order();
+            app.manage(mgr);
+
+            let handle = app.handle().clone();
+            if order.is_empty() {
+                let id = window_state::generate_window_id();
+                handle
+                    .state::<window_state::WindowStateManager>()
+                    .add_window(id.clone());
+                create_app_window(&handle, id, None)
+                    .map_err(std::io::Error::other)?;
+            } else {
+                let entries: Vec<_> = {
+                    let m = handle.state::<window_state::WindowStateManager>();
+                    order.iter().map(|id| (id.clone(), m.get_entry(id))).collect()
+                };
+                for (id, entry) in entries {
+                    if let Err(e) = create_app_window(&handle, id.clone(), entry.as_ref()) {
+                        eprintln!("terax: failed to restore window {id}: {e}");
                     }
-                });
+                }
             }
             Ok(())
         })
@@ -267,6 +349,8 @@ pub fn run() {
             get_launch_dir,
             open_settings_window,
             open_main_window,
+            window_get_state,
+            window_save_workspace_state,
             agent::agent_enable_claude_hooks,
             agent::agent_claude_hooks_status,
             history::history_suggest,
