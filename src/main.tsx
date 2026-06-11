@@ -59,8 +59,6 @@ setTimeout(showWindow, 500);
 setTimeout(retryMissingWebgl, 350);
 
 // Flush pending workspace state before the window closes so the 800ms debounce
-// never loses changes. We prevent the close, save, then re-trigger the close.
-// Flush pending workspace state before the window closes so the 800ms debounce
 // never loses changes. We prevent the close, save, then destroy the window
 // directly (bypasses closeRequested so there is no re-entrancy issue).
 let flushing = false;
@@ -70,7 +68,8 @@ getCurrentWindow().onCloseRequested(async (event) => {
   flushing = true;
   try {
     await flushWorkspaceState();
-  } finally {
-    void getCurrentWindow().destroy();
+    await getCurrentWindow().destroy();
+  } catch {
+    flushing = false;
   }
 });

@@ -213,13 +213,51 @@ multi-monitor o al cambiar de monitor.
 
 ---
 
+## Bug 6: cerrar el ultimo tab no cierra la ventana (RESUELTO)
+
+### Sintoma
+
+Al cerrar el ultimo tab del ultimo workspace, la UI queda vacia pero la ventana permanece abierta.
+Tras el intento fallido, el boton rojo de macOS tambien deja de funcionar.
+
+### Causa raiz
+
+`Window.destroy()` llama internamente a `invoke('plugin:window|destroy', { label })`. Este IPC esta
+controlado por el sistema de capabilities de Tauri 2. **`core:window:allow-destroy` no estaba en
+`src-tauri/capabilities/default.json`**, por lo que cada llamada era rechazada con permiso denegado.
+El `void` alrededor de `destroy()` suprimia el error, haciendo el fallo invisible.
+
+El boton rojo se rompia porque `flushing = true` se establecia en `onCloseRequested` antes de llamar
+`destroy()` y nunca se reseteaba al fallar. Con `flushing` atascado en `true`, el siguiente click
+al boton X retornaba por el early-return path sin cerrar.
+
+### Fix
+
+1. Agregar `"core:window:allow-destroy"` a `src-tauri/capabilities/default.json`.
+2. En `onCloseRequested`, usar `await destroy()` (no `void`) con `catch { flushing = false }` para
+   que el boton rojo siempre pueda reintentar si destroy fallara.
+3. En `useWorkspaces.ts`, agregar `useEffect` que detecta `workspaces.length === 0` y llama
+   `destroy()` (bypass de `onCloseRequested`), y quitar el guard `if (prev.length <= 1) return prev`.
+
+Historia completa con los 6 intentos: [CLOSE_WINDOW_GOTCHAS.md](CLOSE_WINDOW_GOTCHAS.md).
+
+### Leccion
+
+Antes de usar cualquier API de Tauri 2 que puede fallar silenciosamente (especialmente con `void`),
+verificar que el permiso correspondiente (`core:window:allow-*`) este en `capabilities/default.json`.
+`close()` ya estaba permitido pero `destroy()` requiere un permiso separado.
+
+---
+
 ## Estado de archivos tras todos los fixes
 
 | Archivo | Cambio |
 |---|---|
-| `src/components/ui/resizable.tsx` | Separador horizontal `h-[10px]`, fondo transparente, línea visual 1px vía `::after` |
+| `src/components/ui/resizable.tsx` | Separador horizontal `h-[10px]`, fondo transparente, linea visual 1px via `::after` |
 | `src/modules/workspaces/PaneTabBar.tsx` | `onClick` en `DraggableTab` + fallback `onPointerUp` en contenedor; `touch-none` y `cursor-grab` en `DraggableTab` |
 | `src/modules/workspaces/PaneView.tsx` | `visible={...isWorkspaceActive}`; badge GPU via `useSyncExternalStore` |
 | `src/modules/workspaces/WorkspaceView.tsx` | `onDragCancel` en `DndContext`; `document.body.style.cursor` sincrónico durante drag |
 | `src/modules/terminal/lib/rendererPool.ts` | `WEBGL_MAX_CONTEXTS = 7`; `retryMissingWebgl()`; `subscribeToPool()`/`notifyPool()` |
-| `src/main.tsx` | `setTimeout(retryMissingWebgl, 350)` tras `showWindow` |
+| `src/main.tsx` | `setTimeout(retryMissingWebgl, 350)` tras `showWindow`; `onCloseRequested` usa `await destroy()` con reset de flushing en error |
+| `src/modules/workspaces/lib/useWorkspaces.ts` | `useEffect` cierre por workspaces vacios + navegacion adyacente en closeWorkspace/closePanel |
+| `src-tauri/capabilities/default.json` | `core:window:allow-destroy` agregado |
