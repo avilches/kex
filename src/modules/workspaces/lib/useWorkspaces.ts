@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { flushWorkspaceState } from "./workspaceState";
 import {
   allPaneIds,
   findPane,
@@ -55,6 +57,15 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const workspacesRef = useRef(workspaces);
   useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
 
+  // When all workspaces are gone, flush state and destroy the window.
+  // destroy() bypasses onCloseRequested entirely, so there is no re-entrancy
+  // with the flush-before-close handler in main.tsx.
+  useEffect(() => {
+    if (workspaces.length === 0) {
+      void flushWorkspaceState().finally(() => void getCurrentWindow().destroy());
+    }
+  }, [workspaces]);
+
   // ── Workspace operations ──────────────────────────────────────────────────
 
   const addWorkspace = useCallback((cwd?: string): string => {
@@ -74,14 +85,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, []);
 
   const closeWorkspace = useCallback((id: string) => {
-    setWorkspaces((prev) => {
-      if (prev.length <= 1) return prev; // never close last workspace
-      return prev.filter((w) => w.id !== id);
-    });
+    setWorkspaces((prev) => prev.filter((w) => w.id !== id));
     setActiveWorkspaceId((prev) => {
       if (prev !== id) return prev;
+      const closedIdx = workspacesRef.current.findIndex((w) => w.id === id);
       const remaining = workspacesRef.current.filter((w) => w.id !== id);
-      return remaining[remaining.length - 1]?.id ?? prev;
+      return (remaining[closedIdx] ?? remaining[closedIdx - 1])?.id ?? prev;
     });
   }, []);
 
@@ -224,7 +233,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (remaining.length === 0) {
           // Last panel in pane — close the pane
           const newTree = removePaneFromTree(w.paneTree, pane.id);
-          if (!newTree) return []; // Last pane — would close workspace
+          if (!newTree) return []; // Last pane — remove workspace
           const sibling = siblingPane(w.paneTree, pane.id);
           return [{
             ...w,
@@ -249,16 +258,18 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           })),
         }];
       });
-      if (updated.length === 0) return prev; // never close last workspace
-      workspaceRemoved = !updated.find((w) => w.id === workspaceId);
+      // If the last workspace was just removed, allow the array to go empty —
+      // the useEffect above detects workspaces.length === 0 and closes the window.
+      workspaceRemoved = updated.length < prev.length && !updated.find((w) => w.id === workspaceId);
       return updated;
     });
 
-    // Only switch active workspace if this workspace was actually removed
+    // Navigate to the adjacent workspace: next below, then above
     setActiveWorkspaceId((prevId) => {
       if (!workspaceRemoved || prevId !== workspaceId) return prevId;
+      const closedIdx = workspacesRef.current.findIndex((w) => w.id === workspaceId);
       const remaining = workspacesRef.current.filter((w) => w.id !== workspaceId);
-      return remaining[remaining.length - 1]?.id ?? prevId;
+      return (remaining[closedIdx] ?? remaining[closedIdx - 1])?.id ?? prevId;
     });
   }, []);
 

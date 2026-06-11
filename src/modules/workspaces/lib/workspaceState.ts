@@ -53,6 +53,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingWorkspaces: Workspace[] | null = null;
 let pendingActiveIndex = 0;
 
+
 export function saveWorkspaceState(workspaces: Workspace[], activeIndex: number): void {
   pendingWorkspaces = workspaces;
   pendingActiveIndex = activeIndex;
