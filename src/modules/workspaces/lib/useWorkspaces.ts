@@ -134,15 +134,35 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const movePanel = useCallback((workspaceId: string, panelId: string, targetPaneId: string) => {
+  const movePanel = useCallback((workspaceId: string, panelId: string, targetPaneId: string, targetIndex?: number) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
         const sourceResult = findPanelPane(w.paneTree, panelId);
         if (!sourceResult || sourceResult.pane.id === targetPaneId) return w;
-        const newTree = movePanelBetweenPanes(w.paneTree, panelId, targetPaneId);
+        const newTree = movePanelBetweenPanes(w.paneTree, panelId, targetPaneId, targetIndex);
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: targetPaneId };
+      }),
+    );
+  }, []);
+
+  const reorderPanel = useCallback((workspaceId: string, panelId: string, insertionIndex: number) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w;
+        const result = findPanelPane(w.paneTree, panelId);
+        if (!result) return w;
+        const { pane } = result;
+        const from = pane.panels.findIndex((p) => p.id === panelId);
+        if (from === -1) return w;
+        // insertionIndex is the gap index in the original array (0 = before first tab).
+        // Inserting before or after the dragged tab itself is a noop.
+        if (insertionIndex === from || insertionIndex === from + 1) return w;
+        // Convert gap index to arrayMove destination index (which operates after removal).
+        const to = insertionIndex <= from ? insertionIndex : insertionIndex - 1;
+        const newPanels = arrayMove(pane.panels, from, to);
+        return { ...w, paneTree: updatePane(w.paneTree, pane.id, (p) => ({ ...p, panels: newPanels })) };
       }),
     );
   }, []);
@@ -327,6 +347,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     focusPane,
     setPaneDivider,
     movePanel,
+    reorderPanel,
     splitPaneAndPlace,
     openPanel,
     activatePanel,
