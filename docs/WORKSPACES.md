@@ -196,6 +196,13 @@ Tab drag-and-drop uses `@dnd-kit/core` v6.3.1 (`DndContext` in `WorkspaceView`).
   `activationConstraint: { distance: 6 }`. Requires `touch-action: none` (`touch-none` class) to
   prevent WebKit from claiming the initial pointer movement as a scroll gesture and issuing
   `pointercancel` before the 6px threshold is reached.
+  Each `DraggableTab` also registers two `useDroppable` zones on its left and right halves:
+  `tab-insert:<panelId>:before` and `tab-insert:<panelId>:after`. Both are `disabled` when no
+  drag is active (`disabled: !isDragging`) to avoid idle collision overhead.
+- `InsertionGap` (`PaneTabBar.tsx`): a `w-0 -mx-[1px] shrink-0` flex item rendered between every
+  pair of tabs (and before the first / after the last). When the drag pointer is over a
+  `tab-insert:` zone belonging to this pane, `useDndMonitor` sets `insertionIndex` and the
+  corresponding gap renders a 2px `bg-primary` vertical line indicating the insertion point.
 - `DropZone` (`PaneView.tsx`): `useDroppable` per zone. Zones are rendered only during an active
   drag. The set of zones depends on the target pane's pixel dimensions, read from a `ResizeObserver`
   and compared against `paneSplitLimit` (configurable in `terax-settings.json`, default
@@ -208,7 +215,10 @@ Tab drag-and-drop uses `@dnd-kit/core` v6.3.1 (`DndContext` in `WorkspaceView`).
   Each zone is two separate divs: an invisible hit area and a larger visual highlight
   (`pointer-events-none`) that covers the half of the pane in the split direction
   (top/bottom → top or bottom half; left/right → left or right half; center → full pane with
-  `rounded-md`).
+  `rounded-md`). The center zone also accepts a `forceOver` prop: when the drag pointer is over a
+  `tab-insert:` zone in a different pane, `WorkspaceView` sets `tabInsertPaneId` which flows through
+  `SplitNodeView` to `PaneView`, forcing the center zone highlight on the target pane to signal that
+  the tab will move there.
   Drag-drop splits are also blocked when the workspace already has `workspacePaneLimit` panes
   (configurable in `terax-settings.json`, default `8`).
 - `DragOverlay`: lightweight floating chip showing panel icon + title during drag. `dropAnimation:
@@ -216,10 +226,23 @@ Tab drag-and-drop uses `@dnd-kit/core` v6.3.1 (`DndContext` in `WorkspaceView`).
 
 ### Drop resolution (`handleDragEnd` in `WorkspaceView.tsx`)
 
-Zone ids have the form `zone:<paneId>:<direction>`. On drop:
-- `center`: `movePanel(sourceWorkspaceId, panelId, targetPaneId)` — moves tab to another pane
+Two zone ID formats are handled:
+
+**`tab-insert:<panelId>:before|after`** - tab border drop zones for positional insertion:
+- `before`: insert at `indexOf(panelId)` in the target pane
+- `after`: insert at `indexOf(panelId) + 1`
+- Same pane: `reorderPanel(workspaceId, panelId, insertionIndex)` — reorders tabs using
+  `arrayMove`; dropping before or after the dragged tab itself is a noop
+- Different pane: `movePanel(workspaceId, panelId, targetPaneId, insertionIndex)` — moves tab to
+  the target pane at the given position; source pane auto-collapses if it becomes empty
+
+**`zone:<paneId>:<direction>`** - pane-level drop zones:
+- `center`: `movePanel(sourceWorkspaceId, panelId, targetPaneId)` — moves tab to end of another pane
 - directional zones: `splitPaneAndPlace(sourceWorkspaceId, targetPaneId, direction, panelId)` —
   splits the target pane and places the dragged panel in the new half
+
+Both zone types coexist. Tab-border zones take priority when the pointer is over a tab bar (they are
+physically smaller and registered on top). Pane zones handle the content area and pane borders.
 
 Cross-workspace drops are blocked: the target pane is validated to belong to the same workspace as
 the source panel before any mutation.
