@@ -156,13 +156,13 @@ export const SHORTCUTS: Shortcut[] = [
     id: "tab.next",
     label: "Next tab",
     group: "Tabs",
-    defaultBindings: [{ ctrl: true, key: "Tab" }],
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowRight" }],
   },
   {
     id: "tab.prev",
     label: "Previous tab",
     group: "Tabs",
-    defaultBindings: [{ ctrl: true, shift: true, key: "Tab" }],
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowLeft" }],
   },
   {
     id: "tab.selectByIndex",

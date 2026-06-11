@@ -731,8 +731,22 @@ export default function App() {
       "tab.newPreview": () => openPreviewInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActivePanel,
-      "tab.next": () => cycleWorkspace(1),
-      "tab.prev": () => cycleWorkspace(-1),
+      "tab.next": () => {
+        if (!activeWorkspace || !activePane) return;
+        const panels = activePane.panels;
+        if (panels.length < 2) return;
+        const idx = panels.findIndex((p) => p.id === activePane.activePanelId);
+        const next = panels[(idx + 1) % panels.length];
+        activatePanel(activeWorkspace.id, next.id);
+      },
+      "tab.prev": () => {
+        if (!activeWorkspace || !activePane) return;
+        const panels = activePane.panels;
+        if (panels.length < 2) return;
+        const idx = panels.findIndex((p) => p.id === activePane.activePanelId);
+        const prev = panels[(idx - 1 + panels.length) % panels.length];
+        activatePanel(activeWorkspace.id, prev.id);
+      },
       "tab.selectByIndex": (e) => {
         const idx = parseInt(e.key, 10) - 1;
         if (idx >= 0 && idx < workspaces.length) setActiveWorkspaceId(workspaces[idx].id);
@@ -795,10 +809,12 @@ export default function App() {
     [
       activeWorkspace,
       activeWorkspaceId,
+      activePane,
       activePanelId,
       workspaces,
       openCommandPalette,
       cycleWorkspace,
+      activatePanel,
       handleCloseActivePanel,
       inheritedCwd,
       addWorkspace,
