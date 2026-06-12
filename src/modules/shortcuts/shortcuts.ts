@@ -101,7 +101,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "tab.newEditor",
     label: "New editor tab",
     group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
+    defaultBindings: [{ [MOD_PROP]: true, key: "o" }],
   },
   {
     id: "tab.close",
@@ -155,9 +155,9 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "pane.source",
-    label: "Toggle source panel",
+    label: "Toggle Explorer panel",
     group: "Panes",
-    defaultBindings: [{ [MOD_PROP]: true, key: "g" }],
+    defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
   },
   {
     id: "terminal.clear",
@@ -206,12 +206,9 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "rightPanel.toggle",
-    label: "Toggle right panel",
+    label: "Toggle Git panel",
     group: "View",
-    defaultBindings: [
-      { [MOD_PROP]: true, key: "b" },
-      { [MOD_PROP]: true, shift: true, key: "b" },
-    ],
+    defaultBindings: [{ [MOD_PROP]: true, key: "g" }],
   },
   {
     id: "workspace.new",
@@ -316,7 +313,11 @@ export function matchBinding(
   binding: KeyBinding,
   id?: ShortcutId
 ): boolean {
-  const eventKey = e.key.toLowerCase();
+  // On macOS, Option/Alt transforms alpha keys (e.g. Option+B → "∫"), so when
+  // the binding includes alt, compare against e.code ("KeyB") rather than e.key.
+  const eventKey = (binding.alt && /^Key[A-Z]$/.test(e.code))
+    ? e.code.slice(3).toLowerCase()
+    : e.key.toLowerCase();
   const bindingKey = binding.key.toLowerCase();
 
   // Special case for Jump to Tab 1-9

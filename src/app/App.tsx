@@ -28,7 +28,7 @@ import {
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setRightPanelOpen } from "@/modules/settings/store";
+import { setRightPanelOpen, setRightPanelActiveTab } from "@/modules/settings/store";
 import {
   useGlobalShortcuts,
   type ShortcutHandlers,
@@ -585,6 +585,18 @@ export default function App() {
     void setRightPanelOpen(!usePreferencesStore.getState().rightPanelOpen);
   }, []);
 
+  const navigateRightPanelTo = useCallback((tab: "explorer" | "git" | "history") => {
+    const state = usePreferencesStore.getState();
+    if (!state.rightPanelOpen) {
+      void setRightPanelOpen(true);
+      void setRightPanelActiveTab(tab);
+    } else if (state.rightPanelActiveTab === tab) {
+      void setRightPanelOpen(false);
+    } else {
+      void setRightPanelActiveTab(tab);
+    }
+  }, []);
+
   const allPanelsFlat = useMemo(() => {
     const panels: Panel[] = [];
     for (const ws of workspaces) {
@@ -605,7 +617,7 @@ export default function App() {
       launchCwdResolved,
       home,
       sidebarView: "source-control",
-      cycleSidebarView: toggleRightPanel,
+      cycleSidebarView: () => navigateRightPanelTo("git"),
       openCommitHistoryTab: openGitHistoryInPanel,
     });
 
@@ -786,15 +798,13 @@ export default function App() {
       "pane.focusDown": () => focusPaneInDirection("down"),
       "pane.focusLeft": () => focusPaneInDirection("left"),
       "pane.focusRight": () => focusPaneInDirection("right"),
-      "pane.source": toggleSourceControl,
+      "pane.source": () => navigateRightPanelTo("explorer"),
       "terminal.clear": () => { clearFocusedTerminal(); },
       "terminal.toggleInput": () =>
         window.dispatchEvent(new CustomEvent(TOGGLE_BLOCK_INPUT_EVENT)),
       "search.focus": () => searchInlineRef.current?.focus(),
       "settings.open": () => void openSettingsWindow(),
-      "rightPanel.toggle": () => {
-        void setRightPanelOpen(!usePreferencesStore.getState().rightPanelOpen);
-      },
+      "rightPanel.toggle": () => navigateRightPanelTo("git"),
       "window.new": () => void native.openMainWindow(),
       "workspace.prev": () => cycleWorkspace(-1),
       "workspace.next": () => cycleWorkspace(1),
@@ -845,11 +855,7 @@ export default function App() {
       if (id === "terminal.toggleInput") {
         return activePanel?.kind !== "terminal";
       }
-      if (id === "rightPanel.toggle") {
-        const target = (e.target as HTMLElement | null) ?? document.activeElement;
-        const inTerminal = !!(target as HTMLElement | null)?.closest?.(".xterm");
-        return inTerminal && !e.shiftKey;
-      }
+
       return false;
     },
     [activePanel],

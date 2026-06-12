@@ -180,11 +180,11 @@ export function createCommandItems(
     },
     {
       id: "git.source",
-      title: "Toggle source control",
+      title: "Toggle Git panel",
       group: "Git",
       keywords: ["git", "source control", "changes", "staging", "diff"],
       icon: SourceCodeIcon,
-      shortcutId: "pane.source",
+      shortcutId: "rightPanel.toggle",
       run: ctx.toggleSourceControl,
     },
     {

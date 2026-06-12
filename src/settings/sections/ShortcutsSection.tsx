@@ -344,8 +344,13 @@ function Recorder({
       e.preventDefault();
       e.stopPropagation();
 
+      // On macOS, Option transforms alpha keys (e.g. Option+B → "∫"), so use
+      // e.code to recover the actual key name when alt is held.
+      const key = (e.altKey && /^Key[A-Z]$/.test(e.code))
+        ? e.code.slice(3).toLowerCase()
+        : e.key;
       const binding: KeyBinding = {
-        key: e.key,
+        key,
         ctrl: e.ctrlKey,
         shift: e.shiftKey,
         alt: e.altKey,
