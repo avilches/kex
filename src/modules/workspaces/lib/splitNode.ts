@@ -140,3 +140,56 @@ export function updateDivider(tree: SplitNode, splitId: string, position: number
   if (first === tree.first && second === tree.second) return tree;
   return { ...tree, first, second };
 }
+
+export type Rect = { left: number; right: number; top: number; bottom: number };
+
+export function findPaneInDirection(
+  activePaneId: string,
+  direction: "up" | "down" | "left" | "right",
+  rects: Map<string, Rect>,
+): string | null {
+  const activeRect = rects.get(activePaneId);
+  if (!activeRect) return null;
+
+  let best: { paneId: string; score: number } | null = null;
+
+  for (const [paneId, rect] of rects) {
+    if (paneId === activePaneId) continue;
+
+    let isInDirection: boolean;
+    let distance: number;
+    let overlap: number;
+
+    switch (direction) {
+      case "right":
+        isInDirection = rect.left >= activeRect.right - 1;
+        distance = rect.left - activeRect.right;
+        overlap = Math.max(0, Math.min(activeRect.bottom, rect.bottom) - Math.max(activeRect.top, rect.top));
+        break;
+      case "left":
+        isInDirection = rect.right <= activeRect.left + 1;
+        distance = activeRect.left - rect.right;
+        overlap = Math.max(0, Math.min(activeRect.bottom, rect.bottom) - Math.max(activeRect.top, rect.top));
+        break;
+      case "down":
+        isInDirection = rect.top >= activeRect.bottom - 1;
+        distance = rect.top - activeRect.bottom;
+        overlap = Math.max(0, Math.min(activeRect.right, rect.right) - Math.max(activeRect.left, rect.left));
+        break;
+      case "up":
+        isInDirection = rect.bottom <= activeRect.top + 1;
+        distance = activeRect.top - rect.bottom;
+        overlap = Math.max(0, Math.min(activeRect.right, rect.right) - Math.max(activeRect.left, rect.left));
+        break;
+    }
+
+    if (!isInDirection || distance < 0) continue;
+
+    const score = distance * 10000 - overlap;
+    if (!best || score < best.score) {
+      best = { paneId, score };
+    }
+  }
+
+  return best?.paneId ?? null;
+}

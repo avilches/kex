@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   allPaneIds,
   findPane,
+  findPaneInDirection,
   findPanelPane,
   firstPaneId,
   movePanelBetweenPanes,
@@ -10,6 +11,7 @@ import {
   splitPaneInTree,
   updateDivider,
   updatePane,
+  type Rect,
 } from "./splitNode";
 import type { PaneNode, SplitNode } from "./types";
 
@@ -375,5 +377,76 @@ describe("movePanelBetweenPanes with targetIndex", () => {
       const target = result.second as PaneNode;
       expect(target.activePanelId).toBe("a");
     }
+  });
+});
+
+// Helper to build a Rect
+function r(left: number, top: number, right: number, bottom: number): Rect {
+  return { left, top, right, bottom };
+}
+
+describe("findPaneInDirection", () => {
+  // Layout: p1 (left half) | p2 (right half), full height
+  const sideBySide = new Map<string, Rect>([
+    ["p1", r(0, 0, 500, 600)],
+    ["p2", r(500, 0, 1000, 600)],
+  ]);
+
+  test("right: returns p2 from p1", () => {
+    expect(findPaneInDirection("p1", "right", sideBySide)).toBe("p2");
+  });
+  test("left: returns p1 from p2", () => {
+    expect(findPaneInDirection("p2", "left", sideBySide)).toBe("p1");
+  });
+  test("hard stop: right from p2 returns null", () => {
+    expect(findPaneInDirection("p2", "right", sideBySide)).toBeNull();
+  });
+  test("hard stop: up from p1 returns null", () => {
+    expect(findPaneInDirection("p1", "up", sideBySide)).toBeNull();
+  });
+
+  // Layout: p1 (top half) / p2 (bottom half), full width
+  const stacked = new Map<string, Rect>([
+    ["p1", r(0, 0, 1000, 300)],
+    ["p2", r(0, 300, 1000, 600)],
+  ]);
+
+  test("down: returns p2 from p1", () => {
+    expect(findPaneInDirection("p1", "down", stacked)).toBe("p2");
+  });
+  test("up: returns p1 from p2", () => {
+    expect(findPaneInDirection("p2", "up", stacked)).toBe("p1");
+  });
+  test("hard stop: down from p2 returns null", () => {
+    expect(findPaneInDirection("p2", "down", stacked)).toBeNull();
+  });
+
+  // Layout: p1 (left) | p2 (top-right) / p3 (bottom-right)
+  const threePane = new Map<string, Rect>([
+    ["p1", r(0, 0, 500, 600)],
+    ["p2", r(500, 0, 1000, 300)],
+    ["p3", r(500, 300, 1000, 600)],
+  ]);
+
+  test("three panes: right from p1 picks p2 or p3 (closest + overlap)", () => {
+    const result = findPaneInDirection("p1", "right", threePane);
+    expect(["p2", "p3"]).toContain(result);
+  });
+  test("three panes: left from p2 → p1", () => {
+    expect(findPaneInDirection("p2", "left", threePane)).toBe("p1");
+  });
+  test("three panes: left from p3 → p1", () => {
+    expect(findPaneInDirection("p3", "left", threePane)).toBe("p1");
+  });
+  test("three panes: down from p2 → p3", () => {
+    expect(findPaneInDirection("p2", "down", threePane)).toBe("p3");
+  });
+  test("three panes: up from p3 → p2", () => {
+    expect(findPaneInDirection("p3", "up", threePane)).toBe("p2");
+  });
+
+  // unknown pane id
+  test("returns null when activePaneId not in map", () => {
+    expect(findPaneInDirection("ghost", "right", sideBySide)).toBeNull();
   });
 });

@@ -10,11 +10,13 @@ export {
   allPaneIds,
   allPanes,
   findPane,
+  findPaneInDirection,
   findPanelPane,
   firstPaneId,
   siblingPane,
   splitPaneInTree,
   removePaneFromTree,
+  type Rect,
   updatePane,
   updateDivider,
 } from "./lib/splitNode";
