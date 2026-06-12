@@ -1,3 +1,4 @@
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
@@ -104,11 +105,13 @@ export function SettingsApp() {
         {USE_CUSTOM_WINDOW_CONTROLS && <WindowControls closeOnly />}
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-scroll px-8 pt-6 pb-7 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-muted/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border hover:[&::-webkit-scrollbar-thumb]:bg-border/80">
-        <div className="mx-auto w-full max-w-160">
-          {ActiveSection && <ActiveSection />}
+      <ScrollArea type="auto" className="min-h-0 flex-1">
+        <div className="px-8 pt-6 pb-7">
+          <div className="mx-auto w-full max-w-160">
+            {ActiveSection && <ActiveSection />}
+          </div>
         </div>
-      </main>
+      </ScrollArea>
     </div>
   );
 }

@@ -15,36 +15,28 @@ import {
 } from "@/components/ui/tooltip";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  TERMINAL_FONT_SIZES,
   TERMINAL_SCROLLBACK_PRESETS,
   setAgentNotifications,
   setAutostart,
   setEditorAutoSave,
   setEditorAutoSaveDelay,
-  setRestoreWindowState,
   setShowHidden,
-  setTerminalFontFamily,
-  setTerminalLetterSpacing,
-  setTerminalFontSize,
   setTerminalCursorBlink,
   setTerminalScrollback,
   setTerminalWebglEnabled,
   setVimMode,
 } from "@/modules/settings/store";
-import { defaultMonoFontFamily } from "@/lib/fonts";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
-const LETTER_SPACINGS = [-4, -3, -2, -1, 0, 1, 2, 3, 4] as const;
 const AUTO_SAVE_STEP = 100;
 const AUTO_SAVE_MIN = 100;
 const AUTO_SAVE_MAX = 60000;
 
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
-  const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const editorAutoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
@@ -55,11 +47,6 @@ export function GeneralSection() {
   const terminalCursorBlink = usePreferencesStore(
     (s) => s.terminalCursorBlink,
   );
-  const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
-  const terminalLetterSpacing = usePreferencesStore(
-    (s) => s.terminalLetterSpacing,
-  );
-  const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
 
@@ -182,47 +169,6 @@ export function GeneralSection() {
             onCheckedChange={(v) => void setTerminalCursorBlink(v)}
           />
         </SettingRow>
-        <FontFamilyInput
-          value={terminalFontFamily}
-          onChange={(v) => void setTerminalFontFamily(v)}
-        />
-        <SettingRow
-          title="Letter spacing"
-          description="Extra horizontal space between characters (px). Use negative values to tighten Nerd Fonts."
-        >
-          <Select
-            value={String(terminalLetterSpacing)}
-            onValueChange={(v) => void setTerminalLetterSpacing(Number(v))}
-          >
-            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LETTER_SPACINGS.map((v) => (
-                <SelectItem key={v} value={String(v)} className="text-[12px]">
-                  {v > 0 ? `+${v}` : v} px
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingRow>
-        <SettingRow title="Font size" description="Terminal text size.">
-          <Select
-            value={String(terminalFontSize)}
-            onValueChange={(v) => void setTerminalFontSize(Number(v))}
-          >
-            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TERMINAL_FONT_SIZES.map((size) => (
-                <SelectItem key={size} value={String(size)} className="text-[12px]">
-                  {size} px
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingRow>
         <SettingRow
           title="Scrollback"
           description="Lines of history kept per terminal. Higher uses more RAM (~3 KB / line)."
@@ -274,15 +220,6 @@ export function GeneralSection() {
               onCheckedChange={(v) => void onToggleAutostart(v)}
             />
           </SettingRow>
-          <SettingRow
-            title="Restore window position & size"
-            description="Reopen the main window where you left it. Applies on next launch."
-          >
-            <Switch
-              checked={restoreWindowState}
-              onCheckedChange={(v) => void setRestoreWindowState(v)}
-            />
-          </SettingRow>
         </div>
       </div>
     </div>
@@ -294,50 +231,6 @@ function Label({ children }: { children: React.ReactNode }) {
     <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
       {children}
     </span>
-  );
-}
-
-function FontFamilyInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
-  const commit = () => {
-    const next = draft.trim();
-    setDraft(next);
-    if (next !== value) onChange(next);
-  };
-
-  return (
-    <SettingRow
-      title="Font family"
-      description='Comma-separated list with per-glyph fallback. Leave empty for the platform default. Set a Nerd Font (e.g. "MesloLGS NF") first for prompt icons.'
-    >
-      <Input
-        type="text"
-        value={draft}
-        placeholder={defaultMonoFontFamily()}
-        spellCheck={false}
-        autoCorrect="off"
-        autoCapitalize="off"
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.currentTarget.blur();
-          }
-        }}
-        className="h-8 w-56 rounded-md border border-border bg-background px-2.5 text-[12px] md:text-[12px] outline-none focus:border-foreground/40 focus-visible:ring-0 focus-visible:border-foreground/40"
-      />
-    </SettingRow>
   );
 }
 

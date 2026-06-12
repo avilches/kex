@@ -1,12 +1,25 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { defaultMonoFontFamily } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  TERMINAL_FONT_SIZES,
   setBackgroundBlur,
   setBackgroundImageId,
   setBackgroundKind,
   setBackgroundOpacity,
+  setTerminalFontFamily,
+  setTerminalFontSize,
+  setTerminalLetterSpacing,
   setZoomLevel,
 } from "@/modules/settings/store";
 import type { ThemePref } from "@/modules/settings/store";
@@ -30,8 +43,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
+import { SettingRow } from "../components/SettingRow";
+
+const LETTER_SPACINGS = [-4, -3, -2, -1, 0, 1, 2, 3, 4] as const;
 
 const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIcon }[] = [
   { id: "system", label: "System", icon: ComputerIcon },
@@ -68,6 +84,10 @@ export function ThemesSection() {
     void emitThemeEdit({ action: "edit", id });
     void getCurrentWindow().hide();
   };
+
+  const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
+  const terminalLetterSpacing = usePreferencesStore((s) => s.terminalLetterSpacing);
+  const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
 
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const backgroundKind = usePreferencesStore((s) => s.backgroundKind);
@@ -189,6 +209,51 @@ export function ThemesSection() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Terminal</Label>
+        <FontFamilyInput
+          value={terminalFontFamily}
+          onChange={(v) => void setTerminalFontFamily(v)}
+        />
+        <SettingRow title="Font size" description="Terminal text size.">
+          <Select
+            value={String(terminalFontSize)}
+            onValueChange={(v) => void setTerminalFontSize(Number(v))}
+          >
+            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TERMINAL_FONT_SIZES.map((size) => (
+                <SelectItem key={size} value={String(size)} className="text-[12px]">
+                  {size} px
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+        <SettingRow
+          title="Letter spacing"
+          description="Extra horizontal space between characters (px). Use negative values to tighten Nerd Fonts."
+        >
+          <Select
+            value={String(terminalLetterSpacing)}
+            onValueChange={(v) => void setTerminalLetterSpacing(Number(v))}
+          >
+            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LETTER_SPACINGS.map((v) => (
+                <SelectItem key={v} value={String(v)} className="text-[12px]">
+                  {v > 0 ? `+${v}` : v} px
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
       </div>
 
       <div
@@ -409,6 +474,50 @@ export function ThemesSection() {
         )}
       </div>
     </div>
+  );
+}
+
+function FontFamilyInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commit = () => {
+    const next = draft.trim();
+    setDraft(next);
+    if (next !== value) onChange(next);
+  };
+
+  return (
+    <SettingRow
+      title="Font family"
+      description='Comma-separated list with per-glyph fallback. Leave empty for the platform default. Set a Nerd Font (e.g. "MesloLGS NF") first for prompt icons.'
+    >
+      <Input
+        type="text"
+        value={draft}
+        placeholder={defaultMonoFontFamily()}
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="off"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
+        }}
+        className="h-8 w-56 rounded-md border border-border bg-background px-2.5 text-[12px] md:text-[12px] outline-none focus:border-foreground/40 focus-visible:ring-0 focus-visible:border-foreground/40"
+      />
+    </SettingRow>
   );
 }
 
