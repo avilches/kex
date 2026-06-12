@@ -245,7 +245,7 @@ export function WorkspaceView({
       </div>
       <DragOverlay dropAnimation={null}>
         {draggingPanel && (
-          <div className="pointer-events-none flex h-5 items-center gap-1 rounded bg-muted px-1.5 text-[11px] text-foreground shadow-lg ring-1 ring-primary/40 opacity-90">
+          <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
             <span className="shrink-0 opacity-70">{panelIcon(draggingPanel, draggingWorkspaceId ?? undefined)}</span>
             <span className="max-w-[120px] truncate">{panelTitle(draggingPanel)}</span>
           </div>

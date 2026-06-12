@@ -80,12 +80,11 @@ function DraggableTab({
       <div ref={setBeforeRef} className="absolute inset-y-0 left-0 w-1/2" />
       <div ref={setAfterRef} className="absolute inset-y-0 right-0 w-1/2" />
 
-      {/* Insertion indicators: rendered inside the tab to avoid overflow/z-index issues */}
       {insertionBefore && (
-        <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-primary" />
+        <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
       )}
       {insertionAfter && (
-        <div className="pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 rounded-full bg-primary" />
+        <div className="pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
       )}
 
       {active && paneFocused && (
@@ -242,8 +241,8 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           paneFocused={paneFocused}
           workspaceId={workspaceId}
           isDragging={isDragging}
-          insertionBefore={insertionIndex === i}
-          insertionAfter={insertionIndex === i + 1}
+          insertionBefore={insertionIndex === 0 && i === 0}
+          insertionAfter={insertionIndex !== null && insertionIndex > 0 && i === insertionIndex - 1}
           onActivate={onActivate}
           onClose={onClose}
         />
