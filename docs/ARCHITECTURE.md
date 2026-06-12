@@ -160,8 +160,6 @@ See section 9 for the full technical detail.
 
 **Theme editor.** You can create and edit themes in-app. Changes are live-previewed. Custom themes are persisted to the settings store and can be exported as JSON files to share.
 
-**Background image.** A background image can be set with adjustable opacity and blur. The image sits below the UI surface layer.
-
 **Editor theme is independent.** The editor theme is a separate setting from the app theme. You can have a Catppuccin app theme with a GitHub Light editor theme.
 
 **Terminal palette follows app theme.** The xterm.js ANSI color palette (colors 0-15) is derived from the active app theme, so the terminal colors are consistent with the UI.
