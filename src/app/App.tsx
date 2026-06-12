@@ -106,6 +106,7 @@ export default function App() {
     closePanel,
     updatePanelData,
     setTerminalPanelCwd,
+    setWorkspaceCwd,
     setTerminalRunningCommand,
     findPanelGlobal,
     resetWorkspaces,
@@ -391,8 +392,6 @@ export default function App() {
 
   // ── PanelCallbacks ────────────────────────────────────────────────────────
 
-  const authorizedCwds = useRef(new Set<string>());
-
   const panelCallbacks = useMemo<PanelCallbacks>(
     () => ({
       onSearchReady: (panelId, addon) => {
@@ -407,11 +406,11 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) {
           setTerminalPanelCwd(found.workspace.id, panelId, cwd);
-          if (cwd && !authorizedCwds.current.has(cwd)) {
-            authorizedCwds.current.add(cwd);
-            native.workspaceAuthorize(cwd).catch(() => {
-              authorizedCwds.current.delete(cwd);
-            });
+          if (
+            found.workspace.activePaneId === found.pane.id &&
+            found.pane.activePanelId === panelId
+          ) {
+            setWorkspaceCwd(found.workspace.id, cwd);
           }
         }
       },
@@ -478,6 +477,7 @@ export default function App() {
       findPanelGlobal,
       closePanel,
       setTerminalPanelCwd,
+      setWorkspaceCwd,
       setTerminalRunningCommand,
       updatePanelData,
       activeWorkspace,
