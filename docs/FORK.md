@@ -80,7 +80,7 @@ Workspace  (UUID, title, cwd, binary pane tree)
 
 - `useWorkspaces` replaces `useTabs` entirely. Owns workspace list, active workspace, and all pane/panel operations (
   split, close, move, activate).
-- `splitNode.ts` — pure tree-operation library (split, remove, find, flatten, sibling lookup). Fully unit-tested.
+- `splitNode.ts` — pure tree-operation library (split, remove, find, flatten, sibling lookup, directional neighbor lookup via `findPaneInDirection`). Fully unit-tested.
 - `WorkspaceView` → `SplitNodeView` (recursive) → `PaneView` → `PanelContent` — new rendering path. All content kinds (
   terminal, editor, preview, git-*) now live as panels inside panes.
 - `PaneTabBar` — per-pane tab strip with close buttons and a `+` button to open a new terminal panel in that pane.
@@ -117,6 +117,10 @@ previous workspaces or pane layout.
   More natural than the original behavior of always activating the last panel.
 - **Workspace auto-close** — closing the last panel in a workspace closes the workspace itself (unless it is the last
   workspace).
+- **Directional pane focus shortcuts** — `Cmd+Ctrl+Arrow` (Mac) / `Ctrl+Alt+Arrow` (non-Mac) moves focus to the
+  geometrically adjacent pane in the given direction. Uses `findPaneInDirection` (spatial scoring on DOM rects: closest
+  pane wins, tie-broken by perpendicular overlap). Hard stop at borders; no wrap-around. Replaces the old cyclic
+  `Cmd+[` / `Cmd+]` shortcuts.
 
 ### Technical fixes and refactors
 
