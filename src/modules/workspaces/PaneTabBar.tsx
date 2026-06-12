@@ -10,7 +10,7 @@ type Props = {
   activePanelId: string | null;
   paneFocused: boolean;
   workspaceId: string;
-  isDragging: boolean;
+  isWorkspaceActive: boolean;
   onActivate: (panelId: string) => void;
   onClose: (panelId: string) => void;
   onNewTerminal: () => void;
@@ -21,7 +21,7 @@ function DraggableTab({
   activePanelId,
   paneFocused,
   workspaceId,
-  isDragging,
+  isWorkspaceActive,
   insertionBefore,
   insertionAfter,
   onActivate,
@@ -31,21 +31,15 @@ function DraggableTab({
   activePanelId: string | null;
   paneFocused: boolean;
   workspaceId: string;
-  isDragging: boolean;
+  isWorkspaceActive: boolean;
   insertionBefore: boolean;
   insertionAfter: boolean;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
-  const { setNodeRef: setBeforeRef } = useDroppable({
-    id: `tab-insert:${panel.id}:before`,
-    disabled: !isDragging,
-  });
-  const { setNodeRef: setAfterRef } = useDroppable({
-    id: `tab-insert:${panel.id}:after`,
-    disabled: !isDragging,
-  });
+  const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
+  const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${panel.id}:after`, disabled: !isWorkspaceActive });
   const active = panel.id === activePanelId;
   const title = panelTitle(panel);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
@@ -127,7 +121,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isDragging, onActivate, onClose, onNewTerminal }: Props) {
+export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal }: Props) {
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
@@ -180,6 +174,10 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   }, []);
 
   useDndMonitor({
+    onDragStart() {
+      const container = scrollContainerRef.current;
+      if (container) container.scrollLeft = 0;
+    },
     onDragOver(event) {
       const overId = event.over?.id ? String(event.over.id) : null;
       if (!overId?.startsWith("tab-insert:")) {
@@ -193,12 +191,6 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
       const idx = panels.findIndex((p) => p.id === refPanelId);
       if (idx === -1) { setInsertionIndex(null); return; }
       const insertionIdx = side === "before" ? idx : idx + 1;
-      const draggedId = String(event.active.id);
-      const from = panels.findIndex((p) => p.id === draggedId);
-      if (from !== -1 && (insertionIdx === from || insertionIdx === from + 1)) {
-        setInsertionIndex(null);
-        return;
-      }
       setInsertionIndex(insertionIdx);
     },
     onDragEnd() { setInsertionIndex(null); },
@@ -247,7 +239,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           activePanelId={activePanelId}
           paneFocused={paneFocused}
           workspaceId={workspaceId}
-          isDragging={isDragging}
+          isWorkspaceActive={isWorkspaceActive}
           insertionBefore={insertionIndex === 0 && i === 0}
           insertionAfter={insertionIndex !== null && insertionIndex > 0 && i === insertionIndex - 1}
           onActivate={onActivate}

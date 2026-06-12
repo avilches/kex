@@ -67,6 +67,7 @@ export function PaneView({
   callbacks,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
+  const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [paneSize, setPaneSize] = useState({ w: Infinity, h: Infinity });
 
@@ -85,14 +86,24 @@ export function PaneView({
   const tooNarrow = paneSize.w < splitLimit.width;
   const tooShort = paneSize.h < splitLimit.height;
 
+  const DEBUG_PANE_SIZE = true; // TODO: remove
+
   const activePanel = pane.panels.find((p) => p.id === pane.activePanelId);
 
 
   useDndMonitor({
-    onDragStart: () => setIsDragging(true),
-    onDragEnd: () => setIsDragging(false),
-    onDragCancel: () => setIsDragging(false),
+    onDragStart: (event) => {
+      setIsDragging(true);
+      setDraggedPanelId(String(event.active.id));
+    },
+    onDragEnd: () => { setIsDragging(false); setDraggedPanelId(null); },
+    onDragCancel: () => { setIsDragging(false); setDraggedPanelId(null); },
   });
+
+  const isDraggingOwnOnlyTab =
+    draggedPanelId !== null &&
+    pane.panels.length === 1 &&
+    pane.panels[0].id === draggedPanelId;
 
   const { resolvedTheme, resolvedMode } = useTheme();
   const dimOpacity = focused || !activePanel
@@ -111,12 +122,20 @@ export function PaneView({
       onMouseDownCapture={handleFocus}
       onFocus={handleFocus}
     >
+      {DEBUG_PANE_SIZE && (
+        <div className="pointer-events-none absolute right-1 top-8 z-50 rounded bg-black/80 px-1.5 py-1 font-mono text-[10px] leading-tight text-white">
+          <div>{paneSize.w}&times;{paneSize.h}px</div>
+          <div>min {splitLimit.width}&times;{splitLimit.height}</div>
+          <div className={tooNarrow ? "text-red-400" : "text-green-400"}>w: {tooNarrow ? "NO SPLIT" : "ok"}</div>
+          <div className={tooShort ? "text-red-400" : "text-green-400"}>h: {tooShort ? "NO SPLIT" : "ok"}</div>
+        </div>
+      )}
       <PaneTabBar
         panels={pane.panels}
         activePanelId={pane.activePanelId}
         paneFocused={focused}
         workspaceId={workspaceId}
-        isDragging={isDragging}
+        isWorkspaceActive={isWorkspaceActive}
         onActivate={(panelId) => onActivatePanel(workspaceId, panelId)}
         onClose={(panelId) => onClosePanel(workspaceId, panelId)}
         onNewTerminal={() => onNewTerminal(workspaceId, pane.id)}
@@ -152,7 +171,7 @@ export function PaneView({
         )}
 
         {/* drop overlay — only register/show for the active workspace */}
-        {isDragging && isWorkspaceActive && (
+        {isDragging && isWorkspaceActive && !isDraggingOwnOnlyTab && (
           <div className="pointer-events-none absolute inset-0 z-40">
             {tooNarrow && tooShort ? (
               // Both dimensions too small: center only, full pane hit area
