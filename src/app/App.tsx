@@ -47,12 +47,13 @@ import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
 import {
-  allPaneIds,
   allPanes,
   findPane,
+  findPaneInDirection,
   panelTitle,
   type Panel,
   type PanelCallbacks,
+  type Rect,
   useWorkspaces,
   WorkspaceView,
 } from "@/modules/workspaces";
@@ -715,6 +716,18 @@ export default function App() {
     [workspaces, activeWorkspaceId, setActiveWorkspaceId],
   );
 
+  function focusPaneInDirection(dir: "up" | "down" | "left" | "right") {
+    if (!activeWorkspace) return;
+    const paneIds = new Set(allPanes(activeWorkspace.paneTree).map((p) => p.id));
+    const rects = new Map<string, Rect>();
+    for (const el of document.querySelectorAll<HTMLElement>("[data-pane-id]")) {
+      const id = el.dataset.paneId;
+      if (id && paneIds.has(id)) rects.set(id, el.getBoundingClientRect());
+    }
+    const target = findPaneInDirection(activeWorkspace.activePaneId, dir, rects);
+    if (target) focusPane(activeWorkspace.id, target);
+  }
+
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
@@ -769,20 +782,10 @@ export default function App() {
         const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
         openPanel(activeWorkspace.id, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeWorkspace.cwd });
       },
-      "pane.focusNext": () => {
-        if (!activeWorkspace) return;
-        const ids = allPaneIds(activeWorkspace.paneTree);
-        const idx = ids.indexOf(activeWorkspace.activePaneId);
-        const next = ids[(idx + 1) % ids.length];
-        if (next) focusPane(activeWorkspace.id, next);
-      },
-      "pane.focusPrev": () => {
-        if (!activeWorkspace) return;
-        const ids = allPaneIds(activeWorkspace.paneTree);
-        const idx = ids.indexOf(activeWorkspace.activePaneId);
-        const prev = ids[(idx - 1 + ids.length) % ids.length];
-        if (prev) focusPane(activeWorkspace.id, prev);
-      },
+      "pane.focusUp": () => focusPaneInDirection("up"),
+      "pane.focusDown": () => focusPaneInDirection("down"),
+      "pane.focusLeft": () => focusPaneInDirection("left"),
+      "pane.focusRight": () => focusPaneInDirection("right"),
       "pane.source": toggleSourceControl,
       "terminal.clear": () => { clearFocusedTerminal(); },
       "terminal.toggleInput": () =>
