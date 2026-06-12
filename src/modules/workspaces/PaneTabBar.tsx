@@ -192,7 +192,14 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
       if (!refPanelId || !side) { setInsertionIndex(null); return; }
       const idx = panels.findIndex((p) => p.id === refPanelId);
       if (idx === -1) { setInsertionIndex(null); return; }
-      setInsertionIndex(side === "before" ? idx : idx + 1);
+      const insertionIdx = side === "before" ? idx : idx + 1;
+      const draggedId = String(event.active.id);
+      const from = panels.findIndex((p) => p.id === draggedId);
+      if (from !== -1 && (insertionIdx === from || insertionIdx === from + 1)) {
+        setInsertionIndex(null);
+        return;
+      }
+      setInsertionIndex(insertionIdx);
     },
     onDragEnd() { setInsertionIndex(null); },
     onDragCancel() { setInsertionIndex(null); },
