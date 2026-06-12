@@ -1,12 +1,11 @@
 import { useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PaneTabBar } from "./PaneTabBar";
 import { PanelContent } from "./PanelContent";
 import type { PanelCallbacks } from "./PanelContent";
 import type { PaneNode } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { poolSlotStats, subscribeToPool } from "@/modules/terminal/lib/rendererPool";
 import { useTheme } from "@/modules/theme";
 
 type Props = {
@@ -86,13 +85,8 @@ export function PaneView({
   const tooNarrow = paneSize.w < splitLimit.width;
   const tooShort = paneSize.h < splitLimit.height;
 
-  const stats = useSyncExternalStore(subscribeToPool, poolSlotStats);
-
   const activePanel = pane.panels.find((p) => p.id === pane.activePanelId);
-  const isTerminal = activePanel?.kind === "terminal";
-  const hasGpu = isTerminal && stats.some(
-    (s) => s.leafId === pane.activePanelId && s.webgl,
-  );
+
 
   useDndMonitor({
     onDragStart: () => setIsDragging(true),
@@ -128,17 +122,6 @@ export function PaneView({
         onNewTerminal={() => onNewTerminal(workspaceId, pane.id)}
       />
       <div className="relative min-h-0 flex-1">
-        {/* DEBUG — remove before ship */}
-        <div className={cn(
-          "pointer-events-none absolute right-1 top-1 z-50 flex items-center gap-1 rounded px-1 py-0.5 font-mono text-[10px]",
-          (tooNarrow || tooShort) ? "bg-red-500/80 text-white" : "bg-green-600/70 text-white",
-        )}>
-          {paneSize.w === Infinity ? "?" : `${paneSize.w}x${paneSize.h}`}
-          {tooNarrow && tooShort ? " narrow+short" : tooNarrow ? " narrow" : tooShort ? " short" : " OK"}
-          {isTerminal && hasGpu && (
-            <span className="rounded bg-yellow-400/90 px-1 text-black">GPU</span>
-          )}
-        </div>
         {pane.panels.map((panel) => (
           <div
             key={panel.id}

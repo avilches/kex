@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   panels: Panel[];
@@ -16,22 +16,14 @@ type Props = {
   onNewTerminal: () => void;
 };
 
-function InsertionGap({ show }: { show: boolean }) {
-  return (
-    <div className="relative w-0 shrink-0 -mx-[1px]">
-      {show && (
-        <div className="pointer-events-none absolute inset-y-1 -left-px z-10 w-0.5 rounded-full bg-primary" />
-      )}
-    </div>
-  );
-}
-
 function DraggableTab({
   panel,
   activePanelId,
   paneFocused,
   workspaceId,
   isDragging,
+  insertionBefore,
+  insertionAfter,
   onActivate,
   onClose,
 }: {
@@ -40,6 +32,8 @@ function DraggableTab({
   paneFocused: boolean;
   workspaceId: string;
   isDragging: boolean;
+  insertionBefore: boolean;
+  insertionAfter: boolean;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
 }) {
@@ -85,6 +79,14 @@ function DraggableTab({
       {/* Droppable half-zones - registered but only active when a drag is in progress */}
       <div ref={setBeforeRef} className="absolute inset-y-0 left-0 w-1/2" />
       <div ref={setAfterRef} className="absolute inset-y-0 right-0 w-1/2" />
+
+      {/* Insertion indicators: rendered inside the tab to avoid overflow/z-index issues */}
+      {insertionBefore && (
+        <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-primary" />
+      )}
+      {insertionAfter && (
+        <div className="pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 rounded-full bg-primary" />
+      )}
 
       {active && paneFocused && (
         <div
@@ -233,20 +235,19 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
       }}
     >
       {panels.map((p, i) => (
-        <Fragment key={p.id}>
-          <InsertionGap show={insertionIndex === i} />
-          <DraggableTab
-            panel={p}
-            activePanelId={activePanelId}
-            paneFocused={paneFocused}
-            workspaceId={workspaceId}
-            isDragging={isDragging}
-            onActivate={onActivate}
-            onClose={onClose}
-          />
-        </Fragment>
+        <DraggableTab
+          key={p.id}
+          panel={p}
+          activePanelId={activePanelId}
+          paneFocused={paneFocused}
+          workspaceId={workspaceId}
+          isDragging={isDragging}
+          insertionBefore={insertionIndex === i}
+          insertionAfter={insertionIndex === i + 1}
+          onActivate={onActivate}
+          onClose={onClose}
+        />
       ))}
-      <InsertionGap show={insertionIndex === panels.length} />
       <button
         type="button"
         onClick={onNewTerminal}
