@@ -49,9 +49,9 @@ function DraggableTab({
     <div
       ref={setNodeRef}
       {...attributes}
-      {...listeners}
       data-panel-id={panel.id}
       onClick={() => onActivate(panel.id)}
+      {...listeners}
       className={cn(
         "group relative flex min-w-[100px] max-w-[200px] shrink-0 cursor-grab active:cursor-grabbing select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
         connected
@@ -70,9 +70,9 @@ function DraggableTab({
         isThisDragging && "opacity-40",
       )}
     >
-      {/* Droppable half-zones - registered but only active when a drag is in progress */}
-      <div ref={setBeforeRef} className="absolute inset-y-0 left-0 w-1/2" />
-      <div ref={setAfterRef} className="absolute inset-y-0 right-0 w-1/2" />
+      {/* Droppable half-zones - coordinates-based, no pointer events needed */}
+      <div ref={setBeforeRef} className="pointer-events-none absolute inset-y-0 left-0 w-1/2" />
+      <div ref={setAfterRef} className="pointer-events-none absolute inset-y-0 right-0 w-1/2" />
 
       {insertionBefore && (
         <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
@@ -108,14 +108,15 @@ function DraggableTab({
       )}
       <button
         type="button"
-        className="ml-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100"
+        className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           onClose(panel.id);
         }}
         title="Close panel"
       >
-        ×
+        <span className="text-[13px] leading-none">×</span>
       </button>
     </div>
   );
