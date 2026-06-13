@@ -8,6 +8,7 @@ import {
   movePanelBetweenPanes,
   removePaneFromTree,
   siblingPane,
+  splitPaneAndInsertPanel,
   splitPaneInTree,
   updateDivider,
   updatePane,
@@ -448,5 +449,43 @@ describe("findPaneInDirection", () => {
   // unknown pane id
   test("returns null when activePaneId not in map", () => {
     expect(findPaneInDirection("ghost", "right", sideBySide)).toBeNull();
+  });
+});
+
+describe("splitPaneAndInsertPanel", () => {
+  test("splits a pane and places the new panel in the new sub-pane", () => {
+    const p1: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
+    const panel = { id: "pan1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
+    const result = splitPaneAndInsertPanel(p1, "p1", "s1", "p2", "horizontal", "second", panel);
+    expect(result.kind).toBe("split");
+    if (result.kind === "split") {
+      expect(result.first).toBe(p1);
+      expect(result.second.kind).toBe("pane");
+      if (result.second.kind === "pane") {
+        expect(result.second.panels).toEqual([panel]);
+        expect(result.second.activePanelId).toBe("pan1");
+      }
+    }
+  });
+
+  test("new pane appears as first when position is 'first'", () => {
+    const p1: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
+    const panel = { id: "pan1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
+    const result = splitPaneAndInsertPanel(p1, "p1", "s1", "p2", "vertical", "first", panel);
+    expect(result.kind).toBe("split");
+    if (result.kind === "split") {
+      expect(result.first.kind).toBe("pane");
+      if (result.first.kind === "pane") {
+        expect(result.first.panels).toEqual([panel]);
+      }
+      expect(result.second).toBe(p1);
+    }
+  });
+
+  test("returns original tree if targetPaneId not found", () => {
+    const p1: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
+    const panel = { id: "pan1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
+    const result = splitPaneAndInsertPanel(p1, "unknown", "s1", "p2", "horizontal", "second", panel);
+    expect(result).toBe(p1);
   });
 });

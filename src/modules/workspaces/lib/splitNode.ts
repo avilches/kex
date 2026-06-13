@@ -193,3 +193,21 @@ export function findPaneInDirection(
 
   return best?.paneId ?? null;
 }
+
+export function splitPaneAndInsertPanel(
+  tree: SplitNode,
+  targetPaneId: string,
+  newSplitId: string,
+  newPaneId: string,
+  orientation: "horizontal" | "vertical",
+  newPanePosition: "first" | "second",
+  panel: Panel,
+): SplitNode {
+  const treeAfterSplit = splitPaneInTree(tree, targetPaneId, newSplitId, newPaneId, orientation, newPanePosition);
+  if (treeAfterSplit === tree) return tree;
+  return updatePane(treeAfterSplit, newPaneId, (p) => ({
+    ...p,
+    panels: [panel],
+    activePanelId: panel.id,
+  }));
+}
