@@ -9,10 +9,10 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { allPanes, findPanelPane } from "./lib/splitNode";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { panelIcon, panelTitle } from "./lib/panelTitle";
+import { basename, panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel, Workspace } from "./lib/types";
 import type { UseWorkspacesReturn } from "./lib/useWorkspaces";
 
@@ -45,11 +45,6 @@ type Props = {
   children: ReactNode;
 };
 
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] ?? path;
-}
-
 export function WorkspaceDndProvider({
   workspaces,
   activeWorkspaceId,
@@ -62,6 +57,9 @@ export function WorkspaceDndProvider({
 }: Props) {
   const [draggingItem, setDraggingItem] = useState<DraggingItem | null>(null);
   const [tabInsertPaneId, setTabInsertPaneId] = useState<string | null>(null);
+
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
+  useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -103,7 +101,7 @@ export function WorkspaceDndProvider({
     const isFileDrag = activeId.startsWith("file:");
 
     if (isFileDrag) {
-      const activeWs = workspaces.find((ws) => ws.id === activeWorkspaceId);
+      const activeWs = workspaces.find((ws) => ws.id === activeWorkspaceIdRef.current);
       if (!activeWs) { setTabInsertPaneId(null); return; }
       for (const pane of allPanes(activeWs.paneTree)) {
         if (pane.panels.some((p) => p.id === refPanelId)) {
@@ -150,11 +148,12 @@ export function WorkspaceDndProvider({
   }
 
   function handleFileDragEnd(filePath: string, overId: string) {
-    const activeWs = workspaces.find((ws) => ws.id === activeWorkspaceId);
+    const activeWs = workspaces.find((ws) => ws.id === activeWorkspaceIdRef.current);
     if (!activeWs) return;
+    const panes = allPanes(activeWs.paneTree);
 
     let existingPanelId: string | null = null;
-    for (const pane of allPanes(activeWs.paneTree)) {
+    for (const pane of panes) {
       const found = pane.panels.find((p) => p.kind === "editor" && p.path === filePath);
       if (found) { existingPanelId = found.id; break; }
     }
@@ -167,7 +166,7 @@ export function WorkspaceDndProvider({
 
       let targetPaneId: string | null = null;
       let refPanelIndex = -1;
-      for (const pane of allPanes(activeWs.paneTree)) {
+      for (const pane of panes) {
         const idx = pane.panels.findIndex((p) => p.id === refPanelId);
         if (idx !== -1) { targetPaneId = pane.id; refPanelIndex = idx; break; }
       }
@@ -179,13 +178,13 @@ export function WorkspaceDndProvider({
         const sourceResult = findPanelPane(activeWs.paneTree, existingPanelId);
         if (!sourceResult) return;
         if (sourceResult.pane.id === targetPaneId) {
-          onReorderPanel(activeWorkspaceId, existingPanelId, insertionIndex);
+          onReorderPanel(activeWorkspaceIdRef.current, existingPanelId, insertionIndex);
         } else {
-          onMovePanel(activeWorkspaceId, existingPanelId, targetPaneId, insertionIndex);
+          onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId, insertionIndex);
         }
       } else {
         const panel: Panel = { id: crypto.randomUUID(), kind: "editor", path: filePath, preview: false, dirty: false };
-        onOpenPanel(activeWorkspaceId, targetPaneId, panel, insertionIndex);
+        onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, panel, insertionIndex);
       }
       return;
     }
@@ -195,25 +194,25 @@ export function WorkspaceDndProvider({
     const targetPaneId = parts[1]!;
     const zone = parts[2] as "top" | "bottom" | "left" | "right" | "center";
 
-    const targetPaneExists = allPanes(activeWs.paneTree).some((p) => p.id === targetPaneId);
+    const targetPaneExists = panes.some((p) => p.id === targetPaneId);
     if (!targetPaneExists) return;
 
     if (zone === "center") {
       if (existingPanelId) {
         const sourceResult = findPanelPane(activeWs.paneTree, existingPanelId);
         if (sourceResult?.pane.id === targetPaneId) return;
-        onMovePanel(activeWorkspaceId, existingPanelId, targetPaneId);
+        onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId);
       } else {
         const panel: Panel = { id: crypto.randomUUID(), kind: "editor", path: filePath, preview: false, dirty: false };
-        onOpenPanel(activeWorkspaceId, targetPaneId, panel);
+        onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, panel);
       }
     } else {
       const { workspacePaneLimit } = usePreferencesStore.getState();
-      if (allPanes(activeWs.paneTree).length >= workspacePaneLimit) return;
+      if (panes.length >= workspacePaneLimit) return;
       if (existingPanelId) {
-        onSplitPaneAndPlace(activeWorkspaceId, targetPaneId, zone, existingPanelId);
+        onSplitPaneAndPlace(activeWorkspaceIdRef.current, targetPaneId, zone, existingPanelId);
       } else {
-        onSplitPaneAndOpenFile(activeWorkspaceId, targetPaneId, zone, filePath);
+        onSplitPaneAndOpenFile(activeWorkspaceIdRef.current, targetPaneId, zone, filePath);
       }
     }
   }
@@ -288,8 +287,7 @@ export function WorkspaceDndProvider({
       onMovePanel(sourceWorkspaceId, panelId, targetPaneId);
     } else {
       const { workspacePaneLimit } = usePreferencesStore.getState();
-      const ws = workspaces.find((w) => w.id === sourceWorkspaceId);
-      if (ws && allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+      if (allPanes(sourceWs.paneTree).length >= workspacePaneLimit) return;
       onSplitPaneAndPlace(sourceWorkspaceId, targetPaneId, zone, panelId);
     }
   }
