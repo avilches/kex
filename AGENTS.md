@@ -17,8 +17,7 @@ Production-grade or it does not ship. Every change is judged against all of thes
 - **Performance**: ultra-lightweight is the product. ~7-8 MB bundle, high-performance terminal. For every change ask:
   how much RAM it costs, whether it adds IPC round-trips or redundant requests, whether it triggers extra re-renders or
   wasted work, whether it pulls a heavy dependency. Unused features consume zero resources.
-- **Security**: no critical security holes. Validate at every boundary (IPC, fs, network). The secret-path deny-list
-  applies on both read and write and is never bypassed.
+- **Security**: no critical security holes. Validate at every boundary (IPC, fs, network).
 - **UI/UX**: polished, professional, premium. Every state and detail considered.
 - **Architecture**: new or changed logic lives in pure, dependency-light functions (functional core); tauri commands and
   React components stay thin (imperative shell). Keeps it testable without a later rewrite.

@@ -43,6 +43,12 @@ pub struct FileStat {
     pub kind: StatKind,
 }
 
+// No workspace authorization or secret-path deny-list is applied here. The explorer
+// only surfaces paths the user navigated to, and terminal commands can reach arbitrary
+// paths regardless of any app-level gate. If Terax ever runs autonomous agents that
+// call these IPC commands directly, add guard_read/guard_write helpers (canonicalize,
+// check deny-list components, call is_authorized) before resolve_path. See
+// docs/ARCHITECTURE.md §4.2.
 #[tauri::command]
 pub fn fs_read_file(path: String, workspace: Option<WorkspaceEnv>) -> Result<ReadResult, String> {
     let workspace = WorkspaceEnv::from_option(workspace);

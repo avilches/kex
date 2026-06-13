@@ -190,11 +190,13 @@ When you switch panels or panes, the outgoing panel is hidden with CSS classes. 
 
 ### 4.2 Workspace authorization
 
-Before any git command or file operation can run against a directory, that directory must be in the `WorkspaceRegistry`. The registry is populated automatically when you open Terax in a directory (via CLI argument or the OS file manager context menu), and when you explicitly navigate to one via the terminal (`cd` triggers an OSC 7 event that registers the new cwd). `workspace_authorize` is the IPC command for explicit authorization.
+Before any git or shell command can run against a directory, that directory must be in the `WorkspaceRegistry`. The registry is populated automatically when you open Terax in a directory (via CLI argument or the OS file manager context menu), and when you explicitly navigate to one via the terminal (`cd` triggers an OSC 7 event that registers the new cwd). `workspace_authorize` is the IPC command for explicit authorization.
 
 The registry lives in memory only — it does not persist across restarts. Each session builds it up as the user navigates.
 
-The practical effect: if you open a file in the editor or try a git operation in a directory you haven't navigated to in the terminal yet, the git-related features (diff decorations, source control panel) will fail with "path is outside the authorized workspace" until you `cd` there in a terminal first.
+The practical effect: if you try a git operation in a directory you haven't navigated to in the terminal yet, the git-related features (diff decorations, source control panel) will fail with "path is outside the authorized workspace" until you `cd` there in a terminal first.
+
+**`fs_*` commands are not workspace-gated.** File read/write commands (`fs_read_file`, `fs_write_file`, `fs_stat`, `fs_create_*`, `fs_rename`, `fs_delete`, `fs_read_dir`, `fs_search`, `fs_grep`, etc.) accept any path the OS allows. This is a deliberate decision: the explorer only surfaces paths the user has explicitly navigated to, so there is no app-level vector for a user to accidentally open a path outside their workspace. Terminal commands can access arbitrary paths regardless of any app-level guard, so a gate here would only stop the app's own UI — not a shell running inside a pane. A deny-list for secret paths (`.ssh`, `.env`, `*.pem`, etc.) would be worthwhile if Terax ever runs autonomous agents that make IPC calls directly; the right insertion point is `guard_read`/`guard_write` helpers at the top of `fs/file.rs`, applied before `resolve_path`. Until then, `capabilities/default.json` is the real boundary: only code in the webview bundle can call these commands.
 
 ### 4.3 Windows: ConPTY spawn serialization
 
