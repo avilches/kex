@@ -1039,6 +1039,55 @@ export default function App() {
                           cwd: ws?.cwd,
                         });
                       }}
+                      onSplitTerminalRight={(wsId, paneId) => {
+                        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+                        const ws = workspaces.find((w) => w.id === wsId);
+                        if (!ws) return;
+                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+                        const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
+                        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) return;
+                        const newPaneId = splitPane(wsId, paneId, "horizontal");
+                        openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: ws.cwd });
+                      }}
+                      onSplitTerminalDown={(wsId, paneId) => {
+                        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+                        const ws = workspaces.find((w) => w.id === wsId);
+                        if (!ws) return;
+                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+                        const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
+                        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) return;
+                        const newPaneId = splitPane(wsId, paneId, "vertical");
+                        openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: ws.cwd });
+                      }}
+                      onNewBrowser={(wsId, paneId) => {
+                        const panelId = crypto.randomUUID();
+                        openPanel(wsId, paneId, { id: panelId, kind: "preview", url: "" });
+                        setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+                      }}
+                      onSplitBrowserRight={(wsId, paneId) => {
+                        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+                        const ws = workspaces.find((w) => w.id === wsId);
+                        if (!ws) return;
+                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+                        const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
+                        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) return;
+                        const newPaneId = splitPane(wsId, paneId, "horizontal");
+                        const panelId = crypto.randomUUID();
+                        openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
+                        setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+                      }}
+                      onSplitBrowserDown={(wsId, paneId) => {
+                        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+                        const ws = workspaces.find((w) => w.id === wsId);
+                        if (!ws) return;
+                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+                        const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
+                        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) return;
+                        const newPaneId = splitPane(wsId, paneId, "vertical");
+                        const panelId = crypto.randomUUID();
+                        openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
+                        setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+                      }}
                       onDividerChange={(wsId, splitId, pos) => setPaneDivider(wsId, splitId, pos)}
                       onMovePanel={movePanel}
                       onReorderPanel={reorderPanel}
