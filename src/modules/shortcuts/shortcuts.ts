@@ -338,19 +338,6 @@ export function matchBinding(
 /**
  * Display helpers
  */
-const SHORTCUTS_BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
-
-export function getShortcutLabel(
-  id: ShortcutId,
-  userShortcuts: Partial<Record<ShortcutId, KeyBinding[]>>,
-): string | null {
-  const shortcut = SHORTCUTS_BY_ID.get(id);
-  if (!shortcut) return null;
-  const bindings = userShortcuts[id] ?? shortcut.defaultBindings;
-  const tokens = getBindingTokens(bindings?.[0]);
-  return tokens.length ? tokens.join(" ") : null;
-}
-
 export function getBindingTokens(binding?: KeyBinding): string[] {
   if (!binding) return [];
   const tokens: string[] = [];
@@ -376,4 +363,17 @@ export function getBindingTokens(binding?: KeyBinding): string[] {
 
   tokens.push(keyLabel);
   return tokens;
+}
+
+const SHORTCUTS_BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
+
+export function getShortcutLabel(
+  id: ShortcutId,
+  userShortcuts: Partial<Record<ShortcutId, KeyBinding[]>>,
+): string | null {
+  const shortcut = SHORTCUTS_BY_ID.get(id);
+  if (!shortcut) return null;
+  const bindings = userShortcuts[id] ?? shortcut.defaultBindings;
+  const tokens = getBindingTokens(bindings?.[0]);
+  return tokens.length ? tokens.join(" ") : null;
 }
