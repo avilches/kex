@@ -6,6 +6,7 @@ export { useWorkspaces, type UseWorkspacesReturn } from "./lib/useWorkspaces";
 export { panelTitle, panelIcon } from "./lib/panelTitle";
 export { SplitNodeView } from "./SplitNodeView";
 export { WorkspaceView } from "./WorkspaceView";
+export { useWorkspaceDnd } from "./WorkspaceDndProvider";
 export {
   allPaneIds,
   allPanes,

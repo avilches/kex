@@ -72,6 +72,10 @@ export function WorkspaceDndProvider({
       setDraggingItem({ kind: "file", path: activeId.slice(5) });
       return;
     }
+    if (activeId.startsWith("dir:")) {
+      setDraggingItem({ kind: "file", path: activeId.slice(4) });
+      return;
+    }
     for (const ws of workspaces) {
       const result = findPanelPane(ws.paneTree, activeId);
       if (result) {

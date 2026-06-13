@@ -14,6 +14,7 @@ import {
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useDndMonitor } from "@dnd-kit/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   forwardRef,
@@ -185,6 +186,26 @@ export const FileExplorer = memo(
     ref,
   ) {
     const tree = useFileTree(rootPath, { onPathRenamed, onPathDeleted });
+
+    // Move a dragged file/folder when dropped on a folder row. The drop target
+    // is only registered for valid destinations (see TreeRow), so over here is
+    // always a legal move; movePath additionally guards against name clashes.
+    useDndMonitor({
+      onDragEnd({ active, over }) {
+        if (!over) return;
+        const overId = String(over.id);
+        if (!overId.startsWith("explorer-dir:")) return;
+        const activeId = String(active.id);
+        const from = activeId.startsWith("file:")
+          ? activeId.slice(5)
+          : activeId.startsWith("dir:")
+            ? activeId.slice(4)
+            : null;
+        if (from === null) return;
+        void tree.movePath(from, overId.slice("explorer-dir:".length));
+      },
+    });
+
     const gitDecorations = usePreferencesStore((s) => s.explorerGitDecorations);
     const { lookup: lookupGitStatus } = useGitStatus(
       rootPath,

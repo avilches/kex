@@ -6,10 +6,11 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
-import { useDraggable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { memo, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
+import { useWorkspaceDnd } from "@/modules/workspaces";
 import { InlineInput } from "./InlineInput";
 import {
   copyToClipboard,
@@ -76,11 +77,48 @@ function EntryRowImpl(props: EntryRowProps) {
   } = props;
 
   const [isConfirming, setIsConfirming] = useState(false);
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `file:${path}`,
-    disabled: isDir,
-    data: { path },
+  const { draggingItem } = useWorkspaceDnd();
+  const dragSource =
+    draggingItem?.kind === "file" ? draggingItem.path : null;
+
+  // Files drag as `file:` (also openable in a pane); folders as `dir:` (move
+  // only, the workspace dnd ignores them for pane opening).
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } =
+    useDraggable({
+      id: isDir ? `dir:${path}` : `file:${path}`,
+      data: { path },
+    });
+
+  // A folder is a valid move target unless it is the source itself, the
+  // source's current parent (no-op), or a descendant of the source.
+  const isValidDropTarget =
+    isDir &&
+    dragSource !== null &&
+    dragSource !== path &&
+    !path.startsWith(`${dragSource}/`) &&
+    dragSource.slice(0, dragSource.lastIndexOf("/")) !== path;
+
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `explorer-dir:${path}`,
+    disabled: !isValidDropTarget,
   });
+  const isDropTarget = isValidDropTarget && isOver;
+
+  const setRefs = useCallback(
+    (node: HTMLButtonElement | null) => {
+      setDragRef(node);
+      setDropRef(node);
+    },
+    [setDragRef, setDropRef],
+  );
+
+  // Spring open a collapsed folder after hovering over it during a drag.
+  useEffect(() => {
+    if (!isOver || !isValidDropTarget || isExpanded) return;
+    const t = setTimeout(() => actions.toggle(path), 700);
+    return () => clearTimeout(t);
+  }, [isOver, isValidDropTarget, isExpanded, actions, path]);
+
   const iconUrl = isDir ? folderIconUrl(name, isExpanded) : fileIconUrl(name);
   const createTarget = isDir ? path : path.slice(0, path.lastIndexOf("/")) || rootPath;
   const paddingLeft = 6 + depth * 12;
@@ -114,7 +152,7 @@ function EntryRowImpl(props: EntryRowProps) {
           </div>
         ) : (
           <button
-            ref={setNodeRef}
+            ref={setRefs}
             type="button"
             data-fs-path={path}
             onClick={handleClick}
@@ -127,6 +165,7 @@ function EntryRowImpl(props: EntryRowProps) {
                   ? "text-muted-foreground/70"
                   : "text-foreground/85",
               isDragging && "opacity-50",
+              isDropTarget && "bg-primary/10 ring-1 ring-primary/60",
             )}
             style={{ paddingLeft }}
             {...listeners}
