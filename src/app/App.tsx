@@ -291,6 +291,16 @@ export default function App() {
     });
   }, [activeWorkspace, activeCwd, openPanel]);
 
+  const openNewBlock = useCallback((targetPaneId?: string) => {
+    if (!activeWorkspace) return;
+    openPanel(activeWorkspace.id, targetPaneId ?? activeWorkspace.activePaneId, {
+      id: crypto.randomUUID(),
+      kind: "terminal",
+      blocks: true,
+      cwd: activeCwd ?? activeWorkspace.cwd,
+    });
+  }, [activeWorkspace, activeCwd, openPanel]);
+
   // ── Window title ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -893,7 +903,7 @@ export default function App() {
               openNewTerminal();
             },
             openNewWorkspace: () => addWorkspace(home ?? undefined),
-            openNewBlock: () => addWorkspace(home ?? undefined),
+            openNewBlock: () => openNewBlock(),
             openNewEditor: () => setNewEditorOpen(true),
             openNewPreview: () => openPreviewInPanel(""),
             openGitGraph: openGitGraphFromContext,
@@ -934,6 +944,7 @@ export default function App() {
       home,
       addWorkspace,
       openNewTerminal,
+      openNewBlock,
       openPreviewInPanel,
       openGitGraphFromContext,
       toggleSourceControl,

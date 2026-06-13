@@ -76,6 +76,7 @@ export function PanelContent({ panel, visible, focused, callbacks }: Props) {
           visible={visible}
           focused={focused}
           initialCwd={panel.cwd}
+          blocks={panel.blocks}
           onSearchReady={callbacks.onSearchReady}
           onExit={callbacks.onExit}
           onCwd={callbacks.onCwd}
