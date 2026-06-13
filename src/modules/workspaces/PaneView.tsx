@@ -20,6 +20,11 @@ type Props = {
   onClosePanel: (workspaceId: string, panelId: string) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
+  onSplitTerminalRight: (workspaceId: string, paneId: string) => void;
+  onSplitTerminalDown: (workspaceId: string, paneId: string) => void;
+  onNewBrowser: (workspaceId: string, paneId: string) => void;
+  onSplitBrowserRight: (workspaceId: string, paneId: string) => void;
+  onSplitBrowserDown: (workspaceId: string, paneId: string) => void;
   callbacks: PanelCallbacks;
 };
 
@@ -65,6 +70,11 @@ export function PaneView({
   onClosePanel,
   onFocusPane,
   onNewTerminal,
+  onSplitTerminalRight,
+  onSplitTerminalDown,
+  onNewBrowser,
+  onSplitBrowserRight,
+  onSplitBrowserDown,
   callbacks,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
@@ -148,6 +158,19 @@ export function PaneView({
         onActivate={(panelId) => onActivatePanel(workspaceId, panelId)}
         onClose={(panelId) => onClosePanel(workspaceId, panelId)}
         onNewTerminal={() => onNewTerminal(workspaceId, pane.id)}
+        onCloseOtherPanels={(panelId) => {
+          pane.panels
+            .filter((p) => p.id !== panelId)
+            .forEach((p) => onClosePanel(workspaceId, p.id));
+        }}
+        onCloseAllPanels={() => {
+          [...pane.panels].forEach((p) => onClosePanel(workspaceId, p.id));
+        }}
+        onSplitTerminalRight={() => onSplitTerminalRight(workspaceId, pane.id)}
+        onSplitTerminalDown={() => onSplitTerminalDown(workspaceId, pane.id)}
+        onNewBrowser={() => onNewBrowser(workspaceId, pane.id)}
+        onSplitBrowserRight={() => onSplitBrowserRight(workspaceId, pane.id)}
+        onSplitBrowserDown={() => onSplitBrowserDown(workspaceId, pane.id)}
       />
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (
