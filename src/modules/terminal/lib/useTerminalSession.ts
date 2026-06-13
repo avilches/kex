@@ -195,6 +195,19 @@ export function clearFocusedTerminal(): boolean {
   return false;
 }
 
+/**
+ * Move the block selection in the focused-and-visible block terminal. Steps to
+ * the previous (-1) or next (+1) command block. No-op when focus is elsewhere
+ * or the focused terminal has no block decorations.
+ */
+export function navigateFocusedBlocks(dir: -1 | 1): void {
+  for (const [, s] of sessions) {
+    if (!s.visibleNow || !s.focusedNow) continue;
+    s.blockDecorations?.navigateBlocks(dir);
+    return;
+  }
+}
+
 export function leafIdForPty(ptyId: number): string | null {
   for (const [leafId, s] of sessions) {
     if (s.pty?.id === ptyId) return leafId;
@@ -697,12 +710,6 @@ export function useTerminalSession({
     [leafId],
   );
 
-  const blockHoverAt = useCallback(
-    (clientY: number) =>
-      sessions.get(leafId)?.blockDecorations?.hoverAt(clientY) ?? null,
-    [leafId],
-  );
-
   const readBlockId = useCallback(
     (id: string) =>
       sessions.get(leafId)?.blockDecorations?.readById(id) ?? null,
@@ -760,7 +767,6 @@ export function useTerminalSession({
       applyTheme,
       blockMode,
       selectBlockAt,
-      blockHoverAt,
       readBlockId,
       subscribeBlocks,
       visibleBlocks,
@@ -776,7 +782,6 @@ export function useTerminalSession({
       applyTheme,
       blockMode,
       selectBlockAt,
-      blockHoverAt,
       readBlockId,
       subscribeBlocks,
       visibleBlocks,

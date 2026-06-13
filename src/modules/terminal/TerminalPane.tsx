@@ -7,7 +7,6 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState,
 } from "react";
 import { BlockOverlay } from "./block/BlockOverlay";
 import {
@@ -95,24 +94,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       [session],
     );
 
-    const [hoveredId, setHoveredId] = useState<string | null>(null);
-    const hideHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const cancelHideHover = () => {
-      if (hideHoverTimer.current) {
-        clearTimeout(hideHoverTimer.current);
-        hideHoverTimer.current = null;
-      }
-    };
-    const scheduleHideHover = () => {
-      cancelHideHover();
-      hideHoverTimer.current = setTimeout(() => setHoveredId(null), 120);
-    };
-    useEffect(() => {
-      return () => {
-        if (hideHoverTimer.current) clearTimeout(hideHoverTimer.current);
-      };
-    }, []);
-
     const hideStyle = {
       visibility: visible ? ("visible" as const) : ("hidden" as const),
       pointerEvents: visible ? ("auto" as const) : ("none" as const),
@@ -140,23 +121,17 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
                 if (!moved) session.selectBlockAt(e.clientY);
                 if (session.blockMode === "prompt") focusLeafInput(panelId);
               }}
-              onMouseMove={(e) => {
-                cancelHideHover();
-                const id = session.blockHoverAt(e.clientY)?.block.id ?? null;
-                setHoveredId((prev) => (prev === id ? prev : id));
-              }}
-              onMouseLeave={scheduleHideHover}
             />
             <BlockOverlay
               subscribe={session.subscribeBlocks}
               getVisible={session.visibleBlocks}
-              hoveredId={hoveredId}
               readOutput={(id) => session.readBlockId(id)?.output ?? null}
               searchBlock={session.searchBlock}
               revealMatch={session.revealMatch}
               clearSearch={session.clearSearch}
-              onHoverKeepAlive={cancelHideHover}
-              onHoverEnd={() => setHoveredId(null)}
+              promptReady={session.blockMode === "prompt"}
+              onRunAgain={(cmd) => submitToLeaf(panelId, cmd)}
+              onRestoreFocus={() => focusLeafInput(panelId)}
             />
           </div>
           <div className="shrink-0 border-t border-border/40 px-3 py-2">

@@ -4,6 +4,7 @@ export {
   disposeSession,
   leafHasForegroundProcess,
   leafIdForPty,
+  navigateFocusedBlocks,
   refreshTerminalLeaf,
   respawnSession,
   terminalDebugStats,

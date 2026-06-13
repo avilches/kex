@@ -39,6 +39,7 @@ import { StatusBar } from "@/modules/statusbar";
 import {
   clearFocusedTerminal,
   disposeSession,
+  navigateFocusedBlocks,
   type TerminalPaneHandle,
   useTerminalFileDrop,
   writeToSession,
@@ -814,6 +815,8 @@ export default function App() {
       "terminal.clear": () => { clearFocusedTerminal(); },
       "terminal.toggleInput": () =>
         window.dispatchEvent(new CustomEvent(TOGGLE_BLOCK_INPUT_EVENT)),
+      "blocks.prev": () => navigateFocusedBlocks(-1),
+      "blocks.next": () => navigateFocusedBlocks(1),
       "search.focus": () => searchInlineRef.current?.focus(),
       "settings.open": () => void openSettingsWindow(),
       "rightPanel.toggle": () => navigateRightPanelTo("git"),
@@ -868,6 +871,12 @@ export default function App() {
       }
       if (id === "terminal.toggleInput") {
         return activePanel?.kind !== "terminal";
+      }
+      if (id === "blocks.prev" || id === "blocks.next") {
+        return !(
+          activePanel?.kind === "terminal" &&
+          (activePanel as { blocks?: boolean }).blocks === true
+        );
       }
 
       return false;

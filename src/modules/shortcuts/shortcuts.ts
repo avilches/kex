@@ -24,6 +24,8 @@ export type ShortcutId =
   | "pane.source"
   | "terminal.clear"
   | "terminal.toggleInput"
+  | "blocks.prev"
+  | "blocks.next"
   | "search.focus"
   | "explorer.search"
   | "rightPanel.toggle"
@@ -173,6 +175,20 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Toggle Shell / AI input",
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "u" }],
+  },
+  {
+    id: "blocks.prev",
+    label: "Previous command block",
+    group: "Terminal",
+    defaultBindings: [{ [MOD_PROP]: true, key: "ArrowUp" }],
+    allowRepeat: true,
+  },
+  {
+    id: "blocks.next",
+    label: "Next command block",
+    group: "Terminal",
+    defaultBindings: [{ [MOD_PROP]: true, key: "ArrowDown" }],
+    allowRepeat: true,
   },
   {
     id: "tab.next",

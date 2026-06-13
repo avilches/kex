@@ -79,6 +79,7 @@ export class BlockDecorations {
   private live: LiveBlock | null = null;
   private cwd = "";
   private idSeq = 0;
+  private selectedId: string | null = null;
   private searchDeco: IDecoration | null = null;
   private searchMarker: IMarker | null = null;
   private mode: ModeState = initialModeState();
@@ -238,24 +239,6 @@ export class BlockDecorations {
     return lines;
   }
 
-  hoverAt(
-    clientY: number,
-  ): { block: BlockMeta; top: number; bottom: number } | null {
-    const screen = this.term.element?.querySelector<HTMLElement>(".xterm-screen");
-    if (!screen || this.term.rows === 0) return null;
-    const rect = screen.getBoundingClientRect();
-    const cellHeight = rect.height / this.term.rows;
-    if (cellHeight <= 0) return null;
-    const viewportY = this.term.buffer.active.viewportY;
-    const row = Math.floor((clientY - rect.top) / cellHeight);
-    const block = this.blockAt(viewportY + row);
-    if (!block) return null;
-    const offset = rect.top - (this.term.element?.getBoundingClientRect().top ?? rect.top);
-    const top = offset + Math.max(0, (block.startLine - viewportY) * cellHeight);
-    const bottom = offset + (block.endLine - viewportY + 1) * cellHeight;
-    return { block, top, bottom };
-  }
-
   visibleBlocks(): VisibleBlocks {
     const term = this.term;
     // No block chrome over a full-screen TUI (vim/htop) — it owns the screen.
@@ -297,9 +280,13 @@ export class BlockDecorations {
       if (startLine < vpTop && endLine >= vpTop) sticky = pb;
     };
 
-    // entries are chronological, so once a block starts below the viewport all
-    // later ones do too — stop early instead of scanning the whole history.
-    for (const e of this.entries) {
+    // entries are chronological, so binary search beats a full scan per frame
+    for (
+      let i = this.firstIndexEndingAtOrAfter(vpTop);
+      i < this.entries.length;
+      i++
+    ) {
+      const e = this.entries[i];
       const r = this.rangeOf(e);
       if (!r) continue;
       if (r.start > vpBottom) break;
@@ -349,8 +336,56 @@ export class BlockDecorations {
     const row = Math.floor((clientY - rect.top) / cellHeight);
     const bufferRow = this.term.buffer.active.viewportY + row;
     const block = this.blockAt(bufferRow);
-    if (block) this.term.selectLines(block.startLine, block.endLine);
-    else this.term.clearSelection();
+    if (!block) {
+      this.clearBlockSelection();
+      return;
+    }
+    if (block.id === this.selectedId && this.term.hasSelection()) {
+      this.clearBlockSelection();
+      return;
+    }
+    this.selectBlock(block.id);
+  }
+
+  selectBlock(id: string): void {
+    const e = this.entries.find((x) => x.id === id);
+    const r = e ? this.rangeOf(e) : null;
+    if (!r) return;
+    this.term.selectLines(r.start, r.end);
+    this.selectedId = id;
+  }
+
+  clearBlockSelection(): boolean {
+    const had = this.term.hasSelection();
+    this.term.clearSelection();
+    this.selectedId = null;
+    return had;
+  }
+
+  // Steps relative to the selected block when one is selected, otherwise
+  // starts from the most recent block.
+  navigateBlocks(dir: -1 | 1): void {
+    if (this.entries.length === 0) return;
+    let idx: number;
+    const cur = this.selectedId
+      ? this.entries.findIndex((e) => e.id === this.selectedId)
+      : -1;
+    if (cur >= 0 && this.term.hasSelection()) {
+      idx = cur + dir;
+    } else {
+      idx = dir < 0 ? this.entries.length - 1 : -1;
+    }
+    while (idx >= 0 && idx < this.entries.length) {
+      const e = this.entries[idx];
+      const r = this.rangeOf(e);
+      if (r) {
+        this.term.selectLines(r.start, r.end);
+        this.selectedId = e.id;
+        this.term.scrollToLine(Math.max(0, r.start - 2));
+        return;
+      }
+      idx += dir;
+    }
   }
 
   dispose(): void {
@@ -370,6 +405,19 @@ export class BlockDecorations {
 
   private rangeOf(e: Entry): LineRange | null {
     return computeRange(e.startMarker, e.endMarker);
+  }
+
+  // Disposed ranges (trimmed-oldest prefix) sort as -1, before any viewport.
+  private firstIndexEndingAtOrAfter(line: number): number {
+    let lo = 0;
+    let hi = this.entries.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const r = this.rangeOf(this.entries[mid]);
+      if ((r?.end ?? -1) < line) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
   }
 
   private toMeta(e: Entry, r: LineRange): BlockMeta {

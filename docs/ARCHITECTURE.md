@@ -82,7 +82,7 @@ There are two separate WebView windows: the main window (`index.html`) and the s
 **Shell integration.** Terax injects init scripts at shell startup that emit OSC 7 (current working directory) and OSC 133 sequences (prompt boundaries, command start, command end, exit code). This enables:
 - The CWD breadcrumb in the status bar to update as you `cd` through directories.
 - The file explorer to follow the active terminal's working directory.
-- Command block detection for future features.
+- The optional **block terminal** mode (a panel with `blocks: true`): command output is grouped into blocks with per-block chrome (cwd, time, duration, exit badge on failure) and a hover toolbar (`Run again`, copy command/output, find in block). The shell's prompt is suppressed and input is driven by a host-rendered `ShellInput`. `Cmd+Up`/`Cmd+Down` navigate between command blocks.
 
 Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), PowerShell 5.1 (full), cmd.exe (no integration — basic terminal only).
 

@@ -40,6 +40,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-33](pending/bugs/BUG-33-segmentsfromcwd-case-sensitive-home-windows.md) — segmentsFromCwd: case-sensitive en home Windows
 - [BUG-34](pending/bugs/BUG-34-cd-quoting-breaks-cmd-fallback.md) — cd quoting rompe fallback a cmd.exe
 - [BUG-35](pending/bugs/BUG-35-usepresence-mounted-in-deps-reentrancy.md) — usePresence: mounted en deps causa reentrancy
+- [BUG-36](pending/bugs/BUG-36-block-menu-desaparece-bloque-largo.md) - Menu de acciones de bloque desaparece en bloques muy largos
 
 ## Features (`docs/pending/features/`)
 
