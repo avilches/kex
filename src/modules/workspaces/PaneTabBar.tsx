@@ -183,6 +183,15 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     };
   }, []);
 
+  // Keep active tab visible when the container is resized (pane resize, split, etc.)
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => scrollActiveIntoView('auto'));
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
   // Snap back when the panel list changes (tab opened or closed)
   useEffect(() => {
     userScrolledRef.current = false;
