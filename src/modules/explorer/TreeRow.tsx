@@ -6,6 +6,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
+import { useDraggable } from "@dnd-kit/core";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useState } from "react";
@@ -61,6 +62,11 @@ function EntryRowImpl(props: EntryRowProps) {
   } = props;
 
   const [isConfirming, setIsConfirming] = useState(false);
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `file:${path}`,
+    disabled: isDir,
+    data: { path },
+  });
   const iconUrl = isDir ? folderIconUrl(name, isExpanded) : fileIconUrl(name);
   const createTarget = isDir ? path : path.slice(0, path.lastIndexOf("/")) || rootPath;
   const paddingLeft = 6 + depth * 12;
@@ -94,6 +100,7 @@ function EntryRowImpl(props: EntryRowProps) {
           </div>
         ) : (
           <button
+            ref={setNodeRef}
             type="button"
             data-fs-path={path}
             onClick={handleClick}
@@ -101,8 +108,11 @@ function EntryRowImpl(props: EntryRowProps) {
             className={cn(
               "group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
               isSelected && "bg-accent text-foreground",
+              isDragging && "opacity-50",
             )}
             style={{ paddingLeft }}
+            {...listeners}
+            {...attributes}
           >
             <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
               {isDir ? (
