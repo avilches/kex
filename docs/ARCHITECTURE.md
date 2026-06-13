@@ -120,6 +120,12 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **Drag to open.** Files (not directories) can be dragged from the explorer and dropped onto any pane drop zone or between tabs to open them as permanent editor tabs. Dropping on a directional zone (top/bottom/left/right) splits the target pane and opens the file in the new sub-pane. The drag experience is visually identical to dragging tabs between panes. See `WorkspaceDndProvider.tsx`.
 
+**Drag to move.** Dragging a file or folder onto another folder row moves it there (`fs_rename`). Built on the same `@dnd-kit` context as drag-to-open (not a second pointer system): folder rows are `useDroppable` (`explorer-dir:<path>`), folders drag as `dir:<path>` (move only, ignored by the pane-open handler), files as `file:<path>` (openable in a pane *and* movable). The move is committed by `useDndMonitor` in `FileExplorer` calling `tree.movePath`; the drop target is only registered for valid destinations (not self, current parent, or a descendant) and `movePath` additionally refuses name clashes. Hovering a collapsed folder for 700ms springs it open.
+
+**Drop files from the OS.** Dragging files/folders from Finder/Explorer onto an explorer folder copies them in (`fs_copy`, recursive, refuses to overwrite). Uses Tauri's native drag-drop (`onDragDropEvent`), one webview listener that hit-tests by `data-fs-path` / `data-explorer-drop`. It coexists with the terminal's own OS-drop listener (`useTerminalFileDrop`, which hit-tests `data-pane-leaf`): both receive every event but each acts only on its own DOM region, so they never steal each other's drops.
+
+**Git decorations.** Optional (Settings > General > Explorer, **off by default**). Tints each file name by git status (modified/added/deleted/renamed/untracked) and dims gitignored entries; collapsed folders bubble up the highest-priority status of their children. The data rides the always-resident Source Control snapshot (no extra git IPC or watcher); the only backend cost is a `max_depth(1)` `WalkBuilder` per directory read, and only when the flag is on (gated to a real git repo so it never trips macOS folder-access prompts outside one). Pure logic in `lib/gitStatusUtils.ts` (tested); colors in `lib/gitStatusColor.ts`.
+
 ### 3.4 Source control
 
 **Git status and staging.** The source control panel shows modified, staged, untracked, and conflicted files. You can stage / unstage individual files or hunks. The diff view uses the CodeMirror merge extension.

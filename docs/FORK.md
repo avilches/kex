@@ -38,6 +38,19 @@ notifications, Sonner toasts). Zero cost when no agent runs.
 `ai` (Vercel AI SDK v6), `@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/cerebras`, `@ai-sdk/groq`,
 `@ai-sdk/xai`, `@ai-sdk/react`, `streamdown` — all removed. Reduces the frontend bundle by roughly half.
 
+### Features de upstream evaluadas y omitidas
+
+- `src/modules/spaces/` (Spaces, agrupacion de tabs): evaluado en el upstream sync 2026-06-13, omitido. El upstream anade
+  "spaces" como una capa que agrupa tabs planos (cada tab con su propio paneTree), persistida en `terax-spaces.json`. El
+  fork ya cubre esa necesidad (varios entornos de trabajo agrupados, conmutables, reordenables, persistidos) con su
+  modelo Workspace -> Pane -> Panel y el WorkspaceSidebar, sin un nivel intermedio de tabs. Traer spaces introduciria un
+  segundo eje de agrupacion redundante, un segundo store en disco, y resucitaria el modelo de tabs planos eliminado en la
+  Phase 2. Se omite por conflicto de arquitectura, no por falta de valor. Piezas de UI sueltas (SpaceAvatar con acento
+  oklch, InlineRename, DropIndicator) quedan como posible pulido futuro del WorkspaceSidebar.
+- `src/modules/dnd/` (dnd foundation del upstream): omitido. Es una fachada sobre @dnd-kit; el fork ya tiene
+  `WorkspaceDndProvider` (drag de panels entre panes y de archivos del explorer a panes), mas avanzado.
+- Empaquetado Nix (`flake.nix`, `nix/`): el upstream distribuye via Nix; el fork no. Se ignoran todos los commits nix.
+
 ---
 
 ## What has been added or changed
@@ -150,3 +163,21 @@ These phases are designed but not fully implemented:
 - **Multi-window workspace migration** — workspaces can be dragged from one window's sidebar to another window's
   sidebar. Requires a Tauri event protocol (`terax:workspace-transfer`) that transfers the workspace entity by ID across
   WebView instances.
+
+---
+
+### Upstream sync log
+
+#### 2026-06-13
+
+- Upstream HEAD: 8e1c4743fb4efcf1f3d089457c32dc1326552683
+- Commits revisados: f69eecc34df5be9aa1b23166de7e84b231bca481..8e1c4743fb4efcf1f3d089457c32dc1326552683 (50 commits reales, 5 merges)
+- Outcome: work plan creado en docs/upstream-2026-06-13.md y ejecutado (rama sync/upstream-2026-06-13)
+- Bug fixes / perf aplicados (Bucket B): pwsh startup cursor query (tab blanco Windows, da_filter CPR); dormantRing coalesce + keep-history-on-overflow; raw-body pty_write (solo la parte de latencia, sin el watchdog que el upstream luego revierte ni tcgetpgrp); macOS press-and-hold off; editor cursor zoom macOS; AppImage env strip; integracion de blocks en bash/fish/pwsh (serie de 4 commits); test del ciclo OSC 133 de blocks; perf del explorer (RowActions memo + sameDirListing); tokens de motion compartidos (2 commits)
+- New features aplicadas (Bucket C): git status decorations en el explorer (+ fix de gitignore-fuera-de-repo); drag-to-move dentro del explorer; aceptar archivos soltados desde el SO (fs_copy)
+- Divergencias conscientes en la integracion:
+  - git decorations OFF por defecto (el upstream lo trae ON). El WalkBuilder por-directorio tiene coste real y la filosofia del fork es "lo no usado cuesta cero"; se activa en Settings > General > Explorer.
+  - drag-to-move reimplementado con @dnd-kit en lugar del hook pointer-based del upstream (useExplorerDnd). El fork ya gestiona el drag de filas con @dnd-kit (arrastrar archivos a panes via WorkspaceDndProvider); dos sistemas de pointer-events sobre la misma fila chocarian. Carpetas como useDroppable (explorer-dir:<path>), drag de carpetas con prefijo dir:, move via useDndMonitor + movePath. El hook useExplorerDnd del upstream NO se integro.
+- Changes skipped (removed surface): subsistema AI (chips, OsIcon, parte AI de WorkspaceInputBar); empaquetado Nix (5 commits); modelo de tabs/spaces del upstream; modulo dnd del upstream; version bump 0.8.0; band-aids de conpty stall revertidos por el propio upstream (solo se aplico la causa raiz, 18187f4)
+- New features rejected: Spaces (modelo de agrupacion de tabs, conflicto con el modelo Workspace del fork); dnd foundation (ya superado por WorkspaceDndProvider)
+- New features deferred (no en esta ronda): blocks toolbar+navigation+exit badge (C5, requiere antes cablear la activacion del modo blocks); cableado de activacion del modo blocks (campo blocks en Panel, propagacion en PanelContent, arreglar openNewBlock); markdown rendered/raw toggle; blocks watermark; blocks copy-grid-selection; Cmd+Shift+T blocks; mejoras de UI derivadas de motion tokens. Mejoras menores anotadas en docs/TODO-explorer-dnd-drop-targets.md (drop sobre archivo/raiz, color git en fila seleccionada, drag explorer->SO).

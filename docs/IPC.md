@@ -28,7 +28,7 @@ Shell integration scripts (`scripts/`) are injected at spawn time. Platform dete
 
 | Command | Description |
 |---|---|
-| `fs_read_dir` | Directory listing (one level) |
+| `fs_read_dir` | Directory listing (one level). Optional `git_decorations` flag adds a per-entry `gitignored` bool (gated to a real repo) for the explorer git decorations |
 | `list_subdirs` | List only subdirectories (for the explorer tree) |
 | `fs_read_file` | Read file contents as UTF-8 string |
 | `fs_write_file` | Write file contents |
@@ -38,6 +38,7 @@ Shell integration scripts (`scripts/`) are injected at spawn time. Platform dete
 | `fs_create_dir` | Create a new directory (recursive) |
 | `fs_rename` | Rename or move a file/directory |
 | `fs_delete` | Delete a file or directory |
+| `fs_copy` | Copy external files/dirs into a destination directory (recursive, refuses to overwrite). Backs the explorer OS-file-drop; sources are absolute OS paths, only the destination is workspace-resolved |
 | `fs_watch_add` | Start watching a path for changes (emits Tauri events) |
 | `fs_watch_remove` | Stop watching a path |
 | `fs_search` | Fuzzy file name search via `nucleo-matcher` + `ignore` |
