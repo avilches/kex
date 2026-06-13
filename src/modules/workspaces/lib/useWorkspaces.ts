@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { flushWorkspaceState } from "./workspaceState";
 import {
   allPaneIds,
+  allPanes,
   findPane,
   findPanelPane,
   firstPaneId,
   movePanelBetweenPanes,
   removePaneFromTree,
   siblingPane,
+  splitPaneAndInsertPanel,
   splitPaneInTree,
   updateDivider,
   updatePane,
@@ -204,19 +207,45 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
+  const splitPaneAndOpenFile = useCallback((
+    workspaceId: string,
+    targetPaneId: string,
+    direction: "left" | "right" | "top" | "bottom",
+    path: string,
+  ) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w;
+        const { workspacePaneLimit } = usePreferencesStore.getState();
+        if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
+        const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
+        const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
+        const newPaneId = crypto.randomUUID();
+        const newSplitId = crypto.randomUUID();
+        const panel: Panel = { id: crypto.randomUUID(), kind: "editor", path, preview: false, dirty: false };
+        const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, newSplitId, newPaneId, orientation, newPanePosition, panel);
+        if (newTree === w.paneTree) return w;
+        return { ...w, paneTree: newTree, activePaneId: newPaneId };
+      }),
+    );
+  }, []);
+
   // ── Panel operations ──────────────────────────────────────────────────────
 
-  const openPanel = useCallback((workspaceId: string, paneId: string, panel: Panel) => {
+  const openPanel = useCallback((workspaceId: string, paneId: string, panel: Panel, insertionIndex?: number) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
         return {
           ...w,
-          paneTree: updatePane(w.paneTree, paneId, (p) => ({
-            ...p,
-            panels: [...p.panels, panel],
-            activePanelId: panel.id,
-          })),
+          paneTree: updatePane(w.paneTree, paneId, (p) => {
+            const idx = insertionIndex !== undefined
+              ? Math.min(insertionIndex, p.panels.length)
+              : p.panels.length;
+            const newPanels = [...p.panels];
+            newPanels.splice(idx, 0, panel);
+            return { ...p, panels: newPanels, activePanelId: panel.id };
+          }),
         };
       }),
     );
@@ -367,6 +396,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     movePanel,
     reorderPanel,
     splitPaneAndPlace,
+    splitPaneAndOpenFile,
     openPanel,
     activatePanel,
     closePanel,
