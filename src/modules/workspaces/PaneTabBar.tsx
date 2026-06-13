@@ -134,7 +134,8 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   const paneFocusedRef = useRef(paneFocused);
   const isWorkspaceActiveRef = useRef(isWorkspaceActive);
   const userScrolledRef = useRef(false);
-  const userScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mouseLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mouseInsideRef = useRef(true);
 
   useEffect(() => { activePanelIdRef.current = activePanelId; });
   useEffect(() => { paneFocusedRef.current = paneFocused; });
@@ -161,7 +162,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     scrollActiveIntoView('auto');
   }, [activePanelId]);
 
-  // Wheel scroll: translate vertical delta to horizontal, snap back to active tab after idle
+  // Wheel scroll: translate vertical delta to horizontal; snap-back managed by focus/mouse-leave logic
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -169,16 +170,22 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
       e.preventDefault();
       const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       container.scrollLeft += delta;
-      if (userScrollTimerRef.current) clearTimeout(userScrollTimerRef.current);
-      userScrollTimerRef.current = setTimeout(() => {
-        userScrollTimerRef.current = null;
-        scrollActiveIntoView('smooth');
-      }, 800);
+      userScrolledRef.current = true;
+      // Edge case: scroll via trackpad while pointer was already outside
+      if (!mouseInsideRef.current && !mouseLeaveTimerRef.current) {
+        mouseLeaveTimerRef.current = setTimeout(() => {
+          mouseLeaveTimerRef.current = null;
+          if (paneFocusedRef.current && isWorkspaceActiveRef.current) {
+            userScrolledRef.current = false;
+            scrollActiveIntoView('smooth');
+          }
+        }, 5000);
+      }
     };
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => {
       container.removeEventListener('wheel', handleWheel);
-      if (userScrollTimerRef.current) clearTimeout(userScrollTimerRef.current);
+      if (mouseLeaveTimerRef.current) clearTimeout(mouseLeaveTimerRef.current);
     };
   }, []);
 
