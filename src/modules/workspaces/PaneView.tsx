@@ -177,6 +177,7 @@ export function PaneView({
           useAgentStore.getState().finish(panelId);
           void detachAgentSession(panelId);
         }}
+        onRenamePanel={callbacks.onRenamePanel}
       />
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (

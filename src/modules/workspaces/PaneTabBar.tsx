@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/context-menu";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { useTabRenameStore } from "./lib/tabRenameStore";
 
 type Props = {
   panels: Panel[];
@@ -32,6 +34,7 @@ type Props = {
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
   onDetachAgent: (panelId: string) => void;
+  onRenamePanel?: (panelId: string, title: string | undefined) => void;
 };
 
 function DraggableTab({
@@ -55,6 +58,7 @@ function DraggableTab({
   onSplitBrowserDown,
   onDetachAgent,
   shortcutLabels,
+  onRenamePanel,
 }: {
   panel: Panel;
   activePanelId: string | null;
@@ -76,6 +80,7 @@ function DraggableTab({
   onSplitBrowserDown: () => void;
   onDetachAgent: (panelId: string) => void;
   shortcutLabels: Record<string, string | null>;
+  onRenamePanel?: (panelId: string, title: string | undefined) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
@@ -98,172 +103,240 @@ function DraggableTab({
         })()
       : title;
 
+  const isRenaming = useTabRenameStore((s) => s.renamingPanelId === panel.id);
+  const clearRename = useTabRenameStore((s) => s.clearRename);
+  const startRename = useTabRenameStore((s) => s.startRename);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const handledRef = useRef(false);
+
+  useEffect(() => {
+    if (isRenaming) handledRef.current = false;
+  }, [isRenaming]);
+
+  function handleSave() {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    const value = inputRef.current?.value.trim() ?? "";
+    onRenamePanel?.(panel.id, value || undefined);
+    clearRename();
+  }
+
+  function handleCancel() {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    clearRename();
+  }
+
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          ref={setNodeRef}
-          {...attributes}
-          data-panel-id={panel.id}
-          title={hasAgent ? [
-            agentSession!.agent,
-            `Session: ${agentSession!.panelId.slice(0, 8)}...`,
-            `Started: ${new Date(agentSession!.startedAt).toLocaleTimeString()}`,
-            agentSession!.restored ? "Session restored" : null,
-            isRestoreError ? "Session restore failed" : null,
-            panel.kind === "terminal" ? (panel.cwd ?? "") : null,
-          ].filter((x): x is string => x !== null).join("\n") : undefined}
-          onClick={() => onActivate(panel.id)}
-          onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
-          onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
-          {...listeners}
-          className={cn(
-            "group relative flex min-w-[100px] max-w-[200px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
-            isThisDragging ? "cursor-grabbing" : "cursor-default",
-            connected
-              ? [
-                  "self-stretch border-r border-border/30",
-                  active
-                    ? "bg-background text-foreground"
-                    : "border-b border-border/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                ]
-              : [
-                  "h-5 rounded",
-                  active
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                ],
-            isThisDragging && "opacity-40",
-          )}
-        >
-          {/* Droppable half-zones - coordinates-based, no pointer events needed */}
-          <div ref={setBeforeRef} className="pointer-events-none absolute inset-y-0 left-0 w-1/2" />
-          <div ref={setAfterRef} className="pointer-events-none absolute inset-y-0 right-0 w-1/2" />
-
-          {insertionBefore && (
-            <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
-          )}
-          {insertionAfter && (
-            <div className="pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
-          )}
-
-          {active && paneFocused && (
+    <Popover
+      open={isRenaming}
+      onOpenChange={(open) => { if (!open) handleSave(); }}
+    >
+      <PopoverAnchor asChild>
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
             <div
-              className={cn("absolute inset-x-0 top-0 bg-tab-focus-indicator", connected ? "h-[1.5px]" : "h-0.5 rounded-t")}
-            />
-          )}
-          <span className={cn("shrink-0", hasAgent ? "opacity-100" : "opacity-70")}>
-            {hasAgent
-              ? isRestoreError
-                ? <span title="Session restore failed">{"⚠"}</span>
-                : "✦"
-              : panelIcon(panel, workspaceId)}
-          </span>
-          <span
-            className={cn(
-              "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
-              panel.kind === "terminal" && panel.runningCommand && "text-center",
-              isRestoreError && "text-destructive/70",
+              ref={setNodeRef}
+              {...attributes}
+              data-panel-id={panel.id}
+              title={hasAgent ? [
+                agentSession!.agent,
+                `Session: ${agentSession!.panelId.slice(0, 8)}...`,
+                `Started: ${new Date(agentSession!.startedAt).toLocaleTimeString()}`,
+                agentSession!.restored ? "Session restored" : null,
+                isRestoreError ? "Session restore failed" : null,
+                panel.kind === "terminal" ? (panel.cwd ?? "") : null,
+              ].filter((x): x is string => x !== null).join("\n") : undefined}
+              onClick={() => onActivate(panel.id)}
+              onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+              onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
+              {...listeners}
+              className={cn(
+                "group relative flex min-w-[100px] max-w-[200px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
+                isThisDragging ? "cursor-grabbing" : "cursor-default",
+                connected
+                  ? [
+                      "self-stretch border-r border-border/30",
+                      active
+                        ? "bg-background text-foreground"
+                        : "border-b border-border/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                    ]
+                  : [
+                      "h-5 rounded",
+                      active
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                    ],
+                isThisDragging && "opacity-40",
+              )}
+            >
+              {/* Droppable half-zones - coordinates-based, no pointer events needed */}
+              <div ref={setBeforeRef} className="pointer-events-none absolute inset-y-0 left-0 w-1/2" />
+              <div ref={setAfterRef} className="pointer-events-none absolute inset-y-0 right-0 w-1/2" />
+
+              {insertionBefore && (
+                <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
+              )}
+              {insertionAfter && (
+                <div className="pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
+              )}
+
+              {active && paneFocused && (
+                <div
+                  className={cn("absolute inset-x-0 top-0 bg-tab-focus-indicator", connected ? "h-[1.5px]" : "h-0.5 rounded-t")}
+                />
+              )}
+              <span className={cn("shrink-0", hasAgent ? "opacity-100" : "opacity-70")}>
+                {hasAgent
+                  ? isRestoreError
+                    ? <span title="Session restore failed">{"⚠"}</span>
+                    : "✦"
+                  : panelIcon(panel, workspaceId)}
+              </span>
+              <span
+                className={cn(
+                  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
+                  panel.kind === "terminal" && panel.runningCommand && "text-center",
+                  isRestoreError && "text-destructive/70",
+                )}
+                style={{ direction: panel.kind === "terminal" && !panel.runningCommand ? "rtl" : "ltr" }}
+                title={
+                  panel.kind === "terminal"
+                    ? panel.runningCommand
+                      ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
+                      : (panel.cwd?.replace(/\/$/, "") ?? "shell")
+                    : agentTitle
+                }
+              >
+                {agentTitle}
+              </span>
+              {panel.kind === "editor" && panel.dirty && (
+                <span className="shrink-0 text-[8px] text-primary">●</span>
+              )}
+              {hasAgent && (
+                isRestoreError ? (
+                  <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-destructive" />
+                ) : agentSession?.status === "working" ? (
+                  <span className="ml-0.5 size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
+                ) : (
+                  <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
+                )
+              )}
+              <button
+                type="button"
+                className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose(panel.id);
+                }}
+                title="Close panel"
+              >
+                <span className="text-[13px] leading-none">×</span>
+              </button>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            {onRenamePanel && (
+              <>
+                <ContextMenuItem onSelect={() => startRename(panel.id)}>
+                  Rename Tab
+                  {shortcutLabels["tab.rename"] && (
+                    <ContextMenuShortcut>{shortcutLabels["tab.rename"]}</ContextMenuShortcut>
+                  )}
+                </ContextMenuItem>
+                {panel.title && (
+                  <ContextMenuItem onSelect={() => onRenamePanel(panel.id, undefined)}>
+                    Reset Tab Name
+                  </ContextMenuItem>
+                )}
+                <ContextMenuSeparator />
+              </>
             )}
-            style={{ direction: panel.kind === "terminal" && !panel.runningCommand ? "rtl" : "ltr" }}
-            title={
-              panel.kind === "terminal"
-                ? panel.runningCommand
-                  ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
-                  : (panel.cwd?.replace(/\/$/, "") ?? "shell")
-                : agentTitle
-            }
-          >
-            {agentTitle}
-          </span>
-          {panel.kind === "editor" && panel.dirty && (
-            <span className="shrink-0 text-[8px] text-primary">●</span>
-          )}
-          {hasAgent && (
-            isRestoreError ? (
-              <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-destructive" />
-            ) : agentSession?.status === "working" ? (
-              <span className="ml-0.5 size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
-            ) : (
-              <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
-            )
-          )}
-          <button
-            type="button"
-            className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose(panel.id);
-            }}
-            title="Close panel"
-          >
-            <span className="text-[13px] leading-none">×</span>
-          </button>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={() => onClose(panel.id)}>
-          Close Tab
-          {shortcutLabels["tab.close"] && (
-            <ContextMenuShortcut>{shortcutLabels["tab.close"]}</ContextMenuShortcut>
-          )}
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={panelsCount <= 1}
-          onSelect={() => onCloseOtherPanels(panel.id)}
-        >
-          Close Other Tabs
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={onCloseAllPanels}>
-          Close All Tabs
-        </ContextMenuItem>
-        {hasAgent && (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuItem onSelect={() => onDetachAgent(panel.id)}>
-              Detach Claude
+            <ContextMenuItem onSelect={() => onClose(panel.id)}>
+              Close Tab
+              {shortcutLabels["tab.close"] && (
+                <ContextMenuShortcut>{shortcutLabels["tab.close"]}</ContextMenuShortcut>
+              )}
             </ContextMenuItem>
-          </>
-        )}
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={onNewTerminal}>
-          New Terminal Tab
-          {shortcutLabels["tab.new"] && (
-            <ContextMenuShortcut>{shortcutLabels["tab.new"]}</ContextMenuShortcut>
-          )}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={onSplitTerminalRight}>
-          New Terminal Split Right
-          {shortcutLabels["pane.splitRight"] && (
-            <ContextMenuShortcut>{shortcutLabels["pane.splitRight"]}</ContextMenuShortcut>
-          )}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={onSplitTerminalDown}>
-          New Terminal Split Down
-          {shortcutLabels["pane.splitDown"] && (
-            <ContextMenuShortcut>{shortcutLabels["pane.splitDown"]}</ContextMenuShortcut>
-          )}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={onNewBrowser}>
-          New Browser Tab
-          {shortcutLabels["tab.newPreview"] && (
-            <ContextMenuShortcut>{shortcutLabels["tab.newPreview"]}</ContextMenuShortcut>
-          )}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={onSplitBrowserRight}>
-          New Browser Split Right
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={onSplitBrowserDown}>
-          New Browser Split Down
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+            <ContextMenuItem
+              disabled={panelsCount <= 1}
+              onSelect={() => onCloseOtherPanels(panel.id)}
+            >
+              Close Other Tabs
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onCloseAllPanels}>
+              Close All Tabs
+            </ContextMenuItem>
+            {hasAgent && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem onSelect={() => onDetachAgent(panel.id)}>
+                  Detach Claude
+                </ContextMenuItem>
+              </>
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={onNewTerminal}>
+              New Terminal Tab
+              {shortcutLabels["tab.new"] && (
+                <ContextMenuShortcut>{shortcutLabels["tab.new"]}</ContextMenuShortcut>
+              )}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onSplitTerminalRight}>
+              New Terminal Split Right
+              {shortcutLabels["pane.splitRight"] && (
+                <ContextMenuShortcut>{shortcutLabels["pane.splitRight"]}</ContextMenuShortcut>
+              )}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onSplitTerminalDown}>
+              New Terminal Split Down
+              {shortcutLabels["pane.splitDown"] && (
+                <ContextMenuShortcut>{shortcutLabels["pane.splitDown"]}</ContextMenuShortcut>
+              )}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={onNewBrowser}>
+              New Browser Tab
+              {shortcutLabels["tab.newPreview"] && (
+                <ContextMenuShortcut>{shortcutLabels["tab.newPreview"]}</ContextMenuShortcut>
+              )}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onSplitBrowserRight}>
+              New Browser Split Right
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onSplitBrowserDown}>
+              New Browser Split Down
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      </PopoverAnchor>
+
+      <PopoverContent
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        className="w-52 gap-0 rounded-lg p-1.5"
+        onEscapeKeyDown={(e) => { e.preventDefault(); handleCancel(); }}
+      >
+        <input
+          ref={inputRef}
+          autoFocus
+          onFocus={(e) => e.currentTarget.select()}
+          defaultValue={panel.title ?? ""}
+          placeholder={title}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); handleSave(); }
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground/60"
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent }: Props) {
+export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel }: Props) {
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutLabels: Record<string, string | null> = {
@@ -272,6 +345,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     "pane.splitRight": getShortcutLabel("pane.splitRight", userShortcuts),
     "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
     "tab.newPreview":  getShortcutLabel("tab.newPreview",  userShortcuts),
+    "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
   };
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
@@ -447,6 +521,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           onSplitBrowserDown={onSplitBrowserDown}
           onDetachAgent={onDetachAgent}
           shortcutLabels={shortcutLabels}
+          onRenamePanel={onRenamePanel}
         />
       ))}
       <button

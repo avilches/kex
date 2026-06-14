@@ -30,3 +30,9 @@ describe("getShortcutLabel", () => {
     expect(label).toBeNull();
   });
 });
+
+test("tab.rename has a label containing R", () => {
+  const label = getShortcutLabel("tab.rename", {});
+  expect(label).not.toBeNull();
+  expect(label).toMatch(/R/i);
+});
