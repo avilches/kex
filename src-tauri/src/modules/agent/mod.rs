@@ -1,3 +1,5 @@
+pub mod session_store;
+
 use serde_json::{json, Value};
 
 const HOOK_EVENTS: [(&str, &str); 3] = [
