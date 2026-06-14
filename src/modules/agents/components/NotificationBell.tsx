@@ -14,6 +14,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useMemo, useState } from "react";
+import { setClaudeHooksEnabled } from "@/modules/settings/store";
 import { AgentIcon } from "../lib/agentIcon";
 import type { AgentNotification, AgentStatus } from "../lib/types";
 import { useAgentStore } from "../store/agentStore";
@@ -150,6 +151,7 @@ export function NotificationBell({ onActivate }: Props) {
     setInstalling(true);
     try {
       await invoke("agent_enable_claude_hooks");
+      await setClaudeHooksEnabled(true);
       setHooksReady(true);
     } catch {
       setHooksReady(false);
