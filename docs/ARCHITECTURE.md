@@ -1,14 +1,14 @@
-# Terax — Architecture and Technical Reference
+# Kex — Architecture and Technical Reference
 
-Terax is a lightweight, open-source terminal emulator. ~7-8 MB on disk. No telemetry. No account.
+Kex is a lightweight, open-source terminal emulator. ~7-8 MB on disk. No telemetry. No account.
 
-This document is the canonical reference for understanding how Terax works — both technically and from the user's perspective. It covers architecture, feature semantics, known limitations, and technical decisions that have observable effects on usage.
+This document is the canonical reference for understanding how Kex works — both technically and from the user's perspective. It covers architecture, feature semantics, known limitations, and technical decisions that have observable effects on usage.
 
 ---
 
 ## Table of contents
 
-1. [What Terax is and is not](#1-what-terax-is-and-is-not)
+1. [What Kex is and is not](#1-what-kex-is-and-is-not)
 2. [High-level architecture](#2-high-level-architecture)
 3. [Features — user perspective](#3-features--user-perspective)
 4. [Technical decisions with user-visible effects](#4-technical-decisions-with-user-visible-effects)
@@ -21,7 +21,7 @@ See also: [IPC.md](IPC.md) — Tauri command surface and agent notification prot
 
 ---
 
-## 1. What Terax is and is not
+## 1. What Kex is and is not
 
 **Is:** a fast, terminal-first development workspace with a native PTY backend, an integrated code editor, file explorer, and source control.
 
@@ -35,7 +35,7 @@ See also: [IPC.md](IPC.md) — Tauri command surface and agent notification prot
 
 ## 2. High-level architecture
 
-Terax uses a strict **two-process model**. The Rust process owns all OS access. The WebView (React) never touches the filesystem, processes, shells, or the network directly — everything goes through typed IPC calls (`invoke()`) to Tauri commands registered in `src-tauri/src/lib.rs`.
+Kex uses a strict **two-process model**. The Rust process owns all OS access. The WebView (React) never touches the filesystem, processes, shells, or the network directly — everything goes through typed IPC calls (`invoke()`) to Tauri commands registered in `src-tauri/src/lib.rs`.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -77,16 +77,16 @@ There are two separate WebView windows: the main window (`index.html`) and the s
 
 **Workspace/Pane/Panel model.** The center area uses a three-level hierarchy: Workspaces (listed in a 52px vertical sidebar on the left) contain a binary pane tree; each pane holds a tab strip of panels. Panels are never unmounted when you switch between them — each PTY keeps receiving output in the background. Switching to a panel that has been running a command shows you the complete, up-to-date buffer instantly.
 
-**Native PTY via `portable-pty`.** Not a wrapper around `script` or `expect`. Terax spawns a real pseudo-terminal, so TUI apps (vim, htop, tmux, lazygit, etc.) work correctly, including mouse input and true color.
+**Native PTY via `portable-pty`.** Not a wrapper around `script` or `expect`. Kex spawns a real pseudo-terminal, so TUI apps (vim, htop, tmux, lazygit, etc.) work correctly, including mouse input and true color.
 
-**Shell integration.** Terax injects init scripts at shell startup that emit OSC 7 (current working directory) and OSC 133 sequences (prompt boundaries, command start, command end, exit code). This enables:
+**Shell integration.** Kex injects init scripts at shell startup that emit OSC 7 (current working directory) and OSC 133 sequences (prompt boundaries, command start, command end, exit code). This enables:
 - The CWD breadcrumb in the status bar to update as you `cd` through directories.
 - The file explorer to follow the active terminal's working directory.
 - The optional **block terminal** mode (a panel with `blocks: true`): command output is grouped into blocks with per-block chrome (cwd, time, duration, exit badge on failure) and a hover toolbar (`Run again`, copy command/output, find in block). The shell's prompt is suppressed and input is driven by a host-rendered `ShellInput`. `Cmd+Up`/`Cmd+Down` navigate between command blocks.
 
 Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), PowerShell 5.1 (full), cmd.exe (no integration — basic terminal only).
 
-**Split panes.** Terminals can be split horizontally and vertically within a pane. Each panel is an independent PTY. Splitting a pane creates a second pane alongside it; each pane has its own panel tab strip. Two limits apply, both configurable in `terax-settings.json`: `paneSplitLimit` (default `{ width: 250, height: 250 }`) blocks horizontal splits when the pane is too narrow and vertical splits when it is too short; `workspacePaneLimit` (default `8`) caps the total number of panes per workspace. Both keyboard shortcuts and drag-and-drop zones enforce these limits.
+**Split panes.** Terminals can be split horizontally and vertically within a pane. Each panel is an independent PTY. Splitting a pane creates a second pane alongside it; each pane has its own panel tab strip. Two limits apply, both configurable in `kex-settings.json`: `paneSplitLimit` (default `{ width: 250, height: 250 }`) blocks horizontal splits when the pane is too narrow and vertical splits when it is too short; `workspacePaneLimit` (default `8`) caps the total number of panes per workspace. Both keyboard shortcuts and drag-and-drop zones enforce these limits.
 
 **Inline search.** `Cmd+F` / `Ctrl+F` opens an inline search bar that searches the xterm.js buffer. Matches are highlighted in the viewport and you can jump between them.
 
@@ -132,7 +132,7 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **Commit.** Type a commit message and commit with `Cmd+Enter` / `Ctrl+Enter`. No separate terminal command needed.
 
-**Push.** Push to the remote with upstream awareness — Terax tells you if you are ahead, behind, or diverged before you push.
+**Push.** Push to the remote with upstream awareness — Kex tells you if you are ahead, behind, or diverged before you push.
 
 **Branch display.** The current branch (or detached HEAD state) is shown in the header.
 
@@ -150,13 +150,15 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 ### 3.6 Terminal coding-agent notifications
 
-When Claude Code (or a future compatible agent) runs inside a Terax terminal, Terax detects its state via OSC sequences emitted by agent hooks. The tab shows a spinner while the agent is working, an amber dot when it needs your input, and no indicator when it is idle. A notification bell in the header lists active sessions and recent events with OS notifications when you are away from the window.
+When Claude Code (or a future compatible agent) runs inside a Kex terminal, Kex detects its state via OSC sequences emitted by agent hooks. The tab shows a spinner while the agent is working, an amber dot when it needs your input, and no indicator when it is idle. A notification bell in the header lists active sessions and recent events with OS notifications when you are away from the window.
+
+The indicator is cleared by any of: the agent's `Stop` hook firing normally, the agent process exiting (OSC 133;D), the PTY closing, or the user typing anything in the terminal. The last condition ensures the indicator never lingers after Ctrl+C or abnormal termination — the moment the user interacts, it is gone.
 
 See IPC.md for the full protocol detail.
 
 ### 3.7a Agent session restore
 
-When an agent session is running at the time Terax closes, Terax offers to resume it automatically on the next launch. The tab showing a restored session displays `agentname · dirname` as its title, a `✦` icon, and a status indicator (spinner while working, amber dot while waiting for input, nothing when idle). If the resume command fails (missing transcript, deleted directory), the icon becomes `⚠` and the title turns red.
+When an agent session is running at the time Kex closes, Kex offers to resume it automatically on the next launch. The tab showing a restored session displays `agentname · dirname` as its title, a `✦` icon, and a status indicator (spinner while working, amber dot while waiting for input, nothing when idle). If the resume command fails (missing transcript, deleted directory), the icon becomes `⚠` and the title turns red.
 
 Hooks must be installed via "Set up Claude Code" (notification bell popover) for this feature to work. See `docs/AGENT_SESSION_RESTORE.md` for the complete design and edge cases.
 
@@ -166,11 +168,11 @@ Hooks must be installed via "Set up Claude Code" (notification bell popover) for
 
 **Image and PDF viewers.** The preview pane also handles images and PDFs opened from the file explorer.
 
-**Sandboxed.** The preview runs in its own webview context. It cannot communicate with the Terax app surface.
+**Sandboxed.** The preview runs in its own webview context. It cannot communicate with the Kex app surface.
 
 ### 3.8 Themes and customization
 
-**App theme.** The theme engine writes CSS custom properties to the document root. All UI components consume the theme through those variables. There are 10 built-in app themes: Terax Default, Nord, Tide, Catppuccin, Tokyo Night, Caffeine, Claude, Gruvbox, Sage, Rose Pine.
+**App theme.** The theme engine writes CSS custom properties to the document root. All UI components consume the theme through those variables. There are 10 built-in app themes: Kex Default, Nord, Tide, Catppuccin, Tokyo Night, Caffeine, Claude, Gruvbox, Sage, Rose Pine.
 
 **Theme editor.** You can create and edit themes in-app. Changes are live-previewed. Custom themes are persisted to the settings store and can be exported as JSON files to share.
 
@@ -202,13 +204,13 @@ When you switch panels or panes, the outgoing panel is hidden with CSS classes. 
 
 ### 4.2 Workspace authorization
 
-Before any git or shell command can run against a directory, that directory must be in the `WorkspaceRegistry`. The registry is populated automatically when you open Terax in a directory (via CLI argument or the OS file manager context menu), and when you explicitly navigate to one via the terminal (`cd` triggers an OSC 7 event that registers the new cwd). `workspace_authorize` is the IPC command for explicit authorization.
+Before any git or shell command can run against a directory, that directory must be in the `WorkspaceRegistry`. The registry is populated automatically when you open Kex in a directory (via CLI argument or the OS file manager context menu), and when you explicitly navigate to one via the terminal (`cd` triggers an OSC 7 event that registers the new cwd). `workspace_authorize` is the IPC command for explicit authorization.
 
 The registry lives in memory only — it does not persist across restarts. Each session builds it up as the user navigates.
 
 The practical effect: if you try a git operation in a directory you haven't navigated to in the terminal yet, the git-related features (diff decorations, source control panel) will fail with "path is outside the authorized workspace" until you `cd` there in a terminal first.
 
-**`fs_*` commands are not workspace-gated.** File read/write commands (`fs_read_file`, `fs_write_file`, `fs_stat`, `fs_create_*`, `fs_rename`, `fs_delete`, `fs_read_dir`, `fs_search`, `fs_grep`, etc.) accept any path the OS allows. This is a deliberate decision: the explorer only surfaces paths the user has explicitly navigated to, so there is no app-level vector for a user to accidentally open a path outside their workspace. Terminal commands can access arbitrary paths regardless of any app-level guard, so a gate here would only stop the app's own UI — not a shell running inside a pane. A deny-list for secret paths (`.ssh`, `.env`, `*.pem`, etc.) would be worthwhile if Terax ever runs autonomous agents that make IPC calls directly; the right insertion point is `guard_read`/`guard_write` helpers at the top of `fs/file.rs`, applied before `resolve_path`. Until then, `capabilities/default.json` is the real boundary: only code in the webview bundle can call these commands.
+**`fs_*` commands are not workspace-gated.** File read/write commands (`fs_read_file`, `fs_write_file`, `fs_stat`, `fs_create_*`, `fs_rename`, `fs_delete`, `fs_read_dir`, `fs_search`, `fs_grep`, etc.) accept any path the OS allows. This is a deliberate decision: the explorer only surfaces paths the user has explicitly navigated to, so there is no app-level vector for a user to accidentally open a path outside their workspace. Terminal commands can access arbitrary paths regardless of any app-level guard, so a gate here would only stop the app's own UI — not a shell running inside a pane. A deny-list for secret paths (`.ssh`, `.env`, `*.pem`, etc.) would be worthwhile if Kex ever runs autonomous agents that make IPC calls directly; the right insertion point is `guard_read`/`guard_write` helpers at the top of `fs/file.rs`, applied before `resolve_path`. Until then, `capabilities/default.json` is the real boundary: only code in the webview bundle can call these commands.
 
 ### 4.3 Windows: ConPTY spawn serialization
 
@@ -216,17 +218,17 @@ On Windows, opening a new terminal tab serializes through a `SPAWN_LOCK` mutex. 
 
 ### 4.4 Windows: Job Objects for process cleanup
 
-Every ConPTY child process on Windows is assigned to a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. When the Job handle is released (Terax closes, crashes, or is killed), the OS terminates the entire process subtree of that shell session. Without this, `npm run dev` started inside a PowerShell terminal would continue running after Terax exits, as `TerminateProcess` only kills the immediate child.
+Every ConPTY child process on Windows is assigned to a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. When the Job handle is released (Kex closes, crashes, or is killed), the OS terminates the entire process subtree of that shell session. Without this, `npm run dev` started inside a PowerShell terminal would continue running after Terax exits, as `TerminateProcess` only kills the immediate child.
 
-Closing a tab from the UI (the explicit close button) also kills the immediate child. The Job Object handles the "Terax process died unexpectedly" case.
+Closing a tab from the UI (the explicit close button) also kills the immediate child. The Job Object handles the "Kex process died unexpectedly" case.
 
 ### 4.5 OSC trust model
 
-Terax's shell integration emits and parses OSC 7 (cwd) and OSC 133 (prompt/command boundaries). The cwd from OSC 7 updates the status bar breadcrumb and the explorer root. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
+Kex's shell integration emits and parses OSC 7 (cwd) and OSC 133 (prompt/command boundaries). The cwd from OSC 7 updates the status bar breadcrumb and the explorer root. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
 
 ### 4.6 Forward-slash canonical paths
 
-The frontend stores all paths in forward-slash form. OSC 7 on Windows emits `/C:/Users/foo`; Terax normalizes it to `C:/Users/foo` at parse time. `homeDir()` on Windows returns backslashes; `App.tsx` converts at the boundary. Any code consuming a path that might originate from the OS must normalize separators with `.split(/[\\/]/)`. This is documented in `AGENTS.md` and enforced in code review.
+The frontend stores all paths in forward-slash form. OSC 7 on Windows emits `/C:/Users/foo`; Kex normalizes it to `C:/Users/foo` at parse time. `homeDir()` on Windows returns backslashes; `App.tsx` converts at the boundary. Any code consuming a path that might originate from the OS must normalize separators with `.split(/[\\/]/)`. This is documented in `AGENTS.md` and enforced in code review.
 
 The reason: consistent string equality for path comparison (e.g., preventing the file explorer from flashing when `tab.cwd` arrives). Using two representations and forgetting to normalize in one place causes subtle bugs.
 
@@ -246,13 +248,13 @@ Earlier approaches that were removed: auto-detecting installed Nerd Fonts via `d
 
 ### 5.1 No SSH support (yet)
 
-SSH is on the roadmap but not yet implemented. Terax does not manage SSH connections, key agents, or remote filesystems. You can of course `ssh user@host` in a terminal tab — the PTY runs it fine — but the editor, file explorer, and git panel all operate on the local filesystem (or the WSL filesystem on Windows). See ROADMAP.md.
+SSH is on the roadmap but not yet implemented. Kex does not manage SSH connections, key agents, or remote filesystems. You can of course `ssh user@host` in a terminal tab — the PTY runs it fine — but the editor, file explorer, and git panel all operate on the local filesystem (or the WSL filesystem on Windows). See ROADMAP.md.
 
 ### 5.2 No persistent terminal layout restore
 
-Terminal sessions are not persisted across restarts. When you close and reopen Terax, terminal panels restart with a fresh PTY in their saved `cwd`. Shell history within the terminal is whatever your shell persists natively (`.zsh_history`, `.bash_history`, etc.).
+Terminal sessions are not persisted across restarts. When you close and reopen Kex, terminal panels restart with a fresh PTY in their saved `cwd`. Shell history within the terminal is whatever your shell persists natively (`.zsh_history`, `.bash_history`, etc.).
 
-**Exception: agent sessions.** If Claude Code hooks are installed (`agent_enable_claude_hooks`), Terax records the active session id and cwd at Claude Code exit and restores it automatically on next launch by running `claude --resume '<id>'` in the terminal. See section 3.7a and `docs/AGENT_SESSION_RESTORE.md`.
+**Exception: agent sessions.** If Claude Code hooks are installed (`agent_enable_claude_hooks`), Kex records the active session id and cwd at Claude Code exit and restores it automatically on next launch by running `claude --resume '<id>'` in the terminal. See section 3.7a and `docs/AGENT_SESSION_RESTORE.md`.
 
 ### 5.3 No LSP / language server
 
@@ -264,7 +266,7 @@ The file tree watches for filesystem changes via `notify`. On some Linux filesys
 
 ### 5.5 Apple Silicon / macOS code signing
 
-Terax is not yet notarized by Apple. The first launch on macOS Gatekeeper requires right-click > Open (or `xattr -dr com.apple.quarantine Terax.app`). Auto-updates are signed with minisign but not Apple-notarized.
+Kex is not yet notarized by Apple. The first launch on macOS Gatekeeper requires right-click > Open (or `xattr -dr com.apple.quarantine Kex.app`). Auto-updates are signed with minisign but not Apple-notarized.
 
 ### 5.6 Windows: no code signing
 
@@ -385,4 +387,4 @@ Contains typed wrappers for all Tauri `invoke()` calls (`native.readFile`, `nati
 
 **CSP.** The WebView has a strict Content Security Policy (see `tauri.conf.json`). `connect-src` allows `self`, Tauri IPC, and `https:` plus `http://localhost:*` (for local dev servers). `script-src` allows `wasm-unsafe-eval` (required for xterm.js WebGL). No `unsafe-eval`.
 
-**OSC trust.** Terax only processes OSC 7 and OSC 133 sequences from shell integration scripts. There is no OSC-based execution primitive (unlike iTerm2's proprietary sequences). The risk is cwd spoofing from maliciously crafted output, not code execution.
+**OSC trust.** Kex only processes OSC 7 and OSC 133 sequences from shell integration scripts. There is no OSC-based execution primitive (unlike iTerm2's proprietary sequences). The risk is cwd spoofing from maliciously crafted output, not code execution.

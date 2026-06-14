@@ -277,6 +277,8 @@ configureRendererPool({
     if (!s) return null;
     return {
       writeToPty: (data) => {
+        const store = useAgentStore.getState();
+        if (store.sessions[leafId]) store.finish(leafId);
         s.pty?.write(data);
       },
       resizePty: (cols, rows) => {
