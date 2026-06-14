@@ -28,14 +28,14 @@ pub struct RestorePlan {
 }
 
 fn store_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".config").join("terax").join("agent-sessions.json"))
+    dirs::home_dir().map(|h| h.join(".config").join("kex").join("agent-sessions.json"))
 }
 
 // Written just before PTYs die (last window destroyed). Consumed once at next launch.
 // Exists separately from agent-sessions.json because SessionEnd overwrites state to
 // "exited" in the seconds after the PTY dies — we need our own pre-death copy.
 fn candidates_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".config").join("terax").join("restore-candidates.json"))
+    dirs::home_dir().map(|h| h.join(".config").join("kex").join("restore-candidates.json"))
 }
 
 fn claude_projects_root() -> PathBuf {

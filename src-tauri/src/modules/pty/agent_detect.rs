@@ -8,7 +8,7 @@ const OSC_MAX: usize = 2048;
 const DEFAULT_AGENTS: &[&str] = &["claude", "codex"];
 
 // OSC 777 marker our Claude Code hooks emit via `terminalSequence`.
-const TERAX_MARKER: &[u8] = b"notify;Terax;";
+const TERAX_MARKER: &[u8] = b"notify;Kex;";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum State {
@@ -315,17 +315,17 @@ mod tests {
     fn terax_marker_drives_status() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        assert_eq!(run(&mut d, &osc("777;notify;Terax;attention")), vec![Transition::Attention]);
-        assert_eq!(run(&mut d, &osc("777;notify;Terax;working")), vec![Transition::Working]);
-        assert!(run(&mut d, &osc("777;notify;Terax;working")).is_empty());
-        assert_eq!(run(&mut d, &osc("777;notify;Terax;finished")), vec![Transition::Finished]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;attention")), vec![Transition::Attention]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;working")), vec![Transition::Working]);
+        assert!(run(&mut d, &osc("777;notify;Kex;working")).is_empty());
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;finished")), vec![Transition::Finished]);
     }
 
     #[test]
     fn terax_marker_auto_arms_without_preexec() {
         let mut d = AgentDetector::new();
         assert_eq!(
-            run(&mut d, &osc("777;notify;Terax;attention")),
+            run(&mut d, &osc("777;notify;Kex;attention")),
             vec![started("claude"), Transition::Attention]
         );
     }
@@ -384,12 +384,12 @@ mod tests {
     fn disarms_after_finished_so_next_prompt_restarts() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        assert_eq!(run(&mut d, &osc("777;notify;Terax;finished")), vec![Transition::Finished]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;finished")), vec![Transition::Finished]);
         // Disarmed: 133;D is a no-op (armed=false)
         assert!(run(&mut d, &osc("133;D;0")).is_empty());
         // Next working auto-arms again → only Started (ensure_armed already sets
         // status=Working so set_working is a no-op immediately after)
-        assert_eq!(run(&mut d, &osc("777;notify;Terax;working")), vec![started("claude")]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;working")), vec![started("claude")]);
     }
 
     #[test]
@@ -400,6 +400,6 @@ mod tests {
         seq.extend(std::iter::repeat_n(b'x', OSC_MAX + 100));
         seq.extend_from_slice(&[ESC, ST_FINAL]);
         assert!(run(&mut d, &seq).is_empty());
-        assert_eq!(run(&mut d, &osc("777;notify;Terax;attention")), vec![Transition::Attention]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;attention")), vec![Transition::Attention]);
     }
 }

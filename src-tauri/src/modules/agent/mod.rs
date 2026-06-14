@@ -8,14 +8,14 @@ const HOOK_EVENTS: [(&str, &str); 3] = [
     ("Stop", "finished"),
 ];
 
-// Includes the pre-v2.1.139 /dev/tty variant so re-running migrates it.
-const OWNED_MARKERS: [&str; 2] = ["notify;Terax;", "terax;notify"];
+// Includes legacy Terax markers so re-running migrates them to the Kex name.
+const OWNED_MARKERS: [&str; 3] = ["notify;Kex;", "notify;Terax;", "terax;notify"];
 
-// Gated on TERAX_TERMINAL; no-op outside Terax. Returns the sequence via
+// Gated on KEX_TERMINAL; no-op outside Kex. Returns the sequence via
 // `terminalSequence` because hooks lost /dev/tty access in v2.1.139.
 fn hook_cmd(event: &str) -> String {
     format!(
-        r#"[ -n "$TERAX_TERMINAL" ] && printf '{{"terminalSequence":"\\u001b]777;notify;Terax;{event}\\u0007"}}' || true"#
+        r#"[ -n "$KEX_TERMINAL" ] && printf '{{"terminalSequence":"\\u001b]777;notify;Kex;{event}\\u0007"}}' || true"#
     )
 }
 
@@ -46,20 +46,20 @@ const SESSION_HOOK_MARKER: &str = "terax-session-hook";
 // Bump this when the script behaviour changes in a way that requires reinstall.
 // agent_claude_hooks_status checks the installed file for this marker so that
 // users with an older script see the "Set up Claude Code" button again.
-const SESSION_HOOK_SCRIPT_VERSION: &str = "terax-session-v2";
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v1";
 
 const SESSION_HOOK_SCRIPT: &str = r#"#!/usr/bin/env bash
-# terax-session-v2
+# kex-session-v1
 set -euo pipefail
 
-PANEL_ID="${TERAX_PANEL_ID:-}"
+PANEL_ID="${KEX_PANEL_ID:-}"
 [ -z "$PANEL_ID" ] && exit 0
 
 PAYLOAD="$(cat)"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
 # Only act on SessionStart. SessionEnd is intentionally ignored: the hook fires
-# when the PTY dies (e.g. Terax closing), not only when the user exits claude,
+# when the PTY dies (e.g. Kex closing), not only when the user exits claude,
 # so writing "exited" here would prevent restore on the next launch.
 # Sessions that the user wants to detach are cleared via the "Detach Claude"
 # option in the tab context menu.
@@ -69,7 +69,7 @@ SESSION_ID="$(printf '%s' "$PAYLOAD" | jq -r '.session_id // empty')"
 TRANSCRIPT="$(printf '%s' "$PAYLOAD" | jq -r '.transcript_path // empty')"
 CWD="$(printf '%s' "$PAYLOAD" | jq -r '.cwd // empty')"
 
-STORE="$HOME/.config/terax/agent-sessions.json"
+STORE="$HOME/.config/kex/agent-sessions.json"
 mkdir -p "$(dirname "$STORE")"
 [ -f "$STORE" ] || printf '{"version":1,"panels":{}}' > "$STORE"
 
@@ -86,14 +86,14 @@ fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
     Ok(dirs::home_dir()
         .ok_or_else(|| "could not resolve home dir".to_string())?
         .join(".config")
-        .join("terax")
+        .join("kex")
         .join("hooks")
         .join("session.sh"))
 }
 
 fn session_hook_cmd() -> String {
     format!(
-        r#"[ -n "$TERAX_PANEL_ID" ] && "$HOME/.config/terax/hooks/session.sh" || true  # {SESSION_HOOK_MARKER}"#
+        r#"[ -n "$KEX_PANEL_ID" ] && "$HOME/.config/kex/hooks/session.sh" || true  # {SESSION_HOOK_MARKER}"#
     )
 }
 
@@ -235,7 +235,7 @@ pub fn agent_claude_hooks_status() -> bool {
         .is_some_and(|s| s.contains(SESSION_HOOK_SCRIPT_VERSION));
     HOOK_EVENTS
         .iter()
-        .all(|(_, m)| content.contains(&format!("notify;Terax;{m}")))
+        .all(|(_, m)| content.contains(&format!("notify;Kex;{m}")))
         && content.contains(SESSION_HOOK_MARKER)
         && script_current
 }
@@ -261,9 +261,9 @@ mod tests {
         assert_eq!(hook_count(&out, "UserPromptSubmit"), 1);
         assert_eq!(hook_count(&out, "Notification"), 1);
         assert_eq!(hook_count(&out, "Stop"), 1);
-        assert!(command(&out, "Notification", 0).contains("notify;Terax;attention"));
-        assert!(command(&out, "Stop", 0).contains("notify;Terax;finished"));
-        assert!(command(&out, "UserPromptSubmit", 0).contains("notify;Terax;working"));
+        assert!(command(&out, "Notification", 0).contains("notify;Kex;attention"));
+        assert!(command(&out, "Stop", 0).contains("notify;Kex;finished"));
+        assert!(command(&out, "UserPromptSubmit", 0).contains("notify;Kex;working"));
         assert!(command(&out, "Stop", 0).contains("terminalSequence"));
         assert!(!command(&out, "Stop", 0).contains("/dev/tty"));
     }
@@ -283,7 +283,7 @@ mod tests {
                 "Notification": [
                     { "hooks": [ {
                         "type": "command",
-                        "command": "[ -n \"$TERAX_TERMINAL\" ] && printf '\\033]777;terax;notify\\033\\\\' > /dev/tty || true"
+                        "command": "[ -n \"$KEX_TERMINAL\" ] && printf '\\033]777;terax;notify\\033\\\\' > /dev/tty || true"
                     } ] }
                 ]
             }
@@ -328,7 +328,7 @@ mod tests {
         });
         let out = merge_hooks(input);
         assert_eq!(hook_count(&out, "Notification"), 1);
-        assert!(command(&out, "Notification", 0).contains("notify;Terax;attention"));
+        assert!(command(&out, "Notification", 0).contains("notify;Kex;attention"));
     }
 
     #[test]

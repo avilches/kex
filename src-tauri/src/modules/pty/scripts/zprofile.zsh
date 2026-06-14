@@ -1,9 +1,9 @@
-# terax-shell-integration (zprofile)
+# kex-shell-integration (zprofile)
 #
 # See zshenv.zsh for the rationale on the trailing `:`.
 {
-  _terax_user_zdotdir="${TERAX_USER_ZDOTDIR:-$HOME}"
-  [ -f "$_terax_user_zdotdir/.zprofile" ] && source "$_terax_user_zdotdir/.zprofile"
-  unset _terax_user_zdotdir
+  _kex_user_zdotdir="${KEX_USER_ZDOTDIR:-$HOME}"
+  [ -f "$_kex_user_zdotdir/.zprofile" ] && source "$_kex_user_zdotdir/.zprofile"
+  unset _kex_user_zdotdir
 }
 :
