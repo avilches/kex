@@ -246,6 +246,23 @@ La instalacion es idempotente y no sobrescribe hooks preexistentes del usuario: 
 
 ---
 
+## Pendientes antes de implementar
+
+### Revisar el sistema de hooks existente
+
+`agent_enable_claude_hooks` ya existe en Rust y escribe en `.claude/settings.local.json` del worktree (local, por proyecto). El nuevo hook `SessionStart` necesita ser global (`~/.claude/settings.json`) para capturar sesiones en cualquier directorio.
+
+Antes de implementar hay que verificar:
+
+- Donde escribe exactamente `agent_enable_claude_hooks` y que formato usa.
+- Si ya hay un mecanismo para fusionar con `~/.claude/settings.json` o solo escribe en `.local.json`.
+- Donde viven actualmente los JSON de configuracion de hooks que Terax genera, y si hay colision de paths con el nuevo `~/.config/terax/agent-sessions.json`.
+- Si el script bash del hook debe instalarse en `~/.local/bin/` o en otro lugar mas apropiado para Terax.
+
+Esta decision afecta directamente a la seccion "Instalacion de hooks" de este spec, que debe revisarse una vez verificado el codigo existente.
+
+---
+
 ## Archivos afectados (estimacion)
 
 | Archivo | Cambio |
