@@ -266,6 +266,11 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
     }
 }
 
+#[tauri::command]
+fn agent_session_restore_plan() -> Vec<agent::session_store::RestorePlan> {
+    agent::session_store::load_restore_plan()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cli_dir = parse_launch_dir();
@@ -410,6 +415,7 @@ pub fn run() {
             restore_window_geometry,
             agent::agent_enable_claude_hooks,
             agent::agent_claude_hooks_status,
+            agent_session_restore_plan,
             history::history_suggest,
             history::history_commands,
             history::history_record,
