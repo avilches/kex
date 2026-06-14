@@ -41,6 +41,70 @@ fn is_empty_group(group: &Value) -> bool {
         .is_none_or(|hs| hs.is_empty())
 }
 
+const SESSION_HOOK_MARKER: &str = "terax-session-hook";
+
+const SESSION_HOOK_SCRIPT: &str = r#"#!/usr/bin/env bash
+set -euo pipefail
+
+PANEL_ID="${TERAX_PANEL_ID:-}"
+[ -z "$PANEL_ID" ] && exit 0
+
+PAYLOAD="$(cat)"
+EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
+SESSION_ID="$(printf '%s' "$PAYLOAD" | jq -r '.session_id // empty')"
+TRANSCRIPT="$(printf '%s' "$PAYLOAD" | jq -r '.transcript_path // empty')"
+CWD="$(printf '%s' "$PAYLOAD" | jq -r '.cwd // empty')"
+
+STORE="$HOME/.config/terax/agent-sessions.json"
+mkdir -p "$(dirname "$STORE")"
+[ -f "$STORE" ] || printf '{"version":1,"panels":{}}' > "$STORE"
+
+TMP="$(mktemp)"
+case "$EVENT" in
+  SessionStart)
+    jq --arg p "$PANEL_ID" --arg sid "$SESSION_ID" \
+       --arg tp "$TRANSCRIPT" --arg cwd "$CWD" \
+       --arg ts "$(date +%s)" \
+       '.panels[$p] = {agent:"claude",session_id:$sid,cwd_launch:$cwd,transcript_path:$tp,state:"idle",updated_at:($ts|tonumber)}' \
+       "$STORE" > "$TMP" && mv -f "$TMP" "$STORE"
+    ;;
+  SessionEnd)
+    jq --arg p "$PANEL_ID" --arg ts "$(date +%s)" \
+       '.panels[$p].state = "exited" | .panels[$p].updated_at = ($ts|tonumber)' \
+       "$STORE" > "$TMP" && mv -f "$TMP" "$STORE"
+    ;;
+esac
+exit 0
+"#;
+
+fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
+    Ok(dirs::home_dir()
+        .ok_or_else(|| "could not resolve home dir".to_string())?
+        .join(".config")
+        .join("terax")
+        .join("hooks")
+        .join("session.sh"))
+}
+
+fn session_hook_cmd() -> String {
+    format!(
+        r#"[ -n "$TERAX_PANEL_ID" ] && "$HOME/.config/terax/hooks/session.sh" || true  # {SESSION_HOOK_MARKER}"#
+    )
+}
+
+fn is_session_hook(group: &Value) -> bool {
+    group
+        .get("hooks")
+        .and_then(Value::as_array)
+        .is_some_and(|hs| {
+            hs.iter().any(|h| {
+                h.get("command")
+                    .and_then(Value::as_str)
+                    .is_some_and(|c| c.contains(SESSION_HOOK_MARKER))
+            })
+        })
+}
+
 fn merge_hooks(mut root: Value) -> Value {
     if !root.is_object() {
         root = json!({});
@@ -61,6 +125,18 @@ fn merge_hooks(mut root: Value) -> Value {
         arr.retain(|group| !is_ours(group) && !is_empty_group(group));
         arr.push(json!({
             "hooks": [ { "type": "command", "command": hook_cmd(marker) } ]
+        }));
+    }
+
+    for event in ["SessionStart", "SessionEnd"] {
+        let arr = hooks.entry(event).or_insert_with(|| json!([]));
+        if !arr.is_array() {
+            *arr = json!([]);
+        }
+        let arr = arr.as_array_mut().unwrap();
+        arr.retain(|group| !is_session_hook(group) && !is_empty_group(group));
+        arr.push(json!({
+            "hooks": [ { "type": "command", "command": session_hook_cmd(), "timeout": 10 } ]
         }));
     }
     root
@@ -84,6 +160,20 @@ fn settings_path() -> Result<std::path::PathBuf, String> {
 
 #[tauri::command]
 pub fn agent_enable_claude_hooks() -> Result<(), String> {
+    // Install session persistence hook script
+    let script_path = session_hook_script_path()?;
+    let script_dir = script_path.parent().unwrap();
+    std::fs::create_dir_all(script_dir)
+        .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
+    std::fs::write(&script_path, SESSION_HOOK_SCRIPT)
+        .map_err(|e| format!("write session hook script: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("chmod session hook: {e}"))?;
+    }
+
     let path = settings_path()?;
     let dir = path.parent().unwrap();
     std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
@@ -116,9 +206,14 @@ pub fn agent_claude_hooks_status() -> bool {
     else {
         return false;
     };
+    let script_ok = session_hook_script_path()
+        .map(|p| p.exists())
+        .unwrap_or(false);
     HOOK_EVENTS
         .iter()
         .all(|(_, m)| content.contains(&format!("notify;Terax;{m}")))
+        && content.contains(SESSION_HOOK_MARKER)
+        && script_ok
 }
 
 #[cfg(test)]
@@ -227,5 +322,39 @@ mod tests {
             existing_config(Some(r#"{"permissions":{}}"#), p).unwrap(),
             json!({ "permissions": {} })
         );
+    }
+
+    #[test]
+    fn adds_session_hooks_to_empty_config() {
+        let out = merge_hooks(json!({}));
+        assert!(out["hooks"]["SessionStart"].as_array().unwrap().len() >= 1);
+        assert!(out["hooks"]["SessionEnd"].as_array().unwrap().len() >= 1);
+        let cmd = out["hooks"]["SessionStart"][0]["hooks"][0]["command"].as_str().unwrap();
+        assert!(cmd.contains(SESSION_HOOK_MARKER));
+        assert!(cmd.contains("session.sh"));
+    }
+
+    #[test]
+    fn session_hooks_are_idempotent() {
+        let once = merge_hooks(json!({}));
+        let twice = merge_hooks(once.clone());
+        assert_eq!(
+            twice["hooks"]["SessionStart"].as_array().unwrap().len(),
+            once["hooks"]["SessionStart"].as_array().unwrap().len()
+        );
+    }
+
+    #[test]
+    fn session_hooks_preserve_foreign_hooks() {
+        let input = json!({
+            "hooks": {
+                "SessionStart": [
+                    { "hooks": [ { "type": "command", "command": "echo hello" } ] }
+                ]
+            }
+        });
+        let out = merge_hooks(input);
+        assert_eq!(out["hooks"]["SessionStart"].as_array().unwrap().len(), 2);
+        assert_eq!(out["hooks"]["SessionStart"][0]["hooks"][0]["command"].as_str().unwrap(), "echo hello");
     }
 }
