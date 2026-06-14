@@ -629,12 +629,12 @@ mod windows {
         #[test]
         fn builds_wsl_zsh_launch_spec_with_env_and_login() {
             let spec = build_wsl_launch_spec(
-                Some("/home/vinicios/repo"),
+                Some("/home/user/repo"),
                 "Ubuntu",
                 "/usr/bin/zsh",
                 ShellKind::Zsh,
                 WslShellIntegration::Zsh {
-                    zdotdir: "/home/vinicios/.cache/kex/shell-integration/zsh".into(),
+                    zdotdir: "/home/user/.cache/kex/shell-integration/zsh".into(),
                     user_zdotdir: None,
                 },
             );
@@ -644,10 +644,10 @@ mod windows {
                     "-d".to_string(),
                     "Ubuntu".to_string(),
                     "--cd".to_string(),
-                    "/home/vinicios/repo".to_string(),
+                    "/home/user/repo".to_string(),
                     "--exec".to_string(),
                     "env".to_string(),
-                    "ZDOTDIR=/home/vinicios/.cache/kex/shell-integration/zsh".to_string(),
+                    "ZDOTDIR=/home/user/.cache/kex/shell-integration/zsh".to_string(),
                     "/usr/bin/zsh".to_string(),
                     "-l".to_string(),
                 ]
@@ -657,13 +657,13 @@ mod windows {
         #[test]
         fn builds_wsl_zsh_launch_spec_with_user_zdotdir_probe() {
             let spec = build_wsl_launch_spec(
-                Some("/home/vinicios/repo"),
+                Some("/home/user/repo"),
                 "Ubuntu",
                 "/usr/bin/zsh",
                 ShellKind::Zsh,
                 WslShellIntegration::Zsh {
-                    zdotdir: "/home/vinicios/.cache/kex/shell-integration/zsh".into(),
-                    user_zdotdir: Some("/home/vinicios/.config/zsh".into()),
+                    zdotdir: "/home/user/.cache/kex/shell-integration/zsh".into(),
+                    user_zdotdir: Some("/home/user/.config/zsh".into()),
                 },
             );
             assert_eq!(
@@ -672,11 +672,11 @@ mod windows {
                     "-d".to_string(),
                     "Ubuntu".to_string(),
                     "--cd".to_string(),
-                    "/home/vinicios/repo".to_string(),
+                    "/home/user/repo".to_string(),
                     "--exec".to_string(),
                     "env".to_string(),
-                    "KEX_USER_ZDOTDIR=/home/vinicios/.config/zsh".to_string(),
-                    "ZDOTDIR=/home/vinicios/.cache/kex/shell-integration/zsh".to_string(),
+                    "KEX_USER_ZDOTDIR=/home/user/.config/zsh".to_string(),
+                    "ZDOTDIR=/home/user/.cache/kex/shell-integration/zsh".to_string(),
                     "/usr/bin/zsh".to_string(),
                     "-l".to_string(),
                 ]
@@ -686,7 +686,7 @@ mod windows {
         #[test]
         fn builds_wsl_zsh_launch_spec_without_integration_still_uses_login_shell() {
             let spec = build_wsl_launch_spec(
-                Some("/home/vinicios/repo"),
+                Some("/home/user/repo"),
                 "Ubuntu",
                 "/usr/bin/zsh",
                 ShellKind::Zsh,
@@ -698,7 +698,7 @@ mod windows {
                     "-d".to_string(),
                     "Ubuntu".to_string(),
                     "--cd".to_string(),
-                    "/home/vinicios/repo".to_string(),
+                    "/home/user/repo".to_string(),
                     "--exec".to_string(),
                     "/usr/bin/zsh".to_string(),
                     "-l".to_string(),
@@ -709,12 +709,12 @@ mod windows {
         #[test]
         fn builds_wsl_bash_launch_spec_with_rcfile() {
             let spec = build_wsl_launch_spec(
-                Some("/home/vinicios/repo"),
+                Some("/home/user/repo"),
                 "Ubuntu",
                 "/bin/bash",
                 ShellKind::Bash,
                 WslShellIntegration::Bash {
-                    rcfile: "/home/vinicios/.cache/kex/shell-integration/bash/bashrc".into(),
+                    rcfile: "/home/user/.cache/kex/shell-integration/bash/bashrc".into(),
                 },
             );
             assert_eq!(
@@ -723,11 +723,11 @@ mod windows {
                     "-d".to_string(),
                     "Ubuntu".to_string(),
                     "--cd".to_string(),
-                    "/home/vinicios/repo".to_string(),
+                    "/home/user/repo".to_string(),
                     "--exec".to_string(),
                     "/bin/bash".to_string(),
                     "--rcfile".to_string(),
-                    "/home/vinicios/.cache/kex/shell-integration/bash/bashrc".to_string(),
+                    "/home/user/.cache/kex/shell-integration/bash/bashrc".to_string(),
                     "-i".to_string(),
                 ]
             );
@@ -736,7 +736,7 @@ mod windows {
         #[test]
         fn builds_wsl_fish_launch_spec_without_init_command() {
             let spec = build_wsl_launch_spec(
-                Some("/home/vinicios/repo"),
+                Some("/home/user/repo"),
                 "Ubuntu",
                 "/usr/bin/fish",
                 ShellKind::Fish,
@@ -748,7 +748,7 @@ mod windows {
                     "-d".to_string(),
                     "Ubuntu".to_string(),
                     "--cd".to_string(),
-                    "/home/vinicios/repo".to_string(),
+                    "/home/user/repo".to_string(),
                     "--exec".to_string(),
                     "env".to_string(),
                     "fish_features=no-mark-prompt".to_string(),

@@ -481,7 +481,7 @@ mod tests {
             &WorkspaceEnv::Wsl {
                 distro: "Ubuntu".into(),
             },
-            Some("/home/vinicios/Nova pasta/repo"),
+            Some("/home/user/Nova pasta/repo"),
             &[OsString::from("status"), OsString::from("--short")],
         )
         .expect("valid WSL distro");
@@ -497,7 +497,7 @@ mod tests {
                 "-d",
                 "Ubuntu",
                 "--cd",
-                "/home/vinicios/Nova pasta/repo",
+                "/home/user/Nova pasta/repo",
                 "--exec",
                 "git",
                 "status",

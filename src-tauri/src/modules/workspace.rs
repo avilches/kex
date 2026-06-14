@@ -653,7 +653,7 @@ mod tests {
 
     #[test]
     fn resolve_path_keeps_local_paths_unchanged() {
-        let path = r"C:\Users\vinicios\repo";
+        let path = r"C:\Users\user\repo";
         assert_eq!(
             resolve_path(path, &WorkspaceEnv::Local),
             PathBuf::from(path)
@@ -666,8 +666,8 @@ mod tests {
             distro: "Ubuntu".into(),
         };
         assert_eq!(
-            resolve_path("/home/vinicios/repo", &workspace),
-            wsl_path_to_host("Ubuntu", "/home/vinicios/repo")
+            resolve_path("/home/user/repo", &workspace),
+            wsl_path_to_host("Ubuntu", "/home/user/repo")
         );
     }
 
@@ -679,15 +679,15 @@ mod tests {
     #[test]
     fn wsl_drvfs_child_maps_to_windows_drive() {
         assert_eq!(
-            wsl_drvfs_to_windows("/mnt/d/Users/vinicios/repo"),
-            Some(PathBuf::from(r"D:\Users\vinicios\repo"))
+            wsl_drvfs_to_windows("/mnt/d/Users/user/repo"),
+            Some(PathBuf::from(r"D:\Users\user\repo"))
         );
     }
 
     #[test]
     fn wsl_drvfs_rejects_non_drive_mounts() {
         assert_eq!(wsl_drvfs_to_windows("/mnt/wsl"), None);
-        assert_eq!(wsl_drvfs_to_windows("/home/vinicios"), None);
+        assert_eq!(wsl_drvfs_to_windows("/home/user"), None);
     }
 
     #[test]
