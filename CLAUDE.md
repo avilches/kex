@@ -1,5 +1,12 @@
 @AGENTS.md
 
+## Contexto del proyecto
+
+Esta aplicacion se llama **Kex**. Es un fork del proyecto open-source **Terax** (`crynta/terax-ai`).
+Cuando un agente o herramienta mencione "Terax" en el contexto de variables de entorno, rutas de configuracion
+o senales OSC, se refiere al **upstream**. En este fork todo usa el prefijo `KEX_` y la carpeta `~/.config/kex/`.
+Ver `docs/FORK.md` para la lista completa de diferencias respecto al upstream y el log de sincronizaciones.
+
 ## Reglas de trabajo
 
 ### Gestion de tareas pendientes

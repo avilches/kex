@@ -1,7 +1,11 @@
 ## Project
 
-**Terax** — open-source terminal emulator. Tauri 2 + Rust (`portable-pty`) backend, React 19 + TypeScript + xterm.js (
-webgl) client.
+**Kex** — this fork of [Terax](https://github.com/crynta/terax-ai). Open-source terminal emulator. Tauri 2 + Rust
+(`portable-pty`) backend, React 19 + TypeScript + xterm.js (webgl) client.
+
+The upstream project is **Terax** (`crynta/terax-ai`). All env vars, config paths, and OSC signals in this fork use
+the `KEX_` prefix and `~/.config/kex/` / `~/.cache/kex/` paths to avoid conflicts with upstream installations. See
+`docs/FORK.md` for the full list of divergences and the upstream sync log.
 
 - Bundle id: `app.crynta.terax`
 - Package manager: **pnpm**
