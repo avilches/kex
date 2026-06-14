@@ -1,5 +1,6 @@
 pub mod session_store;
 
+use serde::Serialize as _;
 use serde_json::{json, Value};
 
 const HOOK_EVENTS: [(&str, &str); 3] = [
@@ -165,49 +166,88 @@ fn settings_path() -> Result<std::path::PathBuf, String> {
 
 #[tauri::command]
 pub fn agent_enable_claude_hooks() -> Result<(), String> {
-    // Install session persistence hook script
+    // Update session hook script only when the installed version is outdated.
     let script_path = session_hook_script_path()?;
-    let script_dir = script_path
-        .parent()
-        .ok_or_else(|| "session hook script path has no parent".to_string())?;
-    std::fs::create_dir_all(script_dir)
-        .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
-    let script_tmp = script_path.with_extension("sh.terax-tmp");
-    std::fs::write(&script_tmp, SESSION_HOOK_SCRIPT)
-        .map_err(|e| format!("write session hook tmp: {e}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&script_tmp, std::fs::Permissions::from_mode(0o755))
-            .map_err(|e| format!("chmod session hook: {e}"))?;
+    let current = std::fs::read_to_string(&script_path).unwrap_or_default();
+    if current != SESSION_HOOK_SCRIPT {
+        let script_dir = script_path
+            .parent()
+            .ok_or_else(|| "session hook script path has no parent".to_string())?;
+        std::fs::create_dir_all(script_dir)
+            .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
+        let script_tmp = script_path.with_extension("sh.kex-tmp");
+        std::fs::write(&script_tmp, SESSION_HOOK_SCRIPT)
+            .map_err(|e| format!("write session hook tmp: {e}"))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script_tmp, std::fs::Permissions::from_mode(0o755))
+                .map_err(|e| format!("chmod session hook: {e}"))?;
+        }
+        std::fs::rename(&script_tmp, &script_path).map_err(|e| {
+            let _ = std::fs::remove_file(&script_tmp);
+            format!("rename session hook: {e}")
+        })?;
     }
-    std::fs::rename(&script_tmp, &script_path).map_err(|e| {
-        let _ = std::fs::remove_file(&script_tmp);
-        format!("rename session hook: {e}")
-    })?;
 
     let path = settings_path()?;
     let dir = path.parent().unwrap();
     std::fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
 
-    let existing = match std::fs::read_to_string(&path) {
-        Ok(s) => existing_config(Some(&s), &path)?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => json!({}),
+    let existing_str = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(e) => return Err(format!("read {}: {e}", path.display())),
     };
 
-    let merged = merge_hooks(existing);
-    let out = serde_json::to_string_pretty(&merged).map_err(|e| e.to_string())?;
+    let existing = existing_config(
+        if existing_str.is_empty() { None } else { Some(&existing_str) },
+        &path,
+    )?;
+    let merged = merge_hooks(existing.clone());
 
-    // Write to a sibling temp file then rename so a crash mid-write can't leave
-    // a truncated settings.json.
-    let tmp = path.with_extension("json.terax-tmp");
+    // Skip writing when nothing changed — avoids reformatting the user's file
+    // on repeated runs (e.g. the startup auto-reinstall path).
+    if merged == existing {
+        return Ok(());
+    }
+
+    // Detect the original indent so we don't change the user's preferred style.
+    let indent = detect_json_indent(existing_str.as_str());
+    let out = serialize_pretty(&merged, indent)?;
+
+    // Atomic write via temp file so a crash mid-write never truncates the file.
+    let tmp = path.with_extension("json.kex-tmp");
     std::fs::write(&tmp, out).map_err(|e| format!("write {}: {e}", tmp.display()))?;
     std::fs::rename(&tmp, &path).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
         format!("rename into {}: {e}", path.display())
     })?;
     Ok(())
+}
+
+/// Detect the indent used in a JSON string (spaces or tab, min 1 char).
+/// Falls back to two spaces if nothing is found.
+fn detect_json_indent(s: &str) -> &[u8] {
+    for line in s.lines() {
+        let trimmed = line.trim_start_matches([' ', '\t']);
+        if !trimmed.is_empty() && trimmed != line {
+            let indent_len = line.len() - trimmed.len();
+            if indent_len > 0 {
+                return &line.as_bytes()[..indent_len];
+            }
+        }
+    }
+    b"  "
+}
+
+fn serialize_pretty(value: &serde_json::Value, indent: &[u8]) -> Result<String, String> {
+    let mut buf = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(indent);
+    let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+    serde::Serialize::serialize(value, &mut ser).map_err(|e| e.to_string())?;
+    buf.push(b'\n');
+    String::from_utf8(buf).map_err(|e| e.to_string())
 }
 
 /// Remove a panel's session entry from the persistent store.
