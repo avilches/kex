@@ -11,6 +11,7 @@ import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
 import { isMarkdownPath } from "@/lib/utils";
 import { AgentNotificationsBridge } from "@/modules/agents";
+import { loadRestorePlans } from "@/modules/agents/lib/agentSessionRestore";
 import {
   CommandPalette,
   createCommandItems,
@@ -153,6 +154,10 @@ export default function App() {
     const activeIdx = workspaces.findIndex((w) => w.id === activeWorkspaceId);
     saveWorkspaceState(workspaces, activeIdx);
   }, [workspaces, activeWorkspaceId]);
+
+  useEffect(() => {
+    void loadRestorePlans();
+  }, []);
 
   // Focus the active terminal when the active workspace changes (tab/workspace switch).
   useEffect(() => {
