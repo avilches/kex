@@ -14,7 +14,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useMemo, useState } from "react";
-import { setClaudeHooksEnabled } from "@/modules/settings/store";
+import { setAgentNotifications } from "@/modules/settings/store";
 import { AgentIcon } from "../lib/agentIcon";
 import type { AgentNotification, AgentStatus } from "../lib/types";
 import { useAgentStore } from "../store/agentStore";
@@ -151,7 +151,7 @@ export function NotificationBell({ onActivate }: Props) {
     setInstalling(true);
     try {
       await invoke("agent_enable_claude_hooks");
-      await setClaudeHooksEnabled(true);
+      await setAgentNotifications(true);
       setHooksReady(true);
     } catch (e) {
       console.error("[kex] agent_enable_claude_hooks failed:", e);

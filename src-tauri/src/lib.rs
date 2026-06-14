@@ -415,6 +415,7 @@ pub fn run() {
             window_save_workspace_state,
             restore_window_geometry,
             agent::agent_enable_claude_hooks,
+            agent::agent_disable_claude_hooks,
             agent::agent_claude_hooks_status,
             agent::agent_detach_session,
             agent_session_restore_plan,

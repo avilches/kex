@@ -65,7 +65,6 @@ export type Preferences = {
   tabBarStyle: TabBarStyle;
   workspacePaneLimit: number;
   paneSplitLimit: PaneSplitLimit;
-  claudeHooksEnabled: boolean;
 };
 
 const STORE_PATH = "terax-settings.json";
@@ -96,7 +95,6 @@ const KEY_PANEL_SIDE = "panelSide";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
-const KEY_CLAUDE_HOOKS_ENABLED = "claudeHooksEnabled";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -140,7 +138,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
-  claudeHooksEnabled: false,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -241,9 +238,6 @@ export async function loadPreferences(): Promise<Preferences> {
       }
       return DEFAULT_PREFERENCES.paneSplitLimit;
     })(),
-    claudeHooksEnabled:
-      get<boolean>(KEY_CLAUDE_HOOKS_ENABLED) ??
-      DEFAULT_PREFERENCES.claudeHooksEnabled,
   };
 
   // Persist any config keys that weren't present so they're discoverable in the JSON.
@@ -349,9 +343,6 @@ export async function setAgentNotifications(value: boolean): Promise<void> {
   await writePref(KEY_AGENT_NOTIFICATIONS, value);
 }
 
-export async function setClaudeHooksEnabled(value: boolean): Promise<void> {
-  await writePref(KEY_CLAUDE_HOOKS_ENABLED, value);
-}
 
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},

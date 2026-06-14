@@ -34,11 +34,11 @@ await initLaunchDir();
 // Load saved workspace layout for session restore.
 await initWorkspaceState();
 
-// Auto-reinstall Claude Code hooks if the user had enabled them previously.
+// Auto-reinstall Claude Code hooks if the user has agent notifications enabled.
 // agent_enable_claude_hooks is idempotent: only touches the script/settings
 // when the installed version is outdated or our hooks are missing.
 loadPreferences().then((prefs) => {
-  if (prefs.claudeHooksEnabled) {
+  if (prefs.agentNotifications) {
     invoke("agent_enable_claude_hooks").catch(() => {});
   }
 });

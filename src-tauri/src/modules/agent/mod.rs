@@ -110,6 +110,28 @@ fn is_session_hook(group: &Value) -> bool {
         })
 }
 
+fn remove_hooks(mut root: Value) -> Value {
+    if !root.is_object() {
+        return root;
+    }
+    let obj = root.as_object_mut().unwrap();
+    let hooks = match obj.get_mut("hooks").filter(|h| h.is_object()) {
+        Some(h) => h.as_object_mut().unwrap(),
+        None => return root,
+    };
+    for (event, _) in HOOK_EVENTS {
+        if let Some(arr) = hooks.get_mut(event).and_then(Value::as_array_mut) {
+            arr.retain(|g| !is_ours(g) && !is_empty_group(g));
+        }
+    }
+    for event in ["SessionStart", "SessionEnd"] {
+        if let Some(arr) = hooks.get_mut(event).and_then(Value::as_array_mut) {
+            arr.retain(|g| !is_session_hook(g) && !is_empty_group(g));
+        }
+    }
+    root
+}
+
 fn merge_hooks(mut root: Value) -> Value {
     if !root.is_object() {
         root = json!({});
@@ -216,6 +238,33 @@ pub fn agent_enable_claude_hooks() -> Result<(), String> {
     let out = serialize_pretty(&merged, indent)?;
 
     // Atomic write via temp file so a crash mid-write never truncates the file.
+    let tmp = path.with_extension("json.kex-tmp");
+    std::fs::write(&tmp, out).map_err(|e| format!("write {}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, &path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("rename into {}: {e}", path.display())
+    })?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn agent_disable_claude_hooks() -> Result<(), String> {
+    let path = settings_path()?;
+    let existing_str = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(format!("read {}: {e}", path.display())),
+    };
+    let existing = existing_config(
+        if existing_str.is_empty() { None } else { Some(&existing_str) },
+        &path,
+    )?;
+    let cleaned = remove_hooks(existing.clone());
+    if cleaned == existing {
+        return Ok(());
+    }
+    let indent = detect_json_indent(existing_str.as_str());
+    let out = serialize_pretty(&cleaned, indent)?;
     let tmp = path.with_extension("json.kex-tmp");
     std::fs::write(&tmp, out).map_err(|e| format!("write {}: {e}", tmp.display()))?;
     std::fs::rename(&tmp, &path).map_err(|e| {

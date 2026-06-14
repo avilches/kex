@@ -27,6 +27,7 @@ import {
   setTerminalWebglEnabled,
   setVimMode,
 } from "@/modules/settings/store";
+import { invoke } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
@@ -53,6 +54,26 @@ export function GeneralSection() {
   );
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
+  const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
+  const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
+
+  const onToggleAgentNotifications = async (next: boolean) => {
+    setAgentNotifsInstalling(true);
+    setAgentNotifsError(null);
+    try {
+      if (next) {
+        await invoke("agent_enable_claude_hooks");
+      } else {
+        await invoke("agent_disable_claude_hooks");
+      }
+      await setAgentNotifications(next);
+    } catch (e) {
+      setAgentNotifsError(next ? "Could not install hooks in Claude Code config." : "Could not remove hooks from Claude Code config.");
+      console.error("[kex] agent hooks toggle failed:", e);
+    } finally {
+      setAgentNotifsInstalling(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -212,13 +233,17 @@ export function GeneralSection() {
         <Label>Agents</Label>
         <SettingRow
           title="Coding agent notifications"
-          description="Alert when Claude Code or Codex running in a terminal needs your input or finishes. Desktop notification when Terax is unfocused, in-app otherwise."
+          description="Alert when Claude Code or Codex needs input or finishes. Installs hooks in ~/.claude/settings.json. Desktop notification when Kex is unfocused, in-app otherwise."
         >
           <Switch
             checked={agentNotifications}
-            onCheckedChange={(v) => void setAgentNotifications(v)}
+            disabled={agentNotifsInstalling}
+            onCheckedChange={(v) => void onToggleAgentNotifications(v)}
           />
         </SettingRow>
+        {agentNotifsError && (
+          <p className="text-[11px] text-destructive">{agentNotifsError}</p>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">
