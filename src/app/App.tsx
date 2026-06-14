@@ -73,6 +73,7 @@ import {
   getSavedWorkspaceState,
   saveWorkspaceState,
 } from "@/modules/workspaces/lib/workspaceState";
+import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -485,6 +486,10 @@ export default function App() {
       onGitHistorySearchHandle: (_panelId, handle) => {
         setGitHistoryHandle(handle);
       },
+      onRenamePanel: (panelId, title) => {
+        const found = findPanelGlobal(panelId);
+        if (found) updatePanelData(found.workspace.id, panelId, (p) => ({ ...p, title }));
+      },
     }),
     [
       activePanelId,
@@ -767,6 +772,9 @@ export default function App() {
       "tab.newPreview": () => openPreviewInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActivePanel,
+      "tab.rename": () => {
+        if (activePanelId) useTabRenameStore.getState().startRename(activePanelId);
+      },
       "tab.next": () => {
         if (!activeWorkspace || !activePane) return;
         const panels = activePane.panels;
