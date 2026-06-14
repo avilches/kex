@@ -17,6 +17,13 @@ Nunca usar `setInterval + setTick` para releer estado mutable externo (arrays a 
 
 Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una segunda instancia. Los componentes ya montados siguen usando la instancia vieja. Para diagnosticar bugs de estado mutable, siempre hacer kill del proceso y `pnpm tauri dev` fresco antes de leer logs. No confiar en resultados de sesiones con cambios via HMR.
 
+## Documentacion viva
+
+- `docs/ARCHITECTURE.md` + `docs/IPC.md` + `docs/BUILD.md` — referencia principal (ver AGENTS.md para politica de actualizacion)
+- `docs/WORKSPACES.md` + `docs/WORKSPACES_GOTCHAS.md` — subsistema de workspaces y pool de terminales
+- `docs/AGENT_SESSION_RESTORE.md` — hooks, store JSON, algoritmo de restore, UI del tab, casos de error
+- `docs/FORK.md` — divergencias y roadmap respecto al upstream
+
 ## Notas de implementacion
 ### Fix WebGL GPU al arrancar
 
