@@ -147,14 +147,36 @@ previous workspaces or pane layout.
   the Workspace/Panel model each panel gets and keeps its own slot; eviction no longer applies.
 - **`TERMINAL_ID` env var** — injected into the shell environment at PTY spawn (both Unix and Windows). Available to
   shell scripts and tools running inside the terminal.
-- **`TERAX_PANEL_ID` env var** — UUID injected into each PTY shell at spawn. Used by session persistence hooks to
-  associate an agent session with a specific terminal panel across restarts.
-- **Agent session restore** — when Claude Code hooks are installed, Terax writes the active session id and cwd to
-  `~/.config/terax/agent-sessions.json` (via `SessionStart`/`SessionEnd` hooks installed by `agent_enable_claude_hooks`).
-  On relaunch, `agent_session_restore_plan` (Rust) reads the store, locates the Claude Code JSONL transcript to verify
-  the cwd, and returns a resume command per recoverable session. The frontend types the command (`claude --resume '<id>'`)
-  into the terminal 200ms after the PTY opens. Tab UI: `agentname · dirname` title, `✦` icon, colored status dot;
-  `⚠` on error. See `docs/AGENT_SESSION_RESTORE.md`.
+- **`KEX_PANEL_ID` env var** (formerly `TERAX_PANEL_ID`) — UUID injected into each PTY shell at spawn. Used by session
+  persistence hooks to associate an agent session with a specific terminal panel across restarts.
+- **App env var prefix renamed to `KEX_`** — all shell integration env vars (`TERAX_TERMINAL`, `TERAX_BLOCKS`,
+  `TERAX_PANEL_ID`, `TERAX_USER_ZDOTDIR`) have been renamed to `KEX_TERMINAL`, `KEX_BLOCKS`, `KEX_PANEL_ID`,
+  `KEX_USER_ZDOTDIR`. Shell integration cache moved from `~/.cache/terax/` to `~/.cache/kex/`. Fish integration file
+  is now `kex.fish`. **Sync impact**: any upstream commit that references `TERAX_` env vars or `terax` paths will
+  need manual adaptation. The old Terax hook markers are still in `OWNED_MARKERS` as migration targets (they get
+  replaced when the user reinstalls hooks).
+- **Claude Code hooks config path renamed to `~/.config/kex/`** (formerly `~/.config/terax/`) — `agent-sessions.json`,
+  `restore-candidates.json`, and `hooks/session.sh` are now under `~/.config/kex/`. Hook OSC signal changed from
+  `notify;Terax;` to `notify;Kex;`. Script version marker is now `kex-session-v1`. Users with the old Terax hooks
+  installed will see the "Enable Claude Code alerts" button again (status check detects the outdated script via the
+  version marker) and reinstalling updates both the script and the OSC signal.
+- **Agent session restore** — when Claude Code hooks are installed, the app writes the active session id and cwd to
+  `~/.config/kex/agent-sessions.json` (via `SessionStart` hook; `SessionEnd` is intentionally ignored to avoid a
+  race with PTY death). On relaunch, `agent_session_restore_plan` (Rust) reads the store (preferring
+  `restore-candidates.json` written just before the last close), locates the Claude Code JSONL transcript to verify
+  the cwd, and returns a resume command per recoverable session. The frontend types the command
+  (`claude --resume '<id>'`) into the terminal 200ms after the PTY opens. Tab UI: `agentname · dirname` title, `✦`
+  icon, colored status dot; `⚠` on error. See `docs/AGENT_SESSION_RESTORE.md`.
+- **`claudeHooksEnabled` setting** — boolean persisted in the app settings store. When true, the app silently calls
+  `agent_enable_claude_hooks` on every startup (idempotent: only updates the script or settings.json when the
+  installed version is outdated or hooks are missing). User sets it by clicking "Enable Claude Code alerts" in the
+  notification bell.
+- **Minimal `~/.claude/settings.json` writes** — `agent_enable_claude_hooks` now uses `serde_json` with
+  `preserve_order` (insertion-order key serialization via IndexMap) and detects the original indent style, so
+  reformatting is kept to the minimum necessary. If our hooks are already present, settings.json is not touched at
+  all. **Sync impact**: `Cargo.toml` now has `serde_json = { version = "1", features = ["preserve_order"] }` instead
+  of `serde_json = "1"`. Upstream commits that add direct `serde_json` usage will still compile; only the object key
+  order in serialized output changes from alphabetical to insertion order.
 - `native.ts` moved from `src/modules/terminal/` to `src/lib/native.ts` — shared across all modules.
 
 ---
