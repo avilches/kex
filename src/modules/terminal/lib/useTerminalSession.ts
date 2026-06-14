@@ -383,6 +383,7 @@ async function openPtyForSession(
     },
     cwd,
     s.blocks,
+    leafId,
   );
 }
 

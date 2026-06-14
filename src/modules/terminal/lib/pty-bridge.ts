@@ -21,6 +21,7 @@ export async function openPty(
   handlers: PtyHandlers,
   cwd?: string,
   blocks?: boolean,
+  panelId?: string,
 ): Promise<PtySession> {
   // Raw bytes — no base64/JSON round-trip; messages arrive as ArrayBuffer.
   const onData = new Channel<ArrayBuffer>();
@@ -47,6 +48,7 @@ export async function openPty(
     cwd: cwd ?? null,
     workspace: currentWorkspaceEnv(),
     blocks: blocks ?? false,
+    panelId: panelId ?? null,
     onData,
     onExit,
   });
