@@ -31,6 +31,7 @@ type Props = {
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
+  onDetachAgent: (panelId: string) => void;
 };
 
 function DraggableTab({
@@ -52,6 +53,7 @@ function DraggableTab({
   onNewBrowser,
   onSplitBrowserRight,
   onSplitBrowserDown,
+  onDetachAgent,
   shortcutLabels,
 }: {
   panel: Panel;
@@ -72,6 +74,7 @@ function DraggableTab({
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
+  onDetachAgent: (panelId: string) => void;
   shortcutLabels: Record<string, string | null>;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
@@ -218,6 +221,14 @@ function DraggableTab({
         <ContextMenuItem onSelect={onCloseAllPanels}>
           Close All Tabs
         </ContextMenuItem>
+        {hasAgent && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => onDetachAgent(panel.id)}>
+              Detach Claude
+            </ContextMenuItem>
+          </>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={onNewTerminal}>
           New Terminal Tab
@@ -255,7 +266,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown }: Props) {
+export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent }: Props) {
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutLabels: Record<string, string | null> = {
@@ -437,6 +448,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           onNewBrowser={onNewBrowser}
           onSplitBrowserRight={onSplitBrowserRight}
           onSplitBrowserDown={onSplitBrowserDown}
+          onDetachAgent={onDetachAgent}
           shortcutLabels={shortcutLabels}
         />
       ))}

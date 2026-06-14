@@ -24,3 +24,8 @@ export function consumeRestorePlan(panelId: string): RestorePlan | null {
   restorePlans.delete(panelId);
   return plan;
 }
+
+export async function detachAgentSession(panelId: string): Promise<void> {
+  restorePlans?.delete(panelId);
+  await invoke("agent_detach_session", { panelId });
+}

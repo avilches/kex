@@ -8,6 +8,8 @@ import type { PaneNode } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import { subscribeToPool, poolSlotStats } from "@/modules/terminal";
+import { detachAgentSession } from "@/modules/agents/lib/agentSessionRestore";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 
 type Props = {
   pane: PaneNode;
@@ -171,6 +173,10 @@ export function PaneView({
         onNewBrowser={() => onNewBrowser(workspaceId, pane.id)}
         onSplitBrowserRight={() => onSplitBrowserRight(workspaceId, pane.id)}
         onSplitBrowserDown={() => onSplitBrowserDown(workspaceId, pane.id)}
+        onDetachAgent={(panelId) => {
+          useAgentStore.getState().finish(panelId);
+          void detachAgentSession(panelId);
+        }}
       />
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (

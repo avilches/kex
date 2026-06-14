@@ -51,6 +51,14 @@ PANEL_ID="${TERAX_PANEL_ID:-}"
 
 PAYLOAD="$(cat)"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
+
+# Only act on SessionStart. SessionEnd is intentionally ignored: the hook fires
+# when the PTY dies (e.g. Terax closing), not only when the user exits claude,
+# so writing "exited" here would prevent restore on the next launch.
+# Sessions that the user wants to detach are cleared via the "Detach Claude"
+# option in the tab context menu.
+[ "$EVENT" = "SessionStart" ] || exit 0
+
 SESSION_ID="$(printf '%s' "$PAYLOAD" | jq -r '.session_id // empty')"
 TRANSCRIPT="$(printf '%s' "$PAYLOAD" | jq -r '.transcript_path // empty')"
 CWD="$(printf '%s' "$PAYLOAD" | jq -r '.cwd // empty')"
@@ -60,20 +68,11 @@ mkdir -p "$(dirname "$STORE")"
 [ -f "$STORE" ] || printf '{"version":1,"panels":{}}' > "$STORE"
 
 TMP="$(mktemp)"
-case "$EVENT" in
-  SessionStart)
-    jq --arg p "$PANEL_ID" --arg sid "$SESSION_ID" \
-       --arg tp "$TRANSCRIPT" --arg cwd "$CWD" \
-       --arg ts "$(date +%s)" \
-       '.panels[$p] = {agent:"claude",session_id:$sid,cwd_launch:$cwd,transcript_path:$tp,state:"idle",updated_at:($ts|tonumber)}' \
-       "$STORE" > "$TMP" && mv -f "$TMP" "$STORE"
-    ;;
-  SessionEnd)
-    jq --arg p "$PANEL_ID" --arg ts "$(date +%s)" \
-       '.panels[$p].state = "exited" | .panels[$p].updated_at = ($ts|tonumber)' \
-       "$STORE" > "$TMP" && mv -f "$TMP" "$STORE"
-    ;;
-esac
+jq --arg p "$PANEL_ID" --arg sid "$SESSION_ID" \
+   --arg tp "$TRANSCRIPT" --arg cwd "$CWD" \
+   --arg ts "$(date +%s)" \
+   '.panels[$p] = {agent:"claude",session_id:$sid,cwd_launch:$cwd,transcript_path:$tp,state:"idle",updated_at:($ts|tonumber)}' \
+   "$STORE" > "$TMP" && mv -f "$TMP" "$STORE"
 exit 0
 "#;
 
@@ -203,6 +202,14 @@ pub fn agent_enable_claude_hooks() -> Result<(), String> {
         format!("rename into {}: {e}", path.display())
     })?;
     Ok(())
+}
+
+/// Remove a panel's session entry from the persistent store.
+/// Called from the "Detach Claude" tab context menu option so the user can
+/// opt out of restore for a specific session without closing the tab.
+#[tauri::command]
+pub fn agent_detach_session(panel_id: String) -> Result<(), String> {
+    session_store::detach_session(&panel_id)
 }
 
 #[tauri::command]

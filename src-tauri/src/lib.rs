@@ -115,9 +115,10 @@ fn create_app_window(
                 mgr.save();
             } else {
                 // Last window closed (app quit) — keep state to restore next launch.
-                log::info!("[window] Destroyed {win_label}: last window, keeping state for restore");
-            }
-            if live == 0 {
+                // Snapshot idle agent sessions now, before the process exits and PTYs die.
+                // The snapshot survives the SessionEnd hook that fires after PTY death.
+                log::info!("[window] Destroyed {win_label}: last window, snapshotting agent sessions");
+                agent::session_store::snapshot_idle_sessions();
                 if let Some(s) = app_handle.get_webview_window("settings") {
                     let _ = s.close();
                 }
@@ -415,6 +416,7 @@ pub fn run() {
             restore_window_geometry,
             agent::agent_enable_claude_hooks,
             agent::agent_claude_hooks_status,
+            agent::agent_detach_session,
             agent_session_restore_plan,
             history::history_suggest,
             history::history_commands,
