@@ -9,6 +9,7 @@ export function basename(path: string): string {
 }
 
 export function panelTitle(panel: Panel): string {
+  if (panel.kind !== "terminal" && panel.title) return panel.title;
   switch (panel.kind) {
     case "terminal": {
       if (panel.runningCommand) return basename(panel.runningCommand.trim().split(/\s+/)[0] ?? "");
