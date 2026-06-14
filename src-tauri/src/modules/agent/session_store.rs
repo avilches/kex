@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::BufRead;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -60,9 +61,11 @@ fn find_jsonl(session_id: &str, transcript_path: &str) -> Option<PathBuf> {
 }
 
 fn read_launch_cwd_from_jsonl(jsonl: &PathBuf) -> Option<String> {
-    let content = std::fs::read_to_string(jsonl).ok()?;
-    for line in content.lines() {
-        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(line) {
+    let file = std::fs::File::open(jsonl).ok()?;
+    let reader = std::io::BufReader::new(file);
+    for line in reader.lines() {
+        let line = line.ok()?;
+        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) {
             if let Some(cwd) = obj.get("cwd").and_then(|v| v.as_str()) {
                 if !cwd.is_empty() {
                     return Some(cwd.to_string());
@@ -75,9 +78,9 @@ fn read_launch_cwd_from_jsonl(jsonl: &PathBuf) -> Option<String> {
 
 fn resume_cmd_for_agent(agent: &str, session_id: &str, cwd: &str) -> String {
     match agent {
-        "claude" => format!("cd {} && claude --resume {}", shell_quote(cwd), session_id),
+        "claude" => format!("cd {} && claude --resume {}", shell_quote(cwd), shell_quote(session_id)),
         "codex" => format!("cd {} && codex resume --last", shell_quote(cwd)),
-        "gemini" => format!("cd {} && gemini --resume {}", shell_quote(cwd), session_id),
+        "gemini" => format!("cd {} && gemini --resume {}", shell_quote(cwd), shell_quote(session_id)),
         _ => format!("cd {}", shell_quote(cwd)),
     }
 }
@@ -148,7 +151,7 @@ mod tests {
     #[test]
     fn resume_cmd_claude() {
         let cmd = resume_cmd_for_agent("claude", "abc-123", "/home/user/repo");
-        assert_eq!(cmd, "cd '/home/user/repo' && claude --resume abc-123");
+        assert_eq!(cmd, "cd '/home/user/repo' && claude --resume 'abc-123'");
     }
 
     #[test]
