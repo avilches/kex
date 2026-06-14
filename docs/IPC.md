@@ -121,8 +121,9 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `window_get_state` | Return the saved `WindowEntry` (workspaces + geometry) for a given window label |
 | `window_save_workspace_state` | Persist workspace list and active index for a window label to `workspaces.json` |
 | `get_launch_dir` | Return the CLI launch directory (drained on first call) |
-| `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks |
-| `agent_claude_hooks_status` | Query whether hooks are installed |
+| `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
+| `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
+| `agent_session_restore_plan` | Return `Vec<RestorePlan>` — one entry per panel that had a running agent session at last close |
 
 ---
 
@@ -150,4 +151,20 @@ The detection logic runs entirely on the PTY byte filter. When no agent is runni
 Hooks can be installed from within the app (the notification bell popover shows a "Set up Claude Code" prompt if hooks are not yet installed). The installer (`agent_enable_claude_hooks`):
 - Reads the existing Claude Code `settings.json` atomically
 - Injects the `terax:agent-signal` hook entries without overwriting unrelated settings
+- Also injects `SessionStart` and `SessionEnd` hooks that write to `~/.config/terax/agent-sessions.json` (see below)
 - Is idempotent — re-running it on an already-configured installation is safe
+
+### Agent session persistence
+
+In addition to the live notification hooks, `agent_enable_claude_hooks` installs two Claude Code lifecycle hooks:
+
+- **`SessionStart`**: writes `{ panelId, agent, sessionId, cwd, state: "running" }` to `~/.config/terax/agent-sessions.json` (atomic `mktemp` + `mv`; uses `jq` if available, raw JSON otherwise).
+- **`SessionEnd`**: updates `state` to `"exited"` for the matching `panelId`.
+
+The hook script reads `TERAX_PANEL_ID` from the environment — a UUID injected into every PTY shell environment at spawn time (see `pty_open`).
+
+On the next Terax launch, `agent_session_restore_plan` reads the store, skips exited sessions, locates the agent's JSONL transcript (e.g. `~/.claude/projects/*/<sessionId>.jsonl`) to read the session's recorded `cwd`, verifies the directory still exists, and returns one `RestorePlan` per recoverable session. The frontend then types the appropriate resume command (e.g. `claude --resume '<id>'`) into the terminal 200ms after the PTY opens.
+
+`CLAUDE_CONFIG_DIR` is respected: if set, the hook writes there instead of `~/.config/terax/`, and the restore logic searches for transcripts under that directory.
+
+See `docs/AGENT_SESSION_RESTORE.md` for the complete design.

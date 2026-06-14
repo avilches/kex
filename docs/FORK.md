@@ -147,6 +147,14 @@ previous workspaces or pane layout.
   the Workspace/Panel model each panel gets and keeps its own slot; eviction no longer applies.
 - **`TERMINAL_ID` env var** — injected into the shell environment at PTY spawn (both Unix and Windows). Available to
   shell scripts and tools running inside the terminal.
+- **`TERAX_PANEL_ID` env var** — UUID injected into each PTY shell at spawn. Used by session persistence hooks to
+  associate an agent session with a specific terminal panel across restarts.
+- **Agent session restore** — when Claude Code hooks are installed, Terax writes the active session id and cwd to
+  `~/.config/terax/agent-sessions.json` (via `SessionStart`/`SessionEnd` hooks installed by `agent_enable_claude_hooks`).
+  On relaunch, `agent_session_restore_plan` (Rust) reads the store, locates the Claude Code JSONL transcript to verify
+  the cwd, and returns a resume command per recoverable session. The frontend types the command (`claude --resume '<id>'`)
+  into the terminal 200ms after the PTY opens. Tab UI: `agentname · dirname` title, `✦` icon, colored status dot;
+  `⚠` on error. See `docs/AGENT_SESSION_RESTORE.md`.
 - `native.ts` moved from `src/modules/terminal/` to `src/lib/native.ts` — shared across all modules.
 
 ---

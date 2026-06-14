@@ -152,7 +152,13 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 When Claude Code (or a future compatible agent) runs inside a Terax terminal, Terax detects its state via OSC sequences emitted by agent hooks. A notification bell in the header shows the agent's status (working / needs attention / done) with OS notifications when you are away from the window.
 
-See section 9 for the full technical detail.
+See IPC.md for the full protocol detail.
+
+### 3.7a Agent session restore
+
+When an agent session is running at the time Terax closes, Terax offers to resume it automatically on the next launch. The tab showing a restored session displays `agentname · dirname` as its title, a colored status dot, and a `✦` icon. If the resume command fails (missing transcript, deleted directory), the icon becomes `⚠` and the title turns red.
+
+Hooks must be installed via "Set up Claude Code" (notification bell popover) for this feature to work. See `docs/AGENT_SESSION_RESTORE.md` for the complete design and edge cases.
 
 ### 3.7 Web preview
 
@@ -244,7 +250,9 @@ SSH is on the roadmap but not yet implemented. Terax does not manage SSH connect
 
 ### 5.2 No persistent terminal layout restore
 
-Terminal sessions are not persisted across restarts. When you close and reopen Terax, you start with a fresh terminal. Tab layout (number of tabs, split pane configuration, working directories) is not saved. Shell history within the terminal is whatever your shell persists natively (`.zsh_history`, `.bash_history`, etc.). Persistent sessions and layout restore are on the roadmap.
+Terminal sessions are not persisted across restarts. When you close and reopen Terax, terminal panels restart with a fresh PTY in their saved `cwd`. Shell history within the terminal is whatever your shell persists natively (`.zsh_history`, `.bash_history`, etc.).
+
+**Exception: agent sessions.** If Claude Code hooks are installed (`agent_enable_claude_hooks`), Terax records the active session id and cwd at Claude Code exit and restores it automatically on next launch by running `claude --resume '<id>'` in the terminal. See section 3.7a and `docs/AGENT_SESSION_RESTORE.md`.
 
 ### 5.3 No LSP / language server
 
@@ -332,9 +340,9 @@ src/
     ├── terminal/                  — xterm.js stack, PTY bridge, OSC parsing, blocks
     │   └── block/                 — Block overlay, shell input, mode machine, history
     ├── editor/                    — CodeMirror 6 stack, diffs, vim
-    ├── agents/                    — Terminal agent notifications (Claude Code, etc.)
+    ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)
     │   ├── components/            — NotificationBell
-    │   ├── lib/                   — route, notify, agentIcon
+    │   ├── lib/                   — route, notify, agentIcon, agentSessionRestore
     │   └── store/                 — agentStore
     ├── explorer/                  — File tree, fuzzy search, icons, inline rename
     ├── source-control/            — Git stage/commit/push panel
