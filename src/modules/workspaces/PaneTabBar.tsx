@@ -13,6 +13,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 
 type Props = {
   panels: Panel[];
@@ -80,6 +81,19 @@ function DraggableTab({
   const title = panelTitle(panel);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
+  const agentSession = useAgentStore((s) => s.sessions[panel.id]);
+  const hasAgent = agentSession !== undefined;
+  const isRestoreError = agentSession?.restoreError ?? false;
+
+  const agentTitle =
+    hasAgent && panel.kind === "terminal"
+      ? (() => {
+          const agentName = agentSession!.agent;
+          const cwd = panel.cwd ?? "";
+          const dirname = cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd;
+          return `${agentName} · ${dirname || title}`;
+        })()
+      : title;
 
   return (
     <ContextMenu>
@@ -88,6 +102,14 @@ function DraggableTab({
           ref={setNodeRef}
           {...attributes}
           data-panel-id={panel.id}
+          title={hasAgent ? [
+            agentSession!.agent,
+            `Session: ${agentSession!.panelId.slice(0, 8)}...`,
+            `Started: ${new Date(agentSession!.startedAt).toLocaleTimeString()}`,
+            agentSession!.restored ? "Session restored" : null,
+            isRestoreError ? "Session restore failed" : null,
+            panel.kind === "terminal" ? (panel.cwd ?? "") : null,
+          ].filter((x): x is string => x !== null).join("\n") : undefined}
           onClick={() => onActivate(panel.id)}
           onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
           onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
@@ -127,25 +149,44 @@ function DraggableTab({
               className={cn("absolute inset-x-0 top-0 bg-tab-focus-indicator", connected ? "h-[1.5px]" : "h-0.5 rounded-t")}
             />
           )}
-          <span className="shrink-0 opacity-70">{panelIcon(panel, workspaceId)}</span>
+          <span className={cn("shrink-0", hasAgent ? "opacity-100" : "opacity-70")}>
+            {hasAgent
+              ? isRestoreError
+                ? <span title="Session restore failed">{"⚠"}</span>
+                : "✦"
+              : panelIcon(panel, workspaceId)}
+          </span>
           <span
             className={cn(
               "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
               panel.kind === "terminal" && panel.runningCommand && "text-center",
+              isRestoreError && "text-destructive/70",
             )}
             style={{ direction: panel.kind === "terminal" && !panel.runningCommand ? "rtl" : "ltr" }}
             title={
               panel.kind === "terminal"
                 ? panel.runningCommand
-                  ? `${title} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
+                  ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
                   : (panel.cwd?.replace(/\/$/, "") ?? "shell")
-                : title
+                : agentTitle
             }
           >
-            {title}
+            {agentTitle}
           </span>
           {panel.kind === "editor" && panel.dirty && (
             <span className="shrink-0 text-[8px] text-primary">●</span>
+          )}
+          {hasAgent && (
+            <span
+              className={cn(
+                "ml-0.5 inline-block shrink-0 size-[6px] rounded-full",
+                isRestoreError
+                  ? "bg-destructive"
+                  : agentSession?.status === "working"
+                    ? "bg-green-500 animate-pulse"
+                    : "bg-amber-400 animate-pulse",
+              )}
+            />
           )}
           <button
             type="button"
