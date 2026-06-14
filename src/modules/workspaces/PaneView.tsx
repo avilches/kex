@@ -171,6 +171,7 @@ export function PaneView({
         onNewBrowser={() => onNewBrowser(workspaceId, pane.id)}
         onSplitBrowserRight={() => onSplitBrowserRight(workspaceId, pane.id)}
         onSplitBrowserDown={() => onSplitBrowserDown(workspaceId, pane.id)}
+        onRenamePanel={callbacks.onRenamePanel}
       />
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (

@@ -54,6 +54,8 @@ export type PanelCallbacks = {
   // Git history callbacks
   onOpenCommitFile?: (input: CommitFileDiffOpenInput) => void;
   onGitHistorySearchHandle?: (panelId: string, handle: GitHistorySearchHandle | null) => void;
+  // Tab rename
+  onRenamePanel?: (panelId: string, title: string | undefined) => void;
 };
 
 type Props = {
