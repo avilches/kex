@@ -31,6 +31,12 @@ authoritative list of removed surface. Future sync runs may have added new entri
 First, confirm the working tree is clean. If there are uncommitted changes, stop and ask the user to commit or stash
 before proceeding -- a dirty tree will contaminate cherry-picks and manual merges.
 
+This applies to **continuations too**, not just a fresh start. A sync run across multiple sessions tends to accumulate
+uncommitted work that entangles with unrelated user WIP in shared files (e.g. `App.tsx`, `PanelContent.tsx`). Once
+entangled, neither `git add -p` nor per-file commits can separate sync from WIP cleanly. Establish a commit-barrier:
+commit (or stash) each completed sync chunk before the next session, and never let sync edits sit uncommitted next to
+unrelated WIP.
+
 ```bash
 git status --porcelain
 ```
@@ -122,6 +128,25 @@ git log LAST_SYNC..HEAD --oneline -- <file>
 
 If the output is non-empty, the file has diverged in both directions: mark it **requires manual merge** immediately. Do
 not attempt a cherry-pick on it.
+
+**Also check the inverse: pre-divergence files.** An empty output above does NOT guarantee a clean cherry-pick. It only
+means the fork has not touched the file *since* `LAST_SYNC`. It misses the case where the upstream developed the file
+heavily and the fork is still on a much older version inherited from the original fork point (this is common for CI,
+infra, and workflow files the fork never syncs individually -- their real common base is the fork point, not
+`LAST_SYNC`). A cherry-pick of a recent commit then targets steps/sections the fork never received, and fails or applies
+something incoherent. Guard against it:
+
+```bash
+git diff HEAD:<file> upstream/main:<file> --stat
+```
+
+If a file the fork has NOT modified since `LAST_SYNC` nonetheless differs substantially from `upstream/main` (large line
+delta, missing whole sections), the fork is on a pre-divergence version. Mark it **requires manual merge**, never
+cherry-pick, and consider whether adopting the upstream's full evolution of that file is separate infra work rather than
+part of this sync (record it as a pending improvement and document the divergence in FORK.md). Real example
+(2026-06-13): `afd1167` modified a `release.yml` AppImage step the fork never had -- the fork's `release.yml` was 96
+lines (original fork point) vs the upstream's 202; `git log LAST_SYNC..HEAD` was empty, so the naive path would have
+called it a clean cherry-pick.
 
 Then analyze the upstream diff for this file. Determine:
 
@@ -244,6 +269,23 @@ Fix all errors before proceeding to Step 8. Do not skip or bypass checks.
 Create `docs/upstream-YYYY-mm-dd.md` using today's date. This file must be **fully self-contained**: a new agent reading
 it in a fresh session with zero conversation context must be able to execute it completely. The executing agent should
 use the `superpowers:executing-plans` skill to run this plan with review checkpoints.
+
+**The `Approach` and effort estimate of every item are provisional and expire.** They are written from the upstream's
+perspective and must be re-verified against the fork's actual current code at execution time, not trusted from the plan.
+The fork's structure can invalidate an approach that reads as trivial. Real example (2026-06-13): a panel-swap entrance
+animation was planned as "1 cheap line", but the fork keeps all panels mounted and toggles `invisible
+pointer-events-none` instead of remounting, so a CSS entrance animation never fires -- the whole approach was moot. When
+executing a deferred/EVALUAR item, first confirm the target code still matches what the approach assumes; if not,
+re-decide the item rather than forcing the stale plan.
+
+For any item whose recommendation is `evaluar` or that is deferred to a later session, give it an explicit decision
+state that gets updated when decided, so a multi-session sync stays auditable:
+
+```
+- <commit> <description>: EVALUAR | APLICADO (YYYY-mm-dd, how) | DESCARTADO (YYYY-mm-dd, why) | POSPUESTO (YYYY-mm-dd, blocker)
+```
+
+Update the state in place when the item is resolved; do not leave a stale "EVALUAR" once a decision exists.
 
 Use this exact structure:
 
