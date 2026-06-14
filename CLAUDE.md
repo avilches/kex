@@ -22,6 +22,7 @@ Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una
 - `docs/ARCHITECTURE.md` + `docs/IPC.md` + `docs/BUILD.md` — referencia principal (ver AGENTS.md para politica de actualizacion)
 - `docs/WORKSPACES.md` + `docs/WORKSPACES_GOTCHAS.md` — subsistema de workspaces y pool de terminales
 - `docs/AGENT_SESSION_RESTORE.md` — hooks, store JSON, algoritmo de restore, UI del tab, casos de error
+- `docs/RESTORE_SESSION_TESTS.md` — plan de pruebas manuales con checklist de diagnostico
 - `docs/FORK.md` — divergencias y roadmap respecto al upstream
 
 ## Notas de implementacion
