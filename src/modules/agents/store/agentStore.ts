@@ -17,6 +17,9 @@ type AgentStoreState = {
   start: (panelId: string, tabId: string, agent: string) => void;
   setStatus: (panelId: string, status: AgentStatus) => void;
   finish: (panelId: string) => void;
+  startRestored: (panelId: string, tabId: string, agent: string) => void;
+  setRestoreError: (panelId: string, tabId: string, agent: string) => void;
+  clearRestored: (panelId: string) => void;
   setLocalAgent: (state: LocalAgentState) => void;
   pushNotification: (
     n: Omit<AgentNotification, "id" | "at" | "read">,
@@ -44,6 +47,8 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             startedAt: now,
             lastActivityAt: now,
             attentionSince: null,
+            restored: false,
+            restoreError: false,
           },
         },
       };
@@ -62,6 +67,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             status,
             lastActivityAt: now,
             attentionSince: status === "waiting" ? now : null,
+            restored: false,
           },
         },
       };
@@ -73,6 +79,60 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       const next = { ...s.sessions };
       delete next[panelId];
       return { sessions: next };
+    }),
+
+  startRestored: (panelId, tabId, agent) =>
+    set((s) => {
+      const now = Date.now();
+      return {
+        sessions: {
+          ...s.sessions,
+          [panelId]: {
+            panelId,
+            tabId,
+            agent,
+            status: "working",
+            startedAt: now,
+            lastActivityAt: now,
+            attentionSince: null,
+            restored: true,
+            restoreError: false,
+          },
+        },
+      };
+    }),
+
+  setRestoreError: (panelId, tabId, agent) =>
+    set((s) => {
+      const now = Date.now();
+      return {
+        sessions: {
+          ...s.sessions,
+          [panelId]: {
+            panelId,
+            tabId,
+            agent,
+            status: "working",
+            startedAt: now,
+            lastActivityAt: now,
+            attentionSince: null,
+            restored: false,
+            restoreError: true,
+          },
+        },
+      };
+    }),
+
+  clearRestored: (panelId) =>
+    set((s) => {
+      const prev = s.sessions[panelId];
+      if (!prev?.restored) return s;
+      return {
+        sessions: {
+          ...s.sessions,
+          [panelId]: { ...prev, restored: false },
+        },
+      };
     }),
 
   setLocalAgent: (state) =>

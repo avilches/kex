@@ -23,6 +23,8 @@ export type AgentSession = {
   startedAt: number;
   lastActivityAt: number;
   attentionSince: number | null;
+  restored: boolean;
+  restoreError: boolean;
 };
 
 export type AgentNotification = {
