@@ -162,17 +162,24 @@ fn settings_path() -> Result<std::path::PathBuf, String> {
 pub fn agent_enable_claude_hooks() -> Result<(), String> {
     // Install session persistence hook script
     let script_path = session_hook_script_path()?;
-    let script_dir = script_path.parent().unwrap();
+    let script_dir = script_path
+        .parent()
+        .ok_or_else(|| "session hook script path has no parent".to_string())?;
     std::fs::create_dir_all(script_dir)
         .map_err(|e| format!("create {}: {e}", script_dir.display()))?;
-    std::fs::write(&script_path, SESSION_HOOK_SCRIPT)
-        .map_err(|e| format!("write session hook script: {e}"))?;
+    let script_tmp = script_path.with_extension("sh.terax-tmp");
+    std::fs::write(&script_tmp, SESSION_HOOK_SCRIPT)
+        .map_err(|e| format!("write session hook tmp: {e}"))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755))
+        std::fs::set_permissions(&script_tmp, std::fs::Permissions::from_mode(0o755))
             .map_err(|e| format!("chmod session hook: {e}"))?;
     }
+    std::fs::rename(&script_tmp, &script_path).map_err(|e| {
+        let _ = std::fs::remove_file(&script_tmp);
+        format!("rename session hook: {e}")
+    })?;
 
     let path = settings_path()?;
     let dir = path.parent().unwrap();
