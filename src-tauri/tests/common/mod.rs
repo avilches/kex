@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use tempfile::TempDir;
-use terax_lib::modules::fs::to_canon;
-use terax_lib::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
+use kex_lib::modules::fs::to_canon;
+use kex_lib::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
 pub struct GitRepoFixture {
     pub registry: WorkspaceRegistry,

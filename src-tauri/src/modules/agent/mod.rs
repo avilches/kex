@@ -41,7 +41,7 @@ fn is_empty_group(group: &Value) -> bool {
         .is_none_or(|hs| hs.is_empty())
 }
 
-const SESSION_HOOK_MARKER: &str = "terax-session-hook";
+const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 
 // Bump this when the script behaviour changes in a way that requires reinstall.
 // agent_claude_hooks_status checks the installed file for this marker so that

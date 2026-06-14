@@ -314,7 +314,7 @@ export default function App() {
     const label = activePanel ? (activeCwd ? basename(activeCwd) : panelTitle(activePanel)) : "";
     let title: string;
     if (project && label && label !== project) title = `${project} — ${label}`;
-    else title = project || label || "Terax";
+    else title = project || label || "Kex";
     document.title = title;
     void getCurrentWindow().setTitle(title).catch(() => {});
   }, [explorerRoot, activeCwd, activePanel]);

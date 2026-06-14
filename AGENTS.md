@@ -64,7 +64,7 @@ goes through `invoke()` calls to commands registered in `src-tauri/src/lib.rs`:
   WSL bridge (`wsl_list_distros`, `wsl_default_distro`, `wsl_home`).
 - `open_settings_window`: separate webview window for Settings (optional `tab` arg deep-links a section).
 - `agent::agent_enable_claude_hooks` / `agent_claude_hooks_status`: atomically install Claude Code terminal hooks; gated
-  on `TERAX_TERMINAL`.
+  on `KEX_TERMINAL`.
 
 ### PTY shell integration
 
@@ -86,7 +86,7 @@ leave one of the resulting PTYs with a stalled output pipe. Don't remove the loc
 under fast tab spam.
 
 Each ConPTY child is also assigned to a per-session **Job Object** with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` (
-`pty/job.rs`). When the Job HANDLE drops — clean shutdown, panic, or even SIGKILL'd Terax process — the kernel kills
+`pty/job.rs`). When the Job HANDLE drops — clean shutdown, panic, or even SIGKILL'd Kex process — the kernel kills
 every descendant of the shell (e.g. `npm run dev` spawned from inside pwsh). Without this Windows orphans the entire
 process subtree because `TerminateProcess` only kills the immediate child. macOS/Linux rely on
 `Drop for Session → killer.kill()`; on dev-`Ctrl-C` of `cargo run` destructors don't fire and orphans are possible there
@@ -133,7 +133,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **markdown/** — markdown preview renderer (backs the `markdown` tab kind).
 - **workspace/** — workspace environment switching (Local + WSL distros).
 - **theme/** — custom theme engine (no `next-themes`). `ThemeProvider` + `applyTheme` write CSS variables; built-in
-  presets in `themes/` (terax-default, nord, tide, catppuccin, tokyo-night, caffeine, claude, gruvbox, sage, rose-pine),
+  presets in `themes/` (kex-default, nord, tide, catppuccin, tokyo-night, caffeine, claude, gruvbox, sage, rose-pine),
   user themes via `customThemes.ts` + `validateTheme.ts`, optional background image via `bgImageStore.ts` +
   `SurfaceLayer`.
 - **updater/** — auto-updater UI built on `tauri-plugin-updater`.
@@ -141,11 +141,11 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
   terminal `sessions` + `notifications`) and a shared router (`lib/route.ts`: suppress when focused-and-visible,
   OS-notify when unfocused, in-app Sonner toast when focused-but-hidden) feed the header `NotificationBell`. Terminal
   detection is Rust-side (`pty/agent_detect.rs`) on the PTY reader's byte filter, armed on `OSC 133;C;<cmd>`, emitting
-  `terax:agent-signal` transitions (`started`/`working`/`attention`/`finished`/`exited`) driven only by OSC sequences (
+  `kex:agent-signal` transitions (`started`/`working`/`attention`/`finished`/`exited`) driven only by OSC sequences (
   never raw output, so a repainting TUI never flaps) — zero cost when no agent runs. Terminal signals arrive via Claude
   Code hooks (`UserPromptSubmit`/`Notification`/`Stop`) returning an `OSC 777` marker through the `terminalSequence`
   field (hooks lost `/dev/tty` access in v2.1.139); `agent_enable_claude_hooks` installs them (atomic write, never
-  clobbers invalid JSON, prunes empty groups), gated on `TERAX_TERMINAL`, and the marker self-arms the detector so it
+  clobbers invalid JSON, prunes empty groups), gated on `KEX_TERMINAL`, and the marker self-arms the detector so it
   works in bash/Windows/tmux without shell preexec.
 
 ### UI conventions
@@ -257,7 +257,7 @@ exist."
   by `pty closed id=1` in dev logs.
 - **Windows PowerShell process lifecycle**: `killer.kill()` from `portable-pty` only kills the immediate child.
   Descendants (e.g. `npm run dev` started inside pwsh) survive unless something else takes them down. The Job Object in
-  `pty/job.rs` handles this for the Terax-process-death case; an explicit `pty_close` from JS also kills only the
+  `pty/job.rs` handles this for the Kex-process-death case; an explicit `pty_close` from JS also kills only the
   immediate child + relies on the Job to take the rest. Don't disable the Job without a replacement.
 - **Panel `cwd` storage**: comes from OSC 7 with forward slashes (after `parseOsc7` strips `/C:` → `C:`). Anything that
   consumes `panel.cwd` and passes it to a Rust fs command on Windows must normalize separators or accept both forms —

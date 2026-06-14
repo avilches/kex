@@ -132,9 +132,9 @@ function DraggableTab({
       open={isRenaming}
       onOpenChange={(open) => { if (!open) handleSave(); }}
     >
-      <PopoverAnchor asChild>
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <PopoverAnchor asChild>
             <div
               ref={setNodeRef}
               {...attributes}
@@ -235,8 +235,9 @@ function DraggableTab({
                 <span className="text-[13px] leading-none">×</span>
               </button>
             </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
+          </PopoverAnchor>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
             {onRenamePanel && (
               <>
                 <ContextMenuItem onSelect={() => startRename(panel.id)}>
@@ -308,9 +309,8 @@ function DraggableTab({
             <ContextMenuItem onSelect={onSplitBrowserDown}>
               New Browser Split Down
             </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
-      </PopoverAnchor>
+        </ContextMenuContent>
+      </ContextMenu>
 
       <PopoverContent
         side="bottom"
@@ -318,6 +318,8 @@ function DraggableTab({
         sideOffset={4}
         className="w-52 gap-0 rounded-lg p-1.5"
         onEscapeKeyDown={(e) => { e.preventDefault(); handleCancel(); }}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onFocusOutside={(e) => e.preventDefault()}
       >
         <input
           ref={inputRef}
@@ -328,6 +330,7 @@ function DraggableTab({
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); handleSave(); }
           }}
+          onBlur={handleSave}
           onPointerDown={(e) => e.stopPropagation()}
           className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground/60"
         />

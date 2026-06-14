@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Terax",
+  "productName": "Kex",
   "version": "0.7.3",
   "identifier": "app.crynta.terax",
   "build": {
@@ -72,7 +72,7 @@
     },
     "category": "DeveloperTool",
     "shortDescription": "AI-native terminal emulator",
-    "longDescription": "Terax — an open-source AI-native terminal emulator with multi-tab, file explorer, code editor, web preview, voice input, and AI agents."
+    "longDescription": "Kex — an open-source AI-native terminal emulator with multi-tab, file explorer, code editor, web preview, voice input, and AI agents."
   },
   "plugins": {
     "updater": {

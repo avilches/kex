@@ -1,4 +1,4 @@
-# Terax - Índice de bugs
+# Kex - Índice de bugs
 
 Cada bug es un fichero autocontenido y accionable por un agente en `docs/pending/bugs/`. Un agente puede ejecutar cualquiera de forma aislada: cada fichero incluye contexto del proyecto, ubicación `archivo:línea`, problema, impacto, fix concreto, criterios de aceptación, comandos de verificación y el test a añadir si toca un subsistema core.
 

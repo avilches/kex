@@ -1,4 +1,4 @@
-# Plan ejecutable: Terax como espacio componible (Notas Markdown + Marcadores)
+# Plan ejecutable: Kex como espacio componible (Notas Markdown + Marcadores)
 
 Documento de especificacion e implementacion pensado para ser ejecutado por un agente.
 Cada fase es autocontenida, enviable de forma aislada, y deja todas las comprobaciones de calidad en verde.

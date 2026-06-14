@@ -138,7 +138,7 @@ pub fn detach_session(panel_id: &str) -> Result<(), String> {
             if let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) {
                 store.panels.remove(panel_id);
                 if let Ok(out) = serde_json::to_string_pretty(&store) {
-                    let tmp = path.with_extension("json.terax-tmp");
+                    let tmp = path.with_extension("json.kex-tmp");
                     if std::fs::write(&tmp, out).is_ok() {
                         let _ = std::fs::rename(&tmp, &path);
                     }
@@ -153,7 +153,7 @@ pub fn detach_session(panel_id: &str) -> Result<(), String> {
                 if let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) {
                     store.panels.remove(panel_id);
                     if let Ok(out) = serde_json::to_string_pretty(&store) {
-                        let tmp = cpath.with_extension("json.terax-tmp");
+                        let tmp = cpath.with_extension("json.kex-tmp");
                         if std::fs::write(&tmp, out).is_ok() {
                             let _ = std::fs::rename(&tmp, &cpath);
                         }
@@ -198,7 +198,7 @@ pub fn snapshot_idle_sessions() {
         Some(p) => p,
         None => return,
     };
-    let tmp = cpath.with_extension("json.terax-tmp");
+    let tmp = cpath.with_extension("json.kex-tmp");
     if std::fs::write(&tmp, out).is_ok() {
         let _ = std::fs::rename(&tmp, &cpath);
     }

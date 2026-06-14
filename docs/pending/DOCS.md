@@ -1,4 +1,4 @@
-# Terax - Discrepancias entre documentación y código
+# Kex - Discrepancias entre documentación y código
 
 Verificación de que `AGENTS.md`, `CLAUDE.md`, `docs/*` y la documentación raíz se correspondan con lo que hace el código. La primera es crítica: `ROADMAP.md` describe el producto upstream AI-native que este fork eliminó.
 

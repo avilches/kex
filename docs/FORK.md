@@ -167,10 +167,11 @@ previous workspaces or pane layout.
   the cwd, and returns a resume command per recoverable session. The frontend types the command
   (`claude --resume '<id>'`) into the terminal 200ms after the PTY opens. Tab UI: `agentname · dirname` title, `✦`
   icon, colored status dot; `⚠` on error. See `docs/AGENT_SESSION_RESTORE.md`.
-- **`claudeHooksEnabled` setting** — boolean persisted in the app settings store. When true, the app silently calls
-  `agent_enable_claude_hooks` on every startup (idempotent: only updates the script or settings.json when the
-  installed version is outdated or hooks are missing). User sets it by clicking "Enable Claude Code alerts" in the
-  notification bell.
+- **`agentNotifications` setting** (formerly `claudeHooksEnabled`) — boolean persisted in the app settings store.
+  Controls both notification routing and hook lifecycle. Enabling it calls `agent_enable_claude_hooks`; disabling it
+  calls `agent_disable_claude_hooks` (removes Kex hooks from `~/.claude/settings.json`). On every startup, the app
+  silently calls `agent_enable_claude_hooks` when this is true (idempotent). Controlled via Settings > General >
+  Coding agent notifications; also accessible from the notification bell popup ("Enable Claude Code alerts").
 - **Minimal `~/.claude/settings.json` writes** — `agent_enable_claude_hooks` now uses `serde_json` with
   `preserve_order` (insertion-order key serialization via IndexMap) and detects the original indent style, so
   reformatting is kept to the minimum necessary. If our hooks are already present, settings.json is not touched at
@@ -185,7 +186,7 @@ previous workspaces or pane layout.
 
 These phases are designed but not fully implemented:
 
-- **Phase 3 — Persistent terminal sessions** — a tmux daemon per workspace that keeps shell sessions alive across Terax
+- **Phase 3 — Persistent terminal sessions** — a tmux daemon per workspace that keeps shell sessions alive across Kex
   restarts. Panels restore with their full scrollback and running processes intact.
 - **Phase 4 — Drag-and-drop panel management** — drag panels between panes (5-zone drop: top / bottom / left / right /
   center), drag workspaces to reorder the sidebar, drag panels to other workspaces. Infrastructure (dnd-kit, stable

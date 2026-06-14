@@ -6,7 +6,7 @@ export type ThemePref = "system" | "light" | "dark";
 
 export type TabBarStyle = "connected" | "pill";
 
-export const DEFAULT_THEME_ID = "terax-default";
+export const DEFAULT_THEME_ID = "kex-default";
 
 export const EDITOR_THEMES = [
   "atomone",
@@ -67,7 +67,7 @@ export type Preferences = {
   paneSplitLimit: PaneSplitLimit;
 };
 
-const STORE_PATH = "terax-settings.json";
+const STORE_PATH = "kex-settings.json";
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
 const KEY_EDITOR_THEME = "editorTheme";
@@ -146,7 +146,7 @@ const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
 // page lives in a separate webview, so writes there never reach the main
 // window's subscribers. Mirror every setter through a Tauri event so any
 // window can listen.
-const PREFS_CHANGED_EVENT = "terax://prefs-changed";
+const PREFS_CHANGED_EVENT = "kex://prefs-changed";
 
 async function writePref<T>(key: string, value: T): Promise<void> {
   await store.set(key, value);

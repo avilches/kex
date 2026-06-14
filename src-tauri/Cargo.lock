@@ -2329,6 +2329,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "kex"
+version = "0.7.3"
+dependencies = [
+ "dirs 6.0.0",
+ "globset",
+ "grep-matcher",
+ "grep-regex",
+ "grep-searcher",
+ "ignore",
+ "libc",
+ "log",
+ "notify",
+ "nucleo-matcher",
+ "objc2",
+ "objc2-foundation",
+ "portable-pty",
+ "proptest",
+ "serde",
+ "serde_json",
+ "shared_child",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-log",
+ "tauri-plugin-notification",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-process",
+ "tauri-plugin-store",
+ "tauri-plugin-updater",
+ "tempfile",
+ "tokio",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4249,6 +4285,7 @@ version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
 dependencies = [
+ "indexmap 2.14.0",
  "itoa",
  "memchr",
  "serde",
@@ -5184,42 +5221,6 @@ checksum = "c4790fc369d5a530f4b544b094e31388b9b3a37c0f4652ade4505945f5660d24"
 dependencies = [
  "new_debug_unreachable",
  "utf-8",
-]
-
-[[package]]
-name = "terax"
-version = "0.7.3"
-dependencies = [
- "dirs 6.0.0",
- "globset",
- "grep-matcher",
- "grep-regex",
- "grep-searcher",
- "ignore",
- "libc",
- "log",
- "notify",
- "nucleo-matcher",
- "objc2",
- "objc2-foundation",
- "portable-pty",
- "proptest",
- "serde",
- "serde_json",
- "shared_child",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-log",
- "tauri-plugin-notification",
- "tauri-plugin-opener",
- "tauri-plugin-os",
- "tauri-plugin-process",
- "tauri-plugin-store",
- "tauri-plugin-updater",
- "tempfile",
- "tokio",
- "windows-sys 0.61.2",
 ]
 
 [[package]]

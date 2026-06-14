@@ -49,7 +49,7 @@ fn create_app_window(
     // around macOS cascade which overrides any position set before or at show().
     let builder =
         WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
-            .title("Terax")
+            .title("Kex")
             .inner_size(width, height)
             .min_inner_size(640.0, 480.0)
             .resizable(true)
@@ -144,7 +144,7 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         let _ = window.show();
         let _ = window.set_focus();
         if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
-            let _ = window.emit("terax:settings-tab", t);
+            let _ = window.emit("kex:settings-tab", t);
         }
         return Ok(());
     }
@@ -319,7 +319,7 @@ pub fn run() {
                 };
                 for (id, entry) in entries {
                     if let Err(e) = create_app_window(&handle, id.clone(), entry.as_ref()) {
-                        eprintln!("terax: failed to restore window {id}: {e}");
+                        eprintln!("kex: failed to restore window {id}: {e}");
                     }
                 }
                 // Re-focus the window that had focus when the app last closed.

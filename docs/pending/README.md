@@ -1,4 +1,4 @@
-# Revisión completa de Terax
+# Revisión completa de Kex
 
 Auditoría de código (backend Rust + frontend React), documentación y propuesta de mejoras/features, evaluada contra la filosofía del proyecto: **terminal ultraligero, rápido y eficiente en memoria; terminales + edición/visualización de ficheros; sin foco en agentes; buen diff de git en doble panel.**
 

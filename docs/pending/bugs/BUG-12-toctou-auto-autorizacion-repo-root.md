@@ -7,7 +7,7 @@ Terax es un emulador de terminal open-source: backend Tauri 2 + Rust (portable-p
 `src-tauri/src/modules/git/operations.rs:45-46`, `src-tauri/src/modules/git/operations.rs:103-104`; `src-tauri/src/modules/git/workspace.rs:32-35`
 
 ## Problema
-`resolve_repo_in_authorized` / `panel_snapshot` toman el cwd autorizado, ejecutan `git rev-parse --show-toplevel` y auto-autorizan el root devuelto sin comprobar que caiga dentro de un root ya autorizado. Si el usuario autorizo `~/proj/sub` pero el repo arranca en `~/proj`, Terax auto-autoriza `~/proj` entero (status/diff/log de todo el padre).
+`resolve_repo_in_authorized` / `panel_snapshot` toman el cwd autorizado, ejecutan `git rev-parse --show-toplevel` y auto-autorizan el root devuelto sin comprobar que caiga dentro de un root ya autorizado. Si el usuario autorizo `~/proj/sub` pero el repo arranca en `~/proj`, Kex auto-autoriza `~/proj` entero (status/diff/log de todo el padre).
 
 ## Impacto / repro
 Escalada de alcance sutil; viola "autorizacion nunca evadible". Repro: autorizar un subdirectorio `~/proj/sub` que pertenece a un repo cuyo toplevel es `~/proj`; ejecutar una operacion git y observar que `~/proj` queda autorizado por completo, exponiendo status/diff/log del padre.

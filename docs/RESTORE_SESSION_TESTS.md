@@ -11,11 +11,11 @@ Ejecutar en orden. Cada check desbloquea el siguiente.
 
 ### D1 — Entorno de la shell
 
-Abrir un terminal dentro de Terax y ejecutar:
+Abrir un terminal dentro de Kex y ejecutar:
 
 ```bash
-echo "PANEL_ID: $TERAX_PANEL_ID"
-echo "TERMINAL: $TERAX_TERMINAL"
+echo "PANEL_ID: $KEX_PANEL_ID"
+echo "TERMINAL: $KEX_TERMINAL"
 ```
 
 Esperado:
@@ -31,26 +31,26 @@ Si `PANEL_ID` esta vacio, los hooks de sesion no funcionaran. El problema esta e
 cat ~/.claude/settings.json | python3 -m json.tool | grep -A3 "Session"
 ```
 
-Esperado: entradas `SessionStart` y `SessionEnd` con `terax-session-hook` en el comando.
+Esperado: entradas `SessionStart` y `SessionEnd` con `kex-session-hook` en el comando.
 
 Si no aparecen, los hooks no estan instalados. Clicar el campanazo > "Set up Claude Code".
 
 ### D3 — Script de sesion existe y es ejecutable
 
 ```bash
-ls -la ~/.config/terax/hooks/session.sh
-head -5 ~/.config/terax/hooks/session.sh
+ls -la ~/.config/kex/hooks/session.sh
+head -5 ~/.config/kex/hooks/session.sh
 ```
 
 Esperado: `-rwxr-xr-x` y `#!/usr/bin/env bash` en la primera linea.
 
 ### D4 — El store se escribe al lanzar claude
 
-Lanzar `claude` dentro de Terax y esperar a que muestre el prompt (puede tardar ~5s).
+Lanzar `claude` dentro de Kex y esperar a que muestre el prompt (puede tardar ~5s).
 Luego en otro terminal:
 
 ```bash
-cat ~/.config/terax/agent-sessions.json | python3 -m json.tool
+cat ~/.config/kex/agent-sessions.json | python3 -m json.tool
 ```
 
 Esperado: objeto con `panels` que tiene una clave igual al UUID de D1, con `state: "idle"`.
@@ -65,21 +65,21 @@ which jq || echo "jq NO encontrado"
 Si falta `jq`: instalar con `brew install jq` (macOS) o `apt install jq` (Linux).
 Nota: el script tiene un fallback sin jq pero es menos robusto.
 
-### D5 — El store sobrevive al cerrar Terax
+### D5 — El store sobrevive al cerrar Kex
 
-Cerrar Terax (sin salir de claude), luego:
+Cerrar Kex (sin salir de claude), luego:
 
 ```bash
-cat ~/.config/terax/agent-sessions.json | python3 -m json.tool
+cat ~/.config/kex/agent-sessions.json | python3 -m json.tool
 ```
 
 El `state` debe seguir siendo `"idle"` (no `"exited"`).
 Si es `"exited"`: el hook `SessionEnd` se disparo antes del cierre, lo que ocurre si claude
-sale solo antes de que Terax se cierre. Confirmar que claude seguia corriendo al cerrar.
+sale solo antes de que Kex se cierre. Confirmar que claude seguia corriendo al cerrar.
 
 ### D6 — El restore plan se construye al reabrir
 
-Abrir Terax con la consola de DevTools activa (menu > View > Toggle DevTools o en dev mode).
+Abrir Kex con la consola de DevTools activa (menu > View > Toggle DevTools o en dev mode).
 En la consola buscar logs de `agent_session_restore_plan`. Añadir un log temporal si es necesario:
 
 En `src/modules/agents/lib/agentSessionRestore.ts`:
@@ -121,15 +121,15 @@ o `CLAUDE_CONFIG_DIR` esta configurado a otra ruta.
 
 ### D8 — El panelId del store coincide con el del panel nuevo
 
-El problema mas sutil: al reabrir Terax, los paneles obtienen IDs nuevos (UUIDs frescos) porque
+El problema mas sutil: al reabrir Kex, los paneles obtienen IDs nuevos (UUIDs frescos) porque
 el estado de workspace se restaura desde `workspace-state.json`. Ese archivo persiste el `panel.id`.
 
-El store guarda el `TERAX_PANEL_ID` de la sesion anterior. Si ese ID coincide con el ID que
+El store guarda el `KEX_PANEL_ID` de la sesion anterior. Si ese ID coincide con el ID que
 tiene el panel al restaurarse (que viene de `workspace-state.json`), funciona. Si no coincide,
 `consumeRestorePlan` no encuentra el plan.
 
-Verificar: el `panelId` en `~/.config/terax/agent-sessions.json` debe ser el mismo que el
-`id` del panel en `~/.config/terax/workspaces.json` (o `workspace-state.json`).
+Verificar: el `panelId` en `~/.config/kex/agent-sessions.json` debe ser el mismo que el
+`id` del panel en `~/.config/kex/workspaces.json` (o `workspace-state.json`).
 
 ```bash
 # panel IDs en el workspace guardado
@@ -137,7 +137,7 @@ cat ~/Library/Application\ Support/app.crynta.terax/workspaces.json \
   | python3 -m json.tool | grep '"id"' | head -20
 
 # panel IDs en el session store
-cat ~/.config/terax/agent-sessions.json | python3 -m json.tool | grep -E '"panels"|{' | head -10
+cat ~/.config/kex/agent-sessions.json | python3 -m json.tool | grep -E '"panels"|{' | head -10
 ```
 
 Si los IDs no coinciden: este es el bug raiz. El UUID del panel cambia entre sesiones.
@@ -151,11 +151,11 @@ Si los IDs no coinciden: este es el bug raiz. El UUID del panel cambia entre ses
 Prerequisito: limpiar hooks existentes si los hay.
 
 ```bash
-# Quitar entradas de Terax de settings.json (hacerlo a mano o con jq)
-rm -f ~/.config/terax/hooks/session.sh
+# Quitar entradas de Kex de settings.json (hacerlo a mano o con jq)
+rm -f ~/.config/kex/hooks/session.sh
 ```
 
-- [ ] Abrir Terax
+- [ ] Abrir Kex
 - [ ] Abrir el campanazo de notificaciones (header, derecha)
 - [ ] Esperado: boton o indicador "Set up Claude Code"
 - [ ] Verificar: `agent_claude_hooks_status` devuelve false
@@ -163,15 +163,15 @@ rm -f ~/.config/terax/hooks/session.sh
 ### A2 Instalar hooks
 
 - [ ] Clicar "Set up Claude Code" en el campanazo
-- [ ] Verificar: `ls -la ~/.config/terax/hooks/session.sh` muestra `-rwxr-xr-x`
-- [ ] Verificar: `cat ~/.claude/settings.json` tiene `terax-session-hook` en `SessionStart` y `SessionEnd`
-- [ ] Verificar: tambien tiene los hooks de notificacion (`notify;Terax;working`, etc.)
-- [ ] Abrir un terminal en Terax: `echo $TERAX_PANEL_ID` muestra un UUID
+- [ ] Verificar: `ls -la ~/.config/kex/hooks/session.sh` muestra `-rwxr-xr-x`
+- [ ] Verificar: `cat ~/.claude/settings.json` tiene `kex-session-hook` en `SessionStart` y `SessionEnd`
+- [ ] Verificar: tambien tiene los hooks de notificacion (`notify;Kex;working`, etc.)
+- [ ] Abrir un terminal en Kex: `echo $KEX_PANEL_ID` muestra un UUID
 
 ### A3 Idempotencia
 
 - [ ] Clicar "Set up Claude Code" una segunda vez
-- [ ] Verificar: `settings.json` no tiene entradas duplicadas de Terax (cada evento debe tener exactamente 1 entrada de Terax)
+- [ ] Verificar: `settings.json` no tiene entradas duplicadas de Kex (cada evento debe tener exactamente 1 entrada de Kex)
 
 ---
 
@@ -179,10 +179,10 @@ rm -f ~/.config/terax/hooks/session.sh
 
 ### B1 SessionStart escribe la entrada
 
-- [ ] Abrir terminal en Terax, anotar el UUID de `$TERAX_PANEL_ID`
+- [ ] Abrir terminal en Kex, anotar el UUID de `$KEX_PANEL_ID`
 - [ ] Ejecutar `claude`
 - [ ] Esperar el prompt de claude (5-10s)
-- [ ] En otro terminal: `cat ~/.config/terax/agent-sessions.json | python3 -m json.tool`
+- [ ] En otro terminal: `cat ~/.config/kex/agent-sessions.json | python3 -m json.tool`
 - [ ] Esperado: entrada para el UUID anotado con `state: "idle"`, `session_id` relleno
 - [ ] Verificar UI: icono `✦` en el tab, dot verde pulsando, titulo `claude · dirname`
 
@@ -192,11 +192,11 @@ rm -f ~/.config/terax/hooks/session.sh
 - [ ] Verificar: store tiene `state: "exited"` para ese panel ID
 - [ ] Verificar UI: dot desaparece, titulo vuelve al cwd normal, icono vuelve al normal
 
-### B3 Script no se ejecuta fuera de Terax
+### B3 Script no se ejecuta fuera de Kex
 
 - [ ] Abrir Terminal.app u otro emulador externo
 - [ ] Ejecutar `claude` ahi
-- [ ] Verificar: `~/.config/terax/agent-sessions.json` NO se actualiza (el script hace `exit 0` si `TERAX_PANEL_ID` esta vacio)
+- [ ] Verificar: `~/.config/kex/agent-sessions.json` NO se actualiza (el script hace `exit 0` si `KEX_PANEL_ID` esta vacio)
 
 ---
 
@@ -204,12 +204,12 @@ rm -f ~/.config/terax/hooks/session.sh
 
 ### C1 Happy path
 
-- [ ] Abrir Terax, abrir terminal
+- [ ] Abrir Kex, abrir terminal
 - [ ] `cd ~/algun-proyecto-real` (el directorio debe existir)
 - [ ] Ejecutar `claude`, esperar el prompt
-- [ ] **Sin salir de claude**, cerrar Terax con Cmd+Q
-- [ ] Verificar: `cat ~/.config/terax/agent-sessions.json` tiene `state: "idle"` (NO "exited")
-- [ ] Reabrir Terax
+- [ ] **Sin salir de claude**, cerrar Kex con Cmd+Q
+- [ ] Verificar: `cat ~/.config/kex/agent-sessions.json` tiene `state: "idle"` (NO "exited")
+- [ ] Reabrir Kex
 - [ ] Esperado (primeros 200ms): el terminal recibe automaticamente `cd '/ruta' && claude --resume '<session_id>'`
 - [ ] Verificar: tab muestra `✦ claude · dirname`, dot verde pulsando
 - [ ] Verificar: claude arranca mostrando contexto de la sesion anterior
@@ -227,24 +227,24 @@ Partiendo del estado de C1 (sesion restaurada, dot verde):
 
 - [ ] Lanzar claude, salir con `/exit`
 - [ ] Verificar store: `state: "exited"`
-- [ ] Cerrar y reabrir Terax
+- [ ] Cerrar y reabrir Kex
 - [ ] Verificar: NO se inyecta ningun comando en ese terminal
 - [ ] Verificar: tab no muestra `✦` ni dot
 
 ### C4 Error de restore — JSONL no encontrado
 
-- [ ] Abrir `~/.config/terax/agent-sessions.json` y cambiar `session_id` por un valor inventado
+- [ ] Abrir `~/.config/kex/agent-sessions.json` y cambiar `session_id` por un valor inventado
 - [ ] Asegurarse de que `state: "idle"` (no exited)
-- [ ] Reabrir Terax
+- [ ] Reabrir Kex
 - [ ] Esperado: tab muestra `⚠` (warning), dot **rojo estatico**, titulo en color rojo apagado
 
 ### C5 Error de restore — cwd borrado
 
-- [ ] Crear directorio temporal: `mkdir /tmp/test-terax-restore`
-- [ ] En Terax: `cd /tmp/test-terax-restore && claude`, esperar prompt
-- [ ] Cerrar Terax
-- [ ] Borrar el directorio: `rm -rf /tmp/test-terax-restore`
-- [ ] Reabrir Terax
+- [ ] Crear directorio temporal: `mkdir /tmp/test-kex-restore`
+- [ ] En Kex: `cd /tmp/test-kex-restore && claude`, esperar prompt
+- [ ] Cerrar Kex
+- [ ] Borrar el directorio: `rm -rf /tmp/test-kex-restore`
+- [ ] Reabrir Kex
 - [ ] Esperado: tab muestra `⚠`, dot rojo
 
 ### C6 Limpiar error escribiendo
@@ -258,10 +258,10 @@ Partiendo de C4 o C5 (tab en estado `⚠`):
 
 - [ ] Crear dos panes (split): Cmd+D o Cmd+E
 - [ ] Lanzar `claude` en cada pane
-- [ ] Anotar ambos `$TERAX_PANEL_ID`
-- [ ] Cerrar Terax sin salir de ninguno
+- [ ] Anotar ambos `$KEX_PANEL_ID`
+- [ ] Cerrar Kex sin salir de ninguno
 - [ ] Verificar: store tiene dos entradas con `state: "idle"`
-- [ ] Reabrir Terax
+- [ ] Reabrir Kex
 - [ ] Esperado: ambos terminales restauran su sesion independientemente
 
 ---
@@ -329,27 +329,27 @@ Este es un bug pendiente de corregir (ver `PaneTabBar.tsx:105-112` y `165-174`).
 ### E1 jq no instalado
 
 - [ ] Renombrar jq temporalmente: `sudo mv $(which jq) /tmp/jq-backup`
-- [ ] Lanzar claude en Terax
+- [ ] Lanzar claude en Kex
 - [ ] Verificar si el store se escribe (el script tiene un fallback sed/awk)
 - [ ] Restaurar: `sudo mv /tmp/jq-backup $(which jq)`
 
 ### E2 Store JSON corrupto
 
-- [ ] Escribir JSON invalido en el store: `echo "{ corrupto" > ~/.config/terax/agent-sessions.json`
-- [ ] Reabrir Terax
+- [ ] Escribir JSON invalido en el store: `echo "{ corrupto" > ~/.config/kex/agent-sessions.json`
+- [ ] Reabrir Kex
 - [ ] Esperado: no hay crash, `load_restore_plan` devuelve `[]` silenciosamente
 
 ### E3 Store vacio
 
-- [ ] Borrar el store: `rm ~/.config/terax/agent-sessions.json`
-- [ ] Reabrir Terax
+- [ ] Borrar el store: `rm ~/.config/kex/agent-sessions.json`
+- [ ] Reabrir Kex
 - [ ] Esperado: arranque normal sin ningun intento de restore
 
 ### E4 CLAUDE_CONFIG_DIR configurado
 
-- [ ] Exportar en la shell de Terax: `export CLAUDE_CONFIG_DIR=/tmp/claude-alt`
+- [ ] Exportar en la shell de Kex: `export CLAUDE_CONFIG_DIR=/tmp/claude-alt`
 - [ ] Lanzar claude, verificar que el transcript se crea bajo `/tmp/claude-alt/projects/`
-- [ ] El store sigue en `~/.config/terax/` (no se mueve con CLAUDE_CONFIG_DIR)
+- [ ] El store sigue en `~/.config/kex/` (no se mueve con CLAUDE_CONFIG_DIR)
 - [ ] Al reabrir, el restore planner debe buscar transcripts bajo `/tmp/claude-alt/projects/`
 
 ---
@@ -357,10 +357,10 @@ Este es un bug pendiente de corregir (ver `PaneTabBar.tsx:105-112` y `165-174`).
 ## Checklist de diagnostico rapido (en caso de que no restaure)
 
 ```
-[ ] echo $TERAX_PANEL_ID  →  UUID no vacio
-[ ] ls -la ~/.config/terax/hooks/session.sh  →  existe, permisos 755
-[ ] cat ~/.claude/settings.json | grep terax-session-hook  →  aparece
-[ ] cat ~/.config/terax/agent-sessions.json  →  existe, state: "idle", session_id relleno
+[ ] echo $KEX_PANEL_ID  →  UUID no vacio
+[ ] ls -la ~/.config/kex/hooks/session.sh  →  existe, permisos 755
+[ ] cat ~/.claude/settings.json | grep kex-session-hook  →  aparece
+[ ] cat ~/.config/kex/agent-sessions.json  →  existe, state: "idle", session_id relleno
 [ ] find ~/.claude/projects -name "<session_id>.jsonl"  →  archivo encontrado
 [ ] panelId en agent-sessions.json == id del panel en workspace-state.json
 ```

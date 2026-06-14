@@ -213,7 +213,7 @@ export function NotificationBell({ onActivate }: Props) {
           <div className="border-t border-border/60 px-3 py-5 text-center text-xs leading-relaxed text-muted-foreground">
             No agent activity yet.
             <br />
-            Run the Terax agent or Claude Code to track it here.
+            Run Claude Code or Codex inside a terminal to track it here.
           </div>
         ) : (
           <div className="max-h-80 overflow-y-auto border-t border-border/60 p-1">

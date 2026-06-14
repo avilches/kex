@@ -67,7 +67,7 @@ export function SettingsApp() {
       }
     };
     const unlistenPromise = getCurrentWebviewWindow().listen<string>(
-      "terax:settings-tab",
+      "kex:settings-tab",
       (e) => apply(e.payload),
     );
     return () => {

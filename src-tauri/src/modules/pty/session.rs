@@ -13,7 +13,7 @@ use super::da_filter::DaFilter;
 use super::shell_init;
 use crate::modules::workspace::WorkspaceEnv;
 
-const AGENT_EVENT: &str = "terax:agent-signal";
+const AGENT_EVENT: &str = "kex:agent-signal";
 
 // Flusher coalesces a short window after first-byte arrival so we send chunks,
 // not single bytes. MAX_IDLE is only a safety net for missed signals.
@@ -28,7 +28,7 @@ const MAX_PENDING: usize = 4 * 1024 * 1024;
 // Hard reset (ESC c) + dim notice. Written verbatim into the stream when
 // we're forced to discard backlog.
 const OVERFLOW_NOTICE: &[u8] =
-    b"\x1bc\x1b[2m[terax: dropped output due to backpressure]\x1b[0m\r\n";
+    b"\x1bc\x1b[2m[kex: dropped output due to backpressure]\x1b[0m\r\n";
 
 pub struct Session {
     // Field drop order is intentional. Rust drops fields top-to-bottom:

@@ -218,7 +218,7 @@ On Windows, opening a new terminal tab serializes through a `SPAWN_LOCK` mutex. 
 
 ### 4.4 Windows: Job Objects for process cleanup
 
-Every ConPTY child process on Windows is assigned to a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. When the Job handle is released (Kex closes, crashes, or is killed), the OS terminates the entire process subtree of that shell session. Without this, `npm run dev` started inside a PowerShell terminal would continue running after Terax exits, as `TerminateProcess` only kills the immediate child.
+Every ConPTY child process on Windows is assigned to a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. When the Job handle is released (Kex closes, crashes, or is killed), the OS terminates the entire process subtree of that shell session. Without this, `npm run dev` started inside a PowerShell terminal would continue running after Kex exits, as `TerminateProcess` only kills the immediate child.
 
 Closing a tab from the UI (the explicit close button) also kills the immediate child. The Job Object handles the "Kex process died unexpectedly" case.
 

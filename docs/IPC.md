@@ -1,4 +1,4 @@
-# Terax — Backend IPC surface
+# Kex — Backend IPC surface
 
 All Tauri commands registered in `src-tauri/src/lib.rs` via `tauri::generate_handler![]`. The WebView calls them via `invoke()` from `src/lib/native.ts` — never use `invoke()` directly in components or hooks.
 
@@ -122,6 +122,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `window_save_workspace_state` | Persist workspace list and active index for a window label to `workspaces.json` |
 | `get_launch_dir` | Return the CLI launch directory (drained on first call) |
 | `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
+| `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
 | `agent_session_restore_plan` | Return `Vec<RestorePlan>` — one entry per panel that had a running agent session at last close |
 
@@ -129,11 +130,11 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 
 ## Terminal agent notification protocol
 
-Terax passively monitors terminal panels for coding agents (Claude Code, Codex, etc.) using OSC sequences. No configuration is required — detection arms itself automatically once a compatible agent is detected.
+Kex passively monitors terminal panels for coding agents (Claude Code, Codex, etc.) using OSC sequences. No configuration is required — detection arms itself automatically once a compatible agent is detected.
 
 ### How it works
 
-1. Claude Code (or a compatible agent) installs Terax hooks via `agent_enable_claude_hooks`. These hooks emit an `OSC 777` marker through the hook's `terminalSequence` field (hooks lost `/dev/tty` access in Claude Code v2.1.139).
+1. Claude Code (or a compatible agent) installs Kex hooks via `agent_enable_claude_hooks`. These hooks emit an `OSC 777` marker through the hook's `terminalSequence` field (hooks lost `/dev/tty` access in Claude Code v2.1.139).
 2. The OSC 777 marker self-arms `agent_detect.rs` in the PTY byte reader. The detector tracks the agent's state via subsequent OSC sequences.
 3. OSC 133;C (command prompt shown) arms the detector. Subsequent hook events transition the state machine: `started` / `working` / `attention` (needs user input) / `finished` / `exited`.
 4. The frontend `AgentNotificationsBridge.tsx` maps these state transitions to the notification router (`lib/route.ts`):
@@ -158,13 +159,13 @@ Hooks can be installed from within the app (the notification bell popover shows 
 
 In addition to the live notification hooks, `agent_enable_claude_hooks` installs two Claude Code lifecycle hooks:
 
-- **`SessionStart`**: writes `{ panelId, agent, sessionId, cwd, state: "running" }` to `~/.config/terax/agent-sessions.json` (atomic `mktemp` + `mv`; uses `jq` if available, raw JSON otherwise).
+- **`SessionStart`**: writes `{ panelId, agent, sessionId, cwd, state: "running" }` to `~/.config/kex/agent-sessions.json` (atomic `mktemp` + `mv`; uses `jq` if available, raw JSON otherwise).
 - **`SessionEnd`**: updates `state` to `"exited"` for the matching `panelId`.
 
-The hook script reads `TERAX_PANEL_ID` from the environment — a UUID injected into every PTY shell environment at spawn time (see `pty_open`).
+The hook script reads `KEX_PANEL_ID` from the environment — a UUID injected into every PTY shell environment at spawn time (see `pty_open`).
 
-On the next Terax launch, `agent_session_restore_plan` reads the store, skips exited sessions, locates the agent's JSONL transcript (e.g. `~/.claude/projects/*/<sessionId>.jsonl`) to read the session's recorded `cwd`, verifies the directory still exists, and returns one `RestorePlan` per recoverable session. The frontend then types the appropriate resume command (e.g. `claude --resume '<id>'`) into the terminal 200ms after the PTY opens.
+On the next Kex launch, `agent_session_restore_plan` reads the store, skips exited sessions, locates the agent's JSONL transcript (e.g. `~/.claude/projects/*/<sessionId>.jsonl`) to read the session's recorded `cwd`, verifies the directory still exists, and returns one `RestorePlan` per recoverable session. The frontend then types the appropriate resume command (e.g. `claude --resume '<id>'`) into the terminal 200ms after the PTY opens.
 
-`CLAUDE_CONFIG_DIR` is respected: if set, the hook writes there instead of `~/.config/terax/`, and the restore logic searches for transcripts under that directory.
+`CLAUDE_CONFIG_DIR` is respected: if set, the hook writes there instead of `~/.config/kex/`, and the restore logic searches for transcripts under that directory.
 
 See `docs/AGENT_SESSION_RESTORE.md` for the complete design.

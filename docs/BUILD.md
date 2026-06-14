@@ -1,4 +1,4 @@
-# Terax — Build and packaging
+# Kex — Build and packaging
 
 ## Development
 
