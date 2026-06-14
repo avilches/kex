@@ -133,7 +133,7 @@ Verificar: el `panelId` en `~/.config/kex/agent-sessions.json` debe ser el mismo
 
 ```bash
 # panel IDs en el workspace guardado
-cat ~/Library/Application\ Support/app.crynta.terax/workspaces.json \
+cat ~/Library/Application\ Support/app.betauer.kex/workspaces.json \
   | python3 -m json.tool | grep '"id"' | head -20
 
 # panel IDs en el session store

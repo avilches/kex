@@ -8,8 +8,7 @@ const HOOK_EVENTS: [(&str, &str); 3] = [
     ("Stop", "finished"),
 ];
 
-// Includes legacy Terax markers so re-running migrates them to the Kex name.
-const OWNED_MARKERS: [&str; 3] = ["notify;Kex;", "notify;Terax;", "terax;notify"];
+const OWNED_MARKERS: [&str; 1] = ["notify;Kex;"];
 
 // Gated on KEX_TERMINAL; no-op outside Kex. Returns the sequence via
 // `terminalSequence` because hooks lost /dev/tty access in v2.1.139.
@@ -362,24 +361,6 @@ mod tests {
         let twice = merge_hooks(once.clone());
         assert_eq!(once, twice);
         assert_eq!(hook_count(&twice, "Notification"), 1);
-    }
-
-    #[test]
-    fn migrates_legacy_dev_tty_hook() {
-        let legacy = json!({
-            "hooks": {
-                "Notification": [
-                    { "hooks": [ {
-                        "type": "command",
-                        "command": "[ -n \"$KEX_TERMINAL\" ] && printf '\\033]777;terax;notify\\033\\\\' > /dev/tty || true"
-                    } ] }
-                ]
-            }
-        });
-        let out = merge_hooks(legacy);
-        assert_eq!(hook_count(&out, "Notification"), 1);
-        assert!(command(&out, "Notification", 0).contains("terminalSequence"));
-        assert!(!command(&out, "Notification", 0).contains("/dev/tty"));
     }
 
     #[test]

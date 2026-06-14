@@ -28,7 +28,7 @@ The current window system has several flaws:
 
 ## Data model -- `terax-windows.json`
 
-Stored in the app data directory (`~/Library/Application Support/app.crynta.terax/` on macOS).
+Stored in the app data directory (`~/Library/Application Support/app.betauer.kex/` on macOS).
 
 ```json
 {

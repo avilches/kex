@@ -903,7 +903,7 @@ Verify:
 4. Close settings — it closes cleanly
 5. Close all main windows — settings closes if open (test this)
 6. Reopen the app — both previously open windows restore with their last size, position, and workspace tabs
-7. Check `~/Library/Application Support/app.crynta.terax/terax-windows.json` — contains both window entries with correct data
+7. Check `~/Library/Application Support/app.betauer.kex/terax-windows.json` — contains both window entries with correct data
 8. Check the same directory — `.window-state.json` still exists but is not updated anymore (inert)
 
 - [ ] **Step 4: Final commit**

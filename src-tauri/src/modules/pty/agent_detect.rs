@@ -8,7 +8,7 @@ const OSC_MAX: usize = 2048;
 const DEFAULT_AGENTS: &[&str] = &["claude", "codex"];
 
 // OSC 777 marker our Claude Code hooks emit via `terminalSequence`.
-const TERAX_MARKER: &[u8] = b"notify;Kex;";
+const KEX_MARKER: &[u8] = b"notify;Kex;";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum State {
@@ -160,7 +160,7 @@ impl AgentDetector {
     }
 
     fn handle_osc777<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
-        if let Some(event) = pt.strip_prefix(TERAX_MARKER) {
+        if let Some(event) = pt.strip_prefix(KEX_MARKER) {
             // Self-arms so notifications work even when no shell preexec fired
             // (bash, Windows, tmux, wrappers).
             match event {
@@ -312,7 +312,7 @@ mod tests {
     }
 
     #[test]
-    fn terax_marker_drives_status() {
+    fn kex_marker_drives_status() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
         assert_eq!(run(&mut d, &osc("777;notify;Kex;attention")), vec![Transition::Attention]);
@@ -322,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn terax_marker_auto_arms_without_preexec() {
+    fn kex_marker_auto_arms_without_preexec() {
         let mut d = AgentDetector::new();
         assert_eq!(
             run(&mut d, &osc("777;notify;Kex;attention")),

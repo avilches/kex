@@ -7,7 +7,7 @@ The upstream project is **Terax** (`crynta/terax-ai`). All env vars, config path
 the `KEX_` prefix and `~/.config/kex/` / `~/.cache/kex/` paths to avoid conflicts with upstream installations. See
 `docs/FORK.md` for the full list of divergences and the upstream sync log.
 
-- Bundle id: `app.crynta.terax`
+- Bundle id: `app.betauer.kex`
 - Package manager: **pnpm**
 - Platforms: macOS, Linux, Windows
 - Frontend checks: `pnpm lint`, `pnpm check-types`, `pnpm test`
