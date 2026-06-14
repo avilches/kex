@@ -12,6 +12,7 @@ export type ShortcutId =
   | "tab.newPreview"
   | "tab.newEditor"
   | "tab.close"
+  | "tab.rename"
   | "tab.next"
   | "tab.prev"
   | "tab.selectByIndex"
@@ -114,6 +115,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Close tab or pane",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "w" }],
+  },
+  {
+    id: "tab.rename",
+    label: "Rename tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
   },
   {
     id: "pane.splitRight",
