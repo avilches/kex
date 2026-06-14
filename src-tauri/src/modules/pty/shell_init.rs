@@ -52,17 +52,18 @@ pub fn build_command(
     cwd: Option<String>,
     workspace: WorkspaceEnv,
     blocks: bool,
+    panel_id: Option<String>,
 ) -> Result<CommandBuilder, String> {
     #[cfg(unix)]
     {
         let _ = workspace;
-        let mut cmd = unix::build(cwd, blocks)?;
+        let mut cmd = unix::build(cwd, blocks, panel_id.as_deref())?;
         cmd.env("TERMINAL_ID", id.to_string());
         Ok(cmd)
     }
     #[cfg(windows)]
     {
-        let mut cmd = windows::build(cwd, workspace, blocks)?;
+        let mut cmd = windows::build(cwd, workspace, blocks, panel_id.as_deref())?;
         cmd.env("TERMINAL_ID", id.to_string());
         Ok(cmd)
     }
@@ -104,12 +105,15 @@ fn ensure_utf8_locale(cmd: &mut CommandBuilder) {
     cmd.env("LANG", fallback);
 }
 
-fn apply_common(cmd: &mut CommandBuilder, cwd: Option<String>, blocks: bool) {
+fn apply_common(cmd: &mut CommandBuilder, cwd: Option<String>, blocks: bool, panel_id: Option<&str>) {
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERAX_TERMINAL", "1");
     if blocks {
         cmd.env("TERAX_BLOCKS", "1");
+    }
+    if let Some(pid) = panel_id {
+        cmd.env("TERAX_PANEL_ID", pid);
     }
     for (key, value) in workspace::appimage_env_overrides() {
         match value {
@@ -193,10 +197,10 @@ mod unix {
         }
     }
 
-    pub fn build(cwd: Option<String>, blocks: bool) -> Result<CommandBuilder, String> {
+    pub fn build(cwd: Option<String>, blocks: bool, panel_id: Option<&str>) -> Result<CommandBuilder, String> {
         let (shell, shell_path) = Shell::detect();
         let mut cmd = CommandBuilder::new(&shell_path);
-        super::apply_common(&mut cmd, cwd, blocks);
+        super::apply_common(&mut cmd, cwd, blocks, panel_id);
 
         match shell {
             Shell::Zsh => {
@@ -358,6 +362,7 @@ mod windows {
         cwd: Option<String>,
         workspace: WorkspaceEnv,
         blocks: bool,
+        panel_id: Option<&str>,
     ) -> Result<CommandBuilder, String> {
         if let WorkspaceEnv::Wsl { distro } = workspace {
             let _ = blocks;
@@ -372,7 +377,7 @@ mod windows {
         let is_powershell = shell_name == "pwsh.exe" || shell_name == "powershell.exe";
 
         let mut cmd = CommandBuilder::new(&shell_path);
-        super::apply_common(&mut cmd, cwd, blocks);
+        super::apply_common(&mut cmd, cwd, blocks, panel_id);
 
         if is_powershell {
             match prepare_ps_profile() {

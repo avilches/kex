@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { consumeRestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -127,6 +129,10 @@ export function whenSessionReady(leafId: string, timeoutMs = 4000): Promise<void
 export function writeToSession(leafId: string, data: string): boolean {
   const s = sessions.get(leafId);
   if (!s || !s.pty) return false;
+  const agentSession = useAgentStore.getState().sessions[leafId];
+  if (agentSession?.restoreError) {
+    useAgentStore.getState().finish(leafId);
+  }
   void s.pty.write(data);
   return true;
 }
@@ -383,6 +389,7 @@ async function openPtyForSession(
     },
     cwd,
     s.blocks,
+    leafId,
   );
 }
 
@@ -515,6 +522,18 @@ function attachSession(
         }
         s.pty = pty;
         if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
+        const plan = consumeRestorePlan(leafId);
+        if (plan) {
+          const store = useAgentStore.getState();
+          if (plan.resumeCmd) {
+            store.startRestored(leafId, leafId, plan.agent);
+            setTimeout(() => {
+              s.pty?.write(plan.resumeCmd + "\r");
+            }, 200);
+          } else {
+            store.setRestoreError(leafId, leafId, plan.agent);
+          }
+        }
       })
       .catch((e) => {
         s.ptyOpening = false;
