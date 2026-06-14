@@ -41,6 +41,9 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-34](pending/bugs/BUG-34-cd-quoting-breaks-cmd-fallback.md) — cd quoting rompe fallback a cmd.exe
 - [BUG-35](pending/bugs/BUG-35-usepresence-mounted-in-deps-reentrancy.md) — usePresence: mounted en deps causa reentrancy
 - [BUG-36](pending/bugs/BUG-36-block-menu-desaparece-bloque-largo.md) - Menu de acciones de bloque desaparece en bloques muy largos
+- [BUG-37](pending/bugs/BUG-37-blocks-atajos-rotos.md) - Blocks: sin hotkey para nuevo block terminal; Cmd+U switch no funciona
+- [BUG-38](pending/bugs/BUG-38-busqueda-cmdF-incompleta.md) - Cmd+F: no busca en documentos; terminal search sin navegacion entre resultados
+- [BUG-39](pending/bugs/BUG-39-file-search-ux-poco-clara.md) - Busqueda de ficheros: UX poco clara (solo via Cmd+P + #?)
 
 ## Features (`docs/pending/features/`)
 
@@ -60,6 +63,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [M5](pending/improvements/M5-diff-grandes-worker.md) — Diffs grandes en Web Worker
 - [M6](pending/improvements/M6-reaping-bg-procs-y-registry.md) — Reaping de procesos background y registry
 - [M7](pending/improvements/M7-quick-wins.md) — Quick wins varios
+- [M8](pending/improvements/M8-release-appimage-wayland-updater-sig.md) — Adoptar sistema de release de AppImage del upstream (fix libwayland + sig race-free)
 
 ## Contexto adicional (`docs/pending/`)
 

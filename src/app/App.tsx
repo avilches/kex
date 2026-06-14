@@ -9,6 +9,7 @@ import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
 import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
+import { isMarkdownPath } from "@/lib/utils";
 import { AgentNotificationsBridge } from "@/modules/agents";
 import {
   CommandPalette,
@@ -64,10 +65,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
 import { RightPanel, type RightPanelHandle } from "./components/RightPanel";
-import {
-  TOGGLE_BLOCK_INPUT_EVENT,
-  WorkspaceInputBar,
-} from "./components/WorkspaceInputBar";
+import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceSidebar } from "./components/WorkspaceSidebar";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
@@ -111,6 +109,7 @@ export default function App() {
     setTerminalPanelCwd,
     setWorkspaceCwd,
     setTerminalRunningCommand,
+    setPanelView,
     findPanelGlobal,
     resetWorkspaces,
   } = useWorkspaces(initialOpts);
@@ -332,10 +331,15 @@ export default function App() {
   const openFileInPanel = useCallback(
     (path: string, pin?: boolean) => {
       if (!activeWorkspace) return undefined;
-      // Check if already open; activate it
+      // Markdown opens in its rendered view by default; the per-panel toggle
+      // flips it to the raw editor (and back).
+      const markdown = isMarkdownPath(path);
+      // Check if already open (as editor or rendered markdown); activate it.
       for (const pane of allPanes(activeWorkspace.paneTree)) {
         const existing = pane.panels.find(
-          (p) => p.kind === "editor" && (p as { path: string }).path === path,
+          (p) =>
+            (p.kind === "editor" || p.kind === "markdown") &&
+            (p as { path: string }).path === path,
         );
         if (existing) {
           activatePanel(activeWorkspace.id, existing.id);
@@ -343,13 +347,13 @@ export default function App() {
         }
       }
       const panelId = crypto.randomUUID();
-      openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: panelId,
-        kind: "editor",
-        path,
-        dirty: false,
-        preview: !(pin ?? false),
-      });
+      openPanel(
+        activeWorkspace.id,
+        activeWorkspace.activePaneId,
+        markdown
+          ? { id: panelId, kind: "markdown", path }
+          : { id: panelId, kind: "editor", path, dirty: false, preview: !(pin ?? false) },
+      );
       return panelId;
     },
     [activeWorkspace, activatePanel, openPanel],
@@ -392,18 +396,6 @@ export default function App() {
         setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
       }
       return panelId;
-    },
-    [activeWorkspace, openPanel],
-  );
-
-  const openMarkdownInPanel = useCallback(
-    (path: string) => {
-      if (!activeWorkspace) return;
-      openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: crypto.randomUUID(),
-        kind: "markdown",
-        path,
-      });
     },
     [activeWorkspace, openPanel],
   );
@@ -451,6 +443,10 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) closePanel(found.workspace.id, panelId);
       },
+      onSetMarkdownView: (panelId, mode) => {
+        const found = findPanelGlobal(panelId);
+        if (found) setPanelView(found.workspace.id, panelId, mode);
+      },
       registerEditorHandle: (panelId, h) => {
         if (h) {
           editorHandles.current.set(panelId, h);
@@ -497,6 +493,7 @@ export default function App() {
       setTerminalPanelCwd,
       setWorkspaceCwd,
       setTerminalRunningCommand,
+      setPanelView,
       updatePanelData,
       activeWorkspace,
       openPanel,
@@ -765,6 +762,7 @@ export default function App() {
       "tab.new": () => {
         openNewTerminal();
       },
+      "tab.newBlock": () => openNewBlock(),
       "workspace.new": () => addWorkspace(home ?? undefined),
       "tab.newPreview": () => openPreviewInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
@@ -813,8 +811,6 @@ export default function App() {
       "pane.focusRight": () => focusPaneInDirection("right"),
       "pane.source": () => navigateRightPanelTo("explorer"),
       "terminal.clear": () => { clearFocusedTerminal(); },
-      "terminal.toggleInput": () =>
-        window.dispatchEvent(new CustomEvent(TOGGLE_BLOCK_INPUT_EVENT)),
       "blocks.prev": () => navigateFocusedBlocks(-1),
       "blocks.next": () => navigateFocusedBlocks(1),
       "search.focus": () => searchInlineRef.current?.focus(),
@@ -846,6 +842,7 @@ export default function App() {
       activatePanel,
       handleCloseActivePanel,
       openNewTerminal,
+      openNewBlock,
       addWorkspace,
       openPanel,
       openPreviewInPanel,
@@ -868,9 +865,6 @@ export default function App() {
       if (id === "terminal.clear") {
         const target = (e.target as HTMLElement | null) ?? document.activeElement;
         return !(target as HTMLElement | null)?.closest?.(".xterm");
-      }
-      if (id === "terminal.toggleInput") {
-        return activePanel?.kind !== "terminal";
       }
       if (id === "blocks.prev" || id === "blocks.next") {
         return !(
@@ -1026,7 +1020,6 @@ export default function App() {
                       onPathRenamed={handlePathRenamed}
                       onPathDeleted={handlePathDeleted}
                       onRevealInTerminal={cdInNewWorkspace}
-                      onOpenMarkdownPreview={openMarkdownInPanel}
                       sourceControl={sourceControl}
                       onOpenDiff={openGitDiffInPanel}
                       onOpenGitGraph={openGitGraphFromContext}
@@ -1149,7 +1142,6 @@ export default function App() {
                       onPathRenamed={handlePathRenamed}
                       onPathDeleted={handlePathDeleted}
                       onRevealInTerminal={cdInNewWorkspace}
-                      onOpenMarkdownPreview={openMarkdownInPanel}
                       sourceControl={sourceControl}
                       onOpenDiff={openGitDiffInPanel}
                       onOpenGitGraph={openGitGraphFromContext}

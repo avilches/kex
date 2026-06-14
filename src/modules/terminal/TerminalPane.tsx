@@ -9,6 +9,7 @@ import {
   useRef,
 } from "react";
 import { BlockOverlay } from "./block/BlockOverlay";
+import { BlockWatermark } from "./block/BlockWatermark";
 import {
   focusLeafInput,
   interruptLeaf,
@@ -122,6 +123,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
                 if (session.blockMode === "prompt") focusLeafInput(panelId);
               }}
             />
+            <BlockWatermark leafId={panelId} subscribe={session.subscribeBlocks} />
             <BlockOverlay
               subscribe={session.subscribeBlocks}
               getVisible={session.visibleBlocks}

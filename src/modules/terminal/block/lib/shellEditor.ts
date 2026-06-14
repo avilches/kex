@@ -61,6 +61,8 @@ export type ShellEditorOptions = {
   getCwd?: () => string | null;
   /** Fires on every edit with the current text (used to gate empty-state UI). */
   onChange?: (text: string) => void;
+  /** Escape at the prompt (only when no completion popup is open to close). */
+  onEscape?: () => void;
 };
 
 export type ShellEditorHandle = {
@@ -286,6 +288,14 @@ export function createShellEditor(opts: ShellEditorOptions): ShellEditorHandle {
           return true;
         },
         preventDefault: true,
+      },
+      {
+        key: "Escape",
+        run: () => {
+          if (!opts.onEscape) return false;
+          opts.onEscape();
+          return true;
+        },
       },
     ]),
   );

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isMarkdownPath } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { flushWorkspaceState } from "./workspaceState";
 import {
@@ -348,6 +349,22 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     updatePanelData(workspaceId, panelId, (p) => p.kind === "terminal" ? { ...p, runningCommand: cmd ?? undefined } : p);
   }, [updatePanelData]);
 
+  // Flip a markdown file panel between its rendered view (kind "markdown") and
+  // the raw editor (kind "editor"), preserving id/path/title. Switching to
+  // rendered is a no-op while the editor has unsaved changes.
+  const setPanelView = useCallback((workspaceId: string, panelId: string, mode: "rendered" | "raw") => {
+    updatePanelData(workspaceId, panelId, (p) => {
+      if (mode === "raw" && p.kind === "markdown" && isMarkdownPath(p.path)) {
+        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false };
+      }
+      if (mode === "rendered" && p.kind === "editor" && isMarkdownPath(p.path)) {
+        if (p.dirty) return p;
+        return { id: p.id, kind: "markdown", path: p.path, title: p.title };
+      }
+      return p;
+    });
+  }, [updatePanelData]);
+
   const setWorkspaceCwd = useCallback((workspaceId: string, cwd: string) => {
     const normalized = cwd.length > 1 ? cwd.replace(/\/$/, "") : cwd;
     setWorkspaces((prev) =>
@@ -404,6 +421,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setTerminalPanelCwd,
     setWorkspaceCwd,
     setTerminalRunningCommand,
+    setPanelView,
     findPanelGlobal,
     findPaneGlobal,
     resetWorkspaces,

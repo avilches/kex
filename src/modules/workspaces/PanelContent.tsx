@@ -1,5 +1,7 @@
+import { isMarkdownPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
+import { MarkdownViewToggle } from "@/modules/markdown/MarkdownViewToggle";
 import type { PreviewPaneHandle } from "@/modules/preview/PreviewPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -44,6 +46,8 @@ export type PanelCallbacks = {
   onEditorDirtyChange?: (panelId: string, dirty: boolean) => void;
   onEditorClose?: (panelId: string) => void;
   registerEditorHandle?: (panelId: string, handle: EditorPaneHandle | null) => void;
+  // Markdown callbacks
+  onSetMarkdownView?: (panelId: string, mode: "rendered" | "raw") => void;
   // Preview callbacks
   onPreviewUrlChange?: (panelId: string, url: string) => void;
   registerPreviewHandle?: (panelId: string, handle: PreviewPaneHandle | null) => void;
@@ -87,15 +91,25 @@ export function PanelContent({ panel, visible, focused, callbacks }: Props) {
     case "editor":
       return (
         <Suspense fallback={null}>
-          <EditorPane
-            ref={(h: EditorPaneHandle | null) => {
-              (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
-              callbacks.registerEditorHandle?.(panel.id, h);
-            }}
-            path={panel.path}
-            onDirtyChange={(dirty: boolean) => callbacks.onEditorDirtyChange?.(panel.id, dirty)}
-            onClose={() => callbacks.onEditorClose?.(panel.id)}
-          />
+          <div className="relative h-full w-full">
+            {isMarkdownPath(panel.path) && (
+              <MarkdownViewToggle
+                mode="raw"
+                onChange={(mode) => callbacks.onSetMarkdownView?.(panel.id, mode)}
+                renderedDisabled={panel.dirty}
+                renderedHint="Save to preview"
+              />
+            )}
+            <EditorPane
+              ref={(h: EditorPaneHandle | null) => {
+                (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
+                callbacks.registerEditorHandle?.(panel.id, h);
+              }}
+              path={panel.path}
+              onDirtyChange={(dirty: boolean) => callbacks.onEditorDirtyChange?.(panel.id, dirty)}
+              onClose={() => callbacks.onEditorClose?.(panel.id)}
+            />
+          </div>
         </Suspense>
       );
 
@@ -117,7 +131,11 @@ export function PanelContent({ panel, visible, focused, callbacks }: Props) {
     case "markdown":
       return (
         <Suspense fallback={null}>
-          <MarkdownPreviewPane path={panel.path} visible={visible} />
+          <MarkdownPreviewPane
+            path={panel.path}
+            visible={visible}
+            onSetView={(mode: "rendered" | "raw") => callbacks.onSetMarkdownView?.(panel.id, mode)}
+          />
         </Suspense>
       );
 

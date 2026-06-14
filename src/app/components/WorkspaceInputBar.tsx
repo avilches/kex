@@ -1,5 +1,3 @@
-export const TOGGLE_BLOCK_INPUT_EVENT = "terax:toggle-block-input";
-
 import { useBlockController } from "@/modules/terminal/lib/blockController";
 import { useTheme } from "@/modules/theme";
 import { lazy, Suspense } from "react";

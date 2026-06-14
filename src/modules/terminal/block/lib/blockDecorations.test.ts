@@ -192,3 +192,30 @@ describe("BlockDecorations — selection and navigation", () => {
     expect(() => deco.navigateBlocks(-1)).not.toThrow();
   });
 });
+
+describe("BlockDecorations — hasAnyBlock", () => {
+  it("is false on a fresh terminal", () => {
+    const { term } = makeFakeTerm();
+    const deco = new BlockDecorations(term);
+    expect(deco.hasAnyBlock()).toBe(false);
+  });
+
+  it("is true while a command is still running", () => {
+    const { term, emit, setLine } = makeFakeTerm();
+    const deco = new BlockDecorations(term);
+    setLine(1);
+    emit("C;sleep 10");
+    expect(deco.getBlocks()).toHaveLength(0);
+    expect(deco.hasAnyBlock()).toBe(true);
+  });
+
+  it("is true once a block has finished", () => {
+    const { term, emit, setLine } = makeFakeTerm();
+    const deco = new BlockDecorations(term);
+    setLine(1);
+    emit("C;ls");
+    setLine(3);
+    emit("D;0");
+    expect(deco.hasAnyBlock()).toBe(true);
+  });
+});

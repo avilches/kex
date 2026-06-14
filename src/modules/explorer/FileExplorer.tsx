@@ -55,7 +55,6 @@ type Props = {
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
-  onOpenMarkdownPreview?: (path: string) => void;
   gitStatus?: GitStatusSnapshot | null;
 };
 
@@ -182,7 +181,6 @@ export const FileExplorer = memo(
       onPathDeleted,
       onRevealInTerminal,
       onAttachToAgent,
-      onOpenMarkdownPreview,
       gitStatus,
     },
     ref,
@@ -477,7 +475,6 @@ export const FileExplorer = memo(
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}
               onAttachToAgent={onAttachToAgent}
-              onOpenMarkdownPreview={onOpenMarkdownPreview}
             />
           );
         }

@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
+import { MarkdownViewToggle } from "./MarkdownViewToggle";
 
 type ReadResult =
   | { kind: "text"; content: string; size: number }
@@ -20,6 +21,7 @@ type Status =
 type Props = {
   path: string;
   visible: boolean;
+  onSetView: (mode: "rendered" | "raw") => void;
 };
 
 function MarkdownCode({ children }: { children?: React.ReactNode }) {
@@ -32,7 +34,7 @@ function MarkdownCode({ children }: { children?: React.ReactNode }) {
 
 const components = { code: MarkdownCode };
 
-export function MarkdownPreviewPane({ path, visible }: Props) {
+export function MarkdownPreviewPane({ path, visible, onSetView }: Props) {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
 
   useEffect(() => {
@@ -67,10 +69,11 @@ export function MarkdownPreviewPane({ path, visible }: Props) {
   return (
     <div
       className={cn(
-        "flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-background",
+        "relative flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-background",
         !visible && "pointer-events-none",
       )}
     >
+      <MarkdownViewToggle mode="rendered" onChange={onSetView} />
       <div className="flex-1 overflow-auto px-6 py-4">
         {status.kind === "loading" && (
           <p className="text-[12px] text-muted-foreground">Loading…</p>

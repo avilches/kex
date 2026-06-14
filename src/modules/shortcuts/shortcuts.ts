@@ -8,7 +8,7 @@ export type ShortcutId =
   | "commandPalette.open"
   | "commandPalette.content"
   | "tab.new"
-
+  | "tab.newBlock"
   | "tab.newPreview"
   | "tab.newEditor"
   | "tab.close"
@@ -23,7 +23,6 @@ export type ShortcutId =
   | "pane.focusRight"
   | "pane.source"
   | "terminal.clear"
-  | "terminal.toggleInput"
   | "blocks.prev"
   | "blocks.next"
   | "search.focus"
@@ -91,7 +90,12 @@ export const SHORTCUTS: Shortcut[] = [
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
   },
-
+  {
+    id: "tab.newBlock",
+    label: "New Blocks terminal",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
+  },
   {
     id: "tab.newPreview",
     label: "New web preview",
@@ -169,12 +173,6 @@ export const SHORTCUTS: Shortcut[] = [
     // macOS — on other platforms Ctrl+K is readline's kill-line, so we leave it
     // unbound and let users assign their own in settings.
     defaultBindings: IS_MAC ? [{ meta: true, key: "k" }] : [],
-  },
-  {
-    id: "terminal.toggleInput",
-    label: "Toggle Shell / AI input",
-    group: "Terminal",
-    defaultBindings: [{ [MOD_PROP]: true, key: "u" }],
   },
   {
     id: "blocks.prev",

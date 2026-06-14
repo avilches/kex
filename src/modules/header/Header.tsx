@@ -95,7 +95,7 @@ export function Header({
           variant="ghost"
           onClick={onOpenCommandPalette}
           title="Command palette"
-          className="shrink-0 gap-1.5 rounded-md px-1.5 text-muted-foreground"
+          className="shrink-0 gap-1.5 rounded-md px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <HugeiconsIcon icon={CommandIcon} size={14} strokeWidth={1.75} />
         </Button>
@@ -107,9 +107,9 @@ export function Header({
         )}
       </div>
 
-      {!IS_MAC && <span className="mx-1 h-5 w-px shrink-0 bg-border" />}
+      {!IS_MAC && <span className="mx-1 h-5 w-px shrink-0 bg-border/70" />}
 
-      {IS_MAC && <span className="mr-1 h-full w-px shrink-0 bg-border" />}
+      {IS_MAC && <span className="mr-1 h-full w-px shrink-0 bg-border/70" />}
 
       <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
 
@@ -128,14 +128,14 @@ export function Header({
 
       {panelSide === "right" && (
         <>
-          <span className="h-5 w-px shrink-0 bg-border" />
+          <span className="h-5 w-px shrink-0 bg-border/70" />
           {toggleButton}
         </>
       )}
 
       {USE_CUSTOM_WINDOW_CONTROLS && (
         <>
-          <span className="ml-1 h-5 w-px shrink-0 bg-border" />
+          <span className="ml-1 h-5 w-px shrink-0 bg-border/70" />
           <WindowControls />
         </>
       )}

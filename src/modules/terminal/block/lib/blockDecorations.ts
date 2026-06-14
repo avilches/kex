@@ -149,6 +149,12 @@ export class BlockDecorations {
     return out;
   }
 
+  // Any command block exists, finished or still running. Gates the first-run
+  // watermark: once the leaf has ever produced a block it dies for good.
+  hasAnyBlock(): boolean {
+    return this.entries.length > 0 || this.live !== null;
+  }
+
   blockAt(line: number): BlockMeta | null {
     const ranges = this.entries.map((e) => this.rangeOf(e));
     const i = blockIndexAt(ranges, line);

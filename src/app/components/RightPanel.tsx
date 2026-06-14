@@ -31,7 +31,6 @@ export type RightPanelProps = {
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
-  onOpenMarkdownPreview?: (path: string) => void;
   // SourceControlPanel props
   sourceControl: SourceControlSummary;
   onOpenDiff: (input: {
@@ -101,7 +100,6 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               onPathDeleted={props.onPathDeleted}
               onRevealInTerminal={props.onRevealInTerminal}
               onAttachToAgent={props.onAttachToAgent}
-              onOpenMarkdownPreview={props.onOpenMarkdownPreview}
               gitStatus={props.sourceControl.status}
             />
           </div>

@@ -361,6 +361,8 @@ src/
 
 All panel kinds follow the same never-unmount rule. Panels live inside panes; panes are nodes of a binary split tree inside a workspace. The workspace sidebar (left, 52px) lists workspaces; the right panel holds Explorer, Source Control, and Git History.
 
+Markdown files open in their rendered view (`kind: "markdown"`) by default; a floating Rendered/Raw toggle (`MarkdownViewToggle`) flips a single panel in place between `markdown` and `editor` via `setPanelView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty).
+
 ### `src/lib/native.ts`
 
 Contains typed wrappers for all Tauri `invoke()` calls (`native.readFile`, `native.gitCommit`, `native.workspaceAuthorize`, etc.). All modules import from `@/lib/native` — never use `invoke()` directly in components or hooks.
