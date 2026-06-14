@@ -43,7 +43,13 @@ fn is_empty_group(group: &Value) -> bool {
 
 const SESSION_HOOK_MARKER: &str = "terax-session-hook";
 
+// Bump this when the script behaviour changes in a way that requires reinstall.
+// agent_claude_hooks_status checks the installed file for this marker so that
+// users with an older script see the "Set up Claude Code" button again.
+const SESSION_HOOK_SCRIPT_VERSION: &str = "terax-session-v2";
+
 const SESSION_HOOK_SCRIPT: &str = r#"#!/usr/bin/env bash
+# terax-session-v2
 set -euo pipefail
 
 PANEL_ID="${TERAX_PANEL_ID:-}"
@@ -220,14 +226,18 @@ pub fn agent_claude_hooks_status() -> bool {
     else {
         return false;
     };
-    let script_ok = session_hook_script_path()
-        .map(|p| p.exists())
-        .unwrap_or(false);
+    // Check that the installed script is the current version. An older script
+    // (e.g. one that wrote "exited" on SessionEnd) won't have SESSION_HOOK_SCRIPT_VERSION
+    // and will return false here so the user sees the install button again.
+    let script_current = session_hook_script_path()
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .is_some_and(|s| s.contains(SESSION_HOOK_SCRIPT_VERSION));
     HOOK_EVENTS
         .iter()
         .all(|(_, m)| content.contains(&format!("notify;Terax;{m}")))
         && content.contains(SESSION_HOOK_MARKER)
-        && script_ok
+        && script_current
 }
 
 #[cfg(test)]
