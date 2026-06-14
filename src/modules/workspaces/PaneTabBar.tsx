@@ -180,16 +180,13 @@ function DraggableTab({
             <span className="shrink-0 text-[8px] text-primary">●</span>
           )}
           {hasAgent && (
-            <span
-              className={cn(
-                "ml-0.5 inline-block shrink-0 size-[6px] rounded-full",
-                isRestoreError
-                  ? "bg-destructive"
-                  : agentSession?.status === "working"
-                    ? "bg-green-500 animate-pulse"
-                    : "bg-amber-400 animate-pulse",
-              )}
-            />
+            isRestoreError ? (
+              <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-destructive" />
+            ) : agentSession?.status === "working" ? (
+              <span className="ml-0.5 size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
+            ) : (
+              <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
+            )
           )}
           <button
             type="button"

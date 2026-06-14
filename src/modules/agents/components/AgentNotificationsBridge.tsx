@@ -80,9 +80,9 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       return;
     }
     case "finished": {
-      store.setStatus(panelId, "waiting");
       const session = store.sessions[panelId];
       if (session) route(session, "finished", ctx);
+      store.finish(panelId);
       return;
     }
     case "exited":

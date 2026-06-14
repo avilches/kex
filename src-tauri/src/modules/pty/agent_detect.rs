@@ -177,6 +177,11 @@ impl AgentDetector {
                     self.ensure_armed(emit);
                     self.status = Status::Waiting;
                     emit(Transition::Finished);
+                    // Disarm so the session is truly over. If the user sends
+                    // another prompt without exiting claude, the next working
+                    // OSC will auto-arm and emit Started, creating a fresh
+                    // session on the JS side.
+                    self.disarm();
                 }
                 _ => {}
             }
@@ -373,6 +378,18 @@ mod tests {
         let mut out2 = Vec::new();
         d.finish(|t| out2.push(t));
         assert!(out2.is_empty());
+    }
+
+    #[test]
+    fn disarms_after_finished_so_next_prompt_restarts() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;claude"));
+        assert_eq!(run(&mut d, &osc("777;notify;Terax;finished")), vec![Transition::Finished]);
+        // Disarmed: 133;D is a no-op (armed=false)
+        assert!(run(&mut d, &osc("133;D;0")).is_empty());
+        // Next working auto-arms again → only Started (ensure_armed already sets
+        // status=Working so set_working is a no-op immediately after)
+        assert_eq!(run(&mut d, &osc("777;notify;Terax;working")), vec![started("claude")]);
     }
 
     #[test]

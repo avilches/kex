@@ -150,13 +150,13 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 ### 3.6 Terminal coding-agent notifications
 
-When Claude Code (or a future compatible agent) runs inside a Terax terminal, Terax detects its state via OSC sequences emitted by agent hooks. A notification bell in the header shows the agent's status (working / needs attention / done) with OS notifications when you are away from the window.
+When Claude Code (or a future compatible agent) runs inside a Terax terminal, Terax detects its state via OSC sequences emitted by agent hooks. The tab shows a spinner while the agent is working, an amber dot when it needs your input, and no indicator when it is idle. A notification bell in the header lists active sessions and recent events with OS notifications when you are away from the window.
 
 See IPC.md for the full protocol detail.
 
 ### 3.7a Agent session restore
 
-When an agent session is running at the time Terax closes, Terax offers to resume it automatically on the next launch. The tab showing a restored session displays `agentname · dirname` as its title, a colored status dot, and a `✦` icon. If the resume command fails (missing transcript, deleted directory), the icon becomes `⚠` and the title turns red.
+When an agent session is running at the time Terax closes, Terax offers to resume it automatically on the next launch. The tab showing a restored session displays `agentname · dirname` as its title, a `✦` icon, and a status indicator (spinner while working, amber dot while waiting for input, nothing when idle). If the resume command fails (missing transcript, deleted directory), the icon becomes `⚠` and the title turns red.
 
 Hooks must be installed via "Set up Claude Code" (notification bell popover) for this feature to work. See `docs/AGENT_SESSION_RESTORE.md` for the complete design and edge cases.
 

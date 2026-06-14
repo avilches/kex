@@ -170,8 +170,10 @@ Actions:
 
 | Condition | Icon | Title | Status dot |
 |---|---|---|---|
-| Agent running (normal) | `✦` | agent name + workspace | colored dot |
-| Agent restored, no error | `✦` | `agentname · dirname` | green/amber dot |
+| Agent working | `✦` | `agentname · dirname` | white spinner (animate-spin, 8px border ring) |
+| Agent waiting for input | `✦` | `agentname · dirname` | amber dot (6px, static) |
+| Agent finished / idle | panel icon | panel title | none (session deleted on `finished`) |
+| Agent restored, no error | `✦` | `agentname · dirname` | white spinner |
 | Restore error | `⚠` (red) | `agentname · dirname` (red) | red static dot |
 | No agent | panel icon | panel title | none |
 
