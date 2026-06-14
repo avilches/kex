@@ -20,6 +20,7 @@ struct SessionStore {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RestorePlan {
     pub panel_id: String,
     pub agent: String,

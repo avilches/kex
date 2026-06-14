@@ -153,7 +153,8 @@ export function NotificationBell({ onActivate }: Props) {
       await invoke("agent_enable_claude_hooks");
       await setClaudeHooksEnabled(true);
       setHooksReady(true);
-    } catch {
+    } catch (e) {
+      console.error("[kex] agent_enable_claude_hooks failed:", e);
       setHooksReady(false);
     } finally {
       setInstalling(false);
