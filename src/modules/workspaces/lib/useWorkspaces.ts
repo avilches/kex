@@ -3,7 +3,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isMarkdownPath } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { flushWorkspaceState } from "./workspaceState";
+import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import {
   allPaneIds,
@@ -63,10 +63,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
 
   // When all workspaces are gone, flush state and destroy the window.
-  // destroy() bypasses onCloseRequested entirely, so there is no re-entrancy
-  // with the flush-before-close handler in main.tsx.
+  // Uses claimClose() to avoid racing with the onCloseRequested handler in main.tsx
+  // when the user closes the last workspace and clicks X simultaneously.
   useEffect(() => {
-    if (workspaces.length === 0) {
+    if (workspaces.length === 0 && claimClose()) {
       void flushWorkspaceState().finally(() => void getCurrentWindow().destroy());
     }
   }, [workspaces]);

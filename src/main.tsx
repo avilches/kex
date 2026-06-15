@@ -12,7 +12,7 @@ import App from "./app/App";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 import { loadPreferences } from "./modules/settings/store";
-import { flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
+import { claimClose, flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
 import { retryMissingWebgl } from "./modules/terminal/lib/rendererPool";
 
 if (USE_CUSTOM_WINDOW_CONTROLS) {
@@ -69,17 +69,13 @@ setTimeout(showWindow, 500);
 setTimeout(retryMissingWebgl, 350);
 
 // Flush pending workspace state before the window closes so the 800ms debounce
-// never loses changes. We prevent the close, save, then destroy the window
-// directly (bypasses closeRequested so there is no re-entrancy issue).
-let flushing = false;
+// never loses changes. claimClose() is shared with the last-workspace-removed
+// effect in useWorkspaces to prevent a double flush when both paths fire.
 getCurrentWindow().onCloseRequested(async (event) => {
-  if (flushing) return;
+  if (!claimClose()) return;
   event.preventDefault();
-  flushing = true;
   try {
     await flushWorkspaceState();
     await getCurrentWindow().destroy();
-  } catch {
-    flushing = false;
-  }
+  } catch { /* nothing — window stays open; user can retry */ }
 });

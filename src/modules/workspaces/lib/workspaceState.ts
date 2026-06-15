@@ -70,6 +70,15 @@ export function saveWorkspaceState(workspaces: Workspace[], activeIndex: number)
   }, 800);
 }
 
+// Claimed once by whichever close path runs first (window X button or last-workspace-removed
+// effect). Prevents double flush + double destroy when both fire in the same event loop.
+let closeClaimed = false;
+export function claimClose(): boolean {
+  if (closeClaimed) return false;
+  closeClaimed = true;
+  return true;
+}
+
 // Called on window close — cancels the debounce and saves immediately so
 // pending workspace changes are not lost when the window closes.
 export async function flushWorkspaceState(): Promise<void> {
