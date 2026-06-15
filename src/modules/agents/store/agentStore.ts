@@ -18,7 +18,7 @@ type AgentStoreState = {
   setStatus: (panelId: string, status: AgentStatus) => void;
   finish: (panelId: string) => void;
   startRestored: (panelId: string, tabId: string, agent: string) => void;
-  setRestoreError: (panelId: string, tabId: string, agent: string) => void;
+  setRestoreError: (panelId: string, tabId: string, agent: string, reason?: string) => void;
   clearRestored: (panelId: string) => void;
   setLocalAgent: (state: LocalAgentState) => void;
   pushNotification: (
@@ -102,7 +102,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  setRestoreError: (panelId, tabId, agent) =>
+  setRestoreError: (panelId, tabId, agent, reason) =>
     set((s) => {
       const now = Date.now();
       return {
@@ -118,6 +118,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             attentionSince: null,
             restored: false,
             restoreError: true,
+            restoreErrorReason: reason,
           },
         },
       };

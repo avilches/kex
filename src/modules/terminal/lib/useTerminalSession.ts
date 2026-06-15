@@ -533,7 +533,8 @@ function attachSession(
               s.pty?.write(plan.resumeCmd + "\r");
             }, 200);
           } else {
-            store.setRestoreError(leafId, leafId, plan.agent);
+            console.error(`[kex] session restore failed for panel ${leafId} (${plan.agent}): ${plan.errorReason || "unknown error"}`);
+            store.setRestoreError(leafId, leafId, plan.agent, plan.errorReason || undefined);
           }
         }
       })

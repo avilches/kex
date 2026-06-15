@@ -26,6 +26,7 @@ pub struct RestorePlan {
     pub agent: String,
     pub resume_cmd: String,
     pub cwd: String,
+    pub error_reason: String,
 }
 
 fn store_path() -> Option<PathBuf> {
@@ -108,6 +109,7 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>) -> Vec<RestorePlan> 
                     agent: record.agent.unwrap_or_else(|| "claude".to_string()),
                     resume_cmd: String::new(),
                     cwd: record.cwd_launch,
+                    error_reason: format!("Transcript not found for session {}", record.session_id),
                 });
                 continue;
             }
@@ -119,13 +121,14 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>) -> Vec<RestorePlan> 
                 panel_id,
                 agent: record.agent.unwrap_or_else(|| "claude".to_string()),
                 resume_cmd: String::new(),
-                cwd,
+                cwd: cwd.clone(),
+                error_reason: format!("Directory not found: {cwd}"),
             });
             continue;
         }
         let agent = record.agent.unwrap_or_else(|| "claude".to_string());
         let cmd = resume_cmd_for_agent(&agent, &record.session_id, &cwd);
-        plans.push(RestorePlan { panel_id, agent, resume_cmd: cmd, cwd });
+        plans.push(RestorePlan { panel_id, agent, resume_cmd: cmd, cwd, error_reason: String::new() });
     }
     plans
 }

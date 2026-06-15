@@ -20,8 +20,8 @@ export function panelTitle(panel: Panel): string {
       const parts = cwd.split(/[\\/]/).filter(Boolean);
       if (parts.length === 0) return cwd;
       const prefix = /^[\\/]/.test(cwd) ? "/" : "";
-      if (parts.length <= 3) return prefix + parts.join("/");
-      return "…/" + parts.slice(-3).join("/");
+      if (parts.length <= 2) return prefix + parts.join("/");
+      return "…/" + parts.slice(-2).join("/");
     }
     case "editor":          return basename(panel.path);
     case "preview":         return panel.url || "Preview";

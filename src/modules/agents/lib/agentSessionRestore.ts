@@ -5,6 +5,7 @@ export type RestorePlan = {
   agent: string;
   resumeCmd: string;
   cwd: string;
+  errorReason: string;
 };
 
 let restorePlans: Map<string, RestorePlan> | null = null;

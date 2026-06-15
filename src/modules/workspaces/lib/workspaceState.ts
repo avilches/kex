@@ -11,6 +11,7 @@ let cached: SavedState | null = null;
 
 function sanitizePanel(p: Panel): Panel {
   if (p.kind === "editor") return { ...p, dirty: false };
+  if (p.kind === "terminal") return { ...p, runningCommand: undefined };
   return p;
 }
 
@@ -34,7 +35,7 @@ export async function initWorkspaceState(): Promise<void> {
       ? `${entry.workspaces.length} workspace(s), activeIndex=${entry.activeIndex}`
       : "null (no saved state)");
     if (entry && Array.isArray(entry.workspaces) && entry.workspaces.length > 0) {
-      cached = { workspaces: entry.workspaces, activeIndex: entry.activeIndex };
+      cached = { workspaces: entry.workspaces.map(sanitizeWorkspace), activeIndex: entry.activeIndex };
     }
   } catch (err) {
     console.error("[workspace-state] initWorkspaceState error:", err);

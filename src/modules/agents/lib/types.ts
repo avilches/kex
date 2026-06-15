@@ -25,6 +25,7 @@ export type AgentSession = {
   attentionSince: number | null;
   restored: boolean;
   restoreError: boolean;
+  restoreErrorReason?: string;
 };
 
 export type AgentNotification = {

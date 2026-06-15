@@ -103,6 +103,12 @@ function DraggableTab({
         })()
       : title;
 
+  // Truncate from the left so the right end (the leaf directory) is always visible.
+  // ~32 chars at 11px font fits in the ~196px available after icon/close/padding.
+  const displayTitle = agentTitle.length > 32
+    ? '…' + agentTitle.slice(-31)
+    : agentTitle;
+
   const isRenaming = useTabRenameStore((s) => s.renamingPanelId === panel.id);
   const clearRename = useTabRenameStore((s) => s.clearRename);
   const startRename = useTabRenameStore((s) => s.startRename);
@@ -144,7 +150,7 @@ function DraggableTab({
                 `Session: ${agentSession!.panelId.slice(0, 8)}...`,
                 `Started: ${new Date(agentSession!.startedAt).toLocaleTimeString()}`,
                 agentSession!.restored ? "Session restored" : null,
-                isRestoreError ? "Session restore failed" : null,
+                isRestoreError ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}` : null,
                 panel.kind === "terminal" ? (panel.cwd ?? "") : null,
               ].filter((x): x is string => x !== null).join("\n") : undefined}
               onClick={() => onActivate(panel.id)}
@@ -213,7 +219,7 @@ function DraggableTab({
                           : agentTitle
                 }
               >
-                {agentTitle}
+                {displayTitle}
               </span>
               {panel.kind === "editor" && panel.dirty && (
                 <span className="shrink-0 text-[8px] text-primary">●</span>
