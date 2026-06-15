@@ -1,6 +1,7 @@
 import type { Workspace } from "@/modules/workspaces";
 import { findPanelPane } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
 import { routeAgentNotification } from "../lib/route";
@@ -58,21 +59,32 @@ function route(
   });
 }
 
+function ensureSession(panelId: string, ctx: Ctx, agent: string): boolean {
+  const store = useAgentStore.getState();
+  if (store.sessions[panelId]) return true;
+  const info = panelInfo(ctx.workspaces, panelId);
+  if (!info) return false;
+  store.start(panelId, info.workspaceId, agent);
+  return true;
+}
+
 function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const panelId = leafIdForPty(sig.id);
+  console.debug("[kex:agent] signal", sig.kind, "pty", sig.id, "agent", sig.agent, "→ panel", panelId);
   if (panelId === null) return;
   const store = useAgentStore.getState();
 
   switch (sig.kind) {
     case "started": {
-      const info = panelInfo(ctx.workspaces, panelId);
-      if (!info) return;
-      store.start(panelId, info.workspaceId, sig.agent ?? "agent");
+      const ok = ensureSession(panelId, ctx, sig.agent ?? "claude");
+      if (!ok) console.debug("[kex:agent] panelInfo returned null for panel", panelId, "workspaces:", ctx.workspaces.length);
       return;
     }
-    case "working":
+    case "working": {
+      ensureSession(panelId, ctx, sig.agent ?? "claude");
       store.setStatus(panelId, "working");
       return;
+    }
     case "attention": {
       store.setStatus(panelId, "waiting");
       const session = store.sessions[panelId];
@@ -83,10 +95,12 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       const session = store.sessions[panelId];
       if (session) route(session, "finished", ctx);
       store.finish(panelId);
+      invoke("agent_detach_session", { panelId }).catch(() => {});
       return;
     }
     case "exited":
       store.finish(panelId);
+      invoke("agent_detach_session", { panelId }).catch(() => {});
       return;
   }
 }
@@ -107,14 +121,15 @@ export function AgentNotificationsBridge({
   useEffect(() => {
     let alive = true;
     let unlisten: (() => void) | undefined;
+    console.debug("[kex:agent] bridge mounting, registering listener");
     listen<AgentSignal>("kex:agent-signal", (e) =>
       handleSignal(e.payload, ctxRef.current),
     )
       .then((u) => {
-        if (alive) unlisten = u;
-        else u();
+        if (alive) { unlisten = u; console.debug("[kex:agent] listener ready"); }
+        else { u(); console.debug("[kex:agent] listener removed (stale mount)"); }
       })
-      .catch(() => {});
+      .catch((e) => console.debug("[kex:agent] listen failed:", e));
     return () => {
       alive = false;
       unlisten?.();

@@ -98,18 +98,23 @@ fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
-fn build_plans_from(panels: HashMap<String, SessionRecord>) -> Vec<RestorePlan> {
+fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&PathBuf>) -> Vec<RestorePlan> {
     let mut plans = Vec::new();
     for (panel_id, record) in panels {
         let jsonl = match find_jsonl(&record.session_id, &record.transcript_path) {
             Some(j) => j,
             None => {
+                // Transcript deleted — session is permanently gone. Auto-remove from store
+                // so the ⚠ indicator doesn't reappear on subsequent launches.
+                if let Some(path) = store_path {
+                    remove_panel_from_store(&panel_id, path);
+                }
                 plans.push(RestorePlan {
                     panel_id,
                     agent: record.agent.unwrap_or_else(|| "claude".to_string()),
                     resume_cmd: String::new(),
                     cwd: record.cwd_launch,
-                    error_reason: format!("Transcript not found for session {}", record.session_id),
+                    error_reason: format!("Session transcript not found (session may have been cleared by Claude Code)"),
                 });
                 continue;
             }
@@ -131,6 +136,17 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>) -> Vec<RestorePlan> 
         plans.push(RestorePlan { panel_id, agent, resume_cmd: cmd, cwd, error_reason: String::new() });
     }
     plans
+}
+
+fn remove_panel_from_store(panel_id: &str, path: &PathBuf) {
+    let Ok(content) = std::fs::read_to_string(path) else { return };
+    let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return };
+    store.panels.remove(panel_id);
+    let Ok(out) = serde_json::to_string_pretty(&store) else { return };
+    let tmp = path.with_extension("json.kex-tmp");
+    if std::fs::write(&tmp, out).is_ok() {
+        let _ = std::fs::rename(&tmp, path);
+    }
 }
 
 /// Remove a panel entry from agent-sessions.json (and candidates if present).
@@ -217,7 +233,9 @@ pub fn load_restore_plan() -> Vec<RestorePlan> {
         let _ = std::fs::remove_file(&cpath);
         if let Ok(store) = serde_json::from_str::<SessionStore>(&content) {
             if !store.panels.is_empty() {
-                return build_plans_from(store.panels);
+                // Pass the main store path so missing transcripts can be auto-removed.
+                let main_path = store_path();
+                return build_plans_from(store.panels, main_path.as_ref());
             }
         }
     }
@@ -242,7 +260,7 @@ pub fn load_restore_plan() -> Vec<RestorePlan> {
         .into_iter()
         .filter(|(_, r)| r.state != "exited")
         .collect();
-    build_plans_from(active)
+    build_plans_from(active, Some(&path))
 }
 
 #[cfg(test)]
