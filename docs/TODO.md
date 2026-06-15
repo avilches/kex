@@ -33,7 +33,7 @@ Implementacion (boceto): extender el tipo `Panel` para que editor y preview pued
 
 Plan completo y fuente de verdad: [NOTES_AND_BOOKMARKS_PLAN.md](NOTES_AND_BOOKMARKS_PLAN.md). Incluye especificacion, modelos de datos, 6 fases con rutas concretas, esqueletos de codigo (TS y Rust), criterios de aceptacion y comandos de verificacion por fase.
 
-No es una mejora incremental del terminal: convierte Terax en un espacio de trabajo componible que ademas funciona como aplicacion de notas Markdown (edicion WYSIWYG) y un sistema de marcadores estilo Arc. Las notas son ficheros `.md` en disco, no una DB. Tres pilares pensados para anadirse poco a poco reusando primitivas existentes, sin crear modos exclusivos:
+No es una mejora incremental del terminal: convierte Kex en un espacio de trabajo componible que ademas funciona como aplicacion de notas Markdown (edicion WYSIWYG) y un sistema de marcadores estilo Arc. Las notas son ficheros `.md` en disco, no una DB. Tres pilares pensados para anadirse poco a poco reusando primitivas existentes, sin crear modos exclusivos:
 
 1. Notas Markdown con edicion WYSIWYG (estilo Notion/Bear).
 2. Navegacion de notas: favoritos, recientes, busqueda por nombre y doble visor (carpetas + lista de notas) como segundo modo del explorer.
@@ -270,14 +270,14 @@ Estado: idea anotada (2026-06-14). Hoy el hint "Cmd+U switch" en el prompt de un
 
 ### Por que hoy no se hace
 
-El modo blocks lo decide la shell al arrancar, leyendo la env var `TERAX_BLOCKS` una sola vez en `zshrc.zsh`/`bashrc.bash`/`init.fish`/`profile.ps1` (suprime su prompt para que el host dibuje la barra de input). Una shell ya arrancada no cambia su prompt aunque cambie la variable. Por eso alternar el modo en caliente exigiria re-spawnear el PTY (`respawnSession`), que es destructivo: borra el scrollback y mata el proceso en curso.
+El modo blocks lo decide la shell al arrancar, leyendo la env var `KEX_BLOCKS` una sola vez en `zshrc.zsh`/`bashrc.bash`/`init.fish`/`profile.ps1` (suprime su prompt para que el host dibuje la barra de input). Una shell ya arrancada no cambia su prompt aunque cambie la variable. Por eso alternar el modo en caliente exigiria re-spawnear el PTY (`respawnSession`), que es destructivo: borra el scrollback y mata el proceso en curso.
 
 ### Camino para hacerlo limpio (no destructivo)
 
 Dos piezas independientes:
 
 1. **Integracion de shell dinamica**: que los scripts re-evaluen el modo en cada `precmd` (leyendo un fichero/var en vez de solo al arrancar), de modo que la supresion del prompt se pueda activar/desactivar sin reiniciar la shell. Esto resuelve el cambio de prompt y no necesita tmux.
-2. **Persistencia de sesion (tmux u otro)**: si la shell corre dentro de una sesion tmux persistente y Terax es solo un cliente `attach`, detach/re-attach no mata el proceso ni pierde el scrollback. Complementa al punto 1 para que el toggle sea totalmente no destructivo.
+2. **Persistencia de sesion (tmux u otro)**: si la shell corre dentro de una sesion tmux persistente y Kex es solo un cliente `attach`, detach/re-attach no mata el proceso ni pierde el scrollback. Complementa al punto 1 para que el toggle sea totalmente no destructivo.
 
 Frontend: al alternar el flag `blocks` del Panel + del Session, hay que re-vincular el slot para intercambiar los handlers OSC (BlockDecorations vs prompt/cwd tracker; hoy se eligen una sola vez en `bindLeafToSlot`).
 

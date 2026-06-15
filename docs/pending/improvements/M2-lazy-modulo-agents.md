@@ -6,7 +6,7 @@
 
 La filosofía del proyecto es explícitamente NO ser un producto de agentes. El detector Rust es de coste cero cuando no corre ningún agente (bien), pero la superficie frontend de `agents` tiene **coste fijo permanente** aunque nunca se use un agente:
 
-- `AgentNotificationsBridge` (`App.tsx:1168`) registra un listener permanente `terax:agent-signal`.
+- `AgentNotificationsBridge` (`App.tsx:1168`) registra un listener permanente `kex:agent-signal`.
 - `useWindowFocus` registra `onFocusChanged`.
 - `NotificationBell` está siempre en el header, suscrito a dos slices de zustand.
 - El módulo arrastra `zustand` (`agentStore.ts`) y `@tauri-apps/plugin-notification`; si zustand solo se usa aquí, es una dependencia cargada por una feature no-core.
@@ -18,7 +18,7 @@ Coste cero en el frontend para usuarios que solo quieren "terminales + editar fi
 
 ## Plan accionable
 
-1. No registrar los listeners (`terax:agent-signal`, `onFocusChanged`) ni montar `NotificationBell` hasta la primera señal `terax:agent-signal` observada (o hasta que `agentNotifications` esté activo). Hoy `route.ts:36` ya comprueba la preferencia, pero los listeners se registran antes.
+1. No registrar los listeners (`kex:agent-signal`, `onFocusChanged`) ni montar `NotificationBell` hasta la primera señal `kex:agent-signal` observada (o hasta que `agentNotifications` esté activo). Hoy `route.ts:36` ya comprueba la preferencia, pero los listeners se registran antes.
 2. Gate por la preferencia `agentNotifications` (ya existente): si está desactivada, no montar nada de la superficie.
 3. Lazy-import del módulo (`React.lazy`/import dinámico) para que `zustand` y `plugin-notification` no entren en el bundle inicial si la feature está apagada.
 4. Arreglar `relativeTime` para que se refresque (timer o recálculo on-open del popover) o mostrar timestamp absoluto.

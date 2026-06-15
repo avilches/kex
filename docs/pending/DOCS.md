@@ -6,23 +6,17 @@ Verificación de que `AGENTS.md`, `CLAUDE.md`, `docs/*` y la documentación raí
 
 ## CRÍTICAS
 
-### D3 [critical] `ROADMAP.md` describe un producto AI-native que este fork eliminó
+### ~~D3 [critical] `ROADMAP.md` describe un producto AI-native que este fork eliminó~~ RESUELTO
 
-- **Documento:** `ROADMAP.md:12-46`.
-- **Afirma:** *"Terax is a fast, lightweight, AI-native terminal (ADE) ... first-class AI agent system ... Keys stored in the OS keychain"*, temas con "Agents, tools, autocomplete, voice", shipped con "AI-context redaction".
-- **Realidad:** `docs/FORK.md:14-40` documenta que se eliminó por completo `src/modules/ai/`, `secrets.rs` (keyring), `net.rs` y el AI SDK. `src/modules/ai` no existe; `keyring`/`anthropic`/`openai` no aparecen en `Cargo.toml` ni `package.json`. `README.md` ya está actualizado.
-- **Acción:** Reescribir `ROADMAP.md` acorde al fork no-AI (como ya se hizo con README), o eliminarlo. Hoy es documentación del upstream pegada sin revisar.
+`ROADMAP.md` reescrito para Kex (2026-06-14): elimina todo lo AI-native, describe el fork sin AI subsystem.
 
 ---
 
 ## HIGH
 
-### D4 [high] `SECURITY.md` describe subsistemas AI ya eliminados
+### ~~D4 [high] `SECURITY.md` describe subsistemas AI ya eliminados~~ RESUELTO
 
-- **Documento:** `SECURITY.md` ("What we do to keep things safe", "What's in scope").
-- **Afirma:** *"API keys live in the OS keychain via keyring"*, "talks to AI providers", "AI tool approval. File writes and shell commands from the agent need your OK", scope incluye "AI tool results, credentials".
-- **Realidad:** keyring y el subsistema AI fueron removidos (`FORK.md:14-40`). No hay almacén de API keys, ni aprobación de herramientas, ni proveedores AI.
-- **Acción:** Actualizar `SECURITY.md`: eliminar keyring/AI/tool-approval y ajustar el scope a lo que el fork expone (PTY, FS, IPC, plugins, updater).
+`SECURITY.md` reescrito para Kex (2026-06-14): eliminados keyring/AI/tool-approval, scope actualizado a PTY/FS/IPC/updater.
 
 ---
 

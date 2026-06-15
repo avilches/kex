@@ -104,7 +104,7 @@ When `visible` becomes **false**:
 
 While a session has no slot, incoming PTY bytes go into `DormantRing` (256 chunks / 256 KB cap).
 On slot re-acquisition, `drainRing` replays them into xterm. If the cap is exceeded, old chunks
-are dropped and the message `[terax: dropped output during hibernation]` is prepended on drain.
+are dropped and the message `[kex: dropped output during hibernation]` is prepended on drain.
 
 The PTY process itself is never paused — the OS shell keeps running and output keeps arriving;
 only the rendering is deferred.
@@ -239,7 +239,7 @@ type DraggingItem =
   corresponding gap renders a 2px `bg-primary` vertical line indicating the insertion point.
 - `DropZone` (`PaneView.tsx`): `useDroppable` per zone. Zones are rendered only during an active
   drag. The set of zones depends on the target pane's pixel dimensions, read from a `ResizeObserver`
-  and compared against `paneSplitLimit` (configurable in `terax-settings.json`, default
+  and compared against `paneSplitLimit` (configurable in `kex-settings.json`, default
   `{ width: 250, height: 250 }`):
   - **width < limit AND height < limit**: only `center`, covering the full pane (`inset-0`).
   - **width < limit only**: `top`, `bottom`, `center` — horizontal splits disabled.
@@ -254,7 +254,7 @@ type DraggingItem =
   `SplitNodeView` to `PaneView`, forcing the center zone highlight on the target pane to signal that
   the tab will move there.
   Drag-drop splits are also blocked when the workspace already has `workspacePaneLimit` panes
-  (configurable in `terax-settings.json`, default `8`).
+  (configurable in `kex-settings.json`, default `8`).
 - `DragOverlay` (`WorkspaceDndProvider.tsx`): lightweight floating chip showing panel icon + title
   for tab drags, or a file icon + basename for file drags. `dropAnimation: null` to avoid fighting
   the layout reflow on drop.

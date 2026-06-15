@@ -914,6 +914,6 @@ export function refreshTerminalLeaf(leafId: string): void {
 }
 
 if (import.meta.env?.DEV && typeof window !== "undefined") {
-  (window as unknown as { __teraxTerm?: unknown }).__teraxTerm =
+  (window as unknown as { __kexTerm?: unknown }).__kexTerm =
     terminalDebugStats;
 }

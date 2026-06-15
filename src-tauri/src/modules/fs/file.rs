@@ -45,7 +45,7 @@ pub struct FileStat {
 
 // No workspace authorization or secret-path deny-list is applied here. The explorer
 // only surfaces paths the user navigated to, and terminal commands can reach arbitrary
-// paths regardless of any app-level gate. If Terax ever runs autonomous agents that
+// paths regardless of any app-level gate. If Kex ever runs autonomous agents that
 // call these IPC commands directly, add guard_read/guard_write helpers (canonicalize,
 // check deny-list components, call is_authorized) before resolve_path. See
 // docs/ARCHITECTURE.md §4.2.
@@ -227,7 +227,7 @@ mod tests {
 
         let target = dir.path().join("note.txt");
         // Pre-stage a symlink at the legacy deterministic staging path.
-        let legacy = dir.path().join(".note.txt.terax.tmp");
+        let legacy = dir.path().join(".note.txt.kex.tmp");
         symlink(&outside, &legacy).unwrap();
 
         write_atomic(&target, b"payload").unwrap();

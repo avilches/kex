@@ -1,7 +1,7 @@
 # BUG-12 [medium · seguridad] TOCTOU: auto-autorizacion del repo root ascendente extiende el alcance hacia arriba
 
 ## Contexto del proyecto
-Terax es un emulador de terminal open-source: backend Tauri 2 + Rust (portable-pty), frontend React 19 + TypeScript + xterm.js (webgl). Filosofia: ultraligero, rapido, eficiente en memoria; sin foco en agentes; buen diff de git en doble panel. Repo: /Users/avilches/Work/Proy/Repos/terax-ai. Convenciones: sin em-dash, sin emojis, imports `@/...` en frontend, comentarios solo del 'why'.
+Kex es un emulador de terminal open-source: backend Tauri 2 + Rust (portable-pty), frontend React 19 + TypeScript + xterm.js (webgl). Filosofia: ultraligero, rapido, eficiente en memoria; notificaciones de agentes de IA (Claude Code, Codex); buen diff de git en doble panel. Repo: /Users/avilches/Work/Proy/Repos/terax-ai. Convenciones: sin em-dash, sin emojis, imports `@/...` en frontend, comentarios solo del 'why'.
 
 ## Ubicacion
 `src-tauri/src/modules/git/operations.rs:45-46`, `src-tauri/src/modules/git/operations.rs:103-104`; `src-tauri/src/modules/git/workspace.rs:32-35`

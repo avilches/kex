@@ -5,7 +5,7 @@
 
 ## Contexto
 
-Hay dos estilos de tab bar implementados y persistidos via `tabBarStyle` en `terax-settings.json`:
+Hay dos estilos de tab bar implementados y persistidos via `tabBarStyle` en `kex-settings.json`:
 
 - `"connected"` (por defecto): pestañas pegadas al panel inferior, líneas divisorias compartidas, la pestaña activa se funde con el área de contenido del panel mediante una línea de acento de foco.
 - `"pill"`: estilo flotante original, la pestaña activa se resalta con un fondo distinto.
@@ -23,5 +23,5 @@ Añadir un control en la sección correspondiente de la ventana de Settings (`sr
 ## Criterios de aceptación
 
 - La opción aparece en Settings y refleja el valor actual de `tabBarStyle`.
-- Cambiarla actualiza el estilo en vivo y persiste en `terax-settings.json`.
+- Cambiarla actualiza el estilo en vivo y persiste en `kex-settings.json`.
 - `pnpm lint`, `pnpm check-types`, `pnpm test` en verde.

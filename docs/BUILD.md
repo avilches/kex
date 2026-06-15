@@ -48,10 +48,10 @@ Manual `manualChunks` splits the bundle to keep the initial load fast:
 | macOS | `.dmg` + `.app` | `minimumSystemVersion: 13.0`, `titleBarStyle: Overlay`, entitlements.plist |
 | Linux | `.deb`, `.rpm`, `.AppImage` | deb/rpm link against system webkit2gtk; AppImage bundles media framework |
 | Windows | NSIS `.exe` | `currentUser` mode (no admin required), WebView2 via `downloadBootstrapper` |
-| Arch Linux | AUR `terax-bin` | Tracks latest release |
+| Arch Linux | AUR `kex-bin` | Tracks latest release |
 
 ## Auto-updater
 
-Update manifest endpoint: `https://github.com/crynta/terax-ai/releases/latest/download/latest.json`
+Update manifest endpoint: `https://github.com/avilches/kex/releases/latest/download/latest.json`
 
 Updates are signed with a minisign key. The public key is embedded in `tauri.conf.json`. The updater verifies the signature before applying an update.

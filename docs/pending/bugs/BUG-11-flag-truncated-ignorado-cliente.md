@@ -1,7 +1,7 @@
 # BUG-11 [medium] El flag truncated del backend se ignora por completo en el cliente
 
 ## Contexto del proyecto
-Terax es un emulador de terminal open-source: backend Tauri 2 + Rust (portable-pty), frontend React 19 + TypeScript + xterm.js (webgl). Filosofia: ultraligero, rapido, eficiente en memoria; sin foco en agentes; buen diff de git en doble panel. Repo: /Users/avilches/Work/Proy/Repos/terax-ai. Convenciones: sin em-dash, sin emojis, imports `@/...` en frontend, comentarios solo del 'why'.
+Kex es un emulador de terminal open-source: backend Tauri 2 + Rust (portable-pty), frontend React 19 + TypeScript + xterm.js (webgl). Filosofia: ultraligero, rapido, eficiente en memoria; notificaciones de agentes de IA (Claude Code, Codex); buen diff de git en doble panel. Repo: /Users/avilches/Work/Proy/Repos/terax-ai. Convenciones: sin em-dash, sin emojis, imports `@/...` en frontend, comentarios solo del 'why'.
 
 ## Ubicacion
 Tipo `GitDiffContentResult.truncated` en `src/lib/native.ts:72`; producido en `src-tauri/src/modules/git/operations.rs:259,788` y `src-tauri/src/modules/git/process.rs:385-406`; nunca leido en `src/modules/editor` | `src/modules/source-control` | `src/modules/git-history`.

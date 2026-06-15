@@ -1,6 +1,6 @@
 import type { Theme } from "../types";
 
-export const teraxDefault: Theme = {
+export const kexDefault: Theme = {
   id: "kex-default",
   name: "Kex Default",
   description: "The default Kex look - clean glass over neutral surfaces.",

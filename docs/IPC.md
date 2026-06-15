@@ -151,8 +151,8 @@ The detection logic runs entirely on the PTY byte filter. When no agent is runni
 
 Hooks can be installed from within the app (the notification bell popover shows a "Set up Claude Code" prompt if hooks are not yet installed). The installer (`agent_enable_claude_hooks`):
 - Reads the existing Claude Code `settings.json` atomically
-- Injects the `terax:agent-signal` hook entries without overwriting unrelated settings
-- Also injects `SessionStart` and `SessionEnd` hooks that write to `~/.config/terax/agent-sessions.json` (see below)
+- Injects the `kex:agent-signal` hook entries without overwriting unrelated settings
+- Also injects `SessionStart` and `SessionEnd` hooks that write to `~/.config/kex/agent-sessions.json` (see below)
 - Is idempotent — re-running it on an already-configured installation is safe
 
 ### Agent session persistence

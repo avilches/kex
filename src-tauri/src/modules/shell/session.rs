@@ -122,7 +122,7 @@ impl ShellSession {
 
 fn wrap_posix_with_sentinel(command: &str, sentinel: &str) -> String {
     format!(
-        "{command}\n__terax_rc=$?\nprintf '\\n%s%s\\n' '{sentinel}' \"$(pwd)\"\nexit $__terax_rc\n",
+        "{command}\n__kex_rc=$?\nprintf '\\n%s%s\\n' '{sentinel}' \"$(pwd)\"\nexit $__kex_rc\n",
     )
 }
 
@@ -137,7 +137,7 @@ fn wrap_with_sentinel(command: &str, workspace: &WorkspaceEnv, sentinel: &str) -
     #[cfg(windows)]
     {
         format!(
-        "{command}\n$__terax_rc = if ($null -ne $LASTEXITCODE) {{ $LASTEXITCODE }} elseif ($?) {{ 0 }} else {{ 1 }}\n\"`n{sentinel}$($PWD.Path)\"\nexit $__terax_rc\n",
+        "{command}\n$__kex_rc = if ($null -ne $LASTEXITCODE) {{ $LASTEXITCODE }} elseif ($?) {{ 0 }} else {{ 1 }}\n\"`n{sentinel}$($PWD.Path)\"\nexit $__kex_rc\n",
     )
     }
 }

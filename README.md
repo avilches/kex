@@ -1,27 +1,27 @@
 <div align="center">
-  <img src="public/logo.png" width="144" height="144" alt="Terax" />
-  <h1>Terax</h1>
+  <img src="public/logo.png" width="144" height="144" alt="Kex" />
+  <h1>Kex</h1>
 
   <p><strong>Lightweight terminal-first dev workspace.</strong></p>
 
   <p>
-    <img src="https://img.shields.io/github/v/release/crynta/terax-ai?label=version&color=blue" alt="version" />
+    <img src="https://img.shields.io/github/v/release/avilches/kex?label=version&color=blue" alt="version" />
     <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="license" />
     <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="platform" />
   </p>
 
   <p>
-    <a href="https://terax.app">Website</a>
+    <a href="https://github.com/avilches/kex">GitHub</a>
     ·
-    <a href="https://terax.app/docs">Docs</a>
-    ·
-    <a href="https://github.com/crynta/Terax-website">Website's source code</a>
+    <a href="https://github.com/avilches/kex/releases/latest">Releases</a>
   </p>
 </div>
 
 ---
 
-Terax is a lightweight open-source terminal emulator built on Tauri 2 + Rust and React 19. Native PTY backend with a WebGL renderer, workspace/pane layout with per-pane tab strips, code editor, file explorer, source control with a git graph, and a web preview pane. About 7-8 MB on disk. No telemetry. No account.
+Kex is a lightweight open-source terminal emulator built on Tauri 2 + Rust and React 19. Native PTY backend with a WebGL renderer, workspace/pane layout with per-pane tab strips, code editor, file explorer, source control with a git graph, and a web preview pane. About 7-8 MB on disk. No telemetry. No account.
+
+Fork of [crynta/terax-ai](https://github.com/crynta/terax-ai) with the AI subsystem removed and the workspace/pane model extended. See [docs/FORK.md](docs/FORK.md) for the full list of divergences.
 
 ## Screenshots
 
@@ -85,18 +85,18 @@ Terax is a lightweight open-source terminal emulator built on Tauri 2 + Rust and
 
 ## Install
 
-Latest installers are on the [Releases](https://github.com/crynta/terax-ai/releases/latest) page. Terax auto-updates from there.
+Latest installers are on the [Releases](https://github.com/avilches/kex/releases/latest) page. Kex auto-updates from there.
 
 ### Windows notes
 
-- On first launch Windows shows "Windows protected your PC" because Terax isn't code-signed yet. Click **More info** then **Run anyway**.
+- On first launch Windows shows "Windows protected your PC" because Kex isn't code-signed yet. Click **More info** then **Run anyway**.
 - Default shell detection: `pwsh.exe` (PowerShell 7+) -> `powershell.exe` (Windows PowerShell 5.1) -> `cmd.exe`.
 - WSL is a first-class workspace environment, not a wrapped subprocess.
 
 ### Linux notes
 
-- **Arch / AUR:** `yay -S terax-bin` (or `paru`, etc.). Tracks the latest release.
-- **AppImage:** needs FUSE. Without it: `./Terax_*.AppImage --appimage-extract-and-run`. On Wayland with rendering glitches, try `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Otherwise the `.deb` / `.rpm` packages link against the system GTK stack and tend to be smoother.
+- **Arch / AUR:** `yay -S kex-bin` (or `paru`, etc.). Tracks the latest release.
+- **AppImage:** needs FUSE. Without it: `./Kex_*.AppImage --appimage-extract-and-run`. On Wayland with rendering glitches, try `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Otherwise the `.deb` / `.rpm` packages link against the system GTK stack and tend to be smoother.
 
 ## Build from source
 
@@ -127,20 +127,8 @@ Tauri 2, Rust, `portable-pty`, React 19, TypeScript, Vite, xterm.js, CodeMirror 
 
 ## Contributing
 
-Issues and PRs are welcome! Feel free to open issues, suggest features, or submit pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+Issues and PRs are welcome. Feel free to open issues, suggest features, or submit pull requests.
 
 ## License
 
-Terax is licensed under the Apache-2.0 License. For more information on our dependencies, see [Apache License 2.0](LICENSE).
-
-## Star history
-
-<div align="center">
-  <a href="https://www.star-history.com/#crynta/terax-ai&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=crynta/terax-ai&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=crynta/terax-ai&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=crynta/terax-ai&type=Date" />
-    </picture>
-  </a>
-</div>
+Kex is licensed under the Apache-2.0 License. For more information on our dependencies, see [Apache License 2.0](LICENSE).

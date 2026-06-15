@@ -51,7 +51,7 @@ Rutas confirmadas durante el analisis (verificar antes de editar):
 - Resolver de lenguaje (incluye markdown): `src/modules/editor/lib/languageResolver.ts`
 - Preview markdown actual (solo lectura, `Streamdown`): `src/modules/markdown/MarkdownPreviewPane.tsx`
 - Preview de URL (iframe sandbox): `src/modules/preview/PreviewPane.tsx`
-- Store de settings (`LazyStore` "terax-settings.json"): `src/modules/settings/store.ts`
+- Store de settings (`LazyStore` "kex-settings.json"): `src/modules/settings/store.ts`
 - Hook de preferencias (Zustand): `src/modules/settings/preferences.ts`
 - Patron de store persistente de referencia: `src/modules/theme/customThemes.ts`
 - Abrir ventana settings: `src/modules/settings/openSettingsWindow.ts`
@@ -76,7 +76,7 @@ Rutas confirmadas durante el analisis (verificar antes de editar):
 - `useDocument` ya implementa dirty tracking (comparacion saved vs buffer) y autosave configurable por preferencias (`editorAutoSave`, `editorAutoSaveDelay`).
 - `fs_search` es fuzzy, smart-case, respeta `.gitignore`, poda `node_modules/.git/target/...`, devuelve `{ hits: [{path, rel, name, is_dir}], truncated }`.
 - dnd-kit ya se usa para reordenar workspaces y arrastrar ficheros.
-- Patron de store: `LazyStore` + evento cross-window `terax://...-changed` + hook Zustand con `init()` idempotente (ver `customThemes.ts`).
+- Patron de store: `LazyStore` + evento cross-window `kex://...-changed` + hook Zustand con `init()` idempotente (ver `customThemes.ts`).
 
 ---
 
@@ -99,7 +99,7 @@ Una fase no esta terminada hasta que los cinco pasan. Cualquier cambio a un subs
 // src/modules/workspaces/lib/types.ts  -> ampliar la union Panel
 | { id: string; kind: "note"; path: string; title?: string; dirty: boolean }
 
-// src/modules/notes/lib/notesStore.ts  (LazyStore "terax-notes.json")
+// src/modules/notes/lib/notesStore.ts  (LazyStore "kex-notes.json")
 export type NoteVault = { id: string; name: string; root: string };
 export type RecentNote = { path: string; openedAt: number };
 export type NotesState = {
@@ -116,7 +116,7 @@ export type NoteListItem = {
   snippet: string;  // primera linea de cuerpo no vacia, recortada
 };
 
-// src/modules/bookmarks/lib/bookmarksStore.ts  (LazyStore "terax-bookmarks.json")
+// src/modules/bookmarks/lib/bookmarksStore.ts  (LazyStore "kex-bookmarks.json")
 export type Bookmark = {
   id: string; url: string; title: string;
   favicon?: string; folderId?: string; order: number;
@@ -231,10 +231,10 @@ Objetivo: favoritos, recientes y vaults persistidos, mas un comando Rust eficien
 ## 2.1 notesStore (frontend, sin Rust)
 
 1. Crear `src/modules/notes/lib/notesStore.ts` siguiendo el patron de `src/modules/theme/customThemes.ts`:
-   - `LazyStore("terax-notes.json", { defaults: {}, autoSave: 200 })`
+   - `LazyStore("kex-notes.json", { defaults: {}, autoSave: 200 })`
    - Claves: `favorites`, `recents`, `vaults`.
    - Funciones: `listFavorites`, `toggleFavorite(path)`, `isFavorite(path)`, `pushRecent(path, openedAt)` (ring buffer cap 30, dedup por path, mas reciente primero), `listRecents`, `listVaults`, `addVault`, `removeVault`.
-   - Evento cross-window `terax://notes-changed` emitido tras cada mutacion.
+   - Evento cross-window `kex://notes-changed` emitido tras cada mutacion.
    - `onNotesChange(cb)` combinando `store.onChange` y `listen` del evento.
    - Normalizar rutas a canonica forward-slash antes de guardar (usar `fs_canonicalize` cuando convenga, o normalizacion en frontend).
 2. Crear hook Zustand `src/modules/notes/lib/useNotesStore.ts` con `init()` idempotente (igual patron que `usePreferencesStore`).
@@ -402,10 +402,10 @@ Objetivo: lista vertical de URLs a la izquierda, en carpetas, reordenables, que 
 
 ## 5.1 bookmarksStore (frontend, sin Rust)
 
-1. Crear `src/modules/bookmarks/lib/bookmarksStore.ts` con el mismo patron (`LazyStore("terax-bookmarks.json")`):
+1. Crear `src/modules/bookmarks/lib/bookmarksStore.ts` con el mismo patron (`LazyStore("kex-bookmarks.json")`):
    - Claves `bookmarks` y `folders`.
    - Funciones: `listBookmarks`, `addBookmark({ url, title, folderId? })` (favicon resuelto al anadir), `removeBookmark(id)`, `updateBookmark(id, patch)`, `reorderBookmark(id, toOrder, folderId?)`, CRUD de folders.
-   - Evento `terax://bookmarks-changed`, `onBookmarksChange(cb)`.
+   - Evento `kex://bookmarks-changed`, `onBookmarksChange(cb)`.
 2. Hook Zustand `src/modules/bookmarks/lib/useBookmarksStore.ts` con `init()` idempotente.
 3. Favicon: resolver en el frontend (por ejemplo via `https://www.google.com/s2/favicons?domain=...` o leyendo `/favicon.ico`), guardar la URL del favicon en el bookmark. Validar la URL en el limite antes de guardarla.
 
