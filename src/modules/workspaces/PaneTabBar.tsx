@@ -237,7 +237,7 @@ function DraggableTab({
             </div>
           </PopoverAnchor>
         </ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
             {onRenamePanel && (
               <>
                 <ContextMenuItem onSelect={() => startRename(panel.id)}>
@@ -324,13 +324,13 @@ function DraggableTab({
         <input
           ref={inputRef}
           autoFocus
-          onFocus={(e) => e.currentTarget.select()}
+          onFocus={(e) => { e.stopPropagation(); e.currentTarget.select(); }}
+          onBlur={handleSave}
           defaultValue={panel.title ?? ""}
           placeholder={title}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); handleSave(); }
           }}
-          onBlur={handleSave}
           onPointerDown={(e) => e.stopPropagation()}
           className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground/60"
         />
