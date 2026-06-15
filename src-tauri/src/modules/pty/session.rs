@@ -8,9 +8,10 @@ use portable_pty::{native_pty_system, ChildKiller, MasterPty, PtySize};
 use tauri::ipc::{Channel, Response};
 use tauri::{AppHandle, Emitter};
 
-use super::agent_detect::AgentDetector;
+use super::agent_detect::{AgentDetector, Transition};
 use super::da_filter::DaFilter;
 use super::shell_init;
+use crate::modules::agent::session_store;
 use crate::modules::workspace::WorkspaceEnv;
 
 const AGENT_EVENT: &str = "kex:agent-signal";
@@ -185,6 +186,13 @@ pub fn spawn(
                             log::debug!("pty first byte after {}ms", spawn_at.elapsed().as_millis());
                         }
                         agent_detect.process(&buf[..n], |t| {
+                            if let Transition::SessionStart {
+                                ref panel_id, ref agent, ref session_id,
+                                ref transcript_path, ref cwd,
+                            } = t {
+                                session_store::record_session(panel_id, agent, session_id, transcript_path, cwd);
+                                return;
+                            }
                             let _ = app_reader.emit(AGENT_EVENT, t.into_signal(id));
                         });
                         filtered.clear();

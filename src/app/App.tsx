@@ -11,7 +11,7 @@ import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
 import { isMarkdownPath } from "@/lib/utils";
 import { AgentNotificationsBridge } from "@/modules/agents";
-import { loadRestorePlans } from "@/modules/agents/lib/agentSessionRestore";
+import { loadRestorePlans, pruneOrphanedPlans } from "@/modules/agents/lib/agentSessionRestore";
 import {
   CommandPalette,
   createCommandItems,
@@ -157,7 +157,17 @@ export default function App() {
   }, [workspaces, activeWorkspaceId]);
 
   useEffect(() => {
-    void loadRestorePlans();
+    void loadRestorePlans().then(() => {
+      const knownIds = new Set<string>();
+      for (const ws of workspacesRef.current) {
+        for (const pane of allPanes(ws.paneTree)) {
+          for (const panel of pane.panels) {
+            if (panel.kind === "terminal") knownIds.add(panel.id);
+          }
+        }
+      }
+      pruneOrphanedPlans(knownIds);
+    });
   }, []);
 
   // Focus the active terminal when the active workspace changes (tab/workspace switch).

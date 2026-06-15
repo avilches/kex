@@ -4,9 +4,9 @@ export type AgentSource = "terminal" | "local";
 
 export type AgentSignalKind =
   | "started"
-  | "working"
-  | "attention"
-  | "finished"
+  | "UserPromptSubmit"
+  | "Notification"
+  | "Stop"
   | "exited";
 
 export type AgentSignal = {

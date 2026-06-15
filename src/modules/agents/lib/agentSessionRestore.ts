@@ -41,3 +41,13 @@ export async function detachAgentSession(panelId: string): Promise<void> {
   restorePlans?.delete(panelId);
   await invoke("agent_detach_session", { panelId });
 }
+
+export function pruneOrphanedPlans(knownPanelIds: Set<string>): void {
+  if (!restorePlans) return;
+  for (const panelId of restorePlans.keys()) {
+    if (!knownPanelIds.has(panelId)) {
+      console.debug(`[agent-session] pruning orphaned plan panel=${panelId} (panel no longer in workspace)`);
+      void detachAgentSession(panelId);
+    }
+  }
+}

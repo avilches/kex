@@ -13,7 +13,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { setAgentNotifications } from "@/modules/settings/store";
 import { AgentIcon } from "../lib/agentIcon";
 import type { AgentNotification, AgentStatus } from "../lib/types";
@@ -139,6 +139,10 @@ export function NotificationBell({ onActivate }: Props) {
       .catch(() => setHooksReady(null));
   };
 
+  useEffect(() => {
+    refreshHooks();
+  }, []);
+
   const onOpenChange = (next: boolean) => {
     setOpen(next);
     if (next) {
@@ -238,7 +242,7 @@ export function NotificationBell({ onActivate }: Props) {
           </div>
         )}
 
-        <div className="border-t flex justify-center border-border/60 p-1">
+        <div className="border-t border-border/60 p-1">
           {hooksReady ? (
             <div className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-muted-foreground">
               <HugeiconsIcon
@@ -247,7 +251,11 @@ export function NotificationBell({ onActivate }: Props) {
                 strokeWidth={1.75}
                 className="text-primary"
               />
-              Claude Code alerts enabled
+              <span>
+                <span className="font-medium text-foreground">Claude Code hooks active</span>
+                <br />
+                Session restore and tab notifications enabled
+              </span>
             </div>
           ) : (
             <button
@@ -262,7 +270,14 @@ export function NotificationBell({ onActivate }: Props) {
                 strokeWidth={1.75}
                 className={cn(installing && "animate-spin")}
               />
-              {installing ? "Enabling..." : "Enable Claude Code alerts"}
+              <span className="text-left">
+                <span className="block font-medium">
+                  {installing ? "Installing hooks..." : "Install Claude Code hooks for Kex"}
+                </span>
+                <span className="block text-[11px]">
+                  Session restore on close · Tab notifications
+                </span>
+              </span>
             </button>
           )}
           {hooksReady === false && !installing ? (

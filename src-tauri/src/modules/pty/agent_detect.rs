@@ -24,13 +24,37 @@ enum Status {
     Waiting,
 }
 
+// OSC 777;kex-session;<panel_id>;<agent>;<session_id>;<transcript_path>;<cwd>
+// All five fields are percent-encoded (jq @uri) so they're safe to delimit with ';'.
+const KEX_SESSION_MARKER: &[u8] = b"kex-session;";
+
+fn percent_decode(s: &[u8]) -> String {
+    let mut out = Vec::with_capacity(s.len());
+    let mut i = 0;
+    while i < s.len() {
+        if s[i] == b'%' && i + 2 < s.len() {
+            let hi = (s[i + 1] as char).to_digit(16);
+            let lo = (s[i + 2] as char).to_digit(16);
+            if let (Some(h), Some(l)) = (hi, lo) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(s[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Transition {
     Started { agent: String },
-    Working,
-    Attention,
-    Finished,
+    UserPromptSubmit,
+    Notification,
+    Stop,
     Exited,
+    SessionStart { panel_id: String, agent: String, session_id: String, transcript_path: String, cwd: String },
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -46,10 +70,11 @@ impl Transition {
             Transition::Started { agent } => {
                 AgentSignal { id, kind: "started", agent: Some(agent) }
             }
-            Transition::Working => AgentSignal { id, kind: "working", agent: None },
-            Transition::Attention => AgentSignal { id, kind: "attention", agent: None },
-            Transition::Finished => AgentSignal { id, kind: "finished", agent: None },
+            Transition::UserPromptSubmit => AgentSignal { id, kind: "UserPromptSubmit", agent: None },
+            Transition::Notification => AgentSignal { id, kind: "Notification", agent: None },
+            Transition::Stop => AgentSignal { id, kind: "Stop", agent: None },
             Transition::Exited => AgentSignal { id, kind: "exited", agent: None },
+            Transition::SessionStart { .. } => unreachable!("SessionStart is handled before into_signal"),
         }
     }
 }
@@ -150,6 +175,11 @@ impl AgentDetector {
             Some(i) => (&body[..i], &body[i + 1..]),
             None => (&body[..], &body[0..0]),
         };
+        log::trace!(
+            "[osc] ps={} pt={}",
+            String::from_utf8_lossy(ps),
+            String::from_utf8_lossy(pt)
+        );
         match ps {
             b"133" => self.handle_osc133(pt, emit),
             // OSC 9;4 is taskbar progress, not a notification.
@@ -161,33 +191,62 @@ impl AgentDetector {
 
     fn handle_osc777<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
         if let Some(event) = pt.strip_prefix(KEX_MARKER) {
+            log::debug!("[osc777] kex event: {}", String::from_utf8_lossy(event));
             // Self-arms so notifications work even when no shell preexec fired
             // (bash, Windows, tmux, wrappers).
             match event {
-                b"working" => {
+                b"UserPromptSubmit" => {
                     self.ensure_armed(emit);
                     self.set_working(emit);
                 }
-                b"attention" => {
+                b"Notification" => {
                     self.ensure_armed(emit);
                     self.status = Status::Waiting;
-                    emit(Transition::Attention);
+                    emit(Transition::Notification);
                 }
-                b"finished" => {
+                b"Stop" => {
                     self.ensure_armed(emit);
                     self.status = Status::Waiting;
-                    emit(Transition::Finished);
+                    emit(Transition::Stop);
                     // Disarm so the session is truly over. If the user sends
                     // another prompt without exiting claude, the next working
                     // OSC will auto-arm and emit Started, creating a fresh
                     // session on the JS side.
                     self.disarm();
                 }
-                _ => {}
+                _ => {
+                    log::debug!("[osc777] unknown kex event, ignored");
+                }
             }
             return;
         }
+        if let Some(data) = pt.strip_prefix(KEX_SESSION_MARKER) {
+            log::debug!("[osc777] kex-session payload: {}", String::from_utf8_lossy(data));
+            self.handle_kex_session(data, emit);
+            return;
+        }
+        log::debug!("[osc777] generic attention: {}", String::from_utf8_lossy(pt));
         self.generic_attention(emit);
+    }
+
+    fn handle_kex_session<F: FnMut(Transition)>(&mut self, data: &[u8], emit: &mut F) {
+        // Format: <panel_id>;<agent>;<session_id>;<transcript_path>;<cwd>
+        // All fields are percent-encoded.
+        let parts: Vec<&[u8]> = data.splitn(5, |&b| b == b';').collect();
+        if parts.len() != 5 {
+            log::debug!("[agent-detect] kex-session: malformed payload ({} parts)", parts.len());
+            return;
+        }
+        let panel_id = percent_decode(parts[0]);
+        let agent = percent_decode(parts[1]);
+        let session_id = percent_decode(parts[2]);
+        let transcript_path = percent_decode(parts[3]);
+        let cwd = percent_decode(parts[4]);
+        if panel_id.is_empty() || session_id.is_empty() {
+            log::debug!("[agent-detect] kex-session: missing panel_id or session_id");
+            return;
+        }
+        emit(Transition::SessionStart { panel_id, agent, session_id, transcript_path, cwd });
     }
 
     fn handle_osc133<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
@@ -198,12 +257,14 @@ impl AgentDetector {
                 }
                 let cmd = pt.strip_prefix(b"C;").unwrap_or(b"");
                 if let Some(agent) = self.match_agent(cmd) {
+                    log::debug!("[osc133] C armed: agent={agent} cmd={}", String::from_utf8_lossy(cmd));
                     self.armed = true;
                     self.status = Status::Working;
                     emit(Transition::Started { agent });
                 }
             }
             Some(b'D') if self.armed => {
+                log::debug!("[osc133] D exited");
                 self.disarm();
                 emit(Transition::Exited);
             }
@@ -213,6 +274,7 @@ impl AgentDetector {
 
     fn ensure_armed<F: FnMut(Transition)>(&mut self, emit: &mut F) {
         if !self.armed {
+            log::debug!("[osc777] auto-arming (no OSC 133;C seen)");
             self.armed = true;
             self.status = Status::Working;
             emit(Transition::Started { agent: "claude".into() });
@@ -222,14 +284,14 @@ impl AgentDetector {
     fn set_working<F: FnMut(Transition)>(&mut self, emit: &mut F) {
         if self.status != Status::Working {
             self.status = Status::Working;
-            emit(Transition::Working);
+            emit(Transition::UserPromptSubmit);
         }
     }
 
     fn generic_attention<F: FnMut(Transition)>(&mut self, emit: &mut F) {
         if self.armed {
             self.status = Status::Waiting;
-            emit(Transition::Attention);
+            emit(Transition::Notification);
         }
     }
 
@@ -315,18 +377,18 @@ mod tests {
     fn kex_marker_drives_status() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;attention")), vec![Transition::Attention]);
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;working")), vec![Transition::Working]);
-        assert!(run(&mut d, &osc("777;notify;Kex;working")).is_empty());
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;finished")), vec![Transition::Finished]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;Notification")), vec![Transition::Notification]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![Transition::UserPromptSubmit]);
+        assert!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")).is_empty());
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;Stop")), vec![Transition::Stop]);
     }
 
     #[test]
     fn kex_marker_auto_arms_without_preexec() {
         let mut d = AgentDetector::new();
         assert_eq!(
-            run(&mut d, &osc("777;notify;Kex;attention")),
-            vec![started("claude"), Transition::Attention]
+            run(&mut d, &osc("777;notify;Kex;Notification")),
+            vec![started("claude"), Transition::Notification]
         );
     }
 
@@ -335,8 +397,8 @@ mod tests {
         let mut d = AgentDetector::new();
         assert!(run(&mut d, &osc("777;notify;Other;ready")).is_empty());
         run(&mut d, &osc("133;C;codex"));
-        assert_eq!(run(&mut d, &osc("777;notify;Codex;ready")), vec![Transition::Attention]);
-        assert_eq!(run(&mut d, &osc("9;needs you")), vec![Transition::Attention]);
+        assert_eq!(run(&mut d, &osc("777;notify;Codex;ready")), vec![Transition::Notification]);
+        assert_eq!(run(&mut d, &osc("9;needs you")), vec![Transition::Notification]);
         assert!(run(&mut d, &osc("9;4;1;50")).is_empty());
     }
 
@@ -384,12 +446,12 @@ mod tests {
     fn disarms_after_finished_so_next_prompt_restarts() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;finished")), vec![Transition::Finished]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;Stop")), vec![Transition::Stop]);
         // Disarmed: 133;D is a no-op (armed=false)
         assert!(run(&mut d, &osc("133;D;0")).is_empty());
-        // Next working auto-arms again → only Started (ensure_armed already sets
+        // Next UserPromptSubmit auto-arms again → only Started (ensure_armed already sets
         // status=Working so set_working is a no-op immediately after)
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;working")), vec![started("claude")]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![started("claude")]);
     }
 
     #[test]
@@ -400,6 +462,6 @@ mod tests {
         seq.extend(std::iter::repeat_n(b'x', OSC_MAX + 100));
         seq.extend_from_slice(&[ESC, ST_FINAL]);
         assert!(run(&mut d, &seq).is_empty());
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;attention")), vec![Transition::Attention]);
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;Notification")), vec![Transition::Notification]);
     }
 }

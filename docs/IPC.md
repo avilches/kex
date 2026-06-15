@@ -130,42 +130,4 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 
 ## Terminal agent notification protocol
 
-Kex passively monitors terminal panels for coding agents (Claude Code, Codex, etc.) using OSC sequences. No configuration is required — detection arms itself automatically once a compatible agent is detected.
-
-### How it works
-
-1. Claude Code (or a compatible agent) installs Kex hooks via `agent_enable_claude_hooks`. These hooks emit an `OSC 777` marker through the hook's `terminalSequence` field (hooks lost `/dev/tty` access in Claude Code v2.1.139).
-2. The OSC 777 marker self-arms `agent_detect.rs` in the PTY byte reader. The detector tracks the agent's state via subsequent OSC sequences.
-3. OSC 133;C (command prompt shown) arms the detector. Subsequent hook events transition the state machine: `started` / `working` / `attention` (needs user input) / `finished` / `exited`.
-4. The frontend `AgentNotificationsBridge.tsx` maps these state transitions to the notification router (`lib/route.ts`):
-   - Panel is focused and visible: suppress (user is already watching)
-   - Window is not focused: send an OS notification
-   - Window is focused but the panel is hidden: show a Sonner toast
-5. The `NotificationBell` in the header aggregates status across all active terminal agent sessions.
-
-### Zero cost when idle
-
-The detection logic runs entirely on the PTY byte filter. When no agent is running, no extra work is done. There are no polling timers or background requests.
-
-### Installing hooks
-
-Hooks can be installed from within the app (the notification bell popover shows a "Set up Claude Code" prompt if hooks are not yet installed). The installer (`agent_enable_claude_hooks`):
-- Reads the existing Claude Code `settings.json` atomically
-- Injects the `kex:agent-signal` hook entries without overwriting unrelated settings
-- Also injects `SessionStart` and `SessionEnd` hooks that write to `~/.config/kex/agent-sessions.json` (see below)
-- Is idempotent — re-running it on an already-configured installation is safe
-
-### Agent session persistence
-
-In addition to the live notification hooks, `agent_enable_claude_hooks` installs two Claude Code lifecycle hooks:
-
-- **`SessionStart`**: writes `{ panelId, agent, sessionId, cwd, state: "running" }` to `~/.config/kex/agent-sessions.json` (atomic `mktemp` + `mv`; uses `jq` if available, raw JSON otherwise).
-- **`SessionEnd`**: updates `state` to `"exited"` for the matching `panelId`.
-
-The hook script reads `KEX_PANEL_ID` from the environment — a UUID injected into every PTY shell environment at spawn time (see `pty_open`).
-
-On the next Kex launch, `agent_session_restore_plan` reads the store, skips exited sessions, locates the agent's JSONL transcript (e.g. `~/.claude/projects/*/<sessionId>.jsonl`) to read the session's recorded `cwd`, verifies the directory still exists, and returns one `RestorePlan` per recoverable session. The frontend then types the appropriate resume command (e.g. `claude --resume '<id>'`) into the terminal 200ms after the PTY opens.
-
-`CLAUDE_CONFIG_DIR` is respected: if set, the hook writes there instead of `~/.config/kex/`, and the restore logic searches for transcripts under that directory.
-
-See `docs/AGENT_SESSION_RESTORE.md` for the complete design.
+Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) using OSC sequences emitted by the shell and Claude Code hooks. See `docs/NOTIFICATIONS.md` for the full OSC sequence reference, detector state machine, and notification routing. See `docs/AGENT_SESSION_RESTORE.md` for session persistence and restore.

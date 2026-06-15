@@ -41,18 +41,17 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_PANEL_ID" ] && "$HOME/.config/kex/hooks/session.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/session.sh`, marker: `kex-session-v1`):
+The script (`~/.config/kex/hooks/session.sh`, marker: `kex-session-v2`):
 
 1. Reads `KEX_PANEL_ID` from the environment. If unset, exits silently (panel is not managed by Kex).
 2. Reads the JSON event from stdin and extracts `session_id`, `transcript_path`, and `cwd` via `jq`.
-3. Atomically writes/updates `~/.config/kex/agent-sessions.json` using `jq + mktemp + mv`.
-4. Sets `state: "idle"` for this panel — sessions stay `"idle"` in the store until the panel is explicitly detached.
+3. Emits `OSC 777;kex-session;<panel_id>;claude;<session_id>;<transcript_path>;<cwd>` through `terminalSequence`
+   (hooks lost `/dev/tty` access in Claude Code v2.1.139; all fields are percent-encoded with `jq @uri`).
+4. Rust `agent_detect.rs` intercepts the OSC in the PTY byte reader and calls `session_store::record_session`.
 
-### SessionEnd hook
-
-Registered in Claude Code's `SessionEnd` event but **intentionally a no-op**: the hook fires when the PTY dies
-(including when Kex itself closes), not only when the user exits Claude. Writing `"exited"` here would prevent restore
-on the next launch. Sessions are cleared only via "Detach Claude" in the tab context menu.
+There is no `SessionEnd` hook. Sessions are cleared from the store only when the agent exits (`OSC 133;D` →
+`agent_detach_session`) or the user detaches manually. Panels always close while in "idle" state because the webview
+is destroyed before the PTYs finish shutting down, so a single store file is sufficient.
 
 ### CLAUDE_CONFIG_DIR support
 
@@ -61,9 +60,9 @@ If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcri
 
 ---
 
-## Session store format
+## Session store
 
-`~/.config/kex/agent-sessions.json`
+`~/Library/Application Support/app.betauer.kex/agent-sessions.json`
 
 ```json
 {
@@ -74,31 +73,15 @@ If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcri
       "session_id": "<claude-session-id>",
       "cwd_launch": "/home/user/project",
       "transcript_path": "/home/user/.claude/projects/.../session.jsonl",
-      "state": "idle",
       "updated_at": 1718000000
     }
   }
 }
 ```
 
-`state` is written as `"idle"` by the hook and stays `"idle"` until the panel entry is removed via detach. The restore
-planner skips entries where `state == "exited"` (set only by future mechanisms, not the current hook).
+Initialized via `session_store::init(data_dir)` in `lib.rs` `setup()` using a `OnceLock<PathBuf>`.
 
-Supported agent values: `"claude"`, `"codex"`, `"gemini"`. Unknown values generate a bare `cd '<cwd>'` restore command.
-
----
-
-## Restore candidates snapshot
-
-`~/.config/kex/restore-candidates.json`
-
-Written by `snapshot_idle_sessions()` just before the last window closes (`on_window_event::Destroyed` in `lib.rs`).
-Contains only the panels whose `state == "idle"` at that moment — a snapshot that bypasses the race where `SessionEnd`
-might fire in the seconds after the PTY dies and overwrite state.
-
-`load_restore_plan()` consumes (reads + deletes) this file first. Deletion prevents double-restore across repeated
-launches without a new session in between. If the file is absent (SIGKILL, crash, first launch), the planner falls
-back to reading `agent-sessions.json` directly and filtering `state != "exited"`.
+Supported agent values: `"claude"`, `"codex"`, `"gemini"`. Unknown values produce an empty `resume_cmd`.
 
 ---
 
@@ -108,34 +91,39 @@ back to reading `agent-sessions.json` directly and filtering `state != "exited"`
 
 ### Algorithm
 
-For each eligible session:
+For each session in the store:
 
 1. **Find the JSONL transcript.** Checks the stored `transcript_path` first, then globs
    `~/.claude/projects/**/<sessionId>.jsonl` (or `CLAUDE_CONFIG_DIR`).
-2. **Read the launch cwd.** Opens the JSONL with `BufReader` and reads only as many lines as needed to find the first
-   `cwd` field. Avoids loading potentially large transcripts into memory.
-3. **Verify the directory exists.** If the cwd is missing or was deleted, the plan has an empty `resumeCmd` (signals a
-   restore error in the tab UI).
-4. **Build the resume command.**
-   - `claude`: `cd '<cwd>' && claude --resume '<sessionId>'`
-   - `codex`: `cd '<cwd>' && codex resume --last`
-   - `gemini`: `cd '<cwd>' && gemini --resume '<sessionId>'`
-   - others: `cd '<cwd>'`
+2. **Skip if no JSONL.** If the transcript does not exist, the user never sent a message in this session —
+   `claude --resume` would fail. The entry is removed from the store and excluded from the plan.
+3. **Read the launch cwd.** Opens the JSONL with `BufReader` and reads only as many lines as needed to find the first
+   `cwd` field, avoiding loading large transcripts into memory.
+4. **Verify the directory exists.** If the cwd is missing or was deleted, the plan carries a non-empty `error_reason`
+   and an empty `resume_cmd` (signals a restore error in the tab UI). Entry is removed from the store.
+5. **Build the resume command.**
+   - `claude`: `claude --resume '<sessionId>'`
+   - `codex`: `codex resume --last`
+   - `gemini`: `gemini --resume '<sessionId>'`
+   - others: empty string
+
+The PTY is spawned with `plan.cwd` as the initial working directory, so no `cd` prefix is needed in the command.
 
 ### RestorePlan type
 
 ```rust
 #[serde(rename_all = "camelCase")]
 pub struct RestorePlan {
-    pub panel_id: String,   // → "panelId" on the wire
+    pub panel_id: String,    // → "panelId" on the wire
     pub agent: String,
-    pub resume_cmd: String, // → "resumeCmd" on the wire
+    pub resume_cmd: String,  // → "resumeCmd" on the wire; empty signals error
     pub cwd: String,
+    pub error_reason: String,
 }
 ```
 
-The `rename_all = "camelCase"` is required — the frontend Map is keyed by `panelId` and would silently miss all
-sessions if it received `panel_id` instead.
+`rename_all = "camelCase"` is required — the frontend Map is keyed by `panelId` and would silently miss all sessions
+if it received `panel_id` instead.
 
 ---
 
@@ -159,7 +147,7 @@ if plan = consumeRestorePlan(leafId):
     startRestored(leafId, plan.agent)
     setTimeout(() => pty.write(plan.resumeCmd + "\r"), 200)
   else:
-    setRestoreError(leafId)
+    setRestoreError(leafId, plan.errorReason)
 ```
 
 The 200ms delay lets the shell finish its init sequence before the command is injected.
@@ -168,41 +156,16 @@ The 200ms delay lets the shell finish its init sequence before the command is in
 
 ## agentStore extensions
 
-`AgentSession` gains two fields:
+`AgentSession` has two restore-specific fields:
 
 - `restored: boolean` — true while the session was opened via restore (cleared on the first real OSC event).
-- `restoreError: boolean` — true if the plan had an empty `resumeCmd` (cwd missing or transcript not found).
+- `restoreError: boolean` / `restoreErrorReason?: string` — set if the plan had an empty `resumeCmd`.
 
 Actions:
 
-- `startRestored(panelId, tabId, agent)` — creates a minimal session record with `restored: true`.
+- `startRestored(panelId, tabId, agent)` — creates a session record with `restored: true`, `status: "working"`.
 - `setRestoreError(panelId, tabId, agent)` — sets `restoreError: true`.
 - `setStatus` (existing) — clears `restored` on the first real state transition.
-
----
-
-## Tab UI
-
-`PaneTabBar` / `DraggableTab` reads from `agentStore`:
-
-| Condition | Icon | Title | Status dot |
-|---|---|---|---|
-| Agent working | `✦` | `agentname · dirname` | white spinner |
-| Agent waiting for input | `✦` | `agentname · dirname` | amber dot |
-| Agent finished / idle | panel icon | panel title | none |
-| Agent restored, no error | `✦` | `agentname · dirname` | white spinner |
-| Restore error | `⚠` | `agentname · dirname` (red) | red static dot |
-| No agent | panel icon | panel title | none |
-
-`dirname` is the last path segment of `panel.cwd`.
-
-### Indicator lifecycle
-
-The spinner or dot is cleared by the first of these events to arrive:
-
-- `finished` signal — agent's `Stop` hook fired normally.
-- `exited` signal — OSC 133;D (shell command ended) or PTY closed.
-- User types anything in the terminal — `writeToPty` in `useTerminalSession` calls `store.finish()` when a session is active. This ensures the indicator disappears immediately after Ctrl+C or any abnormal termination, without a timer.
 
 ---
 
@@ -210,11 +173,10 @@ The spinner or dot is cleared by the first of these events to arrive:
 
 | Case | Behaviour |
 |---|---|
-| `agentNotifications` disabled | Hooks not installed; store file is not written; `load_restore_plan` returns `[]` |
-| Session ended cleanly and user detached | Panel removed from store; not included in plan |
-| JSONL transcript missing | `RestorePlan.resumeCmd` is empty; tab shows `⚠` restore error |
-| cwd deleted between sessions | Same as above |
+| `agentNotifications` disabled | Hooks not installed; store not written; `load_restore_plan` returns `[]` |
+| Agent exited cleanly | `agent_detach_session` removes panel from store; not in plan |
+| JSONL transcript missing (no messages sent) | Entry removed from store; excluded from plan entirely |
+| cwd deleted between sessions | `resumeCmd` empty, `errorReason` set; tab shows `⚠` restore error |
 | `KEX_PANEL_ID` not set in shell | Hook exits silently; session not recorded |
 | `agent_session_restore_plan` IPC fails | `loadRestorePlans` catches and sets an empty Map; no crash |
-| Resume command fails inside terminal | User sees the error in the terminal; `⚠` indicator stays until user types |
-| SIGKILL / crash (no window close event) | `snapshot_idle_sessions` does not run; fallback reads `agent-sessions.json` directly |
+| Resume command fails inside terminal | User sees the error in the terminal; `⚠` stays until user types |

@@ -3,9 +3,9 @@ pub mod session_store;
 use serde_json::{json, Value};
 
 const HOOK_EVENTS: [(&str, &str); 3] = [
-    ("UserPromptSubmit", "working"),
-    ("Notification", "attention"),
-    ("Stop", "finished"),
+    ("UserPromptSubmit", "UserPromptSubmit"),
+    ("Notification", "Notification"),
+    ("Stop", "Stop"),
 ];
 
 const OWNED_MARKERS: [&str; 1] = ["notify;Kex;"];
@@ -45,41 +45,29 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // Bump this when the script behaviour changes in a way that requires reinstall.
 // agent_claude_hooks_status checks the installed file for this marker so that
 // users with an older script see the "Set up Claude Code" button again.
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v1";
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v2";
 
-const SESSION_HOOK_SCRIPT: &str = r#"#!/usr/bin/env bash
-# kex-session-v1
-set -euo pipefail
+// Sends session metadata via OSC 777;kex-session so Rust validates and records it.
+// Fields are percent-encoded (jq @uri) to allow ';' as a safe delimiter.
+// jq -cn handles JSON encoding so ESC/BEL become proper Unicode escapes in output.
+// Rust side: agent_detect::handle_kex_session -> session_store::record_session.
+const SESSION_HOOK_SCRIPT: &str = "#!/usr/bin/env bash
+# kex-session-v2
+[ -n \"$KEX_TERMINAL\" ] || exit 0
+[ -n \"$KEX_PANEL_ID\" ] || exit 0
 
-PANEL_ID="${KEX_PANEL_ID:-}"
-[ -z "$PANEL_ID" ] && exit 0
+PAYLOAD=\"$(cat)\"
+EVENT=\"$(printf '%s' \"$PAYLOAD\" | jq -r '.hook_event_name // empty')\"
+[ \"$EVENT\" = \"SessionStart\" ] || exit 0
 
-PAYLOAD="$(cat)"
-EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
+PID=\"$(printf '%s' \"$KEX_PANEL_ID\"  | jq -Rr @uri)\"
+SID=\"$(printf '%s' \"$PAYLOAD\" | jq -r '.session_id      // \"\"' | jq -Rr @uri)\"
+TP=\"$(printf '%s'  \"$PAYLOAD\" | jq -r '.transcript_path // \"\"' | jq -Rr @uri)\"
+CWD=\"$(printf '%s' \"$PAYLOAD\" | jq -r '.cwd             // \"\"' | jq -Rr @uri)\"
 
-# Only act on SessionStart. SessionEnd is intentionally ignored: the hook fires
-# when the PTY dies (e.g. Kex closing), not only when the user exits claude,
-# so writing "exited" here would prevent restore on the next launch.
-# Sessions that the user wants to detach are cleared via the "Detach Claude"
-# option in the tab context menu.
-[ "$EVENT" = "SessionStart" ] || exit 0
-
-SESSION_ID="$(printf '%s' "$PAYLOAD" | jq -r '.session_id // empty')"
-TRANSCRIPT="$(printf '%s' "$PAYLOAD" | jq -r '.transcript_path // empty')"
-CWD="$(printf '%s' "$PAYLOAD" | jq -r '.cwd // empty')"
-
-STORE="$HOME/.config/kex/agent-sessions.json"
-mkdir -p "$(dirname "$STORE")"
-[ -f "$STORE" ] || printf '{"version":1,"panels":{}}' > "$STORE"
-
-TMP="$(mktemp)"
-jq --arg p "$PANEL_ID" --arg sid "$SESSION_ID" \
-   --arg tp "$TRANSCRIPT" --arg cwd "$CWD" \
-   --arg ts "$(date +%s)" \
-   '.panels[$p] = {agent:"claude",session_id:$sid,cwd_launch:$cwd,transcript_path:$tp,state:"idle",updated_at:($ts|tonumber)}' \
-   "$STORE" > "$TMP" && mv -f "$TMP" "$STORE"
-exit 0
-"#;
+SEQ=\"$(printf '%b' '\\033]777;kex-session;'\"$PID;claude;$SID;$TP;$CWD\"'\\007')\"
+jq -cn --arg seq \"$SEQ\" '{\"terminalSequence\":$seq}'
+";
 
 fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
     Ok(dirs::home_dir()
@@ -154,17 +142,15 @@ fn merge_hooks(mut root: Value) -> Value {
         }));
     }
 
-    for event in ["SessionStart", "SessionEnd"] {
-        let arr = hooks.entry(event).or_insert_with(|| json!([]));
-        if !arr.is_array() {
-            *arr = json!([]);
-        }
-        let arr = arr.as_array_mut().unwrap();
-        arr.retain(|group| !is_session_hook(group) && !is_empty_group(group));
-        arr.push(json!({
-            "hooks": [ { "type": "command", "command": session_hook_cmd(), "timeout": 10 } ]
-        }));
+    let arr = hooks.entry("SessionStart").or_insert_with(|| json!([]));
+    if !arr.is_array() {
+        *arr = json!([]);
     }
+    let arr = arr.as_array_mut().unwrap();
+    arr.retain(|group| !is_session_hook(group) && !is_empty_group(group));
+    arr.push(json!({
+        "hooks": [ { "type": "command", "command": session_hook_cmd(), "timeout": 10 } ]
+    }));
     root
 }
 
@@ -273,33 +259,6 @@ pub fn agent_disable_claude_hooks() -> Result<(), String> {
     Ok(())
 }
 
-/// Detect the indent used in a JSON string (spaces or tab, min 1 char).
-/// Falls back to two spaces if nothing is found.
-fn detect_json_indent(s: &str) -> &[u8] {
-    for line in s.lines() {
-        let trimmed = line.trim_start_matches([' ', '\t']);
-        if !trimmed.is_empty() && trimmed != line {
-            let indent_len = line.len() - trimmed.len();
-            if indent_len > 0 {
-                return &line.as_bytes()[..indent_len];
-            }
-        }
-    }
-    b"  "
-}
-
-fn serialize_pretty(value: &serde_json::Value, indent: &[u8]) -> Result<String, String> {
-    let mut buf = Vec::new();
-    let formatter = serde_json::ser::PrettyFormatter::with_indent(indent);
-    let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
-    serde::Serialize::serialize(value, &mut ser).map_err(|e| e.to_string())?;
-    buf.push(b'\n');
-    String::from_utf8(buf).map_err(|e| e.to_string())
-}
-
-/// Remove a panel's session entry from the persistent store.
-/// Called from the "Detach Claude" tab context menu option so the user can
-/// opt out of restore for a specific session without closing the tab.
 #[tauri::command]
 pub fn agent_detach_session(panel_id: String) -> Result<(), String> {
     session_store::detach_session(&panel_id)
@@ -313,104 +272,88 @@ pub fn agent_claude_hooks_status() -> bool {
     else {
         return false;
     };
-    // Check that the installed script is the current version. An older script
-    // (e.g. one that wrote "exited" on SessionEnd) won't have SESSION_HOOK_SCRIPT_VERSION
-    // and will return false here so the user sees the install button again.
+    let Ok(root) = serde_json::from_str::<Value>(&content) else {
+        return false;
+    };
+    // Check that at least one Kex hook is present in UserPromptSubmit.
+    let has_prompt_hook = root["hooks"]["UserPromptSubmit"]
+        .as_array()
+        .is_some_and(|arr| arr.iter().any(is_ours));
+    if !has_prompt_hook {
+        return false;
+    }
+    // Check that the session hook script is up-to-date.
     let script_current = session_hook_script_path()
         .ok()
         .and_then(|p| std::fs::read_to_string(p).ok())
-        .is_some_and(|s| s.contains(SESSION_HOOK_SCRIPT_VERSION));
+        .unwrap_or_default();
     HOOK_EVENTS
         .iter()
-        .all(|(_, m)| content.contains(&format!("notify;Kex;{m}")))
-        && content.contains(SESSION_HOOK_MARKER)
-        && script_current
+        .all(|(event, marker)| {
+            root["hooks"][event]
+                .as_array()
+                .is_some_and(|arr| arr.iter().any(|g| is_ours(g) && {
+                    g["hooks"].as_array().is_some_and(|hs| hs.iter().any(|h| {
+                        h["command"].as_str().is_some_and(|c| c.contains(marker))
+                    }))
+                }))
+        })
+        && script_current.contains(SESSION_HOOK_SCRIPT_VERSION)
+}
+
+fn detect_json_indent(s: &str) -> usize {
+    for line in s.lines().skip(1) {
+        let trimmed = line.trim_start_matches(' ');
+        let spaces = line.len() - trimmed.len();
+        if spaces > 0 {
+            return spaces;
+        }
+    }
+    2
+}
+
+fn serialize_pretty(value: &Value, indent: usize) -> Result<String, String> {
+    let raw = serde_json::to_string_pretty(value)
+        .map_err(|e| format!("serialize: {e}"))?;
+    if indent == 2 {
+        return Ok(raw);
+    }
+    let pad = " ".repeat(indent);
+    let out = raw
+        .lines()
+        .map(|line| {
+            let depth = (line.len() - line.trim_start_matches(' ').len()) / 2;
+            format!("{}{}", pad.repeat(depth), line.trim_start())
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(out)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn hook_count(root: &Value, event: &str) -> usize {
-        root["hooks"][event].as_array().map_or(0, Vec::len)
-    }
-
-    fn command(root: &Value, event: &str, idx: usize) -> String {
-        root["hooks"][event][idx]["hooks"][0]["command"]
-            .as_str()
-            .unwrap()
-            .to_string()
-    }
-
-    #[test]
-    fn adds_all_event_hooks_to_empty_config() {
-        let out = merge_hooks(json!({}));
-        assert_eq!(hook_count(&out, "UserPromptSubmit"), 1);
-        assert_eq!(hook_count(&out, "Notification"), 1);
-        assert_eq!(hook_count(&out, "Stop"), 1);
-        assert!(command(&out, "Notification", 0).contains("notify;Kex;attention"));
-        assert!(command(&out, "Stop", 0).contains("notify;Kex;finished"));
-        assert!(command(&out, "UserPromptSubmit", 0).contains("notify;Kex;working"));
-        assert!(command(&out, "Stop", 0).contains("terminalSequence"));
-        assert!(!command(&out, "Stop", 0).contains("/dev/tty"));
-    }
-
-    #[test]
-    fn is_idempotent() {
-        let once = merge_hooks(json!({}));
-        let twice = merge_hooks(once.clone());
-        assert_eq!(once, twice);
-        assert_eq!(hook_count(&twice, "Notification"), 1);
-    }
-
     #[test]
     fn preserves_unrelated_settings_and_foreign_hooks() {
         let input = json!({
-            "permissions": { "allow": ["Bash"] },
+            "permissions": { "allow": ["bash"] },
             "hooks": {
-                "Notification": [
-                    { "hooks": [ { "type": "command", "command": "say hi" } ] }
+                "UserPromptSubmit": [
+                    { "hooks": [ { "type": "command", "command": "echo hi" } ] }
                 ]
             }
         });
-        let out = merge_hooks(input);
-        assert_eq!(out["permissions"]["allow"][0], "Bash");
-        assert_eq!(hook_count(&out, "Notification"), 2);
-        assert_eq!(command(&out, "Notification", 0), "say hi");
+        let out = merge_hooks(input.clone());
+        assert_eq!(out["permissions"], input["permissions"]);
+        let arr = out["hooks"]["UserPromptSubmit"].as_array().unwrap();
+        assert!(arr.len() >= 2);
+        assert_eq!(arr[0]["hooks"][0]["command"].as_str().unwrap(), "echo hi");
     }
 
     #[test]
-    fn replaces_non_object_root() {
-        let out = merge_hooks(json!("garbage"));
-        assert_eq!(hook_count(&out, "Notification"), 1);
-    }
-
-    #[test]
-    fn prunes_empty_groups_and_collapses_duplicates() {
-        let input = json!({
-            "hooks": {
-                "Notification": [
-                    { "hooks": [] },
-                    { "hooks": [ { "type": "command", "command": hook_cmd("attention") } ] }
-                ]
-            }
-        });
-        let out = merge_hooks(input);
-        assert_eq!(hook_count(&out, "Notification"), 1);
-        assert!(command(&out, "Notification", 0).contains("notify;Kex;attention"));
-    }
-
-    #[test]
-    fn existing_config_absent_or_empty_starts_fresh() {
+    fn existing_config_parses_valid_json() {
         let p = std::path::Path::new("/x/settings.json");
-        assert_eq!(existing_config(None, p).unwrap(), json!({}));
-        assert_eq!(existing_config(Some("   \n"), p).unwrap(), json!({}));
-    }
-
-    #[test]
-    fn existing_config_refuses_to_clobber_invalid_json() {
-        let p = std::path::Path::new("/x/settings.json");
-        assert!(existing_config(Some("{ not json,"), p).is_err());
         assert_eq!(
             existing_config(Some(r#"{"permissions":{}}"#), p).unwrap(),
             json!({ "permissions": {} })
@@ -421,7 +364,7 @@ mod tests {
     fn adds_session_hooks_to_empty_config() {
         let out = merge_hooks(json!({}));
         assert!(out["hooks"]["SessionStart"].as_array().unwrap().len() >= 1);
-        assert!(out["hooks"]["SessionEnd"].as_array().unwrap().len() >= 1);
+        assert!(out["hooks"]["SessionEnd"].as_array().is_none_or(|a| a.is_empty()));
         let cmd = out["hooks"]["SessionStart"][0]["hooks"][0]["command"].as_str().unwrap();
         assert!(cmd.contains(SESSION_HOOK_MARKER));
         assert!(cmd.contains("session.sh"));

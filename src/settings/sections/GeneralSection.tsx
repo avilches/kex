@@ -232,8 +232,8 @@ export function GeneralSection() {
       <div className="flex flex-col gap-2">
         <Label>Agents</Label>
         <SettingRow
-          title="Coding agent notifications"
-          description="Alert when Claude Code or Codex needs input or finishes. Installs hooks in ~/.claude/settings.json. Desktop notification when Kex is unfocused, in-app otherwise."
+          title="Claude Code hooks for Kex"
+          description="Saves and restores sessions on close, and shows notifications in the tab bar when Claude needs input or finishes. Installs hooks in ~/.claude/settings.json."
         >
           <Switch
             checked={agentNotifications}

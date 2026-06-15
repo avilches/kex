@@ -70,26 +70,25 @@ function ensureSession(panelId: string, ctx: Ctx, agent: string): boolean {
 
 function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const panelId = leafIdForPty(sig.id);
-  console.debug("[kex:agent] signal", sig.kind, "pty", sig.id, "agent", sig.agent, "→ panel", panelId);
   if (panelId === null) return;
   const store = useAgentStore.getState();
 
   switch (sig.kind) {
     case "started":
       return;
-    case "working": {
+    case "UserPromptSubmit": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       store.setStatus(panelId, "working");
       return;
     }
-    case "attention": {
+    case "Notification": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       store.setStatus(panelId, "waiting");
       const session = store.sessions[panelId];
       if (session) route(session, "attention", ctx);
       return;
     }
-    case "finished": {
+    case "Stop": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       const session = store.sessions[panelId];
       if (session) route(session, "finished", ctx);
@@ -120,15 +119,14 @@ export function AgentNotificationsBridge({
   useEffect(() => {
     let alive = true;
     let unlisten: (() => void) | undefined;
-    console.debug("[kex:agent] bridge mounting, registering listener");
     listen<AgentSignal>("kex:agent-signal", (e) =>
       handleSignal(e.payload, ctxRef.current),
     )
       .then((u) => {
-        if (alive) { unlisten = u; console.debug("[kex:agent] listener ready"); }
-        else { u(); console.debug("[kex:agent] listener removed (stale mount)"); }
+        if (alive) unlisten = u;
+        else u();
       })
-      .catch((e) => console.debug("[kex:agent] listen failed:", e));
+      .catch((e) => console.error("[kex:agent] listen failed:", e));
     return () => {
       alive = false;
       unlisten?.();

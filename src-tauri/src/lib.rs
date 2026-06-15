@@ -115,10 +115,7 @@ fn create_app_window(
                 mgr.save();
             } else {
                 // Last window closed (app quit) — keep state to restore next launch.
-                // Snapshot idle agent sessions now, before the process exits and PTYs die.
-                // The snapshot survives the SessionEnd hook that fires after PTY death.
-                log::info!("[window] Destroyed {win_label}: last window, snapshotting agent sessions");
-                agent::session_store::snapshot_idle_sessions();
+                log::info!("[window] Destroyed {win_label}: last window, keeping state for restore");
                 if let Some(s) = app_handle.get_webview_window("settings") {
                     let _ = s.close();
                 }
@@ -292,6 +289,9 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(tauri_plugin_log::log::LevelFilter::Info)
+                .level_for("kex_lib::modules::agent", tauri_plugin_log::log::LevelFilter::Debug)
+                .level_for("kex_lib::modules::pty::agent_detect", tauri_plugin_log::log::LevelFilter::Debug)
+                .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview))
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
@@ -300,6 +300,7 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|e| std::io::Error::other(e.to_string()))?;
+            agent::session_store::init(data_dir.clone());
             let state_path = data_dir.join("workspaces.json");
             let mgr = window_state::WindowStateManager::new(state_path);
             mgr.load();
