@@ -131,6 +131,8 @@ export default function App() {
   const workspacesRef = useRef(workspaces);
   workspacesRef.current = workspaces;
 
+  const activeCwdRef = useRef<string | null>(null);
+
   // ── Active panel derivation ───────────────────────────────────────────────
 
   const activePane = activeWorkspace
@@ -145,6 +147,7 @@ export default function App() {
   const isEditorPanel = activePanel?.kind === "editor";
   const isGitHistoryPanel = activePanel?.kind === "git-history";
   const activeCwd = isTerminalPanel ? ((activePanel as { cwd?: string }).cwd ?? null) : null;
+  activeCwdRef.current = activeCwd;
 
   // ── Handle maps ───────────────────────────────────────────────────────────
 
@@ -430,6 +433,129 @@ export default function App() {
       return panelId;
     },
     [activeWorkspace, openPanel],
+  );
+
+  // ── WorkspaceView stable callbacks (use refs to avoid recreating on cd) ──
+
+  const onActivatePanelStable = useCallback(
+    (wsId: string, panelId: string) => activatePanel(wsId, panelId),
+    [activatePanel],
+  );
+
+  const onClosePanelStable = useCallback(
+    (wsId: string, panelId: string) => {
+      const found = findPanelGlobal(panelId);
+      if (found?.panel.kind === "terminal") disposeSession(panelId);
+      closePanel(wsId, panelId);
+    },
+    [findPanelGlobal, closePanel],
+  );
+
+  const onFocusPaneStable = useCallback(
+    (wsId: string, paneId: string) => focusPane(wsId, paneId),
+    [focusPane],
+  );
+
+  const onNewTerminalStable = useCallback(
+    (wsId: string, paneId: string) => {
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      openPanel(wsId, paneId, {
+        id: crypto.randomUUID(),
+        kind: "terminal",
+        cwd: activeCwdRef.current ?? ws?.cwd,
+      });
+    },
+    [openPanel],
+  );
+
+  const onSplitTerminalRightStable = useCallback(
+    (wsId: string, paneId: string) => {
+      const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (!ws) return;
+      if (allPanes(ws.paneTree).length >= workspacePaneLimit) { toastSplitBlocked("pane-limit", workspacePaneLimit); return; }
+      const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
+      if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) { toastSplitBlocked("too-narrow"); return; }
+      const newPaneId = splitPane(wsId, paneId, "horizontal");
+      openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeCwdRef.current ?? ws.cwd });
+    },
+    [splitPane, openPanel],
+  );
+
+  const onSplitTerminalDownStable = useCallback(
+    (wsId: string, paneId: string) => {
+      const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (!ws) return;
+      if (allPanes(ws.paneTree).length >= workspacePaneLimit) { toastSplitBlocked("pane-limit", workspacePaneLimit); return; }
+      const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
+      if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) { toastSplitBlocked("too-short"); return; }
+      const newPaneId = splitPane(wsId, paneId, "vertical");
+      openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeCwdRef.current ?? ws.cwd });
+    },
+    [splitPane, openPanel],
+  );
+
+  const onNewBrowserStable = useCallback(
+    (wsId: string, paneId: string) => {
+      const panelId = crypto.randomUUID();
+      openPanel(wsId, paneId, { id: panelId, kind: "preview", url: "" });
+      setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+    },
+    [openPanel],
+  );
+
+  const onSplitBrowserRightStable = useCallback(
+    (wsId: string, paneId: string) => {
+      const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (!ws) return;
+      if (allPanes(ws.paneTree).length >= workspacePaneLimit) { toastSplitBlocked("pane-limit", workspacePaneLimit); return; }
+      const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
+      if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) { toastSplitBlocked("too-narrow"); return; }
+      const newPaneId = splitPane(wsId, paneId, "horizontal");
+      const panelId = crypto.randomUUID();
+      openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
+      setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+    },
+    [splitPane, openPanel],
+  );
+
+  const onSplitBrowserDownStable = useCallback(
+    (wsId: string, paneId: string) => {
+      const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (!ws) return;
+      if (allPanes(ws.paneTree).length >= workspacePaneLimit) { toastSplitBlocked("pane-limit", workspacePaneLimit); return; }
+      const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
+      if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) { toastSplitBlocked("too-short"); return; }
+      const newPaneId = splitPane(wsId, paneId, "vertical");
+      const panelId = crypto.randomUUID();
+      openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
+      setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+    },
+    [splitPane, openPanel],
+  );
+
+  const onDividerChangeStable = useCallback(
+    (wsId: string, splitId: string, pos: number) => setPaneDivider(wsId, splitId, pos),
+    [setPaneDivider],
+  );
+
+  const onOpenCommitFileStable = useCallback(
+    (params: { repoRoot: string; sha: string; path: string; originalPath: string | null }) => {
+      const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
+      if (!ws) return;
+      openPanel(ws.id, ws.activePaneId, {
+        id: crypto.randomUUID(),
+        kind: "git-commit-file",
+        repoRoot: params.repoRoot,
+        sha: params.sha,
+        path: params.path,
+        originalPath: params.originalPath,
+      });
+    },
+    [activeWorkspaceId, openPanel],
   );
 
   // ── PanelCallbacks ────────────────────────────────────────────────────────
@@ -1068,17 +1194,7 @@ export default function App() {
                       onOpenDiff={openGitDiffInPanel}
                       onOpenGitGraph={openGitGraphFromContext}
                       repoRoot={rightPanelRepoRoot}
-                      onOpenCommitFile={(params) => {
-                        if (!activeWorkspace) return;
-                        openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-                          id: crypto.randomUUID(),
-                          kind: "git-commit-file",
-                          repoRoot: params.repoRoot,
-                          sha: params.sha,
-                          path: params.path,
-                          originalPath: params.originalPath,
-                        });
-                      }}
+                      onOpenCommitFile={onOpenCommitFileStable}
                       onSearchHandle={setGitHistoryHandle}
                     />
                   </ResizablePanel>
@@ -1092,95 +1208,16 @@ export default function App() {
                     <WorkspaceView
                       workspaces={workspaces}
                       activeWorkspaceId={activeWorkspaceId}
-                      onActivatePanel={(wsId, panelId) => activatePanel(wsId, panelId)}
-                      onClosePanel={(wsId, panelId) => {
-                        const found = findPanelGlobal(panelId);
-                        if (found?.panel.kind === "terminal") disposeSession(panelId);
-                        closePanel(wsId, panelId);
-                      }}
-                      onFocusPane={(wsId, paneId) => focusPane(wsId, paneId)}
-                      onNewTerminal={(wsId, paneId) => {
-                        const ws = workspaces.find((w) => w.id === wsId);
-                        openPanel(wsId, paneId, {
-                          id: crypto.randomUUID(),
-                          kind: "terminal",
-                          cwd: activeCwd ?? ws?.cwd,
-                        });
-                      }}
-                      onSplitTerminalRight={(wsId, paneId) => {
-                        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
-                        const ws = workspaces.find((w) => w.id === wsId);
-                        if (!ws) return;
-                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
-                          toastSplitBlocked("pane-limit", workspacePaneLimit);
-                          return;
-                        }
-                        const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-                        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
-                          toastSplitBlocked("too-narrow");
-                          return;
-                        }
-                        const newPaneId = splitPane(wsId, paneId, "horizontal");
-                        openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeCwd ?? ws.cwd });
-                      }}
-                      onSplitTerminalDown={(wsId, paneId) => {
-                        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
-                        const ws = workspaces.find((w) => w.id === wsId);
-                        if (!ws) return;
-                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
-                          toastSplitBlocked("pane-limit", workspacePaneLimit);
-                          return;
-                        }
-                        const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-                        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
-                          toastSplitBlocked("too-short");
-                          return;
-                        }
-                        const newPaneId = splitPane(wsId, paneId, "vertical");
-                        openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeCwd ?? ws.cwd });
-                      }}
-                      onNewBrowser={(wsId, paneId) => {
-                        const panelId = crypto.randomUUID();
-                        openPanel(wsId, paneId, { id: panelId, kind: "preview", url: "" });
-                        setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
-                      }}
-                      onSplitBrowserRight={(wsId, paneId) => {
-                        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
-                        const ws = workspaces.find((w) => w.id === wsId);
-                        if (!ws) return;
-                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
-                          toastSplitBlocked("pane-limit", workspacePaneLimit);
-                          return;
-                        }
-                        const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-                        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
-                          toastSplitBlocked("too-narrow");
-                          return;
-                        }
-                        const newPaneId = splitPane(wsId, paneId, "horizontal");
-                        const panelId = crypto.randomUUID();
-                        openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
-                        setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
-                      }}
-                      onSplitBrowserDown={(wsId, paneId) => {
-                        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
-                        const ws = workspaces.find((w) => w.id === wsId);
-                        if (!ws) return;
-                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
-                          toastSplitBlocked("pane-limit", workspacePaneLimit);
-                          return;
-                        }
-                        const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-                        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
-                          toastSplitBlocked("too-short");
-                          return;
-                        }
-                        const newPaneId = splitPane(wsId, paneId, "vertical");
-                        const panelId = crypto.randomUUID();
-                        openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
-                        setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
-                      }}
-                      onDividerChange={(wsId, splitId, pos) => setPaneDivider(wsId, splitId, pos)}
+                      onActivatePanel={onActivatePanelStable}
+                      onClosePanel={onClosePanelStable}
+                      onFocusPane={onFocusPaneStable}
+                      onNewTerminal={onNewTerminalStable}
+                      onSplitTerminalRight={onSplitTerminalRightStable}
+                      onSplitTerminalDown={onSplitTerminalDownStable}
+                      onNewBrowser={onNewBrowserStable}
+                      onSplitBrowserRight={onSplitBrowserRightStable}
+                      onSplitBrowserDown={onSplitBrowserDownStable}
+                      onDividerChange={onDividerChangeStable}
                       callbacks={panelCallbacks}
                     />
                   </div>
@@ -1214,17 +1251,7 @@ export default function App() {
                       onOpenDiff={openGitDiffInPanel}
                       onOpenGitGraph={openGitGraphFromContext}
                       repoRoot={rightPanelRepoRoot}
-                      onOpenCommitFile={(params) => {
-                        if (!activeWorkspace) return;
-                        openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-                          id: crypto.randomUUID(),
-                          kind: "git-commit-file",
-                          repoRoot: params.repoRoot,
-                          sha: params.sha,
-                          path: params.path,
-                          originalPath: params.originalPath,
-                        });
-                      }}
+                      onOpenCommitFile={onOpenCommitFileStable}
                       onSearchHandle={setGitHistoryHandle}
                     />
                   </ResizablePanel>
