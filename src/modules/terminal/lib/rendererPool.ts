@@ -380,7 +380,7 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
     try {
       slot.term.write(p.snapshot);
     } catch (e) {
-      console.warn("[terax] snapshot replay failed:", e);
+      console.warn("[kex] snapshot replay failed:", e);
     }
   }
   if (p.altScreen) {
@@ -534,7 +534,7 @@ function serializeSlot(slot: Slot): SerializeOutput {
     );
     snapshot = slot.serializeAddon.serialize({ scrollback: cap });
   } catch (e) {
-    console.warn("[terax] serialize failed:", e);
+    console.warn("[kex] serialize failed:", e);
   }
   return {
     snapshot,
@@ -633,7 +633,7 @@ function disposeSlot(slot: Slot): void {
   try {
     slot.term.dispose();
   } catch (e) {
-    console.warn("[terax] slot dispose failed:", e);
+    console.warn("[kex] slot dispose failed:", e);
   }
   slot.host.remove();
   const i = slots.indexOf(slot);

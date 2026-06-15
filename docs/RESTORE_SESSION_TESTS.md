@@ -129,7 +129,7 @@ tiene el panel al restaurarse (que viene de `workspace-state.json`), funciona. S
 `consumeRestorePlan` no encuentra el plan.
 
 Verificar: el `panelId` en `~/.config/kex/agent-sessions.json` debe ser el mismo que el
-`id` del panel en `~/.config/kex/workspaces.json` (o `workspace-state.json`).
+`id` del panel en `workspace-state.json` (via `tauri-plugin-store`, ver comando abajo).
 
 ```bash
 # panel IDs en el workspace guardado

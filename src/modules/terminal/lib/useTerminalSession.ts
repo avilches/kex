@@ -295,7 +295,7 @@ configureRendererPool({
         pty
           .resize(cols, rows + 1)
           .then(() => pty.resize(cols, rows))
-          .catch((e) => console.warn("[terax] kickPty failed:", e));
+          .catch((e) => console.warn("[kex] kickPty failed:", e));
       },
     };
   },
@@ -539,7 +539,7 @@ function attachSession(
       })
       .catch((e) => {
         s.ptyOpening = false;
-        console.error("[terax] openPty failed:", e);
+        console.error("[kex] openPty failed:", e);
       });
   }
 }
@@ -579,7 +579,7 @@ export async function respawnSession(
     pty = await openPtyForSession(leafId, s, cwd ?? s.initialCwd);
   } catch (e) {
     s.ptyOpening = false;
-    console.error("[terax] respawn openPty failed:", e);
+    console.error("[kex] respawn openPty failed:", e);
     return;
   }
   s.ptyOpening = false;
@@ -598,7 +598,7 @@ export async function leafHasForegroundProcess(leafId: string): Promise<boolean>
     const result = await invoke<boolean>("pty_has_foreground_process", { id: s.pty.id });
     return result;
   } catch (e) {
-    console.error("[terax] pty_has_foreground_process failed for leaf", leafId, e);
+    console.error("[kex] pty_has_foreground_process failed for leaf", leafId, e);
     return false;
   }
 }

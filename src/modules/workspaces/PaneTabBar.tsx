@@ -152,7 +152,7 @@ function DraggableTab({
               onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
               {...listeners}
               className={cn(
-                "group relative flex min-w-[100px] max-w-[200px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
+                "group relative flex max-w-[240px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
                 isThisDragging ? "cursor-grabbing" : "cursor-default",
                 connected
                   ? [
@@ -199,13 +199,18 @@ function DraggableTab({
                   panel.kind === "terminal" && panel.runningCommand && "text-center",
                   isRestoreError && "text-destructive/70",
                 )}
-                style={{ direction: panel.kind === "terminal" && !panel.runningCommand ? "rtl" : "ltr" }}
                 title={
                   panel.kind === "terminal"
                     ? panel.runningCommand
                       ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
                       : (panel.cwd?.replace(/\/$/, "") ?? "shell")
-                    : agentTitle
+                    : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"
+                      ? panel.path
+                      : panel.kind === "preview"
+                        ? (panel.url || undefined)
+                        : panel.kind === "git-history"
+                          ? panel.repoRoot
+                          : agentTitle
                 }
               >
                 {agentTitle}

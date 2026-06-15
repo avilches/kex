@@ -13,8 +13,15 @@ export function panelTitle(panel: Panel): string {
   switch (panel.kind) {
     case "terminal": {
       if (panel.runningCommand) return basename(panel.runningCommand.trim().split(/\s+/)[0] ?? "");
-      const label = panel.title ?? panel.cwd;
-      return label?.replace(/\/$/, "") || "shell";
+      if (panel.title) return panel.title;
+      if (!panel.cwd) return "shell";
+      const cwd = panel.cwd.replace(/\/$/, "");
+      if (!cwd) return "shell";
+      const parts = cwd.split(/[\\/]/).filter(Boolean);
+      if (parts.length === 0) return cwd;
+      const prefix = /^[\\/]/.test(cwd) ? "/" : "";
+      if (parts.length <= 3) return prefix + parts.join("/");
+      return "…/" + parts.slice(-3).join("/");
     }
     case "editor":          return basename(panel.path);
     case "preview":         return panel.url || "Preview";
