@@ -1,6 +1,6 @@
 import { useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { PaneTabBar } from "./PaneTabBar";
 import { PanelContent } from "./PanelContent";
 import type { PanelCallbacks } from "./PanelContent";
@@ -9,6 +9,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import { detachAgentSession } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { useWorkspaceDndInsert } from "./WorkspaceDndProvider";
 
 type Props = {
   pane: PaneNode;
@@ -16,7 +17,6 @@ type Props = {
   workspaceCwd?: string;
   focused: boolean;
   isWorkspaceActive: boolean;
-  tabInsertPaneId: string | null;
   onActivatePanel: (workspaceId: string, panelId: string) => void;
   onClosePanel: (workspaceId: string, panelId: string) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
@@ -60,13 +60,84 @@ function DropZone({
   );
 }
 
-export function PaneView({
+// Reads tabInsertPaneId from context so PaneView (memoized) is not re-rendered
+// on every dragover — only this sub-component is.
+function PaneDropOverlay({ paneId, tooNarrow, tooShort }: {
+  paneId: string;
+  tooNarrow: boolean;
+  tooShort: boolean;
+}) {
+  const tabInsertPaneId = useWorkspaceDndInsert();
+  return (
+    <div className="pointer-events-none absolute inset-0 z-40">
+      {tooNarrow && tooShort ? (
+        <DropZone
+          id={`zone:${paneId}:center`}
+          hitClassName="pointer-events-auto inset-0"
+          visualClassName="inset-0 rounded-md"
+          forceOver={tabInsertPaneId === paneId}
+        />
+      ) : (
+        <>
+          {!tooShort && (
+            <>
+              <DropZone
+                id={`zone:${paneId}:top`}
+                hitClassName="pointer-events-auto left-0 right-0 top-0 h-1/4"
+                visualClassName="left-0 right-0 top-0 h-1/2 rounded-t-md"
+              />
+              <DropZone
+                id={`zone:${paneId}:bottom`}
+                hitClassName="pointer-events-auto bottom-0 left-0 right-0 h-1/4"
+                visualClassName="bottom-0 left-0 right-0 h-1/2 rounded-b-md"
+              />
+            </>
+          )}
+          {!tooNarrow && (
+            <>
+              <DropZone
+                id={`zone:${paneId}:left`}
+                hitClassName={cn(
+                  "pointer-events-auto left-0 w-1/4",
+                  tooShort ? "inset-y-0" : "bottom-1/4 top-1/4",
+                )}
+                visualClassName="bottom-0 left-0 top-0 w-1/2 rounded-l-md"
+              />
+              <DropZone
+                id={`zone:${paneId}:right`}
+                hitClassName={cn(
+                  "pointer-events-auto right-0 w-1/4",
+                  tooShort ? "inset-y-0" : "bottom-1/4 top-1/4",
+                )}
+                visualClassName="bottom-0 right-0 top-0 w-1/2 rounded-r-md"
+              />
+            </>
+          )}
+          <DropZone
+            id={`zone:${paneId}:center`}
+            hitClassName={cn(
+              "pointer-events-auto",
+              tooNarrow
+                ? "inset-y-1/4 left-0 right-0"
+                : tooShort
+                  ? "inset-x-1/4 top-0 bottom-0"
+                  : "bottom-1/4 left-1/4 right-1/4 top-1/4",
+            )}
+            visualClassName="inset-0 rounded-md"
+            forceOver={tabInsertPaneId === paneId}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+export const PaneView = memo(function PaneView({
   pane,
   workspaceId,
   workspaceCwd: _workspaceCwd,
   focused,
   isWorkspaceActive,
-  tabInsertPaneId,
   onActivatePanel,
   onClosePanel,
   onFocusPane,
@@ -124,6 +195,25 @@ export function PaneView({
     if (!focused) onFocusPane(workspaceId, pane.id);
   }, [focused, workspaceId, pane.id, onFocusPane]);
 
+  const handleActivate = useCallback((panelId: string) => onActivatePanel(workspaceId, panelId), [onActivatePanel, workspaceId]);
+  const handleClose = useCallback((panelId: string) => onClosePanel(workspaceId, panelId), [onClosePanel, workspaceId]);
+  const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
+  const handleCloseOtherPanels = useCallback((panelId: string) => {
+    pane.panels.filter((p) => p.id !== panelId).forEach((p) => onClosePanel(workspaceId, p.id));
+  }, [pane.panels, onClosePanel, workspaceId]);
+  const handleCloseAllPanels = useCallback(() => {
+    [...pane.panels].forEach((p) => onClosePanel(workspaceId, p.id));
+  }, [pane.panels, onClosePanel, workspaceId]);
+  const handleSplitTerminalRight = useCallback(() => onSplitTerminalRight(workspaceId, pane.id), [onSplitTerminalRight, workspaceId, pane.id]);
+  const handleSplitTerminalDown = useCallback(() => onSplitTerminalDown(workspaceId, pane.id), [onSplitTerminalDown, workspaceId, pane.id]);
+  const handleNewBrowser = useCallback(() => onNewBrowser(workspaceId, pane.id), [onNewBrowser, workspaceId, pane.id]);
+  const handleSplitBrowserRight = useCallback(() => onSplitBrowserRight(workspaceId, pane.id), [onSplitBrowserRight, workspaceId, pane.id]);
+  const handleSplitBrowserDown = useCallback(() => onSplitBrowserDown(workspaceId, pane.id), [onSplitBrowserDown, workspaceId, pane.id]);
+  const handleDetachAgent = useCallback((panelId: string) => {
+    useAgentStore.getState().finish(panelId);
+    void detachAgentSession(panelId);
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -138,26 +228,17 @@ export function PaneView({
         paneFocused={focused}
         workspaceId={workspaceId}
         isWorkspaceActive={isWorkspaceActive}
-        onActivate={(panelId) => onActivatePanel(workspaceId, panelId)}
-        onClose={(panelId) => onClosePanel(workspaceId, panelId)}
-        onNewTerminal={() => onNewTerminal(workspaceId, pane.id)}
-        onCloseOtherPanels={(panelId) => {
-          pane.panels
-            .filter((p) => p.id !== panelId)
-            .forEach((p) => onClosePanel(workspaceId, p.id));
-        }}
-        onCloseAllPanels={() => {
-          [...pane.panels].forEach((p) => onClosePanel(workspaceId, p.id));
-        }}
-        onSplitTerminalRight={() => onSplitTerminalRight(workspaceId, pane.id)}
-        onSplitTerminalDown={() => onSplitTerminalDown(workspaceId, pane.id)}
-        onNewBrowser={() => onNewBrowser(workspaceId, pane.id)}
-        onSplitBrowserRight={() => onSplitBrowserRight(workspaceId, pane.id)}
-        onSplitBrowserDown={() => onSplitBrowserDown(workspaceId, pane.id)}
-        onDetachAgent={(panelId) => {
-          useAgentStore.getState().finish(panelId);
-          void detachAgentSession(panelId);
-        }}
+        onActivate={handleActivate}
+        onClose={handleClose}
+        onNewTerminal={handleNewTerminal}
+        onCloseOtherPanels={handleCloseOtherPanels}
+        onCloseAllPanels={handleCloseAllPanels}
+        onSplitTerminalRight={handleSplitTerminalRight}
+        onSplitTerminalDown={handleSplitTerminalDown}
+        onNewBrowser={handleNewBrowser}
+        onSplitBrowserRight={handleSplitBrowserRight}
+        onSplitBrowserDown={handleSplitBrowserDown}
+        onDetachAgent={handleDetachAgent}
         onRenamePanel={callbacks.onRenamePanel}
       />
       <div className="relative min-h-0 flex-1">
@@ -192,70 +273,9 @@ export function PaneView({
 
         {/* drop overlay — only register/show for the active workspace */}
         {isDragging && isWorkspaceActive && !isDraggingOwnOnlyTab && (
-          <div className="pointer-events-none absolute inset-0 z-40">
-            {tooNarrow && tooShort ? (
-              // Both dimensions too small: center only, full pane hit area
-              <DropZone
-                id={`zone:${pane.id}:center`}
-                hitClassName="pointer-events-auto inset-0"
-                visualClassName="inset-0 rounded-md"
-                forceOver={tabInsertPaneId === pane.id}
-              />
-            ) : (
-              <>
-                {!tooShort && (
-                  <>
-                    <DropZone
-                      id={`zone:${pane.id}:top`}
-                      hitClassName="pointer-events-auto left-0 right-0 top-0 h-1/4"
-                      visualClassName="left-0 right-0 top-0 h-1/2 rounded-t-md"
-                    />
-                    <DropZone
-                      id={`zone:${pane.id}:bottom`}
-                      hitClassName="pointer-events-auto bottom-0 left-0 right-0 h-1/4"
-                      visualClassName="bottom-0 left-0 right-0 h-1/2 rounded-b-md"
-                    />
-                  </>
-                )}
-                {!tooNarrow && (
-                  <>
-                    <DropZone
-                      id={`zone:${pane.id}:left`}
-                      hitClassName={cn(
-                        "pointer-events-auto left-0 w-1/4",
-                        tooShort ? "inset-y-0" : "bottom-1/4 top-1/4",
-                      )}
-                      visualClassName="bottom-0 left-0 top-0 w-1/2 rounded-l-md"
-                    />
-                    <DropZone
-                      id={`zone:${pane.id}:right`}
-                      hitClassName={cn(
-                        "pointer-events-auto right-0 w-1/4",
-                        tooShort ? "inset-y-0" : "bottom-1/4 top-1/4",
-                      )}
-                      visualClassName="bottom-0 right-0 top-0 w-1/2 rounded-r-md"
-                    />
-                  </>
-                )}
-                <DropZone
-                  id={`zone:${pane.id}:center`}
-                  hitClassName={cn(
-                    "pointer-events-auto",
-                    // When some directional zones are absent, expand center to fill the gap
-                    tooNarrow
-                      ? "inset-y-1/4 left-0 right-0"
-                      : tooShort
-                        ? "inset-x-1/4 top-0 bottom-0"
-                        : "bottom-1/4 left-1/4 right-1/4 top-1/4",
-                  )}
-                  visualClassName="inset-0 rounded-md"
-                  forceOver={tabInsertPaneId === pane.id}
-                />
-              </>
-            )}
-          </div>
+          <PaneDropOverlay paneId={pane.id} tooNarrow={tooNarrow} tooShort={tooShort} />
         )}
       </div>
     </div>
   );
-}
+});

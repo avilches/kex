@@ -28,7 +28,7 @@ export function WorkspaceView({
   activeWorkspaceId,
   ...rest
 }: Props) {
-  const { draggingItem, tabInsertPaneId } = useWorkspaceDnd();
+  const { draggingItem } = useWorkspaceDnd();
 
   // After workspace switch the CSS visibility:hidden is removed. The WebGL
   // canvas doesn't repaint on its own after that — force a refresh once the
@@ -60,7 +60,6 @@ export function WorkspaceView({
             workspaceCwd={ws.cwd}
             activePaneId={ws.activePaneId}
             isWorkspaceActive={ws.id === activeWorkspaceId}
-            tabInsertPaneId={tabInsertPaneId}
             onActivatePanel={rest.onActivatePanel}
             onClosePanel={rest.onClosePanel}
             onFocusPane={rest.onFocusPane}

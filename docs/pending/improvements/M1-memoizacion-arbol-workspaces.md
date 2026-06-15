@@ -18,8 +18,8 @@ Que un cambio en un panel re-renderice solo su subárbol, y que el estado efíme
 
 1. ~~**Sacar estado efímero del árbol persistido (BUG-10)**~~ **HECHO** — `runningCommand` movido a `terminalEphemeralStore.ts` (`Map<panelId, string>` con `useSyncExternalStore`). `setTerminalRunningCommand` ya no llama a `setWorkspaces`; `PaneTabBar` suscribe al store. `cwd` sigue en el árbol (necesario para restore de sesión).
 2. ~~**Memoizar `value` del DnD (BUG-09)**~~ **HECHO** — `useMemo(() => ({ draggingItem, tabInsertPaneId }), [...])` en `WorkspaceDndProvider.tsx`.
-3. **`React.memo` en `PaneView` y `SplitNodeView`** con comparación por `pane`/`node` — requiere BUG-10 previo (callbacks que cierran sobre `workspaces` se recrean en cada `cd`) y sacar `tabInsertPaneId` del prop chain (ver nota más abajo).
-4. **Estabilizar callbacks** pasados desde `App.tsx` con `useCallback` — depende también de BUG-10 para ser efectivo.
+3. ~~**`React.memo` en `PaneView` y `SplitNodeView`**~~ **HECHO** — `memo()` en ambos. `tabInsertPaneId` separado en `WorkspaceDndInsertContext`; `PaneDropOverlay` lo lee desde ese contexto (solo ese sub-componente re-renderiza en `dragover`). Callbacks en `PaneView` estabilizados con `useCallback`.
+4. ~~**Estabilizar callbacks**~~ **HECHO** — callbacks de `PaneView` hacia `PaneTabBar` estabilizados con `useCallback`. Los de `App.tsx` hacia `WorkspaceView` siguen siendo inline arrows que cierran sobre `activeCwd`/`workspaces`; estabilizarlos requiere un refactor de `App.tsx` fuera del scope de M1.
 5. ~~**Cachear `allPanes(tree)` durante el drag**~~ **HECHO** — índice `panelId→{paneId,wsId}` construido en `dragStart`, usado en `handleDragOver` y `handleDragEnd` (`WorkspaceDndProvider.tsx`).
 6. ~~**Quitar debug de producción (BUG-22, BUG-23)**~~ **HECHO** — overlay eliminado, `console.debug` guardados tras `import.meta.env.DEV`.
 

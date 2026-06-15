@@ -3,7 +3,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { useCallback } from "react";
+import { memo, useCallback } from "react";
 import { PaneView } from "./PaneView";
 import type { PanelCallbacks } from "./PanelContent";
 import type { SplitNode } from "./lib/types";
@@ -14,7 +14,6 @@ type Props = {
   workspaceCwd?: string;
   activePaneId: string;
   isWorkspaceActive: boolean;
-  tabInsertPaneId: string | null;
   onActivatePanel: (workspaceId: string, panelId: string) => void;
   onClosePanel: (workspaceId: string, panelId: string) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
@@ -32,7 +31,7 @@ type Props = {
   callbacks: PanelCallbacks;
 };
 
-export function SplitNodeView({ node, activePaneId, ...rest }: Props) {
+export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, ...rest }: Props) {
   const splitId = node.kind === "split" ? node.id : null;
 
   const handleLayoutChanged = useCallback(
@@ -55,7 +54,6 @@ export function SplitNodeView({ node, activePaneId, ...rest }: Props) {
         workspaceCwd={rest.workspaceCwd}
         focused={node.id === activePaneId}
         isWorkspaceActive={rest.isWorkspaceActive}
-        tabInsertPaneId={rest.tabInsertPaneId}
         onActivatePanel={rest.onActivatePanel}
         onClosePanel={rest.onClosePanel}
         onFocusPane={rest.onFocusPane}
@@ -97,4 +95,4 @@ export function SplitNodeView({ node, activePaneId, ...rest }: Props) {
       </ResizablePanel>
     </ResizablePanelGroup>
   );
-}
+});
