@@ -76,6 +76,7 @@ import {
   saveWorkspaceState,
 } from "@/modules/workspaces/lib/workspaceState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
+import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -243,6 +244,7 @@ export default function App() {
         disposeSession(id);
         searchAddons.current.delete(id);
         terminalHandles.current.delete(id);
+        clearRunningCommandEntry(id);
       }
     }
     livePanelIdsRef.current = live;
@@ -269,7 +271,10 @@ export default function App() {
   // ── Workspace state management ────────────────────────────────────────────
 
   const clearWorkspaceState = useCallback(() => {
-    for (const id of livePanelIdsRef.current) disposeSession(id);
+    for (const id of livePanelIdsRef.current) {
+      disposeSession(id);
+      clearRunningCommandEntry(id);
+    }
     searchAddons.current.clear();
     terminalHandles.current.clear();
     editorHandles.current.clear();

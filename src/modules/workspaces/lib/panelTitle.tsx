@@ -8,11 +8,11 @@ export function basename(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-export function panelTitle(panel: Panel): string {
+export function panelTitle(panel: Panel, runningCommand?: string | null): string {
   if (panel.kind !== "terminal" && panel.title) return panel.title;
   switch (panel.kind) {
     case "terminal": {
-      if (panel.runningCommand) return basename(panel.runningCommand.trim().split(/\s+/)[0] ?? "");
+      if (runningCommand) return basename(runningCommand.trim().split(/\s+/)[0] ?? "");
       if (panel.title) return panel.title;
       if (!panel.cwd) return "shell";
       const cwd = panel.cwd.replace(/\/$/, "");

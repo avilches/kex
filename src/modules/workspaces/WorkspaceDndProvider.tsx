@@ -22,16 +22,22 @@ type DraggingItem =
 
 type WorkspaceDndContextValue = {
   draggingItem: DraggingItem | null;
-  tabInsertPaneId: string | null;
 };
 
 const WorkspaceDndContext = createContext<WorkspaceDndContextValue>({
   draggingItem: null,
-  tabInsertPaneId: null,
 });
+
+// Separate context so tabInsertPaneId changes (every dragover) only re-render
+// PaneDropOverlay, not the entire workspace tree.
+const WorkspaceDndInsertContext = createContext<string | null>(null);
 
 export function useWorkspaceDnd(): WorkspaceDndContextValue {
   return useContext(WorkspaceDndContext);
+}
+
+export function useWorkspaceDndInsert(): string | null {
+  return useContext(WorkspaceDndInsertContext);
 }
 
 type Props = {
@@ -280,7 +286,7 @@ export function WorkspaceDndProvider({
     }
   }
 
-  const ctxValue = useMemo(() => ({ draggingItem, tabInsertPaneId }), [draggingItem, tabInsertPaneId]);
+  const ctxValue = useMemo(() => ({ draggingItem }), [draggingItem]);
 
   return (
     <DndContext
@@ -292,7 +298,9 @@ export function WorkspaceDndProvider({
       onDragCancel={handleDragCancel}
     >
       <WorkspaceDndContext.Provider value={ctxValue}>
-        {children}
+        <WorkspaceDndInsertContext.Provider value={tabInsertPaneId}>
+          {children}
+        </WorkspaceDndInsertContext.Provider>
       </WorkspaceDndContext.Provider>
       <DragOverlay dropAnimation={null}>
         {draggingItem?.kind === "panel" && (
