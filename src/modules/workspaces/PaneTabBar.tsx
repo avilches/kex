@@ -104,9 +104,9 @@ function DraggableTab({
       : title;
 
   // Truncate from the left so the right end (the leaf directory) is always visible.
-  // ~32 chars at 11px font fits in the ~196px available after icon/close/padding.
-  const displayTitle = agentTitle.length > 32
-    ? '…' + agentTitle.slice(-31)
+  // 24 chars × ~7px/char ≈ 168px, safely within the ~196px available after icon/close/padding.
+  const displayTitle = agentTitle.length > 24
+    ? '…' + agentTitle.slice(-23)
     : agentTitle;
 
   const isRenaming = useTabRenameStore((s) => s.renamingPanelId === panel.id);
@@ -195,7 +195,7 @@ function DraggableTab({
               <span className={cn("shrink-0", hasAgent ? "opacity-100" : "opacity-70")}>
                 {hasAgent
                   ? isRestoreError
-                    ? <span title="Session restore failed">{"⚠"}</span>
+                    ? <span title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>{"⚠"}</span>
                     : "✦"
                   : panelIcon(panel, workspaceId)}
               </span>
@@ -206,17 +206,19 @@ function DraggableTab({
                   isRestoreError && "text-destructive/70",
                 )}
                 title={
-                  panel.kind === "terminal"
-                    ? panel.runningCommand
-                      ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
-                      : (panel.cwd?.replace(/\/$/, "") ?? "shell")
-                    : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"
-                      ? panel.path
-                      : panel.kind === "preview"
-                        ? (panel.url || undefined)
-                        : panel.kind === "git-history"
-                          ? panel.repoRoot
-                          : agentTitle
+                  isRestoreError
+                    ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`
+                    : panel.kind === "terminal"
+                      ? panel.runningCommand
+                        ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
+                        : (panel.cwd?.replace(/\/$/, "") ?? "shell")
+                      : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"
+                        ? panel.path
+                        : panel.kind === "preview"
+                          ? (panel.url || undefined)
+                          : panel.kind === "git-history"
+                            ? panel.repoRoot
+                            : agentTitle
                 }
               >
                 {displayTitle}
