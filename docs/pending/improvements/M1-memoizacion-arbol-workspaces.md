@@ -16,7 +16,7 @@ Que un cambio en un panel re-renderice solo su subárbol, y que el estado efíme
 
 ## Plan accionable
 
-1. **Sacar estado efímero del árbol persistido (BUG-10):** mover `runningCommand` (y evaluar `cwd` de presentación) a un store separado `Map<panelId, …>` con `useSyncExternalStore`, de modo que `cd`/comandos no produzcan un `workspaces` nuevo. Si `cwd` debe persistirse para restaurar terminales, persistirla con su propio debounce sin tocar la identidad del árbol en cada cambio.
+1. ~~**Sacar estado efímero del árbol persistido (BUG-10)**~~ **HECHO** — `runningCommand` movido a `terminalEphemeralStore.ts` (`Map<panelId, string>` con `useSyncExternalStore`). `setTerminalRunningCommand` ya no llama a `setWorkspaces`; `PaneTabBar` suscribe al store. `cwd` sigue en el árbol (necesario para restore de sesión).
 2. ~~**Memoizar `value` del DnD (BUG-09)**~~ **HECHO** — `useMemo(() => ({ draggingItem, tabInsertPaneId }), [...])` en `WorkspaceDndProvider.tsx`.
 3. **`React.memo` en `PaneView` y `SplitNodeView`** con comparación por `pane`/`node` — requiere BUG-10 previo (callbacks que cierran sobre `workspaces` se recrean en cada `cd`) y sacar `tabInsertPaneId` del prop chain (ver nota más abajo).
 4. **Estabilizar callbacks** pasados desde `App.tsx` con `useCallback` — depende también de BUG-10 para ser efectivo.

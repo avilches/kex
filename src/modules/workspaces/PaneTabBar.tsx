@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -87,7 +88,9 @@ function DraggableTab({
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
   const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${panel.id}:after`, disabled: !isWorkspaceActive });
   const active = panel.id === activePanelId;
-  const title = panelTitle(panel);
+  const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
+  const runningCommand = panel.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
+  const title = panelTitle(panel, runningCommand);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
   const agentSession = useAgentStore((s) => s.sessions[panel.id]);
@@ -209,14 +212,14 @@ function DraggableTab({
               <span
                 className={cn(
                   "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
-                  panel.kind === "terminal" && panel.runningCommand && "text-center",
+                  panel.kind === "terminal" && !!runningCommand && "text-center",
                   isRestoreError && "text-destructive/70",
                 )}
                 title={
                   isRestoreError
                     ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`
                     : panel.kind === "terminal"
-                      ? panel.runningCommand
+                      ? runningCommand
                         ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
                         : (panel.cwd?.replace(/\/$/, "") ?? "shell")
                       : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"

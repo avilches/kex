@@ -11,7 +11,6 @@ let cached: SavedState | null = null;
 
 function sanitizePanel(p: Panel): Panel {
   if (p.kind === "editor") return { ...p, dirty: false };
-  if (p.kind === "terminal") return { ...p, runningCommand: undefined };
   return p;
 }
 

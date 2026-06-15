@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isMarkdownPath } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { flushWorkspaceState } from "./workspaceState";
+import { setRunningCommand } from "./terminalEphemeralStore";
 import {
   allPaneIds,
   allPanes,
@@ -345,9 +346,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     updatePanelData(workspaceId, panelId, (p) => p.kind === "terminal" ? { ...p, cwd: normalized } : p);
   }, [updatePanelData]);
 
-  const setTerminalRunningCommand = useCallback((workspaceId: string, panelId: string, cmd: string | null) => {
-    updatePanelData(workspaceId, panelId, (p) => p.kind === "terminal" ? { ...p, runningCommand: cmd ?? undefined } : p);
-  }, [updatePanelData]);
+  const setTerminalRunningCommand = useCallback((_workspaceId: string, panelId: string, cmd: string | null) => {
+    setRunningCommand(panelId, cmd);
+  }, []);
 
   // Flip a markdown file panel between its rendered view (kind "markdown") and
   // the raw editor (kind "editor"), preserving id/path/title. Switching to

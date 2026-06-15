@@ -1,4 +1,4 @@
-# BUG-10 [medium · perf] La persistencia serializa el arbol completo en cada cd y cada comando
+# BUG-10 [RESUELTO] La persistencia serializa el arbol completo en cada cd y cada comando
 
 ## Contexto del proyecto
 Kex es un emulador de terminal open-source: backend Tauri 2 + Rust (portable-pty), frontend React 19 + TypeScript + xterm.js (webgl). Filosofia: ultraligero, rapido, eficiente en memoria; notificaciones de agentes de IA (Claude Code, Codex); buen diff de git en doble panel. Repo: /Users/avilches/Work/Proy/Repos/terax-ai. Convenciones: sin em-dash, sin emojis, imports `@/...` en frontend, comentarios solo del 'why'.
@@ -12,8 +12,8 @@ Cada `setTerminalPanelCwd` (cada cd, OSC 7) y cada `setTerminalRunningCommand` (
 ## Impacto / repro
 Copia profunda + JSON IPC del estado completo de forma repetida. CPU/GC proporcional al tamano del arbol. Repro: abrir varios terminales, ejecutar comandos y hacer `cd` en ellos; observar serializaciones repetidas del estado completo de workspaces.
 
-## Fix
-`runningCommand` es estado efimero que no necesita persistirse. Sacarlo del modelo persistido o, mejor, fuera del arbol `workspaces` (store separado `Map<panelId, cmd>`) para que no mute la identidad del arbol ni dispare persistencia. Spec en `docs/pending/improvements/M1-memoizacion-arbol-workspaces.md`.
+## Fix (aplicado)
+`runningCommand` movido a `src/modules/workspaces/lib/terminalEphemeralStore.ts`: `Map<panelId, string>` con patron `useSyncExternalStore`. `setTerminalRunningCommand` en `useWorkspaces.ts` ya no llama a `setWorkspaces`; escribe directamente al store. `PaneTabBar.tsx` suscribe al store y lee el valor para su panel. Al cerrar un panel, `clearRunningCommandEntry` limpia la entrada del store. `runningCommand` eliminado del tipo `Panel` en `types.ts`. `cd` (OSC 7) sigue en el arbol `workspaces` ya que es necesario para la restauracion de sesion.
 
 ## Criterios de aceptacion
 - Cambios en `runningCommand` no mutan la identidad del arbol `workspaces` ni disparan el effect de persistencia.
