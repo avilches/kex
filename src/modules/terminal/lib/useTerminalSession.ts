@@ -51,6 +51,7 @@ type Callbacks = {
 type Session = {
   pty: PtySession | null;
   ptyOpening: boolean;
+  ptyGen: number;
   initialCwd: string | undefined;
   lastCwd: string | null;
   pendingExit: number | null;
@@ -326,6 +327,7 @@ function ensureSession(
   const session: Session = {
     pty: null,
     ptyOpening: false,
+    ptyGen: 0,
     initialCwd,
     lastCwd: null,
     pendingExit: null,
@@ -377,11 +379,15 @@ async function openPtyForSession(
 ): Promise<PtySession> {
   const startCols = s.cols > 0 ? s.cols : 80;
   const startRows = s.rows > 0 ? s.rows : 24;
+  const myGen = s.ptyGen;
   return openPty(
     startCols,
     startRows,
     {
-      onData: (bytes) => deliverPtyBytes(leafId, bytes),
+      onData: (bytes) => {
+        if (s.ptyGen !== myGen) return;
+        deliverPtyBytes(leafId, bytes);
+      },
       onExit: (code) => {
         s.shellExited = true;
         s.pty = null;
@@ -567,6 +573,7 @@ export async function respawnSession(
   if (!s || s.disposed) return;
   s.pty?.close();
   s.pty = null;
+  s.ptyGen++;
   s.snapshot = null;
   s.dormantRing = new DormantRing();
   s.shellExited = false;
