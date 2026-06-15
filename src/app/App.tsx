@@ -4,6 +4,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
@@ -79,6 +80,16 @@ import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts[parts.length - 1] ?? path;
+}
+
+function toastSplitBlocked(reason: "pane-limit" | "too-narrow" | "too-short", max?: number) {
+  const msg =
+    reason === "pane-limit"
+      ? `Can't split: max ${max} panes per workspace`
+      : reason === "too-narrow"
+        ? "Pane too narrow to split"
+        : "Pane too short to split";
+  toast(msg, { duration: 2500 });
 }
 
 export default function App() {
@@ -775,6 +786,38 @@ export default function App() {
     if (target) focusPane(activeWorkspace.id, target);
   }
 
+  const doSplitRight = useCallback(() => {
+    if (!activeWorkspace) return;
+    const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+    if (allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit) {
+      toastSplitBlocked("pane-limit", workspacePaneLimit);
+      return;
+    }
+    const el = document.querySelector<HTMLElement>(`[data-pane-id="${activeWorkspace.activePaneId}"]`);
+    if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
+      toastSplitBlocked("too-narrow");
+      return;
+    }
+    const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "horizontal");
+    openNewTerminal(newPaneId);
+  }, [activeWorkspace, splitPane, openNewTerminal]);
+
+  const doSplitDown = useCallback(() => {
+    if (!activeWorkspace) return;
+    const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+    if (allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit) {
+      toastSplitBlocked("pane-limit", workspacePaneLimit);
+      return;
+    }
+    const el = document.querySelector<HTMLElement>(`[data-pane-id="${activeWorkspace.activePaneId}"]`);
+    if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
+      toastSplitBlocked("too-short");
+      return;
+    }
+    const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
+    openNewTerminal(newPaneId);
+  }, [activeWorkspace, splitPane, openNewTerminal]);
+
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
@@ -813,24 +856,8 @@ export default function App() {
         const idx = parseInt(e.key, 10) - 1;
         if (idx >= 0 && idx < workspaces.length) setActiveWorkspaceId(workspaces[idx].id);
       },
-      "pane.splitRight": () => {
-        if (!activeWorkspace) return;
-        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
-        if (allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit) return;
-        const el = document.querySelector<HTMLElement>(`[data-pane-id="${activeWorkspace.activePaneId}"]`);
-        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) return;
-        const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "horizontal");
-        openNewTerminal(newPaneId);
-      },
-      "pane.splitDown": () => {
-        if (!activeWorkspace) return;
-        const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
-        if (allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit) return;
-        const el = document.querySelector<HTMLElement>(`[data-pane-id="${activeWorkspace.activePaneId}"]`);
-        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) return;
-        const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
-        openNewTerminal(newPaneId);
-      },
+      "pane.splitRight": doSplitRight,
+      "pane.splitDown": doSplitDown,
       "pane.focusUp": () => focusPaneInDirection("up"),
       "pane.focusDown": () => focusPaneInDirection("down"),
       "pane.focusLeft": () => focusPaneInDirection("left"),
@@ -872,7 +899,8 @@ export default function App() {
       addWorkspace,
       openPanel,
       openPreviewInPanel,
-      splitPane,
+      doSplitRight,
+      doSplitDown,
       focusPane,
       toggleSourceControl,
       setActiveWorkspaceId,
@@ -938,24 +966,8 @@ export default function App() {
             openGitGraph: openGitGraphFromContext,
             toggleSourceControl,
             closeActiveTabOrPane: handleCloseActivePanel,
-            splitPaneRight: () => {
-              if (!activeWorkspace) return;
-              const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
-              if (allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit) return;
-              const el = document.querySelector<HTMLElement>(`[data-pane-id="${activeWorkspace.activePaneId}"]`);
-              if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) return;
-              const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "horizontal");
-              openNewTerminal(newPaneId);
-            },
-            splitPaneDown: () => {
-              if (!activeWorkspace) return;
-              const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
-              if (allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit) return;
-              const el = document.querySelector<HTMLElement>(`[data-pane-id="${activeWorkspace.activePaneId}"]`);
-              if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) return;
-              const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
-              openNewTerminal(newPaneId);
-            },
+            splitPaneRight: doSplitRight,
+            splitPaneDown: doSplitDown,
             focusSearch: () => searchInlineRef.current?.focus(),
             focusExplorerSearch: () => rightPanelRef.current?.focusExplorer(),
             toggleSidebar: toggleRightPanel,
@@ -978,7 +990,8 @@ export default function App() {
       openGitGraphFromContext,
       toggleSourceControl,
       handleCloseActivePanel,
-      splitPane,
+      doSplitRight,
+      doSplitDown,
       toggleRightPanel,
     ],
   );
@@ -1093,9 +1106,15 @@ export default function App() {
                         const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
                         const ws = workspaces.find((w) => w.id === wsId);
                         if (!ws) return;
-                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
+                          toastSplitBlocked("pane-limit", workspacePaneLimit);
+                          return;
+                        }
                         const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-                        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) return;
+                        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
+                          toastSplitBlocked("too-narrow");
+                          return;
+                        }
                         const newPaneId = splitPane(wsId, paneId, "horizontal");
                         openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeCwd ?? ws.cwd });
                       }}
@@ -1103,9 +1122,15 @@ export default function App() {
                         const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
                         const ws = workspaces.find((w) => w.id === wsId);
                         if (!ws) return;
-                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
+                          toastSplitBlocked("pane-limit", workspacePaneLimit);
+                          return;
+                        }
                         const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-                        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) return;
+                        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
+                          toastSplitBlocked("too-short");
+                          return;
+                        }
                         const newPaneId = splitPane(wsId, paneId, "vertical");
                         openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeCwd ?? ws.cwd });
                       }}
@@ -1118,9 +1143,15 @@ export default function App() {
                         const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
                         const ws = workspaces.find((w) => w.id === wsId);
                         if (!ws) return;
-                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
+                          toastSplitBlocked("pane-limit", workspacePaneLimit);
+                          return;
+                        }
                         const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-                        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) return;
+                        if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
+                          toastSplitBlocked("too-narrow");
+                          return;
+                        }
                         const newPaneId = splitPane(wsId, paneId, "horizontal");
                         const panelId = crypto.randomUUID();
                         openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
@@ -1130,9 +1161,15 @@ export default function App() {
                         const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
                         const ws = workspaces.find((w) => w.id === wsId);
                         if (!ws) return;
-                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) return;
+                        if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
+                          toastSplitBlocked("pane-limit", workspacePaneLimit);
+                          return;
+                        }
                         const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-                        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) return;
+                        if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
+                          toastSplitBlocked("too-short");
+                          return;
+                        }
                         const newPaneId = splitPane(wsId, paneId, "vertical");
                         const panelId = crypto.randomUUID();
                         openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });

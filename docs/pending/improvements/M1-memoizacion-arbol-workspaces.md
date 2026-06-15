@@ -17,11 +17,15 @@ Que un cambio en un panel re-renderice solo su subárbol, y que el estado efíme
 ## Plan accionable
 
 1. **Sacar estado efímero del árbol persistido (BUG-10):** mover `runningCommand` (y evaluar `cwd` de presentación) a un store separado `Map<panelId, …>` con `useSyncExternalStore`, de modo que `cd`/comandos no produzcan un `workspaces` nuevo. Si `cwd` debe persistirse para restaurar terminales, persistirla con su propio debounce sin tocar la identidad del árbol en cada cambio.
-2. **Memoizar `value` del DnD (BUG-09):** `useMemo(() => ({ draggingItem, tabInsertPaneId }), [...])`; considerar separar `tabInsertPaneId` en su propio contexto para que consumidores de `draggingItem` no re-rendericen.
-3. **`React.memo` en `PaneView` y `SplitNodeView`** con comparación por `pane`/`node` (referencia estable gracias a la inmutabilidad de `splitNode.ts`, que ya devuelve la misma referencia sin cambio).
-4. **Estabilizar callbacks** pasados por `{...rest}` desde `App.tsx`/`WorkspaceView.tsx` (`onActivatePanel`, `onClosePanel`, etc.) con `useCallback`; un callback inestable anula el `memo`.
-5. **Cachear `allPanes(tree)` durante el drag** (`WorkspaceDndProvider.tsx`): hoy se recorre varias veces por evento `dragover`; precomputar un índice `panelId→{paneId,index}` en `dragStart`.
-6. **Quitar debug de producción (BUG-22, BUG-23):** `DEBUG_PANE_SIZE` y la suscripción `useSyncExternalStore` por pane tras `import.meta.env.DEV`; eliminar `console.log` de `workspaceState.ts`.
+2. ~~**Memoizar `value` del DnD (BUG-09)**~~ **HECHO** — `useMemo(() => ({ draggingItem, tabInsertPaneId }), [...])` en `WorkspaceDndProvider.tsx`.
+3. **`React.memo` en `PaneView` y `SplitNodeView`** con comparación por `pane`/`node` — requiere BUG-10 previo (callbacks que cierran sobre `workspaces` se recrean en cada `cd`) y sacar `tabInsertPaneId` del prop chain (ver nota más abajo).
+4. **Estabilizar callbacks** pasados desde `App.tsx` con `useCallback` — depende también de BUG-10 para ser efectivo.
+5. ~~**Cachear `allPanes(tree)` durante el drag**~~ **HECHO** — índice `panelId→{paneId,wsId}` construido en `dragStart`, usado en `handleDragOver` y `handleDragEnd` (`WorkspaceDndProvider.tsx`).
+6. ~~**Quitar debug de producción (BUG-22, BUG-23)**~~ **HECHO** — overlay eliminado, `console.debug` guardados tras `import.meta.env.DEV`.
+
+### Nota sobre items 3-4 (React.memo + callbacks)
+
+`tabInsertPaneId` se propaga como prop por toda la cadena `WorkspaceView → SplitNodeView → PaneView`. Con ese prop drilling, `React.memo` no puede saltarse el re-render durante drag (el prop cambia en cada `dragover`). Para que memo sea efectivo durante DnD, hace falta sacar `tabInsertPaneId` del prop chain y que `PaneView` lo lea desde un contexto separado en un sub-componente de DropZone. Hacer esto primero — y BUG-10 para el caso de `cd`/comandos.
 
 ## Criterios de aceptación
 

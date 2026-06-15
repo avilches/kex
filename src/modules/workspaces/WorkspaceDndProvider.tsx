@@ -9,7 +9,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { allPanes, findPanelPane } from "./lib/splitNode";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { basename, panelIcon, panelTitle } from "./lib/panelTitle";
@@ -61,12 +61,28 @@ export function WorkspaceDndProvider({
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
 
+  // panelId → { paneId, wsId } — built once at dragStart, used by handleDragOver (hot path).
+  const dragIndexRef = useRef<Map<string, { paneId: string; wsId: string }>>(new Map());
+
+  const buildDragIndex = useCallback(() => {
+    const idx = new Map<string, { paneId: string; wsId: string }>();
+    for (const ws of workspaces) {
+      for (const pane of allPanes(ws.paneTree)) {
+        for (const panel of pane.panels) {
+          idx.set(panel.id, { paneId: pane.id, wsId: ws.id });
+        }
+      }
+    }
+    return idx;
+  }, [workspaces]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
 
   function handleDragStart(event: DragStartEvent) {
     document.body.style.cursor = "grabbing";
+    dragIndexRef.current = buildDragIndex();
     const activeId = String(event.active.id);
     if (activeId.startsWith("file:")) {
       setDraggingItem({ kind: "file", path: activeId.slice(5) });
@@ -76,17 +92,19 @@ export function WorkspaceDndProvider({
       setDraggingItem({ kind: "file", path: activeId.slice(4) });
       return;
     }
-    for (const ws of workspaces) {
-      const result = findPanelPane(ws.paneTree, activeId);
-      if (result) {
-        setDraggingItem({ kind: "panel", panel: result.panel, workspaceId: ws.id });
-        break;
+    const entry = dragIndexRef.current.get(activeId);
+    if (entry) {
+      const ws = workspaces.find((w) => w.id === entry.wsId);
+      if (ws) {
+        const result = findPanelPane(ws.paneTree, activeId);
+        if (result) setDraggingItem({ kind: "panel", panel: result.panel, workspaceId: ws.id });
       }
     }
   }
 
   function handleDragCancel() {
     document.body.style.cursor = "";
+    dragIndexRef.current = new Map();
     setDraggingItem(null);
     setTabInsertPaneId(null);
   }
@@ -101,40 +119,32 @@ export function WorkspaceDndProvider({
     const refPanelId = parts[1];
     if (!refPanelId) { setTabInsertPaneId(null); return; }
 
+    const idx = dragIndexRef.current;
     const activeId = String(event.active.id);
     const isFileDrag = activeId.startsWith("file:");
 
+    const targetEntry = idx.get(refPanelId);
+    if (!targetEntry) { setTabInsertPaneId(null); return; }
+
     if (isFileDrag) {
-      const activeWs = workspaces.find((ws) => ws.id === activeWorkspaceIdRef.current);
-      if (!activeWs) { setTabInsertPaneId(null); return; }
-      for (const pane of allPanes(activeWs.paneTree)) {
-        if (pane.panels.some((p) => p.id === refPanelId)) {
-          setTabInsertPaneId(pane.id);
-          return;
-        }
+      // For file drags, only allow drop into the active workspace.
+      if (targetEntry.wsId !== activeWorkspaceIdRef.current) {
+        setTabInsertPaneId(null);
+        return;
       }
-      setTabInsertPaneId(null);
+      setTabInsertPaneId(targetEntry.paneId);
       return;
     }
 
-    for (const ws of workspaces) {
-      const sourceResult = findPanelPane(ws.paneTree, activeId);
-      if (!sourceResult) continue;
-      const sourcePaneId = sourceResult.pane.id;
-      for (const pane of allPanes(ws.paneTree)) {
-        if (pane.panels.some((p) => p.id === refPanelId)) {
-          setTabInsertPaneId(pane.id !== sourcePaneId ? pane.id : null);
-          return;
-        }
-      }
-      setTabInsertPaneId(null);
-      return;
-    }
-    setTabInsertPaneId(null);
+    const sourceEntry = idx.get(activeId);
+    if (!sourceEntry) { setTabInsertPaneId(null); return; }
+    setTabInsertPaneId(targetEntry.paneId !== sourceEntry.paneId ? targetEntry.paneId : null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     document.body.style.cursor = "";
+    const idx = dragIndexRef.current;
+    dragIndexRef.current = new Map();
     setDraggingItem(null);
     setTabInsertPaneId(null);
     const { active, over } = event;
@@ -144,14 +154,14 @@ export function WorkspaceDndProvider({
     const overId = String(over.id);
 
     if (activeId.startsWith("file:")) {
-      handleFileDragEnd(activeId.slice(5), overId);
+      handleFileDragEnd(activeId.slice(5), overId, idx);
       return;
     }
 
-    handlePanelDragEnd(activeId, overId);
+    handlePanelDragEnd(activeId, overId, idx);
   }
 
-  function handleFileDragEnd(filePath: string, overId: string) {
+  function handleFileDragEnd(filePath: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>) {
     const activeWs = workspaces.find((ws) => ws.id === activeWorkspaceIdRef.current);
     if (!activeWs) return;
     const panes = allPanes(activeWs.paneTree);
@@ -168,20 +178,20 @@ export function WorkspaceDndProvider({
       const side = parts[2];
       if (!refPanelId || (side !== "before" && side !== "after")) return;
 
-      let targetPaneId: string | null = null;
-      let refPanelIndex = -1;
-      for (const pane of panes) {
-        const idx = pane.panels.findIndex((p) => p.id === refPanelId);
-        if (idx !== -1) { targetPaneId = pane.id; refPanelIndex = idx; break; }
-      }
-      if (!targetPaneId || refPanelIndex === -1) return;
+      const targetEntry = idx.get(refPanelId);
+      if (!targetEntry) return;
+      const targetPaneId = targetEntry.paneId;
+      const targetPane = panes.find((p) => p.id === targetPaneId);
+      if (!targetPane) return;
+      const refPanelIndex = targetPane.panels.findIndex((p) => p.id === refPanelId);
+      if (refPanelIndex === -1) return;
 
       const insertionIndex = refPanelIndex + (side === "after" ? 1 : 0);
 
       if (existingPanelId) {
-        const sourceResult = findPanelPane(activeWs.paneTree, existingPanelId);
-        if (!sourceResult) return;
-        if (sourceResult.pane.id === targetPaneId) {
+        const sourcePaneId = idx.get(existingPanelId)?.paneId ?? null;
+        if (!sourcePaneId) return;
+        if (sourcePaneId === targetPaneId) {
           onReorderPanel(activeWorkspaceIdRef.current, existingPanelId, insertionIndex);
         } else {
           onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId, insertionIndex);
@@ -203,8 +213,8 @@ export function WorkspaceDndProvider({
 
     if (zone === "center") {
       if (existingPanelId) {
-        const sourceResult = findPanelPane(activeWs.paneTree, existingPanelId);
-        if (sourceResult?.pane.id === targetPaneId) return;
+        const sourcePaneId = idx.get(existingPanelId)?.paneId ?? null;
+        if (sourcePaneId === targetPaneId) return;
         onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId);
       } else {
         const panel: Panel = { id: crypto.randomUUID(), kind: "editor", path: filePath, preview: false, dirty: false };
@@ -221,7 +231,13 @@ export function WorkspaceDndProvider({
     }
   }
 
-  function handlePanelDragEnd(panelId: string, overId: string) {
+  function handlePanelDragEnd(panelId: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>) {
+    const sourceEntry = idx.get(panelId);
+    if (!sourceEntry) return;
+    const { paneId: sourcePaneId, wsId: sourceWorkspaceId } = sourceEntry;
+    const sourceWs = workspaces.find((ws) => ws.id === sourceWorkspaceId);
+    if (!sourceWs) return;
+
     if (overId.startsWith("tab-insert:")) {
       const parts = overId.split(":");
       const refPanelId = parts[1];
@@ -229,29 +245,13 @@ export function WorkspaceDndProvider({
       if (!refPanelId || !side) return;
       if (side !== "before" && side !== "after") return;
 
-      let sourceWorkspaceId: string | null = null;
-      let sourcePaneId: string | null = null;
-      for (const ws of workspaces) {
-        for (const pane of allPanes(ws.paneTree)) {
-          if (pane.panels.some((p) => p.id === panelId)) {
-            sourceWorkspaceId = ws.id;
-            sourcePaneId = pane.id;
-            break;
-          }
-        }
-        if (sourceWorkspaceId) break;
-      }
-      if (!sourceWorkspaceId || !sourcePaneId) return;
-
-      const sourceWs = workspaces.find((ws) => ws.id === sourceWorkspaceId);
-      if (!sourceWs) return;
-      let targetPaneId: string | null = null;
-      let refPanelIndex = -1;
-      for (const pane of allPanes(sourceWs.paneTree)) {
-        const idx = pane.panels.findIndex((p) => p.id === refPanelId);
-        if (idx !== -1) { targetPaneId = pane.id; refPanelIndex = idx; break; }
-      }
-      if (!targetPaneId || refPanelIndex === -1) return;
+      const targetEntry = idx.get(refPanelId);
+      if (!targetEntry) return;
+      const targetPaneId = targetEntry.paneId;
+      const targetPane = allPanes(sourceWs.paneTree).find((p) => p.id === targetPaneId);
+      if (!targetPane) return;
+      const refPanelIndex = targetPane.panels.findIndex((p) => p.id === refPanelId);
+      if (refPanelIndex === -1) return;
 
       const insertionIndex = refPanelIndex + (side === "after" ? 1 : 0);
       if (sourcePaneId === targetPaneId) {
@@ -267,34 +267,20 @@ export function WorkspaceDndProvider({
     const targetPaneId = parts[1]!;
     const zone = parts[2] as "top" | "bottom" | "left" | "right" | "center";
 
-    let sourceWorkspaceId: string | null = null;
-    let sourcePaneId: string | null = null;
-    for (const ws of workspaces) {
-      for (const pane of allPanes(ws.paneTree)) {
-        if (pane.panels.some((p) => p.id === panelId)) {
-          sourceWorkspaceId = ws.id;
-          sourcePaneId = pane.id;
-          break;
-        }
-      }
-      if (sourceWorkspaceId) break;
-    }
-    if (!sourceWorkspaceId) return;
-
-    const sourceWs = workspaces.find((ws) => ws.id === sourceWorkspaceId);
-    if (!sourceWs) return;
-    const targetPaneExists = allPanes(sourceWs.paneTree).some((p) => p.id === targetPaneId);
-    if (!targetPaneExists) return;
+    const sourcePanes = allPanes(sourceWs.paneTree);
+    if (!sourcePanes.some((p) => p.id === targetPaneId)) return;
 
     if (zone === "center") {
       if (sourcePaneId === targetPaneId) return;
       onMovePanel(sourceWorkspaceId, panelId, targetPaneId);
     } else {
       const { workspacePaneLimit } = usePreferencesStore.getState();
-      if (allPanes(sourceWs.paneTree).length >= workspacePaneLimit) return;
+      if (sourcePanes.length >= workspacePaneLimit) return;
       onSplitPaneAndPlace(sourceWorkspaceId, targetPaneId, zone, panelId);
     }
   }
+
+  const ctxValue = useMemo(() => ({ draggingItem, tabInsertPaneId }), [draggingItem, tabInsertPaneId]);
 
   return (
     <DndContext
@@ -305,7 +291,7 @@ export function WorkspaceDndProvider({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <WorkspaceDndContext.Provider value={{ draggingItem, tabInsertPaneId }}>
+      <WorkspaceDndContext.Provider value={ctxValue}>
         {children}
       </WorkspaceDndContext.Provider>
       <DragOverlay dropAnimation={null}>

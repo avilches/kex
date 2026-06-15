@@ -13,7 +13,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-06](pending/bugs/BUG-06-diff-rename-staged-pathspec-incompleto.md) — Diff rename staged: pathspec incompleto
 - [BUG-07](pending/bugs/BUG-07-split-name-status-numstat-heuristica-tab.md) — Split name-status/numstat: heuristica por tab
 - [BUG-08](pending/bugs/BUG-08-fuga-procesos-background-shellstate.md) — Fuga de procesos background en ShellState
-- [BUG-09](pending/bugs/BUG-09-dnd-provider-context-value-rerenders.md) — DnD provider context value causa re-renders
 - [BUG-10](pending/bugs/BUG-10-persistencia-serializa-arbol-completo.md) — Persistencia serializa arbol completo
 - [BUG-11](pending/bugs/BUG-11-flag-truncated-ignorado-cliente.md) — Flag `truncated` ignorado en el cliente
 - [BUG-12](pending/bugs/BUG-12-toctou-auto-autorizacion-repo-root.md) — TOCTOU en auto-autorizacion de repo root
@@ -26,8 +25,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-19](pending/bugs/BUG-19-temas-custom-colores-sin-validar.md) — Temas custom: colores sin validar
 - [BUG-20](pending/bugs/BUG-20-pty-open-autoriza-cwd-aunque-spawn-falle.md) — pty_open autoriza cwd aunque spawn falle
 - [BUG-21](pending/bugs/BUG-21-workspaceregistry-sin-cota-on.md) — WorkspaceRegistry sin cota en listeners
-- [BUG-22](pending/bugs/BUG-22-debug-pane-size-en-produccion.md) — Debug pane size en produccion
-- [BUG-23](pending/bugs/BUG-23-console-log-persistencia-produccion.md) — console.log de persistencia en produccion
 - [BUG-24](pending/bugs/BUG-24-respawnsession-dormantring-bytes-en-vuelo.md) — respawnSession: bytes en vuelo del DormantRing
 - [BUG-25](pending/bugs/BUG-25-doble-destroy-cierre-ultimo-panel.md) — Doble destroy al cerrar ultimo panel
 - [BUG-26](pending/bugs/BUG-26-diff-effect-source-dep-recreated.md) — Diff effect: source dep recreada en cada render
