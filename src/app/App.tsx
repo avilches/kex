@@ -778,8 +778,9 @@ export default function App() {
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActivePanel,
       "tab.rename": () => {
-        const tag = document.activeElement?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        const active = document.activeElement;
+        const tag = active?.tagName;
+        if ((tag === "INPUT" || tag === "TEXTAREA") && !active?.classList.contains("xterm-helper-textarea")) return;
         if (activePanelId) useTabRenameStore.getState().startRename(activePanelId);
       },
       "tab.next": () => {
