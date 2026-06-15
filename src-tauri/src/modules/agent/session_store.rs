@@ -169,7 +169,7 @@ pub fn record_session(panel_id: &str, agent: &str, session_id: &str, transcript_
     };
     let jsonl_exists = std::path::Path::new(transcript_path).exists();
     log::info!(
-        "[agent-session] record panel={panel_id} agent={agent} session={session_id} \
+        "[agent-session] record hook=SessionStart panel={panel_id} agent={agent} session={session_id} \
          cwd={cwd} jsonl={}",
         if jsonl_exists { "ok" } else { "not yet" }
     );

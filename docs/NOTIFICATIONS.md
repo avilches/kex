@@ -8,17 +8,16 @@ Kex passively monitors terminal panels for coding agents (Claude Code, Codex, et
 
 | Sequence | Sent by | Cuando | `agent_detect.rs` (Rust) | `osc-handlers.ts` (xterm.js) | `AgentNotificationsBridge` (TS) |
 |---|---|---|---|---|---|
-| `OSC 133;D;<exit>` | Shell (Kex init scripts) | Primera instrucción de `_kex_precmd`: captura `$?` del comando que acaba de terminar antes de que se pierda | Si `armed`: `disarm()`, emit `Exited` → `kex:agent-signal` | `state.inCommand=false`, `onRunningCommand(null)` | `exited` → `store.finish()` + `invoke("agent_detach_session")` |
-| `OSC 7;file://<host><path>` | Shell (Kex init scripts) | Segunda instrucción de `_kex_precmd`: justo después de `D`, antes de mostrar el prompt | | Updates `panel.cwd`. Ignored if `state.inCommand` (protects against output injection) | |
+| `OSC 133;D;<exit>` | Shell (Kex init scripts) | Primera instrucción de `_kex_precmd`: captura `$?` antes de que se pierda | Si `armed`: `disarm()`, emit `Exited` → `kex:agent-signal` | `state.inCommand=false`, `onRunningCommand(null)` | `exited` → `store.finish()` + `invoke("agent_detach_session")` |
+| `OSC 7;file://<host><path>` | Shell (Kex init scripts) | Segunda instrucción de `_kex_precmd`: justo después de `D`, antes del prompt | | Updates `panel.cwd`. Ignorado si `state.inCommand` | |
 | `OSC 133;A` | Shell (Kex init scripts) | Última instrucción de `_kex_precmd`: el prompt está a punto de renderizarse | | `state.inCommand=false`, crea marker de posición del prompt | |
-| `OSC 133;B` | Shell (Kex init scripts) | Incrustado en `PS1`: se emite cuando el shell renderiza el prompt y el usuario puede empezar a escribir | | `state.inCommand=true` | |
-| `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse. En bash <4.4 no se emite | Si `!armed` y `match_agent(cmd)`: `armed=true`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → noop |
-| `OSC 133;C;<cmd>` (ya armado) | Shell (Kex init scripts) | Igual que arriba, pero el detector ya estaba armado por un agente previo | Ignorado | `state.inCommand=true`, `onRunningCommand(cmd)` | |
-| `OSC 9;<msg>` (sin `9;4`) | Cualquier proceso | Varía por aplicacion; Claude Code lo usa para notificaciones del sistema cuando no hay hooks instalados | Si `armed`: `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("waiting")` + route |
-| `OSC 777;notify;Kex;UserPromptSubmit` | Hook `UserPromptSubmit` de Claude Code | El usuario envió un prompt a Claude Code (antes de que Claude empiece a procesar) | `ensure_armed`; si `status!=Working`: `status=Working`, emit `UserPromptSubmit` → `kex:agent-signal` | | `UserPromptSubmit` → `setStatus("working")` (spinner en el tab) |
-| `OSC 777;notify;Kex;Notification` | Hook `Notification` de Claude Code | Claude Code generó una notificación (necesita input del usuario, solicitud de permiso, etc.) | `ensure_armed`, `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("waiting")` + route |
-| `OSC 777;notify;Kex;Stop` | Hook `Stop` de Claude Code | Claude Code terminó de responder y vuelve a esperar input | `ensure_armed`, `status=Waiting`, emit `Stop`, `disarm()` → `kex:agent-signal` | | `Stop` → route "finished" + `store.finish()` |
-| `OSC 777;kex-session;...` | Hook `SessionStart` de Claude Code via `session.sh` | Claude Code inicia una nueva sesión (antes de que el usuario envíe el primer prompt) | Parsea campos, emit `SessionStart` (no llega al frontend) → `session_store::record_session` | | |
+| `OSC 133;B` | Shell (Kex init scripts) | Incrustado en `PS1`: el shell renderizó el prompt | | `state.inCommand=true` | |
+| `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse | Si `match_agent(cmd)`: `armed=true`, `status=Idle`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → noop |
+| `OSC 9;<msg>` (sin `9;4`) | Cualquier proceso | Claude Code lo usa para notificaciones cuando no hay hooks instalados | Si `armed`: `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("waiting")` + route |
+| `OSC 777;notify;Kex;UserPromptSubmit` | Hook `UserPromptSubmit` de Claude Code | El usuario envió un prompt (antes de que Claude empiece a procesar) | `ensure_armed`; `status=Working`, emit `UserPromptSubmit` → `kex:agent-signal` | | `UserPromptSubmit` → `ensureSession` + `setStatus("working")` (spinner en el tab) |
+| `OSC 777;notify;Kex;Notification` | Hook `Notification` de Claude Code | Claude Code necesita input del usuario (permiso, pregunta, etc.) | `ensure_armed`, `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("waiting")` + route |
+| `OSC 777;notify;Kex;Stop` | Hook `Stop` de Claude Code | Claude Code terminó de responder y vuelve a esperar input | `ensure_armed`, `status=Waiting`, emit `Stop`, `status=Idle` (permanece armado) → `kex:agent-signal` | | `Stop` → route "finished" + `store.finish()` |
+| `OSC 777;kex-session;...` | Hook `SessionStart` de Claude Code via `session.sh` | Claude Code inicia una nueva sesión (antes del primer prompt) | Parsea campos (decodificando `%2F` etc.), emit `SessionStart` (no llega al frontend) → `session_store::record_session` | | |
 | `OSC 777;notify;<otro>;...` | Cualquier proceso | Varía | Si `armed`: `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("waiting")` + route |
 
 `OSC 133` lo emite el shell (zsh/bash via los scripts de init de Kex), no Claude Code. Cuando el usuario lanza `claude`, el shell emite `C;claude` y deja de emitir OSC 133 porque Claude Code toma el PTY. El estado working/waiting durante la sesión de Claude Code se conoce exclusivamente a través de los hooks.
@@ -29,32 +28,35 @@ Kex passively monitors terminal panels for coding agents (Claude Code, Codex, et
 
 ## Auto-arming (`ensure_armed`)
 
-Si llega un `OSC 777;notify;Kex;*` sin que antes haya llegado `OSC 133;C` (bash, Windows, tmux, wrappers que no emiten shell integration), `ensure_armed` arma el detector y emite `Started { agent: "claude" }` antes de la transición real. Esto garantiza que los hooks funcionan en cualquier entorno sin depender de la shell integration.
+Si llega un `OSC 777;notify;Kex;*` sin que antes haya llegado `OSC 133;C` (bash, Windows, tmux, wrappers que no emiten shell integration), `ensure_armed` arma el detector (`status=Idle`) y emite `Started { agent: "claude" }` antes de la transición real. Esto garantiza que los hooks funcionan en cualquier entorno sin depender de la shell integration.
 
 ---
 
 ## Detector state machine
 
 ```
-           OSC 133;C (match_agent)
-Ground ─────────────────────────────► Armed/Working
+           OSC 133;C (match_agent) — puede disparar aunque ya esté armado
+Ground ─────────────────────────────► Armed/Idle
+         (o ensure_armed auto-arm)         │
+                                           │ OSC 777;Kex;UserPromptSubmit
+                                           ▼
+                                    Armed/Working
                                            │
-              OSC 777;Kex;UserPromptSubmit │◄──── (si status!=Working)
+         OSC 777;Kex;Notification          │ OSC 777;Kex;Stop
+         OSC 9 / OSC 777;otro             ▼
+         ──────────────────────► Armed/Waiting
+                                           │
+              OSC 777;Kex;UserPromptSubmit │◄──── set_working (siempre emite)
               ─────────────────────────────┘
                                            │
-              OSC 777;Kex;Notification     │
-              OSC 9 / OSC 777;otro         ▼
-              ──────────────────────► Armed/Waiting
-                                           │
-              OSC 777;Kex;UserPromptSubmit │◄──── set_working
-              ─────────────────────────────┘
-                                           │
-              OSC 777;Kex;Stop             │
-              OSC 133;D                    ▼
+              OSC 133;D / PTY close        ▼
               ──────────────────────► Ground (disarmed)
 ```
 
-`set_working` solo emite `UserPromptSubmit` si `status != Working`, evitando transiciones redundantes cuando llegan múltiples hooks consecutivos.
+Notas clave:
+- **`Stop` no desarma el detector**: Claude sigue corriendo, solo ha terminado de responder. El detector queda en `Idle` listo para el siguiente prompt.
+- **`set_working` siempre emite**: no hay guard de idempotencia en Rust. El store del frontend maneja duplicados. Esto es necesario para que el spinner se recupere tras un ESC/CTRL+C (el frontend borra la sesión, Rust no lo sabe, el siguiente `UserPromptSubmit` debe re-crearla).
+- **`OSC 133;C` puede re-armar**: no hay guard `if armed { return }`. Si el usuario sale de Claude y lo relanza en el mismo terminal, el nuevo `133;C` re-arma correctamente.
 
 ---
 
@@ -86,10 +88,25 @@ Solo `Notification` genera toast (el usuario necesita hacer algo). `Stop` genera
 
 `dirname` es el último segmento de `panel.cwd`.
 
-El indicador se limpia con el primero de estos eventos:
-- `Stop` signal: el hook `Stop` de Claude Code disparó normalmente.
-- `Exited` signal: `OSC 133;D` o PTY cerrado.
-- El usuario escribe en el terminal: `writeToPty` llama a `store.finish()` cuando hay sesión activa (cubre Ctrl+C y terminaciones anómalas sin necesidad de timer).
+### Cuando desaparece el indicador
+
+El indicador (spinner o dot) desaparece con el primero de estos eventos:
+
+| Trigger | Aplica a | Mecanismo |
+|---|---|---|
+| `Stop` hook | Spinner y dot | `store.finish()` en `handleSignal` |
+| `Exited` signal (`OSC 133;D` o PTY cerrado) | Spinner y dot | `store.finish()` en `handleSignal` |
+| ESC (`\x1b` solo, 1 byte) | Spinner | `writeToPty` → `clearAgentSessionForLeaf` |
+| CTRL+C (`\x03`) | Spinner | `writeToPty` → `clearAgentSessionForLeaf` |
+| Cualquier tecla | Dot naranja (status=waiting) | `writeToPty` → `clearAgentSessionForLeaf` |
+| Submit desde shell-input bar | Spinner y dot | `submitToLeaf` → `clearAgentSessionForLeaf` |
+| Interrupt (botón UI) | Spinner y dot | `interruptLeaf` → `clearAgentSessionForLeaf` |
+
+`writeToPty` distingue por status: en `waiting` cualquier dato limpia; en `working` solo bytes de interrupción (`\x03`, `\x1b` solo). Las respuestas automáticas de xterm a queries de terminal (`\x1b[?1;2c`, etc.) son secuencias multi-byte que no coinciden con las comprobaciones y no limpian el spinner accidentalmente.
+
+### Re-aparición del spinner tras interrupción
+
+Cuando el usuario interrumpe (ESC/CTRL+C), el frontend borra la sesión pero el detector Rust no cambia de estado. Cuando el usuario envía el siguiente prompt, `set_working` emite `UserPromptSubmit` siempre (sin guard), `ensureSession` re-crea la sesión, y el spinner vuelve a aparecer.
 
 ---
 
