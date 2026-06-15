@@ -271,6 +271,10 @@ export function leafIdForPty(ptyId: number): string | null {
   return null;
 }
 
+export function ptyIdForPanel(panelId: string): number | null {
+  return sessions.get(panelId)?.pty?.id ?? null;
+}
+
 configureRendererPool({
   resolveLeaf(leafId) {
     const s = sessions.get(leafId);
@@ -512,8 +516,13 @@ function attachSession(
   if (s.visibleNow) bindLeafToSlot(leafId, s);
 
   if (!s.pty && !s.ptyOpening && !s.shellExited) {
+    // Consume the restore plan before spawning so we can start the PTY in the
+    // session's cwd directly, without needing a `cd` shell command.
+    const plan = consumeRestorePlan(leafId);
+    const ptyCwd = plan?.resumeCmd ? plan.cwd : s.initialCwd;
+
     s.ptyOpening = true;
-    openPtyForSession(leafId, s, s.initialCwd)
+    openPtyForSession(leafId, s, ptyCwd)
       .then((pty) => {
         s.ptyOpening = false;
         if (s.disposed) {
@@ -522,18 +531,17 @@ function attachSession(
         }
         s.pty = pty;
         if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
-        const plan = consumeRestorePlan(leafId);
         if (plan) {
           const store = useAgentStore.getState();
           if (plan.resumeCmd) {
-            store.startRestored(leafId, leafId, plan.agent);
             setTimeout(() => {
               s.pty?.write(plan.resumeCmd + "\r");
             }, 200);
-          } else {
-            console.error(`[kex] session restore failed for panel ${leafId} (${plan.agent}): ${plan.errorReason || "unknown error"}`);
-            store.setRestoreError(leafId, leafId, plan.agent, plan.errorReason || undefined);
+          } else if (plan.errorReason) {
+            console.error(`[kex] session restore failed for panel ${leafId} (${plan.agent}): ${plan.errorReason}`);
+            store.setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
           }
+          // else: no command, no error — PTY just opened at plan.cwd, nothing to do
         }
       })
       .catch((e) => {

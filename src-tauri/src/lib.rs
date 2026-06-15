@@ -245,6 +245,8 @@ fn window_save_workspace_state(
     workspaces: serde_json::Value,
     active_index: usize,
 ) {
+    let ws_count = workspaces.as_array().map(|a| a.len()).unwrap_or(0);
+    log::debug!("[window] save workspace state: label={label} workspaces={ws_count} activeIndex={active_index}");
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_workspace(&label, workspaces, active_index);
     mgr.save();
@@ -259,7 +261,7 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
     let mgr = app.state::<window_state::WindowStateManager>();
     let Some(entry) = mgr.get_entry(&label) else { return };
     let g = &entry.geometry;
-    log::info!("[window] restore size for {label}: {}x{} maximized={}", g.width, g.height, g.maximized);
+    log::debug!("[window] restore size for {label}: {}x{} maximized={}", g.width, g.height, g.maximized);
     if g.maximized {
         let _ = webview_window.maximize();
     } else if g.width > 0 && g.height > 0 {
@@ -269,7 +271,10 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
 
 #[tauri::command]
 fn agent_session_restore_plan() -> Vec<agent::session_store::RestorePlan> {
-    agent::session_store::load_restore_plan()
+    log::debug!("[agent-session] agent_session_restore_plan invoked");
+    let plans = agent::session_store::load_restore_plan();
+    log::info!("[agent-session] restore: {} plan(s) ready for frontend", plans.len());
+    plans
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

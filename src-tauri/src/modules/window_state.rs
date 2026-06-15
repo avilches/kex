@@ -62,16 +62,16 @@ impl WindowStateManager {
 
     /// Returns true if the file was loaded successfully.
     pub fn load(&self) -> bool {
-        log::info!("[window-state] loading from {}", self.path.display());
+        log::debug!("[window-state] loading from {}", self.path.display());
         let Ok(content) = std::fs::read_to_string(&self.path) else {
-            log::info!("[window-state] file not found or unreadable — starting fresh");
+            log::debug!("[window-state] file not found or unreadable - starting fresh");
             return false;
         };
         let Ok(state) = serde_json::from_str::<WindowStateFile>(&content) else {
-            log::warn!("[window-state] file corrupt or wrong schema — starting fresh");
+            log::warn!("[window-state] file corrupt or wrong schema - starting fresh");
             return false;
         };
-        log::info!(
+        log::debug!(
             "[window-state] loaded {} window(s): {:?}",
             state.window_order.len(),
             state.window_order
@@ -90,8 +90,8 @@ impl WindowStateManager {
         }
         if std::fs::write(&tmp, json).is_ok() {
             let _ = std::fs::rename(&tmp, &self.path);
-            log::info!(
-                "[window-state] saved — windows: {:?}",
+            log::debug!(
+                "[window-state] saved - windows: {:?}",
                 state.window_order
             );
         }
@@ -115,7 +115,7 @@ impl WindowStateManager {
     }
 
     pub fn add_window(&self, label: String) {
-        log::info!("[window-state] add_window: {label}");
+        log::debug!("[window-state] add_window: {label}");
         let mut state = self.inner.write().expect("window state lock poisoned");
         state.windows.entry(label.clone()).or_default();
         if !state.window_order.contains(&label) {
@@ -124,7 +124,7 @@ impl WindowStateManager {
     }
 
     pub fn remove_window(&self, label: &str) {
-        log::info!("[window-state] remove_window: {label}");
+        log::debug!("[window-state] remove_window: {label}");
         let mut state = self.inner.write().expect("window state lock poisoned");
         state.windows.remove(label);
         state.window_order.retain(|l| l != label);
@@ -134,7 +134,7 @@ impl WindowStateManager {
         let mut state = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = state.windows.get_mut(label) {
             let ws_count = entry.workspaces.as_array().map(|a| a.len()).unwrap_or(0);
-            log::info!("[window-state] update_workspace: {label} — {ws_count} workspace(s), activeIndex={active_index}");
+            log::debug!("[window-state] update_workspace: {label} - {ws_count} workspace(s), activeIndex={active_index}");
             entry.workspaces = workspaces;
             entry.active_index = active_index;
         } else {

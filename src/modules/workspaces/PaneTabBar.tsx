@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/context-menu";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { ptyIdForPanel } from "@/modules/terminal/lib/useTerminalSession";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { useTabRenameStore } from "./lib/tabRenameStore";
 
@@ -92,6 +93,7 @@ function DraggableTab({
   const agentSession = useAgentStore((s) => s.sessions[panel.id]);
   const hasAgent = agentSession !== undefined;
   const isRestoreError = agentSession?.restoreError ?? false;
+  const ptyId = panel.kind === "terminal" ? ptyIdForPanel(panel.id) : null;
 
   const agentTitle =
     hasAgent && panel.kind === "terminal"
@@ -145,14 +147,19 @@ function DraggableTab({
               ref={setNodeRef}
               {...attributes}
               data-panel-id={panel.id}
-              title={hasAgent ? [
-                agentSession!.agent,
-                `Session: ${agentSession!.panelId.slice(0, 8)}...`,
-                `Started: ${new Date(agentSession!.startedAt).toLocaleTimeString()}`,
-                agentSession!.restored ? "Session restored" : null,
-                isRestoreError ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}` : null,
-                panel.kind === "terminal" ? (panel.cwd ?? "") : null,
-              ].filter((x): x is string => x !== null).join("\n") : undefined}
+              title={[
+                ...(hasAgent ? [
+                  agentSession!.agent,
+                  `Session: ${agentSession!.panelId.slice(0, 8)}...`,
+                  `Started: ${new Date(agentSession!.startedAt).toLocaleTimeString()}`,
+                  agentSession!.restored ? "Session restored" : null,
+                  isRestoreError ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}` : null,
+                  panel.kind === "terminal" ? (panel.cwd ?? "") : null,
+                ] : []),
+                `panel: ${panel.id}`,
+                panel.kind === "terminal" ? `pty: ${ptyId ?? "-"}` : null,
+                hasAgent ? `ws: ${agentSession!.tabId}` : null,
+              ].filter((x): x is string => x !== null).join("\n") || undefined}
               onClick={() => onActivate(panel.id)}
               onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
               onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}

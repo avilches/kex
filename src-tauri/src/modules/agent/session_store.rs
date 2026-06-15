@@ -85,12 +85,14 @@ fn read_launch_cwd_from_jsonl(jsonl: &PathBuf) -> Option<String> {
     None
 }
 
-fn resume_cmd_for_agent(agent: &str, session_id: &str, cwd: &str) -> String {
+// Returns only the agent command. The frontend spawns the PTY with plan.cwd as the
+// initial working directory, so no `cd` prefix is needed here.
+fn resume_cmd_for_agent(agent: &str, session_id: &str) -> String {
     match agent {
-        "claude" => format!("cd {} && claude --resume {}", shell_quote(cwd), shell_quote(session_id)),
-        "codex" => format!("cd {} && codex resume --last", shell_quote(cwd)),
-        "gemini" => format!("cd {} && gemini --resume {}", shell_quote(cwd), shell_quote(session_id)),
-        _ => format!("cd {}", shell_quote(cwd)),
+        "claude" => format!("claude --resume {}", shell_quote(session_id)),
+        "codex" => "codex resume --last".to_string(),
+        "gemini" => format!("gemini --resume {}", shell_quote(session_id)),
+        _ => String::new(),
     }
 }
 
@@ -101,38 +103,47 @@ fn shell_quote(s: &str) -> String {
 fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&PathBuf>) -> Vec<RestorePlan> {
     let mut plans = Vec::new();
     for (panel_id, record) in panels {
-        let jsonl = match find_jsonl(&record.session_id, &record.transcript_path) {
-            Some(j) => j,
-            None => {
-                // Transcript deleted — session is permanently gone. Auto-remove from store
-                // so the ⚠ indicator doesn't reappear on subsequent launches.
-                if let Some(path) = store_path {
-                    remove_panel_from_store(&panel_id, path);
-                }
-                plans.push(RestorePlan {
-                    panel_id,
-                    agent: record.agent.unwrap_or_else(|| "claude".to_string()),
-                    resume_cmd: String::new(),
-                    cwd: record.cwd_launch,
-                    error_reason: format!("Session transcript not found (session may have been cleared by Claude Code)"),
-                });
-                continue;
+        let agent = record.agent.unwrap_or_else(|| "claude".to_string());
+
+        // Prefer the cwd recorded in the transcript (more accurate than cwd_launch when
+        // the user cd'd before running the agent).
+        let cwd = if let Some(jsonl) = find_jsonl(&record.session_id, &record.transcript_path) {
+            read_launch_cwd_from_jsonl(&jsonl).unwrap_or_else(|| record.cwd_launch.clone())
+        } else {
+            // Transcript not found. This happens when:
+            //   a) The session was very fresh (SessionStart fired before claude wrote the .jsonl).
+            //   b) The session was cleared on the claude side.
+            // Either way, try to resume once with cwd_launch and let claude respond natively.
+            // Remove from store so we don't retry on every launch; a successful resume will
+            // re-add via the SessionStart hook firing again.
+            log::debug!(
+                "[agent-session] restore plan: panel={panel_id} agent={agent} session={} \
+                 - transcript not found, trying once from cwd_launch={}",
+                record.session_id, record.cwd_launch
+            );
+            if let Some(path) = store_path {
+                remove_panel_from_store(&panel_id, path);
             }
+            record.cwd_launch.clone()
         };
-        let cwd = read_launch_cwd_from_jsonl(&jsonl)
-            .unwrap_or_else(|| record.cwd_launch.clone());
+
         if !PathBuf::from(&cwd).exists() {
+            log::debug!("[agent-session] restore plan: panel={panel_id} agent={agent} - cwd not found: {cwd}");
+            // Remove from store so the error doesn't repeat on every launch.
+            if let Some(path) = store_path {
+                remove_panel_from_store(&panel_id, path);
+            }
             plans.push(RestorePlan {
-                panel_id,
-                agent: record.agent.unwrap_or_else(|| "claude".to_string()),
+                panel_id, agent,
                 resume_cmd: String::new(),
                 cwd: cwd.clone(),
                 error_reason: format!("Directory not found: {cwd}"),
             });
             continue;
         }
-        let agent = record.agent.unwrap_or_else(|| "claude".to_string());
-        let cmd = resume_cmd_for_agent(&agent, &record.session_id, &cwd);
+
+        let cmd = resume_cmd_for_agent(&agent, &record.session_id);
+        log::debug!("[agent-session] restore plan: panel={panel_id} agent={agent} session={} cwd={cwd} cmd={cmd:?}", record.session_id);
         plans.push(RestorePlan { panel_id, agent, resume_cmd: cmd, cwd, error_reason: String::new() });
     }
     plans
@@ -206,8 +217,11 @@ pub fn snapshot_idle_sessions() {
         .filter(|(_, r)| r.state == "idle")
         .collect();
     if idle.is_empty() {
+        log::debug!("[agent-session] snapshot: no idle sessions to snapshot");
         return;
     }
+    let panel_ids: Vec<&str> = idle.keys().map(|s| s.as_str()).collect();
+    log::debug!("[agent-session] snapshot: saving {} idle session(s): {:?}", idle.len(), panel_ids);
     let snap = SessionStore { version, panels: idle };
     let out = match serde_json::to_string_pretty(&snap) {
         Ok(s) => s,
@@ -220,6 +234,7 @@ pub fn snapshot_idle_sessions() {
     let tmp = cpath.with_extension("json.kex-tmp");
     if std::fs::write(&tmp, out).is_ok() {
         let _ = std::fs::rename(&tmp, &cpath);
+        log::debug!("[agent-session] snapshot: written to {}", cpath.display());
     }
 }
 
@@ -229,15 +244,20 @@ pub fn load_restore_plan() -> Vec<RestorePlan> {
     // in the seconds after PTYs die. Consuming (deleting) it prevents
     // double-restore on repeated launches without a new session in between.
     if let Some(cpath) = candidates_path().filter(|p| p.exists()) {
+        log::debug!("[agent-session] restore: loading from candidates snapshot {}", cpath.display());
         let content = std::fs::read_to_string(&cpath).unwrap_or_default();
         let _ = std::fs::remove_file(&cpath);
         if let Ok(store) = serde_json::from_str::<SessionStore>(&content) {
             if !store.panels.is_empty() {
+                log::debug!("[agent-session] restore: {} session(s) in candidates snapshot", store.panels.len());
                 // Pass the main store path so missing transcripts can be auto-removed.
                 let main_path = store_path();
-                return build_plans_from(store.panels, main_path.as_ref());
+                let plans = build_plans_from(store.panels, main_path.as_ref());
+                log::debug!("[agent-session] restore: built {} plan(s) from candidates", plans.len());
+                return plans;
             }
         }
+        log::debug!("[agent-session] restore: candidates snapshot empty, falling back to main store");
     }
 
     // Fallback: read agent-sessions.json directly.
@@ -247,20 +267,30 @@ pub fn load_restore_plan() -> Vec<RestorePlan> {
         Some(p) => p,
         None => return vec![],
     };
+    log::debug!("[agent-session] restore: loading from main store {}", path.display());
     let content = match std::fs::read_to_string(&path) {
         Ok(s) => s,
-        Err(_) => return vec![],
+        Err(_) => {
+            log::debug!("[agent-session] restore: main store not found or unreadable");
+            return vec![];
+        }
     };
     let store: SessionStore = match serde_json::from_str(&content) {
         Ok(s) => s,
-        Err(_) => return vec![],
+        Err(_) => {
+            log::debug!("[agent-session] restore: main store corrupt or wrong schema");
+            return vec![];
+        }
     };
     let active: HashMap<_, _> = store
         .panels
         .into_iter()
         .filter(|(_, r)| r.state != "exited")
         .collect();
-    build_plans_from(active, Some(&path))
+    log::debug!("[agent-session] restore: {} active (non-exited) session(s) in main store", active.len());
+    let plans = build_plans_from(active, Some(&path));
+    log::debug!("[agent-session] restore: built {} plan(s) from main store", plans.len());
+    plans
 }
 
 #[cfg(test)]

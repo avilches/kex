@@ -75,30 +75,29 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const store = useAgentStore.getState();
 
   switch (sig.kind) {
-    case "started": {
-      const ok = ensureSession(panelId, ctx, sig.agent ?? "claude");
-      if (!ok) console.debug("[kex:agent] panelInfo returned null for panel", panelId, "workspaces:", ctx.workspaces.length);
+    case "started":
       return;
-    }
     case "working": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       store.setStatus(panelId, "working");
       return;
     }
     case "attention": {
+      ensureSession(panelId, ctx, sig.agent ?? "claude");
       store.setStatus(panelId, "waiting");
       const session = store.sessions[panelId];
       if (session) route(session, "attention", ctx);
       return;
     }
     case "finished": {
+      ensureSession(panelId, ctx, sig.agent ?? "claude");
       const session = store.sessions[panelId];
       if (session) route(session, "finished", ctx);
       store.finish(panelId);
-      invoke("agent_detach_session", { panelId }).catch(() => {});
       return;
     }
     case "exited":
+      ensureSession(panelId, ctx, sig.agent ?? "claude");
       store.finish(panelId);
       invoke("agent_detach_session", { panelId }).catch(() => {});
       return;
