@@ -110,11 +110,17 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
         // the user cd'd before running the agent).
         let jsonl = find_jsonl(&record.session_id, &record.transcript_path);
         if jsonl.is_none() {
+            // No transcript on disk means the user never sent a message in this session.
+            // claude --resume would fail, so skip and clean up the store entry.
             log::info!(
                 "[agent-session] restore plan: panel={panel_id} agent={agent} session={} \
-                 jsonl not found, will attempt resume anyway",
+                 jsonl not found, skipping (no transcript to resume)",
                 record.session_id
             );
+            if let Some(path) = store_path {
+                remove_panel_from_store(&panel_id, path);
+            }
+            continue;
         }
         let cwd = if let Some(ref jsonl) = jsonl {
             read_launch_cwd_from_jsonl(jsonl).unwrap_or_else(|| record.cwd_launch.clone())
@@ -161,11 +167,8 @@ pub fn record_session(panel_id: &str, agent: &str, session_id: &str, transcript_
         Some(p) => p,
         None => return,
     };
-    let jsonl_exists = std::path::Path::new(transcript_path).exists();
     log::info!(
-        "[agent-session] record hook=SessionStart panel={panel_id} agent={agent} session={session_id} \
-         cwd={cwd} jsonl={}",
-        if jsonl_exists { "ok" } else { "not yet" }
+        "[agent-session] record hook=SessionStart panel={panel_id} agent={agent} session={session_id} cwd={cwd}"
     );
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
