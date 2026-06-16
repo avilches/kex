@@ -110,17 +110,11 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
         // the user cd'd before running the agent).
         let jsonl = find_jsonl(&record.session_id, &record.transcript_path);
         if jsonl.is_none() {
-            // No transcript on disk means the user never sent a message in this session.
-            // claude --resume would fail, so skip and clean up the store entry.
             log::info!(
                 "[agent-session] restore plan: panel={panel_id} agent={agent} session={} \
-                 jsonl not found, skipping (no transcript to resume)",
+                 jsonl not found, will attempt resume anyway",
                 record.session_id
             );
-            if let Some(path) = store_path {
-                remove_panel_from_store(&panel_id, path);
-            }
-            continue;
         }
         let cwd = if let Some(ref jsonl) = jsonl {
             read_launch_cwd_from_jsonl(jsonl).unwrap_or_else(|| record.cwd_launch.clone())
