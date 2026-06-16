@@ -15,6 +15,15 @@ use crate::modules::agent::session_store;
 use crate::modules::workspace::WorkspaceEnv;
 
 const AGENT_EVENT: &str = "kex:agent-signal";
+const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentSessionMetaPayload<'a> {
+    panel_id: &'a str,
+    session_id: &'a str,
+    cwd_launch: &'a str,
+}
 
 // Flusher coalesces a short window after first-byte arrival so we send chunks,
 // not single bytes. MAX_IDLE is only a safety net for missed signals.
@@ -191,6 +200,11 @@ pub fn spawn(
                                 ref transcript_path, ref cwd,
                             } = t {
                                 session_store::record_session(panel_id, agent, session_id, transcript_path, cwd);
+                                let _ = app_reader.emit(AGENT_SESSION_META_EVENT, AgentSessionMetaPayload {
+                                    panel_id,
+                                    session_id,
+                                    cwd_launch: cwd,
+                                });
                                 return;
                             }
                             let _ = app_reader.emit(AGENT_EVENT, t.into_signal(id));
