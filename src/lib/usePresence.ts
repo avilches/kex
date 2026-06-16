@@ -10,6 +10,8 @@ export type PresenceState = "open" | "closed";
  */
 export function usePresence(open: boolean, exitMs = 150) {
   const [mounted, setMounted] = useState(open);
+  const mountedRef = useRef(mounted);
+  mountedRef.current = mounted;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -19,13 +21,13 @@ export function usePresence(open: boolean, exitMs = 150) {
     }
     if (open) {
       setMounted(true);
-    } else if (mounted) {
+    } else if (mountedRef.current) {
       timer.current = setTimeout(() => setMounted(false), exitMs);
     }
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [open, exitMs, mounted]);
+  }, [open, exitMs]);
 
   return { mounted, state: (open ? "open" : "closed") as PresenceState };
 }
