@@ -23,7 +23,11 @@ El modo bloques es poco usable sin poder navegar entre bloques con el teclado, y
 2. Pulsar `Cmd+U` -- no cambia de bloque.
 3. Buscar atajo para abrir un nuevo block terminal -- no existe.
 
-## Hipotesis
+## Estado: RESUELTO (2026-06-15)
 
-- El handler de `Cmd+U` puede no estar registrado en el mapa de atajos de bloques, o puede estar registrado pero no llegar al componente activo.
-- La hotkey para nuevo block terminal puede estar pendiente de definir en `src/modules/shortcuts/shortcuts.ts` y cablear en el bloque de bloques.
+Ambos items ya estaban implementados:
+
+1. `tab.newBlock` (Cmd+Shift+T) esta definido en `shortcuts.ts` y cableado en `shortcutHandlers` de `App.tsx`. `BlockWatermark` lo muestra correctamente.
+2. La referencia a `Cmd+U` era stale. Los atajos de navegacion entre bloques son `blocks.prev` (Cmd+ArrowUp) y `blocks.next` (Cmd+ArrowDown), funcionan cuando el panel activo tiene `blocks: true`.
+
+No se requieren cambios de codigo.

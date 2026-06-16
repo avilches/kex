@@ -162,6 +162,12 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
                 if (e.key === "Enter") {
                   e.preventDefault();
                   findDirection(!e.shiftKey);
+                } else if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  findDirection(true);
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  findDirection(false);
                 } else if (e.key === "Escape") {
                   e.preventDefault();
                   clearTarget();

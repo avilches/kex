@@ -22,7 +22,8 @@ Busqueda en documentos completamente inoperativa. Busqueda en terminal inutiliza
 1. Abrir un editor con texto. Pulsar `Cmd+F` -- no pasa nada.
 2. Abrir un terminal con output largo. Pulsar `Cmd+F`. Escribir un termino. No hay forma de ir al siguiente resultado.
 
-## Hipotesis
+## Estado: PARCIALMENTE RESUELTO (2026-06-15)
 
-- `SearchInline` (modulo `header/`) puede no adaptar su target cuando el panel activo no es un terminal. `SearchTarget` puede no cubrir los tipos de panel distintos de `terminal`.
-- La navegacion entre resultados (xterm `FindAddonOptions: incremental`) puede no estar cableada al teclado -- revisar `useTerminalSearch` o equivalente.
+- Navegacion entre resultados (terminal y editor): arreglada. Se anadieron ArrowUp/ArrowDown al `onKeyDown` de `SearchInline` (Shift+Enter ya funcionaba).
+- Label "Find in terminal" renombrado a "Find" en `shortcuts.ts`.
+- Paneles sin target (markdown, git-diff): Cmd+F enfoca el input pero no busca. Implementar busqueda para esos tipos queda pendiente como trabajo mayor.
