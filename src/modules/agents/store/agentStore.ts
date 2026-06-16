@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   AgentNotification,
   AgentSession,
+  AgentSessionMeta,
   AgentStatus,
   LocalAgentState,
 } from "../lib/types";
@@ -20,6 +21,7 @@ type AgentStoreState = {
   startRestored: (panelId: string, tabId: string, agent: string) => void;
   setRestoreError: (panelId: string, tabId: string, agent: string, reason?: string) => void;
   clearRestored: (panelId: string) => void;
+  setMeta: (panelId: string, meta: Partial<AgentSessionMeta>) => void;
   setLocalAgent: (state: LocalAgentState) => void;
   pushNotification: (
     n: Omit<AgentNotification, "id" | "at" | "read">,
@@ -132,6 +134,18 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
         sessions: {
           ...s.sessions,
           [panelId]: { ...prev, restored: false },
+        },
+      };
+    }),
+
+  setMeta: (panelId, meta) =>
+    set((s) => {
+      const prev = s.sessions[panelId];
+      if (!prev) return s;
+      return {
+        sessions: {
+          ...s.sessions,
+          [panelId]: { ...prev, meta: { ...prev.meta, ...meta } },
         },
       };
     }),

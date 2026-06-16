@@ -15,6 +15,12 @@ export type AgentSignal = {
   agent: string | null;
 };
 
+export type AgentSessionMeta = {
+  sessionId?: string;
+  cwdLaunch?: string;
+  // extension futura: contextPct?: number; model?: string;
+};
+
 export type AgentSession = {
   panelId: string;
   tabId: string;
@@ -26,6 +32,7 @@ export type AgentSession = {
   restored: boolean;
   restoreError: boolean;
   restoreErrorReason?: string;
+  meta?: AgentSessionMeta;
 };
 
 export type AgentNotification = {
