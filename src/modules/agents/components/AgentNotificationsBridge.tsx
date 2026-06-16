@@ -10,6 +10,11 @@ import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
 
 type Activate = (workspaceId: string, panelId: string) => void;
+type AgentSessionMetaPayload = {
+  panelId: string;
+  sessionId: string;
+  cwdLaunch: string;
+};
 type Ctx = {
   workspaces: Workspace[];
   activeWorkspaceId: string;
@@ -127,6 +132,24 @@ export function AgentNotificationsBridge({
         else u();
       })
       .catch((e) => console.error("[kex:agent] listen failed:", e));
+    return () => {
+      alive = false;
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    let unlisten: (() => void) | undefined;
+    listen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) => {
+      const { panelId, sessionId, cwdLaunch } = e.payload;
+      useAgentStore.getState().setMeta(panelId, { sessionId, cwdLaunch });
+    })
+      .then((u) => {
+        if (alive) unlisten = u;
+        else u();
+      })
+      .catch((e) => console.error("[kex:agent] listen session-meta failed:", e));
     return () => {
       alive = false;
       unlisten?.();
