@@ -21,6 +21,7 @@ export function WindowControls({ closeOnly = false }: Props) {
   useEffect(() => {
     if (!USE_CUSTOM_WINDOW_CONTROLS || closeOnly) return;
     const w = getCurrentWindow();
+    let cancelled = false;
     let unlisten: (() => void) | undefined;
     void w.isMaximized().then(setMaximized);
     void w
@@ -28,9 +29,13 @@ export function WindowControls({ closeOnly = false }: Props) {
         void w.isMaximized().then(setMaximized);
       })
       .then((un) => {
-        unlisten = un;
+        if (cancelled) un();
+        else unlisten = un;
       });
-    return () => unlisten?.();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, [closeOnly]);
 
   if (!USE_CUSTOM_WINDOW_CONTROLS) return null;
@@ -46,7 +51,7 @@ export function WindowControls({ closeOnly = false }: Props) {
           </CtlButton>
           <CtlButton
             ariaLabel={maximized ? "Restore" : "Maximize"}
-            onClick={() => void w.toggleMaximize()}
+            onClick={() => void w.toggleMaximize().then(() => void w.isMaximized().then(setMaximized))}
           >
             <HugeiconsIcon
               icon={maximized ? Copy01Icon : SquareIcon}
