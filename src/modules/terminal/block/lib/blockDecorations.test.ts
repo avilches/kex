@@ -219,3 +219,98 @@ describe("BlockDecorations — hasAnyBlock", () => {
     expect(deco.hasAnyBlock()).toBe(true);
   });
 });
+
+describe("BlockDecorations — visibleBlocks sticky threshold", () => {
+  // Build a fake terminal that has enough DOM surface for visibleBlocks().
+  function makeTermWithViewport(rows: number, viewportY: number) {
+    const handlers = new Map<number, OscHandler>();
+    let currentLine = 0;
+    const cellHeight = 20;
+    const screenHeight = rows * cellHeight;
+
+    const screen = {
+      getBoundingClientRect: () => ({ top: 0, height: screenHeight }),
+    };
+    const element = {
+      querySelector: (_: string) => screen,
+      getBoundingClientRect: () => ({ top: 0 }),
+    };
+
+    const term = {
+      options: {} as Record<string, unknown>,
+      element,
+      rows,
+      parser: {
+        registerOscHandler(code: number, h: OscHandler) {
+          handlers.set(code, h);
+          return { dispose: () => handlers.delete(code) };
+        },
+      },
+      registerMarker: vi.fn(() => ({
+        line: currentLine,
+        isDisposed: false,
+        dispose: vi.fn(),
+      })),
+      registerDecoration: vi.fn(() => ({ dispose: vi.fn(), onRender: vi.fn() })),
+      onWriteParsed: vi.fn(() => ({ dispose: vi.fn() })),
+      onScroll: vi.fn(() => ({ dispose: vi.fn() })),
+      onRender: vi.fn(() => ({ dispose: vi.fn() })),
+      hasSelection: () => false,
+      selectLines: vi.fn(),
+      clearSelection: vi.fn(),
+      scrollToLine: vi.fn(),
+      buffer: {
+        active: {
+          type: "normal" as const,
+          length: 5000,
+          baseY: 0,
+          cursorY: 0,
+          viewportY,
+          getLine: () => ({ translateToString: () => "" }),
+        },
+      },
+    } as unknown as Terminal;
+
+    return {
+      term,
+      emit: (payload: string) => handlers.get(133)?.(payload),
+      setLine: (n: number) => { currentLine = n; },
+    };
+  }
+
+  it("sets sticky when header row clips above the viewport (startLine < vpTop + 2)", () => {
+    // Block: startLine=10, endLine=50. cellHeight=20px.
+    // headerTop = (startLine - vpTop) * cellHeight - 1.9 * cellHeight
+    // vpTop=8: headerTop = (10-8)*20 - 38 = +2px  → visible, no sticky
+    // vpTop=9: headerTop = (10-9)*20 - 38 = -18px → clipped, sticky
+    const rows = 24;
+    for (const vpTop of [8, 9, 10, 11]) {
+      const { term, emit, setLine } = makeTermWithViewport(rows, vpTop);
+      const deco = new BlockDecorations(term);
+      setLine(10);
+      emit("C;ls");
+      setLine(50);
+      emit("D;0");
+      const { sticky } = deco.visibleBlocks();
+      if (vpTop <= 8) {
+        expect(sticky, `vpTop=${vpTop} should not be sticky`).toBeNull();
+      } else {
+        expect(sticky, `vpTop=${vpTop} should be sticky`).not.toBeNull();
+        expect(sticky!.id).toBe(deco.getBlocks()[0].id);
+      }
+    }
+  });
+
+  it("clears sticky once the block scrolls entirely above the viewport", () => {
+    // Block: startLine=5, endLine=10. With vpTop=11, endLine < vpTop → not in viewport.
+    const { term, emit, setLine } = makeTermWithViewport(24, 11);
+    const deco = new BlockDecorations(term);
+    setLine(5);
+    emit("C;ls");
+    setLine(10);
+    emit("D;0");
+    const { blocks, sticky } = deco.visibleBlocks();
+    expect(blocks).toHaveLength(0);
+    expect(sticky).toBeNull();
+  });
+});

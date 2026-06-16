@@ -283,7 +283,9 @@ export class BlockDecorations {
         headerTop: top - 1.9 * cellHeight,
       };
       out.push(pb);
-      if (startLine < vpTop && endLine >= vpTop) sticky = pb;
+      // Activate 2 rows before startLine reaches vpTop so the StickyHeader
+      // appears exactly when the bt-bar header would clip above overflow-hidden.
+      if (startLine < vpTop + 2 && endLine >= vpTop) sticky = pb;
     };
 
     // entries are chronological, so binary search beats a full scan per frame
