@@ -134,10 +134,14 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
   );
 
   const key = cacheKey(source);
+  const originalPath = source.originalPath;
+  // source is created inline in PanelContent and gets a new object identity on every parent render.
+  // Stabilize it so the fetch effect only re-runs when the diff content actually changes.
+  const stableSource = useMemo(() => source, [key, originalPath]);
 
   useEffect(() => {
     if (!active) return;
-    const cached = loadStateFromCache(source);
+    const cached = loadStateFromCache(stableSource);
     if (cached.kind === "loaded") {
       setState(cached);
       return;
@@ -145,18 +149,18 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     let cancelled = false;
     setState({ kind: "loading" });
     const promise =
-      source.kind === "working"
+      stableSource.kind === "working"
         ? fetchWorkingDiff(
-            source.repoRoot,
-            source.path,
-            source.mode,
-            source.originalPath,
+            stableSource.repoRoot,
+            stableSource.path,
+            stableSource.mode,
+            stableSource.originalPath,
           )
         : fetchCommitDiff(
-            source.repoRoot,
-            source.sha,
-            source.path,
-            source.originalPath,
+            stableSource.repoRoot,
+            stableSource.sha,
+            stableSource.path,
+            stableSource.originalPath,
           );
     promise
       .then((res) => {
@@ -182,7 +186,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [active, key, source]);
+  }, [active, key, originalPath, stableSource]);
 
   const path = source.path;
   const repoRoot = source.repoRoot;
