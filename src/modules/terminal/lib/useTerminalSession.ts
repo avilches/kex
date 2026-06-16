@@ -127,13 +127,17 @@ export function whenSessionReady(leafId: string, timeoutMs = 4000): Promise<void
   });
 }
 
+// Any user-initiated input to a terminal clears the agent session indicator:
+// the user is in control, so neither "working" spinner nor "attention" dot should remain.
+function clearAgentSessionForLeaf(leafId: string): void {
+  const store = useAgentStore.getState();
+  if (store.sessions[leafId]) store.finish(leafId);
+}
+
 export function writeToSession(leafId: string, data: string): boolean {
   const s = sessions.get(leafId);
   if (!s || !s.pty) return false;
-  const agentSession = useAgentStore.getState().sessions[leafId];
-  if (agentSession?.restoreError) {
-    useAgentStore.getState().finish(leafId);
-  }
+  clearAgentSessionForLeaf(leafId);
   void s.pty.write(data);
   return true;
 }
@@ -142,12 +146,14 @@ export function submitToLeaf(leafId: string, text: string): void {
   const s = sessions.get(leafId);
   if (!s?.pty) return;
   s.everSubmitted = true;
+  clearAgentSessionForLeaf(leafId);
   // Bracketed paste keeps a multiline command atomic; trailing CR runs it.
   if (text.includes("\n")) s.pty.write(`\x1b[200~${text}\x1b[201~\r`);
   else s.pty.write(`${text}\r`);
 }
 
 export function interruptLeaf(leafId: string): void {
+  clearAgentSessionForLeaf(leafId);
   sessions.get(leafId)?.pty?.write("\x03");
 }
 
@@ -282,6 +288,20 @@ configureRendererPool({
     if (!s) return null;
     return {
       writeToPty: (data) => {
+        // "waiting" (attention dot): any input acknowledges — user is in control.
+        // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) — these are
+        // explicit user interrupts. Protocol auto-responses from xterm (e.g. "\x1b[?1;2c"
+        // for DA queries) are multi-byte ESC sequences and must NOT clear the spinner.
+        const session = useAgentStore.getState().sessions[leafId];
+        if (session) {
+          if (
+            session.status === "waiting" ||
+            data === "\x03" ||
+            data === "\x1b"
+          ) {
+            useAgentStore.getState().finish(leafId);
+          }
+        }
         s.pty?.write(data);
       },
       resizePty: (cols, rows) => {

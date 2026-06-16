@@ -20,6 +20,8 @@ enum State {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Status {
+    // Armed but no prompt submitted yet (initial state after arm or disarm).
+    Idle,
     Working,
     Waiting,
 }
@@ -98,7 +100,7 @@ impl AgentDetector {
             state: State::Ground,
             osc: Vec::new(),
             armed: false,
-            status: Status::Working,
+            status: Status::Idle,
         }
     }
 
@@ -166,7 +168,7 @@ impl AgentDetector {
 
     fn disarm(&mut self) {
         self.armed = false;
-        self.status = Status::Working;
+        self.status = Status::Idle;
     }
 
     fn finish_osc<F: FnMut(Transition)>(&mut self, emit: &mut F) {
@@ -191,7 +193,7 @@ impl AgentDetector {
 
     fn handle_osc777<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
         if let Some(event) = pt.strip_prefix(KEX_MARKER) {
-            log::debug!("[osc777] kex event: {}", String::from_utf8_lossy(event));
+            log::debug!("[osc777] hook event: {}", String::from_utf8_lossy(event));
             // Self-arms so notifications work even when no shell preexec fired
             // (bash, Windows, tmux, wrappers).
             match event {
@@ -208,20 +210,17 @@ impl AgentDetector {
                     self.ensure_armed(emit);
                     self.status = Status::Waiting;
                     emit(Transition::Stop);
-                    // Disarm so the session is truly over. If the user sends
-                    // another prompt without exiting claude, the next working
-                    // OSC will auto-arm and emit Started, creating a fresh
-                    // session on the JS side.
-                    self.disarm();
+                    // Stay armed — Claude is still running. Reset to Idle so
+                    // the next UserPromptSubmit triggers a new Working transition.
+                    self.status = Status::Idle;
                 }
                 _ => {
-                    log::debug!("[osc777] unknown kex event, ignored");
+                    log::debug!("[osc777] unknown hook event, ignored");
                 }
             }
             return;
         }
         if let Some(data) = pt.strip_prefix(KEX_SESSION_MARKER) {
-            log::debug!("[osc777] kex-session payload: {}", String::from_utf8_lossy(data));
             self.handle_kex_session(data, emit);
             return;
         }
@@ -234,7 +233,7 @@ impl AgentDetector {
         // All fields are percent-encoded.
         let parts: Vec<&[u8]> = data.splitn(5, |&b| b == b';').collect();
         if parts.len() != 5 {
-            log::debug!("[agent-detect] kex-session: malformed payload ({} parts)", parts.len());
+            log::debug!("[osc777] SessionStart hook: malformed payload ({} parts)", parts.len());
             return;
         }
         let panel_id = percent_decode(parts[0]);
@@ -243,28 +242,26 @@ impl AgentDetector {
         let transcript_path = percent_decode(parts[3]);
         let cwd = percent_decode(parts[4]);
         if panel_id.is_empty() || session_id.is_empty() {
-            log::debug!("[agent-detect] kex-session: missing panel_id or session_id");
+            log::debug!("[osc777] SessionStart hook: missing panel_id or session_id");
             return;
         }
+        log::debug!("[osc777] SessionStart hook: panel={panel_id} agent={agent} session={session_id} cwd={cwd}");
         emit(Transition::SessionStart { panel_id, agent, session_id, transcript_path, cwd });
     }
 
     fn handle_osc133<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
         match pt.first() {
             Some(b'C') => {
-                if self.armed {
-                    return;
-                }
                 let cmd = pt.strip_prefix(b"C;").unwrap_or(b"");
                 if let Some(agent) = self.match_agent(cmd) {
-                    log::debug!("[osc133] C armed: agent={agent} cmd={}", String::from_utf8_lossy(cmd));
+                    log::debug!("[shell] osc133 C: armed agent={agent} cmd={}", String::from_utf8_lossy(cmd));
                     self.armed = true;
-                    self.status = Status::Working;
+                    self.status = Status::Idle;
                     emit(Transition::Started { agent });
                 }
             }
             Some(b'D') if self.armed => {
-                log::debug!("[osc133] D exited");
+                log::debug!("[shell] osc133 D: exited");
                 self.disarm();
                 emit(Transition::Exited);
             }
@@ -274,18 +271,19 @@ impl AgentDetector {
 
     fn ensure_armed<F: FnMut(Transition)>(&mut self, emit: &mut F) {
         if !self.armed {
-            log::debug!("[osc777] auto-arming (no OSC 133;C seen)");
+            log::debug!("[osc777] auto-arming (no shell OSC 133;C seen)");
             self.armed = true;
-            self.status = Status::Working;
+            self.status = Status::Idle;
             emit(Transition::Started { agent: "claude".into() });
         }
     }
 
     fn set_working<F: FnMut(Transition)>(&mut self, emit: &mut F) {
-        if self.status != Status::Working {
-            self.status = Status::Working;
-            emit(Transition::UserPromptSubmit);
-        }
+        // Always emit — the frontend store handles idempotency. Not emitting would
+        // desync Rust and JS state (e.g. after user presses ESC to clear the spinner,
+        // the next UserPromptSubmit must always re-create the session).
+        self.status = Status::Working;
+        emit(Transition::UserPromptSubmit);
     }
 
     fn generic_attention<F: FnMut(Transition)>(&mut self, emit: &mut F) {
@@ -376,10 +374,14 @@ mod tests {
     #[test]
     fn kex_marker_drives_status() {
         let mut d = AgentDetector::new();
+        // Arm via shell OSC 133;C → status=Idle
         run(&mut d, &osc("133;C;claude"));
+        // Notification while Idle → Waiting
         assert_eq!(run(&mut d, &osc("777;notify;Kex;Notification")), vec![Transition::Notification]);
+        // UserPromptSubmit while Waiting → Working
         assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![Transition::UserPromptSubmit]);
-        assert!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")).is_empty());
+        // Duplicate UserPromptSubmit — always emits so JS can re-create session after ESC/CTRL+C
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![Transition::UserPromptSubmit]);
         assert_eq!(run(&mut d, &osc("777;notify;Kex;Stop")), vec![Transition::Stop]);
     }
 
@@ -443,15 +445,29 @@ mod tests {
     }
 
     #[test]
-    fn disarms_after_finished_so_next_prompt_restarts() {
+    fn stays_armed_after_stop_ready_for_next_prompt() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
         assert_eq!(run(&mut d, &osc("777;notify;Kex;Stop")), vec![Transition::Stop]);
-        // Disarmed: 133;D is a no-op (armed=false)
-        assert!(run(&mut d, &osc("133;D;0")).is_empty());
-        // Next UserPromptSubmit auto-arms again → only Started (ensure_armed already sets
-        // status=Working so set_working is a no-op immediately after)
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![started("claude")]);
+        // Stop leaves detector armed (Claude still running) — next prompt needs no auto-arm.
+        assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![Transition::UserPromptSubmit]);
+        // Explicit shell exit (133;D) disarms.
+        assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
+        // Now disarmed: next UserPromptSubmit auto-arms.
+        assert_eq!(
+            run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")),
+            vec![started("claude"), Transition::UserPromptSubmit],
+        );
+    }
+
+    #[test]
+    fn rearmed_on_new_invocation_after_stop() {
+        // After Stop (still armed), if the user exits and reruns claude, 133;C re-arms.
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;claude"));
+        run(&mut d, &osc("777;notify;Kex;Stop"));
+        // New invocation: 133;C fires again (no guard; Claude restarted in same terminal).
+        assert_eq!(run(&mut d, &osc("133;C;claude")), vec![started("claude")]);
     }
 
     #[test]
