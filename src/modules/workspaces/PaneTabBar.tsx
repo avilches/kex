@@ -46,9 +46,9 @@ function AgentHoverCardContent({
         <span className="text-[12px] font-medium text-foreground">{agentSession.agent}</span>
         {agentSession.status === "working" ? (
           <span className="size-[7px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
-        ) : (
+        ) : agentSession.status === "waiting" ? (
           <span className="inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
-        )}
+        ) : null}
       </div>
       <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
         {sessionId && (
@@ -287,9 +287,9 @@ function DraggableTab({
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-destructive" />
         ) : agentSession?.status === "working" ? (
           <span className="ml-0.5 size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
-        ) : (
+        ) : agentSession?.status === "waiting" ? (
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
-        )
+        ) : null
       )}
       <button
         type="button"

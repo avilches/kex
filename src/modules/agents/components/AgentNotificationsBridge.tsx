@@ -73,6 +73,15 @@ function ensureSession(panelId: string, ctx: Ctx, agent: string): boolean {
   return true;
 }
 
+function ensureSessionIdle(panelId: string, ctx: Ctx, agent: string): boolean {
+  const store = useAgentStore.getState();
+  if (store.sessions[panelId]) return true;
+  const info = panelInfo(ctx.workspaces, panelId);
+  if (!info) return false;
+  store.startIdle(panelId, info.workspaceId, agent);
+  return true;
+}
+
 function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const panelId = leafIdForPty(sig.id);
   if (panelId === null) return;
@@ -80,6 +89,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
 
   switch (sig.kind) {
     case "started":
+      ensureSessionIdle(panelId, ctx, sig.agent ?? "claude");
       return;
     case "UserPromptSubmit": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
@@ -97,7 +107,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       const session = store.sessions[panelId];
       if (session) route(session, "finished", ctx);
-      store.finish(panelId);
+      store.setStatus(panelId, "idle");
       return;
     }
     case "exited":

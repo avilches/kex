@@ -16,6 +16,7 @@ type AgentStoreState = {
   localAgent: LocalAgentState;
   notifications: AgentNotification[];
   start: (panelId: string, tabId: string, agent: string) => void;
+  startIdle: (panelId: string, tabId: string, agent: string) => void;
   setStatus: (panelId: string, status: AgentStatus) => void;
   finish: (panelId: string) => void;
   startRestored: (panelId: string, tabId: string, agent: string) => void;
@@ -46,6 +47,27 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             tabId,
             agent,
             status: "working",
+            startedAt: now,
+            lastActivityAt: now,
+            attentionSince: null,
+            restored: false,
+            restoreError: false,
+          },
+        },
+      };
+    }),
+
+  startIdle: (panelId, tabId, agent) =>
+    set((s) => {
+      const now = Date.now();
+      return {
+        sessions: {
+          ...s.sessions,
+          [panelId]: {
+            panelId,
+            tabId,
+            agent,
+            status: "idle",
             startedAt: now,
             lastActivityAt: now,
             attentionSince: null,
