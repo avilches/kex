@@ -114,22 +114,11 @@ export function BlockOverlay(props: Props) {
     setSearchId(null);
   };
 
-  const stickyId = vis.sticky?.id ?? null;
-
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
       {vis.blocks.map((b) => (
-        <BlockChrome
-          key={b.id}
-          block={b}
-          all={props}
-          onSearch={setSearchId}
-          isSticky={b.id === stickyId}
-        />
+        <BlockChrome key={b.id} block={b} all={props} onSearch={setSearchId} />
       ))}
-      {vis.sticky && (
-        <StickyHeader block={vis.sticky} all={props} onSearch={setSearchId} />
-      )}
       {searchId && (
         <SearchBar
           blockId={searchId}
@@ -150,51 +139,47 @@ type ChromeProps = {
 
 // No chrome while the command runs; the bar lands together with the divider
 // once the block is finished.
-// When a block is sticky (header above viewport, StickyHeader shows at top),
-// hide the bt-bar to avoid the trigger being clipped by overflow-hidden which
-// causes Radix to close the dropdown as detached.
-function BlockChrome({ block, all, onSearch, isSticky }: ChromeProps & { isSticky: boolean }) {
+//
+// When headerTop goes negative (block header scrolled above the overflow-hidden
+// boundary), the same element switches to bt-sticky appearance and clamps to
+// top=0. Keeping a SINGLE element (just changing className/content) means the
+// Toolbar/DropdownMenu instance is never unmounted, so an open "..." dropdown
+// survives the transition without closing or jumping.
+function BlockChrome({ block, all, onSearch }: ChromeProps) {
   if (block.running) return null;
+  const stuck = block.headerTop < 0;
   return (
     <>
       <div
         className={cn("bt-divider", !block.ok && "bt-divider-fail")}
         style={{ top: block.bottom }}
       />
-      {!isSticky && (
-        <div className="bt-bar" style={{ top: block.headerTop }}>
-          <Meta block={block} />
-          <Toolbar block={block} all={all} onSearch={onSearch} />
-        </div>
-      )}
+      <div
+        className={stuck ? "bt-sticky" : "bt-bar"}
+        style={stuck ? undefined : { top: block.headerTop }}
+      >
+        {stuck ? (
+          <>
+            <HugeiconsIcon
+              className="bt-sticky-icon"
+              icon={CommandLineIcon}
+              size={12}
+              strokeWidth={1.75}
+            />
+            <span className="bt-sticky-cmd">{block.command || "command"}</span>
+          </>
+        ) : (
+          <span className="bt-head-meta">
+            {block.cwd && <span className="bt-cwd">{relPath(block.cwd)}</span>}
+            <span className="bt-clock">
+              <HugeiconsIcon icon={Clock01Icon} size={11} strokeWidth={1.75} />
+              {fmtTime(block.startedAt)}
+            </span>
+          </span>
+        )}
+        <Toolbar block={block} all={all} onSearch={onSearch} />
+      </div>
     </>
-  );
-}
-
-function Meta({ block }: { block: PositionedBlock }) {
-  return (
-    <span className="bt-head-meta">
-      {block.cwd && <span className="bt-cwd">{relPath(block.cwd)}</span>}
-      <span className="bt-clock">
-        <HugeiconsIcon icon={Clock01Icon} size={11} strokeWidth={1.75} />
-        {fmtTime(block.startedAt)}
-      </span>
-    </span>
-  );
-}
-
-function StickyHeader({ block, all, onSearch }: ChromeProps) {
-  return (
-    <div className="bt-sticky">
-      <HugeiconsIcon
-        className="bt-sticky-icon"
-        icon={CommandLineIcon}
-        size={12}
-        strokeWidth={1.75}
-      />
-      <span className="bt-sticky-cmd">{block.command || "command"}</span>
-      <Toolbar block={block} all={all} onSearch={onSearch} />
-    </div>
   );
 }
 
