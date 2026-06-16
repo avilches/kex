@@ -37,6 +37,7 @@ import { useFileTree } from "./lib/useFileTree";
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
+import { pathDirname } from "@/lib/pathUtils";
 import { useGlobalShortcuts } from "@/modules/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { GitStatusSnapshot } from "@/lib/native";
@@ -432,7 +433,7 @@ export const FileExplorer = memo(
           if (row.isDir && row.isExpanded) {
             tree.toggle(row.path);
           } else {
-            const parent = row.path.slice(0, row.path.lastIndexOf("/"));
+            const parent = pathDirname(row.path);
             if (parent && parent !== rootPath) setSelectedPath(parent);
           }
           break;

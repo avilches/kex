@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { pathDirname, pathBasename } from "@/lib/pathUtils";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
 export type DirEntry = {
@@ -30,11 +31,7 @@ export function joinPath(parent: string, name: string): string {
   return `${parent}/${name}`;
 }
 
-export function dirname(path: string): string {
-  const i = path.lastIndexOf("/");
-  if (i <= 0) return "/";
-  return path.slice(0, i);
-}
+export const dirname = pathDirname;
 
 const EXPANSION_CACHE_LIMIT = 8;
 const expansionCache = new Map<string, string[]>();
@@ -394,7 +391,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
   const movePath = useCallback(
     async (from: string, toDir: string) => {
-      const name = from.slice(from.lastIndexOf("/") + 1);
+      const name = pathBasename(from);
       const to = joinPath(toDir, name);
       if (to === from) return;
       const target = nodesRef.current[toDir];

@@ -6,6 +6,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
+import { pathDirname } from "@/lib/pathUtils";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -92,7 +93,7 @@ function EntryRowImpl(props: EntryRowProps) {
     dragSource !== null &&
     dragSource !== path &&
     !path.startsWith(`${dragSource}/`) &&
-    dragSource.slice(0, dragSource.lastIndexOf("/")) !== path;
+    pathDirname(dragSource) !== path;
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `explorer-dir:${path}`,
@@ -116,7 +117,7 @@ function EntryRowImpl(props: EntryRowProps) {
   }, [isOver, isValidDropTarget, isExpanded, actions, path]);
 
   const iconUrl = isDir ? folderIconUrl(name, isExpanded) : fileIconUrl(name);
-  const createTarget = isDir ? path : path.slice(0, path.lastIndexOf("/")) || rootPath;
+  const createTarget = isDir ? path : pathDirname(path) || rootPath;
   const paddingLeft = 6 + depth * 12;
 
   const handleClick = () => {

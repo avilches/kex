@@ -19,6 +19,7 @@ import {
   useRef,
 } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { pathBasename } from "@/lib/pathUtils";
 import {
   buildSharedExtensions,
   languageCompartment,
@@ -273,7 +274,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
                   backgroundImage: 'conic-gradient(#e5e7eb 0.25turn, #f3f4f6 0.25turn 0.5turn, #e5e7eb 0.5turn 0.75turn, #f3f4f6 0.75turn)',
                   backgroundSize: '20px 20px',
                 }}
-                alt={path.split('/').pop()}
+                alt={pathBasename(path)}
               />
             )}
             {isVideo && (
@@ -298,7 +299,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
               <iframe
                 src={assetUrl}
                 className="w-full h-full border-none"
-                title={path.split('/').pop()}
+                title={pathBasename(path)}
               />
             )}
           </div>
