@@ -66,18 +66,18 @@ function AgentHoverCardContent({
           </>
         )}
         <span className="text-muted-foreground">Started</span>
-        <span className="text-foreground">hace {elapsed}</span>
+        <span className="text-foreground">{elapsed} ago</span>
         {agentSession.restored && (
           <>
             <span className="text-muted-foreground">Restored</span>
-            <span className="text-foreground">si</span>
+            <span className="text-foreground">yes</span>
           </>
         )}
         {agentSession.restoreError && (
           <>
             <span className="text-muted-foreground">Error</span>
             <span className="truncate text-destructive">
-              {agentSession.restoreErrorReason ?? "desconocido"}
+              {agentSession.restoreErrorReason ?? "unknown error"}
             </span>
           </>
         )}
@@ -204,6 +204,108 @@ function DraggableTab({
     clearRename();
   }
 
+  const tabDiv = (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      data-panel-id={panel.id}
+      onClick={() => onActivate(panel.id)}
+      onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+      onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
+      {...listeners}
+      className={cn(
+        "group relative flex max-w-[240px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
+        isThisDragging ? "cursor-grabbing" : "cursor-default",
+        connected
+          ? [
+              "self-stretch border-r border-border/30",
+              active
+                ? "bg-background text-foreground"
+                : "border-b border-border/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            ]
+          : [
+              "h-5 rounded",
+              active
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            ],
+        isThisDragging && "opacity-40",
+      )}
+    >
+      {/* Droppable half-zones - coordinates-based, no pointer events needed */}
+      <div ref={setBeforeRef} className="pointer-events-none absolute inset-y-0 left-0 w-1/2" />
+      <div ref={setAfterRef} className="pointer-events-none absolute inset-y-0 right-0 w-1/2" />
+
+      {insertionBefore && (
+        <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
+      )}
+      {insertionAfter && (
+        <div className="pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
+      )}
+
+      {active && paneFocused && (
+        <div
+          className={cn("absolute inset-x-0 top-0 bg-tab-focus-indicator", connected ? "h-[1.5px]" : "h-0.5 rounded-t")}
+        />
+      )}
+      <span className={cn("shrink-0", hasAgent ? "opacity-100" : "opacity-70")}>
+        {hasAgent
+          ? isRestoreError
+            ? <span title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>{"⚠"}</span>
+            : "✦"
+          : panelIcon(panel, workspaceId)}
+      </span>
+      <span
+        className={cn(
+          "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
+          panel.kind === "terminal" && !!runningCommand && "text-center",
+          isRestoreError && "text-destructive/70",
+        )}
+        title={
+          isRestoreError
+            ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`
+            : panel.kind === "terminal"
+              ? runningCommand
+                ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
+                : (panel.cwd?.replace(/\/$/, "") ?? "shell")
+              : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"
+                ? panel.path
+                : panel.kind === "preview"
+                  ? (panel.url || undefined)
+                  : panel.kind === "git-history"
+                    ? panel.repoRoot
+                    : agentTitle
+        }
+      >
+        {displayTitle}
+      </span>
+      {panel.kind === "editor" && panel.dirty && (
+        <span className="shrink-0 text-[8px] text-primary">●</span>
+      )}
+      {hasAgent && (
+        isRestoreError ? (
+          <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-destructive" />
+        ) : agentSession?.status === "working" ? (
+          <span className="ml-0.5 size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
+        ) : (
+          <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
+        )
+      )}
+      <button
+        type="button"
+        className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose(panel.id);
+        }}
+        title="Close panel"
+      >
+        <span className="text-[13px] leading-none">×</span>
+      </button>
+    </div>
+  );
+
   return (
     <HoverCard openDelay={700} closeDelay={100}>
     <Popover
@@ -213,107 +315,13 @@ function DraggableTab({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <PopoverAnchor asChild>
-            <HoverCardTrigger asChild>
-            <div
-              ref={setNodeRef}
-              {...attributes}
-              data-panel-id={panel.id}
-              onClick={() => onActivate(panel.id)}
-              onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
-              onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
-              {...listeners}
-              className={cn(
-                "group relative flex max-w-[240px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
-                isThisDragging ? "cursor-grabbing" : "cursor-default",
-                connected
-                  ? [
-                      "self-stretch border-r border-border/30",
-                      active
-                        ? "bg-background text-foreground"
-                        : "border-b border-border/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                    ]
-                  : [
-                      "h-5 rounded",
-                      active
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                    ],
-                isThisDragging && "opacity-40",
-              )}
-            >
-              {/* Droppable half-zones - coordinates-based, no pointer events needed */}
-              <div ref={setBeforeRef} className="pointer-events-none absolute inset-y-0 left-0 w-1/2" />
-              <div ref={setAfterRef} className="pointer-events-none absolute inset-y-0 right-0 w-1/2" />
-
-              {insertionBefore && (
-                <div className="pointer-events-none absolute inset-y-1 left-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
-              )}
-              {insertionAfter && (
-                <div className="pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
-              )}
-
-              {active && paneFocused && (
-                <div
-                  className={cn("absolute inset-x-0 top-0 bg-tab-focus-indicator", connected ? "h-[1.5px]" : "h-0.5 rounded-t")}
-                />
-              )}
-              <span className={cn("shrink-0", hasAgent ? "opacity-100" : "opacity-70")}>
-                {hasAgent
-                  ? isRestoreError
-                    ? <span title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>{"⚠"}</span>
-                    : "✦"
-                  : panelIcon(panel, workspaceId)}
-              </span>
-              <span
-                className={cn(
-                  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
-                  panel.kind === "terminal" && !!runningCommand && "text-center",
-                  isRestoreError && "text-destructive/70",
-                )}
-                title={
-                  isRestoreError
-                    ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`
-                    : panel.kind === "terminal"
-                      ? runningCommand
-                        ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
-                        : (panel.cwd?.replace(/\/$/, "") ?? "shell")
-                      : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"
-                        ? panel.path
-                        : panel.kind === "preview"
-                          ? (panel.url || undefined)
-                          : panel.kind === "git-history"
-                            ? panel.repoRoot
-                            : agentTitle
-                }
-              >
-                {displayTitle}
-              </span>
-              {panel.kind === "editor" && panel.dirty && (
-                <span className="shrink-0 text-[8px] text-primary">●</span>
-              )}
-              {hasAgent && (
-                isRestoreError ? (
-                  <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-destructive" />
-                ) : agentSession?.status === "working" ? (
-                  <span className="ml-0.5 size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
-                ) : (
-                  <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
-                )
-              )}
-              <button
-                type="button"
-                className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose(panel.id);
-                }}
-                title="Close panel"
-              >
-                <span className="text-[13px] leading-none">×</span>
-              </button>
-            </div>
-            </HoverCardTrigger>
+            {hasAgent ? (
+              <HoverCardTrigger asChild>
+                {tabDiv}
+              </HoverCardTrigger>
+            ) : (
+              tabDiv
+            )}
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
