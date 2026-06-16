@@ -15,9 +15,76 @@ import {
 } from "@/components/ui/context-menu";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { ptyIdForPanel } from "@/modules/terminal/lib/useTerminalSession";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { useTabRenameStore } from "./lib/tabRenameStore";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import type { AgentSession } from "@/modules/agents/lib/types";
+
+function formatElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+function AgentHoverCardContent({
+  agentSession,
+  cwd,
+}: {
+  agentSession: AgentSession;
+  cwd: string | undefined;
+}) {
+  const elapsed = formatElapsed(Date.now() - agentSession.startedAt);
+  const sessionId = agentSession.meta?.sessionId;
+  const directory = cwd ?? agentSession.meta?.cwdLaunch;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[12px] font-medium text-foreground">{agentSession.agent}</span>
+        {agentSession.status === "working" ? (
+          <span className="size-[7px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
+        ) : (
+          <span className="inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
+        )}
+      </div>
+      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
+        {sessionId && (
+          <>
+            <span className="text-muted-foreground">Session</span>
+            <span className="truncate font-mono text-foreground">
+              {sessionId.slice(0, 8)}&hellip;
+            </span>
+          </>
+        )}
+        {directory && (
+          <>
+            <span className="text-muted-foreground">Directory</span>
+            <span className="truncate text-foreground">{directory}</span>
+          </>
+        )}
+        <span className="text-muted-foreground">Started</span>
+        <span className="text-foreground">hace {elapsed}</span>
+        {agentSession.restored && (
+          <>
+            <span className="text-muted-foreground">Restored</span>
+            <span className="text-foreground">si</span>
+          </>
+        )}
+        {agentSession.restoreError && (
+          <>
+            <span className="text-muted-foreground">Error</span>
+            <span className="truncate text-destructive">
+              {agentSession.restoreErrorReason ?? "desconocido"}
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type Props = {
   panels: Panel[];
@@ -96,7 +163,6 @@ function DraggableTab({
   const agentSession = useAgentStore((s) => s.sessions[panel.id]);
   const hasAgent = agentSession !== undefined;
   const isRestoreError = agentSession?.restoreError ?? false;
-  const ptyId = panel.kind === "terminal" ? ptyIdForPanel(panel.id) : null;
 
   const agentTitle =
     hasAgent && panel.kind === "terminal"
@@ -139,6 +205,7 @@ function DraggableTab({
   }
 
   return (
+    <HoverCard openDelay={700} closeDelay={100}>
     <Popover
       open={isRenaming}
       onOpenChange={(open) => { if (!open) handleSave(); }}
@@ -146,23 +213,11 @@ function DraggableTab({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <PopoverAnchor asChild>
+            <HoverCardTrigger asChild>
             <div
               ref={setNodeRef}
               {...attributes}
               data-panel-id={panel.id}
-              title={[
-                ...(hasAgent ? [
-                  agentSession!.agent,
-                  `Session: ${agentSession!.panelId.slice(0, 8)}...`,
-                  `Started: ${new Date(agentSession!.startedAt).toLocaleTimeString()}`,
-                  agentSession!.restored ? "Session restored" : null,
-                  isRestoreError ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}` : null,
-                  panel.kind === "terminal" ? (panel.cwd ?? "") : null,
-                ] : []),
-                `panel: ${panel.id}`,
-                panel.kind === "terminal" ? `pty: ${ptyId ?? "-"}` : null,
-                hasAgent ? `ws: ${agentSession!.tabId}` : null,
-              ].filter((x): x is string => x !== null).join("\n") || undefined}
               onClick={() => onActivate(panel.id)}
               onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
               onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
@@ -258,6 +313,7 @@ function DraggableTab({
                 <span className="text-[13px] leading-none">×</span>
               </button>
             </div>
+            </HoverCardTrigger>
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
@@ -359,6 +415,12 @@ function DraggableTab({
         />
       </PopoverContent>
     </Popover>
+    {hasAgent && !isRestoreError && (
+      <HoverCardContent side="bottom" align="start" className="w-56 rounded-xl p-3">
+        <AgentHoverCardContent agentSession={agentSession!} cwd={panel.kind === "terminal" ? panel.cwd : undefined} />
+      </HoverCardContent>
+    )}
+    </HoverCard>
   );
 }
 
