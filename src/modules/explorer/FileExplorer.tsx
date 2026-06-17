@@ -196,7 +196,6 @@ export const FileExplorer = memo(
       onDragEnd({ active, over }) {
         if (!over) return;
         const overId = String(over.id);
-        if (!overId.startsWith("explorer-dir:")) return;
         const activeId = String(active.id);
         const from = activeId.startsWith("file:")
           ? activeId.slice(5)
@@ -204,7 +203,12 @@ export const FileExplorer = memo(
             ? activeId.slice(4)
             : null;
         if (from === null) return;
-        void tree.movePath(from, overId.slice("explorer-dir:".length));
+        if (overId.startsWith("explorer-dir:")) {
+          void tree.movePath(from, overId.slice("explorer-dir:".length));
+        } else if (overId.startsWith("explorer-file:")) {
+          const filePath = overId.slice("explorer-file:".length);
+          void tree.movePath(from, pathDirname(filePath));
+        }
       },
     });
 

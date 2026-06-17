@@ -101,12 +101,30 @@ function EntryRowImpl(props: EntryRowProps) {
   });
   const isDropTarget = isValidDropTarget && isOver;
 
+  // A file row acts as a drop target for its parent directory: dropping onto a
+  // file is equivalent to dropping onto the folder containing it.
+  const fileParentDir = !isDir ? pathDirname(path) : null;
+  const isFileDropValid =
+    !isDir &&
+    dragSource !== null &&
+    fileParentDir !== null &&
+    dragSource !== fileParentDir &&
+    !fileParentDir.startsWith(`${dragSource}/`) &&
+    pathDirname(dragSource) !== fileParentDir;
+
+  const { setNodeRef: setFileDropRef, isOver: isFileOver } = useDroppable({
+    id: `explorer-file:${path}`,
+    disabled: !isFileDropValid,
+  });
+  const isFileDropTarget = isFileDropValid && isFileOver;
+
   const setRefs = useCallback(
     (node: HTMLButtonElement | null) => {
       setDragRef(node);
       setDropRef(node);
+      setFileDropRef(node);
     },
-    [setDragRef, setDropRef],
+    [setDragRef, setDropRef, setFileDropRef],
   );
 
   // Spring open a collapsed folder after hovering over it during a drag.
@@ -162,7 +180,7 @@ function EntryRowImpl(props: EntryRowProps) {
                   ? "text-muted-foreground/70"
                   : "text-foreground/85",
               isDragging && "opacity-50",
-              (isDropTarget || isExternalDropTarget) &&
+              (isDropTarget || isExternalDropTarget || isFileDropTarget) &&
                 "bg-primary/10 ring-1 ring-primary/60",
             )}
             style={{ paddingLeft }}
