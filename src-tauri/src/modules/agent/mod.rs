@@ -19,8 +19,6 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v5";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
-// OSC format: 777;kex;<event>;<panel_id>;<session_id>;<transcript_path>;<cwd>[;<extra...>]
-// Fields are percent-encoded (jq @uri) to allow ';' as a safe delimiter.
 // Each invocation also appends the full payload to /tmp/kex-hook-<EVENT>.log for field discovery.
 //
 // Known extra fields per event:

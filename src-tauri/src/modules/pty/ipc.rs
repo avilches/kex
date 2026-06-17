@@ -17,7 +17,7 @@ pub fn socket_path_for_pty_id(id: u32) -> PathBuf {
 }
 
 /// Removes the socket file when dropped, stopping the listener thread.
-pub struct IpcGuard(pub PathBuf);
+pub struct IpcGuard(PathBuf);
 
 impl Drop for IpcGuard {
     fn drop(&mut self) {
@@ -139,6 +139,8 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
                  source={source} title={session_title:?} model={model:?}",
                 p.session_id
             );
+            // Agent name is not available in the SessionStart payload. "claude" is the default;
+            // TODO: infer agent from the transcript path or a future payload field.
             session_store::record_session(panel_id, "claude", &p.session_id, &p.transcript_path, &p.cwd);
             let _ = app.emit(AGENT_SESSION_META_EVENT, serde_json::json!({
                 "panelId":      panel_id,
@@ -174,7 +176,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "Notification" => {
             let msg = p.notif_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] Notification panel={panel_id}");
+            log::debug!("[ipc] Notification panel={panel_id} msg_len={}", msg.len());
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "Notification",
