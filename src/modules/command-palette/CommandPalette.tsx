@@ -124,6 +124,7 @@ export function CommandPalette({
   }, [open, initialMode]);
 
   useEffect(() => {
+    if (!open) return;
     if (!inThemes || !value.startsWith("theme:")) return;
     const id = value.slice("theme:".length);
     if (id === "back") return;
@@ -132,7 +133,7 @@ export function CommandPalette({
       THEME_PREVIEW_DELAY_MS,
     );
     return () => window.clearTimeout(handle);
-  }, [value, inThemes, previewThemeId]);
+  }, [open, value, inThemes, previewThemeId]);
 
   const runAfterClose = useCallback(
     (fn: () => void) => {
