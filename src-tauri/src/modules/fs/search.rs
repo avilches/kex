@@ -54,6 +54,7 @@ const PRUNE_DIRS: &[&str] = &[
 /// generation; in-flight scans observe the change and quit early.
 #[derive(Default)]
 pub struct FileSearchState {
+    // Arc needed to move the counter into spawn_blocking's closure.
     generation: Arc<AtomicU64>,
 }
 

@@ -14,8 +14,8 @@ fn fs_search(
     root: String,
     query: String,
     limit: Option<usize>,
-    _max_depth: Option<usize>,
-    _show_hidden: Option<bool>,
+    max_depth: Option<usize>,
+    show_hidden: Option<bool>,
 ) -> Result<SearchResult, String> {
     let q = query.trim().to_string();
     if q.is_empty() {
@@ -28,9 +28,9 @@ fn fs_search(
         &root,
         &q,
         limit.unwrap_or(200).min(1000),
-        8,
+        max_depth.unwrap_or(8).clamp(1, 16),
         &WorkspaceEnv::Local,
-        _show_hidden.unwrap_or(false),
+        show_hidden.unwrap_or(false),
         gen,
         0,
     )
@@ -369,4 +369,21 @@ fn list_subdirs_hides_dot_dirs_by_default() {
 
     let on = list_subdirs(fx.root_str(), true, None).expect("list_subdirs");
     assert!(on.contains(&".hidden".to_string()));
+}
+
+#[test]
+fn search_max_depth_limits_traversal() {
+    let fx = FsFixture::new();
+    fx.write("shallow.rs", "fn main() {}");
+    fx.write("d1/d2/d3/deep.rs", "fn deep() {}");
+
+    // depth=1: solo archivos en el nivel raiz
+    let res = fs_search(fx.root_str(), "rs".into(), None, Some(1), None)
+        .expect("search should succeed");
+    let rels: Vec<&str> = res.hits.iter().map(|h| h.rel.as_str()).collect();
+    assert!(rels.contains(&"shallow.rs"), "shallow.rs debe aparecer con depth=1");
+    assert!(
+        !rels.iter().any(|r| r.contains("deep")),
+        "deep.rs a depth 3 no debe aparecer con depth=1"
+    );
 }
