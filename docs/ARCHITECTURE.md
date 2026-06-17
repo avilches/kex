@@ -150,9 +150,11 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 ### 3.6 Terminal coding-agent notifications
 
-When Claude Code (or a future compatible agent) runs inside a Kex terminal, Kex detects its state via OSC sequences emitted by agent hooks. The tab shows a spinner while the agent is working, an amber dot when it needs your input, and no indicator when it is idle. A notification bell in the header lists active sessions and recent events with OS notifications when you are away from the window.
+When Claude Code (or a future compatible agent) runs inside a Kex terminal, Kex detects its state through two channels: OSC 133 C (shell integration, always active) and a per-session Unix domain socket for Claude Code hook events. The tab shows a spinner while the agent is working, an amber dot when it needs your input, and no indicator when it is idle. A notification bell in the header lists active sessions and recent events with OS notifications when you are away from the window.
 
-The indicator is cleared by any of: the agent's `Stop` hook firing normally, the agent process exiting (OSC 133;D), the PTY closing, or the user typing anything in the terminal. The last condition ensures the indicator never lingers after Ctrl+C or abnormal termination — the moment the user interacts, it is gone.
+The indicator is cleared by any of: the agent's `Stop` hook firing normally, the agent process exiting (OSC 133;D), the PTY closing, or the user typing anything in the terminal. The last condition ensures the indicator never lingers after Ctrl+C or abnormal termination.
+
+The Unix socket (`/tmp/kex-ipc-{pty_id}.sock`, path in `KEX_IPC`) is created before the child process starts in `session::spawn()` and cleaned up on PTY close. Claude Code hooks send raw JSON payloads to it; `pty/ipc.rs` dispatches them to Tauri events consumed by the frontend.
 
 See IPC.md for the full protocol detail.
 

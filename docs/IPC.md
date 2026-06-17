@@ -130,4 +130,23 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 
 ## Terminal agent notification protocol
 
-Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) using OSC sequences emitted by the shell and Claude Code hooks. See `docs/NOTIFICATIONS.md` for the full OSC sequence reference, detector state machine, and notification routing. See `docs/AGENT_SESSION_RESTORE.md` for session persistence and restore.
+Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via two complementary channels:
+
+**OSC 133 C (shell integration)** — the PTY reader detects the sequence `OSC 133;C;<cmd> ST` emitted by the shell init scripts at each prompt. This arms the `AgentDetector` and produces the `started` signal. This path is always active once shell integration is loaded.
+
+**Unix socket IPC (hook events)** — Claude Code hooks call `trigger-event.sh` on each hook event. The script sends the raw JSON payload to a per-session Unix domain socket at `/tmp/kex-ipc-{pty_id}.sock` (path exposed via `KEX_IPC` env var). The Rust listener (`pty/ipc.rs`) reads the JSON and emits Tauri events:
+
+| Hook event | Tauri event | Notes |
+|---|---|---|
+| `SessionStart` | `kex:agent-session-meta` + arms detector | Includes `source`, `sessionTitle`, `model` |
+| `SessionEnd` | `kex:agent-signal` kind=`SessionEnd` | |
+| `UserPromptSubmit` | `kex:agent-signal` kind=`UserPromptSubmit` | Includes `prompt` |
+| `Notification` | `kex:agent-signal` kind=`Notification` | Includes `message` |
+| `Stop` | `kex:agent-signal` kind=`Stop` | Includes `last_assistant_message` as `message` |
+| `StopFailure` | `kex:agent-signal` kind=`StopFailure` | Includes `error_message` as `message` |
+| `PermissionRequest` | `kex:agent-signal` kind=`PermissionRequest` | Includes `tool_name` as `toolName` |
+| `MessageDisplay` | `kex:agent-signal` kind=`MessageDisplay` | Only on `final: true` chunks; `delta` as `message` |
+
+The socket is created in `session::spawn()` before the child process starts, so `KEX_IPC` is always set when the shell reads its environment. The socket file is removed when the `IpcGuard` drops (PTY session closed).
+
+Hooks must be installed via "Set up Claude Code" (notification bell popover). See `docs/NOTIFICATIONS.md` for the detector state machine and `docs/AGENT_SESSION_RESTORE.md` for session persistence.
