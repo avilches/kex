@@ -16,7 +16,7 @@ use std::thread;
 use portable_pty::PtySize;
 use tauri::ipc::{Channel, Response};
 
-use crate::modules::workspace::{authorize_user_spawn_cwd, WorkspaceEnv, WorkspaceRegistry};
+use crate::modules::workspace::{validate_spawn_cwd, WorkspaceEnv, WorkspaceRegistry};
 use session::Session;
 
 pub struct PtyState {
@@ -58,7 +58,9 @@ pub async fn pty_open(
     let window_label = webview_window.label().to_string();
     let workspace = WorkspaceEnv::from_option(workspace);
     let blocks = blocks.unwrap_or(false);
-    authorize_user_spawn_cwd(&registry, cwd.as_deref(), &workspace).map_err(|e| {
+    // Validate before spawn; register only after spawn succeeds so a failed
+    // spawn never widens the authorization surface.
+    let canonical_cwd = validate_spawn_cwd(cwd.as_deref(), &workspace).map_err(|e| {
         log::warn!("pty_open: cwd rejected: {e}");
         e
     })?;
@@ -76,6 +78,12 @@ pub async fn pty_open(
         log::error!("pty_open failed: {e}");
         e
     })?;
+    if let Some(canonical) = canonical_cwd {
+        registry.authorize(&canonical).map_err(|e| {
+            log::warn!("pty_open: registry authorize failed: {e}");
+            e.to_string()
+        })?;
+    }
     state.sessions.write().unwrap().insert(id, session);
     state.window_sessions.write().unwrap()
         .entry(window_label.clone())

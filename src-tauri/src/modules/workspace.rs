@@ -152,6 +152,25 @@ pub fn authorize_user_spawn_cwd(
     Ok(Some(canonical))
 }
 
+// Validates that cwd exists and is a directory; returns canonical path.
+// Does NOT register in the WorkspaceRegistry. Call registry.authorize after
+// a successful spawn so a failed spawn never widens the auth surface.
+pub fn validate_spawn_cwd(
+    cwd: Option<&str>,
+    workspace: &WorkspaceEnv,
+) -> Result<Option<PathBuf>, String> {
+    let Some(cwd) = cwd.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(None);
+    };
+    let resolved = resolve_path(cwd, workspace);
+    let canonical =
+        std::fs::canonicalize(&resolved).map_err(|e| format!("cwd not accessible: {e}"))?;
+    if !canonical.is_dir() {
+        return Err(format!("cwd is not a directory: {}", canonical.display()));
+    }
+    Ok(Some(canonical))
+}
+
 pub fn bootstrap_registry(registry: &WorkspaceRegistry) {
     let _ = registry.authorize(resolve_launch_dir());
     if let Some(home) = dirs::home_dir() {
@@ -870,6 +889,57 @@ mod auth_tests {
         let err = authorize_spawn_cwd(&reg, Some(&s), &WorkspaceEnv::Local)
             .expect_err("symlink-escape must be rejected");
         assert!(err.contains("outside"), "got: {err}");
+    }
+
+    #[test]
+    fn validate_spawn_cwd_accepts_none() {
+        assert!(
+            validate_spawn_cwd(None, &WorkspaceEnv::Local)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn validate_spawn_cwd_accepts_empty_string() {
+        assert!(
+            validate_spawn_cwd(Some("   "), &WorkspaceEnv::Local)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn validate_spawn_cwd_returns_canonical_for_valid_dir() {
+        let dir = tempdir("validate-ok");
+        let s = dir.to_string_lossy().into_owned();
+        let reg = WorkspaceRegistry::default();
+        assert!(!reg.is_authorized(&dir), "registry must be empty before validate");
+        let resolved = validate_spawn_cwd(Some(&s), &WorkspaceEnv::Local)
+            .expect("valid dir accepted")
+            .expect("returned canonical");
+        assert_eq!(resolved, dir);
+        // validate must not register anything
+        assert!(!reg.is_authorized(&dir), "registry must still be empty after validate");
+    }
+
+    #[test]
+    fn validate_spawn_cwd_rejects_missing_path() {
+        let mut missing = env::temp_dir();
+        missing.push(format!(
+            "kex-validate-missing-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let err = validate_spawn_cwd(
+            Some(&missing.to_string_lossy()),
+            &WorkspaceEnv::Local,
+        )
+        .expect_err("missing path must fail");
+        assert!(err.contains("cwd not accessible"), "got: {err}");
     }
 
     #[test]
