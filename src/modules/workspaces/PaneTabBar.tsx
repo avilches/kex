@@ -5,6 +5,7 @@ import type { Panel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
+import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -160,7 +161,9 @@ function DraggableTab({
   const active = panel.id === activePanelId;
   const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const runningCommand = panel.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
-  const title = panelTitle(panel, runningCommand);
+  const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
+  const oscTitle = panel.kind === "terminal" ? oscTitleMap.get(panel.id) : undefined;
+  const title = panelTitle(panel, runningCommand, oscTitle);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
   const agentSession = useAgentStore((s) => s.sessions[panel.id]);

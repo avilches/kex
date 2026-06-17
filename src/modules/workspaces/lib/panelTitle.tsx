@@ -8,12 +8,13 @@ export function basename(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-export function panelTitle(panel: Panel, runningCommand?: string | null): string {
+export function panelTitle(panel: Panel, runningCommand?: string | null, oscTitle?: string): string {
   if (panel.kind !== "terminal" && panel.title) return panel.title;
   switch (panel.kind) {
     case "terminal": {
       if (runningCommand) return basename(runningCommand.trim().split(/\s+/)[0] ?? "");
       if (panel.title) return panel.title;
+      if (oscTitle) return oscTitle;
       if (!panel.cwd) return "shell";
       const cwd = panel.cwd.replace(/\/$/, "");
       if (!cwd) return "shell";

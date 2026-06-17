@@ -78,6 +78,24 @@ export function registerPromptTracker(
   };
 }
 
+export function registerTitleHandler(
+  term: Terminal,
+  onTitle: (title: string) => void,
+): () => void {
+  const d0 = term.parser.registerOscHandler(0, (data) => {
+    onTitle(data);
+    return false;
+  });
+  const d2 = term.parser.registerOscHandler(2, (data) => {
+    onTitle(data);
+    return false;
+  });
+  return () => {
+    d0.dispose();
+    d2.dispose();
+  };
+}
+
 function parseOsc7(data: string): string | null {
   const m = data.match(/^file:\/\/[^/]*(\/.*)$/);
   if (!m) return null;

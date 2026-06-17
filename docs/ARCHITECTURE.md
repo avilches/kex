@@ -226,7 +226,7 @@ Closing a tab from the UI (the explicit close button) also kills the immediate c
 
 ### 4.5 OSC trust model
 
-Kex's shell integration emits and parses OSC 7 (cwd) and OSC 133 (prompt/command boundaries). The cwd from OSC 7 updates the status bar breadcrumb and the explorer root. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
+Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command boundaries), and OSC 0/2 (window/icon title). The cwd from OSC 7 updates the status bar breadcrumb and the explorer root. OSC 0/2 title is written to `oscTitleStore` (in-memory, not persisted) and shown in the pane tab — it takes priority over the cwd-derived fallback but yields to a user-set rename (`panel.title`) and to the active running command. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd or tab title. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
 
 ### 4.6 Forward-slash canonical paths
 
@@ -389,4 +389,4 @@ Contains typed wrappers for all Tauri `invoke()` calls (`native.readFile`, `nati
 
 **CSP.** The WebView has a strict Content Security Policy (see `tauri.conf.json`). `connect-src` allows `self`, Tauri IPC, and `https:` plus `http://localhost:*` (for local dev servers). `script-src` allows `wasm-unsafe-eval` (required for xterm.js WebGL). No `unsafe-eval`.
 
-**OSC trust.** Kex only processes OSC 7 and OSC 133 sequences from shell integration scripts. There is no OSC-based execution primitive (unlike iTerm2's proprietary sequences). The risk is cwd spoofing from maliciously crafted output, not code execution.
+**OSC trust.** Kex processes OSC 7, OSC 133, and OSC 0/2 sequences. OSC 0/2 (window/icon title) is passed through as-is and shown in the pane tab; it is the only channel that updates the tab title at runtime. There is no OSC-based execution primitive (unlike iTerm2's proprietary sequences). The risk is cwd spoofing from maliciously crafted output, not code execution.

@@ -11,7 +11,9 @@ import {
   createShellIntegrationState,
   registerCwdHandler,
   registerPromptTracker,
+  registerTitleHandler,
 } from "./osc-handlers";
+import { clearOscTitle, setOscTitle } from "./oscTitleStore";
 import { openPty, type PtySession } from "./pty-bridge";
 import {
   type BlockMatch,
@@ -502,7 +504,8 @@ function bindLeafToSlot(leafId: string, s: Session): void {
         },
         shellState,
       );
-      return [prompt.dispose, cwd];
+      const titleDispose = registerTitleHandler(term, (t) => setOscTitle(leafId, t));
+      return [prompt.dispose, cwd, titleDispose];
     },
     onSearchReady: (addon) => s.callbacks.onSearchReady?.(addon),
   });
@@ -561,7 +564,7 @@ function attachSession(
           const store = useAgentStore.getState();
           if (plan.resumeCmd) {
             setTimeout(() => {
-              s.pty?.write(plan.resumeCmd + "\r");
+              s.pty?.write(" " + plan.resumeCmd + "\r");
             }, 200);
           } else if (plan.errorReason) {
             console.error(`[kex] session restore failed for panel ${leafId} (${plan.agent}): ${plan.errorReason}`);
@@ -599,6 +602,7 @@ export async function respawnSession(
   s.shellExited = false;
   s.pendingExit = null;
   s.altScreenAtRelease = false;
+  clearOscTitle(leafId);
 
   const slot = getSlotForLeaf(leafId);
   if (slot) {
@@ -646,6 +650,7 @@ export function disposeSession(leafId: string): void {
   s.snapshot = null;
   s.pty?.close();
   s.pty = null;
+  clearOscTitle(leafId);
   sessions.delete(leafId);
   blockViewportListeners.delete(leafId);
   readyLeaves.delete(leafId);

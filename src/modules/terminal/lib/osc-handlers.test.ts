@@ -4,6 +4,7 @@ import {
   createShellIntegrationState,
   registerCwdHandler,
   registerPromptTracker,
+  registerTitleHandler,
 } from "./osc-handlers";
 
 /**
@@ -94,5 +95,41 @@ describe("OSC 7 cwd handler — gated by OSC 133 in-command state", () => {
 
     handlers.get(7)?.("file:///C:/Users/me/project");
     expect(onCwd).toHaveBeenCalledWith("C:/Users/me/project");
+  });
+});
+
+describe("OSC 0/2 title handler", () => {
+  it("calls onTitle when OSC 0 is received", () => {
+    const { term, handlers } = makeFakeTerm();
+    const onTitle = vi.fn();
+    registerTitleHandler(term, onTitle);
+    handlers.get(0)?.("My Title");
+    expect(onTitle).toHaveBeenCalledWith("My Title");
+  });
+
+  it("calls onTitle when OSC 2 is received", () => {
+    const { term, handlers } = makeFakeTerm();
+    const onTitle = vi.fn();
+    registerTitleHandler(term, onTitle);
+    handlers.get(2)?.("Another Title");
+    expect(onTitle).toHaveBeenCalledWith("Another Title");
+  });
+
+  it("calls onTitle with empty string for reset", () => {
+    const { term, handlers } = makeFakeTerm();
+    const onTitle = vi.fn();
+    registerTitleHandler(term, onTitle);
+    handlers.get(0)?.("");
+    expect(onTitle).toHaveBeenCalledWith("");
+  });
+
+  it("returns a dispose function that unregisters both handlers", () => {
+    const { term, handlers } = makeFakeTerm();
+    const onTitle = vi.fn();
+    const dispose = registerTitleHandler(term, onTitle);
+    dispose();
+    handlers.get(0)?.("After dispose");
+    handlers.get(2)?.("After dispose");
+    expect(onTitle).not.toHaveBeenCalled();
   });
 });
