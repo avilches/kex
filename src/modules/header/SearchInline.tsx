@@ -50,6 +50,7 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
     const [openInCompact, setOpenInCompact] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const pendingFocusRef = useRef(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const setInputRef = useCallback((el: HTMLInputElement | null) => {
       inputRef.current = el;
       if (!el || !pendingFocusRef.current) return;
@@ -103,6 +104,15 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
     // Target switched (terminal ↔ editor) or removed → drop highlights.
     useEffect(() => clearTarget, [clearTarget]);
 
+    // Cleanup debounce timer on unmount.
+    useEffect(() => {
+      return () => {
+        if (debounceRef.current !== null) {
+          clearTimeout(debounceRef.current);
+        }
+      };
+    }, []);
+
     const applyIncremental = (next: string) => {
       if (!target) return;
       if (target.kind === "terminal") {
@@ -153,7 +163,11 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
               onChange={(e) => {
                 const next = e.target.value;
                 setQ(next);
-                applyIncremental(next);
+                if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+                debounceRef.current = setTimeout(() => {
+                  debounceRef.current = null;
+                  applyIncremental(next);
+                }, 75);
               }}
               onBlur={() => {
                 if (compact && !q) setOpenInCompact(false);
@@ -170,6 +184,10 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
                   findDirection(false);
                 } else if (e.key === "Escape") {
                   e.preventDefault();
+                  if (debounceRef.current !== null) {
+                    clearTimeout(debounceRef.current);
+                    debounceRef.current = null;
+                  }
                   clearTarget();
                   setQ("");
                   if (compact) {
@@ -183,6 +201,10 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
               <button
                 type="button"
                 onClick={() => {
+                  if (debounceRef.current !== null) {
+                    clearTimeout(debounceRef.current);
+                    debounceRef.current = null;
+                  }
                   setQ("");
                   clearTarget();
                   inputRef.current?.focus();
