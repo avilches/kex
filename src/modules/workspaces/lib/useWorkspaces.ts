@@ -63,6 +63,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const workspacesRef = useRef(workspaces);
   useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
 
+  const previousWorkspaceIdRef = useRef<string | null>(null);
+
   // When all workspaces are gone, flush state and destroy the window.
   // Uses claimClose() to avoid racing with the onCloseRequested handler in main.tsx
   // when the user closes the last workspace and clicks X simultaneously.
@@ -74,12 +76,19 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   // ── Workspace operations ──────────────────────────────────────────────────
 
+  const selectWorkspace = useCallback((id: string) => {
+    setActiveWorkspaceId((prev) => {
+      if (prev !== id) previousWorkspaceIdRef.current = prev;
+      return id;
+    });
+  }, []);
+
   const addWorkspace = useCallback((cwd?: string): string => {
     const ws = newWorkspace(cwd);
     setWorkspaces((prev) => [...prev, ws]);
-    setActiveWorkspaceId(ws.id);
+    selectWorkspace(ws.id);
     return ws.id;
-  }, []);
+  }, [selectWorkspace]);
 
   const reorderWorkspaces = useCallback((fromId: string, toId: string) => {
     setWorkspaces((prev) => {
@@ -94,8 +103,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => prev.filter((w) => w.id !== id));
     setActiveWorkspaceId((prev) => {
       if (prev !== id) return prev;
-      const closedIdx = workspacesRef.current.findIndex((w) => w.id === id);
       const remaining = workspacesRef.current.filter((w) => w.id !== id);
+      const prevId = previousWorkspaceIdRef.current;
+      if (prevId && prevId !== id && remaining.some((w) => w.id === prevId)) return prevId;
+      const closedIdx = workspacesRef.current.findIndex((w) => w.id === id);
       return (remaining[closedIdx] ?? remaining[closedIdx - 1])?.id ?? prev;
     });
   }, []);
@@ -316,11 +327,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       return updated;
     });
 
-    // Navigate to the adjacent workspace: next below, then above
     setActiveWorkspaceId((prevId) => {
       if (!workspaceRemoved || prevId !== workspaceId) return prevId;
-      const closedIdx = workspacesRef.current.findIndex((w) => w.id === workspaceId);
       const remaining = workspacesRef.current.filter((w) => w.id !== workspaceId);
+      const prevWsId = previousWorkspaceIdRef.current;
+      if (prevWsId && prevWsId !== workspaceId && remaining.some((w) => w.id === prevWsId)) return prevWsId;
+      const closedIdx = workspacesRef.current.findIndex((w) => w.id === workspaceId);
       return (remaining[closedIdx] ?? remaining[closedIdx - 1])?.id ?? prevId;
     });
   }, []);
@@ -403,7 +415,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   return {
     workspaces,
     activeWorkspaceId,
-    setActiveWorkspaceId,
+    setActiveWorkspaceId: selectWorkspace,
     activeWorkspace,
     addWorkspace,
     closeWorkspace,
