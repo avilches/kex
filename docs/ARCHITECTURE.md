@@ -226,7 +226,17 @@ Closing a tab from the UI (the explicit close button) also kills the immediate c
 
 ### 4.5 OSC trust model
 
-Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command boundaries), and OSC 0/2 (window/icon title). The cwd from OSC 7 updates the status bar breadcrumb and the explorer root. OSC 0/2 title is written to `oscTitleStore` (in-memory, not persisted) and shown in the pane tab — it takes priority over the cwd-derived fallback but yields to a user-set rename (`panel.title`) and to the active running command. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd or tab title. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
+Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command boundaries), and OSC 0/2 (window/icon title). The cwd from OSC 7 updates the status bar breadcrumb and the explorer root. OSC 0/2 title is written to `oscTitleStore` (in-memory, not persisted) and shown in the pane tab. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd or tab title. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
+
+**Tab title priority** (highest to lowest, evaluated in `PaneTabBar`):
+
+1. `panel.title` — explicit user rename, always wins.
+2. `oscTitle` — value from `oscTitleStore`, set by OSC 0/2 emitted by the running program. Claude Code uses this to propagate its AI-generated conversation title (`ai-title` field in the session JSONL); it emits `✳ Claude Code` on startup and `✳ <ai-title>` once the title is generated. Spinner frames (`⠂ Claude Code`, `⠐ Claude Code`) also arrive but are transient and do not replace a previously stable title because they change before the next render cycle.
+3. `agent · dirname` — shown when an agent is active but no OSC title has arrived yet.
+4. `runningCommand` — basename of the foreground command from OSC 133 C (e.g., `cargo`, `git`). Not shown when `oscTitle` is set.
+5. cwd-derived — last two path segments, truncated from the left so the deepest directory stays visible.
+
+`oscTitleStore` (`src/modules/terminal/lib/oscTitleStore.ts`) is a module-level singleton with `useSyncExternalStore`-compatible API. It is keyed by `panelId`, is never persisted, and is cleared on session dispose and respawn. OSC 0 and OSC 2 are both handled (both set the window title per the terminal spec); the handler is registered via `registerTitleHandler` in `osc-handlers.ts` and wired in `useTerminalSession.ts` alongside the existing OSC 7 and OSC 133 handlers.
 
 ### 4.6 Forward-slash canonical paths
 
@@ -341,7 +351,7 @@ src/
 ├── settings/                      — Second window (SettingsApp.tsx + sections)
 ├── styles/                        — globals.css, fonts.css, tokens, terminalTheme
 └── modules/
-    ├── terminal/                  — xterm.js stack, PTY bridge, OSC parsing, blocks
+    ├── terminal/                  — xterm.js stack, PTY bridge, OSC parsing (7/133/0/2), blocks, oscTitleStore
     │   └── block/                 — Block overlay, shell input, mode machine, history
     ├── editor/                    — CodeMirror 6 stack, diffs, vim
     ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)
