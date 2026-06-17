@@ -51,18 +51,16 @@ function AgentHoverCardContent({
         ) : null}
       </div>
       <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
-        {sessionId && (
-          <>
-            <span className="text-muted-foreground">Session</span>
-            <span className="truncate font-mono text-foreground">
-              {sessionId.slice(0, 8)}&hellip;
-            </span>
-          </>
+        <span className="text-muted-foreground">Session</span>
+        {sessionId ? (
+          <span className="font-mono text-foreground">{sessionId.slice(0, 8)}&hellip;</span>
+        ) : (
+          <span className="text-muted-foreground/60 italic">not started</span>
         )}
         {directory && (
           <>
-            <span className="text-muted-foreground">Directory</span>
-            <span className="truncate text-foreground">{directory}</span>
+            <span className="shrink-0 text-muted-foreground">Directory</span>
+            <span className="break-all text-foreground">{directory}</span>
           </>
         )}
         <span className="text-muted-foreground">Started</span>
@@ -424,7 +422,7 @@ function DraggableTab({
       </PopoverContent>
     </Popover>
     {hasAgent && !isRestoreError && (
-      <HoverCardContent side="bottom" align="start" className="w-56 rounded-xl p-3">
+      <HoverCardContent side="bottom" align="start" className="w-80 rounded-xl p-3">
         <AgentHoverCardContent agentSession={agentSession!} cwd={panel.kind === "terminal" ? panel.cwd : undefined} />
       </HoverCardContent>
     )}

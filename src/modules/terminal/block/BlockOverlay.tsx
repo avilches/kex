@@ -120,12 +120,7 @@ export function BlockOverlay(props: Props) {
         <BlockChrome key={b.id} block={b} all={props} onSearch={setSearchId} />
       ))}
       {vis.sticky && (
-        <StickyHeader
-          key={vis.sticky.id}
-          block={vis.sticky}
-          all={props}
-          onSearch={setSearchId}
-        />
+        <StickyHeader block={vis.sticky} all={props} onSearch={setSearchId} />
       )}
       {searchId && (
         <SearchBar
@@ -145,6 +140,8 @@ type ChromeProps = {
   onSearch: (id: string) => void;
 };
 
+// No chrome while the command runs; the bar lands together with the divider
+// once the block is finished.
 function BlockChrome({ block, all, onSearch }: ChromeProps) {
   if (block.running) return null;
   return (
@@ -154,16 +151,22 @@ function BlockChrome({ block, all, onSearch }: ChromeProps) {
         style={{ top: block.bottom }}
       />
       <div className="bt-bar" style={{ top: block.headerTop }}>
-        <span className="bt-head-meta">
-          {block.cwd && <span className="bt-cwd">{relPath(block.cwd)}</span>}
-          <span className="bt-clock">
-            <HugeiconsIcon icon={Clock01Icon} size={11} strokeWidth={1.75} />
-            {fmtTime(block.startedAt)}
-          </span>
-        </span>
+        <Meta block={block} />
         <Toolbar block={block} all={all} onSearch={onSearch} />
       </div>
     </>
+  );
+}
+
+function Meta({ block }: { block: PositionedBlock }) {
+  return (
+    <span className="bt-head-meta">
+      {block.cwd && <span className="bt-cwd">{relPath(block.cwd)}</span>}
+      <span className="bt-clock">
+        <HugeiconsIcon icon={Clock01Icon} size={11} strokeWidth={1.75} />
+        {fmtTime(block.startedAt)}
+      </span>
+    </span>
   );
 }
 
