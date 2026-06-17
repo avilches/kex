@@ -27,22 +27,26 @@ describe("quoteShellArg (posix)", () => {
   });
 });
 
-describe("quoteShellArg (windows/pwsh)", () => {
+describe("quoteShellArg (windows/cmd.exe and pwsh)", () => {
   const q = (s: string) => quoteShellArg(s, true);
 
-  it("wraps a plain string in single quotes", () => {
-    expect(q("fix the bug")).toBe("'fix the bug'");
+  it("wraps a plain string in double quotes", () => {
+    expect(q("fix the bug")).toBe('"fix the bug"');
   });
 
-  it("doubles embedded single quotes", () => {
-    expect(q("it's broken")).toBe("'it''s broken'");
+  it("wraps a Windows path with spaces in double quotes", () => {
+    expect(q("C:/Some Dir")).toBe('"C:/Some Dir"');
   });
 
-  it("keeps backticks and $ literal inside single quotes", () => {
-    expect(q("$env:PATH `n")).toBe("'$env:PATH `n'");
+  it("escapes embedded double quotes with backslash", () => {
+    expect(q('C:/Has"Quote')).toBe('"C:/Has\\"Quote"');
   });
 
   it("quotes an empty string", () => {
-    expect(q("")).toBe("''");
+    expect(q("")).toBe('""');
+  });
+
+  it("works with normal Windows paths", () => {
+    expect(q("C:/Normal")).toBe('"C:/Normal"');
   });
 });
