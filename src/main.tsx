@@ -34,12 +34,14 @@ await initLaunchDir();
 // Load saved workspace layout for session restore.
 await initWorkspaceState();
 
-// Auto-reinstall Claude Code hooks on startup (idempotent: no-op if up to date).
-// Required for both session restore (SessionStart hook) and tab notifications.
-// Only runs when the user has enabled the integration.
+// Sync Claude Code hooks on startup — idempotent in both directions:
+// - integration ON:  install/update script and settings.json entries (no-op if up to date)
+// - integration OFF: remove any leftover entries from settings.json (no-op if already absent)
 loadPreferences().then((prefs) => {
   if (prefs.agentNotifications) {
     invoke("agent_enable_claude_hooks").catch(() => {});
+  } else {
+    invoke("agent_disable_claude_hooks").catch(() => {});
   }
 });
 
