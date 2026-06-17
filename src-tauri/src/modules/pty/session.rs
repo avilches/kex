@@ -23,6 +23,8 @@ struct AgentSessionMetaPayload<'a> {
     panel_id: &'a str,
     session_id: &'a str,
     cwd_launch: &'a str,
+    session_title: &'a str,
+    model: &'a str,
 }
 
 // Flusher coalesces a short window after first-byte arrival so we send chunks,
@@ -42,18 +44,21 @@ const OVERFLOW_NOTICE: &[u8] =
 
 pub struct Session {
     // Field drop order is intentional. Rust drops fields top-to-bottom:
-    //   1. `_job` — on Windows, closing the Job HANDLE fires
-    //      KILL_ON_JOB_CLOSE, terminating the pwsh tree before the master
-    //      pipe drops. Without this, ClosePseudoConsole in `master`'s Drop
-    //      can block waiting for conhost to drain pending output, freezing
-    //      the Tauri worker thread that triggered the close.
-    //   2. `killer` — best-effort kill (redundant on Windows once Job
-    //      closed, but harmless and required on Unix where there is no Job).
-    //   3. `writer` — closes the input side of the master pipe.
-    //   4. `master` — last; ClosePseudoConsole on Windows. By now the child
+    //   1. `_job` (Windows) — closing the Job HANDLE fires KILL_ON_JOB_CLOSE,
+    //      terminating the pwsh tree before the master pipe drops. Without this,
+    //      ClosePseudoConsole in `master`'s Drop can block waiting for conhost to
+    //      drain pending output, freezing the Tauri worker thread that triggered the close.
+    //   2. `_ipc_guard` (Unix) — removes the socket file; the listener thread exits on
+    //      the next accept error.
+    //   3. `killer` — best-effort kill (redundant on Windows once Job closed, but
+    //      harmless and required on Unix where there is no Job).
+    //   4. `writer` — closes the input side of the master pipe.
+    //   5. `master` — last; ClosePseudoConsole on Windows. By now the child
     //      is dead and conhost has nothing left to drain.
     #[cfg(windows)]
     _job: Option<super::job::PtyJob>,
+    #[cfg(unix)]
+    pub(super) _ipc_guard: Option<super::ipc::IpcGuard>,
     /// PID of the shell process. 0 means unknown; callers must skip checks when 0.
     pub shell_pid: u32,
     pub killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
@@ -130,7 +135,22 @@ pub fn spawn(
     };
     let pair = pty_system.openpty(size).map_err(|e| e.to_string())?;
 
-    let cmd = shell_init::build_command(id, cwd, workspace, blocks, panel_id)?;
+    #[cfg(unix)]
+    let ipc_socket_path = super::ipc::socket_path_for_pty_id(id);
+    #[cfg(unix)]
+    let ipc_path_opt: Option<&str> = ipc_socket_path.to_str();
+    #[cfg(not(unix))]
+    let ipc_path_opt: Option<&str> = None;
+
+    let cmd = shell_init::build_command(id, cwd, workspace, blocks, panel_id.clone(), ipc_path_opt)?;
+
+    #[cfg(unix)]
+    let ipc_guard = super::ipc::spawn_listener(
+        ipc_socket_path,
+        panel_id.clone().unwrap_or_default(),
+        id,
+        app.clone(),
+    );
     let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
 
@@ -161,6 +181,8 @@ pub fn spawn(
     let session = Arc::new(Session {
         #[cfg(windows)]
         _job: job,
+        #[cfg(unix)]
+        _ipc_guard: Some(ipc_guard),
         shell_pid,
         killer: Mutex::new(killer),
         writer: writer.clone(),
@@ -197,20 +219,22 @@ pub fn spawn(
                         agent_detect.process(&buf[..n], |t| {
                             // Events that carry session data - update store + emit meta to frontend
                             let session_data = match &t {
-                                Transition::SessionStart { panel_id, agent, session_id, transcript_path, cwd } => {
-                                    Some((panel_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone()))
+                                Transition::SessionStart { panel_id, agent, session_id, transcript_path, cwd, session_title, model, .. } => {
+                                    Some((panel_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone(), session_title.clone(), model.clone()))
                                 }
-                                Transition::UserPromptSubmit { panel_id, agent, session_id, transcript_path, cwd } => {
-                                    Some((panel_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone()))
+                                Transition::UserPromptSubmit { panel_id, agent, session_id, transcript_path, cwd, .. } => {
+                                    Some((panel_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone(), String::new(), String::new()))
                                 }
                                 _ => None,
                             };
-                            if let Some((panel_id, agent, session_id, transcript_path, cwd)) = session_data {
+                            if let Some((panel_id, agent, session_id, transcript_path, cwd, session_title, model)) = session_data {
                                 session_store::record_session(&panel_id, &agent, &session_id, &transcript_path, &cwd);
                                 let _ = app_reader.emit(AGENT_SESSION_META_EVENT, AgentSessionMetaPayload {
                                     panel_id: &panel_id,
                                     session_id: &session_id,
                                     cwd_launch: &cwd,
+                                    session_title: &session_title,
+                                    model: &model,
                                 });
                                 // SessionStart has no frontend handler - skip emitting to kex:agent-signal
                                 if matches!(t, Transition::SessionStart { .. }) {
@@ -358,6 +382,8 @@ mod tests {
             Arc::new(Mutex::new(pair.master.take_writer().expect("writer")));
 
         let session = Arc::new(Session {
+            #[cfg(unix)]
+            _ipc_guard: None,
             shell_pid: child.process_id().unwrap_or(0),
             killer: Mutex::new(killer),
             writer,
@@ -406,6 +432,8 @@ mod tests {
             Arc::new(Mutex::new(pair.master.take_writer().expect("writer")));
 
         let session = Arc::new(Session {
+            #[cfg(unix)]
+            _ipc_guard: None,
             shell_pid: 0,
             killer: Mutex::new(killer),
             writer,
