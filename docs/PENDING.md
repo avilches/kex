@@ -18,7 +18,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-13](pending/bugs/BUG-13-deteccion-binario-8kb-incoherente.md) — Deteccion de binario con 8 KB incoherente
 - [BUG-14](pending/bugs/BUG-14-git-show-truncamiento-blobs-memoria.md) — git show: truncamiento de blobs en memoria
 - [BUG-15](pending/bugs/BUG-15-usefiletree-callbacks-inestables.md) — useFileTree: callbacks inestables
-- [BUG-17](pending/bugs/BUG-17-busqueda-ipc-sin-cancelacion.md) — Busqueda IPC sin cancelacion
+- [BUG-17](pending/bugs/BUG-17-busqueda-ipc-sin-cancelacion.md) — Busqueda IPC sin cancelacion (fs_search resuelto; fs_grep_interactive pendiente)
 - [BUG-18](pending/bugs/BUG-18-race-refetch-fs-changed-explorer.md) — Race entre refetch y fs-changed en explorer
 - [BUG-20](pending/bugs/BUG-20-pty-open-autoriza-cwd-aunque-spawn-falle.md) — pty_open autoriza cwd aunque spawn falle
 - [BUG-27](pending/bugs/BUG-27-countdifflines-heuristic-not-numstat.md) — countDiffLines: heuristica, no numstat

@@ -1,3 +1,6 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
 use ignore::WalkBuilder;
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher, Utf32Str};
@@ -20,7 +23,7 @@ pub struct SearchHit {
 #[derive(Serialize)]
 pub struct SearchResult {
     pub hits: Vec<SearchHit>,
-    /// True if the scan stopped early (entry budget or hit cap reached).
+    /// True if the scan stopped early (entry budget, hit cap, or superseded query).
     pub truncated: bool,
 }
 
@@ -28,6 +31,9 @@ pub struct SearchResult {
 /// against pathological roots like $HOME where there's no .gitignore and the
 /// tree is effectively unbounded.
 const MAX_SCANNED: usize = 50_000;
+
+const DEFAULT_DEPTH: usize = 8;
+const HARD_DEPTH: usize = 16;
 
 /// Directory names pruned unconditionally — they're rarely useful in a
 /// file-explorer search and they dominate scan time when present.
@@ -44,34 +50,71 @@ const PRUNE_DIRS: &[&str] = &[
     "__pycache__",
 ];
 
+/// Supersession counter for interactive file search. Each new query bumps the
+/// generation; in-flight scans observe the change and quit early.
+#[derive(Default)]
+pub struct FileSearchState {
+    generation: Arc<AtomicU64>,
+}
+
 #[tauri::command]
-pub fn fs_search(
+pub async fn fs_search(
+    state: tauri::State<'_, FileSearchState>,
     root: String,
     query: String,
     limit: Option<usize>,
+    max_depth: Option<usize>,
     workspace: Option<WorkspaceEnv>,
     show_hidden: Option<bool>,
 ) -> Result<SearchResult, String> {
-    let q = query.trim();
+    let q = query.trim().to_string();
     if q.is_empty() {
         return Ok(SearchResult {
             hits: Vec::new(),
             truncated: false,
         });
     }
+
+    let my_gen = state.generation.fetch_add(1, Ordering::SeqCst) + 1;
+    let gen = Arc::clone(&state.generation);
+
     let cap = limit.unwrap_or(200).min(1000);
+    let depth = max_depth.unwrap_or(DEFAULT_DEPTH).clamp(1, HARD_DEPTH);
     let show_hidden = show_hidden.unwrap_or(false);
     let workspace = WorkspaceEnv::from_option(workspace);
     let root_path = resolve_path(&root, &workspace);
+
     if !root_path.is_dir() {
         return Err(format!("not a directory: {root}"));
     }
 
+    tauri::async_runtime::spawn_blocking(move || {
+        search_blocking(&root_path, &root, &q, cap, depth, &workspace, show_hidden, gen, my_gen)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Blocking search core, separated so integration tests can call it without
+/// Tauri's DI container. Pass a detached generation counter with `my_gen == 0`
+/// and an `Arc` that will never be bumped to disable cancellation.
+#[allow(clippy::too_many_arguments)]
+pub fn search_blocking(
+    root_path: &std::path::Path,
+    root_display: &str,
+    query: &str,
+    cap: usize,
+    depth: usize,
+    workspace: &WorkspaceEnv,
+    show_hidden: bool,
+    gen: Arc<AtomicU64>,
+    my_gen: u64,
+) -> Result<SearchResult, String> {
     let mut cands: Vec<SearchHit> = Vec::new();
     let mut scanned: usize = 0;
     let mut truncated = false;
 
-    let walker = WalkBuilder::new(&root_path)
+    let walker = WalkBuilder::new(root_path)
         .hidden(!show_hidden)
         .git_ignore(true)
         .git_global(true)
@@ -79,9 +122,8 @@ pub fn fs_search(
         .ignore(true)
         .parents(true)
         .follow_links(false)
+        .max_depth(Some(depth))
         .filter_entry(|dent| {
-            // Prune known-heavy dirs even when no .gitignore is present (e.g.
-            // searching from $HOME).
             if dent.depth() == 0 {
                 return true;
             }
@@ -93,6 +135,10 @@ pub fn fs_search(
         .build();
 
     for dent in walker.flatten() {
+        if gen.load(Ordering::SeqCst) != my_gen {
+            truncated = true;
+            break;
+        }
         scanned += 1;
         if scanned > MAX_SCANNED {
             truncated = true;
@@ -102,7 +148,7 @@ pub fn fs_search(
         if path == root_path {
             continue;
         }
-        let rel = match path.strip_prefix(&root_path) {
+        let rel = match path.strip_prefix(root_path) {
             Ok(r) => to_canon(r),
             Err(_) => continue,
         };
@@ -112,14 +158,14 @@ pub fn fs_search(
             .unwrap_or_default();
         let is_dir = dent.file_type().map(|t| t.is_dir()).unwrap_or(false);
         cands.push(SearchHit {
-            path: display_path(path, &root_path, &root, &workspace),
+            path: display_path(path, root_path, root_display, workspace),
             rel,
             name,
             is_dir,
         });
     }
 
-    let hits = rank_fuzzy(cands, q, cap);
+    let hits = rank_fuzzy(cands, query, cap);
     Ok(SearchResult { hits, truncated })
 }
 
@@ -163,8 +209,6 @@ pub fn fs_list_files(
 ) -> Result<ListFilesResult, String> {
     const DEFAULT_LIMIT: usize = 2_000;
     const HARD_LIMIT: usize = 10_000;
-    const DEFAULT_DEPTH: usize = 8;
-    const HARD_DEPTH: usize = 16;
 
     let cap = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, HARD_LIMIT);
     let depth = max_depth.unwrap_or(DEFAULT_DEPTH).clamp(1, HARD_DEPTH);
@@ -280,5 +324,12 @@ mod tests {
         let out = rank_fuzzy(cands, "cmdp", 10);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].rel, "CommandPalette.tsx");
+    }
+
+    #[test]
+    fn depth_defaults_are_sane() {
+        assert_eq!(DEFAULT_DEPTH, 8);
+        assert_eq!(HARD_DEPTH, 16);
+        assert!(DEFAULT_DEPTH <= HARD_DEPTH);
     }
 }

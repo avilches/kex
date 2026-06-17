@@ -364,6 +364,7 @@ pub fn run() {
         .manage(fs::watch::FsWatchState::default())
         .manage(history::HistoryState::default())
         .manage(fs::grep::ContentSearchState::default())
+        .manage(fs::search::FileSearchState::default())
         .manage({
             let registry = workspace::WorkspaceRegistry::default();
             workspace::bootstrap_registry(&registry);

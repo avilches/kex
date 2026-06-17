@@ -1,9 +1,40 @@
 mod common;
 
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
+
 use common::{git_available, FsFixture, GitRepoFixture};
 use kex_lib::modules::fs::grep::{fs_glob, fs_grep};
-use kex_lib::modules::fs::search::{fs_list_files, fs_search};
+use kex_lib::modules::fs::search::{fs_list_files, search_blocking, SearchResult};
 use kex_lib::modules::fs::tree::{fs_read_dir, list_subdirs, EntryKind};
+use kex_lib::modules::workspace::WorkspaceEnv;
+
+/// Test wrapper: runs `search_blocking` with a frozen generation (never cancelled).
+fn fs_search(
+    root: String,
+    query: String,
+    limit: Option<usize>,
+    _max_depth: Option<usize>,
+    _show_hidden: Option<bool>,
+) -> Result<SearchResult, String> {
+    let q = query.trim().to_string();
+    if q.is_empty() {
+        return Ok(SearchResult { hits: Vec::new(), truncated: false });
+    }
+    let gen = Arc::new(AtomicU64::new(0));
+    let root_path = std::path::PathBuf::from(&root);
+    search_blocking(
+        &root_path,
+        &root,
+        &q,
+        limit.unwrap_or(200).min(1000),
+        8,
+        &WorkspaceEnv::Local,
+        _show_hidden.unwrap_or(false),
+        gen,
+        0,
+    )
+}
 
 #[test]
 fn grep_finds_matches_and_returns_relative_paths() {
