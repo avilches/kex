@@ -32,9 +32,7 @@ emit_kex() {   # args: event extra_fields_percent_encoded
 # Fails silently if KEX_IPC is unset or socket is unavailable.
 send_ipc() {
     [ -n "$KEX_IPC" ] || return 0
-    if command -v nc > /dev/null 2>&1; then
-        printf '%s\n' "$PAYLOAD" | nc -w 1 -U "$KEX_IPC" 2>/dev/null && return 0
-    fi
+    printf '%s\n' "$PAYLOAD" | nc -w 1 -U "$KEX_IPC" 2>/dev/null && return 0
     python3 -c "
 import socket, sys
 s = socket.socket(socket.AF_UNIX)
