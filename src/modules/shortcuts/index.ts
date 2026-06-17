@@ -1,5 +1,6 @@
 export {
   SHORTCUTS,
+  SHORTCUTS_BY_ID,
   SHORTCUT_GROUPS,
   getBindingTokens,
   getShortcutLabel,

@@ -388,7 +388,7 @@ export function getBindingTokens(binding?: KeyBinding): string[] {
   return tokens;
 }
 
-const SHORTCUTS_BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
+export const SHORTCUTS_BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
 
 export function getShortcutLabel(
   id: ShortcutId,

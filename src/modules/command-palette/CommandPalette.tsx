@@ -12,7 +12,7 @@ import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   getBindingTokens,
-  SHORTCUTS,
+  SHORTCUTS_BY_ID,
   type KeyBinding,
   type ShortcutId,
 } from "@/modules/shortcuts";
@@ -47,7 +47,6 @@ type Props = {
   insertCommand: ((cmd: string) => void) | null;
 };
 
-const SHORTCUTS_BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
 const THEME_PREVIEW_DELAY_MS = 140;
 
 export function CommandPalette({
