@@ -950,6 +950,62 @@ pub fn pull_ff_only(
     ensure_success(&output, "git pull --ff-only failed")
 }
 
+pub fn mv(
+    registry: &WorkspaceRegistry,
+    from: &str,
+    to: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    use crate::modules::workspace::resolve_path;
+
+    let from_path = resolve_path(from, workspace);
+    let from_parent = from_path
+        .parent()
+        .map(|p| p.to_string_lossy().into_owned())
+        .ok_or_else(|| GitError::NotADirectory(from.to_string()))?;
+
+    let cwd = canonical_dir(registry, &from_parent, workspace)?;
+    if !registry.is_authorized(&cwd.local_path) {
+        return Err(GitError::PathOutsideWorkspace(cwd.local_path));
+    }
+    ensure_git_available(&cwd.workspace)?;
+
+    let repo_info = resolve_repo_in_authorized(registry, &cwd)?.ok_or_else(|| {
+        GitError::CommandFailed {
+            context: "not a git repository",
+            detail: from.to_string(),
+        }
+    })?;
+
+    let repo_root = std::path::PathBuf::from(&repo_info.repo_root);
+    let to_path = resolve_path(to, workspace);
+
+    let canonical_from = registry
+        .canonicalize_cached(&from_path)
+        .map_err(GitError::Io)?;
+    let canonical_to = registry
+        .canonicalize_cached(to_path.parent().unwrap_or(&to_path))
+        .map(|parent| parent.join(to_path.file_name().unwrap_or_default()))
+        .map_err(GitError::Io)?;
+
+    let from_rel = canonical_from
+        .strip_prefix(&repo_root)
+        .map(|r| r.to_string_lossy().replace('\\', "/"))
+        .map_err(|_| GitError::PathOutsideWorkspace(canonical_from.clone()))?;
+    let to_rel = canonical_to
+        .strip_prefix(&repo_root)
+        .map(|r| r.to_string_lossy().replace('\\', "/"))
+        .map_err(|_| GitError::PathOutsideWorkspace(canonical_to))?;
+
+    let output = run_git(
+        &cwd.workspace,
+        Some(&repo_info.repo_root),
+        ["mv", "--", &from_rel, &to_rel],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git mv failed")
+}
+
 fn nothing_to_commit(output: &GitOutput) -> bool {
     let stderr = String::from_utf8_lossy(&output.stderr).to_ascii_lowercase();
     let stdout = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
@@ -1053,5 +1109,73 @@ mod tests {
             "fatal: your current branch 'main' does not have any commits yet"
         )));
         assert!(!looks_like_no_head(&mk("fatal: pathspec did not match")));
+    }
+
+    use std::process::Command as Cmd;
+    use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
+
+    fn git_init_with_commit(dir: &std::path::Path) {
+        Cmd::new("git").arg("init").current_dir(dir).status().unwrap();
+        Cmd::new("git").args(["config", "user.email", "t@t.com"]).current_dir(dir).status().unwrap();
+        Cmd::new("git").args(["config", "user.name", "T"]).current_dir(dir).status().unwrap();
+        std::fs::write(dir.join("a.txt"), b"hello").unwrap();
+        Cmd::new("git").args(["add", "a.txt"]).current_dir(dir).status().unwrap();
+        Cmd::new("git").args(["commit", "-m", "init"]).current_dir(dir).status().unwrap();
+    }
+
+    #[test]
+    fn mv_tracked_file_moves_and_stages_rename() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let from = dir.path().join("a.txt").to_string_lossy().into_owned();
+        let to = dir.path().join("b.txt").to_string_lossy().into_owned();
+
+        super::mv(&registry, &from, &to, &WorkspaceEnv::Local).unwrap();
+
+        assert!(!dir.path().join("a.txt").exists());
+        assert!(dir.path().join("b.txt").exists());
+
+        let output = Cmd::new("git")
+            .args(["status", "--porcelain"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        let status = String::from_utf8_lossy(&output.stdout);
+        assert!(status.contains("R "), "expected staged rename, got: {status}");
+    }
+
+    #[test]
+    fn mv_untracked_file_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+        std::fs::write(dir.path().join("new.txt"), b"x").unwrap();
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let from = dir.path().join("new.txt").to_string_lossy().into_owned();
+        let to = dir.path().join("moved.txt").to_string_lossy().into_owned();
+
+        let result = super::mv(&registry, &from, &to, &WorkspaceEnv::Local);
+        assert!(result.is_err(), "expected error for untracked file");
+    }
+
+    #[test]
+    fn mv_outside_repo_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("x.txt"), b"y").unwrap();
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let from = dir.path().join("x.txt").to_string_lossy().into_owned();
+        let to = dir.path().join("y.txt").to_string_lossy().into_owned();
+
+        let result = super::mv(&registry, &from, &to, &WorkspaceEnv::Local);
+        assert!(result.is_err(), "expected error outside git repo");
     }
 }
