@@ -40,8 +40,16 @@ type SearchResult = {
   truncated: boolean;
 };
 
+// "idle"   = no active query
+// "phase1" = both calls in flight, no results shown yet  -> "Searching..."
+// "phase2" = phase 1 done (results shown), phase 2 running -> "Searching deeper..."
+// "done"   = phase 2 complete
+type SearchPhase = "idle" | "phase1" | "phase2" | "done";
+
 const MIN_QUERY_LEN = 2;
 const DEBOUNCE_MS = 300;
+// Depth for the fast first pass: covers root + two subdirectory levels (e.g. src/modules/).
+const PHASE_1_DEPTH = 3;
 
 type Props = {
   rootPath: string;
@@ -73,14 +81,21 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [searching, setSearching] = useState(false);
+  const [phase, setPhase] = useState<SearchPhase>("idle");
   const [truncated, setTruncated] = useState(false);
   const [contextHit, setContextHit] = useState<SearchHit | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastKeyboardNavAt = useRef(0);
+  // Tracks the path of the currently selected item so phase-2 can restore selection.
+  const selectedPathRef = useRef<string | null>(null);
 
   const active = query.trim().length > 0;
+
+  // Keep selectedPathRef current whenever the selected item changes.
+  useEffect(() => {
+    selectedPathRef.current = results[selectedIndex]?.path ?? null;
+  }, [selectedIndex, results]);
 
   useEffect(() => {
     onActiveChange?.(active);
@@ -93,7 +108,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
       setQuery("");
       setResults([]);
       setSelectedIndex(0);
-      setSearching(false);
+      setPhase("idle");
       setTruncated(false);
     }
   }, [open]);
@@ -103,26 +118,59 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
     if (q.length < MIN_QUERY_LEN) {
       setResults([]);
       setSelectedIndex(0);
-      setSearching(false);
+      setPhase("idle");
       setTruncated(false);
       return;
     }
-    setSearching(true);
+    setPhase("phase1");
     let alive = true;
+
     const handle = setTimeout(async () => {
-      try {
-        const res = await invoke<SearchResult>("fs_search", {
-          root: rootPath,
-          query: q,
-          limit: 200,
-          showHidden,
-          workspace: currentWorkspaceEnv(),
-        });
-        if (alive) {
+      const workspace = currentWorkspaceEnv();
+
+      // Both calls start in parallel after the debounce.
+      const fastSearch = invoke<SearchResult>("fs_search", {
+        root: rootPath,
+        query: q,
+        limit: 200,
+        maxDepth: PHASE_1_DEPTH,
+        showHidden,
+        workspace,
+      });
+
+      const deepSearch = invoke<SearchResult>("fs_search", {
+        root: rootPath,
+        query: q,
+        limit: 200,
+        showHidden,
+        workspace,
+      });
+
+      // Phase 1: show shallow hits immediately; switch label to "Searching deeper…".
+      // If the shallow scan found nothing, stay in phase1 and let phase2 show results.
+      fastSearch
+        .then((res) => {
+          if (!alive || res.hits.length === 0) return;
           setResults(res.hits);
-          setTruncated(res.truncated);
           setSelectedIndex(0);
-        }
+          setTruncated(res.truncated);
+          setPhase("phase2");
+        })
+        .catch(() => {
+          // Fast search failed; still waiting for deep.
+        });
+
+      // Phase 2: replace with fully-ranked results; preserve keyboard selection by path.
+      try {
+        const res = await deepSearch;
+        if (!alive) return;
+        const prevPath = selectedPathRef.current;
+        const newIdx = prevPath
+          ? res.hits.findIndex((h) => h.path === prevPath)
+          : -1;
+        setResults(res.hits);
+        setTruncated(res.truncated);
+        setSelectedIndex(newIdx >= 0 ? newIdx : 0);
       } catch (e) {
         if (alive) {
           console.error("fs_search failed:", e);
@@ -131,7 +179,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
           setSelectedIndex(0);
         }
       } finally {
-        if (alive) setSearching(false);
+        if (alive) setPhase("done");
       }
     }, DEBOUNCE_MS);
 
@@ -166,6 +214,9 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
       onOpenFile(hit.path);
     }
   };
+
+  const searching = phase === "phase1" || phase === "phase2";
+  const searchLabel = phase === "phase2" ? "Searching deeper…" : "Searching…";
 
   return (
     <div className="flex flex-col">
@@ -226,13 +277,9 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
           <ContextMenu>
             <ContextMenuTrigger asChild>
               <div className="py-1" ref={scrollRef}>
-                {searching && results.length === 0 ? (
+                {results.length === 0 ? (
                   <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                    Searching…
-                  </div>
-                ) : results.length === 0 ? (
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                    No matches
+                    {phase === "done" ? "No matches" : searchLabel}
                   </div>
                 ) : (
                   results.map((hit, index) => {
@@ -252,7 +299,9 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                         }}
                         className={cn(
                           "flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs transition-colors",
-                          isSelected ? "bg-accent text-foreground" : "hover:bg-accent/50 text-foreground/80"
+                          isSelected
+                            ? "bg-accent text-foreground"
+                            : "hover:bg-accent/50 text-foreground/80",
                         )}
                         title={hit.path}
                       >
@@ -274,7 +323,11 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                     );
                   })
                 )}
-                {truncated && results.length > 0 ? (
+                {searching && results.length > 0 ? (
+                  <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
+                    {searchLabel}
+                  </div>
+                ) : !searching && truncated && results.length > 0 ? (
                   <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
                     Showing partial results - refine your query.
                   </div>
