@@ -1072,9 +1072,21 @@ export default function App() {
     (workspaceId: string, panelId: string) => {
       setActiveWorkspaceId(workspaceId);
       activatePanel(workspaceId, panelId);
+      setTimeout(() => terminalHandles.current.get(panelId)?.focus(), 50);
     },
     [setActiveWorkspaceId, activatePanel],
   );
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .listen<{ workspaceId: string; panelId: string }>("kex:activate-panel", (e) => {
+        onActivateAgent(e.payload.workspaceId, e.payload.panelId);
+      })
+      .then((u) => { unlisten = u; })
+      .catch((e) => console.error("[kex] kex:activate-panel listen failed:", e));
+    return () => { unlisten?.(); };
+  }, [onActivateAgent]);
 
   // ── Command palette ───────────────────────────────────────────────────────
 

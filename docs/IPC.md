@@ -125,6 +125,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
 | `agent_session_restore_plan` | Return `Vec<RestorePlan>` — one entry per panel that had a running agent session at last close |
+| `agent_queue_nav` | Store a pending OS-notification navigation target `{ window_label, workspace_id, panel_id }` with a 5-second TTL. Called by the frontend before sending an OS notification so that when the user clicks the notification and any main window gains focus, Rust can redirect to the correct window and emit `kex:activate-panel` to it. |
 
 ---
 
@@ -150,3 +151,17 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 The socket is created in `session::spawn()` before the child process starts, so `KEX_IPC` is always set when the shell reads its environment. The socket file is removed when the `IpcGuard` drops (PTY session closed).
 
 Hooks must be installed via "Set up Claude Code" (notification bell popover). See `docs/NOTIFICATIONS.md` for the detector state machine and `docs/AGENT_SESSION_RESTORE.md` for session persistence.
+
+### OS notification deep-link
+
+When the app is not focused and an agent event requires an OS notification, the frontend calls `agent_queue_nav` to register a navigation target before calling `sendNotification`. Rust stores it in `PendingNavState` (a `Mutex<Option<PendingNav>>`) with a 5-second TTL.
+
+On every `WindowEvent::Focused(true)` for a main window (`w-*` label), Rust checks for a fresh pending nav. If found, it:
+
+1. Focuses the target window via `WebviewWindow::set_focus()`.
+2. Emits `kex:activate-panel` to that window with payload `{ workspaceId, panelId }`.
+3. Clears the pending nav.
+
+Each main window's `App.tsx` listens for `kex:activate-panel` on startup (via `getCurrentWindow().listen(...)`) and calls `onActivateAgent(workspaceId, panelId)`, which switches the active workspace, activates the panel, and focuses the terminal with a 50 ms delay.
+
+**Limitation:** only the most recent navigation target is kept. If two agents finish while the app is unfocused, clicking either OS notification navigates to the panel of whichever agent finished last.

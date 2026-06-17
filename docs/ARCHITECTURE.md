@@ -156,7 +156,9 @@ The indicator is cleared by any of: the agent's `Stop` hook firing normally, the
 
 The Unix socket (`/tmp/kex-ipc-{pty_id}.sock`, path in `KEX_IPC`) is created before the child process starts in `session::spawn()` and cleaned up on PTY close. Claude Code hooks send raw JSON payloads to it; `pty/ipc.rs` dispatches them to Tauri events consumed by the frontend.
 
-See IPC.md for the full protocol detail.
+**Notification bell scoping.** Each main window runs its own React runtime with its own Zustand store. `kex:agent-signal` is broadcast globally, but `leafIdForPty()` is window-local, so each window's `AgentNotificationsBridge` only processes signals from PTYs that belong to it. The bell in each window shows only that window's agents.
+
+**OS notification deep-link.** When the app is unfocused and the frontend decides to send an OS notification, it first calls `agent_queue_nav` to register `{ windowLabel, workspaceId, panelId }` in `PendingNavState` (Rust, TTL 5 s). On any subsequent `WindowEvent::Focused(true)` for a main window, Rust consumes the pending target, focuses the correct window, and emits `kex:activate-panel` to it. Each window listens for that event and calls `onActivateAgent`, which switches the workspace, activates the panel, and focuses the terminal (50 ms delay for React state to settle). See IPC.md for the full protocol detail.
 
 ### 3.7a Agent session restore
 
