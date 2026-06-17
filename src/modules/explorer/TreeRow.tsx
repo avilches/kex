@@ -208,8 +208,7 @@ function EntryRowImpl(props: EntryRowProps) {
             <span
               className={cn(
                 "min-w-0 flex-1 truncate",
-                !isSelected &&
-                  !gitignored &&
+                !gitignored &&
                   gitStatusCode &&
                   explorerGitTextClass(gitStatusCode),
               )}

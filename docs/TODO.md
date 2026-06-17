@@ -130,42 +130,35 @@ Tres formas de activar el lock:
 
 ---
 
-## Explorer: el color git no se ve cuando el fichero esta seleccionado
-
-Estado: pendiente (anotado 2026-06-13, tras integrar C1 git decorations).
-
-En `src/modules/explorer/TreeRow.tsx`, el tinte git del nombre solo se aplica cuando la fila NO esta seleccionada:
-
-```tsx
-className={cn(
-  "min-w-0 flex-1 truncate",
-  !isSelected && !gitignored && gitStatusCode && explorerGitTextClass(gitStatusCode),
-)}
-```
-
-y el contenedor usa `text-foreground` cuando `isSelected` (sobre `bg-accent`). Resultado: al seleccionar un fichero modificado/nuevo, se pierde el color git.
-
-Esto viene heredado del upstream (que tambien condiciona con `!isSelected`), probablemente porque el color git podria tener bajo contraste sobre el fondo `bg-accent` de la seleccion. Mejora deseada: mostrar el estado git tambien en la fila seleccionada, manteniendo contraste suficiente.
-
-Opciones:
-
-- Mantener el tinte git en el `<span>` del nombre incluso con `isSelected`, y comprobar contraste de cada color (`gitStatusColor.ts`) sobre `bg-accent`.
-- O usar otro indicador no dependiente del color del texto cuando la fila esta seleccionada (p. ej. una letra de estado M/A/D/U/R atenuada a la derecha, o un punto de color), para no depender del contraste del nombre.
-
----
 
 ## Explorer: arrastrar DESDE el explorer HACIA el SO (Finder/Explorer)
 
-Estado: pendiente (anotado 2026-06-13).
+Estado: investigado 2026-06-17, viable en macOS, pendiente de implementar.
 
 Hoy el drag de archivos solo funciona en dos direcciones:
 
 - Dentro del explorer (mover, C2).
 - Desde el SO hacia el explorer (copiar, C3).
 
-Falta el sentido inverso: arrastrar un archivo/carpeta DESDE el explorer y soltarlo en Finder/Explorer del SO (u otra app) para copiarlo/exportarlo. No estaba en el plan de sync ni existe en el upstream.
+Falta el sentido inverso: arrastrar un archivo/carpeta DESDE el explorer y soltarlo en Finder/Explorer del SO (u otra app) para copiarlo/exportarlo.
 
-Dificultad: Tauri intercepta el canal de drag-drop nativo cuando `dragDropEnabled` esta on (por eso el dnd interno usa `@dnd-kit` pointer-based). Iniciar un drag NATIVO saliente desde la webview (para que el SO lo reciba) requiere investigar si Tauri lo permite con la config actual, o un mecanismo alternativo (p. ej. el HTML5 `dragstart` con `DataTransfer` de tipo file, que suele estar bloqueado en webviews de Tauri). Investigar viabilidad antes de estimar.
+### Hallazgos de la investigacion
+
+- HTML5 `dragstart` con `DataTransfer` de tipo `Files` esta bloqueado en webviews de Tauri: no funciona.
+- El plugin oficial para esto es `crabnebula-dev/tauri-plugin-drag` (Tauri 2 compatible). **No esta en `Cargo.toml` ni en las capabilities.**
+- El plugin sortea el bloqueo iniciando el drag nativo desde Rust via IPC cuando el JS lo solicita.
+- Compatibilidad: macOS funciona bien; Linux tiene reportes de problemas en algunos compositors (Mutter/KDE); Windows es experimental.
+
+### Costo estimado de implementacion
+
+| Paso | Estimacion |
+|------|-----------|
+| `Cargo.toml` dep + `lib.rs` plugin + capability entry | trivial |
+| Comando Rust `start_drag(paths: Vec<String>)` | ~40 lineas |
+| Hook `onMouseDown` largo en `TreeRow.tsx` -> IPC | ~30 lineas |
+| Pruebas en macOS/Linux/Windows | 1-2h |
+
+Total estimado: ~2h. Riesgo principal: comportamiento en Linux.
 
 ---
 
