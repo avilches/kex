@@ -977,7 +977,7 @@ pub fn mv(
         }
     })?;
 
-    let repo_root = std::path::PathBuf::from(&repo_info.repo_root);
+    let root_resolved = canonical_dir(registry, &repo_info.repo_root, &cwd.workspace)?;
     let to_path = resolve_path(to, workspace);
 
     let canonical_from = registry
@@ -989,17 +989,17 @@ pub fn mv(
         .map_err(GitError::Io)?;
 
     let from_rel = canonical_from
-        .strip_prefix(&repo_root)
+        .strip_prefix(&root_resolved.local_path)
         .map(|r| r.to_string_lossy().replace('\\', "/"))
         .map_err(|_| GitError::PathOutsideWorkspace(canonical_from.clone()))?;
     let to_rel = canonical_to
-        .strip_prefix(&repo_root)
+        .strip_prefix(&root_resolved.local_path)
         .map(|r| r.to_string_lossy().replace('\\', "/"))
         .map_err(|_| GitError::PathOutsideWorkspace(canonical_to))?;
 
     let output = run_git(
         &cwd.workspace,
-        Some(&repo_info.repo_root),
+        Some(&root_resolved.git_path),
         ["mv", "--", &from_rel, &to_rel],
         DEFAULT_TIMEOUT_SECS,
     )?;

@@ -71,7 +71,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `git_commit_files` | Files changed in a specific commit |
 | `git_commit_file_diff` | Diff of a specific file in a specific commit |
 | `git_remote_url` | Remote URL for the repo (used for remote links) |
-| `git_mv` | Mover o renombrar un fichero/dir trackeado en git; stagea el rename automaticamente |
+| `git_mv` | Move or rename a tracked file/dir; automatically stages the rename |
 
 ---
 
