@@ -19,6 +19,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { AgentSession } from "@/modules/agents/lib/types";
+import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -32,9 +33,11 @@ function formatElapsed(ms: number): string {
 function AgentHoverCardContent({
   agentSession,
   cwd,
+  panelId,
 }: {
   agentSession: AgentSession;
   cwd: string | undefined;
+  panelId: string;
 }) {
   const elapsed = formatElapsed(Date.now() - agentSession.startedAt);
   const sessionId = agentSession.meta?.sessionId;
@@ -53,10 +56,12 @@ function AgentHoverCardContent({
       <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
         <span className="text-muted-foreground">Session</span>
         {sessionId ? (
-          <span className="font-mono text-foreground">{sessionId.slice(0, 8)}&hellip;</span>
+          <span className="break-all font-mono text-foreground">{sessionId}</span>
         ) : (
           <span className="text-muted-foreground/60 italic">not started</span>
         )}
+        <span className="text-muted-foreground">Tab id</span>
+        <span className="break-all font-mono text-foreground">{panelId}</span>
         {directory && (
           <>
             <span className="shrink-0 text-muted-foreground">Directory</span>
@@ -74,7 +79,7 @@ function AgentHoverCardContent({
         {agentSession.restoreError && (
           <>
             <span className="text-muted-foreground">Error</span>
-            <span className="truncate text-destructive">
+            <span className="break-all text-destructive">
               {agentSession.restoreErrorReason ?? "unknown error"}
             </span>
           </>
@@ -250,7 +255,7 @@ function DraggableTab({
         {hasAgent
           ? isRestoreError
             ? <span title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>{"⚠"}</span>
-            : "✦"
+            : <AgentIcon agent={agentSession!.agent} size={12} />
           : panelIcon(panel, workspaceId)}
       </span>
       <span
@@ -422,8 +427,8 @@ function DraggableTab({
       </PopoverContent>
     </Popover>
     {hasAgent && !isRestoreError && (
-      <HoverCardContent side="bottom" align="start" className="w-80 rounded-xl p-3">
-        <AgentHoverCardContent agentSession={agentSession!} cwd={panel.kind === "terminal" ? panel.cwd : undefined} />
+      <HoverCardContent side="bottom" align="start" className="w-96 rounded-xl p-3">
+        <AgentHoverCardContent agentSession={agentSession!} cwd={panel.kind === "terminal" ? panel.cwd : undefined} panelId={panel.id} />
       </HoverCardContent>
     )}
     </HoverCard>
