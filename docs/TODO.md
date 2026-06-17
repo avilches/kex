@@ -138,18 +138,6 @@ Tres formas de activar el lock:
 
 ---
 
-## Explorer: soltar sobre un archivo debe mover a su carpeta padre
-
-Estado: pendiente (anotado 2026-06-13; la parte de soltar en la raiz ya se implemento el 2026-06-17).
-
-Hoy solo las CARPETAS son destino de drop en el drag interno. Al soltar sobre un ARCHIVO, la operacion no hace nada en vez de mover el elemento a la carpeta padre del archivo. El comportamiento deseado (igual que el upstream con `useExplorerDnd`): si el elemento arrastrado cae sobre un archivo, derivar el destino a su carpeta padre.
-
-Implementacion: hacer que los archivos tambien sean `useDroppable` con id `explorer-dir:<parentDir>` (mismo prefijo que las carpetas, para que `onDragEnd` en `FileExplorer.tsx` lo procese sin cambios). Mergear refs draggable+droppable igual que ya se hace en las carpetas (`setRefs`). Guardia: no-op si el archivo ya esta en ese directorio padre.
-
-Archivos implicados: `src/modules/explorer/TreeRow.tsx`.
-
----
-
 ## Explorer: el color git no se ve cuando el fichero esta seleccionado
 
 Estado: pendiente (anotado 2026-06-13, tras integrar C1 git decorations).
