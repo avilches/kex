@@ -20,8 +20,13 @@ export const usePreferencesStore = create<State>((set) => ({
   init: async () => {
     if (initialized) return;
     initialized = true;
-    const prefs = await loadPreferences();
-    set({ ...prefs, hydrated: true });
+    try {
+      const prefs = await loadPreferences();
+      set({ ...prefs, hydrated: true });
+    } catch (err) {
+      console.error("Failed to load preferences, using defaults:", err);
+      set({ ...DEFAULT_PREFERENCES, hydrated: true });
+    }
     void onPreferencesChange((key, value) => {
       set({ [key]: value } as Partial<State>);
     });
