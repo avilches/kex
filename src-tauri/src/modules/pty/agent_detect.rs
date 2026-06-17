@@ -3,12 +3,12 @@ const BEL: u8 = 0x07;
 const OSC_INTRO: u8 = b']';
 const ST_FINAL: u8 = b'\\';
 
-const OSC_MAX: usize = 2048;
+const OSC_MAX: usize = 4096;
 
 const DEFAULT_AGENTS: &[&str] = &["claude", "codex"];
 
-// OSC 777 marker our Claude Code hooks emit via `terminalSequence`.
-const KEX_MARKER: &[u8] = b"notify;Kex;";
+// OSC 777;kex;<event>;<panel_id>;<session_id>;<transcript_path>;<cwd>[;<extra...>]
+const KEX_UNIFIED_MARKER: &[u8] = b"kex;";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum State {
@@ -25,10 +25,6 @@ enum Status {
     Working,
     Waiting,
 }
-
-// OSC 777;kex-session;<panel_id>;<agent>;<session_id>;<transcript_path>;<cwd>
-// All five fields are percent-encoded (jq @uri) so they're safe to delimit with ';'.
-const KEX_SESSION_MARKER: &[u8] = b"kex-session;";
 
 fn percent_decode(s: &[u8]) -> String {
     let mut out = Vec::with_capacity(s.len());
@@ -52,11 +48,16 @@ fn percent_decode(s: &[u8]) -> String {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Transition {
     Started { agent: String },
-    UserPromptSubmit,
-    Notification,
+    // Llevan session data — Rust los usa para record_session + emit meta
+    SessionStart { panel_id: String, session_id: String, transcript_path: String, cwd: String },
+    UserPromptSubmit { panel_id: String, session_id: String, transcript_path: String, cwd: String },
+    // Estado del agente
+    Notification { message: String },
     Stop,
+    StopFailure { error_message: String },
+    SessionEnd,
+    PermissionRequest { tool_name: String },
     Exited,
-    SessionStart { panel_id: String, agent: String, session_id: String, transcript_path: String, cwd: String },
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -64,19 +65,31 @@ pub struct AgentSignal {
     pub id: u32,
     pub kind: &'static str,
     pub agent: Option<String>,
+    pub message: Option<String>,
+    pub tool_name: Option<String>,
 }
 
 impl Transition {
     pub fn into_signal(self, id: u32) -> AgentSignal {
         match self {
-            Transition::Started { agent } => {
-                AgentSignal { id, kind: "started", agent: Some(agent) }
-            }
-            Transition::UserPromptSubmit => AgentSignal { id, kind: "UserPromptSubmit", agent: None },
-            Transition::Notification => AgentSignal { id, kind: "Notification", agent: None },
-            Transition::Stop => AgentSignal { id, kind: "Stop", agent: None },
-            Transition::Exited => AgentSignal { id, kind: "exited", agent: None },
-            Transition::SessionStart { .. } => unreachable!("SessionStart is handled before into_signal"),
+            Transition::Started { agent } =>
+                AgentSignal { id, kind: "started", agent: Some(agent), message: None, tool_name: None },
+            Transition::UserPromptSubmit { .. } =>
+                AgentSignal { id, kind: "UserPromptSubmit", agent: None, message: None, tool_name: None },
+            Transition::Notification { message } =>
+                AgentSignal { id, kind: "Notification", agent: None, message: Some(message), tool_name: None },
+            Transition::Stop =>
+                AgentSignal { id, kind: "Stop", agent: None, message: None, tool_name: None },
+            Transition::StopFailure { error_message } =>
+                AgentSignal { id, kind: "StopFailure", agent: None, message: Some(error_message), tool_name: None },
+            Transition::SessionEnd =>
+                AgentSignal { id, kind: "SessionEnd", agent: None, message: None, tool_name: None },
+            Transition::PermissionRequest { tool_name } =>
+                AgentSignal { id, kind: "PermissionRequest", agent: None, message: None, tool_name: Some(tool_name) },
+            Transition::Exited =>
+                AgentSignal { id, kind: "exited", agent: None, message: None, tool_name: None },
+            Transition::SessionStart { .. } =>
+                unreachable!("SessionStart is handled before into_signal"),
         }
     }
 }
@@ -192,61 +205,90 @@ impl AgentDetector {
     }
 
     fn handle_osc777<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
-        if let Some(event) = pt.strip_prefix(KEX_MARKER) {
-            log::debug!("[osc777] hook event: {}", String::from_utf8_lossy(event));
-            // Self-arms so notifications work even when no shell preexec fired
-            // (bash, Windows, tmux, wrappers).
-            match event {
-                b"UserPromptSubmit" => {
-                    self.ensure_armed(emit);
-                    self.set_working(emit);
-                }
-                b"Notification" => {
-                    self.ensure_armed(emit);
-                    self.status = Status::Waiting;
-                    emit(Transition::Notification);
-                }
-                b"Stop" => {
-                    self.ensure_armed(emit);
-                    self.status = Status::Waiting;
-                    emit(Transition::Stop);
-                    // Stay armed — Claude is still running. Reset to Idle so
-                    // the next UserPromptSubmit triggers a new Working transition.
-                    self.status = Status::Idle;
-                }
-                _ => {
-                    log::debug!("[osc777] unknown hook event, ignored");
-                }
-            }
+        if let Some(data) = pt.strip_prefix(KEX_UNIFIED_MARKER) {
+            self.handle_kex_unified(data, emit);
             return;
         }
-        if let Some(data) = pt.strip_prefix(KEX_SESSION_MARKER) {
-            self.handle_kex_session(data, emit);
+        // OSC 9;4 is taskbar progress, ignore
+        if pt.starts_with(b"4;") || pt == b"4" {
             return;
         }
-        log::debug!("[osc777] generic attention: {}", String::from_utf8_lossy(pt));
+        // Generic attention (Claude Code without hooks, OSC 9 or other OSC 777)
         self.generic_attention(emit);
     }
 
-    fn handle_kex_session<F: FnMut(Transition)>(&mut self, data: &[u8], emit: &mut F) {
-        // Format: <panel_id>;<agent>;<session_id>;<transcript_path>;<cwd>
-        // All fields are percent-encoded.
-        let parts: Vec<&[u8]> = data.splitn(5, |&b| b == b';').collect();
-        if parts.len() != 5 {
-            log::debug!("[osc777] SessionStart hook: malformed payload ({} parts)", parts.len());
+    fn handle_kex_unified<F: FnMut(Transition)>(&mut self, data: &[u8], emit: &mut F) {
+        let fields: Vec<String> = data
+            .split(|&b| b == b';')
+            .map(|f| percent_decode(f))
+            .collect();
+
+        if fields.len() < 5 {
+            log::debug!("[osc777] kex: malformed payload ({} fields)", fields.len());
             return;
         }
-        let panel_id = percent_decode(parts[0]);
-        let agent = percent_decode(parts[1]);
-        let session_id = percent_decode(parts[2]);
-        let transcript_path = percent_decode(parts[3]);
-        let cwd = percent_decode(parts[4]);
-        if panel_id.is_empty() || session_id.is_empty() {
-            log::debug!("[osc777] SessionStart hook: missing panel_id or session_id");
-            return;
+
+        let event = &fields[0];
+        let panel_id = &fields[1];
+        let session_id = &fields[2];
+        let transcript_path = &fields[3];
+        let cwd = &fields[4];
+
+        log::debug!("[osc777] kex: event={event} panel={panel_id} session={session_id} cwd={cwd}");
+
+        // Auto-arm para entornos sin shell preexec (bash, Windows, tmux)
+        self.ensure_armed(emit);
+
+        match event.as_str() {
+            "SessionStart" => {
+                if panel_id.is_empty() || session_id.is_empty() {
+                    log::debug!("[osc777] kex: SessionStart missing panel_id or session_id");
+                    return;
+                }
+                emit(Transition::SessionStart {
+                    panel_id: panel_id.clone(),
+                    session_id: session_id.clone(),
+                    transcript_path: transcript_path.clone(),
+                    cwd: cwd.clone(),
+                });
+            }
+            "UserPromptSubmit" => {
+                self.status = Status::Working;
+                emit(Transition::UserPromptSubmit {
+                    panel_id: panel_id.clone(),
+                    session_id: session_id.clone(),
+                    transcript_path: transcript_path.clone(),
+                    cwd: cwd.clone(),
+                });
+            }
+            "Notification" => {
+                let message = fields.get(6).cloned().unwrap_or_default();
+                self.status = Status::Waiting;
+                emit(Transition::Notification { message });
+            }
+            "Stop" => {
+                self.status = Status::Waiting;
+                emit(Transition::Stop);
+                self.status = Status::Idle;
+            }
+            "StopFailure" => {
+                let error_message = fields.get(6).cloned().unwrap_or_default();
+                self.disarm();
+                emit(Transition::StopFailure { error_message });
+            }
+            "SessionEnd" => {
+                self.disarm();
+                emit(Transition::SessionEnd);
+            }
+            "PermissionRequest" => {
+                let tool_name = fields.get(5).cloned().unwrap_or_default();
+                self.status = Status::Waiting;
+                emit(Transition::PermissionRequest { tool_name });
+            }
+            _ => {
+                log::debug!("[osc777] kex: unknown event: {event}");
+            }
         }
-        log::debug!("[osc777] SessionStart hook: panel={panel_id} agent={agent} session={session_id} cwd={cwd}");
-        emit(Transition::SessionStart { panel_id, agent, session_id, transcript_path, cwd });
     }
 
     fn handle_osc133<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
@@ -278,18 +320,10 @@ impl AgentDetector {
         }
     }
 
-    fn set_working<F: FnMut(Transition)>(&mut self, emit: &mut F) {
-        // Always emit — the frontend store handles idempotency. Not emitting would
-        // desync Rust and JS state (e.g. after user presses ESC to clear the spinner,
-        // the next UserPromptSubmit must always re-create the session).
-        self.status = Status::Working;
-        emit(Transition::UserPromptSubmit);
-    }
-
     fn generic_attention<F: FnMut(Transition)>(&mut self, emit: &mut F) {
         if self.armed {
             self.status = Status::Waiting;
-            emit(Transition::Notification);
+            emit(Transition::Notification { message: String::new() });
         }
     }
 
@@ -330,6 +364,29 @@ mod tests {
 
     fn started(agent: &str) -> Transition {
         Transition::Started { agent: agent.into() }
+    }
+
+    // Helper: build a kex unified OSC body with the required 5 fields
+    fn kex_osc(event: &str) -> String {
+        format!("777;kex;{event};panel1;sess1;%2Ftmp%2Ftranscript;%2Fhome%2Fuser")
+    }
+
+    // Helper: notification kex OSC with optional message (field[5]=type, field[6]=message)
+    fn kex_notification_osc(msg: &str) -> String {
+        format!("777;kex;Notification;panel1;sess1;%2Ftmp%2Ftranscript;%2Fhome%2Fuser;notice;{msg}")
+    }
+
+    fn notification(msg: &str) -> Transition {
+        Transition::Notification { message: msg.into() }
+    }
+
+    fn user_prompt_submit() -> Transition {
+        Transition::UserPromptSubmit {
+            panel_id: "panel1".into(),
+            session_id: "sess1".into(),
+            transcript_path: "/tmp/transcript".into(),
+            cwd: "/home/user".into(),
+        }
     }
 
     #[test]
@@ -377,30 +434,35 @@ mod tests {
         // Arm via shell OSC 133;C → status=Idle
         run(&mut d, &osc("133;C;claude"));
         // Notification while Idle → Waiting
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;Notification")), vec![Transition::Notification]);
+        assert_eq!(
+            run(&mut d, &osc(&kex_notification_osc("hello"))),
+            vec![notification("hello")]
+        );
         // UserPromptSubmit while Waiting → Working
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![Transition::UserPromptSubmit]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
         // Duplicate UserPromptSubmit — always emits so JS can re-create session after ESC/CTRL+C
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![Transition::UserPromptSubmit]);
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;Stop")), vec![Transition::Stop]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop]);
     }
 
     #[test]
     fn kex_marker_auto_arms_without_preexec() {
         let mut d = AgentDetector::new();
         assert_eq!(
-            run(&mut d, &osc("777;notify;Kex;Notification")),
-            vec![started("claude"), Transition::Notification]
+            run(&mut d, &osc(&kex_notification_osc("msg"))),
+            vec![started("claude"), notification("msg")]
         );
     }
 
     #[test]
     fn generic_osc777_and_osc9_attention_only_when_armed() {
         let mut d = AgentDetector::new();
-        assert!(run(&mut d, &osc("777;notify;Other;ready")).is_empty());
+        // Non-kex OSC 777 when not armed → no output
+        assert!(run(&mut d, &osc("777;some-other-payload")).is_empty());
         run(&mut d, &osc("133;C;codex"));
-        assert_eq!(run(&mut d, &osc("777;notify;Codex;ready")), vec![Transition::Notification]);
-        assert_eq!(run(&mut d, &osc("9;needs you")), vec![Transition::Notification]);
+        // Non-kex OSC 777 when armed → generic attention (Notification with empty message)
+        assert_eq!(run(&mut d, &osc("777;some-other-payload")), vec![notification("")]);
+        assert_eq!(run(&mut d, &osc("9;needs you")), vec![notification("")]);
         assert!(run(&mut d, &osc("9;4;1;50")).is_empty());
     }
 
@@ -448,15 +510,15 @@ mod tests {
     fn stays_armed_after_stop_ready_for_next_prompt() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;Stop")), vec![Transition::Stop]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop]);
         // Stop leaves detector armed (Claude still running) — next prompt needs no auto-arm.
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")), vec![Transition::UserPromptSubmit]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
         // Explicit shell exit (133;D) disarms.
         assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
         // Now disarmed: next UserPromptSubmit auto-arms.
         assert_eq!(
-            run(&mut d, &osc("777;notify;Kex;UserPromptSubmit")),
-            vec![started("claude"), Transition::UserPromptSubmit],
+            run(&mut d, &osc(&kex_osc("UserPromptSubmit"))),
+            vec![started("claude"), user_prompt_submit()],
         );
     }
 
@@ -465,7 +527,7 @@ mod tests {
         // After Stop (still armed), if the user exits and reruns claude, 133;C re-arms.
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        run(&mut d, &osc("777;notify;Kex;Stop"));
+        run(&mut d, &osc(&kex_osc("Stop")));
         // New invocation: 133;C fires again (no guard; Claude restarted in same terminal).
         assert_eq!(run(&mut d, &osc("133;C;claude")), vec![started("claude")]);
     }
@@ -478,6 +540,76 @@ mod tests {
         seq.extend(std::iter::repeat_n(b'x', OSC_MAX + 100));
         seq.extend_from_slice(&[ESC, ST_FINAL]);
         assert!(run(&mut d, &seq).is_empty());
-        assert_eq!(run(&mut d, &osc("777;notify;Kex;Notification")), vec![Transition::Notification]);
+        assert_eq!(
+            run(&mut d, &osc(&kex_notification_osc(""))),
+            vec![notification("")]
+        );
+    }
+
+    #[test]
+    fn session_start_emits_transition() {
+        let mut d = AgentDetector::new();
+        let transitions = run(
+            &mut d,
+            &osc("777;kex;SessionStart;panel1;sess1;%2Ftmp%2Ftranscript;%2Fhome%2Fuser"),
+        );
+        assert_eq!(transitions.len(), 2);
+        assert_eq!(transitions[0], started("claude"));
+        assert_eq!(
+            transitions[1],
+            Transition::SessionStart {
+                panel_id: "panel1".into(),
+                session_id: "sess1".into(),
+                transcript_path: "/tmp/transcript".into(),
+                cwd: "/home/user".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn kex_malformed_payload_ignored() {
+        let mut d = AgentDetector::new();
+        // Only 3 fields — must be ignored
+        assert!(run(&mut d, &osc("777;kex;SessionStart;panel1;sess1")).is_empty());
+    }
+
+    #[test]
+    fn stop_failure_and_session_end_disarm() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;claude"));
+        // fields: [0]=StopFailure [1]=panel1 [2]=sess1 [3]=transcript [4]=cwd [5]=type [6]=error_message
+        let stop_fail = run(
+            &mut d,
+            &osc("777;kex;StopFailure;panel1;sess1;%2Ftmp%2Ftranscript;%2Fhome%2Fuser;failure_type;something%20bad"),
+        );
+        assert_eq!(
+            stop_fail,
+            vec![Transition::StopFailure { error_message: "something bad".into() }]
+        );
+        // Should be disarmed now — 133;D should produce no Exited
+        assert!(run(&mut d, &osc("133;D;0")).is_empty());
+
+        // Re-arm and test SessionEnd
+        run(&mut d, &osc("133;C;claude"));
+        let end = run(
+            &mut d,
+            &osc("777;kex;SessionEnd;panel1;sess1;%2Ftmp%2Ftranscript;%2Fhome%2Fuser"),
+        );
+        assert_eq!(end, vec![Transition::SessionEnd]);
+        assert!(run(&mut d, &osc("133;D;0")).is_empty());
+    }
+
+    #[test]
+    fn permission_request_emits_tool_name() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;claude"));
+        let transitions = run(
+            &mut d,
+            &osc("777;kex;PermissionRequest;panel1;sess1;%2Ftmp%2Ftranscript;%2Fhome%2Fuser;Bash"),
+        );
+        assert_eq!(
+            transitions,
+            vec![Transition::PermissionRequest { tool_name: "Bash".into() }]
+        );
     }
 }
