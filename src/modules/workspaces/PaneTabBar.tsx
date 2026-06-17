@@ -34,58 +34,72 @@ function formatElapsed(ms: number): string {
 function AgentHoverCardContent({
   agentSession,
   cwd,
-  panelId,
+  tabTitle,
 }: {
   agentSession: AgentSession;
   cwd: string | undefined;
-  panelId: string;
+  tabTitle: string;
 }) {
   const elapsed = formatElapsed(Date.now() - agentSession.startedAt);
   const sessionId = agentSession.meta?.sessionId;
   const directory = cwd ?? agentSession.meta?.cwdLaunch;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5 text-[11px]">
       <div className="flex items-center gap-1.5">
-        <span className="text-[12px] font-medium text-foreground">{agentSession.agent}</span>
+        <span className="font-medium text-foreground">{tabTitle}</span>
         {agentSession.status === "working" ? (
           <span className="size-[7px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
         ) : agentSession.status === "waiting" ? (
           <span className="inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null}
       </div>
-      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
-        <span className="text-muted-foreground">Session</span>
-        {sessionId ? (
-          <span className="break-all font-mono text-foreground">{sessionId}</span>
-        ) : (
-          <span className="text-muted-foreground/60 italic">not started</span>
-        )}
-        <span className="text-muted-foreground">Tab id</span>
-        <span className="break-all font-mono text-foreground">{panelId}</span>
-        {directory && (
-          <>
-            <span className="shrink-0 text-muted-foreground">Directory</span>
-            <span className="break-all text-foreground">{directory}</span>
-          </>
-        )}
-        <span className="text-muted-foreground">Started</span>
-        <span className="text-foreground">{elapsed} ago</span>
-        {agentSession.restored && (
-          <>
-            <span className="text-muted-foreground">Restored</span>
-            <span className="text-foreground">yes</span>
-          </>
-        )}
-        {agentSession.restoreError && (
-          <>
-            <span className="text-muted-foreground">Error</span>
-            <span className="break-all text-destructive">
-              {agentSession.restoreErrorReason ?? "unknown error"}
-            </span>
-          </>
-        )}
+      {directory && (
+        <div className="break-all text-muted-foreground">{directory}</div>
+      )}
+      {sessionId && (
+        <div className="break-all">
+          <span className="text-muted-foreground">Session </span>
+          <span className="font-mono text-foreground">{sessionId}</span>
+        </div>
+      )}
+      <div>
+        <span className="text-muted-foreground">Started </span>
+        <span className="text-foreground">{elapsed}</span>
+        <span className="text-muted-foreground"> ago</span>
       </div>
+      {agentSession.restoreError && (
+        <div className="break-all text-destructive">
+          {agentSession.restoreErrorReason ?? "unknown error"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TerminalHoverCardContent({
+  customTitle,
+  cwd,
+  runningCommand,
+}: {
+  customTitle: string | undefined;
+  cwd: string | undefined;
+  runningCommand: string | null;
+}) {
+  return (
+    <div className="space-y-1.5 text-[11px]">
+      {customTitle && (
+        <div className="font-medium text-foreground">{customTitle}</div>
+      )}
+      {cwd && (
+        <div className="break-all text-muted-foreground">{cwd}</div>
+      )}
+      {runningCommand && (
+        <div>
+          <span className="text-muted-foreground">Running </span>
+          <span className="font-mono text-foreground">{runningCommand}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -170,21 +184,24 @@ function DraggableTab({
   const hasAgent = agentSession !== undefined;
   const isRestoreError = agentSession?.restoreError ?? false;
 
-  const agentTitle =
-    hasAgent && panel.kind === "terminal"
-      ? (() => {
-          const agentName = agentSession!.agent;
-          const cwd = panel.cwd ?? "";
-          const dirname = cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd;
-          return `${agentName} · ${dirname || title}`;
-        })()
-      : title;
+  const agentTitle = (() => {
+    if (!hasAgent || panel.kind !== "terminal") return title;
+    if (panel.title) return panel.title;
+    if (oscTitle) return oscTitle;
+    const agentName = agentSession!.agent;
+    const cwd = panel.cwd ?? "";
+    const dirname = cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd;
+    return `${agentName} · ${dirname || title}`;
+  })();
 
-  // Truncate from the left so the right end (the leaf directory) is always visible.
-  // 24 chars × ~7px/char ≈ 168px, safely within the ~196px available after icon/close/padding.
-  const displayTitle = agentTitle.length > 24
-    ? '…' + agentTitle.slice(-23)
-    : agentTitle;
+  // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
+  // Paths (cwd segments): truncate from the left so the deepest directory stays visible.
+  const isDescription = !!(panel.title || oscTitle);
+  const displayTitle = isDescription
+    ? agentTitle
+    : agentTitle.length > 28
+      ? '…' + agentTitle.slice(-27)
+      : agentTitle;
 
   const isRenaming = useTabRenameStore((s) => s.renamingPanelId === panel.id);
   const clearRename = useTabRenameStore((s) => s.clearRename);
@@ -220,7 +237,7 @@ function DraggableTab({
       onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
       {...listeners}
       className={cn(
-        "group relative flex max-w-[240px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
+        "group relative flex max-w-[320px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
         isThisDragging ? "cursor-grabbing" : "cursor-default",
         connected
           ? [
@@ -264,23 +281,25 @@ function DraggableTab({
       <span
         className={cn(
           "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
-          panel.kind === "terminal" && !!runningCommand && "text-center",
+          !isDescription && panel.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
         )}
         title={
           isRestoreError
             ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`
-            : panel.kind === "terminal"
-              ? runningCommand
-                ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
-                : (panel.cwd?.replace(/\/$/, "") ?? "shell")
-              : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"
-                ? panel.path
-                : panel.kind === "preview"
-                  ? (panel.url || undefined)
-                  : panel.kind === "git-history"
-                    ? panel.repoRoot
-                    : agentTitle
+            : hasAgent
+              ? undefined
+              : panel.kind === "terminal"
+                ? runningCommand
+                  ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
+                  : (panel.cwd?.replace(/\/$/, "") ?? "shell")
+                : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"
+                  ? panel.path
+                  : panel.kind === "preview"
+                    ? (panel.url || undefined)
+                    : panel.kind === "git-history"
+                      ? panel.repoRoot
+                      : agentTitle
         }
       >
         {displayTitle}
@@ -321,13 +340,9 @@ function DraggableTab({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <PopoverAnchor asChild>
-            {hasAgent ? (
-              <HoverCardTrigger asChild>
-                {tabDiv}
-              </HoverCardTrigger>
-            ) : (
-              tabDiv
-            )}
+            <HoverCardTrigger asChild>
+              {tabDiv}
+            </HoverCardTrigger>
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
@@ -429,9 +444,12 @@ function DraggableTab({
         />
       </PopoverContent>
     </Popover>
-    {hasAgent && !isRestoreError && (
+    {panel.kind === "terminal" && !isRestoreError && (
       <HoverCardContent side="bottom" align="start" className="w-96 rounded-xl p-3">
-        <AgentHoverCardContent agentSession={agentSession!} cwd={panel.kind === "terminal" ? panel.cwd : undefined} panelId={panel.id} />
+        {hasAgent
+          ? <AgentHoverCardContent agentSession={agentSession!} cwd={panel.cwd} tabTitle={agentTitle} />
+          : <TerminalHoverCardContent customTitle={panel.title} cwd={panel.cwd} runningCommand={runningCommand} />
+        }
       </HoverCardContent>
     )}
     </HoverCard>

@@ -1,3 +1,4 @@
+import { info } from "@tauri-apps/plugin-log";
 import { useSyncExternalStore } from "react";
 
 const titles = new Map<string, string>();
@@ -26,6 +27,7 @@ export function setOscTitle(panelId: string, title: string): void {
   if (titles.get(panelId) === title) return;
   titles.set(panelId, title);
   notify();
+  void info(`[oscTitle] panel=${panelId} title=${JSON.stringify(title)} listeners=${listeners.size}`);
 }
 
 export function clearOscTitle(panelId: string): void {

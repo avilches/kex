@@ -32,7 +32,13 @@ function MarkdownCode({ children }: { children?: React.ReactNode }) {
   );
 }
 
-const components = { code: MarkdownCode };
+// Streamdown's image component renders a <div> wrapper for the hover overlay,
+// which is invalid HTML inside <p>. Use div to allow block children.
+function MarkdownParagraph({ children }: { children?: React.ReactNode }) {
+  return <div className="my-[0.5714286em]">{children}</div>;
+}
+
+const components = { code: MarkdownCode, p: MarkdownParagraph };
 
 export function MarkdownPreviewPane({ path, visible, onSetView }: Props) {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
