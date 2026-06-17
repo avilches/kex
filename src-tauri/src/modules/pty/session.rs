@@ -199,6 +199,7 @@ pub fn spawn(
     let pending_r = pending.clone();
     let writer_for_da = writer.clone();
     let app_reader = app.clone();
+    let panel_id_for_reader = panel_id.clone().unwrap_or_default();
     let reader_thread = thread::Builder::new()
         .name("kex-pty-reader".into())
         .spawn(move || {
@@ -241,6 +242,12 @@ pub fn spawn(
                                     return;
                                 }
                                 // UserPromptSubmit continues to emit below
+                            }
+                            // Stash launch command for record_session (called on SessionStart IPC).
+                            if let Transition::Started { ref cmd_string, .. } = t {
+                                if !cmd_string.is_empty() {
+                                    session_store::stash_cmd(&panel_id_for_reader, cmd_string.clone());
+                                }
                             }
                             let _ = app_reader.emit(AGENT_EVENT, t.into_signal(id));
                         });

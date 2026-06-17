@@ -47,7 +47,7 @@ fn percent_decode(s: &[u8]) -> String {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Transition {
-    Started { agent: String },
+    Started { agent: String, cmd_string: String },
     // Llevan session data - Rust los usa para record_session + emit meta
     SessionStart {
         panel_id: String,
@@ -91,7 +91,7 @@ pub struct AgentSignal {
 impl Transition {
     pub fn into_signal(self, id: u32) -> AgentSignal {
         match self {
-            Transition::Started { agent } =>
+            Transition::Started { agent, .. } =>
                 AgentSignal { id, kind: "started", agent: Some(agent), message: None, tool_name: None, prompt: None },
             Transition::UserPromptSubmit { agent, prompt, .. } =>
                 AgentSignal { id, kind: "UserPromptSubmit", agent: Some(agent), message: None, tool_name: None, prompt: Some(prompt) },
@@ -113,6 +113,16 @@ impl Transition {
                 unreachable!("SessionStart is handled before into_signal"),
         }
     }
+}
+
+fn is_print_mode(cmd: &[u8]) -> bool {
+    let s = match std::str::from_utf8(cmd) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    s.split_whitespace()
+        .skip(1) // skip binary name
+        .any(|t| t == "-p" || t == "--print")
 }
 
 pub struct AgentDetector {
@@ -367,12 +377,17 @@ impl AgentDetector {
         match pt.first() {
             Some(b'C') => {
                 let cmd = pt.strip_prefix(b"C;").unwrap_or(b"");
+                if is_print_mode(cmd) {
+                    log::debug!("[shell] osc133 C: skip arm (print mode) cmd={}", String::from_utf8_lossy(cmd));
+                    return;
+                }
                 if let Some(agent) = self.match_agent(cmd) {
-                    log::debug!("[shell] osc133 C: armed agent={agent} cmd={}", String::from_utf8_lossy(cmd));
+                    let cmd_string = String::from_utf8_lossy(cmd).into_owned();
+                    log::debug!("[shell] osc133 C: armed agent={agent} cmd={cmd_string}");
                     self.armed = true;
                     self.status = Status::Idle;
                     self.current_agent = agent.clone();
-                    emit(Transition::Started { agent });
+                    emit(Transition::Started { agent, cmd_string });
                 }
             }
             Some(b'D') if self.armed => {
@@ -390,7 +405,7 @@ impl AgentDetector {
             self.armed = true;
             self.status = Status::Idle;
             self.current_agent = "claude".into();
-            emit(Transition::Started { agent: "claude".into() });
+            emit(Transition::Started { agent: "claude".into(), cmd_string: String::new() });
         }
     }
 
@@ -436,8 +451,13 @@ mod tests {
         v
     }
 
+    // Auto-arm case (no prior OSC 133;C): cmd_string is empty.
     fn started(agent: &str) -> Transition {
-        Transition::Started { agent: agent.into() }
+        Transition::Started { agent: agent.into(), cmd_string: String::new() }
+    }
+
+    fn started_cmd(agent: &str, cmd: &str) -> Transition {
+        Transition::Started { agent: agent.into(), cmd_string: cmd.into() }
     }
 
     // Helper: build a kex unified OSC body with the required 5 fields
@@ -468,7 +488,20 @@ mod tests {
     #[test]
     fn arms_on_agent_command() {
         let mut d = AgentDetector::new();
-        assert_eq!(run(&mut d, &osc("133;C;claude -p hello")), vec![started("claude")]);
+        assert_eq!(run(&mut d, &osc("133;C;claude")), vec![started_cmd("claude", "claude")]);
+        let mut d2 = AgentDetector::new();
+        assert_eq!(
+            run(&mut d2, &osc("133;C;claude --model opus")),
+            vec![started_cmd("claude", "claude --model opus")],
+        );
+    }
+
+    #[test]
+    fn does_not_arm_in_print_mode() {
+        let mut d = AgentDetector::new();
+        assert!(run(&mut d, &osc("133;C;claude -p hello")).is_empty());
+        assert!(run(&mut d, &osc("133;C;claude --print")).is_empty());
+        assert!(run(&mut d, &osc("133;C;claude --model opus -p")).is_empty());
     }
 
     #[test]
@@ -476,16 +509,22 @@ mod tests {
         let mut d = AgentDetector::new();
         assert_eq!(
             run(&mut d, &osc("133;C;/usr/local/bin/codex exec")),
-            vec![started("codex")]
+            vec![started_cmd("codex", "/usr/local/bin/codex exec")]
         );
         let mut d2 = AgentDetector::new();
-        assert_eq!(run(&mut d2, &osc("133;C;npx claude")), vec![started("claude")]);
+        assert_eq!(
+            run(&mut d2, &osc("133;C;npx claude")),
+            vec![started_cmd("claude", "npx claude")]
+        );
     }
 
     #[test]
     fn arms_on_dash_suffixed_alias() {
         let mut d = AgentDetector::new();
-        assert_eq!(run(&mut d, &osc("133;C;claude-enigma")), vec![started("claude")]);
+        assert_eq!(
+            run(&mut d, &osc("133;C;claude-enigma")),
+            vec![started_cmd("claude", "claude-enigma")]
+        );
     }
 
     #[test]
@@ -567,7 +606,7 @@ mod tests {
         assert!(run(&mut d, b"133;C;cla").is_empty());
         let mut out = run(&mut d, b"ude");
         out.extend(run(&mut d, &[ESC, ST_FINAL]));
-        assert_eq!(out, vec![started("claude")]);
+        assert_eq!(out, vec![started_cmd("claude", "claude")]);
     }
 
     #[test]
@@ -605,7 +644,7 @@ mod tests {
         run(&mut d, &osc("133;C;claude"));
         run(&mut d, &osc(&kex_osc("Stop")));
         // New invocation: 133;C fires again (no guard; Claude restarted in same terminal).
-        assert_eq!(run(&mut d, &osc("133;C;claude")), vec![started("claude")]);
+        assert_eq!(run(&mut d, &osc("133;C;claude")), vec![started_cmd("claude", "claude")]);
     }
 
     #[test]

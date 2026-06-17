@@ -127,11 +127,10 @@ export function whenSessionReady(leafId: string, timeoutMs = 4000): Promise<void
   });
 }
 
-// Any user-initiated input to a terminal clears the agent session indicator:
-// the user is in control, so neither "working" spinner nor "attention" dot should remain.
+// User-initiated input acknowledges the agent indicator: spinner and attention dot
+// are cleared, but the session stays alive so the Claude icon remains until the agent exits.
 function clearAgentSessionForLeaf(leafId: string): void {
-  const store = useAgentStore.getState();
-  if (store.sessions[leafId]) store.finish(leafId);
+  useAgentStore.getState().setStatus(leafId, "idle");
 }
 
 export function writeToSession(leafId: string, data: string): boolean {
@@ -288,10 +287,11 @@ configureRendererPool({
     if (!s) return null;
     return {
       writeToPty: (data) => {
-        // "waiting" (attention dot): any input acknowledges — user is in control.
-        // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) — these are
-        // explicit user interrupts. Protocol auto-responses from xterm (e.g. "\x1b[?1;2c"
-        // for DA queries) are multi-byte ESC sequences and must NOT clear the spinner.
+        // "waiting" (attention dot): any input acknowledges — user has seen the notification.
+        // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) clear it —
+        // these are explicit user interrupts. Multi-byte ESC sequences (xterm protocol
+        // auto-responses like "\x1b[?1;2c") must NOT clear the spinner.
+        // In all cases the session is kept alive; only the visual indicator is cleared.
         const session = useAgentStore.getState().sessions[leafId];
         if (session) {
           if (
@@ -299,7 +299,7 @@ configureRendererPool({
             data === "\x03" ||
             data === "\x1b"
           ) {
-            useAgentStore.getState().finish(leafId);
+            useAgentStore.getState().setStatus(leafId, "idle");
           }
         }
         s.pty?.write(data);
