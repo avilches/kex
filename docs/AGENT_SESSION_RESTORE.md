@@ -41,17 +41,26 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_PANEL_ID" ] && "$HOME/.config/kex/hooks/session.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/session.sh`, marker: `kex-session-v2`):
+The script (`~/.config/kex/hooks/session.sh`, marker: `kex-session-v4`) handles multiple Claude Code hook events:
 
 1. Reads `KEX_PANEL_ID` from the environment. If unset, exits silently (panel is not managed by Kex).
-2. Reads the JSON event from stdin and extracts `session_id`, `transcript_path`, and `cwd` via `jq`.
-3. Emits `OSC 777;kex-session;<panel_id>;claude;<session_id>;<transcript_path>;<cwd>` through `terminalSequence`
-   (hooks lost `/dev/tty` access in Claude Code v2.1.139; all fields are percent-encoded with `jq @uri`).
-4. Rust `agent_detect.rs` intercepts the OSC in the PTY byte reader and calls `session_store::record_session`.
+2. Reads the JSON event from stdin and extracts `hook_event_name`, `session_id`, `transcript_path`, and `cwd` via `jq`.
+3. For `SessionStart` and `UserPromptSubmit`: records the session via `session_store::record_session` (necessary
+   for `--resume` to work across restarts).
+4. For all events (SessionStart, UserPromptSubmit, Notification, Stop, StopFailure, SessionEnd, PermissionRequest):
+   builds a unified OSC sequence: `OSC 777;kex;<event>;<panel_id>;<session_id>;<transcript_path>;<cwd>[;<extra>]`
+   where `<extra>` fields (e.g., error type, message) are only present for certain events and are percent-encoded.
+5. Emits the OSC sequence through `terminalSequence`.
+6. Rust `agent_detect.rs` intercepts and processes the OSC, calling `session_store::record_session` for recording
+   events and emitting appropriate signals to the frontend.
 
-There is no `SessionEnd` hook. Sessions are cleared from the store only when the agent exits (`OSC 133;D` →
-`agent_detach_session`) or the user detaches manually. Panels always close while in "idle" state because the webview
-is destroyed before the PTYs finish shutting down, so a single store file is sufficient.
+`UserPromptSubmit` handling is required because Claude Code does not fire `SessionStart` when resuming a session
+with `--resume`. Without it, sessions started via `claude --resume` (whether by the user or by Kex at startup) are
+never written to the store on subsequent runs and cannot be restored on the next launch.
+
+Sessions are cleared from the store when the agent exits (`OSC 133;D` → `agent_detach_session`) or the user detaches
+manually. Panels typically close while in idle state because the webview is destroyed before the PTYs finish shutting
+down, so a single store file is sufficient.
 
 ### CLAUDE_CONFIG_DIR support
 
