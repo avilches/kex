@@ -1,7 +1,7 @@
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { showAgentToast } from "../components/AgentToast";
 import { useAgentStore } from "../store/agentStore";
-import { osNotify } from "./notify";
+import { queueNavAndNotify } from "./notify";
 import type { AgentSource, NotificationKind } from "./types";
 
 type RouteArgs = {
@@ -11,7 +11,7 @@ type RouteArgs = {
   title: string;
   body?: string;
   focused: boolean;
-  /** True when the user is currently looking at this agent. */
+  /** True when the user is currently looking at this agent's panel. */
   visible: boolean;
   /** Allow an in-app toast when focused but not looking at the agent. */
   allowToast: boolean;
@@ -39,7 +39,7 @@ export function routeAgentNotification({
   useAgentStore.getState().pushNotification({ source, agent, kind, tabId, panelId });
 
   if (!focused) {
-    void osNotify(title, body ?? agent);
+    void queueNavAndNotify({ workspaceId: tabId, panelId, title, body: body ?? agent });
     return;
   }
   if (allowToast) {

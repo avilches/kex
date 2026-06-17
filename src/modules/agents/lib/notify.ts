@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   isPermissionGranted,
   requestPermission,
@@ -7,8 +9,6 @@ import {
 let granted = false;
 
 async function ensurePermission(): Promise<boolean> {
-  // Cache only the positive result: a transient denial (e.g. the OS prompt
-  // dismissed while unfocused) must not disable notifications for the session.
   if (granted) return true;
   let ok = await isPermissionGranted();
   if (!ok) ok = (await requestPermission()) === "granted";
@@ -16,7 +16,23 @@ async function ensurePermission(): Promise<boolean> {
   return ok;
 }
 
-export async function osNotify(title: string, body: string): Promise<void> {
+export async function queueNavAndNotify({
+  workspaceId,
+  panelId,
+  title,
+  body,
+}: {
+  workspaceId: string;
+  panelId: string;
+  title: string;
+  body: string;
+}): Promise<void> {
+  const windowLabel = getCurrentWindow().label;
+  try {
+    await invoke("agent_queue_nav", { windowLabel, workspaceId, panelId });
+  } catch (e) {
+    console.warn("[kex] agent_queue_nav failed:", e);
+  }
   try {
     if (await ensurePermission()) sendNotification({ title, body });
   } catch (e) {
