@@ -15,6 +15,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { basename, panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel, Workspace } from "./lib/types";
 import type { UseWorkspacesReturn } from "./lib/useWorkspaces";
+import { newPanelId } from "@/lib/ids";
 
 type DraggingItem =
   | { kind: "panel"; panel: Panel; workspaceId: string }
@@ -203,7 +204,7 @@ export function WorkspaceDndProvider({
           onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId, insertionIndex);
         }
       } else {
-        const panel: Panel = { id: crypto.randomUUID(), kind: "editor", path: filePath, preview: false, dirty: false };
+        const panel: Panel = { id: newPanelId(), kind: "editor", path: filePath, preview: false, dirty: false };
         onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, panel, insertionIndex);
       }
       return;
@@ -223,7 +224,7 @@ export function WorkspaceDndProvider({
         if (sourcePaneId === targetPaneId) return;
         onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId);
       } else {
-        const panel: Panel = { id: crypto.randomUUID(), kind: "editor", path: filePath, preview: false, dirty: false };
+        const panel: Panel = { id: newPanelId(), kind: "editor", path: filePath, preview: false, dirty: false };
         onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, panel);
       }
     } else {

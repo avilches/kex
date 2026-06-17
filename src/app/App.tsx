@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
+import { newPanelId } from "@/lib/ids";
 import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
 import { isMarkdownPath } from "@/lib/utils";
@@ -320,7 +321,7 @@ export default function App() {
   const openNewTerminal = useCallback((targetPaneId?: string) => {
     if (!activeWorkspace) return;
     openPanel(activeWorkspace.id, targetPaneId ?? activeWorkspace.activePaneId, {
-      id: crypto.randomUUID(),
+      id: newPanelId(),
       kind: "terminal",
       cwd: activeCwd ?? activeWorkspace.cwd,
     });
@@ -329,7 +330,7 @@ export default function App() {
   const openNewBlock = useCallback((targetPaneId?: string) => {
     if (!activeWorkspace) return;
     openPanel(activeWorkspace.id, targetPaneId ?? activeWorkspace.activePaneId, {
-      id: crypto.randomUUID(),
+      id: newPanelId(),
       kind: "terminal",
       blocks: true,
       cwd: activeCwd ?? activeWorkspace.cwd,
@@ -381,7 +382,7 @@ export default function App() {
           return existing.id;
         }
       }
-      const panelId = crypto.randomUUID();
+      const panelId = newPanelId();
       openPanel(
         activeWorkspace.id,
         activeWorkspace.activePaneId,
@@ -398,7 +399,7 @@ export default function App() {
     (params: { repoRoot: string; path: string; mode: "-" | "+"; originalPath: string | null }) => {
       if (!activeWorkspace) return;
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: crypto.randomUUID(),
+        id: newPanelId(),
         kind: "git-diff",
         ...params,
       });
@@ -410,7 +411,7 @@ export default function App() {
     (args: { repoRoot: string; branch: string | null }) => {
       if (!activeWorkspace) return;
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: crypto.randomUUID(),
+        id: newPanelId(),
         kind: "git-history",
         repoRoot: args.repoRoot,
       });
@@ -421,7 +422,7 @@ export default function App() {
   const openPreviewInPanel = useCallback(
     (url: string) => {
       if (!activeWorkspace) return undefined;
-      const panelId = crypto.randomUUID();
+      const panelId = newPanelId();
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: panelId,
         kind: "preview",
@@ -460,7 +461,7 @@ export default function App() {
     (wsId: string, paneId: string) => {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       openPanel(wsId, paneId, {
-        id: crypto.randomUUID(),
+        id: newPanelId(),
         kind: "terminal",
         cwd: activeCwdRef.current ?? ws?.cwd,
       });
@@ -477,7 +478,7 @@ export default function App() {
       const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
       if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) { toastSplitBlocked("too-narrow"); return; }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
-      openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeCwdRef.current ?? ws.cwd });
+      openPanel(wsId, newPaneId, { id: newPanelId(), kind: "terminal", cwd: activeCwdRef.current ?? ws.cwd });
     },
     [splitPane, openPanel],
   );
@@ -491,14 +492,14 @@ export default function App() {
       const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
       if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) { toastSplitBlocked("too-short"); return; }
       const newPaneId = splitPane(wsId, paneId, "vertical");
-      openPanel(wsId, newPaneId, { id: crypto.randomUUID(), kind: "terminal", cwd: activeCwdRef.current ?? ws.cwd });
+      openPanel(wsId, newPaneId, { id: newPanelId(), kind: "terminal", cwd: activeCwdRef.current ?? ws.cwd });
     },
     [splitPane, openPanel],
   );
 
   const onNewBrowserStable = useCallback(
     (wsId: string, paneId: string) => {
-      const panelId = crypto.randomUUID();
+      const panelId = newPanelId();
       openPanel(wsId, paneId, { id: panelId, kind: "preview", url: "" });
       setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
     },
@@ -514,7 +515,7 @@ export default function App() {
       const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
       if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) { toastSplitBlocked("too-narrow"); return; }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
-      const panelId = crypto.randomUUID();
+      const panelId = newPanelId();
       openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
       setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
     },
@@ -530,7 +531,7 @@ export default function App() {
       const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
       if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) { toastSplitBlocked("too-short"); return; }
       const newPaneId = splitPane(wsId, paneId, "vertical");
-      const panelId = crypto.randomUUID();
+      const panelId = newPanelId();
       openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
       setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
     },
@@ -547,7 +548,7 @@ export default function App() {
       const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
       if (!ws) return;
       openPanel(ws.id, ws.activePaneId, {
-        id: crypto.randomUUID(),
+        id: newPanelId(),
         kind: "git-commit-file",
         repoRoot: params.repoRoot,
         sha: params.sha,
@@ -632,7 +633,7 @@ export default function App() {
       onOpenCommitFile: (input) => {
         if (!activeWorkspace) return;
         openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-          id: crypto.randomUUID(),
+          id: newPanelId(),
           kind: "git-commit-file",
           repoRoot: input.repoRoot,
           sha: input.sha,

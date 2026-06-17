@@ -20,12 +20,13 @@ import {
   updatePane,
 } from "./splitNode";
 import type { Panel, PaneNode, Workspace } from "./types";
+import { newWorkspaceId, newPaneId, newSplitId, newPanelId } from "@/lib/ids";
 
 function newPaneNode(cwd?: string): PaneNode {
-  const panelId = crypto.randomUUID();
+  const panelId = newPanelId();
   return {
     kind: "pane",
-    id: crypto.randomUUID(),
+    id: newPaneId(),
     panels: [{ id: panelId, kind: "terminal", cwd }],
     activePanelId: panelId,
   };
@@ -34,7 +35,7 @@ function newPaneNode(cwd?: string): PaneNode {
 function newWorkspace(cwd?: string): Workspace {
   const pane = newPaneNode(cwd);
   return {
-    id: crypto.randomUUID(),
+    id: newWorkspaceId(),
     title: cwd ? (cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] ?? "shell") : "shell",
     cwd,
     paneTree: pane,
@@ -102,19 +103,19 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Pane operations ───────────────────────────────────────────────────────
 
   const splitPane = useCallback((workspaceId: string, paneId: string, orientation: "horizontal" | "vertical"): string => {
-    const newPaneId = crypto.randomUUID();
-    const newSplitId = crypto.randomUUID();
+    const freshPaneId = newPaneId();
+    const freshSplitId = newSplitId();
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
         return {
           ...w,
-          paneTree: splitPaneInTree(w.paneTree, paneId, newSplitId, newPaneId, orientation),
-          activePaneId: newPaneId,
+          paneTree: splitPaneInTree(w.paneTree, paneId, freshSplitId, freshPaneId, orientation),
+          activePaneId: freshPaneId,
         };
       }),
     );
-    return newPaneId;
+    return freshPaneId;
   }, []);
 
   const closePane = useCallback((workspaceId: string, paneId: string) => {
@@ -192,19 +193,19 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (w.id !== workspaceId) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
-        const newPaneId = crypto.randomUUID();
-        const newSplitId = crypto.randomUUID();
+        const freshPaneId = newPaneId();
+        const freshSplitId = newSplitId();
         const treeAfterSplit = splitPaneInTree(
           w.paneTree,
           targetPaneId,
-          newSplitId,
-          newPaneId,
+          freshSplitId,
+          freshPaneId,
           orientation,
           newPanePosition,
         );
-        const treeAfterMove = movePanelBetweenPanes(treeAfterSplit, panelId, newPaneId);
+        const treeAfterMove = movePanelBetweenPanes(treeAfterSplit, panelId, freshPaneId);
         if (treeAfterMove === w.paneTree) return w;
-        return { ...w, paneTree: treeAfterMove, activePaneId: newPaneId };
+        return { ...w, paneTree: treeAfterMove, activePaneId: freshPaneId };
       }),
     );
   }, []);
@@ -222,12 +223,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
-        const newPaneId = crypto.randomUUID();
-        const newSplitId = crypto.randomUUID();
-        const panel: Panel = { id: crypto.randomUUID(), kind: "editor", path, preview: false, dirty: false };
-        const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, newSplitId, newPaneId, orientation, newPanePosition, panel);
+        const freshPaneId = newPaneId();
+        const freshSplitId = newSplitId();
+        const panel: Panel = { id: newPanelId(), kind: "editor", path, preview: false, dirty: false };
+        const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, panel);
         if (newTree === w.paneTree) return w;
-        return { ...w, paneTree: newTree, activePaneId: newPaneId };
+        return { ...w, paneTree: newTree, activePaneId: freshPaneId };
       }),
     );
   }, []);

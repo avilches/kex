@@ -1,3 +1,4 @@
+import { newThemeId } from "@/lib/ids";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -66,7 +67,7 @@ export function parseThemeFile(text: string): ValidationResult {
 }
 
 export function starterTheme(): Theme {
-  const id = `my-theme-${crypto.randomUUID().slice(0, 8)}`;
+  const id = newThemeId();
   return {
     id,
     name: "My Theme",
