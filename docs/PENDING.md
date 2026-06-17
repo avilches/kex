@@ -22,7 +22,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-18](pending/bugs/BUG-18-race-refetch-fs-changed-explorer.md) — Race entre refetch y fs-changed en explorer
 - [BUG-19](pending/bugs/BUG-19-temas-custom-colores-sin-validar.md) — Temas custom: colores sin validar
 - [BUG-20](pending/bugs/BUG-20-pty-open-autoriza-cwd-aunque-spawn-falle.md) — pty_open autoriza cwd aunque spawn falle
-- [BUG-21](pending/bugs/BUG-21-workspaceregistry-sin-cota-on.md) — WorkspaceRegistry sin cota en listeners
 - [BUG-27](pending/bugs/BUG-27-countdifflines-heuristic-not-numstat.md) — countDiffLines: heuristica, no numstat
 - [BUG-28](pending/bugs/BUG-28-parse-renamed-empty-path-truncated.md) — parse renamed: empty path en truncado
 - [BUG-30](pending/bugs/BUG-30-fs-mutations-autosave-swallow-errors.md) — fs mutations + autosave silencian errores
