@@ -14,7 +14,7 @@ import {
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useDndMonitor } from "@dnd-kit/core";
+import { useDndMonitor, useDroppable } from "@dnd-kit/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   forwardRef,
@@ -39,6 +39,7 @@ import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
 import { pathDirname } from "@/lib/pathUtils";
 import { useGlobalShortcuts } from "@/modules/shortcuts";
+import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { GitStatusSnapshot } from "@/lib/native";
 
@@ -251,8 +252,24 @@ export const FileExplorer = memo(
       isDir: isDirAt,
       onCopied: tree.refresh,
     });
+
+    // Internal dnd-kit drop target for the root directory (empty space below rows).
+    // The id uses the same "explorer-dir:" prefix so onDragEnd handles it automatically.
+    const { draggingItem } = useWorkspaceDnd();
+    const internalDragSource =
+      draggingItem?.kind === "file" ? draggingItem.path : null;
+    const isRootInternalDropValid =
+      rootPath !== null &&
+      internalDragSource !== null &&
+      pathDirname(internalDragSource) !== rootPath;
+    const { setNodeRef: setRootDropRef, isOver: isRootInternalOver } = useDroppable({
+      id: rootPath ? `explorer-dir:${rootPath}` : "explorer-dir:__none__",
+      disabled: !isRootInternalDropValid,
+    });
+
     const rootIsDropTarget =
-      externalTargetDir != null && externalTargetDir === rootPath;
+      (externalTargetDir != null && externalTargetDir === rootPath) ||
+      (isRootInternalDropValid && isRootInternalOver);
 
     // OS drops bypass @dnd-kit, so the per-row spring-open in TreeRow never
     // fires for them; expand the hovered folder here instead.
@@ -572,7 +589,10 @@ export const FileExplorer = memo(
           <ContextMenu>
             <ContextMenuTrigger asChild>
               <div
-                ref={scrollRef}
+                ref={(node: HTMLDivElement | null) => {
+                  scrollRef.current = node;
+                  setRootDropRef(node);
+                }}
                 data-explorer-drop=""
                 className={cn(
                   "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]",

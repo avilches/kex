@@ -138,42 +138,15 @@ Tres formas de activar el lock:
 
 ---
 
-## Explorer: mejorar los destinos de drop del drag-to-move
+## Explorer: soltar sobre un archivo debe mover a su carpeta padre
 
-Estado: pendiente (anotado 2026-06-13, tras integrar C2 del upstream sync).
+Estado: pendiente (anotado 2026-06-13; la parte de soltar en la raiz ya se implemento el 2026-06-17).
 
-### Contexto
+Hoy solo las CARPETAS son destino de drop en el drag interno. Al soltar sobre un ARCHIVO, la operacion no hace nada en vez de mover el elemento a la carpeta padre del archivo. El comportamiento deseado (igual que el upstream con `useExplorerDnd`): si el elemento arrastrado cae sobre un archivo, derivar el destino a su carpeta padre.
 
-La feature de arrastrar para mover archivos/carpetas dentro del explorer (C2) se reimplemento con `@dnd-kit` en lugar del hook pointer-based del upstream (`useExplorerDnd`), para no chocar con el sistema de drag de archivos a panes que el fork ya tiene (`WorkspaceDndProvider`).
+Implementacion: hacer que los archivos tambien sean `useDroppable` con id `explorer-dir:<parentDir>` (mismo prefijo que las carpetas, para que `onDragEnd` en `FileExplorer.tsx` lo procese sin cambios). Mergear refs draggable+droppable igual que ya se hace en las carpetas (`setRefs`). Guardia: no-op si el archivo ya esta en ese directorio padre.
 
-Archivos implicados:
-
-- `src/modules/explorer/TreeRow.tsx`: cada carpeta es `useDroppable({ id: "explorer-dir:<path>" })`; los archivos y carpetas son `useDraggable` (`file:<path>` / `dir:<path>`).
-- `src/modules/explorer/FileExplorer.tsx`: `useDndMonitor` escucha el `onDragEnd`; si el `over` es `explorer-dir:<path>`, llama a `tree.movePath(from, toDir)`.
-- `src/modules/explorer/lib/useFileTree.ts`: `movePath(from, toDir)` via `fs_rename`.
-
-### Comportamiento actual
-
-- Solo las CARPETAS son destino de drop. Hay que apuntar exactamente a una carpeta y se ilumina con un ring.
-- No se puede soltar sobre un ARCHIVO (no deriva su carpeta padre).
-- No se puede soltar sobre la RAIZ del explorer (el area vacia / fuera de las filas).
-
-### Mejora deseada
-
-1. Soltar sobre un ARCHIVO debe mover el elemento arrastrado a la carpeta PADRE de ese archivo. Asi no hace falta apuntar con precision a una carpeta: se deriva el destino a partir del fichero sobre el que se posa el cursor. Es el comportamiento que tenia el hook del upstream (`useExplorerDnd`): `const t = p ? (isDir(p) ? p : parentDir(p)) : rootPath;`.
-2. Soltar sobre la RAIZ del explorer (o sobre el area vacia) debe mover el elemento a `rootPath`.
-
-### Como implementarlo (boceto)
-
-Opcion A (encaja con el `@dnd-kit` actual):
-
-- Hacer que los ARCHIVOS tambien sean `useDroppable` con un id que codifique su carpeta padre, p. ej. `explorer-dir:<parentDir>` (reutilizando el mismo prefijo, ya que el destino es una carpeta). Asi el `over` sigue siendo una carpeta y `movePath` no cambia. Cuidado con que el mismo nodo sea draggable y droppable a la vez (mergear refs, como ya se hace en las carpetas).
-- Anadir un droppable de RAIZ: el contenedor scrolleable de `FileExplorer` (el `div` con `ref={scrollRef}`) como `useDroppable({ id: "explorer-dir:<rootPath>" })`, de menor prioridad que las filas (con `pointerWithin`, la fila mas especifica gana; revisar la deteccion de colisiones para que la raiz solo capture cuando no hay fila debajo).
-- La validacion de destino valido (no soltar en el propio padre = no-op, no en si mismo, no en descendiente) ya vive en `TreeRow` (`isValidDropTarget`); habra que replicarla para los nuevos droppables de archivo y de raiz, o centralizarla en el `onDragEnd` de `FileExplorer`.
-
-Opcion B: volver al enfoque pointer-based del upstream (`useExplorerDnd`, que ya resolvia los dos casos via `elementFromPoint` + `closest("[data-fs-path]")` + fallback a `rootPath`) y hacerlo coexistir con `@dnd-kit` desactivando el `useDraggable` de las filas del explorer. Mas fiel al upstream pero reintroduce el riesgo de dos sistemas de drag.
-
-Recomendacion: Opcion A, manteniendo un unico sistema de drag (`@dnd-kit`).
+Archivos implicados: `src/modules/explorer/TreeRow.tsx`.
 
 ---
 
