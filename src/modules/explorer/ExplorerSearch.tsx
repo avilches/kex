@@ -41,8 +41,8 @@ type SearchResult = {
 };
 
 // "idle"   = no active query
-// "phase1" = both calls in flight, no results shown yet  -> "Searching..."
-// "phase2" = phase 1 done (results shown), phase 2 running -> "Searching deeper..."
+// "phase1" = both calls in flight, no results shown yet  -> "Searching…"
+// "phase2" = phase 1 done (results shown), phase 2 running -> "Searching deeper…"
 // "done"   = phase 2 complete
 type SearchPhase = "idle" | "phase1" | "phase2" | "done";
 
