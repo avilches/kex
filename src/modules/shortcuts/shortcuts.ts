@@ -341,9 +341,11 @@ export function matchBinding(
     : e.key.toLowerCase();
   const bindingKey = binding.key.toLowerCase();
 
-  // Special case for Jump to Tab 1-9
+  // Special case for Jump to Tab 1-9: only match if both the event key and
+  // the binding key are digits 1-9 and they match exactly.
   if (id === "tab.selectByIndex") {
-    if (!/^[1-9]$/.test(e.key)) return false;
+    if (!/^[1-9]$/.test(e.key) || !/^[1-9]$/.test(binding.key)) return false;
+    if (eventKey !== bindingKey) return false;
   } else if (eventKey !== bindingKey) {
     return false;
   }
