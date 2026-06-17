@@ -132,6 +132,9 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
       },
     },
   },
+  test: {
+    exclude: [".claude/**", "node_modules/**"],
+  },
   clearScreen: false,
   server: {
     port: 1420,
