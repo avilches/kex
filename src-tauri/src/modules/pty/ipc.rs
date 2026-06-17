@@ -30,10 +30,27 @@ struct Payload {
     session_id: String,
     transcript_path: String,
     cwd: String,
+    // SessionStart
     source: Option<String>,
     session_title: Option<String>,
     model: Option<String>,
+    // SessionEnd
     reason: Option<String>,
+    // UserPromptSubmit
+    prompt: Option<String>,
+    // Notification
+    notif_message: Option<String>,
+    // Stop
+    stop_reason: Option<String>,
+    last_message: Option<String>,
+    // StopFailure
+    error_message: Option<String>,
+    // PermissionRequest
+    tool_name: Option<String>,
+    // MessageDisplay
+    is_final: bool,
+    turn_id: Option<String>,
+    delta: Option<String>,
 }
 
 fn parse_payload(json: &str) -> Option<Payload> {
@@ -48,6 +65,15 @@ fn parse_payload(json: &str) -> Option<Payload> {
         session_title:   v["sessionTitle"].as_str().map(str::to_string),
         model:           v["model"].as_str().map(str::to_string),
         reason:          v["reason"].as_str().map(str::to_string),
+        prompt:          v["prompt"].as_str().map(str::to_string),
+        notif_message:   v["message"].as_str().map(str::to_string),
+        stop_reason:     v["stop_reason"].as_str().map(str::to_string),
+        last_message:    v["last_assistant_message"].as_str().map(str::to_string),
+        error_message:   v["error_message"].as_str().map(str::to_string),
+        tool_name:       v["tool_name"].as_str().map(str::to_string),
+        is_final:        v["final"].as_bool().unwrap_or(false),
+        turn_id:         v["turn_id"].as_str().map(str::to_string),
+        delta:           v["delta"].as_str().map(str::to_string),
     })
 }
 
@@ -134,6 +160,83 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
                 "prompt":  null,
             }));
         }
+        "UserPromptSubmit" => {
+            let prompt = p.prompt.as_deref().unwrap_or("");
+            log::debug!("[ipc] UserPromptSubmit panel={panel_id} prompt_len={}", prompt.len());
+            let _ = app.emit(AGENT_EVENT, serde_json::json!({
+                "id":       pty_id,
+                "kind":     "UserPromptSubmit",
+                "agent":    null,
+                "prompt":   prompt,
+                "message":  null,
+                "toolName": null,
+            }));
+        }
+        "Notification" => {
+            let msg = p.notif_message.as_deref().unwrap_or("");
+            log::debug!("[ipc] Notification panel={panel_id}");
+            let _ = app.emit(AGENT_EVENT, serde_json::json!({
+                "id":       pty_id,
+                "kind":     "Notification",
+                "agent":    null,
+                "message":  msg,
+                "toolName": null,
+                "prompt":   null,
+            }));
+        }
+        "Stop" => {
+            let reason = p.stop_reason.as_deref().unwrap_or("");
+            let last   = p.last_message.as_deref().unwrap_or("");
+            log::debug!("[ipc] Stop panel={panel_id} reason={reason}");
+            let _ = app.emit(AGENT_EVENT, serde_json::json!({
+                "id":       pty_id,
+                "kind":     "Stop",
+                "agent":    null,
+                "message":  last,
+                "toolName": null,
+                "prompt":   null,
+            }));
+        }
+        "StopFailure" => {
+            let err = p.error_message.as_deref().unwrap_or("");
+            log::debug!("[ipc] StopFailure panel={panel_id}");
+            let _ = app.emit(AGENT_EVENT, serde_json::json!({
+                "id":       pty_id,
+                "kind":     "StopFailure",
+                "agent":    null,
+                "message":  err,
+                "toolName": null,
+                "prompt":   null,
+            }));
+        }
+        "PermissionRequest" => {
+            let tool = p.tool_name.as_deref().unwrap_or("");
+            log::debug!("[ipc] PermissionRequest panel={panel_id} tool={tool}");
+            let _ = app.emit(AGENT_EVENT, serde_json::json!({
+                "id":       pty_id,
+                "kind":     "PermissionRequest",
+                "agent":    null,
+                "message":  null,
+                "toolName": tool,
+                "prompt":   null,
+            }));
+        }
+        "MessageDisplay" => {
+            if !p.is_final {
+                return;
+            }
+            let delta   = p.delta.as_deref().unwrap_or("");
+            let turn_id = p.turn_id.as_deref().unwrap_or("");
+            log::debug!("[ipc] MessageDisplay panel={panel_id} turn={turn_id}");
+            let _ = app.emit(AGENT_EVENT, serde_json::json!({
+                "id":       pty_id,
+                "kind":     "MessageDisplay",
+                "agent":    null,
+                "message":  delta,
+                "toolName": null,
+                "prompt":   null,
+            }));
+        }
         other => {
             log::debug!("[ipc] unhandled event {other} from panel={panel_id}");
         }
@@ -200,5 +303,51 @@ mod tests {
     fn parse_rejects_invalid_json() {
         assert!(parse_payload("not json").is_none());
         assert!(parse_payload("").is_none());
+    }
+
+    #[test]
+    fn parse_user_prompt_submit() {
+        let json = r#"{"hook_event_name":"UserPromptSubmit","session_id":"s","transcript_path":"","cwd":"","prompt":"hello world"}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.event, "UserPromptSubmit");
+        assert_eq!(p.prompt.as_deref(), Some("hello world"));
+    }
+
+    #[test]
+    fn parse_stop_payload() {
+        let json = r#"{"hook_event_name":"Stop","session_id":"s","transcript_path":"","cwd":"","stop_reason":"end_turn","last_assistant_message":"done"}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.stop_reason.as_deref(), Some("end_turn"));
+        assert_eq!(p.last_message.as_deref(), Some("done"));
+    }
+
+    #[test]
+    fn parse_stop_failure() {
+        let json = r#"{"hook_event_name":"StopFailure","session_id":"s","transcript_path":"","cwd":"","error_message":"oops"}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.error_message.as_deref(), Some("oops"));
+    }
+
+    #[test]
+    fn parse_permission_request() {
+        let json = r#"{"hook_event_name":"PermissionRequest","session_id":"s","transcript_path":"","cwd":"","tool_name":"bash"}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.tool_name.as_deref(), Some("bash"));
+    }
+
+    #[test]
+    fn parse_message_display_final() {
+        let json = r#"{"hook_event_name":"MessageDisplay","session_id":"s","transcript_path":"","cwd":"","final":true,"turn_id":"t1","delta":"hello"}"#;
+        let p = parse_payload(json).unwrap();
+        assert!(p.is_final);
+        assert_eq!(p.turn_id.as_deref(), Some("t1"));
+        assert_eq!(p.delta.as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn parse_message_display_streaming() {
+        let json = r#"{"hook_event_name":"MessageDisplay","session_id":"s","transcript_path":"","cwd":"","final":false,"delta":"chunk"}"#;
+        let p = parse_payload(json).unwrap();
+        assert!(!p.is_final);
     }
 }
