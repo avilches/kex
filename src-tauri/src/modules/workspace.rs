@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
@@ -11,28 +11,65 @@ use serde::{Deserialize, Serialize};
 const CANONICAL_TTL: Duration = Duration::from_secs(1);
 const CANONICAL_CACHE_CAP: usize = 256;
 
+const REGISTRY_CAP: usize = 64;
+
 struct CanonicalEntry {
     canonical: PathBuf,
     inserted_at: Instant,
 }
 
+// Vec-based LRU: index 0 = least recently used, last index = most recently used.
+// 64-entry cap means Vec<remove(0)> shifting cost is negligible.
+#[derive(Default)]
+struct LruRoots {
+    entries: Vec<PathBuf>,
+}
+
+impl LruRoots {
+    fn insert(&mut self, root: PathBuf) {
+        // Descendant of an existing root? Bump the ancestor and return; already authorized.
+        if let Some(idx) = self.entries.iter().position(|r| root.starts_with(r)) {
+            let r = self.entries.remove(idx);
+            self.entries.push(r);
+            return;
+        }
+        // New ancestor: collapse any existing descendants now covered by it.
+        self.entries.retain(|r| !r.starts_with(&root));
+        // Evict LRU entry when at cap.
+        if self.entries.len() >= REGISTRY_CAP {
+            self.entries.remove(0);
+        }
+        self.entries.push(root);
+    }
+
+    fn is_authorized(&mut self, target: &Path) -> bool {
+        if let Some(idx) = self.entries.iter().position(|r| target.starts_with(r)) {
+            let r = self.entries.remove(idx);
+            self.entries.push(r);
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct WorkspaceRegistry {
-    roots: Mutex<HashSet<PathBuf>>,
+    roots: Mutex<LruRoots>,
     canonical_cache: Mutex<HashMap<PathBuf, CanonicalEntry>>,
 }
 
 impl WorkspaceRegistry {
     pub fn authorize<P: AsRef<Path>>(&self, path: P) -> std::io::Result<PathBuf> {
         let canonical = std::fs::canonicalize(path.as_ref())?;
-        let mut set = self.roots.lock().expect("workspace registry poisoned");
-        set.insert(canonical.clone());
+        let mut lru = self.roots.lock().expect("workspace registry poisoned");
+        lru.insert(canonical.clone());
         Ok(canonical)
     }
 
     pub fn is_authorized(&self, target: &Path) -> bool {
-        let set = self.roots.lock().expect("workspace registry poisoned");
-        set.iter().any(|root| target.starts_with(root))
+        let mut lru = self.roots.lock().expect("workspace registry poisoned");
+        lru.is_authorized(target)
     }
 
     pub fn canonicalize_cached<P: AsRef<Path>>(&self, path: P) -> std::io::Result<PathBuf> {
@@ -701,6 +738,99 @@ mod tests {
     #[test]
     fn normalize_wsl_value_falls_back_when_empty() {
         assert_eq!(normalize_wsl_value(" \n".into(), "/bin/sh"), "/bin/sh");
+    }
+}
+
+#[cfg(test)]
+mod lru_tests {
+    use super::*;
+
+    fn pb(s: &str) -> PathBuf {
+        PathBuf::from(s)
+    }
+
+    #[test]
+    fn insert_new_root_is_stored() {
+        let mut lru = LruRoots::default();
+        lru.insert(pb("/a/b"));
+        assert!(lru.is_authorized(&pb("/a/b/c")));
+    }
+
+    #[test]
+    fn descendant_not_inserted_ancestor_bumped() {
+        let mut lru = LruRoots::default();
+        lru.insert(pb("/a"));
+        lru.insert(pb("/z")); // unrelated; becomes MRU
+        lru.insert(pb("/a/b/c")); // descendant of /a → should not add entry
+        assert_eq!(lru.entries.len(), 2);
+        // /a should have been bumped to MRU
+        assert_eq!(lru.entries.last().unwrap(), &pb("/a"));
+    }
+
+    #[test]
+    fn ancestor_inserted_collapses_descendants() {
+        let mut lru = LruRoots::default();
+        lru.insert(pb("/a/b"));
+        lru.insert(pb("/a/c"));
+        lru.insert(pb("/z"));
+        assert_eq!(lru.entries.len(), 3);
+        lru.insert(pb("/a")); // ancestor of /a/b and /a/c → collapses them
+        assert_eq!(lru.entries.len(), 2); // /a and /z remain
+        assert!(lru.entries.contains(&pb("/a")));
+        assert!(!lru.entries.contains(&pb("/a/b")));
+        assert!(!lru.entries.contains(&pb("/a/c")));
+    }
+
+    #[test]
+    fn exact_duplicate_bumps_to_mru() {
+        let mut lru = LruRoots::default();
+        lru.insert(pb("/a"));
+        lru.insert(pb("/z"));
+        assert_eq!(lru.entries[0], pb("/a")); // LRU
+        lru.insert(pb("/a")); // re-insert same → bump
+        assert_eq!(lru.entries.len(), 2);
+        assert_eq!(lru.entries.last().unwrap(), &pb("/a")); // now MRU
+    }
+
+    #[test]
+    fn lru_cap_evicts_least_recently_used() {
+        let mut lru = LruRoots::default();
+        for i in 0..REGISTRY_CAP {
+            lru.insert(PathBuf::from(format!("/root/{i}")));
+        }
+        assert_eq!(lru.entries.len(), REGISTRY_CAP);
+        let first = lru.entries[0].clone();
+        lru.insert(pb("/new"));
+        assert_eq!(lru.entries.len(), REGISTRY_CAP);
+        assert!(!lru.entries.contains(&first), "LRU entry should have been evicted");
+        assert!(lru.entries.contains(&pb("/new")));
+    }
+
+    #[test]
+    fn is_authorized_bumps_matched_root_to_mru() {
+        let mut lru = LruRoots::default();
+        lru.insert(pb("/a"));
+        lru.insert(pb("/b"));
+        assert_eq!(lru.entries[0], pb("/a")); // LRU
+        assert!(lru.is_authorized(&pb("/a/sub")));
+        assert_eq!(lru.entries.last().unwrap(), &pb("/a")); // bumped to MRU
+    }
+
+    #[test]
+    fn is_authorized_false_for_unregistered() {
+        let mut lru = LruRoots::default();
+        lru.insert(pb("/a"));
+        assert!(!lru.is_authorized(&pb("/b/c")));
+    }
+
+    #[test]
+    fn is_authorized_correct_after_collapse() {
+        let mut lru = LruRoots::default();
+        lru.insert(pb("/a/deep/path"));
+        lru.insert(pb("/a")); // collapse /a/deep/path
+        assert!(lru.is_authorized(&pb("/a/deep/path/file")));
+        assert!(lru.is_authorized(&pb("/a/other")));
+        assert!(!lru.is_authorized(&pb("/b/file")));
     }
 }
 
