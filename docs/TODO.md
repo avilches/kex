@@ -34,14 +34,6 @@ Requiere crear un componente generico de HoverCard o especializarlo por `panel.k
 
 ---
 
-## Bug: el input de renombrar tab va en direccion incorrecta
-
-Estado: sin investigar (anotado 2026-06-14).
-
-Al hacer doble-click para renombrar un tab de terminal, el input de texto va en la direccion incorrecta. Deberia ser de derecha a izquierda (RTL) para que el cursor quede a la derecha, igual que el resto del tab, pero actualmente va al reves. Revisar la herencia del `direction` del `<span>` padre en `PaneTabBar.tsx` y forzar la direccion correcta en el `<input>`.
-
----
-
 ## Tabs de editor/preview: guardar cwd y sincronizar con el explorer
 
 Estado: idea anotada (2026-06-14).
