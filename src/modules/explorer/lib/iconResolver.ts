@@ -24,6 +24,8 @@ const DEFAULT_FOLDER = "folder";
 const DEFAULT_FOLDER_OPEN = "folder-open";
 
 const dataUrlCache = new Map<string, string>();
+const fileIconCache = new Map<string, string>();
+const folderIconCache = new Map<string, string>();
 
 // Catppuccin's manifest emits names like `folder_src`/`typescript-react`, but
 // the iconify export normalizes everything to hyphenated slugs.
@@ -65,12 +67,18 @@ function extOf(name: string): string {
 }
 
 export function fileIconUrl(name: string): string {
+  const cached = fileIconCache.get(name);
+  if (cached !== undefined) return cached;
+
   const lower = name.toLowerCase();
 
   const byName = catFileNames[lower];
   if (byName) {
     const url = buildDataUrl(byName);
-    if (url) return url;
+    if (url) {
+      fileIconCache.set(name, url);
+      return url;
+    }
   }
 
   let ext = extOf(lower);
@@ -78,14 +86,20 @@ export function fileIconUrl(name: string): string {
     const iconName = catFileExtensions[ext];
     if (iconName) {
       const url = buildDataUrl(iconName);
-      if (url) return url;
+      if (url) {
+        fileIconCache.set(name, url);
+        return url;
+      }
     }
     const langId = EXT_TO_LANGUAGE_ID[ext];
     if (langId) {
       const iconByLang = catLanguageIds[langId];
       if (iconByLang) {
         const url = buildDataUrl(iconByLang);
-        if (url) return url;
+        if (url) {
+          fileIconCache.set(name, url);
+          return url;
+        }
       }
     }
     const nextDot = ext.indexOf(".");
@@ -93,10 +107,16 @@ export function fileIconUrl(name: string): string {
     ext = ext.slice(nextDot + 1);
   }
 
-  return buildDataUrl(DEFAULT_FILE) ?? "";
+  const defaultUrl = buildDataUrl(DEFAULT_FILE) ?? "";
+  fileIconCache.set(name, defaultUrl);
+  return defaultUrl;
 }
 
 export function folderIconUrl(name: string, expanded: boolean): string {
+  const key = `${name}:${expanded ? "o" : "c"}`;
+  const cached = folderIconCache.get(key);
+  if (cached !== undefined) return cached;
+
   const lower = name.toLowerCase();
 
   const mapped = catFolderNames[lower];
@@ -104,8 +124,13 @@ export function folderIconUrl(name: string, expanded: boolean): string {
     const slug = toIconifySlug(mapped);
     const target = expanded ? `${slug}-open` : slug;
     const url = buildDataUrl(target);
-    if (url) return url;
+    if (url) {
+      folderIconCache.set(key, url);
+      return url;
+    }
   }
 
-  return buildDataUrl(expanded ? DEFAULT_FOLDER_OPEN : DEFAULT_FOLDER) ?? "";
+  const defaultUrl = buildDataUrl(expanded ? DEFAULT_FOLDER_OPEN : DEFAULT_FOLDER) ?? "";
+  folderIconCache.set(key, defaultUrl);
+  return defaultUrl;
 }
