@@ -1,5 +1,7 @@
 mod agent_detect;
 mod da_filter;
+#[cfg(unix)]
+mod ipc;
 #[cfg(windows)]
 mod job;
 mod session;
