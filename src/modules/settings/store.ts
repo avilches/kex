@@ -379,46 +379,48 @@ export async function setTabBarStyle(value: TabBarStyle): Promise<void> {
 
 export type PrefKey = keyof Preferences;
 
+// Defined once; maps store keys to Preferences property names.
+const PREF_KEY_MAP: Record<string, PrefKey> = {
+  [KEY_THEME]: "theme",
+  [KEY_THEME_ID]: "themeId",
+  [KEY_EDITOR_THEME]: "editorTheme",
+  [KEY_AUTOSTART]: "autostart",
+  [KEY_VIM_MODE]: "vimMode",
+  [KEY_SHOW_HIDDEN]: "showHidden",
+  [KEY_EXPLORER_GIT_DECORATIONS]: "explorerGitDecorations",
+  [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
+  [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
+  [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
+  [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
+  [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
+  [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",
+  [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
+  [KEY_ZOOM_LEVEL]: "zoomLevel",
+  [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
+  [KEY_SHORTCUTS]: "shortcuts",
+  [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
+  [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",
+  [KEY_RIGHT_PANEL_OPEN]: "rightPanelOpen",
+  [KEY_RIGHT_PANEL_WIDTH]: "rightPanelWidth",
+  [KEY_RIGHT_PANEL_ACTIVE_TAB]: "rightPanelActiveTab",
+  [KEY_PANEL_SIDE]: "panelSide",
+  [KEY_TAB_BAR_STYLE]: "tabBarStyle",
+};
+
 /** Subscribe to changes from any window (settings → main). */
 export async function onPreferencesChange(
   cb: (key: PrefKey, value: unknown) => void,
 ): Promise<UnlistenFn> {
-  const map: Record<string, PrefKey> = {
-    [KEY_THEME]: "theme",
-    [KEY_THEME_ID]: "themeId",
-    [KEY_EDITOR_THEME]: "editorTheme",
-    [KEY_AUTOSTART]: "autostart",
-    [KEY_VIM_MODE]: "vimMode",
-    [KEY_SHOW_HIDDEN]: "showHidden",
-    [KEY_EXPLORER_GIT_DECORATIONS]: "explorerGitDecorations",
-    [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
-    [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
-    [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
-    [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
-    [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
-    [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",
-    [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
-    [KEY_ZOOM_LEVEL]: "zoomLevel",
-    [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
-    [KEY_SHORTCUTS]: "shortcuts",
-    [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
-    [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",
-    [KEY_RIGHT_PANEL_OPEN]: "rightPanelOpen",
-    [KEY_RIGHT_PANEL_WIDTH]: "rightPanelWidth",
-    [KEY_RIGHT_PANEL_ACTIVE_TAB]: "rightPanelActiveTab",
-    [KEY_PANEL_SIDE]: "panelSide",
-    [KEY_TAB_BAR_STYLE]: "tabBarStyle",
-  };
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref().
   const unsubLocal = await store.onChange<unknown>((key, value) => {
-    const mapped = map[key];
+    const mapped = PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
   const unsubEvent = await listen<{ key: string; value: unknown }>(
     PREFS_CHANGED_EVENT,
     (e) => {
-      const mapped = map[e.payload.key];
+      const mapped = PREF_KEY_MAP[e.payload.key];
       if (mapped) cb(mapped, e.payload.value);
     },
   );
