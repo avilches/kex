@@ -7,12 +7,17 @@ export type AgentSignalKind =
   | "UserPromptSubmit"
   | "Notification"
   | "Stop"
+  | "StopFailure"
+  | "SessionEnd"
+  | "PermissionRequest"
   | "exited";
 
 export type AgentSignal = {
   id: number;
   kind: AgentSignalKind;
   agent: string | null;
+  message?: string;
+  toolName?: string;
 };
 
 export type AgentSessionMeta = {

@@ -40,14 +40,16 @@ function panelInfo(
 
 function route(
   session: AgentSession,
-  kind: "attention" | "finished",
+  kind: "attention" | "finished" | "error",
   ctx: Ctx,
 ): void {
   const info = panelInfo(ctx.workspaces, session.panelId);
   const heading =
     kind === "attention"
       ? `${session.agent} needs your input`
-      : `${session.agent} finished`;
+      : kind === "error"
+        ? `${session.agent} stopped with an error`
+        : `${session.agent} finished`;
 
   routeAgentNotification({
     source: "terminal",
@@ -108,6 +110,26 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       const session = store.sessions[panelId];
       if (session) route(session, "finished", ctx);
       store.setStatus(panelId, "idle");
+      return;
+    }
+    case "PermissionRequest": {
+      ensureSession(panelId, ctx, sig.agent ?? "claude");
+      store.setStatus(panelId, "waiting");
+      const permSession = store.sessions[panelId];
+      if (permSession) route(permSession, "attention", ctx);
+      return;
+    }
+    case "StopFailure": {
+      ensureSession(panelId, ctx, sig.agent ?? "claude");
+      const failSession = store.sessions[panelId];
+      store.finish(panelId);
+      invoke("agent_detach_session", { panelId }).catch(() => {});
+      if (failSession) route(failSession, "error", ctx);
+      return;
+    }
+    case "SessionEnd": {
+      store.finish(panelId);
+      invoke("agent_detach_session", { panelId }).catch(() => {});
       return;
     }
     case "exited":
