@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 
@@ -146,7 +147,12 @@ export function useDocument({ path, onDirtyChange }: Options) {
       const { autoSave: active, autoSaveDelay: delay } = autoSaveRef.current;
       if (active && isDirty) {
         timeoutRef.current = setTimeout(() => {
-          saveNow().catch((e) => console.error("[autosave]", e));
+          saveNow().catch((e) => {
+            console.error("[autosave]", e);
+            toast.error("Autosave failed", {
+              description: e instanceof Error ? e.message : String(e),
+            });
+          });
         }, delay);
       }
     },

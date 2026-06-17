@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { pathDirname, pathBasename } from "@/lib/pathUtils";
@@ -334,6 +335,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         await fetchChildren(pendingCreate.parentPath);
       } catch (e) {
         console.error(`${cmd} failed:`, e);
+        toast.error(`Failed to create ${pendingCreate.kind}: ${trimmed}`, {
+          description: e instanceof Error ? e.message : String(e),
+        });
       } finally {
         setPendingCreate(null);
       }
@@ -369,6 +373,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         await fetchChildren(parent);
       } catch (e) {
         console.error("fs_rename failed:", e);
+        toast.error(`Failed to rename to "${trimmed}"`, {
+          description: e instanceof Error ? e.message : String(e),
+        });
       } finally {
         setRenaming(null);
       }
@@ -384,6 +391,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         await fetchChildren(dirname(path));
       } catch (e) {
         console.error("fs_delete failed:", e);
+        toast.error(`Failed to delete "${pathBasename(path)}"`, {
+          description: e instanceof Error ? e.message : String(e),
+        });
       }
     },
     [fetchChildren, options],
@@ -412,6 +422,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         await Promise.all([fetchChildren(dirname(from)), fetchChildren(toDir)]);
       } catch (e) {
         console.error("fs_rename (move) failed:", e);
+        toast.error(`Failed to move "${name}" to "${toDir}"`, {
+          description: e instanceof Error ? e.message : String(e),
+        });
       }
     },
     [fetchChildren, options],
