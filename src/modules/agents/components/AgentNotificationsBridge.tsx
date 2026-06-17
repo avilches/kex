@@ -14,6 +14,8 @@ type AgentSessionMetaPayload = {
   panelId: string;
   sessionId: string;
   cwdLaunch: string;
+  sessionTitle: string;
+  model: string;
 };
 type Ctx = {
   workspaces: Workspace[];
@@ -133,6 +135,10 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       invoke("agent_detach_session", { panelId }).catch(() => {});
       return;
     }
+    case "MessageDisplay":
+      // Fields TBD after log inspection - for now just ensure session exists.
+      ensureSession(panelId, ctx, sig.agent ?? "claude");
+      return;
     case "exited":
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       store.finish(panelId);
@@ -175,8 +181,8 @@ export function AgentNotificationsBridge({
     let alive = true;
     let unlisten: (() => void) | undefined;
     listen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) => {
-      const { panelId, sessionId, cwdLaunch } = e.payload;
-      useAgentStore.getState().setMeta(panelId, { sessionId, cwdLaunch });
+      const { panelId, sessionId, cwdLaunch, sessionTitle, model } = e.payload;
+      useAgentStore.getState().setMeta(panelId, { sessionId, cwdLaunch, sessionTitle, model });
     })
       .then((u) => {
         if (alive) unlisten = u;

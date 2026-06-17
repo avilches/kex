@@ -49,14 +49,31 @@ fn percent_decode(s: &[u8]) -> String {
 pub enum Transition {
     Started { agent: String },
     // Llevan session data - Rust los usa para record_session + emit meta
-    SessionStart { panel_id: String, agent: String, session_id: String, transcript_path: String, cwd: String },
-    UserPromptSubmit { panel_id: String, agent: String, session_id: String, transcript_path: String, cwd: String },
+    SessionStart {
+        panel_id: String,
+        agent: String,
+        session_id: String,
+        transcript_path: String,
+        cwd: String,
+        source: String,
+        session_title: String,
+        model: String,
+    },
+    UserPromptSubmit {
+        panel_id: String,
+        agent: String,
+        session_id: String,
+        transcript_path: String,
+        cwd: String,
+        prompt: String,
+    },
     // Estado del agente
     Notification { message: String },
-    Stop,
+    Stop { last_message: String },
     StopFailure { error_message: String },
-    SessionEnd,
+    SessionEnd { reason: String },
     PermissionRequest { tool_name: String },
+    MessageDisplay { turn_id: String, message: String },
     Exited,
 }
 
@@ -68,27 +85,30 @@ pub struct AgentSignal {
     pub agent: Option<String>,
     pub message: Option<String>,
     pub tool_name: Option<String>,
+    pub prompt: Option<String>,
 }
 
 impl Transition {
     pub fn into_signal(self, id: u32) -> AgentSignal {
         match self {
             Transition::Started { agent } =>
-                AgentSignal { id, kind: "started", agent: Some(agent), message: None, tool_name: None },
-            Transition::UserPromptSubmit { agent, .. } =>
-                AgentSignal { id, kind: "UserPromptSubmit", agent: Some(agent), message: None, tool_name: None },
+                AgentSignal { id, kind: "started", agent: Some(agent), message: None, tool_name: None, prompt: None },
+            Transition::UserPromptSubmit { agent, prompt, .. } =>
+                AgentSignal { id, kind: "UserPromptSubmit", agent: Some(agent), message: None, tool_name: None, prompt: Some(prompt) },
             Transition::Notification { message } =>
-                AgentSignal { id, kind: "Notification", agent: None, message: Some(message), tool_name: None },
-            Transition::Stop =>
-                AgentSignal { id, kind: "Stop", agent: None, message: None, tool_name: None },
+                AgentSignal { id, kind: "Notification", agent: None, message: Some(message), tool_name: None, prompt: None },
+            Transition::Stop { last_message } =>
+                AgentSignal { id, kind: "Stop", agent: None, message: Some(last_message), tool_name: None, prompt: None },
             Transition::StopFailure { error_message } =>
-                AgentSignal { id, kind: "StopFailure", agent: None, message: Some(error_message), tool_name: None },
-            Transition::SessionEnd =>
-                AgentSignal { id, kind: "SessionEnd", agent: None, message: None, tool_name: None },
+                AgentSignal { id, kind: "StopFailure", agent: None, message: Some(error_message), tool_name: None, prompt: None },
+            Transition::SessionEnd { .. } =>
+                AgentSignal { id, kind: "SessionEnd", agent: None, message: None, tool_name: None, prompt: None },
             Transition::PermissionRequest { tool_name } =>
-                AgentSignal { id, kind: "PermissionRequest", agent: None, message: None, tool_name: Some(tool_name) },
+                AgentSignal { id, kind: "PermissionRequest", agent: None, message: None, tool_name: Some(tool_name), prompt: None },
+            Transition::MessageDisplay { message, .. } =>
+                AgentSignal { id, kind: "MessageDisplay", agent: None, message: Some(message), tool_name: None, prompt: None },
             Transition::Exited =>
-                AgentSignal { id, kind: "exited", agent: None, message: None, tool_name: None },
+                AgentSignal { id, kind: "exited", agent: None, message: None, tool_name: None, prompt: None },
             Transition::SessionStart { .. } =>
                 unreachable!("SessionStart is handled before into_signal"),
         }
@@ -237,13 +257,12 @@ impl AgentDetector {
         let transcript_path = &fields[3];
         let cwd = &fields[4];
 
-        log::debug!("[osc777] kex: event={event} panel={panel_id} session={session_id} cwd={cwd}");
-
         // Auto-arm only for events that imply the agent is active, not for
         // termination events (StopFailure/SessionEnd) - those disarm immediately
         // and auto-arming before disarming would emit a spurious Started.
         match event.as_str() {
-            "SessionStart" | "UserPromptSubmit" | "Notification" | "Stop" | "PermissionRequest" => {
+            "SessionStart" | "UserPromptSubmit" | "Notification" | "Stop"
+            | "PermissionRequest" | "MessageDisplay" => {
                 self.ensure_armed(emit);
             }
             _ => {}
@@ -255,15 +274,30 @@ impl AgentDetector {
                     log::debug!("[osc777] kex: SessionStart missing panel_id or session_id");
                     return;
                 }
+                let source = fields.get(5).cloned().unwrap_or_default();
+                let session_title = fields.get(6).cloned().unwrap_or_default();
+                let model = fields.get(7).cloned().unwrap_or_default();
+                log::debug!(
+                    "[osc777] kex: SessionStart panel={panel_id} session={session_id} \
+                     cwd={cwd} source={source} title={session_title:?} model={model:?}"
+                );
                 emit(Transition::SessionStart {
                     panel_id: panel_id.clone(),
                     agent: self.current_agent.clone(),
                     session_id: session_id.clone(),
                     transcript_path: transcript_path.clone(),
                     cwd: cwd.clone(),
+                    source,
+                    session_title,
+                    model,
                 });
             }
             "UserPromptSubmit" => {
+                let prompt = fields.get(5).cloned().unwrap_or_default();
+                log::debug!(
+                    "[osc777] kex: UserPromptSubmit panel={panel_id} session={session_id} \
+                     cwd={cwd} prompt={prompt:?}"
+                );
                 self.status = Status::Working;
                 emit(Transition::UserPromptSubmit {
                     panel_id: panel_id.clone(),
@@ -271,30 +305,57 @@ impl AgentDetector {
                     session_id: session_id.clone(),
                     transcript_path: transcript_path.clone(),
                     cwd: cwd.clone(),
+                    prompt,
                 });
             }
             "Notification" => {
+                let notif_type = fields.get(5).cloned().unwrap_or_default();
                 let message = fields.get(6).cloned().unwrap_or_default();
+                log::debug!(
+                    "[osc777] kex: Notification panel={panel_id} type={notif_type} msg={message:?}"
+                );
                 self.status = Status::Waiting;
                 emit(Transition::Notification { message });
             }
             "Stop" => {
-                emit(Transition::Stop);
+                let reason = fields.get(5).cloned().unwrap_or_default();
+                let last_message = fields.get(6).cloned().unwrap_or_default();
+                log::debug!(
+                    "[osc777] kex: Stop panel={panel_id} reason={reason} \
+                     last_msg={last_message:?}"
+                );
+                emit(Transition::Stop { last_message });
                 self.status = Status::Idle;
             }
             "StopFailure" => {
+                let error_type = fields.get(5).cloned().unwrap_or_default();
                 let error_message = fields.get(6).cloned().unwrap_or_default();
+                log::debug!(
+                    "[osc777] kex: StopFailure panel={panel_id} type={error_type} msg={error_message:?}"
+                );
                 self.disarm();
                 emit(Transition::StopFailure { error_message });
             }
             "SessionEnd" => {
+                let reason = fields.get(5).cloned().unwrap_or_default();
+                log::debug!("[osc777] kex: SessionEnd panel={panel_id} reason={reason}");
                 self.disarm();
-                emit(Transition::SessionEnd);
+                emit(Transition::SessionEnd { reason });
             }
             "PermissionRequest" => {
                 let tool_name = fields.get(5).cloned().unwrap_or_default();
+                log::debug!("[osc777] kex: PermissionRequest panel={panel_id} tool={tool_name}");
                 self.status = Status::Waiting;
                 emit(Transition::PermissionRequest { tool_name });
+            }
+            "MessageDisplay" => {
+                let turn_id = fields.get(5).cloned().unwrap_or_default();
+                let message = fields.get(6).cloned().unwrap_or_default();
+                log::debug!(
+                    "[osc777] kex: MessageDisplay panel={panel_id} turn={turn_id} \
+                     msg={message:?}"
+                );
+                emit(Transition::MessageDisplay { turn_id, message });
             }
             _ => {
                 log::debug!("[osc777] kex: unknown event: {event}");
@@ -400,6 +461,7 @@ mod tests {
             session_id: "sess1".into(),
             transcript_path: "/tmp/transcript".into(),
             cwd: "/home/user".into(),
+            prompt: "".into(),
         }
     }
 
@@ -456,7 +518,7 @@ mod tests {
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
         // Duplicate UserPromptSubmit - always emits so JS can re-create session after ESC/CTRL+C
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
-        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop { last_message: "".into() }]);
     }
 
     #[test]
@@ -524,7 +586,7 @@ mod tests {
     fn stays_armed_after_stop_ready_for_next_prompt() {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
-        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop]);
+        assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop { last_message: "".into() }]);
         // Stop leaves detector armed (Claude still running) - next prompt needs no auto-arm.
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
         // Explicit shell exit (133;D) disarms.
@@ -577,6 +639,9 @@ mod tests {
                 session_id: "sess1".into(),
                 transcript_path: "/tmp/transcript".into(),
                 cwd: "/home/user".into(),
+                source: "".into(),
+                session_title: "".into(),
+                model: "".into(),
             }
         );
     }
@@ -610,7 +675,7 @@ mod tests {
             &mut d,
             &osc("777;kex;SessionEnd;panel1;sess1;%2Ftmp%2Ftranscript;%2Fhome%2Fuser"),
         );
-        assert_eq!(end, vec![Transition::SessionEnd]);
+        assert_eq!(end, vec![Transition::SessionEnd { reason: "".into() }]);
         assert!(run(&mut d, &osc("133;D;0")).is_empty());
     }
 

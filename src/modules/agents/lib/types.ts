@@ -10,6 +10,7 @@ export type AgentSignalKind =
   | "StopFailure"
   | "SessionEnd"
   | "PermissionRequest"
+  | "MessageDisplay"
   | "exited";
 
 export type AgentSignal = {
@@ -18,12 +19,14 @@ export type AgentSignal = {
   agent: string | null;
   message?: string;
   toolName?: string;
+  prompt?: string;
 };
 
 export type AgentSessionMeta = {
   sessionId?: string;
   cwdLaunch?: string;
-  // extension futura: contextPct?: number; model?: string;
+  sessionTitle?: string;
+  model?: string;
 };
 
 export type AgentSession = {
