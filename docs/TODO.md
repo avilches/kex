@@ -6,6 +6,34 @@ Bugs, features y mejoras ya auditadas y priorizadas viven aparte, en [PENDING.md
 
 ---
 
+## Popup de agente: fecha original de la sesion Claude
+
+Estado: pendiente (anotado 2026-06-16).
+
+El campo "Started" del HoverCard del tab de agente muestra el tiempo desde que el frontend detecto la senial `started`. En sesiones restauradas con `--resume` esto es el momento del restore, no el inicio original de la sesion.
+
+La fecha real esta en el JSONL de la sesion (primera entrada con campo `timestamp`). Para recuperarla: leer ese timestamp en Rust al procesar `SessionStart`, incluirlo en el evento `kex:agent-session-meta` como campo `sessionCreatedAt: u64`, recibirlo en el bridge TS y guardarlo en `AgentSessionMeta.sessionCreatedAt`. El HoverCard mostraria la fecha original en lugar de `startedAt` del store cuando este campo este disponible.
+
+Ficheros implicados: `src-tauri/src/modules/agent/session_store.rs` (lectura del JSONL), `src-tauri/src/modules/pty/session.rs` (incluir en el payload), `src/modules/agents/lib/types.ts` (extender `AgentSessionMeta`), `src/modules/workspaces/PaneTabBar.tsx` (mostrar en el popover).
+
+---
+
+## Popup de informacion para todos los tipos de tab
+
+Estado: pendiente (anotado 2026-06-16).
+
+Hoy el HoverCard con metadata solo aparece en tabs de agente (`hasAgent`). Extenderlo a todos los tipos de panel con informacion relevante segun el `kind`:
+
+- **terminal**: cwd actual, pty id (util para debug).
+- **editor**: ruta completa del fichero, estado dirty, ultima modificacion.
+- **preview**: URL, estado de conexion al servidor de desarrollo.
+- **git-history**: rama activa, repo root.
+- **git-diff**: fichero en diff, workspace.
+
+Requiere crear un componente generico de HoverCard o especializarlo por `panel.kind`, y hacer el trigger condicional disponible para todos los tabs, no solo los de agente. Diseniar primero el componente base antes de implementar cada kind.
+
+---
+
 ## Bug: el input de renombrar tab va en direccion incorrecta
 
 Estado: sin investigar (anotado 2026-06-14).
