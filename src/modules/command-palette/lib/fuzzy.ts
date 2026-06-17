@@ -55,3 +55,46 @@ export function fuzzyBest(query: string, candidates: string[]): number | null {
   }
   return best;
 }
+
+// Takes pre-lowercased inputs to skip redundant toLowerCase per candidate.
+export function fuzzyScoreLower(
+  lowerQuery: string,
+  lowerTarget: string,
+): number | null {
+  if (lowerQuery.length === 0) return 0;
+  if (lowerQuery.length > lowerTarget.length) return null;
+
+  let score = 0;
+  let qi = 0;
+  let lastMatch = -1;
+
+  for (let ti = 0; ti < lowerTarget.length && qi < lowerQuery.length; ti++) {
+    if (lowerTarget[ti] !== lowerQuery[qi]) continue;
+
+    let bonus = 1;
+    if (ti === 0 || isBoundary(lowerTarget[ti - 1])) bonus += BONUS_BOUNDARY;
+    else if (isCamelStart(lowerTarget, ti)) bonus += BONUS_CAMEL;
+    if (lastMatch === ti - 1) bonus += BONUS_CONSECUTIVE;
+    else if (lastMatch >= 0)
+      bonus -= Math.min(ti - lastMatch - 1, MAX_GAP_PENALTY);
+    // No BONUS_EXACT_CASE: both sides are already lowercase.
+
+    score += bonus;
+    lastMatch = ti;
+    qi++;
+  }
+
+  return qi === lowerQuery.length ? score : null;
+}
+
+export function fuzzyBestLower(
+  lowerQuery: string,
+  lowerCandidates: string[],
+): number | null {
+  let best: number | null = null;
+  for (const c of lowerCandidates) {
+    const s = fuzzyScoreLower(lowerQuery, c);
+    if (s !== null && (best === null || s > best)) best = s;
+  }
+  return best;
+}

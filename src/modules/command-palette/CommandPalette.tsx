@@ -32,7 +32,7 @@ import {
   CONTENT_SEARCH_MIN_QUERY,
   useContentSearch,
 } from "./hooks/useContentSearch";
-import { fuzzyBest } from "./lib/fuzzy";
+import { fuzzyBest, fuzzyBestLower } from "./lib/fuzzy";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruRank, mruSnapshot, recordUse } from "./lib/mru";
 import type { PaletteItem } from "./types";
@@ -80,10 +80,13 @@ export function CommandPalette({
 
   const mru = useMemo(() => (open ? mruSnapshot() : {}), [open]);
 
+  // Precomputed once per items change; reused across keystrokes.
+  const searchBlobs = useMemo(() => buildSearchBlobs(commandItems), [commandItems]);
+
   const rankedCommands = useMemo(() => {
     if (inThemes || parsed.mode !== "commands") return [];
-    return rankCommands(commandItems, parsed.term, mru);
-  }, [commandItems, parsed.term, parsed.mode, inThemes, mru]);
+    return rankCommands(commandItems, searchBlobs, parsed.term, mru);
+  }, [commandItems, searchBlobs, parsed.term, parsed.mode, inThemes, mru]);
 
   const themes = useMemo(() => {
     if (!inThemes) return [];
@@ -386,18 +389,29 @@ export function CommandPalette({
   );
 }
 
+// Precomputed once per items change; reused across keystrokes.
+function buildSearchBlobs(items: PaletteItem[]): string[][] {
+  return items.map((item) => [
+    item.title.toLowerCase(),
+    item.group.toLowerCase(),
+    ...(item.keywords?.map((k) => k.toLowerCase()) ?? []),
+  ]);
+}
+
 function rankCommands(
   items: PaletteItem[],
+  blobs: string[][],
   term: string,
   mru: Record<string, number>,
 ): PaletteItem[] {
   if (!term) {
     return [...items].sort((a, b) => mruRank(mru, b.id) - mruRank(mru, a.id));
   }
+  const lowerTerm = term.toLowerCase();
   const scored: { item: PaletteItem; s: number }[] = [];
-  for (const item of items) {
-    const s = fuzzyBest(term, [item.title, item.group, ...(item.keywords ?? [])]);
-    if (s !== null) scored.push({ item, s });
+  for (let i = 0; i < items.length; i++) {
+    const s = fuzzyBestLower(lowerTerm, blobs[i]);
+    if (s !== null) scored.push({ item: items[i], s });
   }
   scored.sort(
     (a, b) => b.s - a.s || mruRank(mru, b.item.id) - mruRank(mru, a.item.id),
