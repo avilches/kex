@@ -75,6 +75,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searching, setSearching] = useState(false);
   const [truncated, setTruncated] = useState(false);
+  const [contextHit, setContextHit] = useState<SearchHit | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastKeyboardNavAt = useRef(0);
@@ -222,26 +223,28 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
 
       {active ? (
         <ScrollArea className="min-h-0 flex-1">
-          <div className="py-1" ref={scrollRef}>
-            {searching && results.length === 0 ? (
-              <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                Searching…
-              </div>
-            ) : results.length === 0 ? (
-              <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                No matches
-              </div>
-            ) : (
-              results.map((hit, index) => {
-                const url = hit.is_dir ? null : fileIconUrl(hit.name);
-                const isSelected = index === selectedIndex;
-                return (
-                  <ContextMenu key={hit.path}>
-                    <ContextMenuTrigger asChild>
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <div className="py-1" ref={scrollRef}>
+                {searching && results.length === 0 ? (
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
+                    Searching…
+                  </div>
+                ) : results.length === 0 ? (
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
+                    No matches
+                  </div>
+                ) : (
+                  results.map((hit, index) => {
+                    const url = hit.is_dir ? null : fileIconUrl(hit.name);
+                    const isSelected = index === selectedIndex;
+                    return (
                       <button
+                        key={hit.path}
                         type="button"
                         data-index={index}
                         onClick={() => handleSelect(hit)}
+                        onContextMenu={() => setContextHit(hit)}
                         onMouseEnter={() => {
                           if (Date.now() - lastKeyboardNavAt.current > 250) {
                             setSelectedIndex(index);
@@ -268,55 +271,55 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                           {hit.rel}
                         </span>
                       </button>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent className={COMPACT_CONTENT}>
-                      {!hit.is_dir && (
-                        <ContextMenuItem
-                          className={COMPACT_ITEM}
-                          onSelect={() => onOpenFile(hit.path)}
-                        >
-                          Open
-                        </ContextMenuItem>
-                      )}
-                      {hit.is_dir && onRevealInTerminal && (
-                        <ContextMenuItem
-                          className={COMPACT_ITEM}
-                          onSelect={() => onRevealInTerminal(hit.path)}
-                        >
-                          Open in Terminal
-                        </ContextMenuItem>
-                      )}
-                      <ContextMenuItem
-                        className={COMPACT_ITEM}
-                        onSelect={() => void revealInFinder(hit.path)}
-                      >
-                        Reveal in Finder
-                      </ContextMenuItem>
-                      <ContextMenuSeparator />
-                      <ContextMenuItem
-                        className={COMPACT_ITEM}
-                        onSelect={() => void copyToClipboard(hit.path)}
-                      >
-                        Copy Path
-                      </ContextMenuItem>
-                      <ContextMenuSeparator />
-                      <ContextMenuItem
-                        className={COMPACT_ITEM}
-                        onSelect={() => onAttachToAgent?.(hit.path)}
-                      >
-                        Attach to Agent
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                );
-              })
-            )}
-            {truncated && results.length > 0 ? (
-              <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
-                Showing partial results — refine your query.
+                    );
+                  })
+                )}
+                {truncated && results.length > 0 ? (
+                  <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
+                    Showing partial results - refine your query.
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent className={COMPACT_CONTENT}>
+              {contextHit && !contextHit.is_dir && (
+                <ContextMenuItem
+                  className={COMPACT_ITEM}
+                  onSelect={() => onOpenFile(contextHit.path)}
+                >
+                  Open
+                </ContextMenuItem>
+              )}
+              {contextHit?.is_dir && onRevealInTerminal && (
+                <ContextMenuItem
+                  className={COMPACT_ITEM}
+                  onSelect={() => onRevealInTerminal(contextHit.path)}
+                >
+                  Open in Terminal
+                </ContextMenuItem>
+              )}
+              <ContextMenuItem
+                className={COMPACT_ITEM}
+                onSelect={() => contextHit && void revealInFinder(contextHit.path)}
+              >
+                Reveal in Finder
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                className={COMPACT_ITEM}
+                onSelect={() => contextHit && void copyToClipboard(contextHit.path)}
+              >
+                Copy Path
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                className={COMPACT_ITEM}
+                onSelect={() => onAttachToAgent?.(contextHit?.path ?? "")}
+              >
+                Attach to Agent
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         </ScrollArea>
       ) : null}
     </div>
