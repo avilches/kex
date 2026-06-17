@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 use std::io::{BufRead, BufReader};
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
@@ -68,7 +70,12 @@ pub fn spawn_listener(
     };
     log::debug!("[ipc] listening panel={panel_id} path={:?}", socket_path);
 
-    thread::spawn(move || run_listener(listener, panel_id, pty_id, app));
+    if let Err(e) = thread::Builder::new()
+        .name(format!("kex-ipc-{panel_id}"))
+        .spawn(move || run_listener(listener, panel_id, pty_id, app))
+    {
+        log::warn!("[ipc] failed to spawn listener thread: {e}");
+    }
     IpcGuard(socket_path)
 }
 
