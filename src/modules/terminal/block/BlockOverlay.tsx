@@ -284,7 +284,7 @@ function MenuItem({
     <DropdownMenuItem
       disabled={disabled}
       onSelect={onClick}
-      className="gap-2 text-xs"
+      className="gap-2"
     >
       <HugeiconsIcon icon={icon} size={13} strokeWidth={1.75} />
       {label}
