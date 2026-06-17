@@ -27,13 +27,31 @@ emit_kex() {   # args: event extra_fields_percent_encoded
     jq -cn --arg seq "$seq" '{"terminalSequence":$seq}'
 }
 
+# Send raw payload to KEX_IPC Unix socket.
+# Uses nc -U (BSD/OpenBSD netcat on macOS + most Linux), falls back to python3.
+# Fails silently if KEX_IPC is unset or socket is unavailable.
+send_ipc() {
+    [ -n "$KEX_IPC" ] || return 0
+    if command -v nc > /dev/null 2>&1; then
+        printf '%s\n' "$PAYLOAD" | nc -w 1 -U "$KEX_IPC" 2>/dev/null && return 0
+    fi
+    python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(2)
+try:
+    s.connect(sys.argv[1])
+    s.sendall(sys.stdin.buffer.read())
+finally:
+    s.close()
+" "$KEX_IPC" <<< "$PAYLOAD" 2>/dev/null || true
+}
+
 handle_SessionStart() {
     log_payload
-    local SRC TITLE MODEL
-    SRC="$(printf '%s'   "$PAYLOAD" | jq -r '.source       // ""' | jq -Rr @uri)"
-    TITLE="$(printf '%s' "$PAYLOAD" | jq -r '.sessionTitle // ""' | cut -c1-256 | jq -Rr @uri)"
-    MODEL="$(printf '%s' "$PAYLOAD" | jq -r '.model        // ""' | jq -Rr @uri)"
-    emit_kex "SessionStart" "${SRC};${TITLE};${MODEL}"
+    # terminalSequence is not injected by Claude Code for lifecycle hooks.
+    # Use Unix socket IPC instead.
+    send_ipc
 }
 
 handle_UserPromptSubmit() {
@@ -69,9 +87,8 @@ handle_StopFailure() {
 
 handle_SessionEnd() {
     log_payload
-    local REASON
-    REASON="$(printf '%s' "$PAYLOAD" | jq -r '.reason // ""' | jq -Rr @uri)"
-    emit_kex "SessionEnd" "$REASON"
+    # Same as SessionStart — terminalSequence not injected.
+    send_ipc
 }
 
 handle_PermissionRequest() {
