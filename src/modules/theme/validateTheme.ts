@@ -32,6 +32,64 @@ function isStr(v: unknown): v is string {
   return typeof v === "string";
 }
 
+function isValidColor(v: string): boolean {
+  if (v.includes("url(") || v.includes("image-set(") || v.includes(";")) {
+    return false;
+  }
+  if (typeof CSS !== "undefined" && typeof CSS.supports === "function") {
+    return CSS.supports("color", v);
+  }
+  return isValidColorFallback(v);
+}
+
+function isValidColorFallback(v: string): boolean {
+  if (v.length === 0) return false;
+  const trimmed = v.trim();
+  if (trimmed.length === 0) return false;
+  if (/^#([0-9a-f]{3}){1,2}$/i.test(trimmed)) return true;
+  if (/^rgb[a]?\(/.test(trimmed)) return true;
+  if (/^hsl[a]?\(/.test(trimmed)) return true;
+  if (/^color\(/.test(trimmed)) return true;
+  if (/^color-mix\(/.test(trimmed)) return true;
+  if (/^hwb\(/.test(trimmed)) return true;
+  if (/^lch\(/.test(trimmed)) return true;
+  if (/^oklch\(/.test(trimmed)) return true;
+  if (/^lab\(/.test(trimmed)) return true;
+  if (/^oklab\(/.test(trimmed)) return true;
+  const namedColors: Record<string, boolean> = {
+    aliceblue: true, antiquewhite: true, aqua: true, aquamarine: true, azure: true,
+    beige: true, bisque: true, black: true, blanchedalmond: true, blue: true,
+    blueviolet: true, brown: true, burlywood: true, cadetblue: true, chartreuse: true,
+    chocolate: true, coral: true, cornflowerblue: true, cornsilk: true, crimson: true,
+    cyan: true, darkblue: true, darkcyan: true, darkgoldenrod: true, darkgray: true,
+    darkgrey: true, darkgreen: true, darkkhaki: true, darkmagenta: true, darkolivegreen: true,
+    darkorange: true, darkorchid: true, darkred: true, darksalmon: true, darkseagreen: true,
+    darkslateblue: true, darkslategray: true, darkslategrey: true, darkturquoise: true,
+    darkviolet: true, deeppink: true, deepskyblue: true, dimgray: true, dimgrey: true,
+    dodgerblue: true, firebrick: true, floralwhite: true, forestgreen: true, fuchsia: true,
+    gainsboro: true, ghostwhite: true, gold: true, goldenrod: true, gray: true, grey: true,
+    green: true, greenyellow: true, honeydew: true, hotpink: true, indianred: true, indigo: true,
+    ivory: true, khaki: true, lavender: true, lavenderblush: true, lawngreen: true, lemonchiffon: true,
+    lightblue: true, lightcoral: true, lightcyan: true, lightgoldenrodyellow: true, lightgray: true,
+    lightgrey: true, lightgreen: true, lightpink: true, lightsalmon: true, lightseagreen: true,
+    lightskyblue: true, lightslategray: true, lightslategrey: true, lightsteelblue: true,
+    lightyellow: true, lime: true, limegreen: true, linen: true, magenta: true, maroon: true,
+    mediumaquamarine: true, mediumblue: true, mediumorchid: true, mediumpurple: true,
+    mediumseagreen: true, mediumslateblue: true, mediumspringgreen: true, mediumturquoise: true,
+    mediumvioletred: true, midnightblue: true, mintcream: true, mistyrose: true, moccasin: true,
+    navajowhite: true, navy: true, oldlace: true, olive: true, olivedrab: true, orange: true,
+    orangered: true, orchid: true, palegoldenrod: true, palegreen: true, paleturquoise: true,
+    palevioletred: true, papayawhip: true, peachpuff: true, peru: true, pink: true, plum: true,
+    powderblue: true, purple: true, rebeccapurple: true, red: true, rosybrown: true,
+    royalblue: true, saddlebrown: true, salmon: true, sandybrown: true, seagreen: true,
+    seashell: true, sienna: true, silver: true, skyblue: true, slateblue: true, slategray: true,
+    slategrey: true, snow: true, springgreen: true, steelblue: true, tan: true, teal: true,
+    thistle: true, tomato: true, turquoise: true, violet: true, wheat: true, white: true,
+    whitesmoke: true, yellow: true, yellowgreen: true, transparent: true, currentcolor: true,
+  };
+  return namedColors[trimmed.toLowerCase()] ?? false;
+}
+
 function parseColors(raw: unknown, path: string): ThemeColors | string {
   if (raw === undefined) return {};
   if (!isObj(raw)) return `${path} must be an object`;
@@ -42,6 +100,7 @@ function parseColors(raw: unknown, path: string): ThemeColors | string {
     }
     const v = raw[k];
     if (!isStr(v) || v.length === 0) return `${path}.${k} must be a non-empty string`;
+    if (!isValidColor(v)) return `${path}.${k} is not a valid CSS color`;
     out[k as keyof ThemeColors] = v;
   }
   return out;
@@ -53,22 +112,27 @@ function parseTerminal(raw: unknown, path: string): TerminalPalette | string {
   const out: TerminalPalette = {};
   if (raw.background !== undefined) {
     if (!isStr(raw.background)) return `${path}.background must be a string`;
+    if (!isValidColor(raw.background)) return `${path}.background is not a valid CSS color`;
     out.background = raw.background;
   }
   if (raw.foreground !== undefined) {
     if (!isStr(raw.foreground)) return `${path}.foreground must be a string`;
+    if (!isValidColor(raw.foreground)) return `${path}.foreground is not a valid CSS color`;
     out.foreground = raw.foreground;
   }
   if (raw.cursor !== undefined) {
     if (!isStr(raw.cursor)) return `${path}.cursor must be a string`;
+    if (!isValidColor(raw.cursor)) return `${path}.cursor is not a valid CSS color`;
     out.cursor = raw.cursor;
   }
   if (raw.cursorAccent !== undefined) {
     if (!isStr(raw.cursorAccent)) return `${path}.cursorAccent must be a string`;
+    if (!isValidColor(raw.cursorAccent)) return `${path}.cursorAccent is not a valid CSS color`;
     out.cursorAccent = raw.cursorAccent;
   }
   if (raw.selection !== undefined) {
     if (!isStr(raw.selection)) return `${path}.selection must be a string`;
+    if (!isValidColor(raw.selection)) return `${path}.selection is not a valid CSS color`;
     out.selection = raw.selection;
   }
   if (raw.ansi !== undefined) {
@@ -77,6 +141,7 @@ function parseTerminal(raw: unknown, path: string): TerminalPalette | string {
     }
     for (let i = 0; i < 16; i++) {
       if (!isStr(raw.ansi[i])) return `${path}.ansi[${i}] must be a string`;
+      if (!isValidColor(raw.ansi[i])) return `${path}.ansi[${i}] is not a valid CSS color`;
     }
     out.ansi = raw.ansi as unknown as TerminalPalette["ansi"];
   }
