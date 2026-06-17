@@ -312,11 +312,13 @@ pub fn agent_claude_hooks_status() -> bool {
     let Ok(root) = serde_json::from_str::<Value>(&content) else {
         return false;
     };
-    // All events must have the session hook (v4 unified protocol).
-    let has_session_hook = root["hooks"]["UserPromptSubmit"]
-        .as_array()
-        .is_some_and(|arr| arr.iter().any(is_session_hook));
-    if !has_session_hook {
+    // All 7 events must have the session hook (v4 unified protocol).
+    let all_hooks_present = SESSION_HOOK_EVENTS.iter().all(|event| {
+        root["hooks"][event]
+            .as_array()
+            .is_some_and(|arr| arr.iter().any(is_session_hook))
+    });
+    if !all_hooks_present {
         return false;
     }
     // Check that the session hook script is up-to-date (v4).

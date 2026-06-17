@@ -195,24 +195,24 @@ pub fn spawn(
                             log::debug!("pty first byte after {}ms", spawn_at.elapsed().as_millis());
                         }
                         agent_detect.process(&buf[..n], |t| {
-                            // Events that carry session data → update store + emit meta to frontend
+                            // Events that carry session data - update store + emit meta to frontend
                             let session_data = match &t {
-                                Transition::SessionStart { panel_id, session_id, transcript_path, cwd } => {
-                                    Some((panel_id.clone(), session_id.clone(), transcript_path.clone(), cwd.clone()))
+                                Transition::SessionStart { panel_id, agent, session_id, transcript_path, cwd } => {
+                                    Some((panel_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone()))
                                 }
-                                Transition::UserPromptSubmit { panel_id, session_id, transcript_path, cwd } => {
-                                    Some((panel_id.clone(), session_id.clone(), transcript_path.clone(), cwd.clone()))
+                                Transition::UserPromptSubmit { panel_id, agent, session_id, transcript_path, cwd } => {
+                                    Some((panel_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone()))
                                 }
                                 _ => None,
                             };
-                            if let Some((panel_id, session_id, transcript_path, cwd)) = session_data {
-                                session_store::record_session(&panel_id, "claude", &session_id, &transcript_path, &cwd);
+                            if let Some((panel_id, agent, session_id, transcript_path, cwd)) = session_data {
+                                session_store::record_session(&panel_id, &agent, &session_id, &transcript_path, &cwd);
                                 let _ = app_reader.emit(AGENT_SESSION_META_EVENT, AgentSessionMetaPayload {
                                     panel_id: &panel_id,
                                     session_id: &session_id,
                                     cwd_launch: &cwd,
                                 });
-                                // SessionStart has no frontend handler — skip emitting to kex:agent-signal
+                                // SessionStart has no frontend handler - skip emitting to kex:agent-signal
                                 if matches!(t, Transition::SessionStart { .. }) {
                                     return;
                                 }

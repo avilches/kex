@@ -42,6 +42,7 @@ function route(
   session: AgentSession,
   kind: "attention" | "finished" | "error",
   ctx: Ctx,
+  extraBody?: string,
 ): void {
   const info = panelInfo(ctx.workspaces, session.panelId);
   const heading =
@@ -56,7 +57,7 @@ function route(
     agent: session.agent,
     kind,
     title: heading,
-    body: info?.title,
+    body: extraBody ?? info?.title,
     focused: ctx.focused,
     visible: ctx.activeWorkspaceId === session.tabId,
     allowToast: kind === "attention",
@@ -124,7 +125,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       const failSession = store.sessions[panelId];
       store.finish(panelId);
       invoke("agent_detach_session", { panelId }).catch(() => {});
-      if (failSession) route(failSession, "error", ctx);
+      if (failSession) route(failSession, "error", ctx, sig.message ?? undefined);
       return;
     }
     case "SessionEnd": {

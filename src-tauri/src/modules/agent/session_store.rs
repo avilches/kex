@@ -168,7 +168,7 @@ pub fn record_session(panel_id: &str, agent: &str, session_id: &str, transcript_
         None => return,
     };
     log::info!(
-        "[agent-session] record hook=SessionStart panel={panel_id} agent={agent} session={session_id} cwd={cwd}"
+        "[agent-session] record panel={panel_id} agent={agent} session={session_id} cwd={cwd}"
     );
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

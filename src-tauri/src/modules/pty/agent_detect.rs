@@ -48,9 +48,9 @@ fn percent_decode(s: &[u8]) -> String {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Transition {
     Started { agent: String },
-    // Llevan session data — Rust los usa para record_session + emit meta
-    SessionStart { panel_id: String, session_id: String, transcript_path: String, cwd: String },
-    UserPromptSubmit { panel_id: String, session_id: String, transcript_path: String, cwd: String },
+    // Llevan session data - Rust los usa para record_session + emit meta
+    SessionStart { panel_id: String, agent: String, session_id: String, transcript_path: String, cwd: String },
+    UserPromptSubmit { panel_id: String, agent: String, session_id: String, transcript_path: String, cwd: String },
     // Estado del agente
     Notification { message: String },
     Stop,
@@ -61,6 +61,7 @@ pub enum Transition {
 }
 
 #[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentSignal {
     pub id: u32,
     pub kind: &'static str,
@@ -74,8 +75,8 @@ impl Transition {
         match self {
             Transition::Started { agent } =>
                 AgentSignal { id, kind: "started", agent: Some(agent), message: None, tool_name: None },
-            Transition::UserPromptSubmit { .. } =>
-                AgentSignal { id, kind: "UserPromptSubmit", agent: None, message: None, tool_name: None },
+            Transition::UserPromptSubmit { agent, .. } =>
+                AgentSignal { id, kind: "UserPromptSubmit", agent: Some(agent), message: None, tool_name: None },
             Transition::Notification { message } =>
                 AgentSignal { id, kind: "Notification", agent: None, message: Some(message), tool_name: None },
             Transition::Stop =>
@@ -100,6 +101,7 @@ pub struct AgentDetector {
     osc: Vec<u8>,
     armed: bool,
     status: Status,
+    current_agent: String,
 }
 
 impl AgentDetector {
@@ -114,6 +116,7 @@ impl AgentDetector {
             osc: Vec::new(),
             armed: false,
             status: Status::Idle,
+            current_agent: String::new(),
         }
     }
 
@@ -236,8 +239,15 @@ impl AgentDetector {
 
         log::debug!("[osc777] kex: event={event} panel={panel_id} session={session_id} cwd={cwd}");
 
-        // Auto-arm para entornos sin shell preexec (bash, Windows, tmux)
-        self.ensure_armed(emit);
+        // Auto-arm only for events that imply the agent is active, not for
+        // termination events (StopFailure/SessionEnd) - those disarm immediately
+        // and auto-arming before disarming would emit a spurious Started.
+        match event.as_str() {
+            "SessionStart" | "UserPromptSubmit" | "Notification" | "Stop" | "PermissionRequest" => {
+                self.ensure_armed(emit);
+            }
+            _ => {}
+        }
 
         match event.as_str() {
             "SessionStart" => {
@@ -247,6 +257,7 @@ impl AgentDetector {
                 }
                 emit(Transition::SessionStart {
                     panel_id: panel_id.clone(),
+                    agent: self.current_agent.clone(),
                     session_id: session_id.clone(),
                     transcript_path: transcript_path.clone(),
                     cwd: cwd.clone(),
@@ -256,6 +267,7 @@ impl AgentDetector {
                 self.status = Status::Working;
                 emit(Transition::UserPromptSubmit {
                     panel_id: panel_id.clone(),
+                    agent: self.current_agent.clone(),
                     session_id: session_id.clone(),
                     transcript_path: transcript_path.clone(),
                     cwd: cwd.clone(),
@@ -267,7 +279,6 @@ impl AgentDetector {
                 emit(Transition::Notification { message });
             }
             "Stop" => {
-                self.status = Status::Waiting;
                 emit(Transition::Stop);
                 self.status = Status::Idle;
             }
@@ -299,6 +310,7 @@ impl AgentDetector {
                     log::debug!("[shell] osc133 C: armed agent={agent} cmd={}", String::from_utf8_lossy(cmd));
                     self.armed = true;
                     self.status = Status::Idle;
+                    self.current_agent = agent.clone();
                     emit(Transition::Started { agent });
                 }
             }
@@ -316,6 +328,7 @@ impl AgentDetector {
             log::debug!("[osc777] auto-arming (no shell OSC 133;C seen)");
             self.armed = true;
             self.status = Status::Idle;
+            self.current_agent = "claude".into();
             emit(Transition::Started { agent: "claude".into() });
         }
     }
@@ -383,6 +396,7 @@ mod tests {
     fn user_prompt_submit() -> Transition {
         Transition::UserPromptSubmit {
             panel_id: "panel1".into(),
+            agent: "claude".into(),
             session_id: "sess1".into(),
             transcript_path: "/tmp/transcript".into(),
             cwd: "/home/user".into(),
@@ -440,7 +454,7 @@ mod tests {
         );
         // UserPromptSubmit while Waiting → Working
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
-        // Duplicate UserPromptSubmit — always emits so JS can re-create session after ESC/CTRL+C
+        // Duplicate UserPromptSubmit - always emits so JS can re-create session after ESC/CTRL+C
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
         assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop]);
     }
@@ -511,7 +525,7 @@ mod tests {
         let mut d = AgentDetector::new();
         run(&mut d, &osc("133;C;claude"));
         assert_eq!(run(&mut d, &osc(&kex_osc("Stop"))), vec![Transition::Stop]);
-        // Stop leaves detector armed (Claude still running) — next prompt needs no auto-arm.
+        // Stop leaves detector armed (Claude still running) - next prompt needs no auto-arm.
         assert_eq!(run(&mut d, &osc(&kex_osc("UserPromptSubmit"))), vec![user_prompt_submit()]);
         // Explicit shell exit (133;D) disarms.
         assert_eq!(run(&mut d, &osc("133;D;0")), vec![Transition::Exited]);
@@ -559,6 +573,7 @@ mod tests {
             transitions[1],
             Transition::SessionStart {
                 panel_id: "panel1".into(),
+                agent: "claude".into(),
                 session_id: "sess1".into(),
                 transcript_path: "/tmp/transcript".into(),
                 cwd: "/home/user".into(),
@@ -569,7 +584,7 @@ mod tests {
     #[test]
     fn kex_malformed_payload_ignored() {
         let mut d = AgentDetector::new();
-        // Only 3 fields — must be ignored
+        // Only 3 fields - must be ignored
         assert!(run(&mut d, &osc("777;kex;SessionStart;panel1;sess1")).is_empty());
     }
 
@@ -586,7 +601,7 @@ mod tests {
             stop_fail,
             vec![Transition::StopFailure { error_message: "something bad".into() }]
         );
-        // Should be disarmed now — 133;D should produce no Exited
+        // Should be disarmed now - 133;D should produce no Exited
         assert!(run(&mut d, &osc("133;D;0")).is_empty());
 
         // Re-arm and test SessionEnd
