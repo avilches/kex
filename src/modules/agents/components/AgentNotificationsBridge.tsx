@@ -54,6 +54,14 @@ function route(
         ? `${session.agent} stopped with an error`
         : `${session.agent} finished`;
 
+  const activeWs = ctx.workspaces.find((w) => w.id === session.tabId);
+  const panelResult = activeWs ? findPanelPane(activeWs.paneTree, session.panelId) : null;
+  const panelVisible =
+    ctx.activeWorkspaceId === session.tabId &&
+    !!panelResult &&
+    activeWs?.activePaneId === panelResult.pane.id &&
+    panelResult.pane.activePanelId === session.panelId;
+
   routeAgentNotification({
     source: "terminal",
     agent: session.agent,
@@ -61,7 +69,7 @@ function route(
     title: heading,
     body: extraBody ?? info?.title,
     focused: ctx.focused,
-    visible: ctx.activeWorkspaceId === session.tabId,
+    visible: panelVisible,
     allowToast: kind === "attention",
     tabId: session.tabId,
     panelId: session.panelId,
