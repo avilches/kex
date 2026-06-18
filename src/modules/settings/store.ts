@@ -6,6 +6,8 @@ export type ThemePref = "system" | "light" | "dark";
 
 export type TabBarStyle = "connected" | "pill";
 
+export type GitColorScheme = "none" | "vscode" | "jetbrains";
+
 export const DEFAULT_THEME_ID = "kex-default";
 
 export const EDITOR_THEMES = [
@@ -45,7 +47,7 @@ export type Preferences = {
   autostart: boolean;
   vimMode: boolean;
   showHidden: boolean;
-  explorerGitDecorations: boolean;
+  explorerGitColorScheme: GitColorScheme;
   terminalWebglEnabled: boolean;
   terminalCursorBlink: boolean;
   terminalFontFamily: string;
@@ -75,7 +77,8 @@ const KEY_AUTOSTART = "autostart";
 const KEY_VIM_MODE = "vimMode";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
-const KEY_EXPLORER_GIT_DECORATIONS = "explorerGitDecorations";
+const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
+const LEGACY_KEY_EXPLORER_GIT_DECORATIONS = "explorerGitDecorations";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
@@ -118,7 +121,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autostart: false,
   vimMode: false,
   showHidden: false,
-  explorerGitDecorations: false,
+  explorerGitColorScheme: "none",
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
   terminalFontFamily: "",
@@ -171,9 +174,13 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_SHOW_HIDDEN) ??
       get<boolean>(LEGACY_KEY_SHOW_HIDDEN_DIRS) ??
       DEFAULT_PREFERENCES.showHidden,
-    explorerGitDecorations:
-      get<boolean>(KEY_EXPLORER_GIT_DECORATIONS) ??
-      DEFAULT_PREFERENCES.explorerGitDecorations,
+    explorerGitColorScheme: (() => {
+      const v = get<string>(KEY_EXPLORER_GIT_COLOR_SCHEME);
+      if (v === "none" || v === "vscode" || v === "jetbrains") return v;
+      const legacy = get<boolean>(LEGACY_KEY_EXPLORER_GIT_DECORATIONS);
+      if (legacy === true) return "vscode";
+      return DEFAULT_PREFERENCES.explorerGitColorScheme;
+    })(),
     terminalWebglEnabled:
       get<boolean>(KEY_TERMINAL_WEBGL_ENABLED) ??
       DEFAULT_PREFERENCES.terminalWebglEnabled,
@@ -275,8 +282,8 @@ export async function setShowHidden(value: boolean): Promise<void> {
   await writePref(KEY_SHOW_HIDDEN, value);
 }
 
-export async function setExplorerGitDecorations(value: boolean): Promise<void> {
-  await writePref(KEY_EXPLORER_GIT_DECORATIONS, value);
+export async function setExplorerGitColorScheme(value: GitColorScheme): Promise<void> {
+  await writePref(KEY_EXPLORER_GIT_COLOR_SCHEME, value);
 }
 
 export async function setTerminalWebglEnabled(value: boolean): Promise<void> {
@@ -387,7 +394,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AUTOSTART]: "autostart",
   [KEY_VIM_MODE]: "vimMode",
   [KEY_SHOW_HIDDEN]: "showHidden",
-  [KEY_EXPLORER_GIT_DECORATIONS]: "explorerGitDecorations",
+  [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
   [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",

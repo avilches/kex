@@ -20,7 +20,6 @@ import {
   setAutostart,
   setEditorAutoSave,
   setEditorAutoSaveDelay,
-  setExplorerGitDecorations,
   setShowHidden,
   setTerminalCursorBlink,
   setTerminalScrollback,
@@ -43,9 +42,6 @@ export function GeneralSection() {
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const editorAutoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
   const showHidden = usePreferencesStore((s) => s.showHidden);
-  const explorerGitDecorations = usePreferencesStore(
-    (s) => s.explorerGitDecorations,
-  );
   const terminalWebglEnabled = usePreferencesStore(
     (s) => s.terminalWebglEnabled,
   );
@@ -144,15 +140,6 @@ export function GeneralSection() {
           <Switch
             checked={showHidden}
             onCheckedChange={(v) => void setShowHidden(v)}
-          />
-        </SettingRow>
-        <SettingRow
-          title="Git decorations"
-          description="Tint changed files and dim gitignored entries in the file explorer."
-        >
-          <Switch
-            checked={explorerGitDecorations}
-            onCheckedChange={(v) => void setExplorerGitDecorations(v)}
           />
         </SettingRow>
       </div>

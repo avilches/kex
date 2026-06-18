@@ -21,6 +21,7 @@ import {
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { explorerGitTextClass } from "./lib/gitStatusColor";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
+import type { GitColorScheme } from "@/modules/settings/store";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 
 export type RowActions = {
@@ -45,6 +46,7 @@ export type EntryRowProps = {
   isRenaming: boolean;
   isExternalDropTarget?: boolean;
   gitStatusCode?: GitStatusCode | null;
+  gitColorScheme?: GitColorScheme;
   gitignored?: boolean;
   onOpenFile: (path: string, pin?: boolean) => void;
   onSelectPath: (path: string) => void;
@@ -66,6 +68,7 @@ function EntryRowImpl(props: EntryRowProps) {
     isRenaming,
     isExternalDropTarget = false,
     gitStatusCode,
+    gitColorScheme = "none",
     gitignored = false,
     onOpenFile,
     onSelectPath,
@@ -210,7 +213,7 @@ function EntryRowImpl(props: EntryRowProps) {
                 "min-w-0 flex-1 truncate",
                 !gitignored &&
                   gitStatusCode &&
-                  explorerGitTextClass(gitStatusCode),
+                  explorerGitTextClass(gitStatusCode, gitColorScheme),
               )}
             >
               {name}

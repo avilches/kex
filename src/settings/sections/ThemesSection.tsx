@@ -18,8 +18,9 @@ import {
   setTerminalLetterSpacing,
   setZoomLevel,
   setPanelSide,
+  setExplorerGitColorScheme,
 } from "@/modules/settings/store";
-import type { ThemePref } from "@/modules/settings/store";
+import type { ThemePref, GitColorScheme } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import { deleteCustomTheme, saveCustomTheme } from "@/modules/theme/customThemes";
 import { listBuiltinThemes } from "@/modules/theme/themes";
@@ -84,6 +85,7 @@ export function ThemesSection() {
 
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const panelSide = usePreferencesStore((s) => s.panelSide);
+  const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
 
   const handleThemeFiles = async (files: FileList | null) => {
     setImportError(null);
@@ -194,6 +196,29 @@ export function ThemesSection() {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Explorer</Label>
+        <div className="flex items-start gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+          <span className="flex-1 pt-1 text-[12.5px] font-medium">Git file colors</span>
+          {gitColorScheme !== "none" && (
+            <GitColorPreview scheme={gitColorScheme} />
+          )}
+          <Select
+            value={gitColorScheme}
+            onValueChange={(v) => void setExplorerGitColorScheme(v as GitColorScheme)}
+          >
+            <SelectTrigger size="sm" className="h-8 w-36 shrink-0 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none" className="text-[12px]">None</SelectItem>
+              <SelectItem value="vscode" className="text-[12px]">VS Code</SelectItem>
+              <SelectItem value="jetbrains" className="text-[12px]">JetBrains</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -417,6 +442,54 @@ function FontFamilyInput({
         className="h-8 w-56 rounded-md border border-border bg-background px-2.5 text-[12px] md:text-[12px] outline-none focus:border-foreground/40 focus-visible:ring-0 focus-visible:border-foreground/40"
       />
     </SettingRow>
+  );
+}
+
+type GitPreviewEntry =
+  | { name: string; label: string; color: { vscode: string; jetbrains: string }; kind?: "normal" }
+  | { name: string; label: string; kind: "ignored" | "clean" };
+
+const GIT_PREVIEW_ENTRIES: GitPreviewEntry[] = [
+  { name: "no_changes.rs", label: "",  kind: "clean" },
+  { name: "modified.ts",   label: "M", color: { vscode: "#E2C08D", jetbrains: "#6897BB" } },
+  { name: "new_file.rs",   label: "A", color: { vscode: "#81B88B", jetbrains: "#629755" } },
+  { name: "untracked.md",  label: "U", color: { vscode: "#73C991", jetbrains: "#C75450" } },
+  { name: "deleted.md",    label: "D", color: { vscode: "#C74E39", jetbrains: "#9E9E9E" } },
+  { name: "renamed.tsx",   label: "R", color: { vscode: "#73C991", jetbrains: "#6897BB" } },
+  { name: "ignored.log",   label: "I", kind: "ignored" },
+];
+
+function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
+  return (
+    <div className="flex flex-col gap-px">
+      {GIT_PREVIEW_ENTRIES.map((entry) => {
+        const isIgnored = entry.kind === "ignored";
+        const isClean = entry.kind === "clean";
+        const color = !isIgnored && !isClean && "color" in entry ? entry.color[scheme] : undefined;
+        return (
+          <div key={entry.name} className="flex items-center gap-2.5">
+            <span
+              className={cn(
+                "text-[11px] font-mono",
+                isIgnored ? "text-muted-foreground/70" : isClean ? "text-foreground/85" : "",
+              )}
+              style={color ? { color } : undefined}
+            >
+              {entry.name}
+            </span>
+            <span
+              className={cn(
+                "ml-auto text-[10px] font-semibold tabular-nums",
+                isIgnored ? "text-muted-foreground/50" : isClean ? "text-foreground/40" : "",
+              )}
+              style={color ? { color } : undefined}
+            >
+              {entry.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
