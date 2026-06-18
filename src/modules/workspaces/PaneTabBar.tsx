@@ -26,89 +26,115 @@ import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 
-function CopyableRow({
-  label,
-  value,
-  copyValue,
-  valueClassName,
-}: {
-  label: string;
-  value: string;
-  copyValue?: string;
-  valueClassName?: string;
-}) {
-  const [copied, setCopied] = useState(false);
-
+function HoverTable({ children }: { children: ReactNode }) {
   return (
-    <div className="group/path flex items-start gap-2 break-all">
-      <span className="w-[52px] shrink-0 text-muted-foreground">{label}</span>
-      <span className={cn("min-w-0 flex-1", valueClassName ?? "text-foreground")}>
-        {value}
-      </span>
-      <button
-        type="button"
-        title={`Copy ${label.toLowerCase()}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          void navigator.clipboard
-            .writeText(copyValue ?? value)
-            .then(() => setCopied(true))
-            .catch(() => {});
-        }}
-        className="mt-px flex size-[16px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/path:opacity-100 hover:text-foreground"
-      >
-        <HugeiconsIcon
-          icon={copied ? Tick02Icon : Copy01Icon}
-          size={11}
-          strokeWidth={1.9}
-        />
-      </button>
-    </div>
-  );
-}
-
-function FilePathLines({
-  absPath,
-  repoRel,
-  children,
-}: {
-  absPath: string;
-  repoRel: string | null;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5 text-[11px]">
-      <CopyableRow label="File" value={pathBasename(absPath)} valueClassName="font-medium text-foreground" />
-      {repoRel && <CopyableRow label="Repo" value={repoRel} />}
-      <CopyableRow label="Full" value={absPath} />
+    <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5 text-[11px]">
       {children}
     </div>
   );
 }
 
-function EditorHoverContent({ absPath }: { absPath: string }) {
-  const [repoRel, setRepoRel] = useState<string | null>(null);
+function HoverRow({
+  label,
+  value,
+  copy,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  copy?: string;
+  valueClassName?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <>
+      <span className="whitespace-nowrap text-muted-foreground">{label}</span>
+      <span className="group/row flex min-w-0 items-start gap-1">
+        <span className={cn("min-w-0 break-words", valueClassName ?? "text-foreground")}>
+          {value}
+        </span>
+        {copy !== undefined && (
+          <button
+            type="button"
+            title={`Copy ${label.toLowerCase()}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              void navigator.clipboard
+                .writeText(copy)
+                .then(() => setCopied(true))
+                .catch(() => {});
+            }}
+            className="mt-px flex size-[16px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/row:opacity-100 hover:text-foreground"
+          >
+            <HugeiconsIcon
+              icon={copied ? Tick02Icon : Copy01Icon}
+              size={11}
+              strokeWidth={1.9}
+            />
+          </button>
+        )}
+      </span>
+    </>
+  );
+}
+
+function FilePathLines({
+  absPath,
+  repoRoot,
+  repoRel,
+  children,
+}: {
+  absPath: string;
+  repoRoot: string | null;
+  repoRel: string | null;
+  children?: ReactNode;
+}) {
+  return (
+    <HoverTable>
+      <HoverRow label="Filename" value={pathBasename(absPath)} copy={pathBasename(absPath)} valueClassName="font-medium text-foreground" />
+      {repoRoot && <HoverRow label="Repo root" value={repoRoot} copy={repoRoot} />}
+      {repoRel && <HoverRow label="Relative to repo" value={repoRel} copy={repoRel} />}
+      <HoverRow label="Absolute path" value={absPath} copy={absPath} />
+      {children}
+    </HoverTable>
+  );
+}
+
+function useGitRepoRoot(dir: string | undefined): string | null {
+  const [root, setRoot] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!dir) {
+      setRoot(null);
+      return;
+    }
     let cancelled = false;
-    setRepoRel(null);
+    setRoot(null);
     native
-      .gitResolveRepo(pathDirname(absPath))
+      .gitResolveRepo(dir)
       .then((info) => {
         if (cancelled || !info) return;
-        const root = info.repoRoot.replace(/\\/g, "/").replace(/\/$/, "");
-        const abs = absPath.replace(/\\/g, "/");
-        if (abs !== root && abs.startsWith(`${root}/`)) {
-          setRepoRel(abs.slice(root.length + 1));
-        }
+        setRoot(info.repoRoot.replace(/\\/g, "/").replace(/\/$/, ""));
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [absPath]);
+  }, [dir]);
 
-  return <FilePathLines absPath={absPath} repoRel={repoRel} />;
+  return root;
+}
+
+function EditorHoverContent({ absPath }: { absPath: string }) {
+  const root = useGitRepoRoot(pathDirname(absPath));
+  const abs = absPath.replace(/\\/g, "/");
+  const repoRel =
+    root && abs !== root && abs.startsWith(`${root}/`)
+      ? abs.slice(root.length + 1)
+      : null;
+
+  return <FilePathLines absPath={absPath} repoRoot={root} repoRel={repoRel} />;
 }
 
 function GitFileHoverContent({
@@ -125,15 +151,15 @@ function GitFileHoverContent({
   const root = repoRoot.replace(/\\/g, "/").replace(/\/$/, "");
   const absPath = `${root}/${path}`;
   return (
-    <FilePathLines absPath={absPath} repoRel={path}>
+    <FilePathLines absPath={absPath} repoRoot={root} repoRel={path}>
       {originalPath && originalPath !== path && (
-        <CopyableRow label="Renamed" value={originalPath} />
+        <HoverRow label="Renamed" value={originalPath} copy={originalPath} />
       )}
       {sha && (
-        <CopyableRow
+        <HoverRow
           label="Commit"
           value={sha.slice(0, 8)}
-          copyValue={sha}
+          copy={sha}
           valueClassName="font-mono text-foreground"
         />
       )}
@@ -162,6 +188,7 @@ function AgentHoverCardContent({
   const elapsed = formatElapsed(Date.now() - agentSession.startedAt);
   const sessionId = agentSession.meta?.sessionId;
   const directory = cwd ?? agentSession.meta?.cwdLaunch;
+  const repoRoot = useGitRepoRoot(directory);
 
   return (
     <div className="space-y-1.5 text-[11px]">
@@ -173,20 +200,16 @@ function AgentHoverCardContent({
           <span className="inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null}
       </div>
-      {directory && <CopyableRow label="Path" value={directory} />}
-      {sessionId && (
-        <div className="break-all">
-          <span className="text-muted-foreground">Session </span>
-          <span className="font-mono text-foreground">{sessionId}</span>
-        </div>
-      )}
-      <div>
-        <span className="text-muted-foreground">Started </span>
-        <span className="text-foreground">{elapsed}</span>
-        <span className="text-muted-foreground"> ago</span>
-      </div>
+      <HoverTable>
+        {directory && <HoverRow label="Path" value={directory} copy={directory} />}
+        {repoRoot && <HoverRow label="Repo root" value={repoRoot} copy={repoRoot} />}
+        {sessionId && (
+          <HoverRow label="Session" value={sessionId} copy={sessionId} valueClassName="font-mono text-foreground" />
+        )}
+        <HoverRow label="Started" value={`${elapsed} ago`} />
+      </HoverTable>
       {agentSession.restoreError && (
-        <div className="break-all text-destructive">
+        <div className="break-words text-destructive">
           {agentSession.restoreErrorReason ?? "unknown error"}
         </div>
       )}
@@ -203,18 +226,19 @@ function TerminalHoverCardContent({
   cwd: string | undefined;
   runningCommand: string | null;
 }) {
+  const repoRoot = useGitRepoRoot(cwd);
   return (
     <div className="space-y-1.5 text-[11px]">
       {customTitle && (
         <div className="font-medium text-foreground">{customTitle}</div>
       )}
-      {cwd && <CopyableRow label="Path" value={cwd} />}
-      {runningCommand && (
-        <div>
-          <span className="text-muted-foreground">Running </span>
-          <span className="font-mono text-foreground">{runningCommand}</span>
-        </div>
-      )}
+      <HoverTable>
+        {cwd && <HoverRow label="Path" value={cwd} copy={cwd} />}
+        {repoRoot && <HoverRow label="Repo root" value={repoRoot} copy={repoRoot} />}
+        {runningCommand && (
+          <HoverRow label="Running" value={runningCommand} valueClassName="font-mono text-foreground" />
+        )}
+      </HoverTable>
     </div>
   );
 }
@@ -363,13 +387,13 @@ function DraggableTab({
         return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} sha={panel.sha} />;
       case "git-history":
         return (
-          <div className="space-y-1.5 text-[11px]">
-            <CopyableRow label="Repo" value={panel.repoRoot} />
-          </div>
+          <HoverTable>
+            <HoverRow label="Repo root" value={panel.repoRoot} copy={panel.repoRoot} />
+          </HoverTable>
         );
       case "preview":
         return panel.url
-          ? <div className="space-y-1.5 text-[11px]"><CopyableRow label="URL" value={panel.url} /></div>
+          ? <HoverTable><HoverRow label="URL" value={panel.url} copy={panel.url} /></HoverTable>
           : null;
       default:
         return null;
