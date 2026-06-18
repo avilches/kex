@@ -13,6 +13,7 @@ import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
 import { isMarkdownPath } from "@/lib/utils";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { loadRestorePlans, pruneOrphanedPlans } from "@/modules/agents/lib/agentSessionRestore";
 import {
   CommandPalette,
@@ -1082,6 +1083,13 @@ export default function App() {
       },
       "editor.redo": () => {
         if (activePanelId) editorHandles.current.get(activePanelId)?.redo();
+      },
+      "notifications.jumpToLast": () => {
+        const first = useAgentStore.getState().notifications[0];
+        if (!first) return;
+        setActiveWorkspaceId(first.tabId);
+        activatePanel(first.tabId, first.panelId);
+        setTimeout(() => terminalHandles.current.get(first.panelId)?.focus(), 50);
       },
       "path.copy": () => {
         if (!activePanel) return;

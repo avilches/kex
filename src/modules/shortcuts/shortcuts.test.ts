@@ -99,6 +99,26 @@ test("path.copy shortcut is defined with Cmd/Ctrl+Shift+C binding", () => {
   expect(b.meta || b.ctrl).toBe(true);
 });
 
+describe("notification shortcuts", () => {
+  test("notifications.toggle default binding is Cmd/Ctrl+Shift+I", () => {
+    const s = SHORTCUTS.find((x) => x.id === "notifications.toggle");
+    expect(s).toBeDefined();
+    const b = s!.defaultBindings[0];
+    expect(b.shift).toBe(true);
+    expect(b.key).toBe("i");
+    expect(b.meta || b.ctrl).toBe(true);
+  });
+
+  test("notifications.jumpToLast default binding is Cmd/Ctrl+I (no shift)", () => {
+    const s = SHORTCUTS.find((x) => x.id === "notifications.jumpToLast");
+    expect(s).toBeDefined();
+    const b = s!.defaultBindings[0];
+    expect(b.shift).toBeFalsy();
+    expect(b.key).toBe("i");
+    expect(b.meta || b.ctrl).toBe(true);
+  });
+});
+
 describe("tab.selectByIndex binding uniqueness", () => {
   test("only tab.selectByIndex binds to Cmd/Ctrl+1 through Cmd/Ctrl+9", () => {
     const tabSelectByIndex = SHORTCUTS.find(

@@ -41,7 +41,8 @@ export type ShortcutId =
   | "settings.open"
   | "editor.undo"
   | "editor.redo"
-  | "path.copy";
+  | "path.copy"
+  | "notifications.jumpToLast";
 
 export type ShortcutGroup =
   | "General"
@@ -242,6 +243,12 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "notifications.toggle",
     label: "Notifications",
+    group: "View",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "i" }],
+  },
+  {
+    id: "notifications.jumpToLast",
+    label: "Jump to latest notification",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, key: "i" }],
   },
