@@ -20,7 +20,8 @@ import {
   setPanelSide,
   setExplorerGitColorScheme,
 } from "@/modules/settings/store";
-import type { ThemePref, GitColorScheme } from "@/modules/settings/store";
+import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
+import type { ThemePref } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import { deleteCustomTheme, saveCustomTheme } from "@/modules/theme/customThemes";
 import { listBuiltinThemes } from "@/modules/theme/themes";
@@ -28,6 +29,7 @@ import { validateTheme } from "@/modules/theme/validateTheme";
 import { deleteThemeFile, emitThemeEdit } from "@/modules/theme/themeFiles";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import {
+  Cancel01Icon,
   ComputerIcon,
   Edit02Icon,
   Moon02Icon,
@@ -201,24 +203,43 @@ export function ThemesSection() {
 
       <div className="flex flex-col gap-2">
         <Label>Explorer</Label>
-        <div className="flex items-start gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <span className="flex-1 pt-1 text-[12.5px] font-medium">Git file colors</span>
-          {gitColorScheme !== "none" && (
-            <GitColorPreview scheme={gitColorScheme} />
-          )}
-          <Select
-            value={gitColorScheme}
-            onValueChange={(v) => void setExplorerGitColorScheme(v as GitColorScheme)}
-          >
-            <SelectTrigger size="sm" className="h-8 w-36 shrink-0 text-[12px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none" className="text-[12px]">None</SelectItem>
-              <SelectItem value="vscode" className="text-[12px]">VS Code</SelectItem>
-              <SelectItem value="jetbrains" className="text-[12px]">JetBrains</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[12.5px] font-medium">Git file colors</span>
+            <button
+              type="button"
+              onClick={() => void setExplorerGitColorScheme("none")}
+              className={cn(
+                "flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11.5px] transition-all",
+                gitColorScheme === "none"
+                  ? "border-foreground/60 bg-card ring-1 ring-foreground/20"
+                  : "border-border/60 bg-transparent hover:border-border",
+              )}
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={1.75} />
+              <span>Disable git colors in explorer</span>
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {(["vscode", "jetbrains"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => void setExplorerGitColorScheme(s)}
+                className={cn(
+                  "flex flex-col gap-2 rounded-lg border p-2.5 text-left transition-all",
+                  gitColorScheme === s
+                    ? "border-foreground/60 ring-1 ring-foreground/20"
+                    : "border-border/60 hover:border-border",
+                )}
+              >
+                <span className="text-[12px] font-medium">
+                  {s === "vscode" ? "VS Code" : "JetBrains"}
+                </span>
+                <GitColorPreview scheme={s} />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -451,7 +472,7 @@ type GitPreviewEntry =
 
 const GIT_PREVIEW_ENTRIES: GitPreviewEntry[] = [
   { name: "no_changes.rs", label: "",  kind: "clean" },
-  { name: "modified.ts",   label: "M", color: { vscode: "#E2C08D", jetbrains: "#6897BB" } },
+  { name: "file_modified.ts", label: "M", color: { vscode: "#E2C08D", jetbrains: "#6897BB" } },
   { name: "new_file.rs",   label: "A", color: { vscode: "#81B88B", jetbrains: "#629755" } },
   { name: "untracked.md",  label: "U", color: { vscode: "#73C991", jetbrains: "#C75450" } },
   { name: "deleted.md",    label: "D", color: { vscode: "#C74E39", jetbrains: "#9E9E9E" } },
@@ -466,11 +487,21 @@ function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
         const isIgnored = entry.kind === "ignored";
         const isClean = entry.kind === "clean";
         const color = !isIgnored && !isClean && "color" in entry ? entry.color[scheme] : undefined;
+        const iconUrl = fileIconUrl(entry.name);
         return (
-          <div key={entry.name} className="flex items-center gap-2.5">
+          <div key={entry.name} className="flex items-center gap-1.5">
+            {iconUrl ? (
+              <img
+                src={iconUrl}
+                alt=""
+                className={cn("size-4 shrink-0", (isIgnored || isClean) && "opacity-50")}
+              />
+            ) : (
+              <span className="size-4 shrink-0" />
+            )}
             <span
               className={cn(
-                "text-[11px] font-mono",
+                "text-[12px]",
                 isIgnored ? "text-muted-foreground/70" : isClean ? "text-foreground/85" : "",
               )}
               style={color ? { color } : undefined}
@@ -479,7 +510,7 @@ function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
             </span>
             <span
               className={cn(
-                "ml-auto text-[10px] font-semibold tabular-nums",
+                "ml-auto pl-2 text-[10px] font-semibold tabular-nums",
                 isIgnored ? "text-muted-foreground/50" : isClean ? "text-foreground/40" : "",
               )}
               style={color ? { color } : undefined}
