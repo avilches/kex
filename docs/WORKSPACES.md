@@ -27,12 +27,22 @@ A `Panel` is a tagged union on `kind`: `terminal` | `editor` | `preview` | `mark
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
 its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`).
 
+`editor` and `markdown` panels also carry an optional `explorerRoot`: the folder the explorer and
+git context jump to while that tab is active. It is captured when the file is opened
+(`resolveOpenRoot` in `lib/explorerRoot.ts`: the current explorer root if the file is inside it,
+otherwise the file's parent dir) and consumed by `resolveActiveExplorerRoot`, which the App's
+`explorerRoot` memo uses to override the terminal-derived ambient root. Optional for backward
+compatibility: a panel without it falls back to the file's parent dir (or the ambient root for
+non-file panels).
+
 State is persisted per-window to `workspaces.json` via the `window_save_workspace_state` IPC
 command, debounced 800ms on every mutation. Each window reads its own saved state on mount via
-`window_get_state`. Window size is restored via `restore_window_geometry` IPC called from
-`main.tsx` before `show()`. Window position is not restored (see
-[WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md)). The workspace sidebar (52px, left edge) lists
-workspaces; clicking switches `activeWorkspaceId`.
+`window_get_state`. The Rust side stores `workspaces` as an untyped `serde_json::Value`
+(`window_state.rs`), so any panel field added on the frontend (such as `explorerRoot`) round-trips
+through save and restore without a Rust-side schema change or migration. Window size is restored
+via `restore_window_geometry` IPC called from `main.tsx` before `show()`. Window position is not
+restored (see [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md)). The workspace sidebar (52px, left
+edge) lists workspaces; clicking switches `activeWorkspaceId`.
 
 ---
 
