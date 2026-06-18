@@ -151,6 +151,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
       fastSearch
         .then((res) => {
           if (!alive || res.hits.length === 0) return;
+          selectedPathRef.current = res.hits[0]?.path ?? null;
           setResults(res.hits);
           setSelectedIndex(0);
           setTruncated(res.truncated);
