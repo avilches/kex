@@ -77,6 +77,7 @@ import {
   saveWorkspaceState,
 } from "@/modules/workspaces/lib/workspaceState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
+import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
 
 function basename(path: string): string {
@@ -590,6 +591,55 @@ export default function App() {
 
   // ── PanelCallbacks ────────────────────────────────────────────────────────
 
+  const handlePathRenamed = useCallback(
+    (from: string, to: string) => {
+      for (const ws of workspacesRef.current) {
+        for (const pane of allPanes(ws.paneTree)) {
+          for (const panel of pane.panels) {
+            if (panel.kind !== "editor") continue;
+            const ep = panel as { path: string };
+            if (ep.path === from) {
+              const i = to.lastIndexOf("/");
+              updatePanelData(ws.id, panel.id, (p) =>
+                p.kind === "editor" ? { ...p, path: to, title: i === -1 ? to : to.slice(i + 1) } : p,
+              );
+            } else if (ep.path.startsWith(`${from}/`)) {
+              const newPath = `${to}${ep.path.slice(from.length)}`;
+              const i = newPath.lastIndexOf("/");
+              updatePanelData(ws.id, panel.id, (p) =>
+                p.kind === "editor" ? { ...p, path: newPath, title: i === -1 ? newPath : newPath.slice(i + 1) } : p,
+              );
+            }
+          }
+        }
+      }
+    },
+    [updatePanelData],
+  );
+
+  const handleRenameFileFromTab = useCallback(
+    async (panelId: string, newName: string) => {
+      const found = findPanelGlobal(panelId);
+      if (!found) return;
+      const panel = found.panel;
+      if (panel.kind !== "editor" && panel.kind !== "markdown") return;
+      const oldPath = panel.path;
+      const lastSlash = oldPath.lastIndexOf("/");
+      const parent = lastSlash >= 0 ? oldPath.slice(0, lastSlash) : oldPath;
+      const newPath = `${parent}/${newName}`;
+      try {
+        await native.renameFile(oldPath, newPath);
+        handlePathRenamed(oldPath, newPath);
+        rightPanelRef.current?.refreshExplorer(parent);
+      } catch (e) {
+        toast.error("Failed to rename file", {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      }
+    },
+    [findPanelGlobal, handlePathRenamed],
+  );
+
   const panelCallbacks = useMemo<PanelCallbacks>(
     () => ({
       onSearchReady: (panelId, addon) => {
@@ -677,6 +727,9 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) updatePanelData(found.workspace.id, panelId, (p) => ({ ...p, title }));
       },
+      onRenameFile: (panelId, newName) => {
+        void handleRenameFileFromTab(panelId, newName);
+      },
     }),
     [
       activePanelId,
@@ -689,6 +742,7 @@ export default function App() {
       updatePanelData,
       activeWorkspace,
       openPanel,
+      handleRenameFileFromTab,
     ],
   );
 
@@ -719,32 +773,6 @@ export default function App() {
   }, [pendingTerminalClosePanel, cancelTerminalClose]);
 
   // ── Path rename ───────────────────────────────────────────────────────────
-
-  const handlePathRenamed = useCallback(
-    (from: string, to: string) => {
-      for (const ws of workspacesRef.current) {
-        for (const pane of allPanes(ws.paneTree)) {
-          for (const panel of pane.panels) {
-            if (panel.kind !== "editor") continue;
-            const ep = panel as { path: string };
-            if (ep.path === from) {
-              const i = to.lastIndexOf("/");
-              updatePanelData(ws.id, panel.id, (p) =>
-                p.kind === "editor" ? { ...p, path: to, title: i === -1 ? to : to.slice(i + 1) } : p,
-              );
-            } else if (ep.path.startsWith(`${from}/`)) {
-              const newPath = `${to}${ep.path.slice(from.length)}`;
-              const i = newPath.lastIndexOf("/");
-              updatePanelData(ws.id, panel.id, (p) =>
-                p.kind === "editor" ? { ...p, path: newPath, title: i === -1 ? newPath : newPath.slice(i + 1) } : p,
-              );
-            }
-          }
-        }
-      }
-    },
-    [updatePanelData],
-  );
 
   // ── useEditorFileSync (editor panel shim) ─────────────────────────────────
 
@@ -1005,7 +1033,13 @@ export default function App() {
         const active = document.activeElement;
         const tag = active?.tagName;
         if ((tag === "INPUT" || tag === "TEXTAREA") && !active?.classList.contains("xterm-helper-textarea")) return;
-        if (activePanelId) useTabRenameStore.getState().startRename(activePanelId);
+        if (!activePanelId) return;
+        const panel = findPanelGlobal(activePanelId)?.panel;
+        if (panel?.kind === "editor" || panel?.kind === "markdown") {
+          useFileRenameStore.getState().trigger(activePanelId);
+        } else {
+          useTabRenameStore.getState().startRename(activePanelId);
+        }
       },
       "tab.next": () => {
         if (!activeWorkspace || !activePane) return;
@@ -1110,6 +1144,9 @@ export default function App() {
           activePanel?.kind === "terminal" &&
           (activePanel as { blocks?: boolean }).blocks === true
         );
+      }
+      if (id === "tab.rename") {
+        return rightPanelRef.current?.isExplorerFocused() ?? false;
       }
 
       return false;

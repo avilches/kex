@@ -47,6 +47,7 @@ export type FileExplorerHandle = {
   isFocused: () => boolean;
   focusSearch: () => void;
   toggleSearch: () => void;
+  refresh: (path: string) => void;
 };
 
 type Props = {
@@ -376,6 +377,7 @@ export const FileExplorer = memo(
             searchRef.current?.focus();
           }
         },
+        refresh: (path: string) => tree.refresh(path),
       }),
       [entryPaths, scrollEntryIntoView, selectedPath],
     );
@@ -468,6 +470,13 @@ export const FileExplorer = memo(
           if (row.kind !== "entry") break;
           if (row.isDir) tree.toggle(row.path);
           else onOpenFile(row.path);
+          break;
+        }
+        case "F2": {
+          if (currentIdx < 0) return;
+          e.preventDefault();
+          const path = entryPaths[currentIdx];
+          rowActions.beginRename(path);
           break;
         }
       }
