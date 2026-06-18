@@ -410,6 +410,7 @@ function DraggableTab({
       : agentTitle;
 
   const isRenaming = useTabRenameStore((s) => s.renamingPanelId === panel.id);
+  const anyRenaming = useTabRenameStore((s) => s.renamingPanelId !== null);
   const clearRename = useTabRenameStore((s) => s.clearRename);
   const startRename = useTabRenameStore((s) => s.startRename);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -423,6 +424,13 @@ function DraggableTab({
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
   }, [isRenaming]);
+
+  useEffect(() => {
+    if (!anyRenaming) return;
+    setHoverOpen(false);
+    onHoverChange?.(panel.id, false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anyRenaming]);
 
   function handleSave() {
     if (handledRef.current) return;
@@ -484,6 +492,7 @@ function DraggableTab({
       onClick={() => onActivate(panel.id)}
       onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
       onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
+      onContextMenu={(e) => { if (anyRenaming) e.preventDefault(); }}
       {...listeners}
       className={cn(
         "group relative flex max-w-[320px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
@@ -533,23 +542,6 @@ function DraggableTab({
           !isDescription && panel.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
         )}
-        title={
-          isRestoreError
-            ? `Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`
-            : hasAgent
-              ? undefined
-              : panel.kind === "terminal"
-                ? runningCommand
-                  ? `${agentTitle} · ${panel.cwd?.replace(/\/$/, "") ?? ""}`
-                  : (panel.cwd?.replace(/\/$/, "") ?? "shell")
-                : panel.kind === "editor" || panel.kind === "markdown" || panel.kind === "git-diff" || panel.kind === "git-commit-file"
-                  ? panel.path
-                  : panel.kind === "preview"
-                    ? (panel.url || undefined)
-                    : panel.kind === "git-history"
-                      ? panel.repoRoot
-                      : agentTitle
-        }
       >
         {displayTitle}
       </span>
@@ -586,6 +578,7 @@ function DraggableTab({
       openDelay={700}
       closeDelay={100}
       onOpenChange={(o) => {
+        if (o && anyRenaming) return;
         if (!o && pointerInsideRef.current) return;
         setHoverOpen(o);
         onHoverChange?.(panel.id, o);
@@ -713,7 +706,7 @@ function DraggableTab({
       <HoverCardContent
         side="bottom"
         align="start"
-        className="w-fit min-w-44 max-w-96 rounded-xl p-2.5"
+        className="z-40 w-fit min-w-44 max-w-96 rounded-xl p-2.5"
         onPointerEnter={() => { pointerInsideRef.current = true; }}
         onPointerLeave={() => { pointerInsideRef.current = false; }}
       >
