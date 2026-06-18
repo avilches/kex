@@ -440,6 +440,7 @@ function DraggableTab({
 
   function handleRenameFromHover() {
     setHoverOpen(false);
+    onHoverChange?.(panel.id, false);
     startRename(panel.id);
   }
 
@@ -598,6 +599,7 @@ function DraggableTab({
       <ContextMenu onOpenChange={(o) => {
           if (o) {
             setHoverOpen(false);
+            onHoverChange?.(panel.id, false);
             onSnapIntoView?.(panel.id);
           }
         }}>
