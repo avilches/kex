@@ -3,14 +3,6 @@ import { native } from "@/lib/native";
 import type { SidebarViewId } from "@/modules/sidebar";
 import { useSourceControl } from "./useSourceControl";
 
-function dirname(path: string | null): string | null {
-  if (!path) return null;
-  const normalized = path.replace(/\\/g, "/");
-  const idx = normalized.lastIndexOf("/");
-  if (idx <= 0) return normalized;
-  return normalized.slice(0, idx);
-}
-
 type PanelItem = {
   kind: string;
   path?: string;
@@ -57,7 +49,7 @@ export function useSourceControlContext({
     if (activeTab?.kind === "terminal") {
       return activeTerminalLeafCwd ?? explorerRoot ?? workspaceFallbackPath;
     }
-    if (activeTab?.kind === "editor") return dirname(activeTab.path ?? null);
+    if (activeTab?.kind === "editor") return explorerRoot;
     if (activeTab?.kind === "git-diff") return activeTab.repoRoot;
     if (activeTab?.kind === "git-commit-file") return activeTab.repoRoot;
     if (activeTab?.kind === "git-history") return activeTab.repoRoot;
