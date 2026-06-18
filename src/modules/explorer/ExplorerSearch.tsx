@@ -48,7 +48,6 @@ type SearchPhase = "idle" | "phase1" | "phase2" | "done";
 
 const MIN_QUERY_LEN = 2;
 const DEBOUNCE_MS = 300;
-// Depth for the fast first pass: covers root + two subdirectory levels (e.g. src/modules/).
 const PHASE_1_DEPTH = 3;
 
 type Props = {
@@ -128,42 +127,41 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
     const handle = setTimeout(async () => {
       const workspace = currentWorkspaceEnv();
 
-      // Both calls start in parallel after the debounce.
-      const fastSearch = invoke<SearchResult>("fs_search", {
-        root: rootPath,
-        query: q,
-        limit: 200,
-        maxDepth: PHASE_1_DEPTH,
-        showHidden,
-        workspace,
-      });
-
-      const deepSearch = invoke<SearchResult>("fs_search", {
-        root: rootPath,
-        query: q,
-        limit: 200,
-        showHidden,
-        workspace,
-      });
-
-      // Phase 1: show shallow hits immediately; switch label to "Searching deeper…".
-      // If the shallow scan found nothing, stay in phase1 and let phase2 show results.
-      fastSearch
-        .then((res) => {
-          if (!alive || res.hits.length === 0) return;
+      // Phase 1: shallow scan (sequential so the generation counter doesn't
+      // cause each call to supersede the other).
+      try {
+        const res = await invoke<SearchResult>("fs_search", {
+          root: rootPath,
+          query: q,
+          limit: 200,
+          maxDepth: PHASE_1_DEPTH,
+          showHidden,
+          workspace,
+        });
+        if (!alive) return;
+        if (res.hits.length > 0) {
           selectedPathRef.current = res.hits[0]?.path ?? null;
           setResults(res.hits);
           setSelectedIndex(0);
           setTruncated(res.truncated);
           setPhase("phase2");
-        })
-        .catch(() => {
-          // Fast search failed; still waiting for deep.
-        });
+        }
+      } catch {
+        // Fast search failed; continue to deep.
+      }
 
-      // Phase 2: replace with fully-ranked results; preserve keyboard selection by path.
+      if (!alive) return;
+
+      // Phase 2: full-depth scan; replace with fully-ranked results and
+      // preserve keyboard selection by path.
       try {
-        const res = await deepSearch;
+        const res = await invoke<SearchResult>("fs_search", {
+          root: rootPath,
+          query: q,
+          limit: 200,
+          showHidden,
+          workspace,
+        });
         if (!alive) return;
         const prevPath = selectedPathRef.current;
         const newIdx = prevPath
@@ -217,18 +215,21 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
   };
 
   const searching = phase === "phase1" || phase === "phase2";
-  const searchLabel = phase === "phase2" ? "Searching deeper…" : "Searching…";
 
   return (
     <div className="flex flex-col">
       {open ? (
         <div className="relative shrink-0 px-2 py-1.5 animate-in fade-in-0 slide-in-from-top-3 duration-200 ease-out">
-          <HugeiconsIcon
-            icon={Search01Icon}
-            size={13}
-            strokeWidth={2}
-            className="absolute top-1/2 left-4 -translate-y-1/2 text-muted-foreground"
-          />
+          {searching ? (
+            <div className="absolute top-1/2 left-4 -translate-y-1/2 size-[13px] rounded-full border border-transparent border-t-foreground/70 animate-spin" />
+          ) : (
+            <HugeiconsIcon
+              icon={Search01Icon}
+              size={13}
+              strokeWidth={2}
+              className="absolute top-1/2 left-4 -translate-y-1/2 text-muted-foreground"
+            />
+          )}
           <Input
             ref={inputRef}
             value={query}
@@ -280,7 +281,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
               <div className="py-1" ref={scrollRef}>
                 {results.length === 0 ? (
                   <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                    {phase === "done" ? "No matches" : searchLabel}
+                    {phase === "done" ? "No matches" : null}
                   </div>
                 ) : (
                   results.map((hit, index) => {
@@ -299,36 +300,36 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                           }
                         }}
                         className={cn(
-                          "flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs transition-colors",
+                          "flex w-full items-start gap-1.5 px-2 py-1 text-left transition-colors",
                           isSelected
                             ? "bg-accent text-foreground"
                             : "hover:bg-accent/50 text-foreground/80",
                         )}
                         title={hit.path}
                       >
-                        {url ? (
-                          <img src={url} alt="" className="size-3.5 shrink-0" />
-                        ) : (
-                          <HugeiconsIcon
-                            icon={Folder01Icon}
-                            size={13}
-                            strokeWidth={1.75}
-                            className="shrink-0 text-muted-foreground"
-                          />
-                        )}
-                        <span className="truncate">{hit.name}</span>
-                        <span className="ml-auto truncate text-[10px] text-muted-foreground">
-                          {hit.rel}
-                        </span>
+                        <div className="mt-0.5 shrink-0">
+                          {url ? (
+                            <img src={url} alt="" className="size-3.5" />
+                          ) : (
+                            <HugeiconsIcon
+                              icon={Folder01Icon}
+                              size={13}
+                              strokeWidth={1.75}
+                              className="text-muted-foreground"
+                            />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex flex-col">
+                          <span className="truncate text-xs leading-snug">{hit.name}</span>
+                          <span className="break-all text-[10px] leading-snug text-muted-foreground">
+                            {hit.path}
+                          </span>
+                        </div>
                       </button>
                     );
                   })
                 )}
-                {searching && results.length > 0 ? (
-                  <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
-                    {searchLabel}
-                  </div>
-                ) : !searching && truncated && results.length > 0 ? (
+                {!searching && truncated && results.length > 0 ? (
                   <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
                     Showing partial results - refine your query.
                   </div>

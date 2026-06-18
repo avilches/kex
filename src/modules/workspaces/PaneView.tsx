@@ -241,6 +241,7 @@ export const PaneView = memo(function PaneView({
         onDetachAgent={handleDetachAgent}
         onRenamePanel={callbacks.onRenamePanel}
         onUpdatePanel={callbacks.onUpdatePanel}
+        onRenameFile={callbacks.onRenameFile}
       />
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (

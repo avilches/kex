@@ -3,6 +3,7 @@ import {
   type GitRepoInfo,
   type GitStatusSnapshot,
 } from "@/lib/native";
+import { listenFsChanged } from "@/modules/explorer/lib/watch";
 import { useWorkspaceEnvStore, workspaceScopeKey } from "@/modules/workspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -471,6 +472,34 @@ export function useSourceControl(
     return () => {
       window.removeEventListener("focus", onFocus);
       if (timer) window.clearTimeout(timer);
+    };
+  }, [refresh, enabled]);
+
+  // Working-tree edits (editor saves, file create/delete, terminal git ops in
+  // watched dirs) only reach the explorer tree. The status snapshot that drives
+  // both the panel and the explorer colors is otherwise refreshed only on
+  // context change / focus, so subscribe to the same debounced watcher signal
+  // and re-pull on a trailing edge.
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    let unlisten: (() => void) | undefined;
+    let timer = 0;
+    void listenFsChanged(() => {
+      if (!enabledRef.current || !stateRef.current.hasRepo) return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = 0;
+        void refresh({ remote: "never" });
+      }, 250);
+    }).then((un) => {
+      if (alive) unlisten = un;
+      else un();
+    });
+    return () => {
+      alive = false;
+      if (timer) window.clearTimeout(timer);
+      unlisten?.();
     };
   }, [refresh, enabled]);
 

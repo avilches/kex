@@ -173,8 +173,20 @@ pub fn search_blocking(
 /// Fuzzy-rank candidates against the query (path-aware, smart-case), keeping
 /// the top `cap`. Ties break toward shorter relative paths.
 fn rank_fuzzy(cands: Vec<SearchHit>, query: &str, cap: usize) -> Vec<SearchHit> {
+    // Strip glob wildcards so "*.pdf" degrades gracefully to ".pdf" fuzzy matching.
+    let stripped: String = query.chars().filter(|&c| c != '*' && c != '?').collect();
+    let effective = if stripped.is_empty() {
+        // Pure wildcard query — return all candidates up to cap sorted by path length.
+        let mut out = cands;
+        out.sort_by_key(|h| h.rel.len());
+        out.truncate(cap);
+        return out;
+    } else {
+        stripped.as_str()
+    };
+
     let mut matcher = Matcher::new(Config::DEFAULT.match_paths());
-    let pattern = Pattern::parse(query, CaseMatching::Smart, Normalization::Smart);
+    let pattern = Pattern::parse(effective, CaseMatching::Smart, Normalization::Smart);
     let mut buf = Vec::new();
 
     let mut scored = Vec::with_capacity(cands.len());

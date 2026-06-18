@@ -16,6 +16,15 @@ Ver `docs/FORK.md` para la lista completa de diferencias respecto al upstream y 
 - Cuando el usuario pregunta "que queda por hacer": mostrar primero `docs/PENDING.md`, luego `docs/TODO.md`.
 - Al revisar lo pendiente, buscar tambien ficheros de handoff sueltos (p. ej. `HANDOFF-*.md` en la raiz o en `docs/`) por si el usuario quiere continuar con alguno. Listarlos, decir de que trata cada uno, y ofrecer al usuario limpiarlos, unificarlos o mover su contenido vivo a `docs/PENDING.md` o `docs/TODO.md`. No borrar ni mover un handoff sin confirmacion del usuario.
 
+### Shortcuts siempre configurables
+
+Nunca hardcodear un atajo de teclado (comparar `e.key === "F2"`, `e.metaKey && e.key === "r"`, etc.) en ningun handler. Todos los shortcuts viven en el registry unico `src/modules/shortcuts/shortcuts.ts` (`SHORTCUTS`), que el usuario puede reasignar desde Settings. Para reaccionar a un atajo:
+
+- Atajos globales: registrar el handler por `id` en el mapa que se pasa a `useGlobalShortcuts`. Si un atajo debe ceder a un widget enfocado (p. ej. el explorer maneja su propio rename), deshabilitarlo de forma contextual via la opcion `isDisabled`.
+- Handlers locales de un widget (keydown propio): usar `matchesShortcut(e.nativeEvent, "<id>", userShortcuts)` con `userShortcuts = usePreferencesStore((s) => s.shortcuts)`, nunca comparar teclas a mano. Las teclas de navegacion intrinsecas de un widget (flechas en una lista, Enter para abrir) no son shortcuts de la app y pueden quedarse en el handler local.
+
+Al anadir una accion con atajo: nueva entrada en `SHORTCUTS` (con `id`, `label`, `group`, `defaultBindings`), su `ShortcutId` en el union type, y conectar el handler. Asi aparece automaticamente en la seccion de Settings y queda reasignable.
+
 ### Estado mutable externo en React
 
 Nunca usar `setInterval + setTick` para releer estado mutable externo (arrays a nivel de modulo, pools, caches). El state setter queda stale tras el primer render cycle y no causa re-renders. Usar `useSyncExternalStore(subscribe, getSnapshot)`. `getSnapshot` debe devolver la MISMA referencia si nada cambio (cache obligatorio), de lo contrario React lanza "infinite loop" error. Patron correcto: snapshot cacheado en el modulo, funcion `notify*()` que lo recalcula y notifica, llamar `notify*()` en todos los puntos donde el estado cambia.

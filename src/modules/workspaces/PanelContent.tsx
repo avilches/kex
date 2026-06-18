@@ -58,6 +58,8 @@ export type PanelCallbacks = {
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
   // Panel data update (used by tab bar lock/restore toggles)
   onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
+  // File rename (editor/markdown tabs — renames the file on disk)
+  onRenameFile?: (panelId: string, newName: string) => void;
 };
 
 type Props = {

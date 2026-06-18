@@ -13,6 +13,7 @@ export type ShortcutId =
   | "tab.newEditor"
   | "tab.close"
   | "tab.rename"
+  | "file.rename"
   | "tab.next"
   | "tab.prev"
   | "tab.selectByIndex"
@@ -93,6 +94,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Copy path",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "c" }],
+  },
+  {
+    id: "file.rename",
+    label: "Rename file",
+    group: "General",
+    defaultBindings: [{ key: "F2" }],
   },
   {
     id: "tab.new",
@@ -377,6 +384,23 @@ export function matchBinding(
     !!e.altKey === !!binding.alt &&
     !!e.metaKey === !!binding.meta
   );
+}
+
+/**
+ * Resolves the effective bindings for a shortcut id (user overrides win over
+ * defaults) and checks whether the event matches any of them. Use this instead
+ * of comparing raw key strings so component-local handlers respect the
+ * user-configured keymap.
+ */
+export function matchesShortcut(
+  e: KeyboardEvent,
+  id: ShortcutId,
+  userShortcuts?: Record<ShortcutId, KeyBinding[]>,
+): boolean {
+  const sc = SHORTCUTS.find((s) => s.id === id);
+  if (!sc) return false;
+  const bindings = userShortcuts?.[id] || sc.defaultBindings;
+  return bindings.some((b) => matchBinding(e, b, id));
 }
 
 /**
