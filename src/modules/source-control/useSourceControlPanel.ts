@@ -353,6 +353,7 @@ export function useSourceControlPanel(
     if (!isOpen) {
       setPanelState("closed");
       setSelectionTransition("none");
+      setActionMessage(null);
       return;
     }
     if (summary.isLoading && !summary.hasRepo && !summary.status) {

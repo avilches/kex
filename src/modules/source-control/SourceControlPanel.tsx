@@ -120,6 +120,17 @@ function upstreamBadgeLabel(upstream: string | null | undefined): string {
   return upstream;
 }
 
+function statusTextClass(code: string): string {
+  switch (code) {
+    case "A": return "text-emerald-500/85";
+    case "U": return "text-teal-500/85";
+    case "M": return "text-amber-500/85";
+    case "D": return "text-rose-500/85";
+    case "R": return "text-sky-500/85";
+    default: return "text-muted-foreground/60";
+  }
+}
+
 function statusAccentClass(code: string): string {
   switch (code) {
     case "A":
@@ -904,11 +915,8 @@ function StagedSectionHeader({
       <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
         Staged Changes
       </span>
-      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-border/60 px-1 text-[9.5px] font-semibold tabular-nums text-muted-foreground">
-        {row.count}
-      </span>
       <div
-        className="ml-auto flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100"
+        className="ml-auto flex shrink-0 items-center opacity-70 transition-opacity group-hover:opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
         <IconActionButton
@@ -920,6 +928,11 @@ function StagedSectionHeader({
           <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
         </IconActionButton>
       </div>
+      <span className="flex w-5 shrink-0 items-center justify-center">
+        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-border/60 px-1 text-[9.5px] font-semibold tabular-nums text-muted-foreground">
+          {row.count}
+        </span>
+      </span>
     </div>
   );
 }
@@ -950,11 +963,8 @@ function ChangesSectionHeader({
       <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
         Changes
       </span>
-      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-border/60 px-1 text-[9.5px] font-semibold tabular-nums text-muted-foreground">
-        {row.count}
-      </span>
       <div
-        className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+        className="ml-auto flex shrink-0 items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
         <IconActionButton
@@ -974,6 +984,11 @@ function ChangesSectionHeader({
           <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
         </IconActionButton>
       </div>
+      <span className="flex w-5 shrink-0 items-center justify-center">
+        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-border/60 px-1 text-[9.5px] font-semibold tabular-nums text-muted-foreground">
+          {row.count}
+        </span>
+      </span>
     </div>
   );
 }
@@ -1081,6 +1096,12 @@ const StagedEntryRow = memo(function StagedEntryRow({
               )}
             </IconActionButton>
           </div>
+          <span
+            className={cn("w-5 shrink-0 text-center text-[11px] font-bold font-mono leading-none", !statusHex && statusTextClass(entry.statusCode))}
+            style={statusHex ? { color: statusHex } : undefined}
+          >
+            {entry.statusCode}
+          </span>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
@@ -1251,6 +1272,12 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
               )}
             </IconActionButton>
           </div>
+          <span
+            className={cn("w-5 shrink-0 text-center text-[11px] font-bold font-mono leading-none", !statusHex && statusTextClass(entry.statusCode))}
+            style={statusHex ? { color: statusHex } : undefined}
+          >
+            {entry.statusCode}
+          </span>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
