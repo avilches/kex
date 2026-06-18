@@ -289,20 +289,14 @@ configureRendererPool({
     if (!s) return null;
     return {
       writeToPty: (data) => {
-        // "waiting" (attention dot): any input acknowledges — user has seen the notification.
         // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) clear it —
         // these are explicit user interrupts. Multi-byte ESC sequences (xterm protocol
         // auto-responses like "\x1b[?1;2c") must NOT clear the spinner.
-        // In all cases the session is kept alive; only the visual indicator is cleared.
+        // The attention dot ("waiting") is cleared by focusing the panel, not by typing.
+        // The session is kept alive; only the visual indicator is cleared.
         const session = useAgentStore.getState().sessions[leafId];
-        if (session) {
-          if (
-            session.status === "waiting" ||
-            data === "\x03" ||
-            data === "\x1b"
-          ) {
-            useAgentStore.getState().setStatus(leafId, "idle");
-          }
+        if (session && (data === "\x03" || data === "\x1b")) {
+          useAgentStore.getState().setStatus(leafId, "idle");
         }
         s.pty?.write(data);
       },

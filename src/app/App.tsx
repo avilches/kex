@@ -12,7 +12,7 @@ import { newPanelId } from "@/lib/ids";
 import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
 import { isMarkdownPath } from "@/lib/utils";
-import { AgentNotificationsBridge } from "@/modules/agents";
+import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
 import { loadRestorePlans, pruneOrphanedPlans } from "@/modules/agents/lib/agentSessionRestore";
 import {
   CommandPalette,
@@ -1001,6 +1001,7 @@ export default function App() {
       "search.focus": () => searchInlineRef.current?.focus(),
       "settings.open": () => void openSettingsWindow(),
       "rightPanel.toggle": () => navigateRightPanelTo("git"),
+      "notifications.toggle": () => useBellStore.getState().toggle(),
       "window.new": () => void native.openMainWindow(),
       "workspace.prev": () => cycleWorkspace(-1),
       "workspace.next": () => cycleWorkspace(1),

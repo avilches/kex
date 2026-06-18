@@ -324,6 +324,12 @@ impl AgentDetector {
                 log::debug!(
                     "[osc777] kex: Notification panel={panel_id} type={notif_type} msg={message:?}"
                 );
+                // "idle_prompt" is the end-of-turn wait, already covered by "Stop"
+                // (and Claude may resend it). Ignore it so it does not re-raise the
+                // attention dot right after the turn finished.
+                if notif_type == "idle_prompt" {
+                    return;
+                }
                 self.status = Status::Waiting;
                 emit(Transition::Notification { message });
             }
@@ -566,6 +572,21 @@ mod tests {
         assert_eq!(
             run(&mut d, &osc(&kex_notification_osc("msg"))),
             vec![started("claude"), notification("msg")]
+        );
+    }
+
+    #[test]
+    fn ignores_idle_prompt_notification() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;claude"));
+        // idle_prompt is the end-of-turn wait (already covered by Stop): emit nothing.
+        let idle =
+            "777;kex;Notification;panel1;sess1;%2Ftmp%2Ftranscript;%2Fhome%2Fuser;idle_prompt;waiting";
+        assert!(run(&mut d, &osc(idle)).is_empty());
+        // A genuine notification (different type) still raises attention.
+        assert_eq!(
+            run(&mut d, &osc(&kex_notification_osc("hello"))),
+            vec![notification("hello")]
         );
     }
 

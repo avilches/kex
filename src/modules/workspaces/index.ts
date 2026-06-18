@@ -13,6 +13,7 @@ export {
   findPane,
   findPaneInDirection,
   findPanelPane,
+  focusedPanelId,
   firstPaneId,
   siblingPane,
   splitPaneInTree,

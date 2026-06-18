@@ -40,6 +40,7 @@ struct Payload {
     prompt: Option<String>,
     // Notification
     notif_message: Option<String>,
+    notif_type: Option<String>,
     // Stop
     stop_reason: Option<String>,
     last_message: Option<String>,
@@ -67,6 +68,7 @@ fn parse_payload(json: &str) -> Option<Payload> {
         reason:          v["reason"].as_str().map(str::to_string),
         prompt:          v["prompt"].as_str().map(str::to_string),
         notif_message:   v["message"].as_str().map(str::to_string),
+        notif_type:      v["notification_type"].as_str().map(str::to_string),
         stop_reason:     v["stop_reason"].as_str().map(str::to_string),
         last_message:    v["last_assistant_message"].as_str().map(str::to_string),
         error_message:   v["error_message"].as_str().map(str::to_string),
@@ -175,8 +177,17 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
             }));
         }
         "Notification" => {
+            let notif_type = p.notif_type.as_deref().unwrap_or("");
+            // "idle_prompt" means Claude finished its turn and is waiting for the
+            // next prompt: that is already covered by the "Stop" event, and Claude
+            // can resend it (sometimes twice). Drop it to avoid a duplicate
+            // attention signal right after the turn ends.
+            if notif_type == "idle_prompt" {
+                log::debug!("[ipc] Notification(idle_prompt) panel={panel_id} ignored");
+                return;
+            }
             let msg = p.notif_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] Notification panel={panel_id} msg_len={}", msg.len());
+            log::debug!("[ipc] Notification panel={panel_id} type={notif_type:?} msg={msg:?}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "Notification",

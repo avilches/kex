@@ -14,6 +14,14 @@ export function findPane(tree: SplitNode, paneId: string): PaneNode | null {
   return findPane(tree.first, paneId) ?? findPane(tree.second, paneId);
 }
 
+/** The panel the user is currently focused on within a workspace (active pane's active panel). */
+export function focusedPanelId(
+  tree: SplitNode,
+  activePaneId: string,
+): string | null {
+  return findPane(tree, activePaneId)?.activePanelId ?? null;
+}
+
 export function findPanelPane(
   tree: SplitNode,
   panelId: string,

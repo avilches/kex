@@ -6,18 +6,28 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
-  CheckmarkCircle02Icon,
+  Cancel01Icon,
   Loading03Icon,
   Notification01Icon,
   Notification03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  getSnapshot as getOscTitlesSnapshot,
+  subscribe as subscribeOscTitles,
+} from "@/modules/terminal/lib/oscTitleStore";
 import { setAgentNotifications } from "@/modules/settings/store";
-import { AgentIcon } from "../lib/agentIcon";
-import type { AgentNotification, AgentStatus } from "../lib/types";
+import { type AgentEntry, buildAgentEntries } from "../lib/notificationList";
 import { useAgentStore } from "../store/agentStore";
+import { useBellStore } from "../store/bellStore";
 
 type Props = {
   onActivate: (tabId: string, panelId: string) => void;
@@ -33,52 +43,26 @@ function relativeTime(ts: number): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function StatusRow({
-  agent,
-  status,
-  onClick,
-}: {
-  agent: string;
-  status: AgentStatus;
-  onClick: () => void;
-}) {
-  const waiting = status === "waiting";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-accent"
-    >
-      <AgentIcon
-        agent={agent}
-        size={16}
-        className="shrink-0 text-muted-foreground"
-      />
-      <span className="flex-1 truncate text-sm text-foreground">{agent}</span>
-      <span
-        className={cn(
-          "flex items-center gap-1.5 text-xs",
-          waiting ? "font-medium text-primary" : "text-muted-foreground",
-        )}
-      >
-        {waiting ? <span className="size-1.5 rounded-full bg-primary" /> : null}
-        {waiting ? "waiting" : "working"}
-      </span>
-    </button>
-  );
+function EntryDot({ visual }: { visual: AgentEntry["visual"] }) {
+  // Mirrors the tab indicators in PaneTabBar so the bell stays visually in sync.
+  if (visual === "working") {
+    return (
+      <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
+    );
+  }
+  if (visual === "error") {
+    return <span className="size-[6px] shrink-0 rounded-full bg-destructive" />;
+  }
+  return <span className="size-[6px] shrink-0 rounded-full bg-amber-400" />;
 }
 
-const NOTIF_LABEL: Record<AgentNotification["kind"], string> = {
-  attention: "needs input",
-  finished: "finished",
-  error: "failed",
-};
-
-function NotificationRow({
-  n,
+function AgentEntryRow({
+  entry,
+  name,
   onClick,
 }: {
-  n: AgentNotification;
+  entry: AgentEntry;
+  name: string;
   onClick: () => void;
 }) {
   return (
@@ -88,68 +72,60 @@ function NotificationRow({
       className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-accent"
     >
       <span className="flex w-4 shrink-0 items-center justify-center">
-        {n.kind === "finished" ? (
-          <HugeiconsIcon
-            icon={CheckmarkCircle02Icon}
-            size={15}
-            strokeWidth={1.75}
-            className="text-muted-foreground"
-          />
-        ) : (
-          <span
-            className={cn(
-              "size-1.5 rounded-full",
-              n.kind === "error" ? "bg-destructive" : "bg-primary",
-            )}
-          />
-        )}
+        <EntryDot visual={entry.visual} />
       </span>
       <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-        {n.agent}{" "}
-        <span className="text-muted-foreground">{NOTIF_LABEL[n.kind]}</span>
+        {name}
       </span>
       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-        {relativeTime(n.at)}
+        {relativeTime(entry.at)}
       </span>
     </button>
   );
 }
 
 export function NotificationBell({ onActivate }: Props) {
-  const [open, setOpen] = useState(false);
+  const open = useBellStore((s) => s.open);
+  const setOpen = useBellStore((s) => s.setOpen);
   const [hooksReady, setHooksReady] = useState<boolean | null>(null);
   const [installing, setInstalling] = useState(false);
   const sessions = useAgentStore((s) => s.sessions);
   const notifications = useAgentStore((s) => s.notifications);
   const markAllRead = useAgentStore((s) => s.markAllRead);
+  const clearAll = useAgentStore((s) => s.clearAll);
+  const oscTitles = useSyncExternalStore(
+    subscribeOscTitles,
+    getOscTitlesSnapshot,
+  );
 
-  const active = useMemo(() => Object.values(sessions), [sessions]);
-  const activeCount = active.length;
-  const waitingCount = active.filter((s) => s.status === "waiting").length;
-  // attention maps to an active waiting session, so only completed events add
-  // to the badge to avoid double-counting.
-  const unreadDone = notifications.filter(
-    (n) => !n.read && n.kind !== "attention",
+  const entries = useMemo(
+    () => buildAgentEntries(sessions, notifications),
+    [sessions, notifications],
+  );
+  const activeCount = entries.filter(
+    (e) => e.visual === "waiting" || e.visual === "working",
   ).length;
-  const badge = waitingCount + unreadDone;
+  // One entry per agent, so each pending entry counts once (no double-counting).
+  const badge = entries.filter((e) => e.pending).length;
 
-  const refreshHooks = () => {
+  const refreshHooks = useCallback(() => {
     invoke<boolean>("agent_claude_hooks_status")
       .then(setHooksReady)
       .catch(() => setHooksReady(null));
-  };
+  }, []);
 
   useEffect(() => {
     refreshHooks();
-  }, []);
+  }, [refreshHooks]);
 
-  const onOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (next) {
+  // Opening (by click or by the global shortcut) marks notifications read and
+  // re-checks the hooks status.
+  useEffect(() => {
+    if (open) {
       markAllRead();
       refreshHooks();
     }
-  };
+  }, [open, markAllRead, refreshHooks]);
 
   const enableClaudeHooks = async () => {
     setInstalling(true);
@@ -170,14 +146,10 @@ export function NotificationBell({ onActivate }: Props) {
     setOpen(false);
   };
 
-  const activateNotification = (n: AgentNotification) => {
-    activate(n.tabId, n.panelId);
-  };
-
-  const empty = activeCount === 0 && notifications.length === 0;
+  const empty = entries.length === 0;
 
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -214,50 +186,37 @@ export function NotificationBell({ onActivate }: Props) {
         </div>
 
         {empty ? (
-          <div className="border-t border-border/60 px-3 py-5 text-center text-xs leading-relaxed text-muted-foreground">
-            No agent activity yet.
-            <br />
-            Run Claude Code or Codex inside a terminal to track it here.
+          <div className="border-t border-border/60 px-3 py-5 text-center text-xs text-muted-foreground">
+            No notifications yet
           </div>
         ) : (
           <div className="max-h-80 overflow-y-auto border-t border-border/60 p-1">
-            {active.map((s) => (
-              <StatusRow
-                key={s.panelId}
-                agent={s.agent}
-                status={s.status}
-                onClick={() => activate(s.tabId, s.panelId)}
-              />
-            ))}
-            {activeCount > 0 && notifications.length > 0 ? (
-              <div className="mx-2 my-1 h-px bg-border/50" />
-            ) : null}
-            {notifications.map((n) => (
-              <NotificationRow
-                key={n.id}
-                n={n}
-                onClick={() => activateNotification(n)}
+            {entries.map((entry) => (
+              <AgentEntryRow
+                key={entry.panelId}
+                entry={entry}
+                name={oscTitles.get(entry.panelId) ?? entry.agent}
+                onClick={() => activate(entry.tabId, entry.panelId)}
               />
             ))}
           </div>
         )}
 
-        <div className="border-t border-border/60 p-1">
-          {hooksReady ? (
-            <div className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-muted-foreground">
-              <HugeiconsIcon
-                icon={CheckmarkCircle02Icon}
-                size={13}
-                strokeWidth={1.75}
-                className="text-primary"
-              />
-              <span>
-                <span className="font-medium text-foreground">Claude Code hooks active</span>
-                <br />
-                Session restore and tab notifications enabled
-              </span>
-            </div>
-          ) : (
+        {!empty ? (
+          <div className="border-t border-border/60 p-1">
+            <button
+              type="button"
+              onClick={clearAll}
+              className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={1.75} />
+              Clear all
+            </button>
+          </div>
+        ) : null}
+
+        {!hooksReady ? (
+          <div className="border-t border-border/60 p-1">
             <button
               type="button"
               onClick={enableClaudeHooks}
@@ -272,20 +231,22 @@ export function NotificationBell({ onActivate }: Props) {
               />
               <span className="text-left">
                 <span className="block font-medium">
-                  {installing ? "Installing hooks..." : "Install Claude Code hooks for Kex"}
+                  {installing
+                    ? "Installing hooks..."
+                    : "Install Claude Code hooks for Kex"}
                 </span>
                 <span className="block text-[11px]">
                   Session restore on close · Tab notifications
                 </span>
               </span>
             </button>
-          )}
-          {hooksReady === false && !installing ? (
-            <p className="px-2 pt-1 text-[11px] text-destructive">
-              Could not update Claude Code config.
-            </p>
-          ) : null}
-        </div>
+            {hooksReady === false && !installing ? (
+              <p className="px-2 pt-1 text-[11px] text-destructive">
+                Could not update Claude Code config.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

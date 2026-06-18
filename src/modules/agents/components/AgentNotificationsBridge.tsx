@@ -1,6 +1,7 @@
 import type { Workspace } from "@/modules/workspaces";
-import { findPanelPane } from "@/modules/workspaces";
+import { findPanelPane, focusedPanelId } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
+import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
@@ -31,13 +32,27 @@ function panelInfo(
   for (const ws of workspaces) {
     const result = findPanelPane(ws.paneTree, panelId);
     if (result) {
-      const cwd = result.panel.kind === "terminal" ? result.panel.cwd : undefined;
+      const cwd =
+        result.panel.kind === "terminal" ? result.panel.cwd : undefined;
       const cwdParts = cwd ? cwd.split(/[\\/]/).filter(Boolean) : [];
       const title = cwd ? (cwdParts[cwdParts.length - 1] ?? cwd) : ws.title;
       return { workspaceId: ws.id, title };
     }
   }
   return null;
+}
+
+/** True when this panel is the one the user is actively looking at (active workspace, active pane, active panel). */
+function isPanelVisible(ctx: Ctx, tabId: string, panelId: string): boolean {
+  if (ctx.activeWorkspaceId !== tabId) return false;
+  const ws = ctx.workspaces.find((w) => w.id === tabId);
+  if (!ws) return false;
+  return focusedPanelId(ws.paneTree, ws.activePaneId) === panelId;
+}
+
+/** The user is both focused on the window and looking at this panel: no attention is pending. */
+function isPanelSeen(ctx: Ctx, tabId: string, panelId: string): boolean {
+  return ctx.focused && isPanelVisible(ctx, tabId, panelId);
 }
 
 function route(
@@ -47,20 +62,17 @@ function route(
   extraBody?: string,
 ): void {
   const info = panelInfo(ctx.workspaces, session.panelId);
+  // Prefer the tab's OSC title (what the agent emits) so multiple agents are
+  // distinguishable in the toast / OS notification; fall back to the agent name.
+  const name = getOscTitle(session.panelId) ?? session.agent;
   const heading =
     kind === "attention"
-      ? `${session.agent} needs your input`
+      ? `${name} needs your input`
       : kind === "error"
-        ? `${session.agent} stopped with an error`
-        : `${session.agent} finished`;
+        ? `${name} stopped with an error`
+        : `${name} finished`;
 
-  const activeWs = ctx.workspaces.find((w) => w.id === session.tabId);
-  const panelResult = activeWs ? findPanelPane(activeWs.paneTree, session.panelId) : null;
-  const panelVisible =
-    ctx.activeWorkspaceId === session.tabId &&
-    !!panelResult &&
-    activeWs?.activePaneId === panelResult.pane.id &&
-    panelResult.pane.activePanelId === session.panelId;
+  const panelVisible = isPanelVisible(ctx, session.tabId, session.panelId);
 
   routeAgentNotification({
     source: "terminal",
@@ -111,23 +123,34 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     }
     case "Notification": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
-      store.setStatus(panelId, "waiting");
       const session = store.sessions[panelId];
-      if (session) route(session, "attention", ctx);
+      if (session && !isPanelSeen(ctx, session.tabId, panelId)) {
+        store.setStatus(panelId, "waiting");
+        route(session, "attention", ctx);
+      }
       return;
     }
     case "Stop": {
+      // Claude finished its turn: it is now your move. This is the reliable,
+      // single end-of-turn signal (idle_prompt is filtered out upstream), so it
+      // is what raises the attention dot.
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       const session = store.sessions[panelId];
-      if (session) route(session, "finished", ctx);
-      store.setStatus(panelId, "idle");
+      if (session && !isPanelSeen(ctx, session.tabId, panelId)) {
+        store.setStatus(panelId, "waiting");
+        route(session, "attention", ctx);
+      } else {
+        store.setStatus(panelId, "idle");
+      }
       return;
     }
     case "PermissionRequest": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
-      store.setStatus(panelId, "waiting");
       const permSession = store.sessions[panelId];
-      if (permSession) route(permSession, "attention", ctx);
+      if (permSession && !isPanelSeen(ctx, permSession.tabId, panelId)) {
+        store.setStatus(panelId, "waiting");
+        route(permSession, "attention", ctx);
+      }
       return;
     }
     case "StopFailure": {
@@ -135,7 +158,8 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       const failSession = store.sessions[panelId];
       store.finish(panelId);
       invoke("agent_detach_session", { panelId }).catch(() => {});
-      if (failSession) route(failSession, "error", ctx, sig.message ?? undefined);
+      if (failSession)
+        route(failSession, "error", ctx, sig.message ?? undefined);
       return;
     }
     case "SessionEnd": {
@@ -165,8 +189,22 @@ export function AgentNotificationsBridge({
   onActivate: Activate;
 }) {
   const focused = useWindowFocus();
-  const ctxRef = useRef<Ctx>({ workspaces, activeWorkspaceId, focused, onActivate });
+  const ctxRef = useRef<Ctx>({
+    workspaces,
+    activeWorkspaceId,
+    focused,
+    onActivate,
+  });
   ctxRef.current = { workspaces, activeWorkspaceId, focused, onActivate };
+
+  // Looking at an agent's panel clears its attention dot (tab + bell stay in sync).
+  useEffect(() => {
+    if (!focused) return;
+    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
+    if (!ws) return;
+    const panelId = focusedPanelId(ws.paneTree, ws.activePaneId);
+    if (panelId) useAgentStore.getState().markPanelSeen(panelId);
+  }, [workspaces, activeWorkspaceId, focused]);
 
   useEffect(() => {
     let alive = true;
@@ -190,13 +228,17 @@ export function AgentNotificationsBridge({
     let unlisten: (() => void) | undefined;
     listen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) => {
       const { panelId, sessionId, cwdLaunch, sessionTitle, model } = e.payload;
-      useAgentStore.getState().setMeta(panelId, { sessionId, cwdLaunch, sessionTitle, model });
+      useAgentStore
+        .getState()
+        .setMeta(panelId, { sessionId, cwdLaunch, sessionTitle, model });
     })
       .then((u) => {
         if (alive) unlisten = u;
         else u();
       })
-      .catch((e) => console.error("[kex:agent] listen session-meta failed:", e));
+      .catch((e) =>
+        console.error("[kex:agent] listen session-meta failed:", e),
+      );
     return () => {
       alive = false;
       unlisten?.();

@@ -20,15 +20,20 @@ type AgentStoreState = {
   setStatus: (panelId: string, status: AgentStatus) => void;
   finish: (panelId: string) => void;
   startRestored: (panelId: string, tabId: string, agent: string) => void;
-  setRestoreError: (panelId: string, tabId: string, agent: string, reason?: string) => void;
+  setRestoreError: (
+    panelId: string,
+    tabId: string,
+    agent: string,
+    reason?: string,
+  ) => void;
   clearRestored: (panelId: string) => void;
   setMeta: (panelId: string, meta: Partial<AgentSessionMeta>) => void;
   setLocalAgent: (state: LocalAgentState) => void;
-  pushNotification: (
-    n: Omit<AgentNotification, "id" | "at" | "read">,
-  ) => void;
+  pushNotification: (n: Omit<AgentNotification, "id" | "at" | "read">) => void;
+  markPanelSeen: (panelId: string) => void;
   markAllRead: () => void;
   clearNotifications: () => void;
+  clearAll: () => void;
 };
 
 export const useAgentStore = create<AgentStoreState>((set) => ({
@@ -183,18 +188,78 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
     }),
 
   pushNotification: (n) =>
-    set((s) => ({
-      notifications: [
-        { ...n, id: `n${++notifSeq}`, at: Date.now(), read: false },
-        ...s.notifications,
-      ].slice(0, MAX_NOTIFICATIONS),
-    })),
+    set((s) => {
+      // One notification per agent (panelId): drop any previous entry for the
+      // same panel and reinsert at the front so it bubbles to the top.
+      const rest = s.notifications.filter((x) => x.panelId !== n.panelId);
+      return {
+        notifications: [
+          { ...n, id: `n${++notifSeq}`, at: Date.now(), read: false },
+          ...rest,
+        ].slice(0, MAX_NOTIFICATIONS),
+      };
+    }),
+
+  markPanelSeen: (panelId) =>
+    set((s) => {
+      const prev = s.sessions[panelId];
+      const clearsDot = prev?.status === "waiting";
+      const notif = s.notifications.find((n) => n.panelId === panelId);
+      const marksRead = notif ? !notif.read : false;
+      if (!clearsDot && !marksRead) return s;
+      const now = Date.now();
+      return {
+        sessions:
+          prev && clearsDot
+            ? {
+                ...s.sessions,
+                [panelId]: {
+                  ...prev,
+                  status: "idle",
+                  attentionSince: null,
+                  lastActivityAt: now,
+                },
+              }
+            : s.sessions,
+        notifications: marksRead
+          ? s.notifications.map((n) =>
+              n.panelId === panelId ? { ...n, read: true } : n,
+            )
+          : s.notifications,
+      };
+    }),
 
   markAllRead: () =>
     set((s) => {
       if (!s.notifications.some((n) => !n.read)) return s;
-      return { notifications: s.notifications.map((n) => ({ ...n, read: true })) };
+      return {
+        notifications: s.notifications.map((n) => ({ ...n, read: true })),
+      };
     }),
 
   clearNotifications: () => set({ notifications: [] }),
+
+  // "Clear all": drop every notification and clear every attention dot (waiting
+  // sessions go idle). Working sessions are left running.
+  clearAll: () =>
+    set((s) => {
+      let changed = s.notifications.length > 0;
+      const sessions: Record<string, AgentSession> = {};
+      const now = Date.now();
+      for (const [id, sess] of Object.entries(s.sessions)) {
+        if (sess.status === "waiting") {
+          sessions[id] = {
+            ...sess,
+            status: "idle",
+            attentionSince: null,
+            lastActivityAt: now,
+          };
+          changed = true;
+        } else {
+          sessions[id] = sess;
+        }
+      }
+      if (!changed) return s;
+      return { sessions, notifications: [] };
+    }),
 }));

@@ -29,6 +29,7 @@ export type ShortcutId =
   | "search.focus"
   | "explorer.search"
   | "rightPanel.toggle"
+  | "notifications.toggle"
   | "window.new"
   | "workspace.new"
   | "workspace.prev"
@@ -230,6 +231,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Toggle Git panel",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, key: "g" }],
+  },
+  {
+    id: "notifications.toggle",
+    label: "Notifications",
+    group: "View",
+    defaultBindings: [{ [MOD_PROP]: true, key: "i" }],
   },
   {
     id: "workspace.new",
