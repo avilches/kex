@@ -1111,6 +1111,9 @@ export default function App() {
           (activePanel as { blocks?: boolean }).blocks === true
         );
       }
+      if (id === "tab.rename") {
+        return rightPanelRef.current?.isExplorerFocused() ?? false;
+      }
 
       return false;
     },
