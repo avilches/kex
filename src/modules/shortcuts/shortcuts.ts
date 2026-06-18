@@ -40,7 +40,8 @@ export type ShortcutId =
   | "view.zenMode"
   | "settings.open"
   | "editor.undo"
-  | "editor.redo";
+  | "editor.redo"
+  | "path.copy";
 
 export type ShortcutGroup =
   | "General"
@@ -85,6 +86,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Open settings",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "," }],
+  },
+  {
+    id: "path.copy",
+    label: "Copy path",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "c" }],
   },
   {
     id: "tab.new",

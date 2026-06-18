@@ -1067,12 +1067,28 @@ export default function App() {
       "editor.redo": () => {
         if (activePanelId) editorHandles.current.get(activePanelId)?.redo();
       },
+      "path.copy": () => {
+        if (!activePanel) return;
+        let path: string | undefined;
+        if (activePanel.kind === "editor" || activePanel.kind === "markdown") {
+          path = activePanel.path;
+        } else if (activePanel.kind === "terminal") {
+          path = activePanel.cwd;
+        } else if (activePanel.kind === "preview") {
+          path = activePanel.url;
+        }
+        if (!path) return;
+        void navigator.clipboard.writeText(path).then(() => {
+          toast.success("Path copied");
+        });
+      },
     }),
     [
       activeWorkspace,
       activeWorkspaceId,
       activePane,
       activePanelId,
+      activePanel,
       activeCwd,
       workspaces,
       openCommandPalette,

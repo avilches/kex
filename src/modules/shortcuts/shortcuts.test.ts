@@ -88,6 +88,17 @@ describe("matchBinding", () => {
   });
 });
 
+test("path.copy shortcut is defined with Cmd/Ctrl+Shift+C binding", () => {
+  const s = SHORTCUTS.find((x) => x.id === "path.copy");
+  expect(s).toBeDefined();
+  expect(s!.defaultBindings).toHaveLength(1);
+  const b = s!.defaultBindings[0];
+  expect(b.shift).toBe(true);
+  expect(b.key).toBe("c");
+  // meta on Mac, ctrl elsewhere -- one of them must be true
+  expect(b.meta || b.ctrl).toBe(true);
+});
+
 describe("tab.selectByIndex binding uniqueness", () => {
   test("only tab.selectByIndex binds to Cmd/Ctrl+1 through Cmd/Ctrl+9", () => {
     const tabSelectByIndex = SHORTCUTS.find(
