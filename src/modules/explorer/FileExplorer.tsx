@@ -38,16 +38,15 @@ import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
 import { pathDirname } from "@/lib/pathUtils";
-import { useGlobalShortcuts } from "@/modules/shortcuts";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setRightPanelActiveTab } from "@/modules/settings/store";
 import type { GitStatusSnapshot } from "@/lib/native";
 
 export type FileExplorerHandle = {
   focus: () => void;
   isFocused: () => boolean;
   focusSearch: () => void;
+  toggleSearch: () => void;
 };
 
 type Props = {
@@ -374,21 +373,17 @@ export const FileExplorer = memo(
           setIsSearchOpen(true);
           searchRef.current?.focus();
         },
+        toggleSearch: () => {
+          if (searchRef.current?.isFocused()) {
+            closeSearch();
+          } else {
+            setIsSearchOpen(true);
+            searchRef.current?.focus();
+          }
+        },
       }),
       [entryPaths, scrollEntryIntoView, selectedPath],
     );
-
-    useGlobalShortcuts({
-      "explorer.search": () => {
-        if (searchRef.current?.isFocused()) {
-          closeSearch();
-          return;
-        }
-        void setRightPanelActiveTab("explorer");
-        setIsSearchOpen(true);
-        searchRef.current?.focus();
-      },
-    });
 
     if (!rootPath) {
       return (

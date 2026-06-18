@@ -1035,9 +1035,17 @@ export default function App() {
       "pane.focusRight": () => focusPaneInDirection("right"),
       "pane.source": () => navigateRightPanelTo("explorer"),
       "explorer.search": () => {
-        pendingExplorerSearch.current = true;
-        void setRightPanelOpen(true);
-        void setRightPanelActiveTab("explorer");
+        const state = usePreferencesStore.getState();
+        if (state.rightPanelOpen && state.rightPanelActiveTab === "explorer") {
+          // Panel already visible on explorer: toggle search open/closed.
+          rightPanelRef.current?.toggleExplorerSearch?.();
+        } else {
+          // Panel closed or on another tab: open it, switch to explorer,
+          // then open search once the async IPC resolves and the panel mounts.
+          pendingExplorerSearch.current = true;
+          void setRightPanelOpen(true);
+          void setRightPanelActiveTab("explorer");
+        }
       },
       "terminal.clear": () => { clearFocusedTerminal(); },
       "blocks.prev": () => navigateFocusedBlocks(-1),

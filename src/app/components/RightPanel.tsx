@@ -11,6 +11,7 @@ export type RightPanelTab = "explorer" | "git" | "history";
 
 export type RightPanelHandle = {
   focusExplorer: () => void;
+  toggleExplorerSearch: () => void;
 };
 
 type CommitFileDiffOpenInput = {
@@ -61,6 +62,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
 
     useImperativeHandle(ref, () => ({
       focusExplorer: () => explorerRef.current?.focusSearch?.(),
+      toggleExplorerSearch: () => explorerRef.current?.toggleSearch?.(),
     }));
 
     return (
