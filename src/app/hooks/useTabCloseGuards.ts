@@ -3,7 +3,7 @@ import { leafHasForegroundProcess } from "@/modules/terminal";
 import type { Workspace } from "@/modules/workspaces";
 import { allPanes } from "@/modules/workspaces";
 
-type PanelInfo = { id: string; title: string; kind: string; path?: string };
+type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string };
 
 type Params = {
   workspaces: Workspace[];
@@ -31,9 +31,9 @@ export function useTabCloseGuards({ workspaces, disposePanel, findPanel }: Param
         return;
       }
       if (panel.kind === "terminal") {
-        const busy = await leafHasForegroundProcess(panelId).catch(() => false);
-        if (busy) {
-          setPendingTerminalClosePanel({ id: panelId, title: panel.title ?? "terminal", kind: panel.kind });
+        const processName = await leafHasForegroundProcess(panelId).catch(() => null);
+        if (processName !== null) {
+          setPendingTerminalClosePanel({ id: panelId, title: panel.title ?? "terminal", kind: panel.kind, processName });
           return;
         }
       }

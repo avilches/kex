@@ -9,7 +9,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type PanelInfo = { id: string; title: string; kind: string; path?: string };
+type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string };
 
 type Props = {
   pendingClosePanel: PanelInfo | null;
@@ -69,15 +69,17 @@ export function CloseDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Close Terminal?</AlertDialogTitle>
             <AlertDialogDescription>
-              A process is running. Closing this panel will terminate it.
+              {pendingTerminalClosePanel?.processName
+                ? `Process "${pendingTerminalClosePanel.processName}" is running`
+                : "A process is running"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={onCancelTerminalClose}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={onConfirmTerminalClose}>
-              Close Anyway
+            <AlertDialogAction onClick={onConfirmTerminalClose} autoFocus>
+              Close
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

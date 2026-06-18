@@ -201,7 +201,7 @@ pub fn pty_close(state: tauri::State<PtyState>, id: u32) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn pty_has_foreground_process(state: tauri::State<PtyState>, id: u32) -> Result<bool, String> {
+pub fn pty_has_foreground_process(state: tauri::State<PtyState>, id: u32) -> Result<Option<String>, String> {
     let sessions = state.sessions.read().unwrap();
     let session = sessions.get(&id).ok_or_else(|| {
         log::warn!("pty_has_foreground_process: unknown session id={id}");
@@ -209,23 +209,31 @@ pub fn pty_has_foreground_process(state: tauri::State<PtyState>, id: u32) -> Res
     })?;
     let shell_pid = session.shell_pid;
     if shell_pid == 0 {
-        return Ok(false);
+        return Ok(None);
     }
-    Ok(shell_has_children(shell_pid))
+    Ok(shell_foreground_process_name(shell_pid))
 }
 
-// pgrep -P exits 0 when shell_pid has at least one child, 1 when none.
+// Returns the name of the first foreground child of the shell, or None if no child exists.
 #[cfg(unix)]
-fn shell_has_children(shell_pid: u32) -> bool {
-    std::process::Command::new("pgrep")
-        .args(["-P", &shell_pid.to_string()])
+fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
+    let output = std::process::Command::new("pgrep")
+        .args(["-l", "-P", &shell_pid.to_string()])
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    // Each line is "<pid> <name>"; take the first child's name.
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let first_line = stdout.lines().next()?;
+    let name = first_line.split_whitespace().nth(1)?.to_string();
+    Some(name)
 }
 
 #[cfg(windows)]
-fn shell_has_children(shell_pid: u32) -> bool {
+fn shell_foreground_process_name(shell_pid: u32) -> Option<String> {
+    use std::ffi::CStr;
     use std::mem::{size_of, zeroed};
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
@@ -235,15 +243,19 @@ fn shell_has_children(shell_pid: u32) -> bool {
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if snapshot == INVALID_HANDLE_VALUE {
-            return false;
+            return None;
         }
         let mut entry: PROCESSENTRY32 = zeroed();
         entry.dwSize = size_of::<PROCESSENTRY32>() as u32;
-        let mut found = false;
+        let mut found_name = None;
         if Process32First(snapshot, &mut entry) != 0 {
             loop {
                 if entry.th32ParentProcessID == shell_pid {
-                    found = true;
+                    let name = CStr::from_ptr(entry.szExeFile.as_ptr() as *const i8)
+                        .to_string_lossy()
+                        .into_owned();
+                    let name = name.strip_suffix(".exe").unwrap_or(&name).to_string();
+                    found_name = Some(name);
                     break;
                 }
                 if Process32Next(snapshot, &mut entry) == 0 {
@@ -252,7 +264,7 @@ fn shell_has_children(shell_pid: u32) -> bool {
             }
         }
         CloseHandle(snapshot);
-        found
+        found_name
     }
 }
 

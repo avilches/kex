@@ -623,15 +623,14 @@ export async function respawnSession(
   if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
 }
 
-export async function leafHasForegroundProcess(leafId: string): Promise<boolean> {
+export async function leafHasForegroundProcess(leafId: string): Promise<string | null> {
   const s = sessions.get(leafId);
-  if (!s?.pty || s.shellExited) return false;
+  if (!s?.pty || s.shellExited) return null;
   try {
-    const result = await invoke<boolean>("pty_has_foreground_process", { id: s.pty.id });
-    return result;
+    return await invoke<string | null>("pty_has_foreground_process", { id: s.pty.id });
   } catch (e) {
     console.error("[kex] pty_has_foreground_process failed for leaf", leafId, e);
-    return false;
+    return null;
   }
 }
 
