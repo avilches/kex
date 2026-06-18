@@ -154,7 +154,12 @@ export function NotificationBell({ onActivate }: Props) {
         <Button
           variant="ghost"
           size="icon"
-          className="relative size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className={cn(
+            "relative size-7 shrink-0 rounded-md hover:bg-accent",
+            badge > 0
+              ? "text-amber-400 hover:text-amber-400"
+              : "text-muted-foreground hover:text-foreground",
+          )}
           title="Agent notifications"
         >
           <HugeiconsIcon
@@ -163,7 +168,7 @@ export function NotificationBell({ onActivate }: Props) {
             strokeWidth={1.75}
           />
           {badge > 0 ? (
-            <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-semibold leading-none text-primary-foreground">
+            <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-amber-400 px-0.5 text-[9px] font-semibold leading-none text-neutral-900">
               {badge > 9 ? "9+" : badge}
             </span>
           ) : null}
