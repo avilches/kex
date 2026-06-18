@@ -208,6 +208,11 @@ function DraggableTab({
   const startRename = useTabRenameStore((s) => s.startRename);
   const inputRef = useRef<HTMLInputElement>(null);
   const handledRef = useRef(false);
+  const [hoverOpen, setHoverOpen] = useState(false);
+  // Keep the hover card open while the pointer is still over the tab. Clicking a
+  // tab moves focus into the terminal, which blurs the dnd-kit-focusable trigger
+  // and would otherwise dismiss the card mid-hover.
+  const pointerInsideRef = useRef(false);
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
@@ -232,6 +237,8 @@ function DraggableTab({
       ref={setNodeRef}
       {...attributes}
       data-panel-id={panel.id}
+      onPointerEnter={() => { pointerInsideRef.current = true; }}
+      onPointerLeave={() => { pointerInsideRef.current = false; }}
       onClick={() => onActivate(panel.id)}
       onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
       onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
@@ -332,7 +339,15 @@ function DraggableTab({
   );
 
   return (
-    <HoverCard openDelay={700} closeDelay={100}>
+    <HoverCard
+      open={hoverOpen}
+      openDelay={700}
+      closeDelay={100}
+      onOpenChange={(o) => {
+        if (!o && pointerInsideRef.current) return;
+        setHoverOpen(o);
+      }}
+    >
     <Popover
       open={isRenaming}
       onOpenChange={(open) => { if (!open) handleSave(); }}
@@ -445,7 +460,13 @@ function DraggableTab({
       </PopoverContent>
     </Popover>
     {panel.kind === "terminal" && !isRestoreError && (
-      <HoverCardContent side="bottom" align="start" className="w-96 rounded-xl p-3">
+      <HoverCardContent
+        side="bottom"
+        align="start"
+        className="w-fit min-w-44 max-w-96 rounded-xl p-2.5"
+        onPointerEnter={() => { pointerInsideRef.current = true; }}
+        onPointerLeave={() => { pointerInsideRef.current = false; }}
+      >
         {hasAgent
           ? <AgentHoverCardContent agentSession={agentSession!} cwd={panel.cwd} tabTitle={agentTitle} />
           : <TerminalHoverCardContent customTitle={panel.title} cwd={panel.cwd} runningCommand={runningCommand} />
