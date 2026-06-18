@@ -42,7 +42,24 @@ test("tab.rename has a label containing R", () => {
   expect(label).toMatch(/R/i);
 });
 
-test("tab.rename bare F2 binding matches a plain F2 keydown", () => {
+test("file.rename bare F2 binding matches a plain F2 keydown", () => {
+  const fileRename = SHORTCUTS.find((s) => s.id === "file.rename");
+  expect(fileRename).toBeDefined();
+  const f2Event = {
+    key: "F2",
+    code: "F2",
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+  } as KeyboardEvent;
+  const matches = fileRename!.defaultBindings.some((b) =>
+    matchBinding(f2Event, b, "file.rename"),
+  );
+  expect(matches).toBe(true);
+});
+
+test("tab.rename no longer binds F2 (separated from file.rename)", () => {
   const tabRename = SHORTCUTS.find((s) => s.id === "tab.rename");
   expect(tabRename).toBeDefined();
   const f2Event = {
@@ -56,7 +73,7 @@ test("tab.rename bare F2 binding matches a plain F2 keydown", () => {
   const matches = tabRename!.defaultBindings.some((b) =>
     matchBinding(f2Event, b, "tab.rename"),
   );
-  expect(matches).toBe(true);
+  expect(matches).toBe(false);
 });
 
 describe("matchBinding", () => {
