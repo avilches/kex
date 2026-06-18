@@ -58,6 +58,7 @@ type Props = {
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
   gitStatus?: GitStatusSnapshot | null;
+  onSearchClose?: () => void;
 };
 
 type Row =
@@ -184,6 +185,7 @@ export const FileExplorer = memo(
       onRevealInTerminal,
       onAttachToAgent,
       gitStatus,
+      onSearchClose,
     },
     ref,
   ) {
@@ -212,16 +214,21 @@ export const FileExplorer = memo(
       },
     });
 
-    const gitDecorations = usePreferencesStore((s) => s.explorerGitDecorations);
+    const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
+    const gitEnabled = gitColorScheme !== "none";
     const { lookup: lookupGitStatus } = useGitStatus(
       rootPath,
-      gitDecorations ? gitStatus : null,
-      gitDecorations,
+      gitEnabled ? gitStatus : null,
+      gitEnabled,
     );
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const searchRef = useRef<ExplorerSearchHandle>(null);
+    const closeSearch = useCallback(() => {
+      setIsSearchOpen(false);
+      onSearchClose?.();
+    }, [onSearchClose]);
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -373,7 +380,7 @@ export const FileExplorer = memo(
     useGlobalShortcuts({
       "explorer.search": () => {
         if (searchRef.current?.isFocused()) {
-          setIsSearchOpen(false);
+          closeSearch();
           return;
         }
         setIsSearchOpen(true);
@@ -492,7 +499,8 @@ export const FileExplorer = memo(
               isRenaming={row.kind === "rename"}
               isExternalDropTarget={externalTargetDir === row.path}
               gitStatusCode={row.gitStatusCode}
-              gitignored={gitDecorations && row.gitignored}
+              gitColorScheme={gitColorScheme}
+              gitignored={gitEnabled && row.gitignored}
               onOpenFile={onOpenFile}
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}
@@ -583,7 +591,7 @@ export const FileExplorer = memo(
           rootPath={rootPath}
           onOpenFile={onOpenFile}
           open={isSearchOpen}
-          onRequestClose={() => setIsSearchOpen(false)}
+          onRequestClose={closeSearch}
           onActiveChange={setIsSearchActive}
           onRevealInTerminal={onRevealInTerminal}
           onAttachToAgent={onAttachToAgent}

@@ -683,6 +683,12 @@ export default function App() {
     findPanel: findPanelGlobal,
   });
 
+  const handleCancelTerminalClose = useCallback(() => {
+    const panelId = pendingTerminalClosePanel?.id;
+    cancelTerminalClose();
+    if (panelId) setTimeout(() => terminalHandles.current.get(panelId)?.focus(), 50);
+  }, [pendingTerminalClosePanel, cancelTerminalClose]);
+
   // ── Path rename ───────────────────────────────────────────────────────────
 
   const handlePathRenamed = useCallback(
@@ -886,6 +892,10 @@ export default function App() {
     activeEditorHandle,
     gitHistoryHandle,
   ]);
+
+  const onExplorerSearchClose = useCallback(() => {
+    searchTarget?.focus();
+  }, [searchTarget]);
 
   // ── Shortcuts ─────────────────────────────────────────────────────────────
 
@@ -1204,6 +1214,7 @@ export default function App() {
                       onPathRenamed={handlePathRenamed}
                       onPathDeleted={handlePathDeleted}
                       onRevealInTerminal={cdInNewWorkspace}
+                      onExplorerSearchClose={onExplorerSearchClose}
                       sourceControl={sourceControl}
                       onOpenDiff={openGitDiffInPanel}
                       onOpenGitGraph={openGitGraphFromContext}
@@ -1261,6 +1272,7 @@ export default function App() {
                       onPathRenamed={handlePathRenamed}
                       onPathDeleted={handlePathDeleted}
                       onRevealInTerminal={cdInNewWorkspace}
+                      onExplorerSearchClose={onExplorerSearchClose}
                       sourceControl={sourceControl}
                       onOpenDiff={openGitDiffInPanel}
                       onOpenGitGraph={openGitGraphFromContext}
@@ -1317,7 +1329,7 @@ export default function App() {
             onCancelClose={cancelClose}
             onConfirmClose={confirmClose}
             pendingTerminalClosePanel={pendingTerminalClosePanel}
-            onCancelTerminalClose={cancelTerminalClose}
+            onCancelTerminalClose={handleCancelTerminalClose}
             onConfirmTerminalClose={confirmTerminalClose}
             pendingDeletePanels={pendingDeletePanels}
             onCancelDeleteClose={cancelDeleteClose}
