@@ -220,6 +220,23 @@ export default function App() {
     return () => unlisten?.();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Return focus to the active terminal when the notification bell closes
+  // (Cmd+I again, Esc, or click outside), so typing continues in the tab.
+  const bellOpen = useBellStore((s) => s.open);
+  const bellWasOpen = useRef(false);
+  useEffect(() => {
+    const justClosed = bellWasOpen.current && !bellOpen;
+    bellWasOpen.current = bellOpen;
+    if (!justClosed) return;
+    const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
+    const pane = ws ? findPane(ws.paneTree, ws.activePaneId) : null;
+    if (!pane?.activePanelId) return;
+    const panelId = pane.activePanelId;
+    const raf = requestAnimationFrame(() => {
+      terminalHandles.current.get(panelId)?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [bellOpen, activeWorkspaceId]);
 
   const init = usePreferencesStore((s) => s.init);
   useEffect(() => {

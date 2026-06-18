@@ -173,6 +173,7 @@ export function NotificationBell({ onActivate }: Props) {
         align="end"
         sideOffset={8}
         className="w-80 overflow-hidden p-0 gap-0.5"
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <div className="flex h-10 items-center px-3 pt-0.5">
           <span className="flex gap-1 text-[13px] text-foreground">
