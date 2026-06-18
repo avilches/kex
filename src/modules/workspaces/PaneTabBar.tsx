@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
 import {
@@ -285,6 +285,14 @@ function DraggableTab({
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
+  const wrappedListeners = useMemo(() => ({
+    ...listeners,
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+      // Scroll tab into view before dnd-kit captures the element rect.
+      e.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+      listeners?.onPointerDown?.(e as React.PointerEvent);
+    },
+  }), [listeners]);
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
   const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${panel.id}:after`, disabled: !isWorkspaceActive });
   const active = panel.id === activePanelId;
@@ -387,7 +395,7 @@ function DraggableTab({
       onClick={() => onActivate(panel.id)}
       onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
       onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
-      {...listeners}
+      {...wrappedListeners}
       className={cn(
         "group relative flex max-w-[320px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
         isThisDragging ? "cursor-grabbing" : "cursor-default",
@@ -706,10 +714,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   }, [panels.length]);
 
   useDndMonitor({
-    onDragStart() {
-      const container = scrollContainerRef.current;
-      if (container) container.scrollLeft = 0;
-    },
+    onDragStart() {},
     onDragOver(event) {
       const overId = event.over?.id ? String(event.over.id) : null;
       if (!overId?.startsWith("tab-insert:")) {
