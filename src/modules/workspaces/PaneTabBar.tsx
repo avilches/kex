@@ -349,6 +349,7 @@ function DraggableTab({
   shortcutLabels,
   onRenamePanel,
   onHoverChange,
+  onSnapIntoView,
 }: {
   panel: Panel;
   activePanelId: string | null;
@@ -372,6 +373,7 @@ function DraggableTab({
   shortcutLabels: Record<string, string | null>;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
   onHoverChange?: (panelId: string, open: boolean) => void;
+  onSnapIntoView?: (panelId: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
@@ -586,13 +588,19 @@ function DraggableTab({
         if (!o && pointerInsideRef.current) return;
         setHoverOpen(o);
         onHoverChange?.(panel.id, o);
+        if (o) onSnapIntoView?.(panel.id);
       }}
     >
     <Popover
       open={isRenaming}
       onOpenChange={(open) => { if (!open) handleSave(); }}
     >
-      <ContextMenu onOpenChange={(o) => { if (o) setHoverOpen(false); }}>
+      <ContextMenu onOpenChange={(o) => {
+          if (o) {
+            setHoverOpen(false);
+            onSnapIntoView?.(panel.id);
+          }
+        }}>
         <ContextMenuTrigger asChild>
           <PopoverAnchor asChild>
             <HoverCardTrigger asChild>
@@ -741,11 +749,10 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
 
   useEffect(() => { activePanelIdRef.current = activePanelId; });
 
-  const scrollActiveIntoView = (behavior: ScrollBehavior = 'auto') => {
+  const scrollPanelIntoView = (panelId: string, behavior: ScrollBehavior = 'smooth') => {
     const container = scrollContainerRef.current;
-    const id = activePanelIdRef.current;
-    if (!container || !id) return;
-    const tab = container.querySelector<HTMLElement>(`[data-panel-id="${id}"]`);
+    if (!container) return;
+    const tab = container.querySelector<HTMLElement>(`[data-panel-id="${panelId}"]`);
     if (!tab) return;
     const cr = container.getBoundingClientRect();
     const tr = tab.getBoundingClientRect();
@@ -754,6 +761,12 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     } else if (tr.right > cr.right) {
       container.scrollBy({ left: tr.right - cr.right + 4, behavior });
     }
+  };
+
+  const scrollActiveIntoView = (behavior: ScrollBehavior = 'auto') => {
+    const id = activePanelIdRef.current;
+    if (!id) return;
+    scrollPanelIntoView(id, behavior);
   };
 
   // Scroll active tab into view when it changes (unless user is browsing with wheel)
@@ -911,6 +924,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
             if (open) hoverOpenPanelsRef.current.add(panelId);
             else hoverOpenPanelsRef.current.delete(panelId);
           }}
+          onSnapIntoView={(panelId) => scrollPanelIntoView(panelId, 'smooth')}
         />
       ))}
       <button
