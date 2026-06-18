@@ -48,7 +48,6 @@ type SearchPhase = "idle" | "phase1" | "phase2" | "done";
 
 const MIN_QUERY_LEN = 2;
 const DEBOUNCE_MS = 300;
-// Depth for the fast first pass: covers root + two subdirectory levels (e.g. src/modules/).
 const PHASE_1_DEPTH = 3;
 
 type Props = {
@@ -301,27 +300,31 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                           }
                         }}
                         className={cn(
-                          "flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs transition-colors",
+                          "flex w-full items-start gap-1.5 px-2 py-1 text-left transition-colors",
                           isSelected
                             ? "bg-accent text-foreground"
                             : "hover:bg-accent/50 text-foreground/80",
                         )}
                         title={hit.path}
                       >
-                        {url ? (
-                          <img src={url} alt="" className="size-3.5 shrink-0" />
-                        ) : (
-                          <HugeiconsIcon
-                            icon={Folder01Icon}
-                            size={13}
-                            strokeWidth={1.75}
-                            className="shrink-0 text-muted-foreground"
-                          />
-                        )}
-                        <span className="truncate">{hit.name}</span>
-                        <span className="ml-auto truncate text-[10px] text-muted-foreground">
-                          {hit.rel}
-                        </span>
+                        <div className="mt-0.5 shrink-0">
+                          {url ? (
+                            <img src={url} alt="" className="size-3.5" />
+                          ) : (
+                            <HugeiconsIcon
+                              icon={Folder01Icon}
+                              size={13}
+                              strokeWidth={1.75}
+                              className="text-muted-foreground"
+                            />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex flex-col">
+                          <span className="truncate text-xs leading-snug">{hit.name}</span>
+                          <span className="break-all text-[10px] leading-snug text-muted-foreground">
+                            {hit.path}
+                          </span>
+                        </div>
                       </button>
                     );
                   })
