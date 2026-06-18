@@ -226,6 +226,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     targetPaneId: string,
     direction: "left" | "right" | "top" | "bottom",
     path: string,
+    explorerRoot: string,
   ) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -236,7 +237,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
         const freshPaneId = newPaneId();
         const freshSplitId = newSplitId();
-        const panel: Panel = { id: newPanelId(), kind: "editor", path, preview: false, dirty: false };
+        const panel: Panel = { id: newPanelId(), kind: "editor", path, preview: false, dirty: false, explorerRoot };
         const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, panel);
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };

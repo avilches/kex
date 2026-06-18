@@ -47,7 +47,12 @@ type Props = {
   onMovePanel: UseWorkspacesReturn["movePanel"];
   onReorderPanel: UseWorkspacesReturn["reorderPanel"];
   onSplitPaneAndPlace: UseWorkspacesReturn["splitPaneAndPlace"];
-  onSplitPaneAndOpenFile: UseWorkspacesReturn["splitPaneAndOpenFile"];
+  onSplitPaneAndOpenFile: (
+    workspaceId: string,
+    targetPaneId: string,
+    direction: "left" | "right" | "top" | "bottom",
+    path: string,
+  ) => void;
   onOpenPanel: UseWorkspacesReturn["openPanel"];
   children: ReactNode;
 };

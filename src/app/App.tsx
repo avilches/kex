@@ -78,6 +78,7 @@ import {
 } from "@/modules/workspaces/lib/workspaceState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { resolveActiveExplorerRoot, resolveOpenRoot } from "@/modules/workspaces/lib/explorerRoot";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -334,7 +335,7 @@ export default function App() {
     if (activeCwd) lastTerminalCwdRef.current = activeCwd;
   }, [activeCwd]);
 
-  const explorerRoot = useMemo<string | null>(() => {
+  const ambientExplorerRoot = useMemo<string | null>(() => {
     if (activeCwd) return activeCwd;
     if (lastTerminalCwdRef.current) return lastTerminalCwdRef.current;
     for (const ws of workspaces) {
@@ -346,6 +347,14 @@ export default function App() {
     }
     return home;
   }, [activeCwd, workspaces, home]);
+
+  const explorerRoot = useMemo<string | null>(
+    () => resolveActiveExplorerRoot(activePanel, ambientExplorerRoot),
+    [activePanel, ambientExplorerRoot],
+  );
+
+  const explorerRootRef = useRef<string | null>(null);
+  explorerRootRef.current = explorerRoot;
 
   const openNewTerminal = useCallback((targetPaneId?: string) => {
     if (!activeWorkspace) return;
@@ -412,12 +421,13 @@ export default function App() {
         }
       }
       const panelId = newPanelId();
+      const panelExplorerRoot = resolveOpenRoot(explorerRootRef.current, path);
       openPanel(
         activeWorkspace.id,
         activeWorkspace.activePaneId,
         markdown
-          ? { id: panelId, kind: "markdown", path }
-          : { id: panelId, kind: "editor", path, dirty: false, preview: !(pin ?? false) },
+          ? { id: panelId, kind: "markdown", path, explorerRoot: panelExplorerRoot }
+          : { id: panelId, kind: "editor", path, dirty: false, preview: !(pin ?? false), explorerRoot: panelExplorerRoot },
       );
       return panelId;
     },
@@ -1232,7 +1242,15 @@ export default function App() {
               onMovePanel={movePanel}
               onReorderPanel={reorderPanel}
               onSplitPaneAndPlace={splitPaneAndPlace}
-              onSplitPaneAndOpenFile={splitPaneAndOpenFile}
+              onSplitPaneAndOpenFile={(workspaceId, targetPaneId, direction, path) =>
+                splitPaneAndOpenFile(
+                  workspaceId,
+                  targetPaneId,
+                  direction,
+                  path,
+                  resolveOpenRoot(explorerRootRef.current, path),
+                )
+              }
               onOpenPanel={openPanel}
             >
             <ResizablePanelGroup
