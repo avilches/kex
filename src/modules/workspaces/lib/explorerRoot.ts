@@ -1,0 +1,37 @@
+import { pathDirname } from "@/lib/pathUtils";
+
+function normalize(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
+function isUnder(path: string, root: string): boolean {
+  const p = normalize(path);
+  const r = normalize(root);
+  if (p === r) return true;
+  return p.startsWith(r.endsWith("/") ? r : `${r}/`);
+}
+
+// Root a recordar para un fichero abierto mientras se mostraba `explorerRoot`:
+// el propio explorerRoot si el fichero cuelga de el, o la carpeta del fichero.
+export function resolveOpenRoot(
+  explorerRoot: string | null,
+  path: string,
+): string {
+  if (explorerRoot && isUnder(path, explorerRoot)) return explorerRoot;
+  return pathDirname(path);
+}
+
+// Root expuesto: el del panel de fichero activo si lo recuerda, si no el ambiental.
+export function resolveActiveExplorerRoot(
+  activePanel: { kind: string; explorerRoot?: string } | null,
+  ambient: string | null,
+): string | null {
+  if (
+    activePanel &&
+    (activePanel.kind === "editor" || activePanel.kind === "markdown") &&
+    activePanel.explorerRoot
+  ) {
+    return activePanel.explorerRoot;
+  }
+  return ambient;
+}
