@@ -72,7 +72,7 @@ function FilePathLines({
   return (
     <div className="space-y-1.5 text-[11px]">
       <CopyablePath path={filename} className="font-medium text-foreground" />
-      {repoRel && repoRel !== filename && <CopyablePath path={repoRel} />}
+      {repoRel && <CopyablePath path={repoRel} />}
       <CopyablePath path={absPath} />
       {children}
     </div>
@@ -602,7 +602,7 @@ function DraggableTab({
       <HoverCardContent
         side="bottom"
         align="start"
-        className="w-fit min-w-44 max-w-96 rounded-xl p-2.5"
+        className="w-fit min-w-44 max-w-96 select-text rounded-xl p-2.5"
         onPointerEnter={() => { pointerInsideRef.current = true; }}
         onPointerLeave={() => { pointerInsideRef.current = false; }}
       >
