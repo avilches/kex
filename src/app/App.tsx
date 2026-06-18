@@ -245,7 +245,9 @@ export default function App() {
 
   const rightPanelRef = useRef<RightPanelHandle>(null);
   const rightPanelOpen = usePreferencesStore((s) => s.rightPanelOpen);
+  const rightPanelActiveTab = usePreferencesStore((s) => s.rightPanelActiveTab);
   const panelSide = usePreferencesStore((s) => s.panelSide);
+  const pendingExplorerSearch = useRef(false);
 
   // ── Live terminal panel tracking for session disposal ─────────────────────
 
@@ -314,6 +316,16 @@ export default function App() {
       resetToHome: (home) => { clearWorkspaceState(); resetWorkspaces(home); },
       clearWorkspaceState,
     });
+
+  // When Cmd+Shift+F is pressed while the panel is closed, the panel opens
+  // asynchronously (Tauri IPC). This effect fires once both conditions are met
+  // and calls focusExplorer() to open and focus the search input.
+  useEffect(() => {
+    if (rightPanelOpen && rightPanelActiveTab === "explorer" && pendingExplorerSearch.current) {
+      pendingExplorerSearch.current = false;
+      rightPanelRef.current?.focusExplorer();
+    }
+  }, [rightPanelOpen, rightPanelActiveTab]);
 
   // ── Last known terminal cwd for explorer root / new workspace inheritance ──
 
@@ -1023,9 +1035,9 @@ export default function App() {
       "pane.focusRight": () => focusPaneInDirection("right"),
       "pane.source": () => navigateRightPanelTo("explorer"),
       "explorer.search": () => {
+        pendingExplorerSearch.current = true;
         void setRightPanelOpen(true);
         void setRightPanelActiveTab("explorer");
-        requestAnimationFrame(() => rightPanelRef.current?.focusExplorer());
       },
       "terminal.clear": () => { clearFocusedTerminal(); },
       "blocks.prev": () => navigateFocusedBlocks(-1),
