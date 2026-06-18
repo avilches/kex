@@ -8,9 +8,13 @@ EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
 # Append full payload to /tmp (does not overwrite).
 # Two files: per-event (all panels) and per-panel (all events for this panel).
+# Header shows the event and the IPC socket where the payload will be sent.
 log_payload() {
+    local ipc_dest="${KEX_IPC:-(not set)}"
     local entry
-    entry="$(printf '=== %s ===\n' "$(date)"; printf '%s' "$PAYLOAD" | jq '.'; printf '\n')"
+    entry="$(printf '=== %s  [%s -> %s] ===\n' "$(date)" "$EVENT" "$ipc_dest"
+             printf '%s' "$PAYLOAD" | jq '.'
+             printf '\n')"
     printf '%s\n' "$entry" >> "/tmp/kex-hook-${EVENT}.log"        2>/dev/null
     printf '%s\n' "$entry" >> "/tmp/kex-panel-${KEX_PANEL_ID}.log" 2>/dev/null
 }

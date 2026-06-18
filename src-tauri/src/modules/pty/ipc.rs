@@ -166,7 +166,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "UserPromptSubmit" => {
             let prompt = p.prompt.as_deref().unwrap_or("");
-            log::debug!("[ipc] UserPromptSubmit panel={panel_id} prompt_len={}", prompt.len());
+            log::debug!("[ipc] UserPromptSubmit panel={panel_id} session={} prompt={prompt:?}", p.session_id);
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "UserPromptSubmit",
@@ -200,7 +200,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         "Stop" => {
             let reason = p.stop_reason.as_deref().unwrap_or("");
             let last   = p.last_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] Stop panel={panel_id} reason={reason}");
+            log::debug!("[ipc] Stop panel={panel_id} reason={reason} last={last:?}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "Stop",
@@ -212,7 +212,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "StopFailure" => {
             let err = p.error_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] StopFailure panel={panel_id}");
+            log::debug!("[ipc] StopFailure panel={panel_id} err={err:?}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "StopFailure",
@@ -240,7 +240,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
             }
             let delta   = p.delta.as_deref().unwrap_or("");
             let turn_id = p.turn_id.as_deref().unwrap_or("");
-            log::debug!("[ipc] MessageDisplay panel={panel_id} turn={turn_id}");
+            log::debug!("[ipc] MessageDisplay panel={panel_id} turn={turn_id} delta={delta:?}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "MessageDisplay",
