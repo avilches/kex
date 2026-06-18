@@ -56,6 +56,8 @@ export type PanelCallbacks = {
   onGitHistorySearchHandle?: (panelId: string, handle: GitHistorySearchHandle | null) => void;
   // Tab rename
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
+  // File rename (editor/markdown tabs — renames the file on disk)
+  onRenameFile?: (panelId: string, newName: string) => void;
 };
 
 type Props = {

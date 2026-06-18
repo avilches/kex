@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import React, { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
 import {
@@ -18,6 +18,7 @@ import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { useTabRenameStore } from "./lib/tabRenameStore";
+import { useFileRenameStore } from "./lib/fileRenameStore";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
@@ -153,31 +154,59 @@ function FilePathLines({
   repoRoot,
   repoRel,
   onRename,
+  isRenaming,
+  fileRenameRef,
+  onRenameCommit,
+  onRenameCancel,
   children,
 }: {
   absPath: string;
   repoRoot: string | null;
   repoRel: string | null;
   onRename?: () => void;
+  isRenaming?: boolean;
+  fileRenameRef?: React.Ref<HTMLInputElement>;
+  onRenameCommit?: () => void;
+  onRenameCancel?: () => void;
   children?: ReactNode;
 }) {
+  const filename = pathBasename(absPath);
   return (
     <HoverTable>
-      <HoverRow
-        label="Filename"
-        value={pathBasename(absPath)}
-        copy={pathBasename(absPath)}
-        valueClassName="font-medium text-foreground"
-        action={
-          onRename
-            ? {
-                icon: <HugeiconsIcon icon={PencilEdit01Icon} size={11} strokeWidth={1.9} />,
-                label: "Rename tab",
-                onClick: onRename,
-              }
-            : undefined
-        }
-      />
+      {isRenaming ? (
+        <>
+          <span className="whitespace-nowrap text-muted-foreground">Filename</span>
+          <input
+            ref={fileRenameRef}
+            autoFocus
+            defaultValue={filename}
+            onFocus={(e) => e.currentTarget.select()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); onRenameCommit?.(); }
+              if (e.key === "Escape") { e.preventDefault(); onRenameCancel?.(); }
+            }}
+            onBlur={() => onRenameCancel?.()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="min-w-0 bg-transparent text-[11px] font-medium text-foreground outline-none"
+          />
+        </>
+      ) : (
+        <HoverRow
+          label="Filename"
+          value={filename}
+          copy={filename}
+          valueClassName="font-medium text-foreground"
+          action={
+            onRename
+              ? {
+                  icon: <HugeiconsIcon icon={PencilEdit01Icon} size={11} strokeWidth={1.9} />,
+                  label: "Rename file",
+                  onClick: onRename,
+                }
+              : undefined
+          }
+        />
+      )}
       {repoRoot && <HoverRow label="Repo root" value={repoRoot} copy={repoRoot} />}
       {repoRel && <HoverRow label="Relative to repo" value={repoRel} copy={repoRel} />}
       <HoverRow label="Absolute path" value={absPath} copy={absPath} />
@@ -186,7 +215,21 @@ function FilePathLines({
   );
 }
 
-function EditorHoverContent({ absPath, onRename }: { absPath: string; onRename?: () => void }) {
+function EditorHoverContent({
+  absPath,
+  onRename,
+  isRenaming,
+  fileRenameRef,
+  onRenameCommit,
+  onRenameCancel,
+}: {
+  absPath: string;
+  onRename?: () => void;
+  isRenaming?: boolean;
+  fileRenameRef?: React.Ref<HTMLInputElement>;
+  onRenameCommit?: () => void;
+  onRenameCancel?: () => void;
+}) {
   const root = useGitRepoRoot(pathDirname(absPath));
   const abs = absPath.replace(/\\/g, "/");
   const repoRel =
@@ -194,7 +237,18 @@ function EditorHoverContent({ absPath, onRename }: { absPath: string; onRename?:
       ? abs.slice(root.length + 1)
       : null;
 
-  return <FilePathLines absPath={absPath} repoRoot={root} repoRel={repoRel} onRename={onRename} />;
+  return (
+    <FilePathLines
+      absPath={absPath}
+      repoRoot={root}
+      repoRel={repoRel}
+      onRename={onRename}
+      isRenaming={isRenaming}
+      fileRenameRef={fileRenameRef}
+      onRenameCommit={onRenameCommit}
+      onRenameCancel={onRenameCancel}
+    />
+  );
 }
 
 function GitFileHoverContent({
@@ -324,6 +378,7 @@ type Props = {
   onSplitBrowserDown: () => void;
   onDetachAgent: (panelId: string) => void;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
+  onRenameFile?: (panelId: string, newName: string) => void;
 };
 
 function DraggableTab({
@@ -348,6 +403,7 @@ function DraggableTab({
   onDetachAgent,
   shortcutLabels,
   onRenamePanel,
+  onRenameFile,
   onHoverChange,
   onSnapIntoView,
 }: {
@@ -372,6 +428,7 @@ function DraggableTab({
   onDetachAgent: (panelId: string) => void;
   shortcutLabels: Record<string, string | null>;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
+  onRenameFile?: (panelId: string, newName: string) => void;
   onHoverChange?: (panelId: string, open: boolean) => void;
   onSnapIntoView?: (panelId: string) => void;
 }) {
@@ -416,6 +473,8 @@ function DraggableTab({
   const inputRef = useRef<HTMLInputElement>(null);
   const handledRef = useRef(false);
   const [hoverOpen, setHoverOpen] = useState(false);
+  const [isFileRenaming, setIsFileRenaming] = useState(false);
+  const fileRenameInputRef = useRef<HTMLInputElement>(null);
   // Keep the hover card open while the pointer is still over the tab. Clicking a
   // tab moves focus into the terminal, which blurs the dnd-kit-focusable trigger
   // and would otherwise dismiss the card mid-hover.
@@ -426,11 +485,22 @@ function DraggableTab({
   }, [isRenaming]);
 
   useEffect(() => {
-    if (!anyRenaming) return;
+    if (!anyRenaming || isFileRenaming) return;
     setHoverOpen(false);
     onHoverChange?.(panel.id, false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyRenaming]);
+
+  // Open hover + start inline file rename when triggered via F2 shortcut
+  const triggerPanelId = useFileRenameStore((s) => s.triggerPanelId);
+  useEffect(() => {
+    if (triggerPanelId !== panel.id) return;
+    useFileRenameStore.getState().clearTrigger();
+    if (panel.kind !== "editor" && panel.kind !== "markdown") return;
+    setHoverOpen(true);
+    setIsFileRenaming(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerPanelId]);
 
   function handleSave() {
     if (handledRef.current) return;
@@ -447,9 +517,24 @@ function DraggableTab({
   }
 
   function handleRenameFromHover() {
+    setIsFileRenaming(true);
+  }
+
+  function commitFileRename() {
+    const value = fileRenameInputRef.current?.value.trim() ?? "";
+    const currentName = "path" in panel ? pathBasename((panel as { path: string }).path) : "";
+    setIsFileRenaming(false);
     setHoverOpen(false);
     onHoverChange?.(panel.id, false);
-    startRename(panel.id);
+    if (value && value !== currentName) {
+      onRenameFile?.(panel.id, value);
+    }
+  }
+
+  function cancelFileRename() {
+    setIsFileRenaming(false);
+    setHoverOpen(false);
+    onHoverChange?.(panel.id, false);
   }
 
   const hoverBody: ReactNode = (() => {
@@ -461,7 +546,16 @@ function DraggableTab({
           : <TerminalHoverCardContent customTitle={panel.title} cwd={panel.cwd} runningCommand={runningCommand} />;
       case "editor":
       case "markdown":
-        return <EditorHoverContent absPath={panel.path} onRename={handleRenameFromHover} />;
+        return (
+          <EditorHoverContent
+            absPath={panel.path}
+            onRename={isFileRenaming ? undefined : handleRenameFromHover}
+            isRenaming={isFileRenaming}
+            fileRenameRef={fileRenameInputRef}
+            onRenameCommit={commitFileRename}
+            onRenameCancel={cancelFileRename}
+          />
+        );
       case "git-diff":
         return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} />;
       case "git-commit-file":
@@ -492,7 +586,7 @@ function DraggableTab({
       onClick={() => onActivate(panel.id)}
       onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
       onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
-      onContextMenu={(e) => { if (anyRenaming) e.preventDefault(); }}
+      onContextMenu={(e) => { if (anyRenaming || isFileRenaming) e.preventDefault(); }}
       {...listeners}
       className={cn(
         "group relative flex max-w-[320px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
@@ -579,7 +673,7 @@ function DraggableTab({
       closeDelay={100}
       onOpenChange={(o) => {
         if (o && anyRenaming) return;
-        if (!o && pointerInsideRef.current) return;
+        if (!o && (pointerInsideRef.current || isFileRenaming)) return;
         setHoverOpen(o);
         onHoverChange?.(panel.id, o);
         if (o) onSnapIntoView?.(panel.id);
@@ -717,7 +811,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel }: Props) {
+export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onRenameFile }: Props) {
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutLabels: Record<string, string | null> = {
@@ -915,6 +1009,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           onDetachAgent={onDetachAgent}
           shortcutLabels={shortcutLabels}
           onRenamePanel={onRenamePanel}
+          onRenameFile={onRenameFile}
           onHoverChange={(panelId, open) => {
             if (open) hoverOpenPanelsRef.current.add(panelId);
             else hoverOpenPanelsRef.current.delete(panelId);

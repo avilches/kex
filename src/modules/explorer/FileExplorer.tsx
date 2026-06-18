@@ -47,6 +47,7 @@ export type FileExplorerHandle = {
   isFocused: () => boolean;
   focusSearch: () => void;
   toggleSearch: () => void;
+  refresh: (path: string) => void;
 };
 
 type Props = {
@@ -376,6 +377,7 @@ export const FileExplorer = memo(
             searchRef.current?.focus();
           }
         },
+        refresh: (path: string) => tree.refresh(path),
       }),
       [entryPaths, scrollEntryIntoView, selectedPath],
     );
