@@ -145,6 +145,13 @@ export const native = {
     invoke<void>("fs_create_file", { path, workspace: currentWorkspaceEnv() }),
   createDir: (path: string) =>
     invoke<void>("fs_create_dir", { path, workspace: currentWorkspaceEnv() }),
+  renameFile: async (from: string, to: string) => {
+    try {
+      await invoke<void>("git_mv", { from, to, workspace: currentWorkspaceEnv() });
+    } catch {
+      await invoke<void>("fs_rename", { from, to, workspace: currentWorkspaceEnv() });
+    }
+  },
   // AI tooling never sees dot-prefixed entries regardless of the user's
   // explorer preference — keeps .git / .env / .ssh out of agent context.
   readDir: (path: string) =>

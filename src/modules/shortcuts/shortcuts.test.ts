@@ -42,6 +42,23 @@ test("tab.rename has a label containing R", () => {
   expect(label).toMatch(/R/i);
 });
 
+test("tab.rename bare F2 binding matches a plain F2 keydown", () => {
+  const tabRename = SHORTCUTS.find((s) => s.id === "tab.rename");
+  expect(tabRename).toBeDefined();
+  const f2Event = {
+    key: "F2",
+    code: "F2",
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+  } as KeyboardEvent;
+  const matches = tabRename!.defaultBindings.some((b) =>
+    matchBinding(f2Event, b, "tab.rename"),
+  );
+  expect(matches).toBe(true);
+});
+
 describe("matchBinding", () => {
   function createMockKeyboardEvent(
     key: string,

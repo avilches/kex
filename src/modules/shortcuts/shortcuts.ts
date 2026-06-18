@@ -121,7 +121,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "tab.rename",
     label: "Rename tab",
     group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
+    defaultBindings: [{ [MOD_PROP]: true, key: "r" }, { key: "F2" }],
   },
   {
     id: "pane.splitRight",
