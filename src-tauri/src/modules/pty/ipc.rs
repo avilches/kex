@@ -145,11 +145,12 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
             // TODO: infer agent from the transcript path or a future payload field.
             session_store::record_session(panel_id, "claude", &p.session_id, &p.transcript_path, &p.cwd);
             let _ = app.emit(AGENT_SESSION_META_EVENT, serde_json::json!({
-                "panelId":      panel_id,
-                "sessionId":    p.session_id,
-                "cwdLaunch":    p.cwd,
-                "sessionTitle": session_title,
-                "model":        model,
+                "panelId":        panel_id,
+                "sessionId":      p.session_id,
+                "cwdLaunch":      p.cwd,
+                "sessionTitle":   session_title,
+                "model":          model,
+                "transcriptPath": p.transcript_path,
             }));
         }
         "SessionEnd" => {

@@ -142,6 +142,19 @@ describe("agentStore.markPanelSeen", () => {
   });
 });
 
+describe("agentStore.setMeta transcriptPath", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {} });
+  });
+
+  test("setMeta stores transcriptPath", () => {
+    useAgentStore.getState().start("panel-t", "tab-t", "claude");
+    useAgentStore.getState().setMeta("panel-t", { transcriptPath: "/home/user/.claude/projects/abc/session.jsonl" });
+    const meta = useAgentStore.getState().sessions["panel-t"]?.meta;
+    expect(meta?.transcriptPath).toBe("/home/user/.claude/projects/abc/session.jsonl");
+  });
+});
+
 describe("agentStore.clearAll", () => {
   beforeEach(() => {
     useAgentStore.setState({ sessions: {}, notifications: [] });

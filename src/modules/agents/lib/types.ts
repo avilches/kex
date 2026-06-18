@@ -27,6 +27,7 @@ export type AgentSessionMeta = {
   cwdLaunch?: string;
   sessionTitle?: string;
   model?: string;
+  transcriptPath?: string;
 };
 
 export type AgentSession = {

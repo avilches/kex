@@ -174,6 +174,12 @@ function AgentHoverCardContent({
           <span className="font-mono text-foreground">{sessionId}</span>
         </div>
       )}
+      {agentSession.meta?.transcriptPath && (
+        <div className="space-y-0.5">
+          <div className="text-muted-foreground">Transcript</div>
+          <CopyablePath path={agentSession.meta.transcriptPath} className="font-mono text-foreground" />
+        </div>
+      )}
       <div>
         <span className="text-muted-foreground">Started </span>
         <span className="text-foreground">{elapsed}</span>

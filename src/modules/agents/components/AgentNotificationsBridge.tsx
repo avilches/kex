@@ -17,6 +17,7 @@ type AgentSessionMetaPayload = {
   cwdLaunch: string;
   sessionTitle: string;
   model: string;
+  transcriptPath: string;
 };
 type Ctx = {
   workspaces: Workspace[];
@@ -227,10 +228,10 @@ export function AgentNotificationsBridge({
     let alive = true;
     let unlisten: (() => void) | undefined;
     listen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) => {
-      const { panelId, sessionId, cwdLaunch, sessionTitle, model } = e.payload;
+      const { panelId, sessionId, cwdLaunch, sessionTitle, model, transcriptPath } = e.payload;
       useAgentStore
         .getState()
-        .setMeta(panelId, { sessionId, cwdLaunch, sessionTitle, model });
+        .setMeta(panelId, { sessionId, cwdLaunch, sessionTitle, model, transcriptPath: transcriptPath || undefined });
     })
       .then((u) => {
         if (alive) unlisten = u;
