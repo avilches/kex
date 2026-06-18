@@ -26,24 +26,32 @@ import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 
-function CopyablePath({ path, className }: { path: string; className?: string }) {
+function CopyableRow({
+  label,
+  value,
+  copyValue,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  copyValue?: string;
+  valueClassName?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   return (
-    <div
-      className={cn(
-        "group/path flex items-start gap-1 break-all",
-        className ?? "text-muted-foreground",
-      )}
-    >
-      <span className="min-w-0">{path}</span>
+    <div className="group/path flex items-start gap-2 break-all">
+      <span className="w-[52px] shrink-0 text-muted-foreground">{label}</span>
+      <span className={cn("min-w-0 flex-1", valueClassName ?? "text-foreground")}>
+        {value}
+      </span>
       <button
         type="button"
-        title="Copy path"
+        title={`Copy ${label.toLowerCase()}`}
         onClick={(e) => {
           e.stopPropagation();
           void navigator.clipboard
-            .writeText(path)
+            .writeText(copyValue ?? value)
             .then(() => setCopied(true))
             .catch(() => {});
         }}
@@ -68,12 +76,11 @@ function FilePathLines({
   repoRel: string | null;
   children?: ReactNode;
 }) {
-  const filename = pathBasename(absPath);
   return (
     <div className="space-y-1.5 text-[11px]">
-      <CopyablePath path={filename} className="font-medium text-foreground" />
-      {repoRel && <CopyablePath path={repoRel} />}
-      <CopyablePath path={absPath} />
+      <CopyableRow label="File" value={pathBasename(absPath)} valueClassName="font-medium text-foreground" />
+      {repoRel && <CopyableRow label="Repo" value={repoRel} />}
+      <CopyableRow label="Full" value={absPath} />
       {children}
     </div>
   );
@@ -120,16 +127,15 @@ function GitFileHoverContent({
   return (
     <FilePathLines absPath={absPath} repoRel={path}>
       {originalPath && originalPath !== path && (
-        <div className="break-all">
-          <span className="text-muted-foreground">renamed from </span>
-          <span className="text-foreground">{originalPath}</span>
-        </div>
+        <CopyableRow label="Renamed" value={originalPath} />
       )}
       {sha && (
-        <div>
-          <span className="text-muted-foreground">commit </span>
-          <span className="font-mono text-foreground">{sha}</span>
-        </div>
+        <CopyableRow
+          label="Commit"
+          value={sha.slice(0, 8)}
+          copyValue={sha}
+          valueClassName="font-mono text-foreground"
+        />
       )}
     </FilePathLines>
   );
@@ -167,7 +173,7 @@ function AgentHoverCardContent({
           <span className="inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null}
       </div>
-      {directory && <CopyablePath path={directory} />}
+      {directory && <CopyableRow label="Path" value={directory} />}
       {sessionId && (
         <div className="break-all">
           <span className="text-muted-foreground">Session </span>
@@ -202,7 +208,7 @@ function TerminalHoverCardContent({
       {customTitle && (
         <div className="font-medium text-foreground">{customTitle}</div>
       )}
-      {cwd && <CopyablePath path={cwd} />}
+      {cwd && <CopyableRow label="Path" value={cwd} />}
       {runningCommand && (
         <div>
           <span className="text-muted-foreground">Running </span>
@@ -354,17 +360,16 @@ function DraggableTab({
       case "git-diff":
         return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} />;
       case "git-commit-file":
-        return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} sha={panel.sha.slice(0, 7)} />;
+        return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} sha={panel.sha} />;
       case "git-history":
         return (
           <div className="space-y-1.5 text-[11px]">
-            <div className="font-medium text-foreground">Git History</div>
-            <CopyablePath path={panel.repoRoot} />
+            <CopyableRow label="Repo" value={panel.repoRoot} />
           </div>
         );
       case "preview":
         return panel.url
-          ? <div className="space-y-1.5 text-[11px]"><CopyablePath path={panel.url} className="text-foreground" /></div>
+          ? <div className="space-y-1.5 text-[11px]"><CopyableRow label="URL" value={panel.url} /></div>
           : null;
       default:
         return null;
