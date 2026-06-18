@@ -37,6 +37,9 @@ import {
   COMPACT_ITEM,
 } from "@/modules/explorer/lib/menuItemClass";
 import { joinPath } from "@/modules/explorer/lib/useFileTree";
+import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
+import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   Alert02Icon,
   ArrowDown01Icon,
@@ -119,7 +122,7 @@ function upstreamBadgeLabel(upstream: string | null | undefined): string {
   return upstream;
 }
 
-function statusAccent(code: string): string {
+function statusAccentClass(code: string): string {
   switch (code) {
     case "A":
       return "bg-emerald-500/85";
@@ -898,6 +901,8 @@ const EntryRow = memo(function EntryRow({
     actionBusy === `unstage:${entry.path}`;
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
   const disabled = actionBusy !== null;
+  const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
+  const statusHex = gitStatusHexColor(entry.statusCode as GitStatusCode, gitColorScheme);
 
   const absolutePath = repoRoot
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
@@ -927,11 +932,12 @@ const EntryRow = memo(function EntryRow({
           <span
             className={cn(
               "pointer-events-none absolute inset-y-1 left-0 w-[2px] rounded-full transition-opacity",
-              statusAccent(entry.statusCode),
+              statusHex ? undefined : statusAccentClass(entry.statusCode),
               isSelected || focused
                 ? "opacity-100"
                 : "opacity-55 group-hover:opacity-95",
             )}
+            style={statusHex ? { backgroundColor: statusHex } : undefined}
             aria-hidden
           />
           <button
@@ -956,6 +962,10 @@ const EntryRow = memo(function EntryRow({
                     : "font-medium text-foreground/95",
                   pathLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
                 )}
+                style={{
+                  color: statusHex ?? undefined,
+                  textDecoration: entry.statusCode === "D" ? "line-through" : undefined,
+                }}
               >
                 {fileName}
               </span>

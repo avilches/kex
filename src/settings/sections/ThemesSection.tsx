@@ -29,7 +29,6 @@ import { validateTheme } from "@/modules/theme/validateTheme";
 import { deleteThemeFile, emitThemeEdit } from "@/modules/theme/themeFiles";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import {
-  Cancel01Icon,
   ComputerIcon,
   Edit02Icon,
   Moon02Icon,
@@ -204,22 +203,7 @@ export function ThemesSection() {
       <div className="flex flex-col gap-2">
         <Label>Explorer</Label>
         <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[12.5px] font-medium">Git file colors</span>
-            <button
-              type="button"
-              onClick={() => void setExplorerGitColorScheme("none")}
-              className={cn(
-                "flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11.5px] transition-all",
-                gitColorScheme === "none"
-                  ? "border-foreground/60 bg-card ring-1 ring-foreground/20"
-                  : "border-border/60 bg-transparent hover:border-border",
-              )}
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={1.75} />
-              <span>Disable git colors in explorer</span>
-            </button>
-          </div>
+          <span className="text-[12.5px] font-medium">Git file colors</span>
           <div className="grid grid-cols-2 gap-2">
             {(["vscode", "jetbrains"] as const).map((s) => (
               <button
@@ -504,7 +488,10 @@ function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
                 "text-[12px]",
                 isIgnored ? "text-muted-foreground/70" : isClean ? "text-foreground/85" : "",
               )}
-              style={color ? { color } : undefined}
+              style={{
+                ...(color ? { color } : {}),
+                ...(entry.label === "D" ? { textDecoration: "line-through" } : {}),
+              }}
             >
               {entry.name}
             </span>

@@ -6,7 +6,7 @@ export type ThemePref = "system" | "light" | "dark";
 
 export type TabBarStyle = "connected" | "pill";
 
-export type GitColorScheme = "none" | "vscode" | "jetbrains";
+export type GitColorScheme = "vscode" | "jetbrains";
 
 export const DEFAULT_THEME_ID = "kex-default";
 
@@ -78,7 +78,6 @@ const KEY_VIM_MODE = "vimMode";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
-const LEGACY_KEY_EXPLORER_GIT_DECORATIONS = "explorerGitDecorations";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
@@ -121,7 +120,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autostart: false,
   vimMode: false,
   showHidden: false,
-  explorerGitColorScheme: "none",
+  explorerGitColorScheme: "vscode",
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
   terminalFontFamily: "",
@@ -176,9 +175,7 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.showHidden,
     explorerGitColorScheme: (() => {
       const v = get<string>(KEY_EXPLORER_GIT_COLOR_SCHEME);
-      if (v === "none" || v === "vscode" || v === "jetbrains") return v;
-      const legacy = get<boolean>(LEGACY_KEY_EXPLORER_GIT_DECORATIONS);
-      if (legacy === true) return "vscode";
+      if (v === "vscode" || v === "jetbrains") return v;
       return DEFAULT_PREFERENCES.explorerGitColorScheme;
     })(),
     terminalWebglEnabled:

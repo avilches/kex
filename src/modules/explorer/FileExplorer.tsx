@@ -215,12 +215,7 @@ export const FileExplorer = memo(
     });
 
     const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
-    const gitEnabled = gitColorScheme !== "none";
-    const { lookup: lookupGitStatus } = useGitStatus(
-      rootPath,
-      gitEnabled ? gitStatus : null,
-      gitEnabled,
-    );
+    const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
@@ -497,7 +492,7 @@ export const FileExplorer = memo(
               isExternalDropTarget={externalTargetDir === row.path}
               gitStatusCode={row.gitStatusCode}
               gitColorScheme={gitColorScheme}
-              gitignored={gitEnabled && row.gitignored}
+              gitignored={row.gitignored}
               onOpenFile={onOpenFile}
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}

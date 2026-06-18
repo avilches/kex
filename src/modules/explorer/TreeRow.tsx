@@ -19,7 +19,7 @@ import {
   revealInFinder,
 } from "./lib/contextActions";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
-import { explorerGitTextClass } from "./lib/gitStatusColor";
+import { gitStatusHexColor } from "./lib/gitStatusColor";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
@@ -68,7 +68,7 @@ function EntryRowImpl(props: EntryRowProps) {
     isRenaming,
     isExternalDropTarget = false,
     gitStatusCode,
-    gitColorScheme = "none",
+    gitColorScheme = "vscode",
     gitignored = false,
     onOpenFile,
     onSelectPath,
@@ -209,12 +209,15 @@ function EntryRowImpl(props: EntryRowProps) {
               <span className="size-4 shrink-0" />
             )}
             <span
-              className={cn(
-                "min-w-0 flex-1 truncate",
-                !gitignored &&
-                  gitStatusCode &&
-                  explorerGitTextClass(gitStatusCode, gitColorScheme),
-              )}
+              className="min-w-0 flex-1 truncate"
+              style={
+                !gitignored && gitStatusCode
+                  ? {
+                      color: gitStatusHexColor(gitStatusCode, gitColorScheme) ?? undefined,
+                      textDecoration: gitStatusCode === "D" ? "line-through" : undefined,
+                    }
+                  : undefined
+              }
             >
               {name}
             </span>

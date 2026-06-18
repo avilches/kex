@@ -82,8 +82,7 @@ type Options = {
 export function useFileTree(rootPath: string | null, options?: Options) {
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const showHiddenRef = useRef(showHidden);
-  const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
-  const gitDecorationsRef = useRef(gitColorScheme !== "none");
+  const gitDecorationsRef = useRef(true);
   const [nodes, setNodes] = useState<TreeState>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
@@ -99,9 +98,6 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     showHiddenRef.current = showHidden;
   }, [showHidden]);
 
-  useEffect(() => {
-    gitDecorationsRef.current = gitColorScheme !== "none";
-  }, [gitColorScheme]);
 
   useEffect(() => {
     expandedRef.current = expanded;
@@ -244,11 +240,11 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       .filter(([, state]) => state.status === "loaded")
       .map(([path]) => path);
     for (const path of loadedPaths) void fetchChildren(path);
-    // Re-list loaded directories when visibility or git-decoration prefs change.
+    // Re-list loaded directories when visibility prefs change.
     // `nodes` is intentionally omitted so ordinary tree edits don't refetch
     // every expanded directory.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showHidden, gitColorScheme, rootPath, fetchChildren]);
+  }, [showHidden, rootPath, fetchChildren]);
 
   const toggle = useCallback(
     (path: string) => {
