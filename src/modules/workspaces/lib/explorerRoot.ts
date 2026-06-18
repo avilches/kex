@@ -21,17 +21,18 @@ export function resolveOpenRoot(
   return pathDirname(path);
 }
 
-// Root expuesto: el del panel de fichero activo si lo recuerda, si no el ambiental.
+// Root expuesto para el panel activo: si es de fichero usa su explorerRoot
+// recordado, o en su defecto la carpeta del propio fichero; si no, el ambiental.
 export function resolveActiveExplorerRoot(
-  activePanel: { kind: string; explorerRoot?: string } | null,
+  activePanel: { kind: string; explorerRoot?: string; path?: string } | null,
   ambient: string | null,
 ): string | null {
   if (
     activePanel &&
-    (activePanel.kind === "editor" || activePanel.kind === "markdown") &&
-    activePanel.explorerRoot
+    (activePanel.kind === "editor" || activePanel.kind === "markdown")
   ) {
-    return activePanel.explorerRoot;
+    if (activePanel.explorerRoot) return activePanel.explorerRoot;
+    if (activePanel.path) return pathDirname(activePanel.path);
   }
   return ambient;
 }

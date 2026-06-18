@@ -126,15 +126,30 @@ function useGitRepoRoot(dir: string | undefined): string | null {
   return root;
 }
 
-function EditorHoverContent({ absPath }: { absPath: string }) {
+function EditorHoverContent({
+  absPath,
+  explorerRoot,
+}: {
+  absPath: string;
+  explorerRoot?: string;
+}) {
   const root = useGitRepoRoot(pathDirname(absPath));
   const abs = absPath.replace(/\\/g, "/");
   const repoRel =
     root && abs !== root && abs.startsWith(`${root}/`)
       ? abs.slice(root.length + 1)
       : null;
+  const effectiveRoot = explorerRoot ?? pathDirname(abs);
 
-  return <FilePathLines absPath={absPath} repoRoot={root} repoRel={repoRel} />;
+  return (
+    <FilePathLines absPath={absPath} repoRoot={root} repoRel={repoRel}>
+      <HoverRow
+        label="Explorer root (debug)"
+        value={explorerRoot ? effectiveRoot : `${effectiveRoot} (fallback)`}
+        copy={effectiveRoot}
+      />
+    </FilePathLines>
+  );
 }
 
 function GitFileHoverContent({
@@ -380,7 +395,7 @@ function DraggableTab({
           : <TerminalHoverCardContent customTitle={panel.title} cwd={panel.cwd} runningCommand={runningCommand} />;
       case "editor":
       case "markdown":
-        return <EditorHoverContent absPath={panel.path} />;
+        return <EditorHoverContent absPath={panel.path} explorerRoot={panel.explorerRoot} />;
       case "git-diff":
         return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} />;
       case "git-commit-file":

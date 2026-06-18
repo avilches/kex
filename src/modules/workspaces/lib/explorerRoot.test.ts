@@ -35,7 +35,17 @@ describe("resolveActiveExplorerRoot", () => {
       resolveActiveExplorerRoot({ kind: "markdown", explorerRoot: "/a" }, "/b"),
     ).toBe("/a");
   });
-  it("cae al ambiental cuando el panel no tiene explorerRoot", () => {
+  it("usa la carpeta del fichero cuando el editor no tiene explorerRoot", () => {
+    expect(
+      resolveActiveExplorerRoot({ kind: "editor", path: "/x/y/a.ts" }, "/b"),
+    ).toBe("/x/y");
+  });
+  it("usa la carpeta del fichero cuando el markdown no tiene explorerRoot", () => {
+    expect(
+      resolveActiveExplorerRoot({ kind: "markdown", path: "/x/y/r.md" }, "/b"),
+    ).toBe("/x/y");
+  });
+  it("cae al ambiental para un editor sin explorerRoot ni path", () => {
     expect(resolveActiveExplorerRoot({ kind: "editor" }, "/b")).toBe("/b");
   });
   it("cae al ambiental para un panel de terminal", () => {
