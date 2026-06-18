@@ -1022,6 +1022,11 @@ export default function App() {
       "pane.focusLeft": () => focusPaneInDirection("left"),
       "pane.focusRight": () => focusPaneInDirection("right"),
       "pane.source": () => navigateRightPanelTo("explorer"),
+      "explorer.search": () => {
+        void setRightPanelOpen(true);
+        void setRightPanelActiveTab("explorer");
+        requestAnimationFrame(() => rightPanelRef.current?.focusExplorer());
+      },
       "terminal.clear": () => { clearFocusedTerminal(); },
       "blocks.prev": () => navigateFocusedBlocks(-1),
       "blocks.next": () => navigateFocusedBlocks(1),

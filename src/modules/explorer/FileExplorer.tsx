@@ -41,6 +41,7 @@ import { pathDirname } from "@/lib/pathUtils";
 import { useGlobalShortcuts } from "@/modules/shortcuts";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setRightPanelActiveTab } from "@/modules/settings/store";
 import type { GitStatusSnapshot } from "@/lib/native";
 
 export type FileExplorerHandle = {
@@ -383,6 +384,7 @@ export const FileExplorer = memo(
           closeSearch();
           return;
         }
+        void setRightPanelActiveTab("explorer");
         setIsSearchOpen(true);
         searchRef.current?.focus();
       },
