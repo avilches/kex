@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
 import {
@@ -21,6 +21,119 @@ import { useTabRenameStore } from "./lib/tabRenameStore";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { pathBasename, pathDirname } from "@/lib/pathUtils";
+import { native } from "@/lib/native";
+
+function CopyablePath({ path, className }: { path: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div
+      className={cn(
+        "group/path flex items-start gap-1 break-all",
+        className ?? "text-muted-foreground",
+      )}
+    >
+      <span className="min-w-0">{path}</span>
+      <button
+        type="button"
+        title="Copy path"
+        onClick={(e) => {
+          e.stopPropagation();
+          void navigator.clipboard
+            .writeText(path)
+            .then(() => setCopied(true))
+            .catch(() => {});
+        }}
+        className="mt-px flex size-[16px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/path:opacity-100 hover:text-foreground"
+      >
+        <HugeiconsIcon
+          icon={copied ? Tick02Icon : Copy01Icon}
+          size={11}
+          strokeWidth={1.9}
+        />
+      </button>
+    </div>
+  );
+}
+
+function FilePathLines({
+  absPath,
+  repoRel,
+  children,
+}: {
+  absPath: string;
+  repoRel: string | null;
+  children?: ReactNode;
+}) {
+  const filename = pathBasename(absPath);
+  return (
+    <div className="space-y-1.5 text-[11px]">
+      <CopyablePath path={filename} className="font-medium text-foreground" />
+      {repoRel && repoRel !== filename && <CopyablePath path={repoRel} />}
+      <CopyablePath path={absPath} />
+      {children}
+    </div>
+  );
+}
+
+function EditorHoverContent({ absPath }: { absPath: string }) {
+  const [repoRel, setRepoRel] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setRepoRel(null);
+    native
+      .gitResolveRepo(pathDirname(absPath))
+      .then((info) => {
+        if (cancelled || !info) return;
+        const root = info.repoRoot.replace(/\\/g, "/").replace(/\/$/, "");
+        const abs = absPath.replace(/\\/g, "/");
+        if (abs !== root && abs.startsWith(`${root}/`)) {
+          setRepoRel(abs.slice(root.length + 1));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [absPath]);
+
+  return <FilePathLines absPath={absPath} repoRel={repoRel} />;
+}
+
+function GitFileHoverContent({
+  repoRoot,
+  path,
+  originalPath,
+  sha,
+}: {
+  repoRoot: string;
+  path: string;
+  originalPath: string | null;
+  sha?: string;
+}) {
+  const root = repoRoot.replace(/\\/g, "/").replace(/\/$/, "");
+  const absPath = `${root}/${path}`;
+  return (
+    <FilePathLines absPath={absPath} repoRel={path}>
+      {originalPath && originalPath !== path && (
+        <div className="break-all">
+          <span className="text-muted-foreground">renamed from </span>
+          <span className="text-foreground">{originalPath}</span>
+        </div>
+      )}
+      {sha && (
+        <div>
+          <span className="text-muted-foreground">commit </span>
+          <span className="font-mono text-foreground">{sha}</span>
+        </div>
+      )}
+    </FilePathLines>
+  );
+}
 
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -54,9 +167,7 @@ function AgentHoverCardContent({
           <span className="inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null}
       </div>
-      {directory && (
-        <div className="break-all text-muted-foreground">{directory}</div>
-      )}
+      {directory && <CopyablePath path={directory} />}
       {sessionId && (
         <div className="break-all">
           <span className="text-muted-foreground">Session </span>
@@ -91,9 +202,7 @@ function TerminalHoverCardContent({
       {customTitle && (
         <div className="font-medium text-foreground">{customTitle}</div>
       )}
-      {cwd && (
-        <div className="break-all text-muted-foreground">{cwd}</div>
-      )}
+      {cwd && <CopyablePath path={cwd} />}
       {runningCommand && (
         <div>
           <span className="text-muted-foreground">Running </span>
@@ -231,6 +340,36 @@ function DraggableTab({
     handledRef.current = true;
     clearRename();
   }
+
+  const hoverBody: ReactNode = (() => {
+    switch (panel.kind) {
+      case "terminal":
+        if (isRestoreError) return null;
+        return hasAgent
+          ? <AgentHoverCardContent agentSession={agentSession!} cwd={panel.cwd} tabTitle={agentTitle} />
+          : <TerminalHoverCardContent customTitle={panel.title} cwd={panel.cwd} runningCommand={runningCommand} />;
+      case "editor":
+      case "markdown":
+        return <EditorHoverContent absPath={panel.path} />;
+      case "git-diff":
+        return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} />;
+      case "git-commit-file":
+        return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} sha={panel.sha.slice(0, 7)} />;
+      case "git-history":
+        return (
+          <div className="space-y-1.5 text-[11px]">
+            <div className="font-medium text-foreground">Git History</div>
+            <CopyablePath path={panel.repoRoot} />
+          </div>
+        );
+      case "preview":
+        return panel.url
+          ? <div className="space-y-1.5 text-[11px]"><CopyablePath path={panel.url} className="text-foreground" /></div>
+          : null;
+      default:
+        return null;
+    }
+  })();
 
   const tabDiv = (
     <div
@@ -459,7 +598,7 @@ function DraggableTab({
         />
       </PopoverContent>
     </Popover>
-    {panel.kind === "terminal" && !isRestoreError && (
+    {hoverBody && (
       <HoverCardContent
         side="bottom"
         align="start"
@@ -467,10 +606,7 @@ function DraggableTab({
         onPointerEnter={() => { pointerInsideRef.current = true; }}
         onPointerLeave={() => { pointerInsideRef.current = false; }}
       >
-        {hasAgent
-          ? <AgentHoverCardContent agentSession={agentSession!} cwd={panel.cwd} tabTitle={agentTitle} />
-          : <TerminalHoverCardContent customTitle={panel.title} cwd={panel.cwd} runningCommand={runningCommand} />
-        }
+        {hoverBody}
       </HoverCardContent>
     )}
     </HoverCard>
