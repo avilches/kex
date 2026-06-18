@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import type { GitStatusSnapshot } from "@/lib/native";
 
 export type FileExplorerHandle = {
@@ -216,6 +217,7 @@ export const FileExplorer = memo(
     });
 
     const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
+    const userShortcuts = usePreferencesStore((s) => s.shortcuts);
     const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -414,6 +416,14 @@ export const FileExplorer = memo(
       if (entryPaths.length === 0) return;
 
       const currentIdx = selectedPath ? entryPaths.indexOf(selectedPath) : -1;
+
+      if (matchesShortcut(e.nativeEvent, "file.rename", userShortcuts)) {
+        if (currentIdx < 0) return;
+        e.preventDefault();
+        rowActions.beginRename(entryPaths[currentIdx]);
+        return;
+      }
+
       const move = (next: number) => {
         const clamped = Math.max(0, Math.min(entryPaths.length - 1, next));
         const path = entryPaths[clamped];
@@ -470,13 +480,6 @@ export const FileExplorer = memo(
           if (row.kind !== "entry") break;
           if (row.isDir) tree.toggle(row.path);
           else onOpenFile(row.path);
-          break;
-        }
-        case "F2": {
-          if (currentIdx < 0) return;
-          e.preventDefault();
-          const path = entryPaths[currentIdx];
-          rowActions.beginRename(path);
           break;
         }
       }

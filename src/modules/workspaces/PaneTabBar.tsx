@@ -29,7 +29,7 @@ import { native } from "@/lib/native";
 
 function HoverTable({ children }: { children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5 text-[11px]">
+    <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5 text-[12px]">
       {children}
     </div>
   );
@@ -68,11 +68,11 @@ function HoverRow({
                 .then(() => setCopied(true))
                 .catch(() => {});
             }}
-            className="mt-px flex size-[16px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/row:opacity-100 hover:text-foreground"
+            className="flex size-[20px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/row:opacity-100 hover:text-foreground"
           >
             <HugeiconsIcon
               icon={copied ? Tick02Icon : Copy01Icon}
-              size={11}
+              size={14}
               strokeWidth={1.9}
             />
           </button>
@@ -85,7 +85,7 @@ function HoverRow({
               e.stopPropagation();
               action.onClick();
             }}
-            className="mt-px flex size-[16px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/row:opacity-100 hover:text-foreground"
+            className="flex size-[20px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/row:opacity-100 hover:text-foreground"
           >
             {action.icon}
           </button>
@@ -121,7 +121,7 @@ function FilePathLines({
     <HoverTable>
       {isRenaming ? (
         <>
-          <span className="whitespace-nowrap text-muted-foreground">Filename</span>
+          <span className="whitespace-nowrap text-muted-foreground">Rename file</span>
           <input
             ref={fileRenameRef}
             autoFocus
@@ -133,19 +133,19 @@ function FilePathLines({
             }}
             onBlur={() => onRenameCancel?.()}
             onPointerDown={(e) => e.stopPropagation()}
-            className="min-w-0 bg-transparent text-[11px] font-medium text-foreground outline-none"
+            className="min-w-0 rounded border border-input bg-transparent px-1.5 py-0.5 text-[12px] font-medium text-foreground outline-none focus:border-ring"
           />
         </>
       ) : (
         <HoverRow
-          label="Filename"
+          label="File name"
           value={filename}
           copy={filename}
           valueClassName="font-medium text-foreground"
           action={
             onRename
               ? {
-                  icon: <HugeiconsIcon icon={PencilEdit01Icon} size={11} strokeWidth={1.9} />,
+                  icon: <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={1.9} />,
                   label: "Rename file",
                   onClick: onRename,
                 }
@@ -276,7 +276,7 @@ function AgentHoverCardContent({
   const repoRoot = useGitRepoRoot(directory);
 
   return (
-    <div className="space-y-1.5 text-[11px]">
+    <div className="space-y-1.5 text-[12px]">
       <div className="flex items-center gap-1.5">
         <span className="font-medium text-foreground">{tabTitle}</span>
         {agentSession.status === "working" ? (
@@ -313,7 +313,7 @@ function TerminalHoverCardContent({
 }) {
   const repoRoot = useGitRepoRoot(cwd);
   return (
-    <div className="space-y-1.5 text-[11px]">
+    <div className="space-y-1.5 text-[12px]">
       {customTitle && (
         <div className="font-medium text-foreground">{customTitle}</div>
       )}
@@ -447,6 +447,7 @@ function DraggableTab({
   // tab moves focus into the terminal, which blurs the dnd-kit-focusable trigger
   // and would otherwise dismiss the card mid-hover.
   const pointerInsideRef = useRef(false);
+  const contextMenuOpenRef = useRef(false);
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
@@ -501,8 +502,10 @@ function DraggableTab({
 
   function cancelFileRename() {
     setIsFileRenaming(false);
-    setHoverOpen(false);
-    onHoverChange?.(panel.id, false);
+    if (!pointerInsideRef.current) {
+      setHoverOpen(false);
+      onHoverChange?.(panel.id, false);
+    }
   }
 
   const hoverBody: ReactNode = (() => {
@@ -639,7 +642,7 @@ function DraggableTab({
       openDelay={700}
       closeDelay={100}
       onOpenChange={(o) => {
-        if (o && anyRenaming) return;
+        if (o && (anyRenaming || contextMenuOpenRef.current)) return;
         if (!o && (pointerInsideRef.current || isFileRenaming)) return;
         setHoverOpen(o);
         onHoverChange?.(panel.id, o);
@@ -651,6 +654,7 @@ function DraggableTab({
       onOpenChange={(open) => { if (!open) handleSave(); }}
     >
       <ContextMenu onOpenChange={(o) => {
+          contextMenuOpenRef.current = o;
           if (o) {
             setHoverOpen(false);
             onHoverChange?.(panel.id, false);
@@ -743,11 +747,12 @@ function DraggableTab({
         side="bottom"
         align="start"
         sideOffset={4}
-        className="w-52 gap-0 rounded-lg p-1.5"
+        className="flex w-52 flex-col gap-1 rounded-lg p-2"
         onEscapeKeyDown={(e) => { e.preventDefault(); handleCancel(); }}
         onPointerDownOutside={(e) => e.preventDefault()}
         onFocusOutside={(e) => e.preventDefault()}
       >
+        <span className="text-[12px] text-muted-foreground">Rename tab</span>
         <input
           ref={inputRef}
           autoFocus
@@ -759,7 +764,7 @@ function DraggableTab({
             if (e.key === "Enter") { e.preventDefault(); handleSave(); }
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="w-full bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground/60"
+          className="w-full rounded border border-input bg-transparent px-1.5 py-1 text-[12px] text-foreground outline-none focus:border-ring placeholder:text-muted-foreground/60"
         />
       </PopoverContent>
     </Popover>

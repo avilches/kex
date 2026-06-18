@@ -1044,11 +1044,16 @@ export default function App() {
         const tag = active?.tagName;
         if ((tag === "INPUT" || tag === "TEXTAREA") && !active?.classList.contains("xterm-helper-textarea")) return;
         if (!activePanelId) return;
+        useTabRenameStore.getState().startRename(activePanelId);
+      },
+      "file.rename": () => {
+        const active = document.activeElement;
+        const tag = active?.tagName;
+        if ((tag === "INPUT" || tag === "TEXTAREA") && !active?.classList.contains("xterm-helper-textarea")) return;
+        if (!activePanelId) return;
         const panel = findPanelGlobal(activePanelId)?.panel;
         if (panel?.kind === "editor" || panel?.kind === "markdown") {
           useFileRenameStore.getState().trigger(activePanelId);
-        } else {
-          useTabRenameStore.getState().startRename(activePanelId);
         }
       },
       "tab.next": () => {
@@ -1155,7 +1160,7 @@ export default function App() {
           (activePanel as { blocks?: boolean }).blocks === true
         );
       }
-      if (id === "tab.rename") {
+      if (id === "file.rename") {
         return rightPanelRef.current?.isExplorerFocused() ?? false;
       }
 
