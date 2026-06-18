@@ -455,10 +455,10 @@ type GitPreviewEntry =
   | { name: string; label: string; kind: "ignored" | "clean" };
 
 const GIT_PREVIEW_ENTRIES: GitPreviewEntry[] = [
-  { name: "no_changes.rs", label: "",  kind: "clean" },
+  { name: "no_changes.html", label: "",  kind: "clean" },
   { name: "file_modified.ts", label: "M", color: { vscode: "#E2C08D", jetbrains: "#6897BB" } },
   { name: "new_file.rs",   label: "A", color: { vscode: "#81B88B", jetbrains: "#629755" } },
-  { name: "untracked.md",  label: "U", color: { vscode: "#73C991", jetbrains: "#C75450" } },
+  { name: "untracked.java",  label: "U", color: { vscode: "#73C991", jetbrains: "#C75450" } },
   { name: "deleted.md",    label: "D", color: { vscode: "#C74E39", jetbrains: "#9E9E9E" } },
   { name: "renamed.tsx",   label: "R", color: { vscode: "#73C991", jetbrains: "#6897BB" } },
   { name: "ignored.log",   label: "I", kind: "ignored" },
