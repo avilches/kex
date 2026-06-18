@@ -240,6 +240,7 @@ export const PaneView = memo(function PaneView({
         onSplitBrowserDown={handleSplitBrowserDown}
         onDetachAgent={handleDetachAgent}
         onRenamePanel={callbacks.onRenamePanel}
+        onUpdatePanel={callbacks.onUpdatePanel}
       />
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (

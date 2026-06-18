@@ -1,5 +1,6 @@
 export type Panel =
-  | { id: string; kind: "terminal";        cwd?: string;  title?: string; blocks?: boolean }
+  | { id: string; kind: "terminal"; cwd?: string; title?: string; blocks?: boolean;
+      locked?: boolean; restoreOnRestart?: boolean; persistentCommand?: string }
   | { id: string; kind: "editor";          path: string;  title?: string; dirty: boolean; preview: boolean }
   | { id: string; kind: "preview";         url: string;   title?: string }
   | { id: string; kind: "markdown";        path: string;  title?: string }

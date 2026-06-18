@@ -489,3 +489,15 @@ describe("splitPaneAndInsertPanel", () => {
     expect(result).toBe(p1);
   });
 });
+
+test("terminal panel locked field round-trips through the type", () => {
+  const panel = {
+    id: "p1",
+    kind: "terminal" as const,
+    locked: true,
+    restoreOnRestart: false,
+    persistentCommand: "lazygit",
+  };
+  expect(panel.locked).toBe(true);
+  expect(panel.persistentCommand).toBe("lazygit");
+});

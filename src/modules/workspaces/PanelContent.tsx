@@ -56,6 +56,8 @@ export type PanelCallbacks = {
   onGitHistorySearchHandle?: (panelId: string, handle: GitHistorySearchHandle | null) => void;
   // Tab rename
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
+  // Panel data update (used by tab bar lock/restore toggles)
+  onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
 };
 
 type Props = {

@@ -22,7 +22,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, LockIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 
@@ -198,10 +198,18 @@ function TerminalHoverCardContent({
   customTitle,
   cwd,
   runningCommand,
+  panelLocked,
+  panelRestoreOnRestart,
+  panelPersistentCommand,
+  onUpdatePanel,
 }: {
   customTitle: string | undefined;
   cwd: string | undefined;
   runningCommand: string | null;
+  panelLocked: boolean;
+  panelRestoreOnRestart: boolean;
+  panelPersistentCommand: string | undefined;
+  onUpdatePanel: (updater: (p: Panel) => Panel) => void;
 }) {
   return (
     <div className="space-y-1.5 text-[11px]">
@@ -215,6 +223,54 @@ function TerminalHoverCardContent({
           <span className="font-mono text-foreground">{runningCommand}</span>
         </div>
       )}
+      <div className="mt-1.5 space-y-1 border-t border-border/40 pt-1.5">
+        <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+          <input
+            type="checkbox"
+            className="size-3 accent-primary"
+            checked={panelRestoreOnRestart}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onUpdatePanel((p) => ({
+                ...p,
+                restoreOnRestart: checked,
+                persistentCommand: checked
+                  ? (panelPersistentCommand ?? runningCommand ?? "")
+                  : undefined,
+              }));
+            }}
+          />
+          <span className="text-muted-foreground">Restore on restart</span>
+        </label>
+        {panelRestoreOnRestart && (
+          <input
+            type="text"
+            placeholder="command to run (e.g. lazygit)"
+            defaultValue={panelPersistentCommand ?? ""}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              onUpdatePanel((p) => ({ ...p, persistentCommand: v || undefined }));
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              e.stopPropagation();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="h-6 w-full rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-primary"
+          />
+        )}
+        <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+          <input
+            type="checkbox"
+            className="size-3 accent-primary"
+            checked={panelLocked}
+            onChange={(e) => {
+              onUpdatePanel((p) => ({ ...p, locked: e.target.checked }));
+            }}
+          />
+          <span className="text-muted-foreground">Lock tab (prevent close)</span>
+        </label>
+      </div>
     </div>
   );
 }
@@ -237,6 +293,7 @@ type Props = {
   onSplitBrowserDown: () => void;
   onDetachAgent: (panelId: string) => void;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
+  onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
 };
 
 function DraggableTab({
@@ -261,6 +318,7 @@ function DraggableTab({
   onDetachAgent,
   shortcutLabels,
   onRenamePanel,
+  onUpdatePanel,
 }: {
   panel: Panel;
   activePanelId: string | null;
@@ -283,6 +341,7 @@ function DraggableTab({
   onDetachAgent: (panelId: string) => void;
   shortcutLabels: Record<string, string | null>;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
+  onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
   const wrappedListeners = useMemo(() => ({
@@ -361,7 +420,15 @@ function DraggableTab({
         if (isRestoreError) return null;
         return hasAgent
           ? <AgentHoverCardContent agentSession={agentSession!} cwd={panel.cwd} tabTitle={agentTitle} />
-          : <TerminalHoverCardContent customTitle={panel.title} cwd={panel.cwd} runningCommand={runningCommand} />;
+          : <TerminalHoverCardContent
+              customTitle={panel.title}
+              cwd={panel.cwd}
+              runningCommand={runningCommand}
+              panelLocked={panel.locked ?? false}
+              panelRestoreOnRestart={panel.restoreOnRestart ?? false}
+              panelPersistentCommand={panel.persistentCommand}
+              onUpdatePanel={(updater) => onUpdatePanel?.(panel.id, updater)}
+            />;
       case "editor":
       case "markdown":
         return <EditorHoverContent absPath={panel.path} />;
@@ -476,18 +543,33 @@ function DraggableTab({
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null
       )}
-      <button
-        type="button"
-        className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose(panel.id);
-        }}
-        title="Close panel"
-      >
-        <span className="text-[13px] leading-none">×</span>
-      </button>
+      {panel.kind === "terminal" && panel.locked ? (
+        <button
+          type="button"
+          className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground opacity-60 transition-opacity hover:!opacity-100 hover:bg-muted hover:text-foreground"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUpdatePanel?.(panel.id, (p) => ({ ...p, locked: false }));
+          }}
+          title="Unlock tab"
+        >
+          <HugeiconsIcon icon={LockIcon} size={11} strokeWidth={1.75} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose(panel.id);
+          }}
+          title="Close panel"
+        >
+          <span className="text-[13px] leading-none">×</span>
+        </button>
+      )}
     </div>
   );
 
@@ -627,7 +709,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel }: Props) {
+export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel }: Props) {
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutLabels: Record<string, string | null> = {
@@ -810,6 +892,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           onDetachAgent={onDetachAgent}
           shortcutLabels={shortcutLabels}
           onRenamePanel={onRenamePanel}
+          onUpdatePanel={onUpdatePanel}
         />
       ))}
       <button

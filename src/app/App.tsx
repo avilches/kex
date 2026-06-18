@@ -617,8 +617,19 @@ export default function App() {
         if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
       },
       registerTerminalHandle: (panelId, h) => {
-        if (h) terminalHandles.current.set(panelId, h);
-        else terminalHandles.current.delete(panelId);
+        if (h) {
+          terminalHandles.current.set(panelId, h);
+          const found = findPanelGlobal(panelId);
+          const panel = found?.panel;
+          if (panel?.kind === "terminal" && panel.restoreOnRestart && panel.persistentCommand) {
+            const cmd = panel.persistentCommand;
+            setTimeout(() => {
+              terminalHandles.current.get(panelId)?.write(cmd + "\r");
+            }, 300);
+          }
+        } else {
+          terminalHandles.current.delete(panelId);
+        }
       },
       onEditorDirtyChange: (panelId, dirty) => {
         const found = findPanelGlobal(panelId);
@@ -676,6 +687,10 @@ export default function App() {
       onRenamePanel: (panelId, title) => {
         const found = findPanelGlobal(panelId);
         if (found) updatePanelData(found.workspace.id, panelId, (p) => ({ ...p, title }));
+      },
+      onUpdatePanel: (panelId, updater) => {
+        const found = findPanelGlobal(panelId);
+        if (found) updatePanelData(found.workspace.id, panelId, updater);
       },
     }),
     [
@@ -932,8 +947,9 @@ export default function App() {
 
   const handleCloseActivePanel = useCallback(() => {
     if (!activeWorkspace || !activePanelId) return;
+    if (activePanel?.kind === "terminal" && activePanel.locked) return;
     void handleCloseGuard(activeWorkspace.id, activePanelId);
-  }, [activeWorkspace, activePanelId, handleCloseGuard]);
+  }, [activeWorkspace, activePanelId, activePanel, handleCloseGuard]);
 
   const cycleWorkspace = useCallback(
     (delta: 1 | -1) => {
