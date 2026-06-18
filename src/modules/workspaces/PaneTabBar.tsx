@@ -348,6 +348,7 @@ function DraggableTab({
   onDetachAgent,
   shortcutLabels,
   onRenamePanel,
+  onHoverChange,
 }: {
   panel: Panel;
   activePanelId: string | null;
@@ -370,6 +371,7 @@ function DraggableTab({
   onDetachAgent: (panelId: string) => void;
   shortcutLabels: Record<string, string | null>;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
+  onHoverChange?: (panelId: string, open: boolean) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
@@ -583,6 +585,7 @@ function DraggableTab({
       onOpenChange={(o) => {
         if (!o && pointerInsideRef.current) return;
         setHoverOpen(o);
+        onHoverChange?.(panel.id, o);
       }}
     >
     <Popover
@@ -729,6 +732,12 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   const userScrolledRef = useRef(false);
   const mouseLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mouseInsideRef = useRef(true);
+  const hoverOpenPanelsRef = useRef(new Set<string>());
+  const renamingPanelId = useTabRenameStore((s) => s.renamingPanelId);
+  const isRenamingRef = useRef(false);
+  useEffect(() => {
+    isRenamingRef.current = renamingPanelId !== null;
+  }, [renamingPanelId]);
 
   useEffect(() => { activePanelIdRef.current = activePanelId; });
 
@@ -759,6 +768,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     if (!container) return;
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (hoverOpenPanelsRef.current.size > 0 || isRenamingRef.current) return;
       const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       container.scrollLeft += delta;
       userScrolledRef.current = true;
@@ -897,6 +907,10 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           onDetachAgent={onDetachAgent}
           shortcutLabels={shortcutLabels}
           onRenamePanel={onRenamePanel}
+          onHoverChange={(panelId, open) => {
+            if (open) hoverOpenPanelsRef.current.add(panelId);
+            else hoverOpenPanelsRef.current.delete(panelId);
+          }}
         />
       ))}
       <button
