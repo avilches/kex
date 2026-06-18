@@ -470,6 +470,13 @@ export const FileExplorer = memo(
           else onOpenFile(row.path);
           break;
         }
+        case "F2": {
+          if (currentIdx < 0) return;
+          e.preventDefault();
+          const path = entryPaths[currentIdx];
+          rowActions.beginRename(path);
+          break;
+        }
       }
     };
 
