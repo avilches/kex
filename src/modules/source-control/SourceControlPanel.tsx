@@ -995,7 +995,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
   const fileName = basename(entry.path);
   const iconUrl = fileIconUrl(fileName);
   const pathLabel = entry.originalPath
-    ? `${entry.originalPath} -> ${entry.path}`
+    ? `${entry.originalPath} → ${entry.path}`
     : dirname(entry.path);
   const isBusy = actionBusy === `unstage:${entry.path}`;
   const disabled = actionBusy !== null;
@@ -1066,7 +1066,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
               ) : null}
             </div>
           </button>
-          <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 data-[focused=true]:opacity-100 data-[selected=true]:opacity-100">
+          <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-data-[focused=true]:opacity-100 group-data-[selected=true]:opacity-100">
             <IconActionButton
               label={`Unstage ${entry.path}`}
               disabled={disabled}
@@ -1152,7 +1152,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
   const fileName = basename(entry.path);
   const iconUrl = fileIconUrl(fileName);
   const pathLabel = entry.originalPath
-    ? `${entry.originalPath} -> ${entry.path}`
+    ? `${entry.originalPath} → ${entry.path}`
     : dirname(entry.path);
   const isStageBusy = actionBusy === `stage:${entry.path}`;
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
@@ -1224,7 +1224,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
               ) : null}
             </div>
           </button>
-          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 data-[focused=true]:opacity-100 data-[selected=true]:opacity-100">
+          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-data-[focused=true]:opacity-100 group-data-[selected=true]:opacity-100">
             <IconActionButton
               label={`Discard ${entry.path}`}
               disabled={disabled}
