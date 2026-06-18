@@ -352,7 +352,7 @@ function DraggableTab({
       open={isRenaming}
       onOpenChange={(open) => { if (!open) handleSave(); }}
     >
-      <ContextMenu>
+      <ContextMenu onOpenChange={(o) => { if (o) setHoverOpen(false); }}>
         <ContextMenuTrigger asChild>
           <PopoverAnchor asChild>
             <HoverCardTrigger asChild>
