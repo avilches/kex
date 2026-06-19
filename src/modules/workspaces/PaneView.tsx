@@ -5,6 +5,7 @@ import { PaneTabBar } from "./PaneTabBar";
 import { PanelContent } from "./PanelContent";
 import type { PanelCallbacks } from "./PanelContent";
 import type { PaneNode } from "./lib/types";
+import { isBulkClosable } from "./lib/panelClose";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import { detachAgentSession } from "@/modules/agents/lib/agentSessionRestore";
@@ -199,10 +200,14 @@ export const PaneView = memo(function PaneView({
   const handleClose = useCallback((panelId: string) => onClosePanel(workspaceId, panelId), [onClosePanel, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
   const handleCloseOtherPanels = useCallback((panelId: string) => {
-    pane.panels.filter((p) => p.id !== panelId).forEach((p) => onClosePanel(workspaceId, p.id));
+    pane.panels
+      .filter((p) => p.id !== panelId && isBulkClosable(p))
+      .forEach((p) => onClosePanel(workspaceId, p.id));
   }, [pane.panels, onClosePanel, workspaceId]);
   const handleCloseAllPanels = useCallback(() => {
-    [...pane.panels].forEach((p) => onClosePanel(workspaceId, p.id));
+    pane.panels
+      .filter(isBulkClosable)
+      .forEach((p) => onClosePanel(workspaceId, p.id));
   }, [pane.panels, onClosePanel, workspaceId]);
   const handleSplitTerminalRight = useCallback(() => onSplitTerminalRight(workspaceId, pane.id), [onSplitTerminalRight, workspaceId, pane.id]);
   const handleSplitTerminalDown = useCallback(() => onSplitTerminalDown(workspaceId, pane.id), [onSplitTerminalDown, workspaceId, pane.id]);
