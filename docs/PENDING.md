@@ -27,6 +27,10 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-34](pending/bugs/BUG-34-cd-quoting-breaks-cmd-fallback.md) — cd quoting rompe fallback a cmd.exe
 - [BUG-38](pending/bugs/BUG-38-busqueda-cmdF-incompleta.md) - Cmd+F: no busca en markdown/git-diff (terminal y editor resueltos)
 - [BUG-39](pending/bugs/BUG-39-file-search-ux-poco-clara.md) - Busqueda de ficheros: UX poco clara (solo via Cmd+P + #?)
+- [BUG-40](pending/bugs/BUG-40-stage-unstage-all-incompleto.md) — Stage all / unstage all no procesa todos los ficheros
+- [BUG-41](pending/bugs/BUG-41-explore-root-por-editor-restore.md) — Explore root por editor: persistencia y restore sin verificar
+- [BUG-42](pending/bugs/BUG-42-borrar-fichero-con-editor-abierto.md) — Borrar un fichero con el editor abierto (sin verificar)
+- [BUG-43](pending/bugs/BUG-43-restore-claude-code-con-worktree.md) — Restore de Claude Code cuando ha creado un worktree (sin verificar)
 
 ## Features (`docs/pending/features/`)
 
@@ -36,6 +40,8 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [F5](pending/features/F5-reabrir-tab-cerrado.md) — Reabrir tab cerrado
 - [F6](pending/features/F6-scrollback-persistente.md) — Scrollback persistente
 - [F7](pending/features/F7-tab-bar-style-en-settings.md) — Exponer el estilo de tab bar en Settings
+- [F8](pending/features/F8-explorer-navegacion-teclado.md) — Navegacion del explorer por teclado
+- [F9](pending/features/F9-explorer-operaciones-fichero.md) — Operaciones de fichero en el explorer (duplicar, copiar/pegar, cortar, borrar) + limpieza del menu
 
 ## Mejoras (`docs/pending/improvements/`)
 
@@ -47,6 +53,8 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [M6](pending/improvements/M6-reaping-bg-procs-y-registry.md) — Reaping de procesos background y registry
 - [M7](pending/improvements/M7-quick-wins.md) — Quick wins varios
 - [M8](pending/improvements/M8-release-appimage-wayland-updater-sig.md) — Adoptar sistema de release de AppImage del upstream (fix libwayland + sig race-free)
+- [M9](pending/improvements/M9-rebind-rename-f2-shift-f6.md) — Rebind del atajo de rename: F2 -> Shift+F6
+- [M10](pending/improvements/M10-rendimiento-busqueda-ficheros.md) — Rendimiento de la busqueda de ficheros (fs_search async/paralelo/cancelable + tuning de contenido)
 
 ## Contexto adicional (`docs/pending/`)
 
