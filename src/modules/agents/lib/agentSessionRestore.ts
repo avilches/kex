@@ -9,6 +9,14 @@ export type RestorePlan = {
 };
 
 let restorePlans: Map<string, RestorePlan> | null = null;
+// Resolves once plans are loaded so the terminal spawn can make a correct
+// consume decision instead of racing the load.
+let readyResolve!: () => void;
+const readyPromise = new Promise<void>((r) => { readyResolve = r; });
+
+export function restorePlansReady(): Promise<void> {
+  return readyPromise;
+}
 
 export async function loadRestorePlans(): Promise<void> {
   try {
@@ -24,6 +32,8 @@ export async function loadRestorePlans(): Promise<void> {
   } catch (err) {
     console.error("[agent-session] loadRestorePlans error:", err);
     restorePlans = new Map();
+  } finally {
+    readyResolve();
   }
 }
 

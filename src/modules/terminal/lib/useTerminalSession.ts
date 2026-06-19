@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { consumeRestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { consumeRestorePlan, restorePlansReady } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -55,6 +55,11 @@ type Session = {
   ptyOpening: boolean;
   ptyGen: number;
   initialCwd: string | undefined;
+  // "Run on start" config, captured at startup. On the first PTY spawn the
+  // session decides what to inject: the agent resume (if it had an agent) or
+  // this command (otherwise). `restoreOnRestart === false` disables both.
+  restoreOnRestart: boolean | undefined;
+  persistentCommand: string | undefined;
   lastCwd: string | null;
   pendingExit: number | null;
   shellExited: boolean;
@@ -345,6 +350,8 @@ function ensureSession(
     ptyOpening: false,
     ptyGen: 0,
     initialCwd,
+    restoreOnRestart: undefined,
+    persistentCommand: undefined,
     lastCwd: null,
     pendingExit: null,
     shellExited: false,
@@ -539,38 +546,55 @@ function attachSession(
   if (s.visibleNow) bindLeafToSlot(leafId, s);
 
   if (!s.pty && !s.ptyOpening && !s.shellExited) {
-    // Consume the restore plan before spawning so we can start the PTY in the
-    // session's cwd directly, without needing a `cd` shell command.
-    const plan = consumeRestorePlan(leafId);
-    const ptyCwd = plan?.resumeCmd ? plan.cwd : s.initialCwd;
-
     s.ptyOpening = true;
-    openPtyForSession(leafId, s, ptyCwd)
-      .then((pty) => {
+    // Wait until restore plans are loaded so the consume decision is correct,
+    // then spawn. One place owns "what to inject on a restored terminal":
+    //   - "Run on start" off              -> nothing
+    //   - had an agent (plan)             -> resume it (or surface its error)
+    //   - no agent, has a saved command   -> run that command
+    void restorePlansReady().then(() => {
+      if (s.disposed || s.pty) {
         s.ptyOpening = false;
-        if (s.disposed) {
-          pty.close();
-          return;
-        }
-        s.pty = pty;
-        if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
-        if (plan) {
-          const store = useAgentStore.getState();
-          if (plan.resumeCmd) {
-            setTimeout(() => {
-              s.pty?.write(" " + plan.resumeCmd + "\r");
-            }, 200);
-          } else if (plan.errorReason) {
-            console.error(`[kex] session restore failed for panel ${leafId} (${plan.agent}): ${plan.errorReason}`);
-            store.setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
+        return;
+      }
+      // Consume the plan before spawning so the PTY starts in the agent's cwd
+      // directly, without needing a `cd` shell command.
+      const plan = consumeRestorePlan(leafId);
+      const runOnStart = s.restoreOnRestart !== false;
+      const ptyCwd = runOnStart && plan?.resumeCmd ? plan.cwd : s.initialCwd;
+
+      openPtyForSession(leafId, s, ptyCwd)
+        .then((pty) => {
+          s.ptyOpening = false;
+          if (s.disposed) {
+            pty.close();
+            return;
           }
-          // else: no command, no error — PTY just opened at plan.cwd, nothing to do
-        }
-      })
-      .catch((e) => {
-        s.ptyOpening = false;
-        console.error("[kex] openPty failed:", e);
-      });
+          s.pty = pty;
+          if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
+          if (!runOnStart) return;
+          if (plan) {
+            if (plan.resumeCmd) {
+              setTimeout(() => {
+                s.pty?.write(" " + plan.resumeCmd + "\r");
+              }, 200);
+            } else if (plan.errorReason) {
+              console.error(`[kex] session restore failed for panel ${leafId} (${plan.agent}): ${plan.errorReason}`);
+              useAgentStore.getState().setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
+            }
+            // else: no command, no error — PTY just opened at plan.cwd, nothing to do
+          } else if (s.persistentCommand) {
+            const cmd = s.persistentCommand;
+            setTimeout(() => {
+              s.pty?.write(cmd + "\r");
+            }, 300);
+          }
+        })
+        .catch((e) => {
+          s.ptyOpening = false;
+          console.error("[kex] openPty failed:", e);
+        });
+    });
   }
 }
 
@@ -664,6 +688,8 @@ type Options = {
   focused?: boolean;
   initialCwd?: string;
   blocks?: boolean;
+  restoreOnRestart?: boolean;
+  persistentCommand?: string;
   onSearchReady?: (addon: SearchAddon) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
@@ -677,6 +703,8 @@ export function useTerminalSession({
   focused = true,
   initialCwd,
   blocks = false,
+  restoreOnRestart,
+  persistentCommand,
   onSearchReady,
   onExit,
   onCwd,
@@ -690,10 +718,16 @@ export function useTerminalSession({
   // would detach/rebind the renderer slot (disposing block markers) on each cd.
   const initialCwdRef = useRef(initialCwd);
   initialCwdRef.current = initialCwd;
+  // Run-on-start config is read once at the first PTY spawn (startup), so keep
+  // it in refs and off the effect deps just like initialCwd.
+  const runOnStartRef = useRef({ restoreOnRestart, persistentCommand });
+  runOnStartRef.current = { restoreOnRestart, persistentCommand };
 
   useEffect(() => {
     let cancelled = false;
     const s = ensureSession(leafId, initialCwdRef.current, blocks);
+    s.restoreOnRestart = runOnStartRef.current.restoreOnRestart;
+    s.persistentCommand = runOnStartRef.current.persistentCommand;
     s.ready.then(() => {
       if (cancelled || s.disposed) return;
       const node = container.current;

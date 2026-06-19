@@ -678,19 +678,8 @@ export default function App() {
         if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
       },
       registerTerminalHandle: (panelId, h) => {
-        if (h) {
-          terminalHandles.current.set(panelId, h);
-          const found = findPanelGlobal(panelId);
-          const panel = found?.panel;
-          if (panel?.kind === "terminal" && panel.restoreOnRestart && panel.persistentCommand) {
-            const cmd = panel.persistentCommand;
-            setTimeout(() => {
-              terminalHandles.current.get(panelId)?.write(cmd + "\r");
-            }, 300);
-          }
-        } else {
-          terminalHandles.current.delete(panelId);
-        }
+        if (h) terminalHandles.current.set(panelId, h);
+        else terminalHandles.current.delete(panelId);
       },
       onEditorDirtyChange: (panelId, dirty) => {
         const found = findPanelGlobal(panelId);
@@ -1140,6 +1129,14 @@ export default function App() {
         activatePanel(first.tabId, first.panelId);
         setTimeout(() => terminalHandles.current.get(first.panelId)?.focus(), 50);
       },
+      "tab.lock": () => {
+        if (!activePanelId || activePanel?.kind !== "terminal") return;
+        const found = findPanelGlobal(activePanelId);
+        if (found)
+          updatePanelData(found.workspace.id, activePanelId, (p) =>
+            p.kind === "terminal" ? { ...p, locked: !p.locked } : p,
+          );
+      },
       "path.copy": () => {
         if (!activePanel) return;
         let path: string | undefined;
@@ -1164,6 +1161,8 @@ export default function App() {
       activePanel,
       activeCwd,
       workspaces,
+      findPanelGlobal,
+      updatePanelData,
       openCommandPalette,
       cycleWorkspace,
       activatePanel,
@@ -1202,6 +1201,10 @@ export default function App() {
       }
       if (id === "file.rename") {
         return rightPanelRef.current?.isExplorerFocused() ?? false;
+      }
+      if (id === "tab.lock") {
+        // Only terminal tabs are lockable; leave Cmd+L to CodeMirror elsewhere.
+        return activePanel?.kind !== "terminal";
       }
 
       return false;

@@ -40,6 +40,9 @@ type Props = {
   initialCwd?: string;
   /** Enable command-block decorations (OSC 133) for this terminal. */
   blocks?: boolean;
+  /** "Run on start": resume the agent or run the saved command on first spawn. */
+  restoreOnRestart?: boolean;
+  persistentCommand?: string;
   onSearchReady?: (panelId: string, addon: SearchAddon) => void;
   onExit?: (panelId: string, code: number) => void;
   onCwd?: (panelId: string, cwd: string) => void;
@@ -54,6 +57,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       focused = true,
       initialCwd,
       blocks = false,
+      restoreOnRestart,
+      persistentCommand,
       onSearchReady,
       onExit,
       onCwd,
@@ -72,6 +77,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       focused,
       initialCwd,
       blocks,
+      restoreOnRestart,
+      persistentCommand,
       onSearchReady: (a) => onSearchReady?.(panelId, a),
       onExit: (c) => onExit?.(panelId, c),
       onCwd: (c) => onCwd?.(panelId, c),

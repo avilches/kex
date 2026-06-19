@@ -87,6 +87,8 @@ export function PanelContent({ panel, visible, focused, callbacks }: Props) {
           focused={focused}
           initialCwd={panel.cwd}
           blocks={panel.blocks}
+          restoreOnRestart={panel.restoreOnRestart}
+          persistentCommand={panel.persistentCommand}
           onSearchReady={callbacks.onSearchReady}
           onExit={callbacks.onExit}
           onCwd={callbacks.onCwd}

@@ -23,7 +23,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Copy01Icon, LockIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 
@@ -41,12 +41,14 @@ function HoverRow({
   copy,
   action,
   valueClassName,
+  valueSuffix,
 }: {
   label: string;
   value: string;
   copy?: string;
   action?: { icon: ReactNode; label: string; onClick: () => void };
   valueClassName?: string;
+  valueSuffix?: ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -56,6 +58,7 @@ function HoverRow({
       <span className="group/row flex min-w-0 items-start gap-1">
         <span className={cn("min-w-0 break-words", valueClassName ?? "text-foreground")}>
           {value}
+          {valueSuffix}
         </span>
         {copy !== undefined && (
           <button
@@ -265,15 +268,35 @@ function AgentHoverCardContent({
   agentSession,
   cwd,
   tabTitle,
+  panelRestoreOnRestart,
+  onUpdatePanel,
 }: {
   agentSession: AgentSession;
   cwd: string | undefined;
   tabTitle: string;
+  panelRestoreOnRestart: boolean;
+  onUpdatePanel: (updater: (p: Panel) => Panel) => void;
 }) {
   const elapsed = formatElapsed(Date.now() - agentSession.startedAt);
   const sessionId = agentSession.meta?.sessionId;
   const directory = cwd ?? agentSession.meta?.cwdLaunch;
   const repoRoot = useGitRepoRoot(directory);
+  const transcriptPath = agentSession.meta?.transcriptPath;
+  const [transcriptExists, setTranscriptExists] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!transcriptPath) {
+      setTranscriptExists(null);
+      return;
+    }
+    let cancelled = false;
+    setTranscriptExists(null);
+    native
+      .fsStat(transcriptPath)
+      .then(() => { if (!cancelled) setTranscriptExists(true); })
+      .catch(() => { if (!cancelled) setTranscriptExists(false); });
+    return () => { cancelled = true; };
+  }, [transcriptPath]);
 
   return (
     <div className="space-y-1.5 text-[12px]">
@@ -291,8 +314,18 @@ function AgentHoverCardContent({
         {sessionId && (
           <HoverRow label="Session" value={sessionId} copy={sessionId} valueClassName="font-mono text-foreground" />
         )}
-        {agentSession.meta?.transcriptPath && (
-          <HoverRow label="Transcript" value={agentSession.meta.transcriptPath} copy={agentSession.meta.transcriptPath} valueClassName="font-mono text-foreground" />
+        {transcriptPath && (
+          <HoverRow
+            label="Transcript"
+            value={transcriptPath}
+            copy={transcriptPath}
+            valueClassName="font-mono text-foreground"
+            valueSuffix={
+              transcriptExists === false ? (
+                <span className="ml-1.5 font-sans text-muted-foreground">not created yet</span>
+              ) : undefined
+            }
+          />
         )}
         <HoverRow label="Started" value={`${elapsed} ago`} />
       </HoverTable>
@@ -301,6 +334,20 @@ function AgentHoverCardContent({
           {agentSession.restoreErrorReason ?? "unknown error"}
         </div>
       )}
+      <div className="mt-1.5 border-t border-border/40 pt-1.5">
+        <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+          <input
+            type="checkbox"
+            className="size-3 accent-primary"
+            checked={panelRestoreOnRestart}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onUpdatePanel((p) => ({ ...p, restoreOnRestart: checked }));
+            }}
+          />
+          <span className="text-muted-foreground">Run on start</span>
+        </label>
+      </div>
     </div>
   );
 }
@@ -312,6 +359,7 @@ function TerminalHoverCardContent({
   panelLocked,
   panelRestoreOnRestart,
   panelPersistentCommand,
+  lockShortcut,
   onUpdatePanel,
 }: {
   customTitle: string | undefined;
@@ -320,6 +368,7 @@ function TerminalHoverCardContent({
   panelLocked: boolean;
   panelRestoreOnRestart: boolean;
   panelPersistentCommand: string | undefined;
+  lockShortcut: string | null;
   onUpdatePanel: (updater: (p: Panel) => Panel) => void;
 }) {
   const repoRoot = useGitRepoRoot(cwd);
@@ -352,7 +401,7 @@ function TerminalHoverCardContent({
               }));
             }}
           />
-          <span className="text-muted-foreground">Restore on restart</span>
+          <span className="text-muted-foreground">Run on start</span>
         </label>
         {panelRestoreOnRestart && (
           <input
@@ -381,6 +430,11 @@ function TerminalHoverCardContent({
             }}
           />
           <span className="text-muted-foreground">Lock tab (prevent close)</span>
+          {lockShortcut && (
+            <span className="ml-auto shrink-0 text-[10px] tracking-wide text-muted-foreground/60">
+              {lockShortcut}
+            </span>
+          )}
         </label>
       </div>
     </div>
@@ -435,6 +489,7 @@ function DraggableTab({
   onRenameFile,
   onHoverChange,
   onSnapIntoView,
+  closeHoverToken,
 }: {
   panel: Panel;
   activePanelId: string | null;
@@ -461,6 +516,7 @@ function DraggableTab({
   onRenameFile?: (panelId: string, newName: string) => void;
   onHoverChange?: (panelId: string, open: boolean) => void;
   onSnapIntoView?: (panelId: string) => void;
+  closeHoverToken: number;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
   const wrappedListeners = useMemo(() => ({
@@ -474,6 +530,8 @@ function DraggableTab({
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
   const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${panel.id}:after`, disabled: !isWorkspaceActive });
   const active = panel.id === activePanelId;
+  const isLockable = panel.kind === "terminal";
+  const isLocked = panel.kind === "terminal" && (panel.locked ?? false);
   const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const runningCommand = panel.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
   const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
@@ -530,6 +588,14 @@ function DraggableTab({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyRenaming]);
 
+  // Force-close the hover when the tab bar is scrolled (bumped by the parent).
+  useEffect(() => {
+    if (closeHoverToken === 0) return;
+    setHoverOpen(false);
+    onHoverChange?.(panel.id, false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closeHoverToken]);
+
   // Open hover + start inline file rename when triggered via F2 shortcut
   const triggerPanelId = useFileRenameStore((s) => s.triggerPanelId);
   useEffect(() => {
@@ -583,7 +649,13 @@ function DraggableTab({
       case "terminal":
         if (isRestoreError) return null;
         return hasAgent
-          ? <AgentHoverCardContent agentSession={agentSession!} cwd={panel.cwd} tabTitle={agentTitle} />
+          ? <AgentHoverCardContent
+              agentSession={agentSession!}
+              cwd={panel.cwd}
+              tabTitle={agentTitle}
+              panelRestoreOnRestart={panel.restoreOnRestart !== false}
+              onUpdatePanel={(updater) => onUpdatePanel?.(panel.id, updater)}
+            />
           : <TerminalHoverCardContent
               customTitle={panel.title}
               cwd={panel.cwd}
@@ -591,6 +663,7 @@ function DraggableTab({
               panelLocked={panel.locked ?? false}
               panelRestoreOnRestart={panel.restoreOnRestart ?? false}
               panelPersistentCommand={panel.persistentCommand}
+              lockShortcut={shortcutLabels["tab.lock"]}
               onUpdatePanel={(updater) => onUpdatePanel?.(panel.id, updater)}
             />;
       case "editor":
@@ -702,7 +775,7 @@ function DraggableTab({
       {panel.kind === "terminal" && panel.locked ? (
         <button
           type="button"
-          className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground opacity-60 transition-opacity hover:!opacity-100 hover:bg-muted hover:text-foreground"
+          className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded text-foreground transition-colors hover:bg-muted"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -710,7 +783,7 @@ function DraggableTab({
           }}
           title="Unlock tab"
         >
-          <HugeiconsIcon icon={LockIcon} size={11} strokeWidth={1.75} />
+          <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
         </button>
       ) : (
         <button
@@ -778,7 +851,17 @@ function DraggableTab({
                 <ContextMenuSeparator />
               </>
             )}
-            <ContextMenuItem onSelect={() => onClose(panel.id)}>
+            {isLockable && (
+              <ContextMenuItem
+                onSelect={() => onUpdatePanel?.(panel.id, (p) => ({ ...p, locked: !isLocked }))}
+              >
+                {isLocked ? "Unlock Tab" : "Lock Tab"}
+                {shortcutLabels["tab.lock"] && (
+                  <ContextMenuShortcut>{shortcutLabels["tab.lock"]}</ContextMenuShortcut>
+                )}
+              </ContextMenuItem>
+            )}
+            <ContextMenuItem disabled={isLocked} onSelect={() => onClose(panel.id)}>
               Close Tab
               {shortcutLabels["tab.close"] && (
                 <ContextMenuShortcut>{shortcutLabels["tab.close"]}</ContextMenuShortcut>
@@ -886,6 +969,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
     "tab.newPreview":  getShortcutLabel("tab.newPreview",  userShortcuts),
     "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
+    "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
   };
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
@@ -895,6 +979,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   const mouseLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mouseInsideRef = useRef(true);
   const hoverOpenPanelsRef = useRef(new Set<string>());
+  const [hoverCloseToken, setHoverCloseToken] = useState(0);
   const renamingPanelId = useTabRenameStore((s) => s.renamingPanelId);
   const isRenamingRef = useRef(false);
   useEffect(() => {
@@ -935,7 +1020,13 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     if (!container) return;
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      if (hoverOpenPanelsRef.current.size > 0 || isRenamingRef.current) return;
+      if (isRenamingRef.current) return;
+      // A hover card open over a tab must not block scrolling. Close any open
+      // hovers and let the wheel through.
+      if (hoverOpenPanelsRef.current.size > 0) {
+        hoverOpenPanelsRef.current.clear();
+        setHoverCloseToken((t) => t + 1);
+      }
       const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       container.scrollLeft += delta;
       userScrolledRef.current = true;
@@ -1078,6 +1169,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
             else hoverOpenPanelsRef.current.delete(panelId);
           }}
           onSnapIntoView={(panelId) => scrollPanelIntoView(panelId, 'smooth')}
+          closeHoverToken={hoverCloseToken}
         />
       ))}
       <button
