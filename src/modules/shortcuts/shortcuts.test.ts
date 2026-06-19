@@ -153,6 +153,19 @@ describe("notification shortcuts", () => {
   });
 });
 
+describe("tab.lock shortcut", () => {
+  test("default binding is Cmd/Ctrl+Alt+L (no shift) in the Tabs group", () => {
+    const s = SHORTCUTS.find((x) => x.id === "tab.lock");
+    expect(s).toBeDefined();
+    expect(s!.group).toBe("Tabs");
+    const b = s!.defaultBindings[0];
+    expect(b.shift).toBeFalsy();
+    expect(b.alt).toBe(true);
+    expect(b.key).toBe("l");
+    expect(b.meta || b.ctrl).toBe(true);
+  });
+});
+
 describe("tab.selectByIndex binding uniqueness", () => {
   test("only tab.selectByIndex binds to Cmd/Ctrl+1 through Cmd/Ctrl+9", () => {
     const tabSelectByIndex = SHORTCUTS.find(

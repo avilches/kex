@@ -13,6 +13,7 @@ export type ShortcutId =
   | "tab.newEditor"
   | "tab.close"
   | "tab.rename"
+  | "tab.lock"
   | "file.rename"
   | "tab.next"
   | "tab.prev"
@@ -137,6 +138,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Rename tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
+  },
+  {
+    id: "tab.lock",
+    label: "Lock tab (prevent close)",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "l" }],
   },
   {
     id: "pane.splitRight",
