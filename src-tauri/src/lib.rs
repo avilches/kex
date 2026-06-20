@@ -1,6 +1,6 @@
 pub mod modules;
 
-use modules::{agent, fs, git, history, pty, shell, window_state, workspace};
+use modules::{agent, float_browser, fs, git, history, pty, shell, window_state, workspace};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
@@ -479,8 +479,12 @@ pub fn run() {
                     .build()?;
 
                 // Window
+                let dock_to_kex = MenuItemBuilder::with_id("dock_to_kex", "Dock to Kex")
+                    .build(app)?;
                 let window_menu = SubmenuBuilder::new(app, "Window")
                     .minimize()
+                    .separator()
+                    .item(&dock_to_kex)
                     .separator()
                     .close_window()
                     .build()?;
@@ -503,6 +507,21 @@ pub fn run() {
                     let id = event.id().as_ref();
                     if id == "quit" {
                         let _ = app.emit("kex:before-quit", ());
+                        return;
+                    }
+                    if id == "dock_to_kex" {
+                        let st = app.state::<float_browser::FloatBrowserState>();
+                        let panel_id = st.last_focused_panel_id.lock().unwrap().clone();
+                        if let Some(pid) = panel_id {
+                            let label = float_browser::window_label(&pid);
+                            let origin = {
+                                let map = st.panels.lock().unwrap();
+                                map.get(&pid).map(|m| m.origin_window_label.clone())
+                            };
+                            if let Some(origin_label) = origin {
+                                float_browser::do_dock_and_destroy(app, &pid, &origin_label, &label);
+                            }
+                        }
                         return;
                     }
                     // Route the action to the current window only, so it never fans
@@ -580,6 +599,7 @@ pub fn run() {
         .manage(agent::PendingNavState::default())
         .manage(QuitGuard::default())
         .manage(LaunchDir(Mutex::new(cli_dir)))
+        .manage(float_browser::FloatBrowserState::new())
         .invoke_handler(tauri::generate_handler![
             pty::pty_open,
             pty::pty_write,
@@ -655,6 +675,11 @@ pub fn run() {
             history::history_commands,
             history::history_record,
             history::history_list,
+            float_browser::float_browser_open,
+            float_browser::float_browser_close,
+            float_browser::float_browser_focus,
+            float_browser::float_browser_dock,
+            float_browser::float_browser_navigate,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

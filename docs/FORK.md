@@ -216,6 +216,14 @@ The web pane is a real browser (address bar, navigation, reload), so the panel `
 are migrated on load in `sanitizePanel` (`kind: "preview"` → `"browser"`). The editor `preview` boolean (ephemeral
 tabs) and the markdown preview pane are unrelated and unchanged.
 
+### Floating browser windows
+
+Browser panels can be opened as native `WebviewUrl::External` windows (WKWebView on macOS, WebView2 on Windows),
+bypassing iframe X-Frame-Options restrictions that block sites like localhost dev servers or third-party apps. The panel
+stays as a placeholder in its pane; closing the float window docks it back with the current URL. State is managed
+Rust-side in `FloatBrowserState` (`src-tauri/src/modules/float_browser.rs`); the frontend hook is
+`useFloatBrowser` (`src/modules/browser/useFloatBrowser.ts`).
+
 ---
 
 ## Roadmap (planned, not yet built)

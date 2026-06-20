@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
+  ArrowExpand01Icon,
   ArrowReloadHorizontalIcon,
   Globe02Icon,
   LinkSquare02Icon,
@@ -55,10 +56,11 @@ type Props = {
   url: string;
   onSubmit: (url: string) => void;
   onReload: () => void;
+  onFloat?: () => void;
 };
 
 export const BrowserAddressBar = forwardRef<BrowserAddressBarHandle, Props>(
-  function BrowserAddressBar({ url, onSubmit, onReload }, ref) {
+  function BrowserAddressBar({ url, onSubmit, onReload, onFloat }, ref) {
     const [draft, setDraft] = useState(url);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -201,6 +203,16 @@ export const BrowserAddressBar = forwardRef<BrowserAddressBarHandle, Props>(
             strokeWidth={1.75}
           />
         </Button>
+        {onFloat && url && (
+          <button
+            type="button"
+            title="Open in floating window"
+            onClick={onFloat}
+            className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <HugeiconsIcon icon={ArrowExpand01Icon} size={12} strokeWidth={1.75} />
+          </button>
+        )}
       </div>
       {notice ? (
         <div className="flex items-center gap-1.5 bg-amber-500/8 px-3 py-1 text-[11px] text-amber-600 dark:text-amber-400">

@@ -31,6 +31,7 @@ import {
   type SearchTarget,
 } from "@/modules/header";
 import type { BrowserPaneHandle } from "@/modules/browser";
+import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -131,6 +132,7 @@ export default function App() {
     setActiveWorkspaceId,
     activeWorkspace,
     addWorkspace,
+    closeWorkspace,
     reorderWorkspaces,
     splitPane,
     focusPane,
@@ -156,6 +158,16 @@ export default function App() {
 
   const workspacesRef = useRef(workspaces);
   workspacesRef.current = workspaces;
+
+  const {
+    floatPanel,
+    closeFloatWindow,
+    focusFloatWindow,
+    dockViaCommand,
+    navigateFloatWindow,
+    restoreFloatingPanels,
+    destroyWorkspaceFloats,
+  } = useFloatBrowser({ updatePanelData, findPanelGlobal });
 
   const activeCwdRef = useRef<string | null>(null);
 
@@ -217,6 +229,14 @@ export default function App() {
       }
       pruneOrphanedPlans(knownIds);
     });
+  }, []);
+
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    void restoreFloatingPanels(workspacesRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Focus the active terminal when the active workspace changes (tab/workspace switch).
@@ -353,6 +373,18 @@ export default function App() {
     setActiveSearchAddon(null);
     setActiveEditorHandle(null);
   }, []);
+
+  const handleCloseWorkspace = useCallback(
+    async (wsId: string) => {
+      await destroyWorkspaceFloats(wsId, workspacesRef.current);
+      closeWorkspace(wsId);
+    },
+    [closeWorkspace, destroyWorkspaceFloats],
+  );
+  // Stored in a ref so Task 5 (WorkspaceSidebar close button) can consume it
+  // without re-triggering effects that depend on the callback identity.
+  const handleCloseWorkspaceRef = useRef(handleCloseWorkspace);
+  handleCloseWorkspaceRef.current = handleCloseWorkspace;
 
   const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
   const setWorkspaceEnv = useWorkspaceEnvStore((s) => s.setEnv);
@@ -673,6 +705,38 @@ export default function App() {
     [activeWorkspace, openPanel],
   );
 
+  // ── Float browser callbacks ───────────────────────────────────────────────
+
+  const onFloatBrowserPanel = useCallback(
+    (panelId: string) => {
+      const found = findPanelGlobal(panelId);
+      if (!found || found.panel.kind !== "browser") return;
+      void floatPanel(found.panel, found.workspace.id);
+    },
+    [findPanelGlobal, floatPanel],
+  );
+
+  const onDockBrowserPanel = useCallback(
+    (panelId: string) => {
+      void dockViaCommand(panelId);
+    },
+    [dockViaCommand],
+  );
+
+  const onFocusFloatBrowserPanel = useCallback(
+    (panelId: string) => {
+      void focusFloatWindow(panelId);
+    },
+    [focusFloatWindow],
+  );
+
+  const onNavigateFloatBrowserPanel = useCallback(
+    (panelId: string, url: string) => {
+      void navigateFloatWindow(panelId, url);
+    },
+    [navigateFloatWindow],
+  );
+
   // ── WorkspaceView stable callbacks (use refs to avoid recreating on cd) ──
 
   const onActivatePanelStable = useCallback(
@@ -684,12 +748,9 @@ export default function App() {
     closePanelsRef.current([panelId]);
   }, []);
 
-  const onCloseManyPanelsStable = useCallback(
-    (_wsId: string, panelIds: string[]) => {
-      closePanelsRef.current(panelIds);
-    },
-    [],
-  );
+  const onCloseManyPanelsStable = useCallback((_wsId: string, panelIds: string[]) => {
+    closePanelsRef.current(panelIds);
+  }, []);
 
   const onFocusPaneStable = useCallback(
     (wsId: string, paneId: string) => focusPane(wsId, paneId),
@@ -1081,7 +1142,13 @@ export default function App() {
     handlePathDeleted,
   } = useTabCloseGuards({
     workspaces,
-    disposePanel: (workspaceId, panelId) => closePanel(workspaceId, panelId),
+    disposePanel: (workspaceId, panelId) => {
+      const found = findPanelGlobal(panelId);
+      if (found?.panel.kind === "browser" && found.panel.floating) {
+        void closeFloatWindow(panelId);
+      }
+      closePanel(workspaceId, panelId);
+    },
     findPanel: findPanelGlobal,
     savePanel,
     focusActivePanel,
@@ -1811,6 +1878,7 @@ export default function App() {
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(home ?? undefined)}
               onReorder={reorderWorkspaces}
+              onClose={(wsId) => handleCloseWorkspaceRef.current(wsId)}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
@@ -1892,6 +1960,10 @@ export default function App() {
                         callbacks={panelCallbacks}
                         gitStatus={sourceControl.status}
                         gitColorScheme={gitColorScheme}
+                        onFloatBrowserPanel={onFloatBrowserPanel}
+                        onDockBrowserPanel={onDockBrowserPanel}
+                        onFocusFloatBrowserPanel={onFocusFloatBrowserPanel}
+                        onNavigateFloatBrowserPanel={onNavigateFloatBrowserPanel}
                       />
                     </div>
 

@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod float_browser;
 pub mod fs;
 pub mod git;
 pub mod history;
