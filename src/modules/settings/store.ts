@@ -61,6 +61,7 @@ export type Preferences = {
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number;
+  editorPreviewOnClick: boolean;
   rightPanelOpen: boolean;
   rightPanelWidth: number;
   rightPanelActiveTab: "explorer" | "git" | "history";
@@ -92,6 +93,7 @@ const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_SHORTCUTS = "shortcuts";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
 const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
+const KEY_EDITOR_PREVIEW_ON_CLICK = "editorPreviewOnClick";
 const KEY_RIGHT_PANEL_OPEN = "rightPanelOpen";
 const KEY_RIGHT_PANEL_WIDTH = "rightPanelWidth";
 const KEY_RIGHT_PANEL_ACTIVE_TAB = "rightPanelActiveTab";
@@ -136,6 +138,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 1000,
+  editorPreviewOnClick: true,
   rightPanelOpen: true,
   rightPanelWidth: 240,
   rightPanelActiveTab: "explorer",
@@ -220,6 +223,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_EDITOR_AUTO_SAVE_DELAY) ??
         DEFAULT_PREFERENCES.editorAutoSaveDelay,
     ),
+    editorPreviewOnClick:
+      get<boolean>(KEY_EDITOR_PREVIEW_ON_CLICK) ??
+      DEFAULT_PREFERENCES.editorPreviewOnClick,
     rightPanelOpen:
       get<boolean>(KEY_RIGHT_PANEL_OPEN) ?? DEFAULT_PREFERENCES.rightPanelOpen,
     rightPanelWidth: (() => {
@@ -353,6 +359,10 @@ export async function setEditorAutoSaveDelay(value: number): Promise<void> {
   await writePref(KEY_EDITOR_AUTO_SAVE_DELAY, clampAutoSaveDelay(value));
 }
 
+export async function setEditorPreviewOnClick(value: boolean): Promise<void> {
+  await writePref(KEY_EDITOR_PREVIEW_ON_CLICK, value);
+}
+
 export async function setAgentNotifications(value: boolean): Promise<void> {
   await writePref(KEY_AGENT_NOTIFICATIONS, value);
 }
@@ -415,6 +425,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SHORTCUTS]: "shortcuts",
   [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
   [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",
+  [KEY_EDITOR_PREVIEW_ON_CLICK]: "editorPreviewOnClick",
   [KEY_RIGHT_PANEL_OPEN]: "rightPanelOpen",
   [KEY_RIGHT_PANEL_WIDTH]: "rightPanelWidth",
   [KEY_RIGHT_PANEL_ACTIVE_TAB]: "rightPanelActiveTab",

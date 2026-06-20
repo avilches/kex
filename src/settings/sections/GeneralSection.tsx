@@ -20,6 +20,7 @@ import {
   setAutostart,
   setEditorAutoSave,
   setEditorAutoSaveDelay,
+  setEditorPreviewOnClick,
   setShowHidden,
   setTerminalCursorBlink,
   setTerminalScrollback,
@@ -42,6 +43,7 @@ export function GeneralSection() {
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const editorAutoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
+  const editorPreviewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const terminalWebglEnabled = usePreferencesStore(
     (s) => s.terminalWebglEnabled,
@@ -116,6 +118,15 @@ export function GeneralSection() {
           <Switch
             checked={vimMode}
             onCheckedChange={(v) => void setVimMode(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Click for preview"
+          description="Single click opens a file in a temporary preview tab. Opening another file replaces it. The tab becomes permanent once you edit or lock it."
+        >
+          <Switch
+            checked={editorPreviewOnClick}
+            onCheckedChange={(v) => void setEditorPreviewOnClick(v)}
           />
         </SettingRow>
         <SettingRow
