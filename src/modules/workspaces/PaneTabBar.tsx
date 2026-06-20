@@ -935,7 +935,10 @@ function DraggableTab({
             )}
             {isLockable && (
               <ContextMenuItem
-                onSelect={() => onUpdatePanel?.(panel.id, (p) => ({ ...p, locked: !isLocked }))}
+                onSelect={() => onUpdatePanel?.(panel.id, (p) => {
+                  const newLocked = !isLocked;
+                  return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
+                })}
               >
                 {isLocked ? "Unlock Tab" : "Lock Tab"}
                 {shortcutLabels["tab.lock"] && (

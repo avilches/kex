@@ -1522,7 +1522,7 @@ export default function App() {
             open={newEditorOpen}
             onOpenChange={setNewEditorOpen}
             rootPath={explorerRoot ?? home}
-            onCreated={(path) => openFileInPanel(path)}
+            onCreated={(path) => openFileInPanel(path, true)}
           />
 
           <UpdaterDialog />
