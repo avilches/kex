@@ -6,9 +6,11 @@ import "@xterm/xterm/css/xterm.css";
 import "./styles/globals.css";
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
+import { flushEditors } from "./app/lib/editorFlush";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 import { loadPreferences } from "./modules/settings/store";
@@ -77,7 +79,21 @@ getCurrentWindow().onCloseRequested(async (event) => {
   if (!claimClose()) return;
   event.preventDefault();
   try {
+    await flushEditors();
     await flushWorkspaceState();
     await getCurrentWindow().destroy();
   } catch { /* nothing — window stays open; user can retry */ }
+});
+
+// Cmd+Q fires the custom Quit menu item in Rust (the predefined macOS quit can't
+// be intercepted), which emits this so we can flush before confirming exit.
+listen("kex:before-quit", async () => {
+  try {
+    if (claimClose()) {
+      await flushEditors();
+      await flushWorkspaceState();
+    }
+  } finally {
+    await invoke("confirm_quit").catch(() => {});
+  }
 });

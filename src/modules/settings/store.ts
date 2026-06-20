@@ -135,7 +135,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   agentNotifications: true,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
-  editorAutoSaveDelay: 1000,
+  editorAutoSaveDelay: 15000,
   rightPanelOpen: true,
   rightPanelWidth: 240,
   rightPanelActiveTab: "explorer",
@@ -341,7 +341,7 @@ export async function setZoomLevel(value: number): Promise<void> {
 }
 
 function clampAutoSaveDelay(v: number): number {
-  if (!Number.isFinite(v)) return 1000;
+  if (!Number.isFinite(v)) return 15000;
   return Math.min(60000, Math.max(100, Math.round(v)));
 }
 

@@ -578,6 +578,7 @@ function DraggableTab({
   const title = panelTitle(panel, runningCommand, oscTitle);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
+  const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const agentSession = useAgentStore((s) => s.sessions[panel.id]);
   const hasAgent = agentSession !== undefined;
   const isRestoreError = agentSession?.restoreError ?? false;
@@ -833,7 +834,7 @@ function DraggableTab({
       >
         {displayTitle}
       </span>
-      {panel.kind === "editor" && panel.dirty && (
+      {panel.kind === "editor" && panel.dirty && !editorAutoSave && (
         <span className="shrink-0 text-[8px] text-primary">●</span>
       )}
       {hasAgent && (

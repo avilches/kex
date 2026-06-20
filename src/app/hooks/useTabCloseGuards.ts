@@ -24,6 +24,7 @@ type Params = {
   focusActivePanel: () => void;
   isWarnEnabled: () => boolean;
   setWarnEnabled: (value: boolean) => Promise<void>;
+  isAutoSaveEnabled: () => boolean;
 };
 
 /**
@@ -40,6 +41,7 @@ export function useTabCloseGuards({
   focusActivePanel,
   isWarnEnabled,
   setWarnEnabled,
+  isAutoSaveEnabled,
 }: Params) {
   const [pendingClosePanel, setPendingClosePanel] = useState<PanelInfo | null>(null);
   const [pendingTerminalClosePanel, setPendingTerminalClosePanel] = useState<PanelInfo | null>(null);
@@ -110,6 +112,7 @@ export function useTabCloseGuards({
           hasForegroundProcess: (id) => leafHasForegroundProcess(id),
           isWarnEnabled,
           setWarnEnabled,
+          isAutoSaveEnabled,
           askTerminalClose,
           askEditorClose,
           savePanel,
@@ -131,6 +134,7 @@ export function useTabCloseGuards({
       focusActivePanel,
       isWarnEnabled,
       setWarnEnabled,
+      isAutoSaveEnabled,
       askTerminalClose,
       askEditorClose,
     ],

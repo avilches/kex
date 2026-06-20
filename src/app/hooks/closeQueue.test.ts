@@ -21,6 +21,7 @@ function makeDeps(
     setWarnEnabled: async (v) => {
       warnSet.push(v);
     },
+    isAutoSaveEnabled: () => false,
     askTerminalClose: async () => ({ type: "close", dontAskAgain: false }),
     askEditorClose: async () => ({ type: "save" }),
     savePanel: async (id) => {
@@ -120,6 +121,32 @@ describe("runCloseQueue", () => {
     await runCloseQueue(["a"], deps);
     expect(saved).toEqual([]);
     expect(closed).toEqual(["a"]);
+  });
+
+  it("with autosave on, saves a dirty editor silently and closes", async () => {
+    const ask = vi.fn();
+    const { deps, closed, saved } = makeDeps(
+      { a: { kind: "editor", dirty: true } },
+      { isAutoSaveEnabled: () => true, askEditorClose: ask as never },
+    );
+    await runCloseQueue(["a"], deps);
+    expect(ask).not.toHaveBeenCalled();
+    expect(saved).toEqual(["a"]);
+    expect(closed).toEqual(["a"]);
+  });
+
+  it("with autosave on, a failed save throws and does not close the tab", async () => {
+    const { deps, closed } = makeDeps(
+      { a: { kind: "editor", dirty: true } },
+      {
+        isAutoSaveEnabled: () => true,
+        savePanel: async () => {
+          throw new Error("write failed");
+        },
+      },
+    );
+    await expect(runCloseQueue(["a"], deps)).rejects.toThrow("write failed");
+    expect(closed).toEqual([]);
   });
 
   it("cancel on a dirty editor stops the queue", async () => {

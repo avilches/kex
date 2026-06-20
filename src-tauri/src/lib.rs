@@ -1,12 +1,26 @@
 pub mod modules;
 
 use modules::{agent, fs, git, history, pty, shell, window_state, workspace};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 /// Drained on first read so HMR / re-mounts can't replay the launch dir.
 #[derive(Default)]
 struct LaunchDir(Mutex<Option<String>>);
+
+/// Set once the frontend has been asked to flush before an app quit (Cmd+Q),
+/// so the deferred `ExitRequested` is allowed through on the second pass.
+#[derive(Default)]
+struct QuitGuard(AtomicBool);
+
+/// Called by the frontend once it has flushed editors and workspace state in
+/// response to `kex:before-quit`, to let the deferred quit proceed.
+#[tauri::command]
+fn confirm_quit(app: tauri::AppHandle) {
+    app.state::<QuitGuard>().0.store(true, Ordering::SeqCst);
+    app.exit(0);
+}
 
 #[tauri::command]
 fn get_launch_dir(state: State<'_, LaunchDir>) -> Option<String> {
@@ -311,6 +325,51 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // macOS: the predefined Quit menu item (Cmd+Q) terminates natively and
+            // never fires ExitRequested (tauri#12978), so prevent_exit can't run our
+            // flush. Replace the menu with a custom Quit we intercept in on_menu_event.
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+                let quit = MenuItemBuilder::with_id("quit", "Quit Kex")
+                    .accelerator("Cmd+Q")
+                    .build(app)?;
+                let app_menu = SubmenuBuilder::new(app, "Kex")
+                    .about(None)
+                    .separator()
+                    .services()
+                    .separator()
+                    .hide()
+                    .hide_others()
+                    .show_all()
+                    .separator()
+                    .item(&quit)
+                    .build()?;
+                let edit_menu = SubmenuBuilder::new(app, "Edit")
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .select_all()
+                    .build()?;
+                let window_menu = SubmenuBuilder::new(app, "Window")
+                    .minimize()
+                    .separator()
+                    .close_window()
+                    .build()?;
+                let menu = MenuBuilder::new(app)
+                    .items(&[&app_menu, &edit_menu, &window_menu])
+                    .build()?;
+                app.set_menu(menu)?;
+                app.on_menu_event(|app, event| {
+                    if event.id().as_ref() == "quit" {
+                        let _ = app.emit("kex:before-quit", ());
+                    }
+                });
+            }
+
             let data_dir = app
                 .path()
                 .app_data_dir()
@@ -374,6 +433,7 @@ pub fn run() {
             registry
         })
         .manage(agent::PendingNavState::default())
+        .manage(QuitGuard::default())
         .manage(LaunchDir(Mutex::new(cli_dir)))
         .invoke_handler(tauri::generate_handler![
             pty::pty_open,
@@ -433,6 +493,7 @@ pub fn run() {
             workspace::workspace_authorize,
             workspace::workspace_current_dir,
             get_launch_dir,
+            confirm_quit,
             open_settings_window,
             open_main_window,
             window_get_state,
@@ -449,6 +510,28 @@ pub fn run() {
             history::history_record,
             history::history_list,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // Cmd+Q / menu Quit raise ExitRequested at the app level, bypassing
+            // each window's CloseRequested (and the JS flush wired to it). Defer
+            // the quit once so the frontend can flush dirty editors and workspace
+            // state, then let it proceed on the second pass.
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                let guard = app_handle.state::<QuitGuard>();
+                if guard.0.load(Ordering::SeqCst) {
+                    return;
+                }
+                let has_main = app_handle
+                    .webview_windows()
+                    .keys()
+                    .any(|l| l.starts_with("w-"));
+                if !has_main {
+                    return;
+                }
+                guard.0.store(true, Ordering::SeqCst);
+                api.prevent_exit();
+                let _ = app_handle.emit("kex:before-quit", ());
+            }
+        });
 }

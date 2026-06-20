@@ -58,6 +58,10 @@ export function useDocument({ path, onDirtyChange }: Options) {
     });
     savedRef.current = content;
     setDirty(false);
+    // TODO(debug): temporary autosave toast, remove once triggers are verified.
+    if (autoSaveRef.current.autoSave) {
+      toast.success(`Autosaved ${path.split(/[\\/]/).pop() || path}`);
+    }
   }, [path]);
 
   // Notify parent of dirty transitions.
@@ -132,9 +136,11 @@ export function useDocument({ path, onDirtyChange }: Options) {
 
   const save = useCallback(async () => {
     clearAutoSaveTimer();
-    if (!dirty) return;
+    // Compare buffers (updated synchronously in onChange) instead of the dirty
+    // React state, which lags a render behind a focus-loss flush after a keystroke.
+    if (bufferRef.current === savedRef.current) return;
     await saveNow();
-  }, [dirty, clearAutoSaveTimer, saveNow]);
+  }, [clearAutoSaveTimer, saveNow]);
 
   const onChange = useCallback(
     (next: string) => {

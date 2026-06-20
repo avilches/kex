@@ -72,6 +72,7 @@ import { CloseDialogs } from "./components/CloseDialogs";
 import { RightPanel, type RightPanelHandle } from "./components/RightPanel";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceSidebar } from "./components/WorkspaceSidebar";
+import { setEditorFlush } from "./lib/editorFlush";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
 import {
@@ -213,7 +214,10 @@ export default function App() {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
-        if (!focused) return;
+        if (!focused) {
+          void flushDirtyEditorsRef.current();
+          return;
+        }
         const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
         if (!ws) return;
         const pane = findPane(ws.paneTree, ws.activePaneId);
@@ -289,8 +293,10 @@ export default function App() {
     }
   }, [workspaces, findPanelGlobal]);
 
-  // Update active search addon / editor handle when active panel changes
+  // Update active search addon / editor handle when active panel changes.
+  // Switching tab or workspace flushes any dirty editor we just left.
   useEffect(() => {
+    void flushDirtyEditorsRef.current();
     setActiveSearchAddon(
       activePanelId !== null ? (searchAddons.current.get(activePanelId) ?? null) : null,
     );
@@ -777,6 +783,22 @@ export default function App() {
     await editorHandles.current.get(panelId)?.save();
   }, []);
 
+  // Autosave-on-focus-loss: save every dirty editor (save() no-ops when clean).
+  // Gated on the autosave preference; triggered by tab/workspace switch, window
+  // blur, tab close, and app close.
+  const flushDirtyEditors = useCallback(async () => {
+    if (!usePreferencesStore.getState().editorAutoSave) return;
+    const handles = [...editorHandles.current.values()];
+    await Promise.all(handles.map((h) => h.save().catch(() => {})));
+  }, []);
+  const flushDirtyEditorsRef = useRef(flushDirtyEditors);
+  flushDirtyEditorsRef.current = flushDirtyEditors;
+
+  useEffect(() => {
+    setEditorFlush(() => flushDirtyEditorsRef.current());
+    return () => setEditorFlush(null);
+  }, []);
+
   const focusActivePanel = useCallback(() => {
     const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceIdRef.current);
     if (!ws) return;
@@ -809,6 +831,7 @@ export default function App() {
     isWarnEnabled: () =>
       usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
     setWarnEnabled: setWarnOnCloseTabWithRunningProcess,
+    isAutoSaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
   });
 
   closePanelsRef.current = closePanels;

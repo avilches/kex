@@ -18,6 +18,7 @@ export type CloseQueueDeps = {
   hasForegroundProcess: (panelId: string) => Promise<string | null>;
   isWarnEnabled: () => boolean;
   setWarnEnabled: (value: boolean) => Promise<void>;
+  isAutoSaveEnabled: () => boolean;
   askTerminalClose: (
     panelId: string,
     processName: string,
@@ -60,9 +61,13 @@ export async function runCloseQueue(
     } else if (panel.kind === "editor") {
       if (panel.locked) continue;
       if (panel.dirty) {
-        const decision = await deps.askEditorClose(panelId);
-        if (decision.type === "cancel") return;
-        if (decision.type === "save") await deps.savePanel(panelId);
+        if (deps.isAutoSaveEnabled()) {
+          await deps.savePanel(panelId);
+        } else {
+          const decision = await deps.askEditorClose(panelId);
+          if (decision.type === "cancel") return;
+          if (decision.type === "save") await deps.savePanel(panelId);
+        }
       }
     }
 
