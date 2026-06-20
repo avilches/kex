@@ -10,16 +10,12 @@ type NavigatedEvent = { panelId: string; url: string };
 
 type Deps = {
   updatePanelData: (wsId: string, panelId: string, updater: (p: Panel) => Panel) => void;
-  closePanel: (wsId: string, panelId: string) => void;
   findPanelGlobal: (panelId: string) => { workspace: { id: string }; panel: Panel } | null;
-  workspaces: Workspace[];
 };
 
 export function useFloatBrowser({
   updatePanelData,
-  closePanel: _closePanel,
   findPanelGlobal,
-  workspaces: _workspaces,
 }: Deps) {
   const originWindowLabel = getCurrentWebviewWindow().label;
 
