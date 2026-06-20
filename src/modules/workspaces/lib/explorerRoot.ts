@@ -44,7 +44,7 @@ export type ResolveExplorerRootInput = {
   terminalCwd: string | null;
   gitRoot: string | null;
   pinnedRoot: string | null;
-  home: string;
+  home: string | null;
 };
 
 export function resolveExplorerRoot(r: ResolveExplorerRootInput): string | null {

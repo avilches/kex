@@ -84,7 +84,11 @@ import {
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { resolveActiveExplorerRoot, resolveOpenRoot } from "@/modules/workspaces/lib/explorerRoot";
+import {
+  resolveExplorerRoot,
+  resolveOpenRoot,
+  type ExplorerRootMode,
+} from "@/modules/workspaces/lib/explorerRoot";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -352,7 +356,34 @@ export default function App() {
     if (activeCwd) lastTerminalCwdRef.current = activeCwd;
   }, [activeCwd]);
 
-  const ambientExplorerRoot = useMemo<string | null>(() => {
+  const activeRootMode: ExplorerRootMode =
+    activeWorkspace?.explorerRootMode ?? "terminal";
+
+  // Per-workspace last known git root (runtime only, re-derived on restart).
+  const [gitRootByWs, setGitRootByWs] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const ws = activeWorkspace;
+    if (!ws || activeRootMode !== "git") return;
+    const cwd = activeCwd ?? lastTerminalCwdRef.current;
+    if (!cwd) return;
+    let cancelled = false;
+    void native
+      .gitResolveRepo(cwd)
+      .then((info) => {
+        if (cancelled || !info?.repoRoot) return;
+        setGitRootByWs((prev) =>
+          prev[ws.id] === info.repoRoot
+            ? prev
+            : { ...prev, [ws.id]: info.repoRoot },
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorkspace, activeRootMode, activeCwd]);
+
+  const terminalRootCwd = useMemo<string | null>(() => {
     if (activeCwd) return activeCwd;
     if (lastTerminalCwdRef.current) return lastTerminalCwdRef.current;
     for (const ws of workspaces) {
@@ -362,12 +393,21 @@ export default function App() {
         }
       }
     }
-    return home;
-  }, [activeCwd, workspaces, home]);
+    return null;
+  }, [activeCwd, workspaces]);
 
   const explorerRoot = useMemo<string | null>(
-    () => resolveActiveExplorerRoot(activePanel, ambientExplorerRoot),
-    [activePanel, ambientExplorerRoot],
+    () =>
+      resolveExplorerRoot({
+        mode: activeRootMode,
+        terminalCwd: terminalRootCwd,
+        gitRoot: activeWorkspace
+          ? (gitRootByWs[activeWorkspace.id] ?? null)
+          : null,
+        pinnedRoot: activeWorkspace?.pinnedRoot ?? null,
+        home,
+      }),
+    [activeRootMode, terminalRootCwd, gitRootByWs, activeWorkspace, home],
   );
 
   const explorerRootRef = useRef<string | null>(null);
