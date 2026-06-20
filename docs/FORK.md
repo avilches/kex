@@ -141,6 +141,12 @@ previous workspaces or pane layout.
   focusing an editor no longer reroots the explorer (the upstream per-editor root override was removed). Pure logic in
   `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspace-state.json` (`explorerRootMode`,
   `pinnedRoot`).
+- **Navigable File System root** — in File System mode the root is navigable per workspace: double-clicking a folder
+  enters it, an Up button climbs to the parent (capped at the filesystem or drive root), and a Home button returns to
+  the user's home directory. The current root is stored as `fsRoot` in `workspace-state.json` (default home). A
+  JSON-only preference `keepFolderLayoutOnChangeExplorerRoot` (default `false`) controls whether the per-root tree
+  expansion layout is restored on root change or the tree starts collapsed. These controls appear only in File System
+  mode; the other three root modes are unaffected.
 
 ### Technical fixes and refactors
 
