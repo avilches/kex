@@ -33,7 +33,7 @@ import {
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setRightPanelOpen, setRightPanelActiveTab } from "@/modules/settings/store";
+import { setRightPanelOpen, setRightPanelActiveTab, setWarnOnCloseTabWithRunningProcess } from "@/modules/settings/store";
 import {
   useGlobalShortcuts,
   type ShortcutHandlers,
@@ -160,6 +160,9 @@ export default function App() {
   const searchInlineRef = useRef<SearchInlineHandle | null>(null);
   const terminalHandles = useRef<Map<string, TerminalPaneHandle>>(new Map());
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
+  activeWorkspaceIdRef.current = activeWorkspaceId;
+  const closePanelsRef = useRef<(panelIds: string[]) => void>(() => {});
   const previewHandles = useRef<Map<string, PreviewPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] = useState<EditorPaneHandle | null>(null);
   const [gitHistoryHandle, setGitHistoryHandle] = useState<GitHistorySearchHandle | null>(null);
@@ -486,12 +489,17 @@ export default function App() {
   );
 
   const onClosePanelStable = useCallback(
-    (wsId: string, panelId: string) => {
-      const found = findPanelGlobal(panelId);
-      if (found?.panel.kind === "terminal") disposeSession(panelId);
-      closePanel(wsId, panelId);
+    (_wsId: string, panelId: string) => {
+      closePanelsRef.current([panelId]);
     },
-    [findPanelGlobal, closePanel],
+    [],
+  );
+
+  const onCloseManyPanelsStable = useCallback(
+    (_wsId: string, panelIds: string[]) => {
+      closePanelsRef.current(panelIds);
+    },
+    [],
   );
 
   const onFocusPaneStable = useCallback(
@@ -764,15 +772,30 @@ export default function App() {
 
   // ── Close guards ──────────────────────────────────────────────────────────
 
+  const savePanel = useCallback(async (panelId: string) => {
+    await editorHandles.current.get(panelId)?.save();
+  }, []);
+
+  const focusActivePanel = useCallback(() => {
+    const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceIdRef.current);
+    if (!ws) return;
+    const pane = findPane(ws.paneTree, ws.activePaneId);
+    const panelId = pane?.activePanelId;
+    if (!panelId) return;
+    const kind = findPanelGlobal(panelId)?.panel.kind;
+    requestAnimationFrame(() => {
+      if (kind === "editor") editorHandles.current.get(panelId)?.focus();
+      else terminalHandles.current.get(panelId)?.focus();
+    });
+  }, [findPanelGlobal]);
+
   const {
     pendingClosePanel,
     pendingTerminalClosePanel,
     pendingDeletePanels,
-    handleClose: handleCloseGuard,
-    confirmClose,
-    cancelClose,
-    confirmTerminalClose,
-    cancelTerminalClose,
+    closePanels,
+    resolveEditor,
+    resolveTerminal,
     confirmDeleteClose,
     cancelDeleteClose,
     handlePathDeleted,
@@ -780,13 +803,14 @@ export default function App() {
     workspaces,
     disposePanel: (workspaceId, panelId) => closePanel(workspaceId, panelId),
     findPanel: findPanelGlobal,
+    savePanel,
+    focusActivePanel,
+    isWarnEnabled: () =>
+      usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
+    setWarnEnabled: setWarnOnCloseTabWithRunningProcess,
   });
 
-  const handleCancelTerminalClose = useCallback(() => {
-    const panelId = pendingTerminalClosePanel?.id;
-    cancelTerminalClose();
-    if (panelId) setTimeout(() => terminalHandles.current.get(panelId)?.focus(), 50);
-  }, [pendingTerminalClosePanel, cancelTerminalClose]);
+  closePanelsRef.current = closePanels;
 
   // ── Path rename ───────────────────────────────────────────────────────────
 
@@ -977,8 +1001,8 @@ export default function App() {
   const handleCloseActivePanel = useCallback(() => {
     if (!activeWorkspace || !activePanelId) return;
     if (activePanel?.kind === "terminal" && activePanel.locked) return;
-    void handleCloseGuard(activeWorkspace.id, activePanelId);
-  }, [activeWorkspace, activePanelId, activePanel, handleCloseGuard]);
+    closePanelsRef.current([activePanelId]);
+  }, [activeWorkspace, activePanelId, activePanel]);
 
   const cycleWorkspace = useCallback(
     (delta: 1 | -1) => {
@@ -1381,6 +1405,7 @@ export default function App() {
                       activeWorkspaceId={activeWorkspaceId}
                       onActivatePanel={onActivatePanelStable}
                       onClosePanel={onClosePanelStable}
+                      onCloseManyPanels={onCloseManyPanelsStable}
                       onFocusPane={onFocusPaneStable}
                       onNewTerminal={onNewTerminalStable}
                       onSplitTerminalRight={onSplitTerminalRightStable}
@@ -1474,11 +1499,14 @@ export default function App() {
 
           <CloseDialogs
             pendingClosePanel={pendingClosePanel}
-            onCancelClose={cancelClose}
-            onConfirmClose={confirmClose}
+            onCancelClose={() => resolveEditor({ type: "cancel" })}
+            onSaveClose={() => resolveEditor({ type: "save" })}
+            onDontSaveClose={() => resolveEditor({ type: "dont-save" })}
             pendingTerminalClosePanel={pendingTerminalClosePanel}
-            onCancelTerminalClose={handleCancelTerminalClose}
-            onConfirmTerminalClose={confirmTerminalClose}
+            onCancelTerminalClose={() => resolveTerminal({ type: "cancel" })}
+            onConfirmTerminalClose={(dontAskAgain) =>
+              resolveTerminal({ type: "close", dontAskAgain })
+            }
             pendingDeletePanels={pendingDeletePanels}
             onCancelDeleteClose={cancelDeleteClose}
             onConfirmDeleteClose={confirmDeleteClose}
