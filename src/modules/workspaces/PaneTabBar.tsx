@@ -24,7 +24,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, Copy01Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, Copy01Icon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 import type { GitStatusSnapshot } from "@/lib/native";
@@ -827,7 +827,9 @@ function DraggableTab({
                 <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />
               </span>
             : <AgentIcon agent={agentSession!.agent} size={12} />
-          : panelIcon(panel, workspaceId)}
+          : panel.kind === "browser" && panel.floating
+            ? <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
+            : panelIcon(panel, workspaceId)}
       </span>
       <span
         className={cn(
