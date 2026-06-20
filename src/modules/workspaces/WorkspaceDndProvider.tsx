@@ -9,6 +9,8 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { File01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { allPanes, findPanelPane } from "./lib/splitNode";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -317,7 +319,9 @@ export function WorkspaceDndProvider({
         )}
         {draggingItem?.kind === "file" && (
           <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
-            <span className="shrink-0 opacity-70">📄</span>
+            <span className="shrink-0 opacity-70">
+              <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={1.5} />
+            </span>
             <span className="max-w-[120px] truncate">{basename(draggingItem.path)}</span>
           </div>
         )}

@@ -1,6 +1,14 @@
-import { ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
+import {
+  ComputerTerminal01Icon,
+  GitCommitIcon,
+  GitCompareIcon,
+  GitGraphIcon,
+  Globe02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { IconSvgElement } from "@hugeicons/react";
 import type { ReactNode } from "react";
+import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import type { Panel } from "./types";
 
 export function basename(path: string): string {
@@ -33,15 +41,17 @@ export function panelTitle(panel: Panel, runningCommand?: string | null, oscTitl
   }
 }
 
+const PANEL_ICONS: Record<Exclude<Panel["kind"], "editor" | "markdown">, IconSvgElement> = {
+  terminal: ComputerTerminal01Icon,
+  browser: Globe02Icon,
+  "git-diff": GitCompareIcon,
+  "git-history": GitGraphIcon,
+  "git-commit-file": GitCommitIcon,
+};
+
 export function panelIcon(panel: Panel, _workspaceId?: string): ReactNode {
-  switch (panel.kind) {
-    case "terminal":
-      return <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={1.5} />;
-    case "editor":          return "📄";
-    case "browser":         return "🌐";
-    case "markdown":        return "📝";
-    case "git-diff":        return "±";
-    case "git-history":     return "⏱";
-    case "git-commit-file": return "±";
+  if (panel.kind === "editor" || panel.kind === "markdown") {
+    return <img src={fileIconUrl(basename(panel.path))} alt="" className="size-3.5 shrink-0" />;
   }
+  return <HugeiconsIcon icon={PANEL_ICONS[panel.kind]} size={14} strokeWidth={1.5} />;
 }

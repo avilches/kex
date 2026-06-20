@@ -24,7 +24,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Copy01Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, Copy01Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 import type { GitStatusSnapshot } from "@/lib/native";
@@ -823,7 +823,9 @@ function DraggableTab({
       <span className={cn("shrink-0", hasAgent ? "opacity-100" : "opacity-70")}>
         {hasAgent
           ? isRestoreError
-            ? <span title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>{"⚠"}</span>
+            ? <span className="text-amber-500" title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>
+                <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />
+              </span>
             : <AgentIcon agent={agentSession!.agent} size={12} />
           : panelIcon(panel, workspaceId)}
       </span>
