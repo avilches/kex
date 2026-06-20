@@ -2,7 +2,7 @@ export type Panel =
   | { id: string; kind: "terminal"; cwd?: string; title?: string; blocks?: boolean;
       locked?: boolean; restoreOnRestart?: boolean; persistentCommand?: string }
   | { id: string; kind: "editor"; path: string; title?: string; dirty: boolean; preview: boolean; locked?: boolean; explorerRoot?: string }
-  | { id: string; kind: "browser";         url: string;   title?: string }
+  | { id: string; kind: "browser";         url: string;   title?: string; floating?: boolean }
   | { id: string; kind: "markdown";        path: string;  title?: string; explorerRoot?: string }
   | { id: string; kind: "git-diff";        path: string;  repoRoot: string; mode: "-" | "+"; originalPath: string | null; title?: string }
   | { id: string; kind: "git-history";     repoRoot: string; title?: string }
