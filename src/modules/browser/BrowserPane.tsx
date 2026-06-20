@@ -26,6 +26,7 @@ type Props = {
   onFloat: () => void;
   onDock: () => void;
   onFocusFloat: () => void;
+  onNavigateFloat: (url: string) => void;
 };
 
 // Tear the iframe down after this much invisibility — a background dev
@@ -33,7 +34,7 @@ type Props = {
 const SUSPEND_AFTER_MS = 30_000;
 
 export const BrowserPane = forwardRef<BrowserPaneHandle, Props>(
-  function BrowserPane({ url, visible, onUrlChange, floating, onFloat, onDock, onFocusFloat }, ref) {
+  function BrowserPane({ url, visible, onUrlChange, floating, onFloat, onDock, onFocusFloat, onNavigateFloat }, ref) {
     // `nonce` is part of the iframe `key`. Bumping it remounts the iframe,
     // which is the only reliable cross-origin reload (calling
     // contentWindow.location.reload() throws on cross-origin frames).
@@ -74,7 +75,12 @@ export const BrowserPane = forwardRef<BrowserPaneHandle, Props>(
             pointerEvents: visible ? "auto" : "none",
           }}
         >
-          <FloatingPlaceholder url={url} onDock={onDock} onFocusFloat={onFocusFloat} />
+          <FloatingPlaceholder
+            url={url}
+            onDock={onDock}
+            onFocusFloat={onFocusFloat}
+            onNavigateFloat={onNavigateFloat}
+          />
         </div>
       );
     }
@@ -202,43 +208,50 @@ function FloatingPlaceholder({
   url,
   onDock,
   onFocusFloat,
+  onNavigateFloat,
 }: {
   url: string;
   onDock: () => void;
   onFocusFloat: () => void;
+  onNavigateFloat: (url: string) => void;
 }) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-4 px-6 text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl border border-border/60 bg-card text-muted-foreground">
-        <HugeiconsIcon icon={Globe02Icon} size={20} strokeWidth={1.5} />
-      </div>
-      <div className="space-y-1.5">
-        <p className="text-sm font-medium text-foreground">
-          Viewing in a separate window
-        </p>
-        {url && (
-          <p className="max-w-xs truncate text-xs text-muted-foreground">
-            {url}
+    <>
+      <BrowserAddressBar
+        url={url}
+        onSubmit={onNavigateFloat}
+        onReload={() => onNavigateFloat(url)}
+      />
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="flex size-12 items-center justify-center rounded-2xl border border-border/60 bg-card text-muted-foreground">
+          <HugeiconsIcon icon={Globe02Icon} size={20} strokeWidth={1.5} />
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-foreground">
+            Viewing in a separate window
           </p>
-        )}
+          <p className="max-w-xs text-xs text-muted-foreground">
+            Type a URL above to navigate the floating window.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onDock}
+            className="rounded-md border border-border/60 bg-card px-3 py-1 text-[11px] hover:bg-accent/50"
+          >
+            Dock here
+          </button>
+          <button
+            type="button"
+            onClick={onFocusFloat}
+            className="rounded-md border border-border/60 bg-card px-3 py-1 text-[11px] hover:bg-accent/50"
+          >
+            Focus window
+          </button>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onDock}
-          className="rounded-md border border-border/60 bg-card px-3 py-1 text-[11px] hover:bg-accent/50"
-        >
-          Dock here
-        </button>
-        <button
-          type="button"
-          onClick={onFocusFloat}
-          className="rounded-md border border-border/60 bg-card px-3 py-1 text-[11px] hover:bg-accent/50"
-        >
-          Focus window
-        </button>
-      </div>
-    </div>
+    </>
   );
 }
 

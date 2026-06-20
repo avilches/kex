@@ -679,6 +679,7 @@ pub fn run() {
             float_browser::float_browser_close,
             float_browser::float_browser_focus,
             float_browser::float_browser_dock,
+            float_browser::float_browser_navigate,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

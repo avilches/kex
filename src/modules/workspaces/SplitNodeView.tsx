@@ -37,6 +37,7 @@ type Props = {
   onFloatBrowserPanel?: (panelId: string) => void;
   onDockBrowserPanel?: (panelId: string) => void;
   onFocusFloatBrowserPanel?: (panelId: string) => void;
+  onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
 };
 
 export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, ...rest }: Props) {
@@ -78,6 +79,7 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, .
         onFloatBrowserPanel={rest.onFloatBrowserPanel}
         onDockBrowserPanel={rest.onDockBrowserPanel}
         onFocusFloatBrowserPanel={rest.onFocusFloatBrowserPanel}
+      onNavigateFloatBrowserPanel={rest.onNavigateFloatBrowserPanel}
       />
     );
   }

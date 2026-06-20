@@ -198,6 +198,20 @@ pub fn float_browser_focus(
 }
 
 #[tauri::command]
+pub fn float_browser_navigate(
+    app: AppHandle,
+    panel_id: String,
+    url: String,
+) -> Result<(), String> {
+    let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
+    let label = window_label(&panel_id);
+    if let Some(window) = app.get_webview_window(&label) {
+        window.navigate(parsed_url).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn float_browser_dock(
     app: AppHandle,
     state: State<'_, FloatBrowserState>,

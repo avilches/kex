@@ -70,9 +70,10 @@ type Props = {
   onFloatBrowserPanel?: (panelId: string) => void;
   onDockBrowserPanel?: (panelId: string) => void;
   onFocusFloatBrowserPanel?: (panelId: string) => void;
+  onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
 };
 
-export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowserPanel, onDockBrowserPanel, onFocusFloatBrowserPanel }: Props) {
+export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowserPanel, onDockBrowserPanel, onFocusFloatBrowserPanel, onNavigateFloatBrowserPanel }: Props) {
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
@@ -139,6 +140,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
             onFloat={() => onFloatBrowserPanel?.(panel.id)}
             onDock={() => onDockBrowserPanel?.(panel.id)}
             onFocusFloat={() => onFocusFloatBrowserPanel?.(panel.id)}
+            onNavigateFloat={(url: string) => onNavigateFloatBrowserPanel?.(panel.id, url)}
           />
         </Suspense>
       );

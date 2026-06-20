@@ -147,6 +147,7 @@ export default function App() {
     closeFloatWindow,
     focusFloatWindow,
     dockViaCommand,
+    navigateFloatWindow,
     restoreFloatingPanels,
     destroyWorkspaceFloats,
   } = useFloatBrowser({ updatePanelData, findPanelGlobal });
@@ -571,6 +572,13 @@ export default function App() {
       void focusFloatWindow(panelId);
     },
     [focusFloatWindow],
+  );
+
+  const onNavigateFloatBrowserPanel = useCallback(
+    (panelId: string, url: string) => {
+      void navigateFloatWindow(panelId, url);
+    },
+    [navigateFloatWindow],
   );
 
   // ── WorkspaceView stable callbacks (use refs to avoid recreating on cd) ──
@@ -1605,6 +1613,7 @@ export default function App() {
                       onFloatBrowserPanel={onFloatBrowserPanel}
                       onDockBrowserPanel={onDockBrowserPanel}
                       onFocusFloatBrowserPanel={onFocusFloatBrowserPanel}
+                      onNavigateFloatBrowserPanel={onNavigateFloatBrowserPanel}
                     />
                   </div>
 

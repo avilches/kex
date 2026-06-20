@@ -131,6 +131,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `float_browser_close(panelId)` | Destroy the floating window without docking (no `kex:float-dock` event emitted). Removes from state unconditionally. |
 | `float_browser_focus(panelId)` | Bring the floating window to front via `set_focus`. |
 | `float_browser_dock(panelId)` | Emit `kex:float-dock` to the origin window, then destroy the floating window (same path as the X-button close handler). |
+| `float_browser_navigate(panelId, url)` | Navigate the floating window to `url`. Used by the address bar shown in the docked placeholder so the user can drive the floating window from inside Kex. Triggers `kex:float-navigated` on load completion, which syncs `panel.url`. |
 
 ### Float browser Tauri events
 

@@ -66,7 +66,7 @@ export function useFloatBrowser({
     try {
       await invoke("float_browser_open", {
         panelId: panel.id,
-        url: panel.url || "about:blank",
+        url: panel.url,
         originWindowLabel,
         workspaceId,
       });
@@ -98,6 +98,15 @@ export function useFloatBrowser({
       await invoke("float_browser_dock", { panelId });
     } catch (err) {
       console.error("[float-browser] dock failed:", err);
+    }
+  }
+
+  async function navigateFloatWindow(panelId: string, url: string): Promise<void> {
+    if (!url) return;
+    try {
+      await invoke("float_browser_navigate", { panelId, url });
+    } catch (err) {
+      console.error("[float-browser] navigate failed:", err);
     }
   }
 
@@ -145,6 +154,7 @@ export function useFloatBrowser({
     dockViaCommand,
     closeFloatWindow,
     focusFloatWindow,
+    navigateFloatWindow,
     restoreFloatingPanels,
     destroyWorkspaceFloats,
   };

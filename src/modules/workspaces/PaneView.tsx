@@ -36,6 +36,7 @@ type Props = {
   onFloatBrowserPanel?: (panelId: string) => void;
   onDockBrowserPanel?: (panelId: string) => void;
   onFocusFloatBrowserPanel?: (panelId: string) => void;
+  onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
 };
 
 function DropZone({
@@ -163,6 +164,7 @@ export const PaneView = memo(function PaneView({
   onFloatBrowserPanel,
   onDockBrowserPanel,
   onFocusFloatBrowserPanel,
+  onNavigateFloatBrowserPanel,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
@@ -281,6 +283,7 @@ export const PaneView = memo(function PaneView({
               onFloatBrowserPanel={onFloatBrowserPanel}
               onDockBrowserPanel={onDockBrowserPanel}
               onFocusFloatBrowserPanel={onFocusFloatBrowserPanel}
+              onNavigateFloatBrowserPanel={onNavigateFloatBrowserPanel}
             />
           </div>
         ))}
