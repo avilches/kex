@@ -75,6 +75,9 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, .
         callbacks={rest.callbacks}
         gitStatus={rest.gitStatus}
         gitColorScheme={rest.gitColorScheme}
+        onFloatBrowserPanel={rest.onFloatBrowserPanel}
+        onDockBrowserPanel={rest.onDockBrowserPanel}
+        onFocusFloatBrowserPanel={rest.onFocusFloatBrowserPanel}
       />
     );
   }
