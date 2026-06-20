@@ -449,6 +449,7 @@ export default function App() {
         terminalCwd: terminalRootCwd,
         gitRoot,
         pinnedRoot: workspaceRootPath,
+        fsRoot: null,
         home,
       }),
     [activeRootMode, terminalRootCwd, gitRoot, workspaceRootPath, home],
