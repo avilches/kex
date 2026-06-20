@@ -250,6 +250,7 @@ export default function App() {
   const rightPanelOpen = usePreferencesStore((s) => s.rightPanelOpen);
   const rightPanelActiveTab = usePreferencesStore((s) => s.rightPanelActiveTab);
   const panelSide = usePreferencesStore((s) => s.panelSide);
+  const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
 
   // ── Live terminal panel tracking for session disposal ─────────────────────
@@ -1389,6 +1390,8 @@ export default function App() {
                       onSplitBrowserDown={onSplitBrowserDownStable}
                       onDividerChange={onDividerChangeStable}
                       callbacks={panelCallbacks}
+                      gitStatus={sourceControl.status}
+                      gitColorScheme={gitColorScheme}
                     />
                   </div>
 

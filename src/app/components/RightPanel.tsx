@@ -70,9 +70,9 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
     }));
 
     return (
-      <div className="flex h-full flex-col bg-card/40">
+      <div className="flex h-full flex-col bg-sidebar">
         {/* Tab strip */}
-        <div className="flex h-8 shrink-0 items-center border-b border-border/60 bg-card/60">
+        <div className="flex h-8 shrink-0 items-center border-b border-border/60">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -81,8 +81,8 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               className={cn(
                 "h-full px-3 text-[11px] font-medium transition-colors",
                 activeTab === tab.id
-                  ? "border-b-2 border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-card text-foreground"
+                  : "bg-muted/35 text-muted-foreground hover:bg-card hover:text-foreground",
               )}
             >
               {tab.label}

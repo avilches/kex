@@ -5,6 +5,8 @@ import { PaneTabBar } from "./PaneTabBar";
 import { PanelContent } from "./PanelContent";
 import type { PanelCallbacks } from "./PanelContent";
 import type { PaneNode } from "./lib/types";
+import type { GitStatusSnapshot } from "@/lib/native";
+import type { GitColorScheme } from "@/modules/settings/store";
 import { isBulkClosable } from "./lib/panelClose";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
@@ -28,6 +30,8 @@ type Props = {
   onSplitBrowserRight: (workspaceId: string, paneId: string) => void;
   onSplitBrowserDown: (workspaceId: string, paneId: string) => void;
   callbacks: PanelCallbacks;
+  gitStatus?: GitStatusSnapshot | null;
+  gitColorScheme?: GitColorScheme;
 };
 
 function DropZone({
@@ -149,6 +153,8 @@ export const PaneView = memo(function PaneView({
   onSplitBrowserRight,
   onSplitBrowserDown,
   callbacks,
+  gitStatus,
+  gitColorScheme,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
@@ -247,6 +253,8 @@ export const PaneView = memo(function PaneView({
         onRenamePanel={callbacks.onRenamePanel}
         onUpdatePanel={callbacks.onUpdatePanel}
         onRenameFile={callbacks.onRenameFile}
+        gitStatus={gitStatus}
+        gitColorScheme={gitColorScheme}
       />
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (

@@ -26,6 +26,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Copy01Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
+import type { GitStatusSnapshot } from "@/lib/native";
+import type { GitColorScheme } from "@/modules/settings/store";
+import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
+import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 
 function HoverTable({ children }: { children: ReactNode }) {
   return (
@@ -461,6 +465,8 @@ type Props = {
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
   onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
   onRenameFile?: (panelId: string, newName: string) => void;
+  gitStatus?: GitStatusSnapshot | null;
+  gitColorScheme?: GitColorScheme;
 };
 
 function DraggableTab({
@@ -490,6 +496,9 @@ function DraggableTab({
   onHoverChange,
   onSnapIntoView,
   closeHoverToken,
+  gitStatusMap,
+  gitStatus,
+  gitColorScheme,
 }: {
   panel: Panel;
   activePanelId: string | null;
@@ -517,6 +526,9 @@ function DraggableTab({
   onHoverChange?: (panelId: string, open: boolean) => void;
   onSnapIntoView?: (panelId: string) => void;
   closeHoverToken: number;
+  gitStatusMap?: Map<string, GitStatusCode> | null;
+  gitStatus?: GitStatusSnapshot | null;
+  gitColorScheme?: GitColorScheme;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
   const wrappedListeners = useMemo(() => ({
@@ -542,6 +554,12 @@ function DraggableTab({
   const agentSession = useAgentStore((s) => s.sessions[panel.id]);
   const hasAgent = agentSession !== undefined;
   const isRestoreError = agentSession?.restoreError ?? false;
+
+  const tabColor = useMemo(() => {
+    if (panel.kind !== "editor" || !gitStatusMap || !gitStatus) return null;
+    const code = lookupGitStatus(gitStatusMap, gitStatus.repoRoot, panel.path);
+    return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode") : null;
+  }, [panel, gitStatusMap, gitStatus, gitColorScheme]);
 
   const agentTitle = (() => {
     if (!hasAgent || panel.kind !== "terminal") return title;
@@ -717,13 +735,13 @@ function DraggableTab({
               "self-stretch border-r border-border/30",
               active
                 ? "bg-background text-foreground"
-                : "border-b border-border/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                : "border-b border-border/60 bg-muted/35 text-muted-foreground hover:bg-muted/55 hover:text-foreground",
             ]
           : [
               "h-5 rounded",
               active
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                ? "bg-card text-foreground"
+                : "bg-muted/35 text-muted-foreground hover:bg-muted/55 hover:text-foreground",
             ],
         isThisDragging && "opacity-40",
       )}
@@ -757,6 +775,7 @@ function DraggableTab({
           !isDescription && panel.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
         )}
+        style={tabColor && !isRestoreError ? { color: tabColor } : undefined}
       >
         {displayTitle}
       </span>
@@ -959,7 +978,8 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onRenameFile }: Props) {
+export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onRenameFile, gitStatus, gitColorScheme }: Props) {
+  const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutLabels: Record<string, string | null> = {
@@ -1170,6 +1190,9 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           }}
           onSnapIntoView={(panelId) => scrollPanelIntoView(panelId, 'smooth')}
           closeHoverToken={hoverCloseToken}
+          gitStatusMap={gitStatusMap}
+          gitStatus={gitStatus}
+          gitColorScheme={gitColorScheme}
         />
       ))}
       <button

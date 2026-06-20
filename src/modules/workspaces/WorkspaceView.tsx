@@ -6,6 +6,8 @@ import type { Workspace } from "./lib/types";
 import { SplitNodeView } from "./SplitNodeView";
 import type { PanelCallbacks } from "./PanelContent";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
+import type { GitStatusSnapshot } from "@/lib/native";
+import type { GitColorScheme } from "@/modules/settings/store";
 
 type Props = {
   workspaces: Workspace[];
@@ -21,6 +23,8 @@ type Props = {
   onSplitBrowserRight: (workspaceId: string, paneId: string) => void;
   onSplitBrowserDown: (workspaceId: string, paneId: string) => void;
   callbacks: PanelCallbacks;
+  gitStatus?: GitStatusSnapshot | null;
+  gitColorScheme?: GitColorScheme;
 };
 
 export function WorkspaceView({
@@ -71,6 +75,8 @@ export function WorkspaceView({
             onSplitBrowserRight={rest.onSplitBrowserRight}
             onSplitBrowserDown={rest.onSplitBrowserDown}
             callbacks={rest.callbacks}
+            gitStatus={rest.gitStatus}
+            gitColorScheme={rest.gitColorScheme}
           />
         </div>
       ))}

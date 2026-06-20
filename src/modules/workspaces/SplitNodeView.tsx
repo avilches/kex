@@ -7,6 +7,8 @@ import { memo, useCallback } from "react";
 import { PaneView } from "./PaneView";
 import type { PanelCallbacks } from "./PanelContent";
 import type { SplitNode } from "./lib/types";
+import type { GitStatusSnapshot } from "@/lib/native";
+import type { GitColorScheme } from "@/modules/settings/store";
 
 type Props = {
   node: SplitNode;
@@ -29,6 +31,8 @@ type Props = {
   onSplitBrowserRight: (workspaceId: string, paneId: string) => void;
   onSplitBrowserDown: (workspaceId: string, paneId: string) => void;
   callbacks: PanelCallbacks;
+  gitStatus?: GitStatusSnapshot | null;
+  gitColorScheme?: GitColorScheme;
 };
 
 export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, ...rest }: Props) {
@@ -64,6 +68,8 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, .
         onSplitBrowserRight={rest.onSplitBrowserRight}
         onSplitBrowserDown={rest.onSplitBrowserDown}
         callbacks={rest.callbacks}
+        gitStatus={rest.gitStatus}
+        gitColorScheme={rest.gitColorScheme}
       />
     );
   }

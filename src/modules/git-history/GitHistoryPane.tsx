@@ -506,7 +506,7 @@ export function GitHistoryPane({
 
   return (
     <TooltipProvider delayDuration={500} skipDelayDuration={200}>
-      <div className="flex h-full min-h-0 flex-col bg-background [contain:layout_style]">
+      <div className="flex h-full min-h-0 flex-col bg-sidebar [contain:layout_style]">
         {loadStatus === "initial" && commits.length === 0 ? (
           <CenterPlaceholder>
             <Spinner className="size-4" />
