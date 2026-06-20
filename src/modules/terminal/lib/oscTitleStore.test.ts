@@ -4,6 +4,7 @@ vi.mock("@tauri-apps/plugin-log", () => ({ info: vi.fn(), warn: vi.fn(), error: 
 
 import {
   _clearAll,
+  cleanOscTitle,
   clearOscTitle,
   getOscTitle,
   getSnapshot,
@@ -72,6 +73,21 @@ describe("oscTitleStore", () => {
     expect(cb).not.toHaveBeenCalled();
   });
 
+  it("strips leading status symbol from stored title", () => {
+    setOscTitle("panel-a", "* doing something");
+    expect(getOscTitle("panel-a")).toBe("doing something");
+  });
+
+  it("strips unicode status symbol from stored title", () => {
+    setOscTitle("panel-a", "⏺ working on task");
+    expect(getOscTitle("panel-a")).toBe("working on task");
+  });
+
+  it("does not strip leading letter", () => {
+    setOscTitle("panel-a", "vim file.ts");
+    expect(getOscTitle("panel-a")).toBe("vim file.ts");
+  });
+
   it("setOscTitle is a no-op when title is unchanged", () => {
     setOscTitle("panel-a", "Same");
     const snap1 = getSnapshot();
@@ -81,5 +97,42 @@ describe("oscTitleStore", () => {
     expect(cb).not.toHaveBeenCalled();
     expect(getSnapshot()).toBe(snap1);
     unsub();
+  });
+
+  it("setOscTitle is a no-op when cleaned title is unchanged", () => {
+    setOscTitle("panel-a", "* Same");
+    const snap1 = getSnapshot();
+    const cb = vi.fn();
+    const unsub = subscribe(cb);
+    setOscTitle("panel-a", "* Same");
+    expect(cb).not.toHaveBeenCalled();
+    expect(getSnapshot()).toBe(snap1);
+    unsub();
+  });
+
+  describe("cleanOscTitle", () => {
+    it("strips asterisk prefix", () => {
+      expect(cleanOscTitle("* description")).toBe("description");
+    });
+
+    it("strips unicode symbol prefix", () => {
+      expect(cleanOscTitle("⏺ working")).toBe("working");
+      expect(cleanOscTitle("✓ done")).toBe("done");
+      expect(cleanOscTitle("⊘ stopped")).toBe("stopped");
+    });
+
+    it("does not strip leading letters or digits", () => {
+      expect(cleanOscTitle("bash")).toBe("bash");
+      expect(cleanOscTitle("vim file.ts")).toBe("vim file.ts");
+      expect(cleanOscTitle("1 file")).toBe("1 file");
+    });
+
+    it("does not strip when no space follows", () => {
+      expect(cleanOscTitle("*description")).toBe("*description");
+    });
+
+    it("handles empty string", () => {
+      expect(cleanOscTitle("")).toBe("");
+    });
   });
 });

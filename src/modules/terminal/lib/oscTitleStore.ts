@@ -23,11 +23,19 @@ export function getOscTitle(panelId: string): string | undefined {
   return snapshot.get(panelId);
 }
 
+// Strip a leading status indicator (a single non-alphanumeric character followed
+// by whitespace) that agents like Claude Code prepend to terminal titles,
+// e.g. "* doing something" or "⏺ working on task" -> "doing something".
+export function cleanOscTitle(title: string): string {
+  return title.replace(/^[^\p{L}\p{N}\s]\s+/u, "");
+}
+
 export function setOscTitle(panelId: string, title: string): void {
-  if (titles.get(panelId) === title) return;
-  titles.set(panelId, title);
+  const cleaned = cleanOscTitle(title);
+  if (titles.get(panelId) === cleaned) return;
+  titles.set(panelId, cleaned);
   notify();
-  void info(`[oscTitle] panel=${panelId} title=${JSON.stringify(title)} listeners=${listeners.size}`);
+  void info(`[oscTitle] panel=${panelId} title=${JSON.stringify(cleaned)} listeners=${listeners.size}`);
 }
 
 export function clearOscTitle(panelId: string): void {
