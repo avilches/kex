@@ -2,13 +2,14 @@ import { useCallback, useRef, useState } from "react";
 import { leafHasForegroundProcess } from "@/modules/terminal";
 import type { Workspace } from "@/modules/workspaces";
 import { allPanes } from "@/modules/workspaces";
+import { getRunningCommandsSnapshot } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   runCloseQueue,
   type EditorCloseDecision,
   type TerminalCloseDecision,
 } from "./closeQueue";
 
-type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string };
+type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string };
 
 type FoundPanel = {
   workspace: { id: string };
@@ -72,6 +73,7 @@ export function useTabCloseGuards({
           title: found?.panel.title ?? "terminal",
           kind: "terminal",
           processName,
+          command: getRunningCommandsSnapshot().get(panelId),
         });
         terminalResolverRef.current = resolve;
       }),

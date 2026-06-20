@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { pathBasename } from "@/lib/pathUtils";
 
-type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string };
+type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string };
 
 type Props = {
   pendingClosePanel: PanelInfo | null;
@@ -55,14 +56,20 @@ export function CloseDialogs({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pendingClosePanel?.title
-                ? `Close ${pendingClosePanel.title}?`
-                : "Close file?"}
+              Close Editor:{" "}
+              {pendingClosePanel?.path
+                ? pathBasename(pendingClosePanel.path)
+                : (pendingClosePanel?.title ?? "file")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               You are about to close a file with unsaved changes
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {pendingClosePanel?.path && (
+            <p className="text-[12px] text-muted-foreground break-all">
+              Path: {pendingClosePanel.path}
+            </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel onClick={onCancelClose}>
               Cancel
@@ -83,13 +90,19 @@ export function CloseDialogs({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Close Terminal?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Close Terminal:{" "}
+              {pendingTerminalClosePanel?.processName || "process"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingTerminalClosePanel?.processName
-                ? `Process "${pendingTerminalClosePanel.processName}" is running`
-                : "A process is running"}
+              This running process will be killed
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {pendingTerminalClosePanel?.command && (
+            <p className="text-[12px] text-muted-foreground break-all">
+              Command: {pendingTerminalClosePanel.command}
+            </p>
+          )}
           <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
             <Checkbox
               checked={dontAskAgain}
