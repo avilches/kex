@@ -706,6 +706,19 @@ export const FileExplorer = memo(
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {(rootMode === "terminal" || rootMode === "git") && rootPath && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={() => onSetAsRoot(rootPath)}
+              title="Set as Workspace root"
+              aria-label="Set as Workspace root"
+            >
+              <HugeiconsIcon icon={PinIcon} size={13} strokeWidth={2} />
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="icon"
