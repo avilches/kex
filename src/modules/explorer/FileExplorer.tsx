@@ -7,13 +7,25 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
+  ArrowDown01Icon,
+  ComputerTerminal01Icon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
+  GitBranchIcon,
+  Home01Icon,
+  PinIcon,
   Refresh01Icon,
   Search01Icon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useDndMonitor, useDroppable } from "@dnd-kit/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -42,6 +54,7 @@ import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import type { GitStatusSnapshot } from "@/lib/native";
+import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 
 export type FileExplorerHandle = {
   focus: () => void;
@@ -53,6 +66,12 @@ export type FileExplorerHandle = {
 
 type Props = {
   rootPath: string | null;
+  rootMode: ExplorerRootMode;
+  onChangeRootMode: (mode: ExplorerRootMode) => void;
+  onSetAsRoot: (path: string) => void;
+  pinnedInvalid: boolean;
+  pinnedPath: string | null;
+  gitRootHint: string | null;
   activeFilePath?: string | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
@@ -62,6 +81,38 @@ type Props = {
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
 };
+
+const ROOT_MODES: {
+  id: ExplorerRootMode;
+  label: string;
+  description: string;
+  icon: typeof Search01Icon;
+}[] = [
+  {
+    id: "terminal",
+    label: "Follow terminal",
+    description: "Sigue el cwd del terminal activo",
+    icon: ComputerTerminal01Icon,
+  },
+  {
+    id: "git",
+    label: "Follow git root",
+    description: "Sube a la raiz del repositorio",
+    icon: GitBranchIcon,
+  },
+  {
+    id: "filesystem",
+    label: "File system",
+    description: "Empieza en tu carpeta home",
+    icon: Home01Icon,
+  },
+  {
+    id: "pinned",
+    label: "Pinned folder",
+    description: "Carpeta fijada manualmente",
+    icon: PinIcon,
+  },
+];
 
 type Row =
   | {
@@ -180,6 +231,8 @@ export const FileExplorer = memo(
   forwardRef<FileExplorerHandle, Props>(function FileExplorer(
     {
       rootPath,
+      rootMode,
+      onChangeRootMode,
       activeFilePath,
       onOpenFile,
       onPathRenamed,
@@ -537,59 +590,111 @@ export const FileExplorer = memo(
         tabIndex={0}
         onKeyDown={handleKeyDown}
       >
-        <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-2">
-          <span
-            className="flex flex-1 items-center truncate text-xs font-medium text-foreground/80"
-            title={rootPath}
-          >
-            <img
-              src={folderIconUrl(basename(rootPath), false)}
-              alt=""
-              height={15}
-              width={15}
-              className="mx-1.5"
-            />
-            {basename(rootPath)}
-          </span>
+        <div className="shrink-0 border-b border-border/60">
+          <div className="px-1.5 pt-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-1.5 truncate rounded px-1.5 py-1 text-xs font-medium text-foreground/80 hover:bg-accent"
+                  title={rootPath ?? undefined}
+                >
+                  <HugeiconsIcon
+                    icon={
+                      (
+                        ROOT_MODES.find((m) => m.id === rootMode) ??
+                        ROOT_MODES[0]
+                      ).icon
+                    }
+                    size={13}
+                    strokeWidth={2}
+                    className="text-primary"
+                  />
+                  <span className="truncate">
+                    {rootMode === "filesystem" ? "~" : basename(rootPath)}
+                  </span>
+                  <HugeiconsIcon
+                    icon={ArrowDown01Icon}
+                    size={12}
+                    strokeWidth={2}
+                    className="ml-auto shrink-0 text-muted-foreground"
+                  />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                {ROOT_MODES.map((m) => (
+                  <DropdownMenuItem
+                    key={m.id}
+                    onSelect={() => onChangeRootMode(m.id)}
+                    className="flex items-start gap-2.5"
+                  >
+                    <HugeiconsIcon
+                      icon={m.icon}
+                      size={14}
+                      strokeWidth={2}
+                      className="mt-0.5 text-primary"
+                    />
+                    <span className="flex flex-col">
+                      <span className="text-xs font-medium">{m.label}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {m.description}
+                      </span>
+                    </span>
+                    {rootMode === m.id && (
+                      <HugeiconsIcon
+                        icon={Tick02Icon}
+                        size={13}
+                        strokeWidth={2}
+                        className="ml-auto mt-0.5 text-primary"
+                      />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-foreground"
-            onClick={() => setIsSearchOpen((v) => !v)}
-            title="Search files"
-            aria-label="Search files"
-          >
-            <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
-          </Button>
+          <div className="flex h-8 items-center gap-1 px-2">
+            <div className="flex-1" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsSearchOpen((v) => !v)}
+              title="Search files"
+              aria-label="Search files"
+            >
+              <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
+            </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-foreground"
-            onClick={() => tree.beginCreate(rootPath, "file")}
-            title="New file"
-          >
-            <HugeiconsIcon icon={FileAddIcon} size={13} strokeWidth={2} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-foreground"
-            onClick={() => tree.beginCreate(rootPath, "dir")}
-            title="New folder"
-          >
-            <HugeiconsIcon icon={FolderAddIcon} size={13} strokeWidth={2} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-foreground"
-            onClick={() => tree.refresh(rootPath)}
-            title="Refresh"
-          >
-            <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 text-muted-foreground hover:text-foreground"
+              onClick={() => tree.beginCreate(rootPath, "file")}
+              title="New file"
+            >
+              <HugeiconsIcon icon={FileAddIcon} size={13} strokeWidth={2} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 text-muted-foreground hover:text-foreground"
+              onClick={() => tree.beginCreate(rootPath, "dir")}
+              title="New folder"
+            >
+              <HugeiconsIcon icon={FolderAddIcon} size={13} strokeWidth={2} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 text-muted-foreground hover:text-foreground"
+              onClick={() => tree.refresh(rootPath)}
+              title="Refresh"
+            >
+              <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
+            </Button>
+          </div>
         </div>
 
         <ExplorerSearch

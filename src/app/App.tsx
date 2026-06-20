@@ -134,6 +134,8 @@ export default function App() {
     replacePanel,
     setTerminalPanelCwd,
     setWorkspaceCwd,
+    setExplorerRootMode,
+    setPinnedRoot,
     setTerminalRunningCommand,
     setPanelView,
     findPanelGlobal,
@@ -407,6 +409,20 @@ export default function App() {
         home,
       }),
     [activeRootMode, terminalRootCwd, gitRootByWs, activeWorkspace, home],
+  );
+
+  const handleChangeRootMode = useCallback(
+    (mode: ExplorerRootMode) => {
+      if (activeWorkspace) setExplorerRootMode(activeWorkspace.id, mode);
+    },
+    [activeWorkspace, setExplorerRootMode],
+  );
+
+  const handleSetAsRoot = useCallback(
+    (path: string) => {
+      if (activeWorkspace) setPinnedRoot(activeWorkspace.id, path);
+    },
+    [activeWorkspace, setPinnedRoot],
   );
 
   const openNewTerminal = useCallback((targetPaneId?: string) => {
@@ -1535,6 +1551,12 @@ export default function App() {
                     <RightPanel
                       ref={rightPanelRef}
                       rootPath={explorerRoot}
+                      rootMode={activeRootMode}
+                      onChangeRootMode={handleChangeRootMode}
+                      onSetAsRoot={handleSetAsRoot}
+                      pinnedInvalid={false}
+                      pinnedPath={activeWorkspace?.pinnedRoot ?? null}
+                      gitRootHint={null}
                       activeFilePath={explorerActiveFilePath ?? null}
                       onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                       onPathRenamed={handlePathRenamed}
@@ -1596,6 +1618,12 @@ export default function App() {
                     <RightPanel
                       ref={rightPanelRef}
                       rootPath={explorerRoot}
+                      rootMode={activeRootMode}
+                      onChangeRootMode={handleChangeRootMode}
+                      onSetAsRoot={handleSetAsRoot}
+                      pinnedInvalid={false}
+                      pinnedPath={activeWorkspace?.pinnedRoot ?? null}
+                      gitRootHint={null}
                       activeFilePath={explorerActiveFilePath ?? null}
                       onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                       onPathRenamed={handlePathRenamed}

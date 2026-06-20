@@ -5,6 +5,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setRightPanelActiveTab } from "@/modules/settings/store";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SourceControlSummary } from "@/modules/source-control";
+import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 
 export type RightPanelTab = "explorer" | "git" | "history";
@@ -28,6 +29,12 @@ type CommitFileDiffOpenInput = {
 export type RightPanelProps = {
   // FileExplorer props
   rootPath: string | null;
+  rootMode: ExplorerRootMode;
+  onChangeRootMode: (mode: ExplorerRootMode) => void;
+  onSetAsRoot: (path: string) => void;
+  pinnedInvalid: boolean;
+  pinnedPath: string | null;
+  gitRootHint: string | null;
   activeFilePath?: string | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
@@ -101,6 +108,12 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
             <FileExplorer
               ref={explorerRef}
               rootPath={props.rootPath}
+              rootMode={props.rootMode}
+              onChangeRootMode={props.onChangeRootMode}
+              onSetAsRoot={props.onSetAsRoot}
+              pinnedInvalid={props.pinnedInvalid}
+              pinnedPath={props.pinnedPath}
+              gitRootHint={props.gitRootHint}
               activeFilePath={props.activeFilePath}
               onOpenFile={props.onOpenFile}
               onPathRenamed={props.onPathRenamed}
