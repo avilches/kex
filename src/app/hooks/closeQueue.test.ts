@@ -91,6 +91,17 @@ describe("runCloseQueue", () => {
     expect(closed).toEqual(["a", "b"]);
   });
 
+  it("skips locked editors without asking", async () => {
+    const ask = vi.fn();
+    const { deps, closed } = makeDeps(
+      { a: { kind: "editor", dirty: true, locked: true } },
+      { askEditorClose: ask as never },
+    );
+    await runCloseQueue(["a"], deps);
+    expect(ask).not.toHaveBeenCalled();
+    expect(closed).toEqual([]);
+  });
+
   it("saves a dirty editor on save then closes", async () => {
     const { deps, closed, saved } = makeDeps(
       { a: { kind: "editor", dirty: true } },
