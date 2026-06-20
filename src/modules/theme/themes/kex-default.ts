@@ -17,13 +17,13 @@ export const kexDefault: Theme = {
     },
     dark: {
       colors: {
-        background: "#2D2D2D",
+        background: "#2B2B2B",
         card: "#363636",
         popover: "#363636",
         sidebar: "#2D2D2D",
       },
       terminal: {
-        background: "#000000",
+        background: "#2B2B2B",
       },
       inactivePaneDim: { terminal: 0.12 },
     },
