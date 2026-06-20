@@ -253,7 +253,7 @@ impl AgentDetector {
     fn handle_kex_unified<F: FnMut(Transition)>(&mut self, data: &[u8], emit: &mut F) {
         let fields: Vec<String> = data
             .split(|&b| b == b';')
-            .map(|f| percent_decode(f))
+            .map(percent_decode)
             .collect();
 
         if fields.len() < 5 {
