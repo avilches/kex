@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,16 +9,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string };
 
 type Props = {
   pendingClosePanel: PanelInfo | null;
   onCancelClose: () => void;
-  onConfirmClose: () => void;
+  onSaveClose: () => void;
+  onDontSaveClose: () => void;
   pendingTerminalClosePanel: PanelInfo | null;
   onCancelTerminalClose: () => void;
-  onConfirmTerminalClose: () => void;
+  onConfirmTerminalClose: (dontAskAgain: boolean) => void;
   pendingDeletePanels: PanelInfo[] | null;
   onCancelDeleteClose: () => void;
   onConfirmDeleteClose: () => void;
@@ -27,7 +31,8 @@ type Props = {
 export function CloseDialogs({
   pendingClosePanel,
   onCancelClose,
-  onConfirmClose,
+  onSaveClose,
+  onDontSaveClose,
   pendingTerminalClosePanel,
   onCancelTerminalClose,
   onConfirmTerminalClose,
@@ -35,6 +40,12 @@ export function CloseDialogs({
   onCancelDeleteClose,
   onConfirmDeleteClose,
 }: Props) {
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+
+  useEffect(() => {
+    if (pendingTerminalClosePanel) setDontAskAgain(false);
+  }, [pendingTerminalClosePanel]);
+
   return (
     <>
       <AlertDialog
@@ -43,19 +54,24 @@ export function CloseDialogs({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle>
               {pendingClosePanel?.title
-                ? `"${pendingClosePanel.title}" has unsaved changes. Close anyway?`
-                : "This file has unsaved changes. Close anyway?"}
+                ? `Close ${pendingClosePanel.title}?`
+                : "Close file?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to close a file with unsaved changes
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={onCancelClose}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={onConfirmClose}>
-              Close Anyway
+            <Button variant="outline" onClick={onDontSaveClose}>
+              Don't save
+            </Button>
+            <AlertDialogAction onClick={onSaveClose} autoFocus>
+              Save
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -74,11 +90,21 @@ export function CloseDialogs({
                 : "A process is running"}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            <Checkbox
+              checked={dontAskAgain}
+              onCheckedChange={(v) => setDontAskAgain(v === true)}
+            />
+            Don't ask me again
+          </label>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={onCancelTerminalClose}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={onConfirmTerminalClose} autoFocus>
+            <AlertDialogAction
+              onClick={() => onConfirmTerminalClose(dontAskAgain)}
+              autoFocus
+            >
               Close
             </AlertDialogAction>
           </AlertDialogFooter>
