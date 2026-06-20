@@ -114,9 +114,16 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **Keyboard navigation.** Arrow keys to move, `Enter` to open, `F2` / double-click to rename inline, right-click or context menu key for actions (new file, new folder, rename, delete, copy path, reveal in finder, open in terminal).
 
-**Fuzzy search.** The search bar in the explorer panel searches file names across the entire workspace tree using the `nucleo-matcher` crate on the Rust side.
+**Fuzzy search.** The search bar in the explorer panel searches file names under the active explorer root using the `nucleo-matcher` crate on the Rust side. Because the finder is scoped to the current root, it never surfaces files outside the view.
 
-**Root follows active tab.** The explorer root tracks the working directory of the active terminal tab (derived from OSC 7). If you `cd ~/projects/foo` in a terminal, the explorer follows.
+**Root modes (per workspace).** The explorer root is chosen by an explicit mode stored per workspace (`explorerRootMode`, `pinnedRoot` in `workspace-state.json`) and selected from the dropdown above the tree. The mode is the single source of truth for the root, whether a terminal or an editor pane is focused. The four modes:
+
+- **Follow terminal** (default): root tracks the active terminal cwd (OSC 7). `cd ~/projects/foo` and the explorer follows.
+- **Follow git root**: root is the nearest ancestor of the terminal cwd containing a `.git`, recomputed on each cwd change. Leaving a repo keeps the last known git root until another repo is entered; with no repo anywhere it behaves like Follow terminal.
+- **File system**: root is the user's home directory.
+- **Pinned folder**: root is a folder fixed via the "Set as root" folder context action. If the pinned path no longer exists, the explorer shows an empty state with shortcuts back to the other modes (the Follow git root option previews the root it would resolve to).
+
+The selection logic is the pure `resolveExplorerRoot` (`modules/workspaces/lib/explorerRoot.ts`, tested); the last known git root is runtime-only state in `App.tsx` (re-derived from the cwd on restart) computed via the `git_resolve_repo` command. The previous per-editor root override was removed: opening a file no longer changes the explorer root.
 
 **Drag to open.** Files (not directories) can be dragged from the explorer and dropped onto any pane drop zone or between tabs to open them as permanent editor tabs. Dropping on a directional zone (top/bottom/left/right) splits the target pane and opens the file in the new sub-pane. The drag experience is visually identical to dragging tabs between panes. See `WorkspaceDndProvider.tsx`.
 
