@@ -206,7 +206,11 @@ When you switch panels or panes, the outgoing panel is hidden with CSS classes. 
 - Panel state (scroll position, xterm buffer, editor content, unsaved changes) is preserved exactly as you left it.
 - Memory usage is proportional to the total number of open panels across all workspaces and panes. Each terminal panel holds a live xterm instance; each editor panel holds CodeMirror state. There is no sleep mechanism for idle panels.
 
-### 4.2 Workspace authorization
+### 4.2 Tab close confirmation
+
+Every close path (tab close button, the close shortcut, and Close All / Close Other Tabs) runs through one sequential queue, `closePanels(panelIds)` in `useTabCloseGuards`. The pure core (`hooks/closeQueue.ts`) closes panels one at a time: a terminal with a live foreground process or a dirty editor pauses the queue on a confirmation dialog, and a cancel stops the whole run before closing the current panel. Terminals only prompt when the `warnOnCloseTabWithRunningProcess` preference is on (default on); the terminal dialog's "Don't ask me again" checkbox flips that preference off. The editor dialog offers Save / Don't save / Cancel; Save writes through the editor handle before closing, and a failed write stops the queue without losing the buffer. After any run, focus returns to the active tab's terminal or editor.
+
+### 4.3 Workspace authorization
 
 Before any git or shell command can run against a directory, that directory must be in the `WorkspaceRegistry`. The registry is populated automatically when you open Kex in a directory (via CLI argument or the OS file manager context menu), and when you explicitly navigate to one via the terminal (`cd` triggers an OSC 7 event that registers the new cwd). `workspace_authorize` is the IPC command for explicit authorization.
 
