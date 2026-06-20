@@ -70,9 +70,10 @@ type Props = {
   rootMode: ExplorerRootMode;
   onChangeRootMode: (mode: ExplorerRootMode) => void;
   onSetAsRoot: (path: string) => void;
-  pinnedInvalid: boolean;
-  pinnedPath: string | null;
-  gitRootHint: string | null;
+  terminalCwdPath: string | null;
+  gitRootPath: string | null;
+  workspaceRootPath: string | null;
+  workspaceRootExists: boolean;
   activeFilePath?: string | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
@@ -86,34 +87,46 @@ type Props = {
 const ROOT_MODES: {
   id: ExplorerRootMode;
   label: string;
-  description: string;
   icon: typeof Search01Icon;
 }[] = [
-  {
-    id: "terminal",
-    label: "Follow terminal",
-    description: "Sigue el cwd del terminal activo",
-    icon: ComputerTerminal01Icon,
-  },
-  {
-    id: "git",
-    label: "Follow git root",
-    description: "Sube a la raiz del repositorio",
-    icon: GitBranchIcon,
-  },
-  {
-    id: "filesystem",
-    label: "File system",
-    description: "Empieza en tu carpeta home",
-    icon: Home01Icon,
-  },
-  {
-    id: "pinned",
-    label: "Pinned folder",
-    description: "Carpeta fijada manualmente",
-    icon: PinIcon,
-  },
+  { id: "filesystem", label: "File System", icon: Home01Icon },
+  { id: "pinned", label: "Workspace Root", icon: PinIcon },
+  { id: "terminal", label: "Follow Terminal", icon: ComputerTerminal01Icon },
+  { id: "git", label: "Follow Git Root", icon: GitBranchIcon },
 ];
+
+type RootModeContext = {
+  workspaceRootPath: string | null;
+  workspaceRootExists: boolean;
+  terminalCwdPath: string | null;
+  gitRootPath: string | null;
+};
+
+function rootModeInfo(
+  id: ExplorerRootMode,
+  ctx: RootModeContext,
+): { subtitle: string | null; disabled: boolean } {
+  switch (id) {
+    case "filesystem":
+      return { subtitle: null, disabled: false };
+    case "pinned":
+      if (!ctx.workspaceRootPath)
+        return {
+          subtitle: "Set a new workspace root in the explorer",
+          disabled: true,
+        };
+      if (!ctx.workspaceRootExists)
+        return { subtitle: "Folder not found", disabled: true };
+      return { subtitle: ctx.workspaceRootPath, disabled: false };
+    case "terminal":
+      return { subtitle: ctx.terminalCwdPath, disabled: false };
+    case "git":
+      return {
+        subtitle: ctx.gitRootPath ?? "No git repository in the current path",
+        disabled: false,
+      };
+  }
+}
 
 type Row =
   | {
@@ -241,9 +254,10 @@ export const FileExplorer = memo(
       rootMode,
       onChangeRootMode,
       onSetAsRoot,
-      pinnedInvalid,
-      pinnedPath,
-      gitRootHint,
+      terminalCwdPath,
+      gitRootPath,
+      workspaceRootPath,
+      workspaceRootExists,
       activeFilePath,
       onOpenFile,
       onPathRenamed,
@@ -616,41 +630,47 @@ export const FileExplorer = memo(
         tabIndex={0}
         onKeyDown={handleKeyDown}
       >
-        <div className="shrink-0 border-b border-border/60">
-          <div className="px-1.5 pt-1.5">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-1.5 truncate rounded px-1.5 py-1 text-xs font-medium text-foreground/80 hover:bg-accent"
-                  title={rootPath ?? undefined}
-                >
-                  <HugeiconsIcon
-                    icon={
-                      (
-                        ROOT_MODES.find((m) => m.id === rootMode) ??
-                        ROOT_MODES[0]
-                      ).icon
-                    }
-                    size={13}
-                    strokeWidth={2}
-                    className="text-primary"
-                  />
-                  <span className="truncate">
-                    {rootMode === "filesystem" ? "~" : basename(rootPath)}
-                  </span>
-                  <HugeiconsIcon
-                    icon={ArrowDown01Icon}
-                    size={12}
-                    strokeWidth={2}
-                    className="ml-auto shrink-0 text-muted-foreground"
-                  />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64">
-                {ROOT_MODES.map((m) => (
+        <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-xs font-medium text-foreground/80 hover:bg-accent"
+                title={rootPath ?? undefined}
+              >
+                <HugeiconsIcon
+                  icon={
+                    (
+                      ROOT_MODES.find((m) => m.id === rootMode) ?? ROOT_MODES[0]
+                    ).icon
+                  }
+                  size={13}
+                  strokeWidth={2}
+                  className="shrink-0 text-primary"
+                />
+                <span className="truncate">
+                  {rootMode === "filesystem" ? "~" : basename(rootPath)}
+                </span>
+                <HugeiconsIcon
+                  icon={ArrowDown01Icon}
+                  size={12}
+                  strokeWidth={2}
+                  className="shrink-0 text-muted-foreground"
+                />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72">
+              {ROOT_MODES.map((m) => {
+                const info = rootModeInfo(m.id, {
+                  workspaceRootPath,
+                  workspaceRootExists,
+                  terminalCwdPath,
+                  gitRootPath,
+                });
+                return (
                   <DropdownMenuItem
                     key={m.id}
+                    disabled={info.disabled}
                     onSelect={() => onChangeRootMode(m.id)}
                     className="flex items-start gap-2.5"
                   >
@@ -658,132 +678,85 @@ export const FileExplorer = memo(
                       icon={m.icon}
                       size={14}
                       strokeWidth={2}
-                      className="mt-0.5 text-primary"
+                      className="mt-0.5 shrink-0 text-primary"
                     />
-                    <span className="flex flex-col">
+                    <span className="flex min-w-0 flex-col">
                       <span className="text-xs font-medium">{m.label}</span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {m.description}
-                      </span>
+                      {info.subtitle && (
+                        <span className="truncate text-[11px] text-muted-foreground">
+                          {info.subtitle}
+                        </span>
+                      )}
                     </span>
                     {rootMode === m.id && (
                       <HugeiconsIcon
                         icon={Tick02Icon}
                         size={13}
                         strokeWidth={2}
-                        className="ml-auto mt-0.5 text-primary"
+                        className="ml-auto mt-0.5 shrink-0 text-primary"
                       />
                     )}
                   </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          <div className="flex h-8 items-center gap-1 px-2">
-            <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 text-muted-foreground hover:text-foreground"
-              onClick={() => setIsSearchOpen((v) => !v)}
-              title="Search files"
-              aria-label="Search files"
-            >
-              <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 text-muted-foreground hover:text-foreground"
-              onClick={() => tree.beginCreate(rootPath, "file")}
-              title="New file"
-            >
-              <HugeiconsIcon icon={FileAddIcon} size={13} strokeWidth={2} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 text-muted-foreground hover:text-foreground"
-              onClick={() => tree.beginCreate(rootPath, "dir")}
-              title="New folder"
-            >
-              <HugeiconsIcon icon={FolderAddIcon} size={13} strokeWidth={2} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 text-muted-foreground hover:text-foreground"
-              onClick={() => tree.refresh(rootPath)}
-              title="Refresh"
-            >
-              <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setIsSearchOpen((v) => !v)}
+            title="Search files"
+            aria-label="Search files"
+          >
+            <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => tree.beginCreate(rootPath, "file")}
+            title="New file"
+          >
+            <HugeiconsIcon icon={FileAddIcon} size={13} strokeWidth={2} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => tree.beginCreate(rootPath, "dir")}
+            title="New folder"
+          >
+            <HugeiconsIcon icon={FolderAddIcon} size={13} strokeWidth={2} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => tree.refresh(rootPath)}
+            title="Refresh"
+          >
+            <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
+          </Button>
         </div>
 
-        {pinnedInvalid ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+        {rootMode === "pinned" &&
+        (workspaceRootPath === null || root?.status === "error") ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
             <HugeiconsIcon
               icon={PinOffIcon}
               size={26}
               strokeWidth={1.8}
-              className="text-destructive/80"
+              className="text-muted-foreground"
             />
             <div className="text-sm font-medium text-foreground">
-              La carpeta fijada ya no existe
+              {workspaceRootPath === null
+                ? "No workspace root set"
+                : "Folder not found"}
             </div>
-            {pinnedPath && (
-              <div className="break-all text-[11px] text-muted-foreground">
-                {pinnedPath}
-              </div>
-            )}
-            <div className="mt-2 flex w-full flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => onChangeRootMode("terminal")}
-                className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs hover:bg-accent"
-              >
-                <HugeiconsIcon
-                  icon={ComputerTerminal01Icon}
-                  size={14}
-                  strokeWidth={2}
-                  className="text-primary"
-                />
-                Follow terminal
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeRootMode("git")}
-                className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs hover:bg-accent"
-              >
-                <HugeiconsIcon
-                  icon={GitBranchIcon}
-                  size={14}
-                  strokeWidth={2}
-                  className="text-primary"
-                />
-                Follow git root
-                {gitRootHint && (
-                  <span className="ml-auto max-w-[150px] truncate text-[10px] text-muted-foreground">
-                    {gitRootHint}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeRootMode("filesystem")}
-                className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs hover:bg-accent"
-              >
-                <HugeiconsIcon
-                  icon={Home01Icon}
-                  size={14}
-                  strokeWidth={2}
-                  className="text-primary"
-                />
-                Open file system explorer
-              </button>
+            <div className="break-all text-[11px] text-muted-foreground">
+              {workspaceRootPath ?? "Set a new workspace root in the explorer"}
             </div>
           </div>
         ) : (

@@ -234,6 +234,14 @@ function EntryRowImpl(props: EntryRowProps) {
           if (renameInProgress) e.preventDefault();
         }}
       >
+        {isDir && onSetAsRoot && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onSetAsRoot(path)}
+          >
+            Set as workspace root
+          </ContextMenuItem>
+        )}
         {!isDir && (
           <ContextMenuItem
             className={COMPACT_ITEM}
@@ -248,14 +256,6 @@ function EntryRowImpl(props: EntryRowProps) {
             onSelect={() => onRevealInTerminal(path)}
           >
             Open in Terminal
-          </ContextMenuItem>
-        )}
-        {isDir && onSetAsRoot && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => onSetAsRoot(path)}
-          >
-            Set as root
           </ContextMenuItem>
         )}
         <ContextMenuItem

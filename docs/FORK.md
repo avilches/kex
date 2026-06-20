@@ -135,11 +135,12 @@ previous workspaces or pane layout.
   pane wins, tie-broken by perpendicular overlap). Hard stop at borders; no wrap-around. Replaces the old cyclic
   `Cmd+[` / `Cmd+]` shortcuts.
 - **Explorer root modes** — the explorer root is no longer hardwired to the active terminal cwd. A per-workspace mode
-  (selector above the tree) picks among Follow terminal (default), Follow git root, File system (home), and Pinned
-  folder (set via "Set as root" on any folder). The mode is the single source of truth for the root, so focusing an
-  editor no longer reroots the explorer (the upstream per-editor root override was removed). An invalid pinned folder
-  shows an empty state with one-click recovery to the other modes. Pure logic in `modules/workspaces/lib/explorerRoot.ts`;
-  state persisted in `workspace-state.json` (`explorerRootMode`, `pinnedRoot`).
+  (selector above the tree) picks among File System (home), Workspace Root (set via "Set as workspace root" on any
+  folder), Follow Terminal (default), and Follow Git Root. Each option in the selector shows its resolved path; the
+  Workspace Root option is disabled when unset or missing. The mode is the single source of truth for the root, so
+  focusing an editor no longer reroots the explorer (the upstream per-editor root override was removed). Pure logic in
+  `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspace-state.json` (`explorerRootMode`,
+  `pinnedRoot`).
 
 ### Technical fixes and refactors
 

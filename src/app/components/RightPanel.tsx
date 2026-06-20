@@ -32,9 +32,10 @@ export type RightPanelProps = {
   rootMode: ExplorerRootMode;
   onChangeRootMode: (mode: ExplorerRootMode) => void;
   onSetAsRoot: (path: string) => void;
-  pinnedInvalid: boolean;
-  pinnedPath: string | null;
-  gitRootHint: string | null;
+  terminalCwdPath: string | null;
+  gitRootPath: string | null;
+  workspaceRootPath: string | null;
+  workspaceRootExists: boolean;
   activeFilePath?: string | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
@@ -111,9 +112,10 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               rootMode={props.rootMode}
               onChangeRootMode={props.onChangeRootMode}
               onSetAsRoot={props.onSetAsRoot}
-              pinnedInvalid={props.pinnedInvalid}
-              pinnedPath={props.pinnedPath}
-              gitRootHint={props.gitRootHint}
+              terminalCwdPath={props.terminalCwdPath}
+              gitRootPath={props.gitRootPath}
+              workspaceRootPath={props.workspaceRootPath}
+              workspaceRootExists={props.workspaceRootExists}
               activeFilePath={props.activeFilePath}
               onOpenFile={props.onOpenFile}
               onPathRenamed={props.onPathRenamed}

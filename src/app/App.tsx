@@ -360,30 +360,6 @@ export default function App() {
   const activeRootMode: ExplorerRootMode =
     activeWorkspace?.explorerRootMode ?? "terminal";
 
-  // Per-workspace last known git root (runtime only, re-derived on restart).
-  const [gitRootByWs, setGitRootByWs] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const ws = activeWorkspace;
-    if (!ws || activeRootMode !== "git") return;
-    const cwd = activeCwd ?? lastTerminalCwdRef.current;
-    if (!cwd) return;
-    let cancelled = false;
-    void native
-      .gitResolveRepo(cwd)
-      .then((info) => {
-        if (cancelled || !info?.repoRoot) return;
-        setGitRootByWs((prev) =>
-          prev[ws.id] === info.repoRoot
-            ? prev
-            : { ...prev, [ws.id]: info.repoRoot },
-        );
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [activeWorkspace, activeRootMode, activeCwd]);
-
   const terminalRootCwd = useMemo<string | null>(() => {
     if (activeCwd) return activeCwd;
     if (lastTerminalCwdRef.current) return lastTerminalCwdRef.current;
@@ -397,18 +373,53 @@ export default function App() {
     return null;
   }, [activeCwd, workspaces]);
 
+  // Git root of the current cwd, plus a per-workspace last-known fallback that
+  // survives leaving a repo. Runtime only; re-derived from cwd on restart.
+  const [currentGitRoot, setCurrentGitRoot] = useState<string | null>(null);
+  const [gitRootByWs, setGitRootByWs] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!terminalRootCwd) {
+      setCurrentGitRoot(null);
+      return;
+    }
+    const ws = activeWorkspace;
+    let cancelled = false;
+    void native
+      .gitResolveRepo(terminalRootCwd)
+      .then((info) => {
+        if (cancelled) return;
+        const root = info?.repoRoot ?? null;
+        setCurrentGitRoot(root);
+        if (root && ws) {
+          setGitRootByWs((prev) =>
+            prev[ws.id] === root ? prev : { ...prev, [ws.id]: root },
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentGitRoot(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [terminalRootCwd, activeWorkspace]);
+
+  const gitRoot =
+    currentGitRoot ??
+    (activeWorkspace ? (gitRootByWs[activeWorkspace.id] ?? null) : null);
+
+  const workspaceRootPath = activeWorkspace?.pinnedRoot ?? null;
+
   const explorerRoot = useMemo<string | null>(
     () =>
       resolveExplorerRoot({
         mode: activeRootMode,
         terminalCwd: terminalRootCwd,
-        gitRoot: activeWorkspace
-          ? (gitRootByWs[activeWorkspace.id] ?? null)
-          : null,
-        pinnedRoot: activeWorkspace?.pinnedRoot ?? null,
+        gitRoot,
+        pinnedRoot: workspaceRootPath,
         home,
       }),
-    [activeRootMode, terminalRootCwd, gitRootByWs, activeWorkspace, home],
+    [activeRootMode, terminalRootCwd, gitRoot, workspaceRootPath, home],
   );
 
   const handleChangeRootMode = useCallback(
@@ -425,53 +436,27 @@ export default function App() {
     [activeWorkspace, setPinnedRoot],
   );
 
-  const pinnedPath = activeWorkspace?.pinnedRoot ?? null;
-  const [pinnedInvalid, setPinnedInvalid] = useState(false);
-  const [gitRootHint, setGitRootHint] = useState<string | null>(null);
-
+  // Whether the saved workspace root still exists on disk, so the selector can
+  // disable the option when it is unset or missing.
+  const [workspaceRootExists, setWorkspaceRootExists] = useState(false);
   useEffect(() => {
-    if (activeRootMode !== "pinned" || !pinnedPath) {
-      setPinnedInvalid(false);
+    if (!workspaceRootPath) {
+      setWorkspaceRootExists(false);
       return;
     }
     let cancelled = false;
     void native
-      .fsStat(pinnedPath)
+      .fsStat(workspaceRootPath)
       .then(() => {
-        if (!cancelled) setPinnedInvalid(false);
+        if (!cancelled) setWorkspaceRootExists(true);
       })
       .catch(() => {
-        if (!cancelled) setPinnedInvalid(true);
+        if (!cancelled) setWorkspaceRootExists(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [activeRootMode, pinnedPath]);
-
-  useEffect(() => {
-    if (!pinnedInvalid) {
-      setGitRootHint(null);
-      return;
-    }
-    let cancelled = false;
-    const probe = pinnedPath ?? activeCwd ?? lastTerminalCwdRef.current;
-    const fallback = activeCwd ?? lastTerminalCwdRef.current;
-    void (async () => {
-      let hint: string | null = null;
-      if (probe) {
-        const info = await native.gitResolveRepo(probe).catch(() => null);
-        hint = info?.repoRoot ?? null;
-      }
-      if (!hint && fallback) {
-        const info = await native.gitResolveRepo(fallback).catch(() => null);
-        hint = info?.repoRoot ?? null;
-      }
-      if (!cancelled) setGitRootHint(hint ?? fallback ?? null);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [pinnedInvalid, pinnedPath, activeCwd]);
+  }, [workspaceRootPath]);
 
   const openNewTerminal = useCallback((targetPaneId?: string) => {
     if (!activeWorkspace) return;
@@ -1602,9 +1587,10 @@ export default function App() {
                       rootMode={activeRootMode}
                       onChangeRootMode={handleChangeRootMode}
                       onSetAsRoot={handleSetAsRoot}
-                      pinnedInvalid={pinnedInvalid}
-                      pinnedPath={pinnedPath}
-                      gitRootHint={gitRootHint}
+                      terminalCwdPath={terminalRootCwd}
+                      gitRootPath={gitRoot}
+                      workspaceRootPath={workspaceRootPath}
+                      workspaceRootExists={workspaceRootExists}
                       activeFilePath={explorerActiveFilePath ?? null}
                       onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                       onPathRenamed={handlePathRenamed}
@@ -1669,9 +1655,10 @@ export default function App() {
                       rootMode={activeRootMode}
                       onChangeRootMode={handleChangeRootMode}
                       onSetAsRoot={handleSetAsRoot}
-                      pinnedInvalid={pinnedInvalid}
-                      pinnedPath={pinnedPath}
-                      gitRootHint={gitRootHint}
+                      terminalCwdPath={terminalRootCwd}
+                      gitRootPath={gitRoot}
+                      workspaceRootPath={workspaceRootPath}
+                      workspaceRootExists={workspaceRootExists}
                       activeFilePath={explorerActiveFilePath ?? null}
                       onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                       onPathRenamed={handlePathRenamed}
