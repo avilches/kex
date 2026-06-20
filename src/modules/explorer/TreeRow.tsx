@@ -52,6 +52,7 @@ export type EntryRowProps = {
   onSelectPath: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
+  editorPreviewOnClick: boolean;
 };
 
 function EntryRowImpl(props: EntryRowProps) {
@@ -74,6 +75,7 @@ function EntryRowImpl(props: EntryRowProps) {
     onSelectPath,
     onRevealInTerminal,
     onAttachToAgent,
+    editorPreviewOnClick,
   } = props;
 
   const [isConfirming, setIsConfirming] = useState(false);
@@ -145,7 +147,7 @@ function EntryRowImpl(props: EntryRowProps) {
     if (renameInProgress) return;
     onSelectPath(path);
     if (isDir) actions.toggle(path);
-    else onOpenFile(path);
+    else if (editorPreviewOnClick) onOpenFile(path);
   };
 
   return (
