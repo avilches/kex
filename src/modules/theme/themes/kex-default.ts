@@ -25,7 +25,7 @@ export const kexDefault: Theme = {
       terminal: {
         background: "#2B2B2B",
       },
-      inactivePaneDim: { terminal: 0.12 },
+      inactivePaneDim: { terminal: 0.12, editor: 0.12 },
     },
   },
 };
