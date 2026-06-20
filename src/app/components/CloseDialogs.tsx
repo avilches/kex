@@ -96,7 +96,7 @@ export function CloseDialogs({
               Close terminal {pendingTerminalClosePanel?.processName || "process"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This running process will be killed
+              The running process will be killed
             </AlertDialogDescription>
           </AlertDialogHeader>
           {pendingTerminalClosePanel?.command && (
