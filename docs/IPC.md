@@ -127,6 +127,19 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
 | `agent_session_restore_plan` | Return `Vec<RestorePlan>` — one entry per panel that had a running agent session at last close |
 | `agent_queue_nav` | Store a pending OS-notification navigation target `{ window_label, workspace_id, panel_id }` with a 5-second TTL. Called by the frontend before sending an OS notification so that when the user clicks the notification and any main window gains focus, Rust can redirect to the correct window and emit `kex:activate-panel` to it. |
+| `float_browser_open(panelId, url, originWindowLabel, workspaceId)` | Open a floating `WebviewUrl::External` window for the given browser panel. If the window already exists, focuses it instead of opening a second one. State is inserted only after successful window build. |
+| `float_browser_close(panelId)` | Destroy the floating window without docking (no `kex:float-dock` event emitted). Removes from state unconditionally. |
+| `float_browser_focus(panelId)` | Bring the floating window to front via `set_focus`. |
+| `float_browser_dock(panelId)` | Emit `kex:float-dock` to the origin window, then destroy the floating window (same path as the X-button close handler). |
+
+### Float browser Tauri events
+
+Events emitted by `float_browser.rs` to the **origin window** (not broadcast):
+
+| Event | Payload | Trigger |
+|---|---|---|
+| `kex:float-dock` | `{ panelId, currentUrl }` | Floating window closed via X button, `float_browser_dock` command, or "Dock to Kex" menu item |
+| `kex:float-navigated` | `{ panelId, url }` | Each page load completion (`PageLoadEvent::Finished`) in the floating window |
 
 ---
 

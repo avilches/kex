@@ -58,17 +58,6 @@ pub fn float_browser_open(
 
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
 
-    {
-        let mut map = state.panels.lock().unwrap();
-        map.insert(
-            panel_id.clone(),
-            FloatMeta {
-                origin_window_label: origin_window_label.clone(),
-                workspace_id,
-            },
-        );
-    }
-
     let panel_id_nav = panel_id.clone();
     let origin_nav = origin_window_label.clone();
     let app_nav = app.clone();
@@ -126,6 +115,17 @@ pub fn float_browser_open(
             do_dock_and_destroy(&app_close, &panel_id_close, &origin_close, &label_close);
         }
     });
+
+    {
+        let mut map = state.panels.lock().unwrap();
+        map.insert(
+            panel_id,
+            FloatMeta {
+                origin_window_label,
+                workspace_id,
+            },
+        );
+    }
 
     Ok(())
 }
