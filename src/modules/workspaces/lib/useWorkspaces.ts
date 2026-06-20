@@ -20,7 +20,31 @@ import {
   updatePane,
 } from "./splitNode";
 import type { Panel, PaneNode, Workspace } from "./types";
+import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newPanelId } from "@/lib/ids";
+
+export function applyExplorerRootMode(
+  workspaces: Workspace[],
+  workspaceId: string,
+  mode: ExplorerRootMode,
+): Workspace[] {
+  return workspaces.map((w) =>
+    w.id === workspaceId ? { ...w, explorerRootMode: mode } : w,
+  );
+}
+
+export function applyPinnedRoot(
+  workspaces: Workspace[],
+  workspaceId: string,
+  path: string,
+): Workspace[] {
+  const normalized = path.length > 1 ? path.replace(/\/$/, "") : path;
+  return workspaces.map((w) =>
+    w.id === workspaceId
+      ? { ...w, pinnedRoot: normalized, explorerRootMode: "pinned" }
+      : w,
+  );
+}
 
 function newPaneNode(cwd?: string): PaneNode {
   const panelId = newPanelId();
@@ -405,6 +429,17 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
+  const setExplorerRootMode = useCallback(
+    (workspaceId: string, mode: ExplorerRootMode) => {
+      setWorkspaces((prev) => applyExplorerRootMode(prev, workspaceId, mode));
+    },
+    [],
+  );
+
+  const setPinnedRoot = useCallback((workspaceId: string, path: string) => {
+    setWorkspaces((prev) => applyPinnedRoot(prev, workspaceId, path));
+  }, []);
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -454,6 +489,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     replacePanel,
     setTerminalPanelCwd,
     setWorkspaceCwd,
+    setExplorerRootMode,
+    setPinnedRoot,
     setTerminalRunningCommand,
     setPanelView,
     findPanelGlobal,

@@ -1,3 +1,5 @@
+import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
+
 export type Panel =
   | { id: string; kind: "terminal"; cwd?: string; title?: string; blocks?: boolean;
       locked?: boolean; restoreOnRestart?: boolean; persistentCommand?: string }
@@ -32,4 +34,6 @@ export type Workspace = {
   cwd?: string;
   paneTree: SplitNode;
   activePaneId: string;
+  explorerRootMode?: ExplorerRootMode;
+  pinnedRoot?: string;
 };
