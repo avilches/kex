@@ -24,7 +24,11 @@ import {
 } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { fileIconUrl } from "./lib/iconResolver";
-import { copyToClipboard, revealInFinder } from "./lib/contextActions";
+import {
+  copyToClipboard,
+  relativePath,
+  revealInFinder,
+} from "./lib/contextActions";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { cn } from "@/lib/utils";
 
@@ -322,7 +326,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                         <div className="min-w-0 flex flex-col">
                           <span className="truncate text-xs leading-snug">{hit.name}</span>
                           <span className="break-all text-[10px] leading-snug text-muted-foreground">
-                            {hit.path}
+                            {relativePath(rootPath, hit.path)}
                           </span>
                         </div>
                       </button>
