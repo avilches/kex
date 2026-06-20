@@ -25,6 +25,7 @@ import {
   setTerminalScrollback,
   setTerminalWebglEnabled,
   setVimMode,
+  setWarnOnCloseTabWithRunningProcess,
 } from "@/modules/settings/store";
 import { invoke } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
@@ -49,6 +50,9 @@ export function GeneralSection() {
     (s) => s.terminalCursorBlink,
   );
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
+  const warnOnCloseRunning = usePreferencesStore(
+    (s) => s.warnOnCloseTabWithRunningProcess,
+  );
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
   const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
@@ -188,6 +192,17 @@ export function GeneralSection() {
           <Switch
             checked={terminalCursorBlink}
             onCheckedChange={(v) => void setTerminalCursorBlink(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Warn when closing a tab with a running process"
+          description="Confirm before closing a terminal that still has a process running."
+        >
+          <Switch
+            checked={warnOnCloseRunning}
+            onCheckedChange={(v) =>
+              void setWarnOnCloseTabWithRunningProcess(v)
+            }
           />
         </SettingRow>
         <SettingRow

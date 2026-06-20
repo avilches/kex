@@ -50,6 +50,7 @@ export type Preferences = {
   explorerGitColorScheme: GitColorScheme;
   terminalWebglEnabled: boolean;
   terminalCursorBlink: boolean;
+  warnOnCloseTabWithRunningProcess: boolean;
   terminalFontFamily: string;
   terminalLetterSpacing: number;
   terminalFontSize: number;
@@ -80,6 +81,7 @@ const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
+const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
@@ -123,6 +125,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   explorerGitColorScheme: "vscode",
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
+  warnOnCloseTabWithRunningProcess: true,
   terminalFontFamily: "",
   terminalLetterSpacing: 0,
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
@@ -184,6 +187,9 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalCursorBlink:
       get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
       DEFAULT_PREFERENCES.terminalCursorBlink,
+    warnOnCloseTabWithRunningProcess:
+      get<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
+      DEFAULT_PREFERENCES.warnOnCloseTabWithRunningProcess,
     terminalFontFamily:
       get<string>(KEY_TERMINAL_FONT_FAMILY) ??
       DEFAULT_PREFERENCES.terminalFontFamily,
@@ -291,6 +297,10 @@ export async function setTerminalCursorBlink(value: boolean): Promise<void> {
   await writePref(KEY_TERMINAL_CURSOR_BLINK, value);
 }
 
+export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promise<void> {
+  await writePref(KEY_WARN_ON_CLOSE_RUNNING, value);
+}
+
 export async function setTerminalFontFamily(value: string): Promise<void> {
   await writePref(KEY_TERMINAL_FONT_FAMILY, value.trim());
 }
@@ -394,6 +404,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
   [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
+  [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
   [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
   [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
