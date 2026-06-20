@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/context-menu";
 import {
   ArrowDown01Icon,
+  ArrowUp01Icon,
   ComputerTerminal01Icon,
   FileAddIcon,
   Folder01Icon,
@@ -70,6 +71,11 @@ type Props = {
   rootMode: ExplorerRootMode;
   onChangeRootMode: (mode: ExplorerRootMode) => void;
   onSetAsRoot: (path: string) => void;
+  onEnterFolder?: (path: string) => void;
+  onNavigateUp?: () => void;
+  onNavigateHome?: () => void;
+  canNavigateUp: boolean;
+  isAtHome: boolean;
   homePath: string | null;
   terminalCwdPath: string | null;
   gitRootPath: string | null;
@@ -256,6 +262,11 @@ export const FileExplorer = memo(
       rootMode,
       onChangeRootMode,
       onSetAsRoot,
+      onEnterFolder,
+      onNavigateUp,
+      onNavigateHome,
+      canNavigateUp,
+      isAtHome,
       homePath,
       terminalCwdPath,
       gitRootPath,
@@ -602,6 +613,7 @@ export const FileExplorer = memo(
               onRevealInTerminal={onRevealInTerminal}
               onAttachToAgent={onAttachToAgent}
               onSetAsRoot={onSetAsRoot}
+              onEnterFolder={onEnterFolder}
               editorPreviewOnClick={editorPreviewOnClick}
             />
           );
@@ -634,6 +646,34 @@ export const FileExplorer = memo(
         onKeyDown={handleKeyDown}
       >
         <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-1.5">
+          {rootMode === "filesystem" && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                onClick={() => onNavigateUp?.()}
+                disabled={!canNavigateUp}
+                title="Up one folder"
+                aria-label="Up one folder"
+              >
+                <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={2} />
+              </Button>
+              {!isAtHome && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => onNavigateHome?.()}
+                  title="Go to home folder"
+                  aria-label="Go to home folder"
+                >
+                  <HugeiconsIcon icon={Home01Icon} size={13} strokeWidth={2} />
+                </Button>
+              )}
+              <div className="mx-0.5 h-4 w-px shrink-0 bg-border/60" />
+            </>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

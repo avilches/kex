@@ -35,6 +35,11 @@ export type RightPanelProps = {
   rootMode: ExplorerRootMode;
   onChangeRootMode: (mode: ExplorerRootMode) => void;
   onSetAsRoot: (path: string) => void;
+  onEnterFolder?: (path: string) => void;
+  onNavigateUp?: () => void;
+  onNavigateHome?: () => void;
+  canNavigateUp: boolean;
+  isAtHome: boolean;
   homePath: string | null;
   terminalCwdPath: string | null;
   gitRootPath: string | null;
@@ -116,6 +121,11 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               rootMode={props.rootMode}
               onChangeRootMode={props.onChangeRootMode}
               onSetAsRoot={props.onSetAsRoot}
+              onEnterFolder={props.onEnterFolder}
+              onNavigateUp={props.onNavigateUp}
+              onNavigateHome={props.onNavigateHome}
+              canNavigateUp={props.canNavigateUp}
+              isAtHome={props.isAtHome}
               homePath={props.homePath}
               terminalCwdPath={props.terminalCwdPath}
               gitRootPath={props.gitRootPath}
