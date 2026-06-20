@@ -82,6 +82,10 @@ type Options = {
 export function useFileTree(rootPath: string | null, options?: Options) {
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const showHiddenRef = useRef(showHidden);
+  const keepLayout = usePreferencesStore(
+    (s) => s.keepFolderLayoutOnChangeExplorerRoot,
+  );
+  const keepLayoutRef = useRef(keepLayout);
   const gitDecorationsRef = useRef(true);
   const [nodes, setNodes] = useState<TreeState>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -98,6 +102,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     showHiddenRef.current = showHidden;
   }, [showHidden]);
 
+  useEffect(() => {
+    keepLayoutRef.current = keepLayout;
+  }, [keepLayout]);
 
   useEffect(() => {
     expandedRef.current = expanded;
@@ -193,7 +200,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     setPendingCreate(null);
     setRenaming(null);
 
-    const restored = recallExpansion(rootPath);
+    const restored = keepLayoutRef.current ? recallExpansion(rootPath) : [];
     setExpanded(new Set(restored));
     setNodes({});
 
