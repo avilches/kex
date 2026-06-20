@@ -125,6 +125,7 @@ export default function App() {
     activatePanel,
     closePanel,
     updatePanelData,
+    replacePanel,
     setTerminalPanelCwd,
     setWorkspaceCwd,
     setTerminalRunningCommand,
@@ -412,8 +413,6 @@ export default function App() {
   const openFileInPanel = useCallback(
     (path: string, pin?: boolean) => {
       if (!activeWorkspace) return undefined;
-      // Markdown opens in its rendered view by default; the per-panel toggle
-      // flips it to the raw editor (and back).
       const markdown = isMarkdownPath(path);
       // Check if already open (as editor or rendered markdown); activate it.
       for (const pane of allPanes(activeWorkspace.paneTree)) {
@@ -429,16 +428,38 @@ export default function App() {
       }
       const panelId = newPanelId();
       const panelExplorerRoot = resolveOpenRoot(explorerRootRef.current, path);
+      const isPreview = !(pin ?? false);
+
+      if (!markdown && isPreview) {
+        const activePane = allPanes(activeWorkspace.paneTree).find(
+          (p) => p.id === activeWorkspace.activePaneId,
+        );
+        const existingPreview = activePane?.panels.find(
+          (p) => p.kind === "editor" && p.preview,
+        );
+        if (existingPreview) {
+          replacePanel(activeWorkspace.id, activeWorkspace.activePaneId, existingPreview.id, {
+            id: panelId,
+            kind: "editor",
+            path,
+            dirty: false,
+            preview: true,
+            explorerRoot: panelExplorerRoot,
+          });
+          return panelId;
+        }
+      }
+
       openPanel(
         activeWorkspace.id,
         activeWorkspace.activePaneId,
         markdown
           ? { id: panelId, kind: "markdown", path, explorerRoot: panelExplorerRoot }
-          : { id: panelId, kind: "editor", path, dirty: false, preview: !(pin ?? false), explorerRoot: panelExplorerRoot },
+          : { id: panelId, kind: "editor", path, dirty: false, preview: isPreview, explorerRoot: panelExplorerRoot },
       );
       return panelId;
     },
-    [activeWorkspace, activatePanel, openPanel],
+    [activeWorkspace, activatePanel, openPanel, replacePanel],
   );
 
   const openGitDiffInPanel = useCallback(
