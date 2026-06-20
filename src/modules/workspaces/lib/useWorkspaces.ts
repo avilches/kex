@@ -250,7 +250,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     targetPaneId: string,
     direction: "left" | "right" | "top" | "bottom",
     path: string,
-    explorerRoot: string,
   ) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -261,7 +260,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
         const freshPaneId = newPaneId();
         const freshSplitId = newSplitId();
-        const panel: Panel = { id: newPanelId(), kind: "editor", path, preview: false, dirty: false, explorerRoot };
+        const panel: Panel = { id: newPanelId(), kind: "editor", path, preview: false, dirty: false };
         const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, panel);
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };
@@ -412,11 +411,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const setPanelView = useCallback((workspaceId: string, panelId: string, mode: "rendered" | "raw") => {
     updatePanelData(workspaceId, panelId, (p) => {
       if (mode === "raw" && p.kind === "markdown" && isMarkdownPath(p.path)) {
-        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, explorerRoot: p.explorerRoot };
+        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false };
       }
       if (mode === "rendered" && p.kind === "editor" && isMarkdownPath(p.path)) {
         if (p.dirty) return p;
-        return { id: p.id, kind: "markdown", path: p.path, title: p.title, explorerRoot: p.explorerRoot };
+        return { id: p.id, kind: "markdown", path: p.path, title: p.title };
       }
       return p;
     });

@@ -86,7 +86,6 @@ import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   resolveExplorerRoot,
-  resolveOpenRoot,
   type ExplorerRootMode,
 } from "@/modules/workspaces/lib/explorerRoot";
 
@@ -410,9 +409,6 @@ export default function App() {
     [activeRootMode, terminalRootCwd, gitRootByWs, activeWorkspace, home],
   );
 
-  const explorerRootRef = useRef<string | null>(null);
-  explorerRootRef.current = explorerRoot;
-
   const openNewTerminal = useCallback((targetPaneId?: string) => {
     if (!activeWorkspace) return;
     openPanel(activeWorkspace.id, targetPaneId ?? activeWorkspace.activePaneId, {
@@ -481,7 +477,6 @@ export default function App() {
         }
       }
       const panelId = newPanelId();
-      const panelExplorerRoot = resolveOpenRoot(explorerRootRef.current, path);
       const isPreview = !(pin ?? false);
 
       if (!markdown && isPreview) {
@@ -498,7 +493,6 @@ export default function App() {
             path,
             dirty: false,
             preview: true,
-            explorerRoot: panelExplorerRoot,
           });
           return panelId;
         }
@@ -508,8 +502,8 @@ export default function App() {
         activeWorkspace.id,
         activeWorkspace.activePaneId,
         markdown
-          ? { id: panelId, kind: "markdown", path, explorerRoot: panelExplorerRoot }
-          : { id: panelId, kind: "editor", path, dirty: false, preview: isPreview, explorerRoot: panelExplorerRoot },
+          ? { id: panelId, kind: "markdown", path }
+          : { id: panelId, kind: "editor", path, dirty: false, preview: isPreview },
       );
       return panelId;
     },
@@ -1521,13 +1515,7 @@ export default function App() {
               onReorderPanel={reorderPanel}
               onSplitPaneAndPlace={splitPaneAndPlace}
               onSplitPaneAndOpenFile={(workspaceId, targetPaneId, direction, path) =>
-                splitPaneAndOpenFile(
-                  workspaceId,
-                  targetPaneId,
-                  direction,
-                  path,
-                  resolveOpenRoot(explorerRootRef.current, path),
-                )
+                splitPaneAndOpenFile(workspaceId, targetPaneId, direction, path)
               }
               onOpenPanel={openPanel}
             >
