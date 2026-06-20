@@ -218,6 +218,7 @@ export const FileExplorer = memo(
 
     const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+    const editorPreviewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
     const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -479,7 +480,7 @@ export const FileExplorer = memo(
           const row = rows[idx];
           if (row.kind !== "entry") break;
           if (row.isDir) tree.toggle(row.path);
-          else onOpenFile(row.path);
+          else if (editorPreviewOnClick) onOpenFile(row.path);
           break;
         }
       }
@@ -509,6 +510,7 @@ export const FileExplorer = memo(
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}
               onAttachToAgent={onAttachToAgent}
+              editorPreviewOnClick={editorPreviewOnClick}
             />
           );
         }

@@ -732,7 +732,10 @@ function DraggableTab({
             absPath={panel.path}
             panelLocked={panel.locked ?? false}
             lockShortcut={shortcutLabels["tab.lock"]}
-            onLockToggle={() => onUpdatePanel?.(panel.id, (p) => ({ ...p, locked: !(panel.locked ?? false) }))}
+            onLockToggle={() => onUpdatePanel?.(panel.id, (p) => {
+              const newLocked = !(panel.locked ?? false);
+              return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
+            })}
             onRename={isFileRenaming ? undefined : handleRenameFromHover}
             isRenaming={isFileRenaming}
             fileRenameRef={fileRenameInputRef}
@@ -829,6 +832,7 @@ function DraggableTab({
           "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
           !isDescription && panel.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
+          panel.kind === "editor" && panel.preview && "italic",
         )}
         style={tabColor && !isRestoreError ? { color: tabColor } : undefined}
       >
@@ -932,7 +936,10 @@ function DraggableTab({
             )}
             {isLockable && (
               <ContextMenuItem
-                onSelect={() => onUpdatePanel?.(panel.id, (p) => ({ ...p, locked: !isLocked }))}
+                onSelect={() => onUpdatePanel?.(panel.id, (p) => {
+                  const newLocked = !isLocked;
+                  return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
+                })}
               >
                 {isLocked ? "Unlock Tab" : "Lock Tab"}
                 {shortcutLabels["tab.lock"] && (

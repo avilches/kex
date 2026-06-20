@@ -338,6 +338,24 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, []);
 
+  const replacePanel = useCallback((workspaceId: string, paneId: string, oldPanelId: string, newPanel: Panel) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w;
+        return {
+          ...w,
+          paneTree: updatePane(w.paneTree, paneId, (p) => {
+            const idx = p.panels.findIndex((panel) => panel.id === oldPanelId);
+            if (idx === -1) return p;
+            const newPanels = [...p.panels];
+            newPanels[idx] = newPanel;
+            return { ...p, panels: newPanels, activePanelId: newPanel.id };
+          }),
+        };
+      }),
+    );
+  }, []);
+
   const updatePanelData = useCallback((workspaceId: string, panelId: string, updater: (p: Panel) => Panel) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -433,6 +451,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     activatePanel,
     closePanel,
     updatePanelData,
+    replacePanel,
     setTerminalPanelCwd,
     setWorkspaceCwd,
     setTerminalRunningCommand,
