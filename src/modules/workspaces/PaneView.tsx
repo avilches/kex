@@ -22,6 +22,7 @@ type Props = {
   isWorkspaceActive: boolean;
   onActivatePanel: (workspaceId: string, panelId: string) => void;
   onClosePanel: (workspaceId: string, panelId: string) => void;
+  onCloseManyPanels: (workspaceId: string, panelIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
   onSplitTerminalRight: (workspaceId: string, paneId: string) => void;
@@ -145,6 +146,7 @@ export const PaneView = memo(function PaneView({
   isWorkspaceActive,
   onActivatePanel,
   onClosePanel,
+  onCloseManyPanels,
   onFocusPane,
   onNewTerminal,
   onSplitTerminalRight,
@@ -206,15 +208,15 @@ export const PaneView = memo(function PaneView({
   const handleClose = useCallback((panelId: string) => onClosePanel(workspaceId, panelId), [onClosePanel, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
   const handleCloseOtherPanels = useCallback((panelId: string) => {
-    pane.panels
+    const ids = pane.panels
       .filter((p) => p.id !== panelId && isBulkClosable(p))
-      .forEach((p) => onClosePanel(workspaceId, p.id));
-  }, [pane.panels, onClosePanel, workspaceId]);
+      .map((p) => p.id);
+    onCloseManyPanels(workspaceId, ids);
+  }, [pane.panels, onCloseManyPanels, workspaceId]);
   const handleCloseAllPanels = useCallback(() => {
-    pane.panels
-      .filter(isBulkClosable)
-      .forEach((p) => onClosePanel(workspaceId, p.id));
-  }, [pane.panels, onClosePanel, workspaceId]);
+    const ids = pane.panels.filter(isBulkClosable).map((p) => p.id);
+    onCloseManyPanels(workspaceId, ids);
+  }, [pane.panels, onCloseManyPanels, workspaceId]);
   const handleSplitTerminalRight = useCallback(() => onSplitTerminalRight(workspaceId, pane.id), [onSplitTerminalRight, workspaceId, pane.id]);
   const handleSplitTerminalDown = useCallback(() => onSplitTerminalDown(workspaceId, pane.id), [onSplitTerminalDown, workspaceId, pane.id]);
   const handleNewBrowser = useCallback(() => onNewBrowser(workspaceId, pane.id), [onNewBrowser, workspaceId, pane.id]);

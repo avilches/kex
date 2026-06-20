@@ -14,6 +14,7 @@ type Props = {
   activeWorkspaceId: string;
   onActivatePanel: (workspaceId: string, panelId: string) => void;
   onClosePanel: (workspaceId: string, panelId: string) => void;
+  onCloseManyPanels: (workspaceId: string, panelIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
   onDividerChange?: (workspaceId: string, splitId: string, position: number) => void;
@@ -66,6 +67,7 @@ export function WorkspaceView({
             isWorkspaceActive={ws.id === activeWorkspaceId}
             onActivatePanel={rest.onActivatePanel}
             onClosePanel={rest.onClosePanel}
+            onCloseManyPanels={rest.onCloseManyPanels}
             onFocusPane={rest.onFocusPane}
             onNewTerminal={rest.onNewTerminal}
             onDividerChange={rest.onDividerChange}

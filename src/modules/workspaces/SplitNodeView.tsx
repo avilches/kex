@@ -18,6 +18,7 @@ type Props = {
   isWorkspaceActive: boolean;
   onActivatePanel: (workspaceId: string, panelId: string) => void;
   onClosePanel: (workspaceId: string, panelId: string) => void;
+  onCloseManyPanels: (workspaceId: string, panelIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
   onDividerChange?: (
@@ -60,6 +61,7 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, .
         isWorkspaceActive={rest.isWorkspaceActive}
         onActivatePanel={rest.onActivatePanel}
         onClosePanel={rest.onClosePanel}
+        onCloseManyPanels={rest.onCloseManyPanels}
         onFocusPane={rest.onFocusPane}
         onNewTerminal={rest.onNewTerminal}
         onSplitTerminalRight={rest.onSplitTerminalRight}
