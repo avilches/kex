@@ -1001,7 +1001,7 @@ export default function App() {
 
   const handleCloseActivePanel = useCallback(() => {
     if (!activeWorkspace || !activePanelId) return;
-    if (activePanel?.kind === "terminal" && activePanel.locked) {
+    if ((activePanel?.kind === "terminal" || activePanel?.kind === "editor") && activePanel.locked) {
       flashLockIcon(activePanelId);
       return;
     }
@@ -1159,11 +1159,12 @@ export default function App() {
         setTimeout(() => terminalHandles.current.get(first.panelId)?.focus(), 50);
       },
       "tab.lock": () => {
-        if (!activePanelId || activePanel?.kind !== "terminal") return;
+        if (!activePanelId) return;
+        if (activePanel?.kind !== "terminal" && activePanel?.kind !== "editor") return;
         const found = findPanelGlobal(activePanelId);
         if (found)
           updatePanelData(found.workspace.id, activePanelId, (p) =>
-            p.kind === "terminal" ? { ...p, locked: !p.locked } : p,
+            (p.kind === "terminal" || p.kind === "editor") ? { ...p, locked: !p.locked } : p,
           );
       },
       "path.copy": () => {
@@ -1232,8 +1233,7 @@ export default function App() {
         return rightPanelRef.current?.isExplorerFocused() ?? false;
       }
       if (id === "tab.lock") {
-        // Only terminal tabs are lockable; leave Cmd+L to CodeMirror elsewhere.
-        return activePanel?.kind !== "terminal";
+        return activePanel?.kind !== "terminal" && activePanel?.kind !== "editor";
       }
 
       return false;

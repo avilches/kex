@@ -6,5 +6,5 @@ import type { Panel } from "./types";
  * to unlock them first (or close them individually after unlocking).
  */
 export function isBulkClosable(panel: Panel): boolean {
-  return !(panel.kind === "terminal" && (panel.locked ?? false));
+  return !((panel.kind === "terminal" || panel.kind === "editor") && (panel.locked ?? false));
 }
