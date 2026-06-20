@@ -38,6 +38,8 @@ export type EditorPaneHandle = {
   findPrevious: () => void;
   clearQuery: () => void;
   focus: () => void;
+  /** Persist the buffer to disk. No-op if the document is not dirty. */
+  save: () => Promise<void>;
   getSelection: () => string | null;
   getPath: () => string;
   /** Re-read the file from disk. Skips silently if the buffer is dirty. */
@@ -213,6 +215,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         },
         focus: () => {
           cmRef.current?.view?.focus();
+        },
+        save: async () => {
+          await saveRef.current();
+          onSavedRef.current?.();
         },
         getSelection: () => {
           const view = cmRef.current?.view;
