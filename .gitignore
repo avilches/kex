@@ -26,6 +26,6 @@ stats.html
 *.sln
 *.sw?
 
-*.tsbuildinfo.superpowers/
-.superpowers
+*.tsbuildinfo
+.superpowers/
 .claude/settings.local.json
