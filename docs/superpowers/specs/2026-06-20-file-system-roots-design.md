@@ -160,24 +160,32 @@ nothing. Single-click keeps toggling expand/collapse as today.
 ### Expanded-layout flag
 
 A new boolean preference `keepFolderLayoutOnChangeExplorerRoot` in the
-preferences store (`src/modules/settings/`), default **false**, with **no UI**
-(editable only via the store JSON). Semantics:
+preferences store (`src/modules/settings/store.ts`), default **false**, with
+**no UI** (editable only via the `kex-settings.json` store file).
 
-- `false` (default): when the explorer root changes, the tree starts collapsed,
-  showing only the new root's direct contents. This matches "entering" a folder
-  and refreshing.
-- `true`: the set of expanded folders is preserved across a root change (those
-  still under the new root remain expanded).
+`useFileTree` (`src/modules/explorer/lib/useFileTree.ts`) already maintains a
+per-root expansion cache (`expansionCache` module Map): on a root change it
+remembers the outgoing root's expanded set and restores the incoming root's via
+`recallExpansion`. The flag gates whether that restore happens:
 
-Implementation lives in `useFileTree` (`src/modules/explorer/lib/useFileTree.ts`),
-which is keyed on `rootPath`. When `rootPath` changes and the flag is false,
-reset the expanded set (and any transient tree state that should not survive a
-root change). When the flag is true, leave the expanded set intact. The flag is
-read where `useFileTree` is consumed (FileExplorer) and threaded into the hook,
-so the hook stays free of store coupling.
+- `false` (default): on a root change the tree starts collapsed, showing only
+  the new root's direct contents. `recallExpansion` is skipped (treated as an
+  empty set). This matches "entering" a folder and refreshing.
+- `true`: the existing behavior. The incoming root's previously expanded folders
+  are restored from the cache, so navigating up to a parent you visited before
+  reopens its prior layout.
 
-This flag exists to A/B the two behaviors in real use before committing to one;
-it is intentionally not surfaced in Settings UI.
+Implementation: read the flag inside `useFileTree` via the preferences store
+(the hook already reads `showHidden` the same way) into a ref, and in the
+root-change effect use `const restored = keepLayoutRef.current ? recallExpansion(rootPath) : []`.
+The ref avoids re-running the root-reset effect when the flag value changes
+(it only needs to take effect on the next navigation).
+
+The store wiring mirrors the existing config-only keys (`workspacePaneLimit`,
+`paneSplitLimit`): add to the `Preferences` type, `DEFAULT_PREFERENCES`,
+`loadPreferences`, and the `configDefaults` block so the key is written into the
+JSON on first load and is discoverable. No setter and no Settings UI: this flag
+exists only to A/B the two behaviors in real use before committing to one.
 
 ## Error handling and edge cases
 
