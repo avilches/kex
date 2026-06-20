@@ -716,7 +716,7 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found)
           updatePanelData(found.workspace.id, panelId, (p) =>
-            p.kind === "editor" ? { ...p, dirty } : p,
+            p.kind === "editor" ? { ...p, dirty, ...(dirty ? { preview: false } : {}) } : p,
           );
       },
       onEditorClose: (panelId) => {
@@ -1184,9 +1184,14 @@ export default function App() {
         if (activePanel?.kind !== "terminal" && activePanel?.kind !== "editor") return;
         const found = findPanelGlobal(activePanelId);
         if (found)
-          updatePanelData(found.workspace.id, activePanelId, (p) =>
-            (p.kind === "terminal" || p.kind === "editor") ? { ...p, locked: !p.locked } : p,
-          );
+          updatePanelData(found.workspace.id, activePanelId, (p) => {
+            if (p.kind === "terminal") return { ...p, locked: !p.locked };
+            if (p.kind === "editor") {
+              const newLocked = !p.locked;
+              return { ...p, locked: newLocked, ...(newLocked ? { preview: false } : {}) };
+            }
+            return p;
+          });
       },
       "path.copy": () => {
         if (!activePanel) return;

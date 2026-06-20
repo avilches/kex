@@ -731,7 +731,10 @@ function DraggableTab({
             absPath={panel.path}
             panelLocked={panel.locked ?? false}
             lockShortcut={shortcutLabels["tab.lock"]}
-            onLockToggle={() => onUpdatePanel?.(panel.id, (p) => ({ ...p, locked: !(panel.locked ?? false) }))}
+            onLockToggle={() => onUpdatePanel?.(panel.id, (p) => {
+              const newLocked = !(panel.locked ?? false);
+              return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
+            })}
             onRename={isFileRenaming ? undefined : handleRenameFromHover}
             isRenaming={isFileRenaming}
             fileRenameRef={fileRenameInputRef}
