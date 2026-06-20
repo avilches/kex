@@ -946,7 +946,7 @@ function DraggableTab({
               )}
             </ContextMenuItem>
             <ContextMenuItem
-              disabled={isLocked || panelsCount <= 1}
+              disabled={panelsCount <= 1}
               onSelect={() => onCloseOtherPanels(panel.id)}
             >
               Close Other Tabs
