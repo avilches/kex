@@ -425,6 +425,54 @@ export default function App() {
     [activeWorkspace, setPinnedRoot],
   );
 
+  const pinnedPath = activeWorkspace?.pinnedRoot ?? null;
+  const [pinnedInvalid, setPinnedInvalid] = useState(false);
+  const [gitRootHint, setGitRootHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeRootMode !== "pinned" || !pinnedPath) {
+      setPinnedInvalid(false);
+      return;
+    }
+    let cancelled = false;
+    void native
+      .fsStat(pinnedPath)
+      .then(() => {
+        if (!cancelled) setPinnedInvalid(false);
+      })
+      .catch(() => {
+        if (!cancelled) setPinnedInvalid(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRootMode, pinnedPath]);
+
+  useEffect(() => {
+    if (!pinnedInvalid) {
+      setGitRootHint(null);
+      return;
+    }
+    let cancelled = false;
+    const probe = pinnedPath ?? activeCwd ?? lastTerminalCwdRef.current;
+    const fallback = activeCwd ?? lastTerminalCwdRef.current;
+    void (async () => {
+      let hint: string | null = null;
+      if (probe) {
+        const info = await native.gitResolveRepo(probe).catch(() => null);
+        hint = info?.repoRoot ?? null;
+      }
+      if (!hint && fallback) {
+        const info = await native.gitResolveRepo(fallback).catch(() => null);
+        hint = info?.repoRoot ?? null;
+      }
+      if (!cancelled) setGitRootHint(hint ?? fallback ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pinnedInvalid, pinnedPath, activeCwd]);
+
   const openNewTerminal = useCallback((targetPaneId?: string) => {
     if (!activeWorkspace) return;
     openPanel(activeWorkspace.id, targetPaneId ?? activeWorkspace.activePaneId, {
@@ -1554,9 +1602,9 @@ export default function App() {
                       rootMode={activeRootMode}
                       onChangeRootMode={handleChangeRootMode}
                       onSetAsRoot={handleSetAsRoot}
-                      pinnedInvalid={false}
-                      pinnedPath={activeWorkspace?.pinnedRoot ?? null}
-                      gitRootHint={null}
+                      pinnedInvalid={pinnedInvalid}
+                      pinnedPath={pinnedPath}
+                      gitRootHint={gitRootHint}
                       activeFilePath={explorerActiveFilePath ?? null}
                       onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                       onPathRenamed={handlePathRenamed}
@@ -1621,9 +1669,9 @@ export default function App() {
                       rootMode={activeRootMode}
                       onChangeRootMode={handleChangeRootMode}
                       onSetAsRoot={handleSetAsRoot}
-                      pinnedInvalid={false}
-                      pinnedPath={activeWorkspace?.pinnedRoot ?? null}
-                      gitRootHint={null}
+                      pinnedInvalid={pinnedInvalid}
+                      pinnedPath={pinnedPath}
+                      gitRootHint={gitRootHint}
                       activeFilePath={explorerActiveFilePath ?? null}
                       onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                       onPathRenamed={handlePathRenamed}

@@ -15,6 +15,7 @@ import {
   GitBranchIcon,
   Home01Icon,
   PinIcon,
+  PinOffIcon,
   Refresh01Icon,
   Search01Icon,
   Tick02Icon,
@@ -137,7 +138,13 @@ type Row =
       gitStatusCode: GitStatusCode | null;
     }
   | { kind: "pending"; key: string; depth: number; pendingKind: "file" | "dir" }
-  | { kind: "status"; key: string; depth: number; tone: "muted" | "error"; message: string };
+  | {
+      kind: "status";
+      key: string;
+      depth: number;
+      tone: "muted" | "error";
+      message: string;
+    };
 
 const ROW_HEIGHT = 24;
 const OVERSCAN = 8;
@@ -234,6 +241,9 @@ export const FileExplorer = memo(
       rootMode,
       onChangeRootMode,
       onSetAsRoot,
+      pinnedInvalid,
+      pinnedPath,
+      gitRootHint,
       activeFilePath,
       onOpenFile,
       onPathRenamed,
@@ -272,7 +282,9 @@ export const FileExplorer = memo(
 
     const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-    const editorPreviewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
+    const editorPreviewOnClick = usePreferencesStore(
+      (s) => s.editorPreviewOnClick,
+    );
     const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -286,7 +298,11 @@ export const FileExplorer = memo(
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const { rows, entryIndexByPath } = useMemo(() => {
-      if (!rootPath) return { rows: [] as Row[], entryIndexByPath: new Map<string, number>() };
+      if (!rootPath)
+        return {
+          rows: [] as Row[],
+          entryIndexByPath: new Map<string, number>(),
+        };
       return buildRows(rootPath, tree, lookupGitStatus);
       // `tree` is intentionally omitted: its identity changes every render, but
       // the listed fields are the only inputs buildRows actually reads.
@@ -326,10 +342,11 @@ export const FileExplorer = memo(
       rootPath !== null &&
       internalDragSource !== null &&
       pathDirname(internalDragSource) !== rootPath;
-    const { setNodeRef: setRootDropRef, isOver: isRootInternalOver } = useDroppable({
-      id: rootPath ? `explorer-dir:${rootPath}` : "explorer-dir:__none__",
-      disabled: !isRootInternalDropValid,
-    });
+    const { setNodeRef: setRootDropRef, isOver: isRootInternalOver } =
+      useDroppable({
+        id: rootPath ? `explorer-dir:${rootPath}` : "explorer-dir:__none__",
+        disabled: !isRootInternalDropValid,
+      });
 
     const rootIsDropTarget =
       (externalTargetDir != null && externalTargetDir === rootPath) ||
@@ -396,7 +413,10 @@ export const FileExplorer = memo(
 
     const lastSyncedActivePathRef = useRef<string | null>(null);
     useEffect(() => {
-      if (!activeFilePath || activeFilePath === lastSyncedActivePathRef.current) {
+      if (
+        !activeFilePath ||
+        activeFilePath === lastSyncedActivePathRef.current
+      ) {
         return;
       }
       if (!entryIndexByPath.has(activeFilePath)) return;
@@ -580,7 +600,11 @@ export const FileExplorer = memo(
           );
         case "status":
           return (
-            <StatusRow depth={row.depth} message={row.message} tone={row.tone} />
+            <StatusRow
+              depth={row.depth}
+              message={row.message}
+              tone={row.tone}
+            />
           );
       }
     };
@@ -699,148 +723,217 @@ export const FileExplorer = memo(
           </div>
         </div>
 
-        <ExplorerSearch
-          ref={searchRef}
-          rootPath={rootPath}
-          onOpenFile={onOpenFile}
-          open={isSearchOpen}
-          onRequestClose={closeSearch}
-          onActiveChange={setIsSearchActive}
-          onRevealInTerminal={onRevealInTerminal}
-          onAttachToAgent={onAttachToAgent}
-        />
-
-        {!isSearchActive ? (
-          <ContextMenu>
-            <ContextMenuTrigger asChild>
-              <div
-                ref={(node: HTMLDivElement | null) => {
-                  scrollRef.current = node;
-                  setRootDropRef(node);
-                }}
-                data-explorer-drop=""
-                className={cn(
-                  "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]",
-                  rootIsDropTarget &&
-                    "rounded-sm ring-1 ring-inset ring-primary/50",
-                )}
-              >
-                {pendingAtRoot ? (
-                  <div
-                    className="flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]"
-                    style={{ paddingLeft: 6 }}
-                  >
-                    <span className="size-3.5 shrink-0" />
-                    <img
-                      src={
-                        pendingAtRoot.kind === "dir"
-                          ? folderIconUrl("", false)
-                          : fileIconUrl("untitled")
-                      }
-                      alt=""
-                      className="size-4 shrink-0 opacity-70"
-                    />
-                    <InlineInput
-                      initial=""
-                      placeholder={
-                        pendingAtRoot.kind === "dir" ? "New folder" : "New file"
-                      }
-                      onCommit={tree.commitCreate}
-                      onCancel={tree.cancelCreate}
-                    />
-                  </div>
-                ) : null}
-                {root?.status === "loading" && (
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                    Loading…
-                  </div>
-                )}
-                {root?.status === "error" && (
-                  <div className="px-3 py-2 text-[11px] text-destructive">
-                    {root.message}
-                  </div>
-                )}
-                {root?.status === "loaded" ? (
-                  <div
-                    style={{
-                      height: virtualizer.getTotalSize(),
-                      position: "relative",
-                      width: "100%",
-                    }}
-                  >
-                    {virtualizer.getVirtualItems().map((virtualRow) => {
-                      const row = rows[virtualRow.index];
-                      if (!row) return null;
-                      return (
-                        <div
-                          key={virtualRow.key}
-                          data-virtual-row-index={virtualRow.index}
-                          style={{
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                            width: "100%",
-                            height: virtualRow.size,
-                            transform: `translateY(${virtualRow.start}px)`,
-                          }}
-                        >
-                          {renderRow(row)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
+        {pinnedInvalid ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+            <HugeiconsIcon
+              icon={PinOffIcon}
+              size={26}
+              strokeWidth={1.8}
+              className="text-destructive/80"
+            />
+            <div className="text-sm font-medium text-foreground">
+              La carpeta fijada ya no existe
+            </div>
+            {pinnedPath && (
+              <div className="break-all text-[11px] text-muted-foreground">
+                {pinnedPath}
               </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent
-              className={COMPACT_CONTENT}
-              onCloseAutoFocus={(e) => {
-                if (tree.renaming || tree.pendingCreate) e.preventDefault();
-              }}
-            >
-              {onRevealInTerminal && (
-                <ContextMenuItem
-                  className={COMPACT_ITEM}
-                  onSelect={() => onRevealInTerminal(rootPath)}
+            )}
+            <div className="mt-2 flex w-full flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => onChangeRootMode("terminal")}
+                className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs hover:bg-accent"
+              >
+                <HugeiconsIcon
+                  icon={ComputerTerminal01Icon}
+                  size={14}
+                  strokeWidth={2}
+                  className="text-primary"
+                />
+                Follow terminal
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeRootMode("git")}
+                className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs hover:bg-accent"
+              >
+                <HugeiconsIcon
+                  icon={GitBranchIcon}
+                  size={14}
+                  strokeWidth={2}
+                  className="text-primary"
+                />
+                Follow git root
+                {gitRootHint && (
+                  <span className="ml-auto max-w-[150px] truncate text-[10px] text-muted-foreground">
+                    {gitRootHint}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeRootMode("filesystem")}
+                className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs hover:bg-accent"
+              >
+                <HugeiconsIcon
+                  icon={Home01Icon}
+                  size={14}
+                  strokeWidth={2}
+                  className="text-primary"
+                />
+                Open file system explorer
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <ExplorerSearch
+              ref={searchRef}
+              rootPath={rootPath}
+              onOpenFile={onOpenFile}
+              open={isSearchOpen}
+              onRequestClose={closeSearch}
+              onActiveChange={setIsSearchActive}
+              onRevealInTerminal={onRevealInTerminal}
+              onAttachToAgent={onAttachToAgent}
+            />
+
+            {!isSearchActive ? (
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <div
+                    ref={(node: HTMLDivElement | null) => {
+                      scrollRef.current = node;
+                      setRootDropRef(node);
+                    }}
+                    data-explorer-drop=""
+                    className={cn(
+                      "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]",
+                      rootIsDropTarget &&
+                        "rounded-sm ring-1 ring-inset ring-primary/50",
+                    )}
+                  >
+                    {pendingAtRoot ? (
+                      <div
+                        className="flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]"
+                        style={{ paddingLeft: 6 }}
+                      >
+                        <span className="size-3.5 shrink-0" />
+                        <img
+                          src={
+                            pendingAtRoot.kind === "dir"
+                              ? folderIconUrl("", false)
+                              : fileIconUrl("untitled")
+                          }
+                          alt=""
+                          className="size-4 shrink-0 opacity-70"
+                        />
+                        <InlineInput
+                          initial=""
+                          placeholder={
+                            pendingAtRoot.kind === "dir"
+                              ? "New folder"
+                              : "New file"
+                          }
+                          onCommit={tree.commitCreate}
+                          onCancel={tree.cancelCreate}
+                        />
+                      </div>
+                    ) : null}
+                    {root?.status === "loading" && (
+                      <div className="px-3 py-2 text-[11px] text-muted-foreground">
+                        Loading…
+                      </div>
+                    )}
+                    {root?.status === "error" && (
+                      <div className="px-3 py-2 text-[11px] text-destructive">
+                        {root.message}
+                      </div>
+                    )}
+                    {root?.status === "loaded" ? (
+                      <div
+                        style={{
+                          height: virtualizer.getTotalSize(),
+                          position: "relative",
+                          width: "100%",
+                        }}
+                      >
+                        {virtualizer.getVirtualItems().map((virtualRow) => {
+                          const row = rows[virtualRow.index];
+                          if (!row) return null;
+                          return (
+                            <div
+                              key={virtualRow.key}
+                              data-virtual-row-index={virtualRow.index}
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: virtualRow.size,
+                                transform: `translateY(${virtualRow.start}px)`,
+                              }}
+                            >
+                              {renderRow(row)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent
+                  className={COMPACT_CONTENT}
+                  onCloseAutoFocus={(e) => {
+                    if (tree.renaming || tree.pendingCreate) e.preventDefault();
+                  }}
                 >
-                  Open in Terminal
-                </ContextMenuItem>
-              )}
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => void revealInFinder(rootPath)}
-              >
-                Reveal in Finder
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => tree.beginCreate(rootPath, "file")}
-              >
-                New File
-              </ContextMenuItem>
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => tree.beginCreate(rootPath, "dir")}
-              >
-                New Folder
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => void copyToClipboard(rootPath)}
-              >
-                Copy Path
-              </ContextMenuItem>
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => tree.refresh(rootPath)}
-              >
-                Refresh
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        ) : null}
+                  {onRevealInTerminal && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => onRevealInTerminal(rootPath)}
+                    >
+                      Open in Terminal
+                    </ContextMenuItem>
+                  )}
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => void revealInFinder(rootPath)}
+                  >
+                    Reveal in Finder
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => tree.beginCreate(rootPath, "file")}
+                  >
+                    New File
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => tree.beginCreate(rootPath, "dir")}
+                  >
+                    New Folder
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => void copyToClipboard(rootPath)}
+                  >
+                    Copy Path
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => tree.refresh(rootPath)}
+                  >
+                    Refresh
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+            ) : null}
+          </>
+        )}
       </div>
     );
   }),
