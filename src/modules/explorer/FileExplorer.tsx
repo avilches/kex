@@ -233,6 +233,7 @@ export const FileExplorer = memo(
       rootPath,
       rootMode,
       onChangeRootMode,
+      onSetAsRoot,
       activeFilePath,
       onOpenFile,
       onPathRenamed,
@@ -563,6 +564,7 @@ export const FileExplorer = memo(
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}
               onAttachToAgent={onAttachToAgent}
+              onSetAsRoot={onSetAsRoot}
               editorPreviewOnClick={editorPreviewOnClick}
             />
           );
