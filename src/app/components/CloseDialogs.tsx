@@ -56,10 +56,12 @@ export function CloseDialogs({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Close Editor:{" "}
-              {pendingClosePanel?.path
-                ? pathBasename(pendingClosePanel.path)
-                : (pendingClosePanel?.title ?? "file")}
+              {(() => {
+                const name = pendingClosePanel?.path
+                  ? pathBasename(pendingClosePanel.path)
+                  : pendingClosePanel?.title;
+                return name ? `Close file ${name}?` : "Close file?";
+              })()}
             </AlertDialogTitle>
             <AlertDialogDescription>
               You are about to close a file with unsaved changes
@@ -91,8 +93,7 @@ export function CloseDialogs({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Close Terminal:{" "}
-              {pendingTerminalClosePanel?.processName || "process"}
+              Close terminal {pendingTerminalClosePanel?.processName || "process"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
               This running process will be killed

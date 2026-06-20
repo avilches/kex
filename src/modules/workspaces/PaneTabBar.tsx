@@ -946,16 +946,17 @@ function DraggableTab({
               )}
             </ContextMenuItem>
             <ContextMenuItem
-              disabled={panelsCount <= 1}
+              disabled={isLocked || panelsCount <= 1}
               onSelect={() => onCloseOtherPanels(panel.id)}
             >
               Close Other Tabs
             </ContextMenuItem>
-            {!isLocked && (
-              <ContextMenuItem onSelect={onCloseAllPanels}>
-                Close All Tabs
-              </ContextMenuItem>
-            )}
+            <ContextMenuItem
+              disabled={isLocked}
+              onSelect={onCloseAllPanels}
+            >
+              Close All Tabs
+            </ContextMenuItem>
             {hasAgent && (
               <>
                 <ContextMenuSeparator />
