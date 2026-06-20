@@ -47,7 +47,7 @@ const PORT_PRESETS: readonly PortPreset[] = [
   { port: 11434, label: "Ollama", hint: "ollama api" },
 ];
 
-export type PreviewAddressBarHandle = {
+export type BrowserAddressBarHandle = {
   focus: () => void;
 };
 
@@ -57,8 +57,8 @@ type Props = {
   onReload: () => void;
 };
 
-export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
-  function PreviewAddressBar({ url, onSubmit, onReload }, ref) {
+export const BrowserAddressBar = forwardRef<BrowserAddressBarHandle, Props>(
+  function BrowserAddressBar({ url, onSubmit, onReload }, ref) {
     const [draft, setDraft] = useState(url);
     const inputRef = useRef<HTMLInputElement>(null);
 

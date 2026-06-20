@@ -97,7 +97,7 @@ too — acceptable for now since dev only.
 Single-window React app. Path alias `@/*` → `src/*`. The layout is a 3-column shell: a narrow (52px) workspace sidebar
 on the left, a resizable center content area, and a collapsible right panel (Explorer / Source Control / Git History).
 Content is organized as Workspaces → Panes → Panels. Panels are a tagged union (`kind`: `terminal` | `editor` |
-`preview` | `markdown` | `git-diff` | `git-history` | `git-commit-file`) and **not** unmounted on switch — they're
+`browser` | `markdown` | `git-diff` | `git-history` | `git-commit-file`) and **not** unmounted on switch — they're
 hidden via `invisible pointer-events-none` so PTYs and dev servers keep streaming in the background.
 
 `App.tsx` wires modules together — keep it a coordinator. New features go inside the appropriate `modules/<area>/`.
@@ -113,8 +113,8 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
   supports vim mode and prebuilt themes (Tokyo Night, Nord, GitHub, Atom One, Aura, Copilot, Xcode, Gruvbox Dark).
 - **explorer/** — file tree with Material/Catppuccin icons (`iconResolver.ts`), fuzzy search, keyboard nav, inline
   rename, context actions. Backslash-aware `basename`.
-- **preview/** — auto-detected dev-server preview tab (status-bar pill suggests opening when a localhost URL is
-  detected).
+- **browser/** — web browser tab (address bar + navigation, `browser` panel kind); also surfaces the auto-detected
+  dev-server tab (status-bar pill suggests opening when a localhost URL is detected).
 - **header/** — top bar + inline search (`SearchInline` adapts to terminal vs editor via `SearchTarget`).
   `WindowControls` rendered when `USE_CUSTOM_WINDOW_CONTROLS` is true (Linux + Windows; macOS uses native traffic
   lights).

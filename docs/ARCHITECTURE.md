@@ -376,7 +376,7 @@ src/
     ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image
     ├── settings/                  — Settings store, preferences, window opener
-    ├── preview/                   — Dev server preview pane
+    ├── browser/                   — Web browser pane (address bar; also dev-server preview)
     ├── markdown/                  — Markdown renderer pane
     ├── workspace/                 — Local + WSL environment switching
     ├── updater/                   — Auto-updater dialog
@@ -385,7 +385,7 @@ src/
 
 ### Panel kinds (tagged union)
 
-`terminal` | `editor` | `preview` | `markdown` | `git-diff` | `git-history` | `git-commit-file`
+`terminal` | `editor` | `browser` | `markdown` | `git-diff` | `git-history` | `git-commit-file`
 
 All panel kinds follow the same never-unmount rule. Panels live inside panes; panes are nodes of a binary split tree inside a workspace. The workspace sidebar (left, 52px) lists workspaces; the right panel holds Explorer, Source Control, and Git History.
 

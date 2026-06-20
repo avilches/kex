@@ -41,7 +41,7 @@ export type CommandPaletteActionContext = {
   openNewWorkspace: () => void;
   openNewBlock: () => void;
   openNewEditor: () => void;
-  openNewPreview: () => void;
+  openNewBrowser: () => void;
   openGitGraph: () => void;
   toggleSourceControl: () => void;
   closeActiveTabOrPane: () => void;
@@ -133,13 +133,13 @@ export function createCommandItems(
       run: ctx.openNewEditor,
     },
     {
-      id: "tab.newPreview",
-      title: "New web preview",
+      id: "tab.newBrowser",
+      title: "New browser tab",
       group: "Tabs",
       keywords: ["browser", "web", "localhost", "preview"],
       icon: Globe02Icon,
-      shortcutId: "tab.newPreview",
-      run: ctx.openNewPreview,
+      shortcutId: "tab.newBrowser",
+      run: ctx.openNewBrowser,
     },
     {
       id: "tab.close",

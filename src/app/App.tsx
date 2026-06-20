@@ -30,10 +30,10 @@ import {
   type SearchInlineHandle,
   type SearchTarget,
 } from "@/modules/header";
-import type { PreviewPaneHandle } from "@/modules/preview";
+import type { BrowserPaneHandle } from "@/modules/browser";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setRightPanelOpen, setRightPanelActiveTab, setWarnOnCloseTabWithRunningProcess } from "@/modules/settings/store";
+import { setEditorAutoSave, setPanelSide, setRightPanelOpen, setRightPanelActiveTab, setWarnOnCloseTabWithRunningProcess } from "@/modules/settings/store";
 import {
   useGlobalShortcuts,
   type ShortcutHandlers,
@@ -66,7 +66,9 @@ import {
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import type { SearchAddon } from "@xterm/addon-search";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { IS_MAC } from "@/lib/platform";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
 import { RightPanel, type RightPanelHandle } from "./components/RightPanel";
@@ -166,7 +168,7 @@ export default function App() {
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
   const closePanelsRef = useRef<(panelIds: string[]) => void>(() => {});
-  const previewHandles = useRef<Map<string, PreviewPaneHandle>>(new Map());
+  const browserHandles = useRef<Map<string, BrowserPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] = useState<EditorPaneHandle | null>(null);
   const [gitHistoryHandle, setGitHistoryHandle] = useState<GitHistorySearchHandle | null>(null);
   const pendingGotoLine = useRef<Map<string, number>>(new Map());
@@ -259,6 +261,7 @@ export default function App() {
   const rightPanelOpen = usePreferencesStore((s) => s.rightPanelOpen);
   const rightPanelActiveTab = usePreferencesStore((s) => s.rightPanelActiveTab);
   const panelSide = usePreferencesStore((s) => s.panelSide);
+  const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
 
@@ -288,9 +291,9 @@ export default function App() {
       const found = findPanelGlobal(k);
       if (!found) editorHandles.current.delete(k);
     }
-    for (const k of [...previewHandles.current.keys()]) {
+    for (const k of [...browserHandles.current.keys()]) {
       const found = findPanelGlobal(k);
-      if (!found) previewHandles.current.delete(k);
+      if (!found) browserHandles.current.delete(k);
     }
   }, [workspaces, findPanelGlobal]);
 
@@ -316,7 +319,7 @@ export default function App() {
     searchAddons.current.clear();
     terminalHandles.current.clear();
     editorHandles.current.clear();
-    previewHandles.current.clear();
+    browserHandles.current.clear();
     setActiveSearchAddon(null);
     setActiveEditorHandle(null);
   }, []);
@@ -497,17 +500,17 @@ export default function App() {
     [activeWorkspace, openPanel],
   );
 
-  const openPreviewInPanel = useCallback(
+  const openBrowserInPanel = useCallback(
     (url: string) => {
       if (!activeWorkspace) return undefined;
       const panelId = newPanelId();
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: panelId,
-        kind: "preview",
+        kind: "browser",
         url,
       });
       if (!url) {
-        setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+        setTimeout(() => browserHandles.current.get(panelId)?.focusAddressBar(), 0);
       }
       return panelId;
     },
@@ -583,8 +586,8 @@ export default function App() {
   const onNewBrowserStable = useCallback(
     (wsId: string, paneId: string) => {
       const panelId = newPanelId();
-      openPanel(wsId, paneId, { id: panelId, kind: "preview", url: "" });
-      setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+      openPanel(wsId, paneId, { id: panelId, kind: "browser", url: "" });
+      setTimeout(() => browserHandles.current.get(panelId)?.focusAddressBar(), 0);
     },
     [openPanel],
   );
@@ -599,8 +602,8 @@ export default function App() {
       if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) { toastSplitBlocked("too-narrow"); return; }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
       const panelId = newPanelId();
-      openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
-      setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+      openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
+      setTimeout(() => browserHandles.current.get(panelId)?.focusAddressBar(), 0);
     },
     [splitPane, openPanel],
   );
@@ -615,8 +618,8 @@ export default function App() {
       if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) { toastSplitBlocked("too-short"); return; }
       const newPaneId = splitPane(wsId, paneId, "vertical");
       const panelId = newPanelId();
-      openPanel(wsId, newPaneId, { id: panelId, kind: "preview", url: "" });
-      setTimeout(() => previewHandles.current.get(panelId)?.focusAddressBar(), 0);
+      openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
+      setTimeout(() => browserHandles.current.get(panelId)?.focusAddressBar(), 0);
     },
     [splitPane, openPanel],
   );
@@ -751,16 +754,16 @@ export default function App() {
         }
         if (panelId === activePanelId) setActiveEditorHandle(h);
       },
-      onPreviewUrlChange: (panelId, url) => {
+      onBrowserUrlChange: (panelId, url) => {
         const found = findPanelGlobal(panelId);
         if (found)
           updatePanelData(found.workspace.id, panelId, (p) =>
-            p.kind === "preview" ? { ...p, url } : p,
+            p.kind === "browser" ? { ...p, url } : p,
           );
       },
-      registerPreviewHandle: (panelId, h) => {
-        if (h) previewHandles.current.set(panelId, h);
-        else previewHandles.current.delete(panelId);
+      registerBrowserHandle: (panelId, h) => {
+        if (h) browserHandles.current.set(panelId, h);
+        else browserHandles.current.delete(panelId);
       },
       onOpenCommitFile: (input) => {
         if (!activeWorkspace) return;
@@ -1057,6 +1060,22 @@ export default function App() {
     closePanelsRef.current([activePanelId]);
   }, [activeWorkspace, activePanelId, activePanel]);
 
+  const handleCloseOtherPanels = useCallback(() => {
+    if (!activePane || !activePanelId) return;
+    const ids = activePane.panels
+      .filter((p) => p.id !== activePanelId && !(p as { locked?: boolean }).locked)
+      .map((p) => p.id);
+    if (ids.length) closePanelsRef.current(ids);
+  }, [activePane, activePanelId]);
+
+  const handleCloseAllPanels = useCallback(() => {
+    if (!activePane) return;
+    const ids = activePane.panels
+      .filter((p) => !(p as { locked?: boolean }).locked)
+      .map((p) => p.id);
+    if (ids.length) closePanelsRef.current(ids);
+  }, [activePane]);
+
   const cycleWorkspace = useCallback(
     (delta: 1 | -1) => {
       if (workspaces.length < 2) return;
@@ -1120,7 +1139,7 @@ export default function App() {
       },
       "tab.newBlock": () => openNewBlock(),
       "workspace.new": () => addWorkspace(home ?? undefined),
-      "tab.newPreview": () => openPreviewInPanel(""),
+      "tab.newBrowser": () => openBrowserInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActivePanel,
       "tab.rename": () => {
@@ -1228,7 +1247,7 @@ export default function App() {
           path = activePanel.path;
         } else if (activePanel.kind === "terminal") {
           path = activePanel.cwd;
-        } else if (activePanel.kind === "preview") {
+        } else if (activePanel.kind === "browser") {
           path = activePanel.url;
         }
         if (!path) return;
@@ -1255,7 +1274,7 @@ export default function App() {
       openNewBlock,
       addWorkspace,
       openPanel,
-      openPreviewInPanel,
+      openBrowserInPanel,
       doSplitRight,
       doSplitDown,
       focusPane,
@@ -1319,6 +1338,57 @@ export default function App() {
     return () => { unlisten?.(); };
   }, [onActivateAgent]);
 
+  // ── Native macOS menu wiring ──────────────────────────────────────────────
+  // The menu (built in Rust) emits `kex:menu` with the item id; dispatch to the
+  // same handlers the shortcuts use. Kept in a ref so the listener stays stable.
+  const menuDispatchRef = useRef<(id: string) => void>(() => {});
+  menuDispatchRef.current = (id: string) => {
+    switch (id) {
+      case "settings": void openSettingsWindow(); break;
+      case "new_workspace": addWorkspace(home ?? undefined); break;
+      case "new_terminal": openNewTerminal(); break;
+      case "new_browser": openBrowserInPanel(""); break;
+      case "toggle_autosave":
+        void setEditorAutoSave(!usePreferencesStore.getState().editorAutoSave);
+        break;
+      case "close_tab": handleCloseActivePanel(); break;
+      case "close_others": handleCloseOtherPanels(); break;
+      case "close_all": handleCloseAllPanels(); break;
+      case "toggle_sidebar": toggleRightPanel(); break;
+      case "toggle_explorer": navigateRightPanelTo("explorer"); break;
+      case "toggle_git": navigateRightPanelTo("git"); break;
+      case "toggle_history": navigateRightPanelTo("history"); break;
+      case "toggle_panel_side":
+        void setPanelSide(
+          usePreferencesStore.getState().panelSide === "left" ? "right" : "left",
+        );
+        break;
+    }
+  };
+
+  useEffect(() => {
+    if (!IS_MAC) return;
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .listen<string>("kex:menu", (e) => menuDispatchRef.current(e.payload))
+      .then((u) => { unlisten = u; })
+      .catch((e) => console.error("[kex] kex:menu listen failed:", e));
+    return () => { unlisten?.(); };
+  }, []);
+
+  // Keep the dynamic menu labels in sync with the preferences they reflect.
+  useEffect(() => {
+    if (!IS_MAC) return;
+    void invoke("sync_menu", {
+      state: {
+        autosave: editorAutoSave,
+        sidebarOpen: rightPanelOpen,
+        activeTab: rightPanelActiveTab,
+        panelSide,
+      },
+    }).catch(() => {});
+  }, [editorAutoSave, rightPanelOpen, rightPanelActiveTab, panelSide]);
+
   // ── Command palette ───────────────────────────────────────────────────────
 
   const commandPaletteItems = useMemo(
@@ -1337,7 +1407,7 @@ export default function App() {
             openNewWorkspace: () => addWorkspace(home ?? undefined),
             openNewBlock: () => openNewBlock(),
             openNewEditor: () => setNewEditorOpen(true),
-            openNewPreview: () => openPreviewInPanel(""),
+            openNewBrowser: () => openBrowserInPanel(""),
             openGitGraph: openGitGraphFromContext,
             toggleSourceControl,
             closeActiveTabOrPane: handleCloseActivePanel,
@@ -1361,7 +1431,7 @@ export default function App() {
       addWorkspace,
       openNewTerminal,
       openNewBlock,
-      openPreviewInPanel,
+      openBrowserInPanel,
       openGitGraphFromContext,
       toggleSourceControl,
       handleCloseActivePanel,

@@ -180,6 +180,35 @@ previous workspaces or pane layout.
   order in serialized output changes from alphabetical to insertion order.
 - `native.ts` moved from `src/modules/terminal/` to `src/lib/native.ts` — shared across all modules.
 
+### Native macOS menu
+
+The fork builds its own macOS menu bar instead of the default Tauri menu (`#[cfg(target_os = "macos")]` in `lib.rs`
+`setup`). Three reasons drove this:
+
+- **Save on Cmd+Q.** The predefined macOS Quit item terminates natively and never fires `RunEvent::ExitRequested`
+  ([tauri#12978](https://github.com/tauri-apps/tauri/issues/12978)), so `prevent_exit` could not run the autosave
+  flush. The custom Quit item is intercepted in `on_menu_event`, which emits `kex:before-quit`; the frontend flushes
+  dirty editors and workspace state, then calls the `confirm_quit` command (guarded by `QuitGuard` so the second pass
+  exits). `ExitRequested` is still handled as a fallback for programmatic exits.
+- **App actions in the menu.** Kex / File / Edit / View / Window submenus. Action items emit `kex:menu` with their id,
+  routed via `emit_to` to the focused window only (plain `emit` broadcasts to every window), and dispatched in
+  `App.tsx` to the same handlers the shortcuts use. Dynamic labels (Enable/Disable Autosave, Show/Hide
+  Sidebar/Explorer/Git/History, Move Sidebar Left/Right) are refreshed by the `sync_menu` command whenever the backing
+  preferences change.
+
+### Autosave on focus loss and before close
+
+Autosave no longer relies only on the idle timer (kept as a 15s fallback, editable only in the store JSON). It flushes
+dirty editors when the editor loses focus (tab/workspace switch, window blur) and before a tab or the app closes.
+Closing a tab with autosave on saves silently instead of prompting, and the dirty dot is hidden while autosave is on.
+
+### Browser tab (renamed from "preview")
+
+The web pane is a real browser (address bar, navigation, reload), so the panel `kind` and its module were renamed
+`preview` → `browser` (`src/modules/browser/`, `BrowserPane`, `BrowserPaneHandle`). Sessions saved before the rename
+are migrated on load in `sanitizePanel` (`kind: "preview"` → `"browser"`). The editor `preview` boolean (ephemeral
+tabs) and the markdown preview pane are unrelated and unchanged.
+
 ---
 
 ## Roadmap (planned, not yet built)

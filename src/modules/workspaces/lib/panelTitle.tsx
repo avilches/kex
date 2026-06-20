@@ -25,7 +25,7 @@ export function panelTitle(panel: Panel, runningCommand?: string | null, oscTitl
       return "…/" + parts.slice(-2).join("/");
     }
     case "editor":          return basename(panel.path);
-    case "preview":         return panel.url || "Preview";
+    case "browser":         return panel.url || "Browser";
     case "markdown":        return basename(panel.path);
     case "git-diff":        return basename(panel.path);
     case "git-history":     return "Git History";
@@ -38,7 +38,7 @@ export function panelIcon(panel: Panel, _workspaceId?: string): ReactNode {
     case "terminal":
       return <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={1.5} />;
     case "editor":          return "📄";
-    case "preview":         return "🌐";
+    case "browser":         return "🌐";
     case "markdown":        return "📝";
     case "git-diff":        return "±";
     case "git-history":     return "⏱";

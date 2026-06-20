@@ -20,8 +20,8 @@ describe("isBulkClosable", () => {
 
   test("non-terminal panels are never lockable, always bulk closable", () => {
     const editor: Panel = { id: "e1", kind: "editor", path: "/a.ts", dirty: false, preview: false };
-    const preview: Panel = { id: "p1", kind: "preview", url: "http://localhost" };
+    const browser: Panel = { id: "p1", kind: "browser", url: "http://localhost" };
     expect(isBulkClosable(editor)).toBe(true);
-    expect(isBulkClosable(preview)).toBe(true);
+    expect(isBulkClosable(browser)).toBe(true);
   });
 });

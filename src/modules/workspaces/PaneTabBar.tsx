@@ -764,7 +764,7 @@ function DraggableTab({
             <HoverRow label="Repo root" value={panel.repoRoot} copy={panel.repoRoot} />
           </HoverTable>
         );
-      case "preview":
+      case "browser":
         return panel.url
           ? <HoverTable><HoverRow label="URL" value={panel.url} copy={panel.url} /></HoverTable>
           : null;
@@ -992,8 +992,8 @@ function DraggableTab({
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={onNewBrowser}>
               New Browser Tab
-              {shortcutLabels["tab.newPreview"] && (
-                <ContextMenuShortcut>{shortcutLabels["tab.newPreview"]}</ContextMenuShortcut>
+              {shortcutLabels["tab.newBrowser"] && (
+                <ContextMenuShortcut>{shortcutLabels["tab.newBrowser"]}</ContextMenuShortcut>
               )}
             </ContextMenuItem>
             <ContextMenuItem onSelect={onSplitBrowserRight}>
@@ -1055,7 +1055,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     "tab.new":         getShortcutLabel("tab.new",         userShortcuts),
     "pane.splitRight": getShortcutLabel("pane.splitRight", userShortcuts),
     "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
-    "tab.newPreview":  getShortcutLabel("tab.newPreview",  userShortcuts),
+    "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
     "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
     "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
   };

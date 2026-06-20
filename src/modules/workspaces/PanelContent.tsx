@@ -2,7 +2,7 @@ import { isMarkdownPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
 import { MarkdownViewToggle } from "@/modules/markdown/MarkdownViewToggle";
-import type { PreviewPaneHandle } from "@/modules/preview/PreviewPane";
+import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useRef } from "react";
@@ -19,8 +19,8 @@ const GitDiffPane = lazy(() =>
 const MarkdownPreviewPane = lazy(() =>
   import("@/modules/markdown/MarkdownPreviewPane").then((m) => ({ default: m.MarkdownPreviewPane as ComponentType<any> })),
 );
-const PreviewPane = lazy(() =>
-  import("@/modules/preview/PreviewPane").then((m) => ({ default: m.PreviewPane as ComponentType<any> })),
+const BrowserPane = lazy(() =>
+  import("@/modules/browser/BrowserPane").then((m) => ({ default: m.BrowserPane as ComponentType<any> })),
 );
 const GitHistoryPane = lazy(() =>
   import("@/modules/git-history/GitHistoryPane").then((m) => ({ default: m.GitHistoryPane as ComponentType<any> })),
@@ -48,9 +48,9 @@ export type PanelCallbacks = {
   registerEditorHandle?: (panelId: string, handle: EditorPaneHandle | null) => void;
   // Markdown callbacks
   onSetMarkdownView?: (panelId: string, mode: "rendered" | "raw") => void;
-  // Preview callbacks
-  onPreviewUrlChange?: (panelId: string, url: string) => void;
-  registerPreviewHandle?: (panelId: string, handle: PreviewPaneHandle | null) => void;
+  // Browser callbacks
+  onBrowserUrlChange?: (panelId: string, url: string) => void;
+  registerBrowserHandle?: (panelId: string, handle: BrowserPaneHandle | null) => void;
   // Git history callbacks
   onOpenCommitFile?: (input: CommitFileDiffOpenInput) => void;
   onGitHistorySearchHandle?: (panelId: string, handle: GitHistorySearchHandle | null) => void;
@@ -72,7 +72,7 @@ type Props = {
 export function PanelContent({ panel, visible, focused, callbacks }: Props) {
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
-  const previewRef = useRef<PreviewPaneHandle>(null);
+  const browserRef = useRef<BrowserPaneHandle>(null);
 
   switch (panel.kind) {
     case "terminal":
@@ -121,17 +121,17 @@ export function PanelContent({ panel, visible, focused, callbacks }: Props) {
         </Suspense>
       );
 
-    case "preview":
+    case "browser":
       return (
         <Suspense fallback={null}>
-          <PreviewPane
-            ref={(h: PreviewPaneHandle | null) => {
-              (previewRef as React.MutableRefObject<PreviewPaneHandle | null>).current = h;
-              callbacks.registerPreviewHandle?.(panel.id, h);
+          <BrowserPane
+            ref={(h: BrowserPaneHandle | null) => {
+              (browserRef as React.MutableRefObject<BrowserPaneHandle | null>).current = h;
+              callbacks.registerBrowserHandle?.(panel.id, h);
             }}
             url={panel.url}
             visible={visible}
-            onUrlChange={(url: string) => callbacks.onPreviewUrlChange?.(panel.id, url)}
+            onUrlChange={(url: string) => callbacks.onBrowserUrlChange?.(panel.id, url)}
           />
         </Suspense>
       );

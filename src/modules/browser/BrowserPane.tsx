@@ -8,11 +8,11 @@ import {
   useState,
 } from "react";
 import {
-  PreviewAddressBar,
-  type PreviewAddressBarHandle,
-} from "./PreviewAddressBar";
+  BrowserAddressBar,
+  type BrowserAddressBarHandle,
+} from "./BrowserAddressBar";
 
-export type PreviewPaneHandle = {
+export type BrowserPaneHandle = {
   reload: () => void;
   focusAddressBar: () => void;
   getUrl: () => string;
@@ -28,14 +28,14 @@ type Props = {
 // server page can hold hundreds of MB inside the WebView.
 const SUSPEND_AFTER_MS = 30_000;
 
-export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
-  function PreviewPane({ url, visible, onUrlChange }, ref) {
+export const BrowserPane = forwardRef<BrowserPaneHandle, Props>(
+  function BrowserPane({ url, visible, onUrlChange }, ref) {
     // `nonce` is part of the iframe `key`. Bumping it remounts the iframe,
     // which is the only reliable cross-origin reload (calling
     // contentWindow.location.reload() throws on cross-origin frames).
     const [nonce, setNonce] = useState(0);
     const [loaded, setLoaded] = useState(visible);
-    const addressRef = useRef<PreviewAddressBarHandle>(null);
+    const addressRef = useRef<BrowserAddressBarHandle>(null);
 
     useEffect(() => {
       if (visible) {
@@ -69,7 +69,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
           pointerEvents: visible ? "auto" : "none",
         }}
       >
-        <PreviewAddressBar
+        <BrowserAddressBar
           ref={addressRef}
           url={url}
           onSubmit={onUrlChange}
@@ -101,7 +101,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
               <iframe
                 key={`${url}#${nonce}`}
                 src={url}
-                title="Preview"
+                title="Browser"
                 className="h-full w-full border-0"
                 // sandbox grants the bare minimum for a dev preview: scripts,
                 // same-origin (cookies/storage for the previewed app), forms,
@@ -138,7 +138,7 @@ function SuspendedState({ onReload }: { onReload: () => void }) {
       </div>
       <div className="space-y-1">
         <p className="text-[12.5px] font-medium text-foreground">
-          Preview suspended
+          Browser suspended
         </p>
         <p className="max-w-xs text-[11px] leading-relaxed text-muted-foreground">
           Released to free memory after sitting in the background.

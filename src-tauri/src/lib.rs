@@ -22,6 +22,69 @@ fn confirm_quit(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+/// macOS-only: handles to menu items whose labels track app state.
+#[cfg(target_os = "macos")]
+struct DynMenuItems {
+    autosave: tauri::menu::MenuItem<tauri::Wry>,
+    sidebar: tauri::menu::MenuItem<tauri::Wry>,
+    explorer: tauri::menu::MenuItem<tauri::Wry>,
+    git: tauri::menu::MenuItem<tauri::Wry>,
+    history: tauri::menu::MenuItem<tauri::Wry>,
+    panel_side: tauri::menu::MenuItem<tauri::Wry>,
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Default)]
+struct MenuHandles(Mutex<Option<DynMenuItems>>);
+
+/// Snapshot pushed from the frontend whenever the relevant preferences change,
+/// so the native menu labels stay in sync (Show/Hide, Enable/Disable, side).
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MenuState {
+    autosave: bool,
+    sidebar_open: bool,
+    active_tab: String,
+    panel_side: String,
+}
+
+#[tauri::command]
+fn sync_menu(app: tauri::AppHandle, state: MenuState) {
+    #[cfg(target_os = "macos")]
+    {
+        let handles = app.state::<MenuHandles>();
+        let guard = handles.0.lock().expect("MenuHandles mutex poisoned");
+        let Some(items) = guard.as_ref() else { return };
+        let _ = items.autosave.set_text(if state.autosave {
+            "Disable Autosave"
+        } else {
+            "Enable Autosave"
+        });
+        let _ = items.sidebar.set_text(if state.sidebar_open {
+            "Hide Sidebar"
+        } else {
+            "Show Sidebar"
+        });
+        let on = |tab: &str| state.sidebar_open && state.active_tab == tab;
+        let _ = items
+            .explorer
+            .set_text(if on("explorer") { "Hide Explorer" } else { "Show Explorer" });
+        let _ = items
+            .git
+            .set_text(if on("git") { "Hide Git" } else { "Show Git" });
+        let _ = items
+            .history
+            .set_text(if on("history") { "Hide History" } else { "Show History" });
+        let _ = items.panel_side.set_text(if state.panel_side == "left" {
+            "Move Sidebar to Right"
+        } else {
+            "Move Sidebar to Left"
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, state);
+}
+
 #[tauri::command]
 fn get_launch_dir(state: State<'_, LaunchDir>) -> Option<String> {
     state.0.lock().expect("LaunchDir mutex poisoned").take()
@@ -330,21 +393,58 @@ pub fn run() {
             // flush. Replace the menu with a custom Quit we intercept in on_menu_event.
             #[cfg(target_os = "macos")]
             {
-                use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+                use tauri::menu::{
+                    MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder,
+                };
+
+                // Kex (app menu)
+                let about = PredefinedMenuItem::about(app, None, None)?;
+                let settings = MenuItemBuilder::with_id("settings", "Settings...")
+                    .accelerator("Cmd+,")
+                    .build(app)?;
                 let quit = MenuItemBuilder::with_id("quit", "Quit Kex")
                     .accelerator("Cmd+Q")
                     .build(app)?;
                 let app_menu = SubmenuBuilder::new(app, "Kex")
-                    .about(None)
+                    .item(&about)
                     .separator()
-                    .services()
-                    .separator()
-                    .hide()
-                    .hide_others()
-                    .show_all()
+                    .item(&settings)
                     .separator()
                     .item(&quit)
                     .build()?;
+
+                // File
+                let new_workspace = MenuItemBuilder::with_id("new_workspace", "New Workspace")
+                    .accelerator("Cmd+N")
+                    .build(app)?;
+                let new_terminal = MenuItemBuilder::with_id("new_terminal", "New Terminal Tab")
+                    .accelerator("Cmd+T")
+                    .build(app)?;
+                let new_browser = MenuItemBuilder::with_id("new_browser", "New Browser Tab")
+                    .accelerator("Cmd+Shift+O")
+                    .build(app)?;
+                let autosave =
+                    MenuItemBuilder::with_id("toggle_autosave", "Enable Autosave").build(app)?;
+                let close_tab = MenuItemBuilder::with_id("close_tab", "Close Tab")
+                    .accelerator("Cmd+W")
+                    .build(app)?;
+                let close_others =
+                    MenuItemBuilder::with_id("close_others", "Close Other Tabs").build(app)?;
+                let close_all =
+                    MenuItemBuilder::with_id("close_all", "Close All Tabs").build(app)?;
+                let file_menu = SubmenuBuilder::new(app, "File")
+                    .item(&new_workspace)
+                    .item(&new_terminal)
+                    .item(&new_browser)
+                    .separator()
+                    .item(&autosave)
+                    .separator()
+                    .item(&close_tab)
+                    .item(&close_others)
+                    .item(&close_all)
+                    .build()?;
+
+                // Edit
                 let edit_menu = SubmenuBuilder::new(app, "Edit")
                     .undo()
                     .redo()
@@ -354,18 +454,63 @@ pub fn run() {
                     .paste()
                     .select_all()
                     .build()?;
+
+                // View (labels synced from the frontend via sync_menu)
+                let sidebar =
+                    MenuItemBuilder::with_id("toggle_sidebar", "Hide Sidebar").build(app)?;
+                let explorer = MenuItemBuilder::with_id("toggle_explorer", "Hide Explorer")
+                    .accelerator("Cmd+E")
+                    .build(app)?;
+                let git = MenuItemBuilder::with_id("toggle_git", "Show Git")
+                    .accelerator("Cmd+G")
+                    .build(app)?;
+                let history =
+                    MenuItemBuilder::with_id("toggle_history", "Show History").build(app)?;
+                let panel_side =
+                    MenuItemBuilder::with_id("toggle_panel_side", "Move Sidebar to Left")
+                        .build(app)?;
+                let view_menu = SubmenuBuilder::new(app, "View")
+                    .item(&sidebar)
+                    .item(&explorer)
+                    .item(&git)
+                    .item(&history)
+                    .separator()
+                    .item(&panel_side)
+                    .build()?;
+
+                // Window
                 let window_menu = SubmenuBuilder::new(app, "Window")
                     .minimize()
                     .separator()
                     .close_window()
                     .build()?;
+
                 let menu = MenuBuilder::new(app)
-                    .items(&[&app_menu, &edit_menu, &window_menu])
+                    .items(&[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu])
                     .build()?;
                 app.set_menu(menu)?;
+
+                app.manage(MenuHandles(Mutex::new(Some(DynMenuItems {
+                    autosave,
+                    sidebar,
+                    explorer,
+                    git,
+                    history,
+                    panel_side,
+                }))));
+
                 app.on_menu_event(|app, event| {
-                    if event.id().as_ref() == "quit" {
+                    let id = event.id().as_ref();
+                    if id == "quit" {
                         let _ = app.emit("kex:before-quit", ());
+                        return;
+                    }
+                    // Route the action to the current window only, so it never fans
+                    // out across every open window. emit_to targets a single label;
+                    // plain emit (even on a window) would broadcast to all webviews.
+                    let mgr = app.state::<window_state::WindowStateManager>();
+                    if let Some(label) = mgr.get_focused_window() {
+                        let _ = app.emit_to(label.as_str(), "kex:menu", id.to_string());
                     }
                 });
             }
@@ -494,6 +639,7 @@ pub fn run() {
             workspace::workspace_current_dir,
             get_launch_dir,
             confirm_quit,
+            sync_menu,
             open_settings_window,
             open_main_window,
             window_get_state,

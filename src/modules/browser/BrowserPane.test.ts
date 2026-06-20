@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const src = readFileSync(path.join(here, "PreviewPane.tsx"), "utf8");
+const src = readFileSync(path.join(here, "BrowserPane.tsx"), "utf8");
 const iframeMatch = src.match(/<iframe[\s\S]*?\/>/);
 // Strip JSX comments (`// …` inside `{…}` and `{/* … */}` blocks) so the
 // assertions only see actual attribute syntax — the source explains in a
@@ -22,7 +22,7 @@ const iframeJsx = (iframeMatch?.[0] ?? "")
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/\/\/[^\n]*/g, "");
 
-describe("PreviewPane iframe sandbox", () => {
+describe("BrowserPane iframe sandbox", () => {
   it("declares an iframe in the source", () => {
     expect(iframeJsx).not.toBe("");
   });

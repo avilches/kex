@@ -9,7 +9,7 @@ export type ShortcutId =
   | "commandPalette.content"
   | "tab.new"
   | "tab.newBlock"
-  | "tab.newPreview"
+  | "tab.newBrowser"
   | "tab.newEditor"
   | "tab.close"
   | "tab.rename"
@@ -115,10 +115,10 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
   },
   {
-    id: "tab.newPreview",
-    label: "New web preview",
+    id: "tab.newBrowser",
+    label: "New browser tab",
     group: "Tabs",
-    // Cmd/Ctrl+P now opens the command palette, so web preview moves here.
+    // Cmd/Ctrl+P now opens the command palette, so the browser moves here.
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "o" }],
   },
   {
