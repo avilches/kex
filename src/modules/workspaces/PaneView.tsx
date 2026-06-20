@@ -33,6 +33,9 @@ type Props = {
   callbacks: PanelCallbacks;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
+  onFloatBrowserPanel?: (panelId: string) => void;
+  onDockBrowserPanel?: (panelId: string) => void;
+  onFocusFloatBrowserPanel?: (panelId: string) => void;
 };
 
 function DropZone({
@@ -157,6 +160,9 @@ export const PaneView = memo(function PaneView({
   callbacks,
   gitStatus,
   gitColorScheme,
+  onFloatBrowserPanel,
+  onDockBrowserPanel,
+  onFocusFloatBrowserPanel,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
@@ -272,6 +278,9 @@ export const PaneView = memo(function PaneView({
               visible={panel.id === pane.activePanelId && isWorkspaceActive}
               focused={focused && panel.id === pane.activePanelId}
               callbacks={callbacks}
+              onFloatBrowserPanel={onFloatBrowserPanel}
+              onDockBrowserPanel={onDockBrowserPanel}
+              onFocusFloatBrowserPanel={onFocusFloatBrowserPanel}
             />
           </div>
         ))}

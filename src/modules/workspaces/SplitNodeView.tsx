@@ -34,6 +34,9 @@ type Props = {
   callbacks: PanelCallbacks;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
+  onFloatBrowserPanel?: (panelId: string) => void;
+  onDockBrowserPanel?: (panelId: string) => void;
+  onFocusFloatBrowserPanel?: (panelId: string) => void;
 };
 
 export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, ...rest }: Props) {

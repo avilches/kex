@@ -82,6 +82,9 @@ export function WorkspaceView({
             callbacks={rest.callbacks}
             gitStatus={rest.gitStatus}
             gitColorScheme={rest.gitColorScheme}
+            onFloatBrowserPanel={rest.onFloatBrowserPanel}
+            onDockBrowserPanel={rest.onDockBrowserPanel}
+            onFocusFloatBrowserPanel={rest.onFocusFloatBrowserPanel}
           />
         </div>
       ))}

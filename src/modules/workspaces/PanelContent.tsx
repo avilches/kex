@@ -67,9 +67,12 @@ type Props = {
   visible: boolean;
   focused: boolean;
   callbacks: PanelCallbacks;
+  onFloatBrowserPanel?: (panelId: string) => void;
+  onDockBrowserPanel?: (panelId: string) => void;
+  onFocusFloatBrowserPanel?: (panelId: string) => void;
 };
 
-export function PanelContent({ panel, visible, focused, callbacks }: Props) {
+export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowserPanel, onDockBrowserPanel, onFocusFloatBrowserPanel }: Props) {
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
@@ -130,8 +133,12 @@ export function PanelContent({ panel, visible, focused, callbacks }: Props) {
               callbacks.registerBrowserHandle?.(panel.id, h);
             }}
             url={panel.url}
+            floating={panel.floating ?? false}
             visible={visible}
             onUrlChange={(url: string) => callbacks.onBrowserUrlChange?.(panel.id, url)}
+            onFloat={() => onFloatBrowserPanel?.(panel.id)}
+            onDock={() => onDockBrowserPanel?.(panel.id)}
+            onFocusFloat={() => onFocusFloatBrowserPanel?.(panel.id)}
           />
         </Suspense>
       );
