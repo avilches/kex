@@ -828,6 +828,7 @@ function DraggableTab({
           "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
           !isDescription && panel.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
+          panel.kind === "editor" && panel.preview && "italic",
         )}
         style={tabColor && !isRestoreError ? { color: tabColor } : undefined}
       >
