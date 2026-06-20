@@ -464,8 +464,7 @@ export default function App() {
     explorerRoot !== null &&
     !isFilesystemRoot(explorerRoot);
 
-  const isAtHome =
-    activeRootMode !== "filesystem" || explorerRoot === home;
+  const isAtHome = explorerRoot === home;
 
   const handleChangeRootMode = useCallback(
     (mode: ExplorerRootMode) => {
@@ -482,21 +481,26 @@ export default function App() {
   );
 
   const handleNavigateUp = useCallback(() => {
-    if (!activeWorkspace || !explorerRoot) return;
+    if (!activeWorkspace || activeRootMode !== "filesystem" || !explorerRoot) {
+      return;
+    }
+    if (isFilesystemRoot(explorerRoot)) return;
     setFsRoot(activeWorkspace.id, parentRoot(explorerRoot));
-  }, [activeWorkspace, explorerRoot, setFsRoot]);
+  }, [activeWorkspace, activeRootMode, explorerRoot, setFsRoot]);
 
   const handleNavigateHome = useCallback(() => {
-    if (!activeWorkspace || !home) return;
-    setFsRoot(activeWorkspace.id, home);
-  }, [activeWorkspace, home, setFsRoot]);
+    if (activeWorkspace && activeRootMode === "filesystem" && home) {
+      setFsRoot(activeWorkspace.id, home);
+    }
+  }, [activeWorkspace, activeRootMode, home, setFsRoot]);
 
   const handleEnterFolder = useCallback(
     (path: string) => {
-      if (!activeWorkspace) return;
-      setFsRoot(activeWorkspace.id, path);
+      if (activeWorkspace && activeRootMode === "filesystem") {
+        setFsRoot(activeWorkspace.id, path);
+      }
     },
-    [activeWorkspace, setFsRoot],
+    [activeWorkspace, activeRootMode, setFsRoot],
   );
 
   // Whether the saved workspace root still exists on disk, so the selector can
