@@ -580,29 +580,13 @@ export default function App() {
     [activatePanel],
   );
 
-  const onClosePanelStable = useCallback(
-    (_wsId: string, panelId: string) => {
-      const found = findPanelGlobal(panelId);
-      if (found?.panel.kind === "browser" && found.panel.floating) {
-        void closeFloatWindow(panelId);
-      }
-      closePanelsRef.current([panelId]);
-    },
-    [findPanelGlobal, closeFloatWindow],
-  );
+  const onClosePanelStable = useCallback((_wsId: string, panelId: string) => {
+    closePanelsRef.current([panelId]);
+  }, []);
 
-  const onCloseManyPanelsStable = useCallback(
-    (_wsId: string, panelIds: string[]) => {
-      for (const panelId of panelIds) {
-        const found = findPanelGlobal(panelId);
-        if (found?.panel.kind === "browser" && found.panel.floating) {
-          void closeFloatWindow(panelId);
-        }
-      }
-      closePanelsRef.current(panelIds);
-    },
-    [findPanelGlobal, closeFloatWindow],
-  );
+  const onCloseManyPanelsStable = useCallback((_wsId: string, panelIds: string[]) => {
+    closePanelsRef.current(panelIds);
+  }, []);
 
   const onFocusPaneStable = useCallback(
     (wsId: string, paneId: string) => focusPane(wsId, paneId),
@@ -919,7 +903,13 @@ export default function App() {
     handlePathDeleted,
   } = useTabCloseGuards({
     workspaces,
-    disposePanel: (workspaceId, panelId) => closePanel(workspaceId, panelId),
+    disposePanel: (workspaceId, panelId) => {
+      const found = findPanelGlobal(panelId);
+      if (found?.panel.kind === "browser" && found.panel.floating) {
+        void closeFloatWindow(panelId);
+      }
+      closePanel(workspaceId, panelId);
+    },
     findPanel: findPanelGlobal,
     savePanel,
     focusActivePanel,
