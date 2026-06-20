@@ -659,7 +659,7 @@ export const FileExplorer = memo(
               >
                 <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={2} />
               </Button>
-              {!isAtHome && (
+              {!isAtHome && homePath != null && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -874,6 +874,60 @@ export const FileExplorer = memo(
                   )}
                 </span>
               </button>
+            </div>
+          </div>
+        ) : rootMode === "filesystem" && root?.status === "error" ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+            <HugeiconsIcon
+              icon={PinOffIcon}
+              size={26}
+              strokeWidth={1.8}
+              className="text-muted-foreground"
+            />
+            <div className="text-sm font-medium text-foreground">
+              Folder not found
+            </div>
+            <div className="break-all text-[11px] text-muted-foreground">
+              {rootPath}
+            </div>
+            <div className="mt-2 flex w-full flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigateHome?.()}
+                className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
+              >
+                <HugeiconsIcon
+                  icon={Home01Icon}
+                  size={14}
+                  strokeWidth={2}
+                  className="mt-0.5 shrink-0 text-primary"
+                />
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-medium">Go to home folder</span>
+                  {homePath && (
+                    <span className="break-all text-[10px] text-muted-foreground">
+                      {homePath}
+                    </span>
+                  )}
+                </span>
+              </button>
+              {canNavigateUp && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateUp?.()}
+                  className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
+                >
+                  <HugeiconsIcon
+                    icon={ArrowUp01Icon}
+                    size={14}
+                    strokeWidth={2}
+                    className="mt-0.5 shrink-0 text-primary"
+                  />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="font-medium">Up one folder</span>
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         ) : (
