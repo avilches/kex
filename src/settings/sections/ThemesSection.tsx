@@ -149,7 +149,7 @@ export function ThemesSection() {
           </div>
         </div>
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <span className="text-[12.5px] font-medium">Zoom</span>
+          <span className="text-[12.5px] font-medium">Zoom UI</span>
           <div className="flex items-center gap-2">
             <Slider
               value={[zoomLevel]}
@@ -174,7 +174,7 @@ export function ThemesSection() {
           </div>
         </div>
         <div className="flex items-start justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <span className="text-[12.5px] font-medium">Side panel</span>
+          <span className="text-[12.5px] font-medium">Sidebar position</span>
           <div className="flex items-center gap-1">
             {(["left", "right"] as const).map((side) => (
               <button

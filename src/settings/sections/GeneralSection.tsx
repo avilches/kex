@@ -114,17 +114,8 @@ export function GeneralSection() {
           />
         </SettingRow>
         <SettingRow
-          title="Click for preview"
-          description="Single click opens a file in a temporary preview tab. Opening another file replaces it. The tab becomes permanent once you edit or lock it."
-        >
-          <Switch
-            checked={editorPreviewOnClick}
-            onCheckedChange={(v) => void setEditorPreviewOnClick(v)}
-          />
-        </SettingRow>
-        <SettingRow
           title="Auto save"
-          description="Save files when the editor loses focus (tab/workspace switch, window blur) and before closing a tab or the app."
+          description="Save files when editor loses focus, tab or app closes and every X seconds."
         >
           <Switch
             checked={editorAutoSave}
@@ -136,8 +127,17 @@ export function GeneralSection() {
       <div className="flex flex-col gap-2">
         <Label>Explorer</Label>
         <SettingRow
+          title="Click for preview"
+          description="Single click opens file in a temporary preview tab."
+        >
+          <Switch
+            checked={editorPreviewOnClick}
+            onCheckedChange={(v) => void setEditorPreviewOnClick(v)}
+          />
+        </SettingRow>
+        <SettingRow
           title="Show hidden files"
-          description="Include dot-prefixed files and folders (.env, .gitignore, .config) in the file explorer and search."
+          description="Include dot-prefixed files and folders (.env, .gitignore) in explorer and search."
         >
           <Switch
             checked={showHidden}
