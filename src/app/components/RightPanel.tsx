@@ -1,6 +1,9 @@
 import { cn } from "@/lib/utils";
 import { FileExplorer, type FileExplorerHandle } from "@/modules/explorer";
-import { GitHistoryPane, type GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
+import {
+  GitHistoryPane,
+  type GitHistorySearchHandle,
+} from "@/modules/git-history/GitHistoryPane";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setRightPanelActiveTab } from "@/modules/settings/store";
 import { SourceControlPanel } from "@/modules/source-control";
@@ -32,6 +35,7 @@ export type RightPanelProps = {
   rootMode: ExplorerRootMode;
   onChangeRootMode: (mode: ExplorerRootMode) => void;
   onSetAsRoot: (path: string) => void;
+  homePath: string | null;
   terminalCwdPath: string | null;
   gitRootPath: string | null;
   workspaceRootPath: string | null;
@@ -112,6 +116,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               rootMode={props.rootMode}
               onChangeRootMode={props.onChangeRootMode}
               onSetAsRoot={props.onSetAsRoot}
+              homePath={props.homePath}
               terminalCwdPath={props.terminalCwdPath}
               gitRootPath={props.gitRootPath}
               workspaceRootPath={props.workspaceRootPath}

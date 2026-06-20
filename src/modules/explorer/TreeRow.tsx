@@ -8,7 +8,19 @@ import {
 import { cn } from "@/lib/utils";
 import { pathDirname } from "@/lib/pathUtils";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowRight01Icon,
+  ComputerTerminal01Icon,
+  Copy01Icon,
+  Delete02Icon,
+  File01Icon,
+  FileAddIcon,
+  FolderAddIcon,
+  FolderOpenIcon,
+  Link01Icon,
+  PinIcon,
+  SparklesIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useEffect, useState } from "react";
 import { useWorkspaceDnd } from "@/modules/workspaces";
@@ -82,16 +94,19 @@ function EntryRowImpl(props: EntryRowProps) {
 
   const [isConfirming, setIsConfirming] = useState(false);
   const { draggingItem } = useWorkspaceDnd();
-  const dragSource =
-    draggingItem?.kind === "file" ? draggingItem.path : null;
+  const dragSource = draggingItem?.kind === "file" ? draggingItem.path : null;
 
   // Files drag as `file:` (also openable in a pane); folders as `dir:` (move
   // only, the workspace dnd ignores them for pane opening).
-  const { attributes, listeners, setNodeRef: setDragRef, isDragging } =
-    useDraggable({
-      id: isDir ? `dir:${path}` : `file:${path}`,
-      data: { path },
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: isDir ? `dir:${path}` : `file:${path}`,
+    data: { path },
+  });
 
   // A folder is a valid move target unless it is the source itself, the
   // source's current parent (no-op), or a descendant of the source.
@@ -217,8 +232,11 @@ function EntryRowImpl(props: EntryRowProps) {
               style={
                 !gitignored && gitStatusCode
                   ? {
-                      color: gitStatusHexColor(gitStatusCode, gitColorScheme) ?? undefined,
-                      textDecoration: gitStatusCode === "D" ? "line-through" : undefined,
+                      color:
+                        gitStatusHexColor(gitStatusCode, gitColorScheme) ??
+                        undefined,
+                      textDecoration:
+                        gitStatusCode === "D" ? "line-through" : undefined,
                     }
                   : undefined
               }
@@ -239,7 +257,8 @@ function EntryRowImpl(props: EntryRowProps) {
             className={COMPACT_ITEM}
             onSelect={() => onSetAsRoot(path)}
           >
-            Set as workspace root
+            <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
+            Set as Workspace Root
           </ContextMenuItem>
         )}
         {!isDir && (
@@ -247,6 +266,7 @@ function EntryRowImpl(props: EntryRowProps) {
             className={COMPACT_ITEM}
             onSelect={() => onOpenFile(path, true)}
           >
+            <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open
           </ContextMenuItem>
         )}
@@ -255,6 +275,11 @@ function EntryRowImpl(props: EntryRowProps) {
             className={COMPACT_ITEM}
             onSelect={() => onRevealInTerminal(path)}
           >
+            <HugeiconsIcon
+              icon={ComputerTerminal01Icon}
+              size={14}
+              strokeWidth={2}
+            />
             Open in Terminal
           </ContextMenuItem>
         )}
@@ -262,6 +287,7 @@ function EntryRowImpl(props: EntryRowProps) {
           className={COMPACT_ITEM}
           onSelect={() => void revealInFinder(path)}
         >
+          <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
           Reveal in Finder
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -269,12 +295,14 @@ function EntryRowImpl(props: EntryRowProps) {
           className={COMPACT_ITEM}
           onSelect={() => actions.beginCreate(createTarget, "file")}
         >
+          <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
           New File
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
           onSelect={() => actions.beginCreate(createTarget, "dir")}
         >
+          <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
           New Folder
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -282,12 +310,14 @@ function EntryRowImpl(props: EntryRowProps) {
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(path)}
         >
+          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
           Copy Path
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(relativePath(rootPath, path))}
         >
+          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -295,6 +325,7 @@ function EntryRowImpl(props: EntryRowProps) {
           className={COMPACT_ITEM}
           onSelect={() => onAttachToAgent?.(path)}
         >
+          <HugeiconsIcon icon={SparklesIcon} size={14} strokeWidth={2} />
           Attach to Agent
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -311,6 +342,7 @@ function EntryRowImpl(props: EntryRowProps) {
           }}
           onMouseLeave={() => setTimeout(() => setIsConfirming(false), 1500)}
         >
+          <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
           {isConfirming ? "Click again to confirm" : "Delete"}
         </ContextMenuItem>
       </ContextMenuContent>
@@ -327,7 +359,12 @@ export type PendingRowProps = {
   onCancel: () => void;
 };
 
-export function PendingRow({ depth, kind, onCommit, onCancel }: PendingRowProps) {
+export function PendingRow({
+  depth,
+  kind,
+  onCommit,
+  onCancel,
+}: PendingRowProps) {
   return (
     <div
       className="flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]"
@@ -335,7 +372,9 @@ export function PendingRow({ depth, kind, onCommit, onCancel }: PendingRowProps)
     >
       <span className="size-3.5 shrink-0" />
       <img
-        src={kind === "dir" ? folderIconUrl("", false) : fileIconUrl("untitled")}
+        src={
+          kind === "dir" ? folderIconUrl("", false) : fileIconUrl("untitled")
+        }
         alt=""
         className="size-4 shrink-0 opacity-70"
       />

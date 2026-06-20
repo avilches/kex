@@ -14,11 +14,11 @@ import { useZoom } from "@/lib/useZoom";
 import { isMarkdownPath } from "@/lib/utils";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { loadRestorePlans, pruneOrphanedPlans } from "@/modules/agents/lib/agentSessionRestore";
 import {
-  CommandPalette,
-  createCommandItems,
-} from "@/modules/command-palette";
+  loadRestorePlans,
+  pruneOrphanedPlans,
+} from "@/modules/agents/lib/agentSessionRestore";
+import { CommandPalette, createCommandItems } from "@/modules/command-palette";
 import {
   NewEditorDialog,
   useEditorFileSync,
@@ -33,7 +33,13 @@ import {
 import type { BrowserPaneHandle } from "@/modules/browser";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setEditorAutoSave, setPanelSide, setRightPanelOpen, setRightPanelActiveTab, setWarnOnCloseTabWithRunningProcess } from "@/modules/settings/store";
+import {
+  setEditorAutoSave,
+  setPanelSide,
+  setRightPanelOpen,
+  setRightPanelActiveTab,
+  setWarnOnCloseTabWithRunningProcess,
+} from "@/modules/settings/store";
 import {
   useGlobalShortcuts,
   type ShortcutHandlers,
@@ -94,7 +100,10 @@ function basename(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-function toastSplitBlocked(reason: "pane-limit" | "too-narrow" | "too-short", max?: number) {
+function toastSplitBlocked(
+  reason: "pane-limit" | "too-narrow" | "too-short",
+  max?: number,
+) {
   const msg =
     reason === "pane-limit"
       ? `Can't split: max ${max} panes per workspace`
@@ -108,7 +117,10 @@ export default function App() {
   const savedState = getSavedWorkspaceState();
   const launchDir = getLaunchDir();
   const initialOpts = savedState
-    ? { initialWorkspaces: savedState.workspaces, initialActiveIndex: savedState.activeIndex }
+    ? {
+        initialWorkspaces: savedState.workspaces,
+        initialActiveIndex: savedState.activeIndex,
+      }
     : launchDir
       ? { cwd: launchDir }
       : undefined;
@@ -160,13 +172,16 @@ export default function App() {
   const isTerminalPanel = activePanel?.kind === "terminal";
   const isEditorPanel = activePanel?.kind === "editor";
   const isGitHistoryPanel = activePanel?.kind === "git-history";
-  const activeCwd = isTerminalPanel ? ((activePanel as { cwd?: string }).cwd ?? null) : null;
+  const activeCwd = isTerminalPanel
+    ? ((activePanel as { cwd?: string }).cwd ?? null)
+    : null;
   activeCwdRef.current = activeCwd;
 
   // ── Handle maps ───────────────────────────────────────────────────────────
 
   const searchAddons = useRef<Map<string, SearchAddon>>(new Map());
-  const [activeSearchAddon, setActiveSearchAddon] = useState<SearchAddon | null>(null);
+  const [activeSearchAddon, setActiveSearchAddon] =
+    useState<SearchAddon | null>(null);
   const searchInlineRef = useRef<SearchInlineHandle | null>(null);
   const terminalHandles = useRef<Map<string, TerminalPaneHandle>>(new Map());
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
@@ -174,8 +189,10 @@ export default function App() {
   activeWorkspaceIdRef.current = activeWorkspaceId;
   const closePanelsRef = useRef<(panelIds: string[]) => void>(() => {});
   const browserHandles = useRef<Map<string, BrowserPaneHandle>>(new Map());
-  const [activeEditorHandle, setActiveEditorHandle] = useState<EditorPaneHandle | null>(null);
-  const [gitHistoryHandle, setGitHistoryHandle] = useState<GitHistorySearchHandle | null>(null);
+  const [activeEditorHandle, setActiveEditorHandle] =
+    useState<EditorPaneHandle | null>(null);
+  const [gitHistoryHandle, setGitHistoryHandle] =
+    useState<GitHistorySearchHandle | null>(null);
   const pendingGotoLine = useRef<Map<string, number>>(new Map());
 
   const { zoomIn, zoomOut, zoomReset } = useZoom();
@@ -226,7 +243,9 @@ export default function App() {
           void flushDirtyEditorsRef.current();
           return;
         }
-        const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
+        const ws = workspacesRef.current.find(
+          (w) => w.id === activeWorkspaceId,
+        );
         if (!ws) return;
         const pane = findPane(ws.paneTree, ws.activePaneId);
         if (!pane?.activePanelId) return;
@@ -234,7 +253,9 @@ export default function App() {
           terminalHandles.current.get(pane.activePanelId!)?.focus();
         });
       })
-      .then((u) => { unlisten = u; })
+      .then((u) => {
+        unlisten = u;
+      })
       .catch(() => {});
     return () => unlisten?.();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -307,10 +328,14 @@ export default function App() {
   useEffect(() => {
     void flushDirtyEditorsRef.current();
     setActiveSearchAddon(
-      activePanelId !== null ? (searchAddons.current.get(activePanelId) ?? null) : null,
+      activePanelId !== null
+        ? (searchAddons.current.get(activePanelId) ?? null)
+        : null,
     );
     setActiveEditorHandle(
-      activePanelId !== null ? (editorHandles.current.get(activePanelId) ?? null) : null,
+      activePanelId !== null
+        ? (editorHandles.current.get(activePanelId) ?? null)
+        : null,
     );
   }, [activePanelId]);
 
@@ -336,7 +361,10 @@ export default function App() {
       workspacesRef,
       workspaceEnv,
       setWorkspaceEnv,
-      resetToHome: (home) => { clearWorkspaceState(); resetWorkspaces(home); },
+      resetToHome: (home) => {
+        clearWorkspaceState();
+        resetWorkspaces(home);
+      },
       clearWorkspaceState,
     });
 
@@ -344,7 +372,11 @@ export default function App() {
   // asynchronously (Tauri IPC). This effect fires once both conditions are met
   // and calls focusExplorer() to open and focus the search input.
   useEffect(() => {
-    if (rightPanelOpen && rightPanelActiveTab === "explorer" && pendingExplorerSearch.current) {
+    if (
+      rightPanelOpen &&
+      rightPanelActiveTab === "explorer" &&
+      pendingExplorerSearch.current
+    ) {
       pendingExplorerSearch.current = false;
       rightPanelRef.current?.focusExplorer();
     }
@@ -458,42 +490,64 @@ export default function App() {
     };
   }, [workspaceRootPath]);
 
-  const openNewTerminal = useCallback((targetPaneId?: string) => {
-    if (!activeWorkspace) return;
-    openPanel(activeWorkspace.id, targetPaneId ?? activeWorkspace.activePaneId, {
-      id: newPanelId(),
-      kind: "terminal",
-      cwd: activeCwd ?? activeWorkspace.cwd,
-    });
-  }, [activeWorkspace, activeCwd, openPanel]);
+  const openNewTerminal = useCallback(
+    (targetPaneId?: string) => {
+      if (!activeWorkspace) return;
+      openPanel(
+        activeWorkspace.id,
+        targetPaneId ?? activeWorkspace.activePaneId,
+        {
+          id: newPanelId(),
+          kind: "terminal",
+          cwd: activeCwd ?? activeWorkspace.cwd,
+        },
+      );
+    },
+    [activeWorkspace, activeCwd, openPanel],
+  );
 
-  const openNewBlock = useCallback((targetPaneId?: string) => {
-    if (!activeWorkspace) return;
-    openPanel(activeWorkspace.id, targetPaneId ?? activeWorkspace.activePaneId, {
-      id: newPanelId(),
-      kind: "terminal",
-      blocks: true,
-      cwd: activeCwd ?? activeWorkspace.cwd,
-    });
-  }, [activeWorkspace, activeCwd, openPanel]);
+  const openNewBlock = useCallback(
+    (targetPaneId?: string) => {
+      if (!activeWorkspace) return;
+      openPanel(
+        activeWorkspace.id,
+        targetPaneId ?? activeWorkspace.activePaneId,
+        {
+          id: newPanelId(),
+          kind: "terminal",
+          blocks: true,
+          cwd: activeCwd ?? activeWorkspace.cwd,
+        },
+      );
+    },
+    [activeWorkspace, activeCwd, openPanel],
+  );
 
   // ── Window title ──────────────────────────────────────────────────────────
 
   useEffect(() => {
     const project = explorerRoot ? basename(explorerRoot) : "";
-    const label = activePanel ? (activeCwd ? basename(activeCwd) : panelTitle(activePanel)) : "";
+    const label = activePanel
+      ? activeCwd
+        ? basename(activeCwd)
+        : panelTitle(activePanel)
+      : "";
     let title: string;
     if (project && label && label !== project) title = `${project} — ${label}`;
     else title = project || label || "Kex";
     document.title = title;
-    void getCurrentWindow().setTitle(title).catch(() => {});
+    void getCurrentWindow()
+      .setTitle(title)
+      .catch(() => {});
   }, [explorerRoot, activeCwd, activePanel]);
 
   // ── Dialogs ───────────────────────────────────────────────────────────────
 
   const [newEditorOpen, setNewEditorOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [paletteInitialMode, setPaletteInitialMode] = useState<"commands" | "content">("commands");
+  const [paletteInitialMode, setPaletteInitialMode] = useState<
+    "commands" | "content"
+  >("commands");
   const openCommandPalette = useCallback(
     (mode: "commands" | "content" = "commands") => {
       setPaletteInitialMode(mode);
@@ -536,13 +590,18 @@ export default function App() {
           (p) => p.kind === "editor" && p.preview,
         );
         if (existingPreview) {
-          replacePanel(activeWorkspace.id, activeWorkspace.activePaneId, existingPreview.id, {
-            id: panelId,
-            kind: "editor",
-            path,
-            dirty: false,
-            preview: true,
-          });
+          replacePanel(
+            activeWorkspace.id,
+            activeWorkspace.activePaneId,
+            existingPreview.id,
+            {
+              id: panelId,
+              kind: "editor",
+              path,
+              dirty: false,
+              preview: true,
+            },
+          );
           return panelId;
         }
       }
@@ -552,7 +611,13 @@ export default function App() {
         activeWorkspace.activePaneId,
         markdown
           ? { id: panelId, kind: "markdown", path }
-          : { id: panelId, kind: "editor", path, dirty: false, preview: isPreview },
+          : {
+              id: panelId,
+              kind: "editor",
+              path,
+              dirty: false,
+              preview: isPreview,
+            },
       );
       return panelId;
     },
@@ -560,7 +625,12 @@ export default function App() {
   );
 
   const openGitDiffInPanel = useCallback(
-    (params: { repoRoot: string; path: string; mode: "-" | "+"; originalPath: string | null }) => {
+    (params: {
+      repoRoot: string;
+      path: string;
+      mode: "-" | "+";
+      originalPath: string | null;
+    }) => {
       if (!activeWorkspace) return;
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: newPanelId(),
@@ -593,7 +663,10 @@ export default function App() {
         url,
       });
       if (!url) {
-        setTimeout(() => browserHandles.current.get(panelId)?.focusAddressBar(), 0);
+        setTimeout(
+          () => browserHandles.current.get(panelId)?.focusAddressBar(),
+          0,
+        );
       }
       return panelId;
     },
@@ -607,12 +680,9 @@ export default function App() {
     [activatePanel],
   );
 
-  const onClosePanelStable = useCallback(
-    (_wsId: string, panelId: string) => {
-      closePanelsRef.current([panelId]);
-    },
-    [],
-  );
+  const onClosePanelStable = useCallback((_wsId: string, panelId: string) => {
+    closePanelsRef.current([panelId]);
+  }, []);
 
   const onCloseManyPanelsStable = useCallback(
     (_wsId: string, panelIds: string[]) => {
@@ -640,28 +710,54 @@ export default function App() {
 
   const onSplitTerminalRightStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+      const { paneSplitLimit, workspacePaneLimit } =
+        usePreferencesStore.getState();
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       if (!ws) return;
-      if (allPanes(ws.paneTree).length >= workspacePaneLimit) { toastSplitBlocked("pane-limit", workspacePaneLimit); return; }
-      const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-      if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) { toastSplitBlocked("too-narrow"); return; }
+      if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
+        toastSplitBlocked("pane-limit", workspacePaneLimit);
+        return;
+      }
+      const el = document.querySelector<HTMLElement>(
+        `[data-pane-id="${paneId}"]`,
+      );
+      if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
+        toastSplitBlocked("too-narrow");
+        return;
+      }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
-      openPanel(wsId, newPaneId, { id: newPanelId(), kind: "terminal", cwd: activeCwdRef.current ?? ws.cwd });
+      openPanel(wsId, newPaneId, {
+        id: newPanelId(),
+        kind: "terminal",
+        cwd: activeCwdRef.current ?? ws.cwd,
+      });
     },
     [splitPane, openPanel],
   );
 
   const onSplitTerminalDownStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+      const { paneSplitLimit, workspacePaneLimit } =
+        usePreferencesStore.getState();
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       if (!ws) return;
-      if (allPanes(ws.paneTree).length >= workspacePaneLimit) { toastSplitBlocked("pane-limit", workspacePaneLimit); return; }
-      const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-      if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) { toastSplitBlocked("too-short"); return; }
+      if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
+        toastSplitBlocked("pane-limit", workspacePaneLimit);
+        return;
+      }
+      const el = document.querySelector<HTMLElement>(
+        `[data-pane-id="${paneId}"]`,
+      );
+      if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
+        toastSplitBlocked("too-short");
+        return;
+      }
       const newPaneId = splitPane(wsId, paneId, "vertical");
-      openPanel(wsId, newPaneId, { id: newPanelId(), kind: "terminal", cwd: activeCwdRef.current ?? ws.cwd });
+      openPanel(wsId, newPaneId, {
+        id: newPanelId(),
+        kind: "terminal",
+        cwd: activeCwdRef.current ?? ws.cwd,
+      });
     },
     [splitPane, openPanel],
   );
@@ -670,50 +766,83 @@ export default function App() {
     (wsId: string, paneId: string) => {
       const panelId = newPanelId();
       openPanel(wsId, paneId, { id: panelId, kind: "browser", url: "" });
-      setTimeout(() => browserHandles.current.get(panelId)?.focusAddressBar(), 0);
+      setTimeout(
+        () => browserHandles.current.get(panelId)?.focusAddressBar(),
+        0,
+      );
     },
     [openPanel],
   );
 
   const onSplitBrowserRightStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+      const { paneSplitLimit, workspacePaneLimit } =
+        usePreferencesStore.getState();
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       if (!ws) return;
-      if (allPanes(ws.paneTree).length >= workspacePaneLimit) { toastSplitBlocked("pane-limit", workspacePaneLimit); return; }
-      const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-      if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) { toastSplitBlocked("too-narrow"); return; }
+      if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
+        toastSplitBlocked("pane-limit", workspacePaneLimit);
+        return;
+      }
+      const el = document.querySelector<HTMLElement>(
+        `[data-pane-id="${paneId}"]`,
+      );
+      if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
+        toastSplitBlocked("too-narrow");
+        return;
+      }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
       const panelId = newPanelId();
       openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
-      setTimeout(() => browserHandles.current.get(panelId)?.focusAddressBar(), 0);
+      setTimeout(
+        () => browserHandles.current.get(panelId)?.focusAddressBar(),
+        0,
+      );
     },
     [splitPane, openPanel],
   );
 
   const onSplitBrowserDownStable = useCallback(
     (wsId: string, paneId: string) => {
-      const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+      const { paneSplitLimit, workspacePaneLimit } =
+        usePreferencesStore.getState();
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       if (!ws) return;
-      if (allPanes(ws.paneTree).length >= workspacePaneLimit) { toastSplitBlocked("pane-limit", workspacePaneLimit); return; }
-      const el = document.querySelector<HTMLElement>(`[data-pane-id="${paneId}"]`);
-      if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) { toastSplitBlocked("too-short"); return; }
+      if (allPanes(ws.paneTree).length >= workspacePaneLimit) {
+        toastSplitBlocked("pane-limit", workspacePaneLimit);
+        return;
+      }
+      const el = document.querySelector<HTMLElement>(
+        `[data-pane-id="${paneId}"]`,
+      );
+      if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
+        toastSplitBlocked("too-short");
+        return;
+      }
       const newPaneId = splitPane(wsId, paneId, "vertical");
       const panelId = newPanelId();
       openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
-      setTimeout(() => browserHandles.current.get(panelId)?.focusAddressBar(), 0);
+      setTimeout(
+        () => browserHandles.current.get(panelId)?.focusAddressBar(),
+        0,
+      );
     },
     [splitPane, openPanel],
   );
 
   const onDividerChangeStable = useCallback(
-    (wsId: string, splitId: string, pos: number) => setPaneDivider(wsId, splitId, pos),
+    (wsId: string, splitId: string, pos: number) =>
+      setPaneDivider(wsId, splitId, pos),
     [setPaneDivider],
   );
 
   const onOpenCommitFileStable = useCallback(
-    (params: { repoRoot: string; sha: string; path: string; originalPath: string | null }) => {
+    (params: {
+      repoRoot: string;
+      sha: string;
+      path: string;
+      originalPath: string | null;
+    }) => {
       const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
       if (!ws) return;
       openPanel(ws.id, ws.activePaneId, {
@@ -740,13 +869,21 @@ export default function App() {
             if (ep.path === from) {
               const i = to.lastIndexOf("/");
               updatePanelData(ws.id, panel.id, (p) =>
-                p.kind === "editor" ? { ...p, path: to, title: i === -1 ? to : to.slice(i + 1) } : p,
+                p.kind === "editor"
+                  ? { ...p, path: to, title: i === -1 ? to : to.slice(i + 1) }
+                  : p,
               );
             } else if (ep.path.startsWith(`${from}/`)) {
               const newPath = `${to}${ep.path.slice(from.length)}`;
               const i = newPath.lastIndexOf("/");
               updatePanelData(ws.id, panel.id, (p) =>
-                p.kind === "editor" ? { ...p, path: newPath, title: i === -1 ? newPath : newPath.slice(i + 1) } : p,
+                p.kind === "editor"
+                  ? {
+                      ...p,
+                      path: newPath,
+                      title: i === -1 ? newPath : newPath.slice(i + 1),
+                    }
+                  : p,
               );
             }
           }
@@ -813,7 +950,9 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found)
           updatePanelData(found.workspace.id, panelId, (p) =>
-            p.kind === "editor" ? { ...p, dirty, ...(dirty ? { preview: false } : {}) } : p,
+            p.kind === "editor"
+              ? { ...p, dirty, ...(dirty ? { preview: false } : {}) }
+              : p,
           );
       },
       onEditorClose: (panelId) => {
@@ -864,7 +1003,11 @@ export default function App() {
       },
       onRenamePanel: (panelId, title) => {
         const found = findPanelGlobal(panelId);
-        if (found) updatePanelData(found.workspace.id, panelId, (p) => ({ ...p, title }));
+        if (found)
+          updatePanelData(found.workspace.id, panelId, (p) => ({
+            ...p,
+            title,
+          }));
       },
       onUpdatePanel: (panelId, updater) => {
         const found = findPanelGlobal(panelId);
@@ -912,7 +1055,9 @@ export default function App() {
   }, []);
 
   const focusActivePanel = useCallback(() => {
-    const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceIdRef.current);
+    const ws = workspacesRef.current.find(
+      (w) => w.id === activeWorkspaceIdRef.current,
+    );
     if (!ws) return;
     const pane = findPane(ws.paneTree, ws.activePaneId);
     const panelId = pane?.activePanelId;
@@ -952,7 +1097,13 @@ export default function App() {
 
   // ── useEditorFileSync (editor panel shim) ─────────────────────────────────
 
-  type EditorShim = { kind: "editor"; id: string; path: string; dirty: boolean; preview: boolean };
+  type EditorShim = {
+    kind: "editor";
+    id: string;
+    path: string;
+    dirty: boolean;
+    preview: boolean;
+  };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const editorPanels = useMemo<EditorShim[]>(() => {
     const acc: EditorShim[] = [];
@@ -961,7 +1112,13 @@ export default function App() {
         for (const panel of pane.panels) {
           if (panel.kind === "editor") {
             const ep = panel as EditorShim;
-            acc.push({ kind: "editor", id: ep.id, path: ep.path, dirty: ep.dirty, preview: ep.preview });
+            acc.push({
+              kind: "editor",
+              id: ep.id,
+              path: ep.path,
+              dirty: ep.dirty,
+              preview: ep.preview,
+            });
           }
         }
       }
@@ -971,16 +1128,24 @@ export default function App() {
   const editorPanelsRef = useRef(editorPanels);
   editorPanelsRef.current = editorPanels;
 
-  useEditorFileSync({ tabs: editorPanels, tabsRef: editorPanelsRef, editorRefs: editorHandles });
+  useEditorFileSync({
+    tabs: editorPanels,
+    tabsRef: editorPanelsRef,
+    editorRefs: editorHandles,
+  });
 
   // ── useThemeFileEditing ───────────────────────────────────────────────────
 
-  useThemeFileEditing({ tabsRef: editorPanelsRef, openFileTab: (path) => openFileInPanel(path, true) });
+  useThemeFileEditing({
+    tabsRef: editorPanelsRef,
+    openFileTab: (path) => openFileInPanel(path, true),
+  });
 
   // ── Source control ────────────────────────────────────────────────────────
 
   const activeFilePath = (() => {
-    if (activePanel?.kind === "editor") return (activePanel as { path: string }).path;
+    if (activePanel?.kind === "editor")
+      return (activePanel as { path: string }).path;
     if (activePanel?.kind === "git-diff") {
       const p = activePanel as { path: string; repoRoot: string };
       if (/^([A-Za-z]:|\/|\\)/.test(p.path)) return p.path;
@@ -1002,17 +1167,20 @@ export default function App() {
     void setRightPanelOpen(!usePreferencesStore.getState().rightPanelOpen);
   }, []);
 
-  const navigateRightPanelTo = useCallback((tab: "explorer" | "git" | "history") => {
-    const state = usePreferencesStore.getState();
-    if (!state.rightPanelOpen) {
-      void setRightPanelOpen(true);
-      void setRightPanelActiveTab(tab);
-    } else if (state.rightPanelActiveTab === tab) {
-      void setRightPanelOpen(false);
-    } else {
-      void setRightPanelActiveTab(tab);
-    }
-  }, []);
+  const navigateRightPanelTo = useCallback(
+    (tab: "explorer" | "git" | "history") => {
+      const state = usePreferencesStore.getState();
+      if (!state.rightPanelOpen) {
+        void setRightPanelOpen(true);
+        void setRightPanelActiveTab(tab);
+      } else if (state.rightPanelActiveTab === tab) {
+        void setRightPanelOpen(false);
+      } else {
+        void setRightPanelActiveTab(tab);
+      }
+    },
+    [],
+  );
 
   const allPanelsFlat = useMemo(() => {
     const panels: Panel[] = [];
@@ -1136,7 +1304,10 @@ export default function App() {
 
   const handleCloseActivePanel = useCallback(() => {
     if (!activeWorkspace || !activePanelId) return;
-    if ((activePanel?.kind === "terminal" || activePanel?.kind === "editor") && activePanel.locked) {
+    if (
+      (activePanel?.kind === "terminal" || activePanel?.kind === "editor") &&
+      activePanel.locked
+    ) {
       flashLockIcon(activePanelId);
       return;
     }
@@ -1146,7 +1317,9 @@ export default function App() {
   const handleCloseOtherPanels = useCallback(() => {
     if (!activePane || !activePanelId) return;
     const ids = activePane.panels
-      .filter((p) => p.id !== activePanelId && !(p as { locked?: boolean }).locked)
+      .filter(
+        (p) => p.id !== activePanelId && !(p as { locked?: boolean }).locked,
+      )
       .map((p) => p.id);
     if (ids.length) closePanelsRef.current(ids);
   }, [activePane, activePanelId]);
@@ -1171,45 +1344,65 @@ export default function App() {
 
   function focusPaneInDirection(dir: "up" | "down" | "left" | "right") {
     if (!activeWorkspace) return;
-    const paneIds = new Set(allPanes(activeWorkspace.paneTree).map((p) => p.id));
+    const paneIds = new Set(
+      allPanes(activeWorkspace.paneTree).map((p) => p.id),
+    );
     const rects = new Map<string, Rect>();
     for (const el of document.querySelectorAll<HTMLElement>("[data-pane-id]")) {
       const id = el.dataset.paneId;
       if (id && paneIds.has(id)) rects.set(id, el.getBoundingClientRect());
     }
-    const target = findPaneInDirection(activeWorkspace.activePaneId, dir, rects);
+    const target = findPaneInDirection(
+      activeWorkspace.activePaneId,
+      dir,
+      rects,
+    );
     if (target) focusPane(activeWorkspace.id, target);
   }
 
   const doSplitRight = useCallback(() => {
     if (!activeWorkspace) return;
-    const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+    const { paneSplitLimit, workspacePaneLimit } =
+      usePreferencesStore.getState();
     if (allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit) {
       toastSplitBlocked("pane-limit", workspacePaneLimit);
       return;
     }
-    const el = document.querySelector<HTMLElement>(`[data-pane-id="${activeWorkspace.activePaneId}"]`);
+    const el = document.querySelector<HTMLElement>(
+      `[data-pane-id="${activeWorkspace.activePaneId}"]`,
+    );
     if (!el || el.getBoundingClientRect().width < paneSplitLimit.width) {
       toastSplitBlocked("too-narrow");
       return;
     }
-    const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "horizontal");
+    const newPaneId = splitPane(
+      activeWorkspace.id,
+      activeWorkspace.activePaneId,
+      "horizontal",
+    );
     openNewTerminal(newPaneId);
   }, [activeWorkspace, splitPane, openNewTerminal]);
 
   const doSplitDown = useCallback(() => {
     if (!activeWorkspace) return;
-    const { paneSplitLimit, workspacePaneLimit } = usePreferencesStore.getState();
+    const { paneSplitLimit, workspacePaneLimit } =
+      usePreferencesStore.getState();
     if (allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit) {
       toastSplitBlocked("pane-limit", workspacePaneLimit);
       return;
     }
-    const el = document.querySelector<HTMLElement>(`[data-pane-id="${activeWorkspace.activePaneId}"]`);
+    const el = document.querySelector<HTMLElement>(
+      `[data-pane-id="${activeWorkspace.activePaneId}"]`,
+    );
     if (!el || el.getBoundingClientRect().height < paneSplitLimit.height) {
       toastSplitBlocked("too-short");
       return;
     }
-    const newPaneId = splitPane(activeWorkspace.id, activeWorkspace.activePaneId, "vertical");
+    const newPaneId = splitPane(
+      activeWorkspace.id,
+      activeWorkspace.activePaneId,
+      "vertical",
+    );
     openNewTerminal(newPaneId);
   }, [activeWorkspace, splitPane, openNewTerminal]);
 
@@ -1228,14 +1421,22 @@ export default function App() {
       "tab.rename": () => {
         const active = document.activeElement;
         const tag = active?.tagName;
-        if ((tag === "INPUT" || tag === "TEXTAREA") && !active?.classList.contains("xterm-helper-textarea")) return;
+        if (
+          (tag === "INPUT" || tag === "TEXTAREA") &&
+          !active?.classList.contains("xterm-helper-textarea")
+        )
+          return;
         if (!activePanelId) return;
         useTabRenameStore.getState().startRename(activePanelId);
       },
       "file.rename": () => {
         const active = document.activeElement;
         const tag = active?.tagName;
-        if ((tag === "INPUT" || tag === "TEXTAREA") && !active?.classList.contains("xterm-helper-textarea")) return;
+        if (
+          (tag === "INPUT" || tag === "TEXTAREA") &&
+          !active?.classList.contains("xterm-helper-textarea")
+        )
+          return;
         if (!activePanelId) return;
         const panel = findPanelGlobal(activePanelId)?.panel;
         if (panel?.kind === "editor" || panel?.kind === "markdown") {
@@ -1260,7 +1461,8 @@ export default function App() {
       },
       "tab.selectByIndex": (e) => {
         const idx = parseInt(e.key, 10) - 1;
-        if (idx >= 0 && idx < workspaces.length) setActiveWorkspaceId(workspaces[idx].id);
+        if (idx >= 0 && idx < workspaces.length)
+          setActiveWorkspaceId(workspaces[idx].id);
       },
       "pane.splitRight": doSplitRight,
       "pane.splitDown": doSplitDown,
@@ -1282,7 +1484,9 @@ export default function App() {
           void setRightPanelActiveTab("explorer");
         }
       },
-      "terminal.clear": () => { clearFocusedTerminal(); },
+      "terminal.clear": () => {
+        clearFocusedTerminal();
+      },
       "blocks.prev": () => navigateFocusedBlocks(-1),
       "blocks.next": () => navigateFocusedBlocks(1),
       "search.focus": () => searchInlineRef.current?.focus(),
@@ -1307,18 +1511,26 @@ export default function App() {
         if (!first) return;
         setActiveWorkspaceId(first.tabId);
         activatePanel(first.tabId, first.panelId);
-        setTimeout(() => terminalHandles.current.get(first.panelId)?.focus(), 50);
+        setTimeout(
+          () => terminalHandles.current.get(first.panelId)?.focus(),
+          50,
+        );
       },
       "tab.lock": () => {
         if (!activePanelId) return;
-        if (activePanel?.kind !== "terminal" && activePanel?.kind !== "editor") return;
+        if (activePanel?.kind !== "terminal" && activePanel?.kind !== "editor")
+          return;
         const found = findPanelGlobal(activePanelId);
         if (found)
           updatePanelData(found.workspace.id, activePanelId, (p) => {
             if (p.kind === "terminal") return { ...p, locked: !p.locked };
             if (p.kind === "editor") {
               const newLocked = !p.locked;
-              return { ...p, locked: newLocked, ...(newLocked ? { preview: false } : {}) };
+              return {
+                ...p,
+                locked: newLocked,
+                ...(newLocked ? { preview: false } : {}),
+              };
             }
             return p;
           });
@@ -1376,7 +1588,8 @@ export default function App() {
         return activePanel?.kind !== "editor";
       }
       if (id === "terminal.clear") {
-        const target = (e.target as HTMLElement | null) ?? document.activeElement;
+        const target =
+          (e.target as HTMLElement | null) ?? document.activeElement;
         return !(target as HTMLElement | null)?.closest?.(".xterm");
       }
       if (id === "blocks.prev" || id === "blocks.next") {
@@ -1389,7 +1602,9 @@ export default function App() {
         return rightPanelRef.current?.isExplorerFocused() ?? false;
       }
       if (id === "tab.lock") {
-        return activePanel?.kind !== "terminal" && activePanel?.kind !== "editor";
+        return (
+          activePanel?.kind !== "terminal" && activePanel?.kind !== "editor"
+        );
       }
 
       return false;
@@ -1413,12 +1628,21 @@ export default function App() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
-      .listen<{ workspaceId: string; panelId: string }>("kex:activate-panel", (e) => {
-        onActivateAgent(e.payload.workspaceId, e.payload.panelId);
+      .listen<{ workspaceId: string; panelId: string }>(
+        "kex:activate-panel",
+        (e) => {
+          onActivateAgent(e.payload.workspaceId, e.payload.panelId);
+        },
+      )
+      .then((u) => {
+        unlisten = u;
       })
-      .then((u) => { unlisten = u; })
-      .catch((e) => console.error("[kex] kex:activate-panel listen failed:", e));
-    return () => { unlisten?.(); };
+      .catch((e) =>
+        console.error("[kex] kex:activate-panel listen failed:", e),
+      );
+    return () => {
+      unlisten?.();
+    };
   }, [onActivateAgent]);
 
   // ── Native macOS menu wiring ──────────────────────────────────────────────
@@ -1427,23 +1651,47 @@ export default function App() {
   const menuDispatchRef = useRef<(id: string) => void>(() => {});
   menuDispatchRef.current = (id: string) => {
     switch (id) {
-      case "settings": void openSettingsWindow(); break;
-      case "new_workspace": addWorkspace(home ?? undefined); break;
-      case "new_terminal": openNewTerminal(); break;
-      case "new_browser": openBrowserInPanel(""); break;
+      case "settings":
+        void openSettingsWindow();
+        break;
+      case "new_workspace":
+        addWorkspace(home ?? undefined);
+        break;
+      case "new_terminal":
+        openNewTerminal();
+        break;
+      case "new_browser":
+        openBrowserInPanel("");
+        break;
       case "toggle_autosave":
         void setEditorAutoSave(!usePreferencesStore.getState().editorAutoSave);
         break;
-      case "close_tab": handleCloseActivePanel(); break;
-      case "close_others": handleCloseOtherPanels(); break;
-      case "close_all": handleCloseAllPanels(); break;
-      case "toggle_sidebar": toggleRightPanel(); break;
-      case "toggle_explorer": navigateRightPanelTo("explorer"); break;
-      case "toggle_git": navigateRightPanelTo("git"); break;
-      case "toggle_history": navigateRightPanelTo("history"); break;
+      case "close_tab":
+        handleCloseActivePanel();
+        break;
+      case "close_others":
+        handleCloseOtherPanels();
+        break;
+      case "close_all":
+        handleCloseAllPanels();
+        break;
+      case "toggle_sidebar":
+        toggleRightPanel();
+        break;
+      case "toggle_explorer":
+        navigateRightPanelTo("explorer");
+        break;
+      case "toggle_git":
+        navigateRightPanelTo("git");
+        break;
+      case "toggle_history":
+        navigateRightPanelTo("history");
+        break;
       case "toggle_panel_side":
         void setPanelSide(
-          usePreferencesStore.getState().panelSide === "left" ? "right" : "left",
+          usePreferencesStore.getState().panelSide === "left"
+            ? "right"
+            : "left",
         );
         break;
     }
@@ -1454,9 +1702,13 @@ export default function App() {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen<string>("kex:menu", (e) => menuDispatchRef.current(e.payload))
-      .then((u) => { unlisten = u; })
+      .then((u) => {
+        unlisten = u;
+      })
       .catch((e) => console.error("[kex] kex:menu listen failed:", e));
-    return () => { unlisten?.(); };
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   // Keep the dynamic menu labels in sync with the preferences they reflect.
@@ -1549,7 +1801,12 @@ export default function App() {
           <div className="flex min-h-0 flex-1">
             {/* LEFT: 52px workspace sidebar */}
             <WorkspaceSidebar
-              workspaces={workspaces.map((w) => ({ id: w.id, title: w.title, kind: "terminal", cwd: w.cwd }))}
+              workspaces={workspaces.map((w) => ({
+                id: w.id,
+                title: w.title,
+                kind: "terminal",
+                cwd: w.cwd,
+              }))}
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(home ?? undefined)}
@@ -1563,119 +1820,126 @@ export default function App() {
               onMovePanel={movePanel}
               onReorderPanel={reorderPanel}
               onSplitPaneAndPlace={splitPaneAndPlace}
-              onSplitPaneAndOpenFile={(workspaceId, targetPaneId, direction, path) =>
+              onSplitPaneAndOpenFile={(
+                workspaceId,
+                targetPaneId,
+                direction,
+                path,
+              ) =>
                 splitPaneAndOpenFile(workspaceId, targetPaneId, direction, path)
               }
               onOpenPanel={openPanel}
             >
-            <ResizablePanelGroup
-              orientation="horizontal"
-              className="min-h-0 flex-1"
-            >
-              {/* Tool panel on LEFT when panelSide === "left" */}
-              {rightPanelOpen && panelSide === "left" && (
-                <>
-                  <ResizablePanel
-                    id="tool-panel"
-                    defaultSize="20%"
-                    minSize="12%"
-                    maxSize="35%"
-                  >
-                    <RightPanel
-                      ref={rightPanelRef}
-                      rootPath={explorerRoot}
-                      rootMode={activeRootMode}
-                      onChangeRootMode={handleChangeRootMode}
-                      onSetAsRoot={handleSetAsRoot}
-                      terminalCwdPath={terminalRootCwd}
-                      gitRootPath={gitRoot}
-                      workspaceRootPath={workspaceRootPath}
-                      workspaceRootExists={workspaceRootExists}
-                      activeFilePath={explorerActiveFilePath ?? null}
-                      onOpenFile={(path, pin) => openFileInPanel(path, pin)}
-                      onPathRenamed={handlePathRenamed}
-                      onPathDeleted={handlePathDeleted}
-                      onRevealInTerminal={cdInNewWorkspace}
-                      onExplorerSearchClose={onExplorerSearchClose}
-                      sourceControl={sourceControl}
-                      onOpenDiff={openGitDiffInPanel}
-                      onOpenGitGraph={openGitGraphFromContext}
-                      repoRoot={rightPanelRepoRoot}
-                      onOpenCommitFile={onOpenCommitFileStable}
-                      onSearchHandle={setGitHistoryHandle}
-                    />
-                  </ResizablePanel>
-                  <ResizableHandle withHandle />
-                </>
-              )}
+              <ResizablePanelGroup
+                orientation="horizontal"
+                className="min-h-0 flex-1"
+              >
+                {/* Tool panel on LEFT when panelSide === "left" */}
+                {rightPanelOpen && panelSide === "left" && (
+                  <>
+                    <ResizablePanel
+                      id="tool-panel"
+                      defaultSize="20%"
+                      minSize="12%"
+                      maxSize="35%"
+                    >
+                      <RightPanel
+                        ref={rightPanelRef}
+                        rootPath={explorerRoot}
+                        rootMode={activeRootMode}
+                        onChangeRootMode={handleChangeRootMode}
+                        onSetAsRoot={handleSetAsRoot}
+                        homePath={home}
+                        terminalCwdPath={terminalRootCwd}
+                        gitRootPath={gitRoot}
+                        workspaceRootPath={workspaceRootPath}
+                        workspaceRootExists={workspaceRootExists}
+                        activeFilePath={explorerActiveFilePath ?? null}
+                        onOpenFile={(path, pin) => openFileInPanel(path, pin)}
+                        onPathRenamed={handlePathRenamed}
+                        onPathDeleted={handlePathDeleted}
+                        onRevealInTerminal={cdInNewWorkspace}
+                        onExplorerSearchClose={onExplorerSearchClose}
+                        sourceControl={sourceControl}
+                        onOpenDiff={openGitDiffInPanel}
+                        onOpenGitGraph={openGitGraphFromContext}
+                        repoRoot={rightPanelRepoRoot}
+                        onOpenCommitFile={onOpenCommitFileStable}
+                        onSearchHandle={setGitHistoryHandle}
+                      />
+                    </ResizablePanel>
+                    <ResizableHandle withHandle />
+                  </>
+                )}
 
-              <ResizablePanel id="center" minSize="30%">
-                <div className="flex h-full min-h-0 flex-col">
-                  <div className="relative min-h-0 flex-1">
-                    <WorkspaceView
-                      workspaces={workspaces}
-                      activeWorkspaceId={activeWorkspaceId}
-                      onActivatePanel={onActivatePanelStable}
-                      onClosePanel={onClosePanelStable}
-                      onCloseManyPanels={onCloseManyPanelsStable}
-                      onFocusPane={onFocusPaneStable}
-                      onNewTerminal={onNewTerminalStable}
-                      onSplitTerminalRight={onSplitTerminalRightStable}
-                      onSplitTerminalDown={onSplitTerminalDownStable}
-                      onNewBrowser={onNewBrowserStable}
-                      onSplitBrowserRight={onSplitBrowserRightStable}
-                      onSplitBrowserDown={onSplitBrowserDownStable}
-                      onDividerChange={onDividerChangeStable}
-                      callbacks={panelCallbacks}
-                      gitStatus={sourceControl.status}
-                      gitColorScheme={gitColorScheme}
+                <ResizablePanel id="center" minSize="30%">
+                  <div className="flex h-full min-h-0 flex-col">
+                    <div className="relative min-h-0 flex-1">
+                      <WorkspaceView
+                        workspaces={workspaces}
+                        activeWorkspaceId={activeWorkspaceId}
+                        onActivatePanel={onActivatePanelStable}
+                        onClosePanel={onClosePanelStable}
+                        onCloseManyPanels={onCloseManyPanelsStable}
+                        onFocusPane={onFocusPaneStable}
+                        onNewTerminal={onNewTerminalStable}
+                        onSplitTerminalRight={onSplitTerminalRightStable}
+                        onSplitTerminalDown={onSplitTerminalDownStable}
+                        onNewBrowser={onNewBrowserStable}
+                        onSplitBrowserRight={onSplitBrowserRightStable}
+                        onSplitBrowserDown={onSplitBrowserDownStable}
+                        onDividerChange={onDividerChangeStable}
+                        callbacks={panelCallbacks}
+                        gitStatus={sourceControl.status}
+                        gitColorScheme={gitColorScheme}
+                      />
+                    </div>
+
+                    <WorkspaceInputBar
+                      isBlockTab={false}
+                      activeLeafId={activePanelId}
                     />
                   </div>
+                </ResizablePanel>
 
-                  <WorkspaceInputBar
-                    isBlockTab={false}
-                    activeLeafId={activePanelId}
-                  />
-                </div>
-              </ResizablePanel>
-
-              {/* Tool panel on RIGHT when panelSide === "right" (default) */}
-              {rightPanelOpen && panelSide === "right" && (
-                <>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel
-                    id="tool-panel"
-                    defaultSize="20%"
-                    minSize="12%"
-                    maxSize="35%"
-                  >
-                    <RightPanel
-                      ref={rightPanelRef}
-                      rootPath={explorerRoot}
-                      rootMode={activeRootMode}
-                      onChangeRootMode={handleChangeRootMode}
-                      onSetAsRoot={handleSetAsRoot}
-                      terminalCwdPath={terminalRootCwd}
-                      gitRootPath={gitRoot}
-                      workspaceRootPath={workspaceRootPath}
-                      workspaceRootExists={workspaceRootExists}
-                      activeFilePath={explorerActiveFilePath ?? null}
-                      onOpenFile={(path, pin) => openFileInPanel(path, pin)}
-                      onPathRenamed={handlePathRenamed}
-                      onPathDeleted={handlePathDeleted}
-                      onRevealInTerminal={cdInNewWorkspace}
-                      onExplorerSearchClose={onExplorerSearchClose}
-                      sourceControl={sourceControl}
-                      onOpenDiff={openGitDiffInPanel}
-                      onOpenGitGraph={openGitGraphFromContext}
-                      repoRoot={rightPanelRepoRoot}
-                      onOpenCommitFile={onOpenCommitFileStable}
-                      onSearchHandle={setGitHistoryHandle}
-                    />
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
+                {/* Tool panel on RIGHT when panelSide === "right" (default) */}
+                {rightPanelOpen && panelSide === "right" && (
+                  <>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel
+                      id="tool-panel"
+                      defaultSize="20%"
+                      minSize="12%"
+                      maxSize="35%"
+                    >
+                      <RightPanel
+                        ref={rightPanelRef}
+                        rootPath={explorerRoot}
+                        rootMode={activeRootMode}
+                        onChangeRootMode={handleChangeRootMode}
+                        onSetAsRoot={handleSetAsRoot}
+                        homePath={home}
+                        terminalCwdPath={terminalRootCwd}
+                        gitRootPath={gitRoot}
+                        workspaceRootPath={workspaceRootPath}
+                        workspaceRootExists={workspaceRootExists}
+                        activeFilePath={explorerActiveFilePath ?? null}
+                        onOpenFile={(path, pin) => openFileInPanel(path, pin)}
+                        onPathRenamed={handlePathRenamed}
+                        onPathDeleted={handlePathDeleted}
+                        onRevealInTerminal={cdInNewWorkspace}
+                        onExplorerSearchClose={onExplorerSearchClose}
+                        sourceControl={sourceControl}
+                        onOpenDiff={openGitDiffInPanel}
+                        onOpenGitGraph={openGitGraphFromContext}
+                        repoRoot={rightPanelRepoRoot}
+                        onOpenCommitFile={onOpenCommitFileStable}
+                        onSearchHandle={setGitHistoryHandle}
+                      />
+                    </ResizablePanel>
+                  </>
+                )}
+              </ResizablePanelGroup>
             </WorkspaceDndProvider>
           </div>
 
