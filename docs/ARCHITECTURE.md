@@ -376,7 +376,7 @@ src/
     ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image
     ├── settings/                  — Settings store, preferences, window opener
-    ├── browser/                   — Web browser pane (address bar; also dev-server preview)
+    ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser panels can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the panel stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  — Markdown renderer pane
     ├── workspace/                 — Local + WSL environment switching
     ├── updater/                   — Auto-updater dialog

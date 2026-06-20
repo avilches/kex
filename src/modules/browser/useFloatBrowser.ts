@@ -60,6 +60,7 @@ export function useFloatBrowser({
     panel: Panel & { kind: "browser" },
     workspaceId: string,
   ): Promise<void> {
+    if (!panel.url) return;
     // Mark as floating in state first so the placeholder renders immediately
     updatePanelData(workspaceId, panel.id, (p) => ({ ...p, floating: true }));
     try {
@@ -74,16 +75,6 @@ export function useFloatBrowser({
       updatePanelData(workspaceId, panel.id, (p) => ({ ...p, floating: false }));
       console.error("[float-browser] open failed:", err);
     }
-  }
-
-  function dockPanel(panelId: string, currentUrl: string): void {
-    const found = findPanelGlobal(panelId);
-    if (!found) return;
-    updatePanelData(found.workspace.id, panelId, (p) => ({
-      ...p,
-      floating: false,
-      url: currentUrl || (p.kind === "browser" ? p.url : ""),
-    }));
   }
 
   async function closeFloatWindow(panelId: string): Promise<void> {
@@ -151,7 +142,6 @@ export function useFloatBrowser({
 
   return {
     floatPanel,
-    dockPanel,
     dockViaCommand,
     closeFloatWindow,
     focusFloatWindow,

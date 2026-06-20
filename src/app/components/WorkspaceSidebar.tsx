@@ -25,6 +25,7 @@ export type WorkspaceSidebarProps = {
   onSelect: (id: string) => void;
   onNew: () => void;
   onReorder: (fromId: string, toId: string) => void;
+  onClose?: (id: string) => void;
 };
 
 function abbrev(title: string, kind: string): string {
@@ -45,10 +46,12 @@ function SortableWorkspaceItem({
   ws,
   active,
   onSelect,
+  onClose,
 }: {
   ws: WorkspaceItem;
   active: boolean;
   onSelect: (id: string) => void;
+  onClose?: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ws.id });
   const hue = idHue(ws.id);
@@ -60,36 +63,46 @@ function SortableWorkspaceItem({
   };
 
   return (
-    <button
-      ref={setNodeRef}
-      type="button"
-      title={ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : (ws.title || ws.kind)}
-      onClick={() => onSelect(ws.id)}
-      className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-lg text-[11px] font-semibold transition-all select-none",
-        active
-          ? "text-white"
-          : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
+    <div ref={setNodeRef} className="group relative" style={style}>
+      <button
+        type="button"
+        title={ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : (ws.title || ws.kind)}
+        onClick={() => onSelect(ws.id)}
+        className={cn(
+          "flex h-9 w-9 items-center justify-center rounded-lg text-[11px] font-semibold transition-all select-none",
+          active
+            ? "text-white"
+            : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
+        )}
+        style={
+          active
+            ? {
+                backgroundColor: `hsl(${hue} 55% 42%)`,
+                boxShadow: `0 0 0 2px hsl(var(--card) / 1), 0 0 0 4px hsl(${hue} 55% 55%)`,
+              }
+            : undefined
+        }
+        {...attributes}
+        {...listeners}
+        aria-pressed={active}
+      >
+        {abbrev(ws.title, ws.kind)}
+      </button>
+      {onClose && (
+        <button
+          type="button"
+          title="Close workspace"
+          onClick={(e) => { e.stopPropagation(); onClose(ws.id); }}
+          className="absolute -right-1 -top-1 hidden size-[14px] items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
+        >
+          ×
+        </button>
       )}
-      style={
-        active
-          ? {
-              ...style,
-              backgroundColor: `hsl(${hue} 55% 42%)`,
-              boxShadow: `0 0 0 2px hsl(var(--card) / 1), 0 0 0 4px hsl(${hue} 55% 55%)`,
-            }
-          : style
-      }
-      {...attributes}
-      {...listeners}
-      aria-pressed={active}
-    >
-      {abbrev(ws.title, ws.kind)}
-    </button>
+    </div>
   );
 }
 
-export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReorder }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReorder, onClose }: WorkspaceSidebarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [isDragging, setIsDragging] = useState(false);
 
@@ -125,6 +138,7 @@ export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReor
               ws={ws}
               active={ws.id === activeId}
               onSelect={onSelect}
+              onClose={onClose}
             />
           ))}
         </SortableContext>

@@ -35,10 +35,6 @@ pub fn window_label(panel_id: &str) -> String {
     format!("float-{}", panel_id)
 }
 
-pub fn panel_id_from_label(label: &str) -> Option<String> {
-    label.strip_prefix("float-").map(|s| s.to_string())
-}
-
 #[tauri::command]
 pub fn float_browser_open(
     app: AppHandle,
@@ -130,13 +126,26 @@ pub fn float_browser_open(
     Ok(())
 }
 
-/// Shared logic: get current URL, emit kex:float-dock to origin, remove from state, destroy window.
+/// Shared logic: remove from state, emit kex:float-dock to origin, destroy window.
+/// Idempotent: if the panel is already gone from state (concurrent call), returns early.
 pub fn do_dock_and_destroy(
     app: &AppHandle,
     panel_id: &str,
     origin_label: &str,
     win_label: &str,
 ) {
+    {
+        let st = app.state::<FloatBrowserState>();
+        let mut map = st.panels.lock().unwrap();
+        if map.remove(panel_id).is_none() {
+            return;
+        }
+        let mut focused = st.last_focused_panel_id.lock().unwrap();
+        if focused.as_deref() == Some(panel_id) {
+            *focused = None;
+        }
+    }
+
     let current_url = app
         .get_webview_window(win_label)
         .and_then(|w| w.url().ok())
@@ -148,16 +157,6 @@ pub fn do_dock_and_destroy(
             "kex:float-dock",
             json!({ "panelId": panel_id, "currentUrl": current_url }),
         );
-    }
-
-    {
-        let st = app.state::<FloatBrowserState>();
-        let mut map = st.panels.lock().unwrap();
-        map.remove(panel_id);
-        let mut focused = st.last_focused_panel_id.lock().unwrap();
-        if focused.as_deref() == Some(panel_id) {
-            *focused = None;
-        }
     }
 
     if let Some(win) = app.get_webview_window(win_label) {

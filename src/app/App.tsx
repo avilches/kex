@@ -1537,6 +1537,7 @@ export default function App() {
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(home ?? undefined)}
               onReorder={reorderWorkspaces}
+              onClose={(wsId) => handleCloseWorkspaceRef.current(wsId)}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
