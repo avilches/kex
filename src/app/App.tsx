@@ -422,6 +422,11 @@ export default function App() {
             (p as { path: string }).path === path,
         );
         if (existing) {
+          if (pin && existing.kind === "editor" && existing.preview) {
+            updatePanelData(activeWorkspace.id, existing.id, (p) =>
+              p.kind === "editor" ? { ...p, preview: false } : p,
+            );
+          }
           activatePanel(activeWorkspace.id, existing.id);
           return existing.id;
         }
