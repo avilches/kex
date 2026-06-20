@@ -64,6 +64,7 @@ import {
   WorkspaceView,
 } from "@/modules/workspaces";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
+import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import type { SearchAddon } from "@xterm/addon-search";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1000,7 +1001,10 @@ export default function App() {
 
   const handleCloseActivePanel = useCallback(() => {
     if (!activeWorkspace || !activePanelId) return;
-    if (activePanel?.kind === "terminal" && activePanel.locked) return;
+    if (activePanel?.kind === "terminal" && activePanel.locked) {
+      flashLockIcon(activePanelId);
+      return;
+    }
     closePanelsRef.current([activePanelId]);
   }, [activeWorkspace, activePanelId, activePanel]);
 

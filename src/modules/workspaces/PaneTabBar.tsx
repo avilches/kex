@@ -6,6 +6,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
+import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -435,7 +436,7 @@ function TerminalHoverCardContent({
           />
           <span className="text-muted-foreground">Lock tab (prevent close)</span>
           {lockShortcut && (
-            <span className="ml-auto shrink-0 text-[10px] tracking-wide text-muted-foreground/60">
+            <span className="ml-auto shrink-0 text-[12px] text-muted-foreground/60">
               {lockShortcut}
             </span>
           )}
@@ -588,6 +589,18 @@ function DraggableTab({
   const handledRef = useRef(false);
   const [hoverOpen, setHoverOpen] = useState(false);
   const [isFileRenaming, setIsFileRenaming] = useState(false);
+  const lockFlashSnap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
+  const [lockFlashActive, setLockFlashActive] = useState(false);
+  const lockFlashSeqRef = useRef(0);
+
+  useEffect(() => {
+    if (lockFlashSnap.panelId !== panel.id) return;
+    if (lockFlashSnap.seq === lockFlashSeqRef.current) return;
+    lockFlashSeqRef.current = lockFlashSnap.seq;
+    setLockFlashActive(true);
+    const t = setTimeout(() => setLockFlashActive(false), 500);
+    return () => clearTimeout(t);
+  }, [lockFlashSnap, panel.id]);
   const fileRenameInputRef = useRef<HTMLInputElement>(null);
   // Keep the hover card open while the pointer is still over the tab. Clicking a
   // tab moves focus into the terminal, which blurs the dnd-kit-focusable trigger
@@ -794,7 +807,12 @@ function DraggableTab({
       {panel.kind === "terminal" && panel.locked ? (
         <button
           type="button"
-          className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded text-foreground transition-colors hover:bg-muted"
+          className={cn(
+            "ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded hover:bg-muted",
+            lockFlashActive
+              ? "scale-125 text-amber-400 transition-[color,transform] duration-300"
+              : "text-foreground transition-colors",
+          )}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -967,6 +985,7 @@ function DraggableTab({
       <HoverCardContent
         side="bottom"
         align="start"
+        sideOffset={0}
         className="z-40 w-fit min-w-44 max-w-96 select-text rounded-xl p-2.5"
         onPointerEnter={() => { pointerInsideRef.current = true; }}
         onPointerLeave={() => { pointerInsideRef.current = false; }}
