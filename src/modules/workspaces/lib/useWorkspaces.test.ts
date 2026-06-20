@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Workspace } from "./types";
-import { applyExplorerRootMode, applyPinnedRoot } from "./useWorkspaces";
+import { applyExplorerRootMode, applyFsRoot, applyPinnedRoot } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -28,5 +28,24 @@ describe("applyPinnedRoot", () => {
   it("strips a trailing slash from the pinned path", () => {
     const out = applyPinnedRoot([ws()], "w1", "/some/dir/");
     expect(out[0].pinnedRoot).toBe("/some/dir");
+  });
+});
+
+describe("applyFsRoot", () => {
+  it("sets fsRoot on the matching workspace only and keeps the mode", () => {
+    const out = applyFsRoot([ws(), ws({ id: "w2" })], "w1", "/some/dir");
+    expect(out[0].fsRoot).toBe("/some/dir");
+    expect(out[0].explorerRootMode).toBeUndefined();
+    expect(out[1].fsRoot).toBeUndefined();
+  });
+
+  it("strips a trailing slash from fsRoot", () => {
+    const out = applyFsRoot([ws()], "w1", "/some/dir/");
+    expect(out[0].fsRoot).toBe("/some/dir");
+  });
+
+  it("keeps the root slash for the filesystem root", () => {
+    const out = applyFsRoot([ws()], "w1", "/");
+    expect(out[0].fsRoot).toBe("/");
   });
 });

@@ -36,4 +36,5 @@ export type Workspace = {
   activePaneId: string;
   explorerRootMode?: ExplorerRootMode;
   pinnedRoot?: string;
+  fsRoot?: string;
 };

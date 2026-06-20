@@ -46,6 +46,17 @@ export function applyPinnedRoot(
   );
 }
 
+export function applyFsRoot(
+  workspaces: Workspace[],
+  workspaceId: string,
+  path: string,
+): Workspace[] {
+  const normalized = path.length > 1 ? path.replace(/\/$/, "") : path;
+  return workspaces.map((w) =>
+    w.id === workspaceId ? { ...w, fsRoot: normalized } : w,
+  );
+}
+
 function newPaneNode(cwd?: string): PaneNode {
   const panelId = newPanelId();
   return {
@@ -439,6 +450,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyPinnedRoot(prev, workspaceId, path));
   }, []);
 
+  const setFsRoot = useCallback((workspaceId: string, path: string) => {
+    setWorkspaces((prev) => applyFsRoot(prev, workspaceId, path));
+  }, []);
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -490,6 +505,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceCwd,
     setExplorerRootMode,
     setPinnedRoot,
+    setFsRoot,
     setTerminalRunningCommand,
     setPanelView,
     findPanelGlobal,
