@@ -1,6 +1,6 @@
 pub mod modules;
 
-use modules::{agent, fs, git, history, pty, shell, window_state, workspace};
+use modules::{agent, float_browser, fs, git, history, pty, shell, window_state, workspace};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
@@ -580,6 +580,7 @@ pub fn run() {
         .manage(agent::PendingNavState::default())
         .manage(QuitGuard::default())
         .manage(LaunchDir(Mutex::new(cli_dir)))
+        .manage(float_browser::FloatBrowserState::new())
         .invoke_handler(tauri::generate_handler![
             pty::pty_open,
             pty::pty_write,
@@ -655,6 +656,10 @@ pub fn run() {
             history::history_commands,
             history::history_record,
             history::history_list,
+            float_browser::float_browser_open,
+            float_browser::float_browser_close,
+            float_browser::float_browser_focus,
+            float_browser::float_browser_dock,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
