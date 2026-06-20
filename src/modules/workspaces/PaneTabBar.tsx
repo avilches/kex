@@ -196,6 +196,9 @@ function useGitRepoRoot(dir: string | undefined): string | null {
 
 function EditorHoverContent({
   absPath,
+  panelLocked,
+  lockShortcut,
+  onLockToggle,
   onRename,
   isRenaming,
   fileRenameRef,
@@ -203,6 +206,9 @@ function EditorHoverContent({
   onRenameCancel,
 }: {
   absPath: string;
+  panelLocked?: boolean;
+  lockShortcut?: string | null;
+  onLockToggle?: () => void;
   onRename?: () => void;
   isRenaming?: boolean;
   fileRenameRef?: React.Ref<HTMLInputElement>;
@@ -217,16 +223,36 @@ function EditorHoverContent({
       : null;
 
   return (
-    <FilePathLines
-      absPath={absPath}
-      repoRoot={root}
-      repoRel={repoRel}
-      onRename={onRename}
-      isRenaming={isRenaming}
-      fileRenameRef={fileRenameRef}
-      onRenameCommit={onRenameCommit}
-      onRenameCancel={onRenameCancel}
-    />
+    <div className="space-y-1.5 text-[12px]">
+      <FilePathLines
+        absPath={absPath}
+        repoRoot={root}
+        repoRel={repoRel}
+        onRename={onRename}
+        isRenaming={isRenaming}
+        fileRenameRef={fileRenameRef}
+        onRenameCommit={onRenameCommit}
+        onRenameCancel={onRenameCancel}
+      />
+      {onLockToggle !== undefined && (
+        <div className="mt-1.5 border-t border-border/40 pt-1.5">
+          <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+            <input
+              type="checkbox"
+              className="size-3 accent-primary"
+              checked={panelLocked ?? false}
+              onChange={onLockToggle}
+            />
+            <span className="text-muted-foreground">Lock tab (prevent close)</span>
+            {lockShortcut && (
+              <span className="ml-auto shrink-0 text-[12px] text-muted-foreground/60">
+                {lockShortcut}
+              </span>
+            )}
+          </label>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -543,8 +569,8 @@ function DraggableTab({
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
   const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${panel.id}:after`, disabled: !isWorkspaceActive });
   const active = panel.id === activePanelId;
-  const isLockable = panel.kind === "terminal";
-  const isLocked = panel.kind === "terminal" && (panel.locked ?? false);
+  const isLockable = panel.kind === "terminal" || panel.kind === "editor";
+  const isLocked = (panel.kind === "terminal" || panel.kind === "editor") && (panel.locked ?? false);
   const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const runningCommand = panel.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
   const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
@@ -598,8 +624,10 @@ function DraggableTab({
     if (lockFlashSnap.seq === lockFlashSeqRef.current) return;
     lockFlashSeqRef.current = lockFlashSnap.seq;
     setLockFlashActive(true);
-    const t = setTimeout(() => setLockFlashActive(false), 500);
-    return () => clearTimeout(t);
+    const t1 = setTimeout(() => setLockFlashActive(false), 120);
+    const t2 = setTimeout(() => setLockFlashActive(true), 220);
+    const t3 = setTimeout(() => setLockFlashActive(false), 340);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [lockFlashSnap, panel.id]);
   const fileRenameInputRef = useRef<HTMLInputElement>(null);
   // Keep the hover card open while the pointer is still over the tab. Clicking a
@@ -698,6 +726,19 @@ function DraggableTab({
               onUpdatePanel={(updater) => onUpdatePanel?.(panel.id, updater)}
             />;
       case "editor":
+        return (
+          <EditorHoverContent
+            absPath={panel.path}
+            panelLocked={panel.locked ?? false}
+            lockShortcut={shortcutLabels["tab.lock"]}
+            onLockToggle={() => onUpdatePanel?.(panel.id, (p) => ({ ...p, locked: !(panel.locked ?? false) }))}
+            onRename={isFileRenaming ? undefined : handleRenameFromHover}
+            isRenaming={isFileRenaming}
+            fileRenameRef={fileRenameInputRef}
+            onRenameCommit={commitFileRename}
+            onRenameCancel={cancelFileRename}
+          />
+        );
       case "markdown":
         return (
           <EditorHoverContent
@@ -804,7 +845,7 @@ function DraggableTab({
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null
       )}
-      {panel.kind === "terminal" && panel.locked ? (
+      {isLocked ? (
         <button
           type="button"
           className={cn(
@@ -900,7 +941,7 @@ function DraggableTab({
             )}
             <ContextMenuItem disabled={isLocked} onSelect={() => onClose(panel.id)}>
               Close Tab
-              {shortcutLabels["tab.close"] && (
+              {!isLocked && shortcutLabels["tab.close"] && (
                 <ContextMenuShortcut>{shortcutLabels["tab.close"]}</ContextMenuShortcut>
               )}
             </ContextMenuItem>

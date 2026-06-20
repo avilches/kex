@@ -57,10 +57,13 @@ export async function runCloseQueue(
           }
         }
       }
-    } else if (panel.kind === "editor" && panel.dirty) {
-      const decision = await deps.askEditorClose(panelId);
-      if (decision.type === "cancel") return;
-      if (decision.type === "save") await deps.savePanel(panelId);
+    } else if (panel.kind === "editor") {
+      if (panel.locked) continue;
+      if (panel.dirty) {
+        const decision = await deps.askEditorClose(panelId);
+        if (decision.type === "cancel") return;
+        if (decision.type === "save") await deps.savePanel(panelId);
+      }
     }
 
     deps.closePanel(panelId);
