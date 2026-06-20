@@ -22,6 +22,10 @@ type Props = {
   url: string;
   visible: boolean;
   onUrlChange: (url: string) => void;
+  floating: boolean;
+  onFloat: () => void;
+  onDock: () => void;
+  onFocusFloat: () => void;
 };
 
 // Tear the iframe down after this much invisibility — a background dev
@@ -29,7 +33,7 @@ type Props = {
 const SUSPEND_AFTER_MS = 30_000;
 
 export const BrowserPane = forwardRef<BrowserPaneHandle, Props>(
-  function BrowserPane({ url, visible, onUrlChange }, ref) {
+  function BrowserPane({ url, visible, onUrlChange, floating, onFloat, onDock, onFocusFloat }, ref) {
     // `nonce` is part of the iframe `key`. Bumping it remounts the iframe,
     // which is the only reliable cross-origin reload (calling
     // contentWindow.location.reload() throws on cross-origin frames).
@@ -61,6 +65,20 @@ export const BrowserPane = forwardRef<BrowserPaneHandle, Props>(
 
     const showXfoHint = url ? !isLocalUrl(url) : false;
 
+    if (floating) {
+      return (
+        <div
+          className="flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-background"
+          style={{
+            visibility: visible ? "visible" : "hidden",
+            pointerEvents: visible ? "auto" : "none",
+          }}
+        >
+          <FloatingPlaceholder url={url} onDock={onDock} onFocusFloat={onFocusFloat} />
+        </div>
+      );
+    }
+
     return (
       <div
         className="flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-background"
@@ -74,6 +92,7 @@ export const BrowserPane = forwardRef<BrowserPaneHandle, Props>(
           url={url}
           onSubmit={onUrlChange}
           onReload={() => setNonce((n) => n + 1)}
+          onFloat={onFloat}
         />
         {showXfoHint ? (
           <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border/60 bg-amber-500/8 px-3 text-[11px] text-amber-600 dark:text-amber-400">
@@ -174,6 +193,50 @@ function EmptyState() {
           often block embedding — open them in your browser via the link icon
           if you see a blank page.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function FloatingPlaceholder({
+  url,
+  onDock,
+  onFocusFloat,
+}: {
+  url: string;
+  onDock: () => void;
+  onFocusFloat: () => void;
+}) {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="flex size-12 items-center justify-center rounded-2xl border border-border/60 bg-card text-muted-foreground">
+        <HugeiconsIcon icon={Globe02Icon} size={20} strokeWidth={1.5} />
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-sm font-medium text-foreground">
+          Viewing in a separate window
+        </p>
+        {url && (
+          <p className="max-w-xs truncate text-xs text-muted-foreground">
+            {url}
+          </p>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onDock}
+          className="rounded-md border border-border/60 bg-card px-3 py-1 text-[11px] hover:bg-accent/50"
+        >
+          Dock here
+        </button>
+        <button
+          type="button"
+          onClick={onFocusFloat}
+          className="rounded-md border border-border/60 bg-card px-3 py-1 text-[11px] hover:bg-accent/50"
+        >
+          Focus window
+        </button>
       </div>
     </div>
   );
