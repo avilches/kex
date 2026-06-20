@@ -910,9 +910,11 @@ function DraggableTab({
             >
               Close Other Tabs
             </ContextMenuItem>
-            <ContextMenuItem onSelect={onCloseAllPanels}>
-              Close All Tabs
-            </ContextMenuItem>
+            {!isLocked && (
+              <ContextMenuItem onSelect={onCloseAllPanels}>
+                Close All Tabs
+              </ContextMenuItem>
+            )}
             {hasAgent && (
               <>
                 <ContextMenuSeparator />
