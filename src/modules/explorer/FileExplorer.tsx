@@ -576,6 +576,51 @@ export const FileExplorer = memo(
       if (revealNonce != null) discardPending();
     }, [revealNonce, discardPending]);
 
+    // null = parent not loaded (existence unknown); false = parent loaded and
+    // the entry is gone.
+    const pathPresence = useCallback(
+      (p: string): boolean | null => {
+        const node = tree.nodes[pathDirname(p)];
+        if (node?.status !== "loaded") return null;
+        const base = pathBasename(p);
+        return node.entries.some((e) => e.name === base);
+      },
+      [tree.nodes],
+    );
+
+    // A pending whose target was deleted or moved out from under us (an external
+    // fs change refreshed the parent) loses its row and its input unmounts, yet
+    // the state would persist and keep the tree unclickable. Drop it once the
+    // parent is loaded and the target is confirmed gone. Create-at-root is exempt:
+    // its parent is the root, whose own parent is never loaded.
+    useEffect(() => {
+      if (tree.renaming && pathPresence(tree.renaming) === false) {
+        tree.cancelRename();
+      }
+      if (
+        tree.pendingDuplicate &&
+        pathPresence(tree.pendingDuplicate.sourcePath) === false
+      ) {
+        tree.cancelDuplicate();
+      }
+      if (
+        tree.pendingCreate &&
+        tree.pendingCreate.parentPath !== rootPath &&
+        pathPresence(tree.pendingCreate.parentPath) === false
+      ) {
+        tree.cancelCreate();
+      }
+    }, [
+      tree.renaming,
+      tree.pendingCreate,
+      tree.pendingDuplicate,
+      pathPresence,
+      rootPath,
+      tree.cancelRename,
+      tree.cancelCreate,
+      tree.cancelDuplicate,
+    ]);
+
     // Focus on Explorer: reveal a file on demand. Root/mode changes reload the
     // tree asynchronously, so this re-runs as nodes/expanded settle until every
     // ancestor is loaded, then selects and scrolls (without stealing focus).
