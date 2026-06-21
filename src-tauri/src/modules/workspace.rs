@@ -171,6 +171,24 @@ pub fn validate_spawn_cwd(
     Ok(Some(canonical))
 }
 
+// A saved cwd can be stale or from another environment (e.g. a Windows path in
+// a now-WSL workspace, or a since-deleted dir); the terminal must still open, so
+// fall back to home instead of rejecting. Returns the cwd to spawn in (None
+// meaning home) and the canonical path to authorize after a successful spawn.
+pub fn spawn_cwd_or_home(
+    cwd: Option<String>,
+    workspace: &WorkspaceEnv,
+) -> (Option<String>, Option<PathBuf>) {
+    match validate_spawn_cwd(cwd.as_deref(), workspace) {
+        Ok(Some(canonical)) => (cwd, Some(canonical)),
+        Ok(None) => (None, None),
+        Err(e) => {
+            log::warn!("pty cwd {cwd:?} unusable in {workspace:?} ({e}); opening home");
+            (None, None)
+        }
+    }
+}
+
 pub fn bootstrap_registry(registry: &WorkspaceRegistry) {
     let _ = registry.authorize(resolve_launch_dir());
     if let Some(home) = dirs::home_dir() {
@@ -940,6 +958,47 @@ mod auth_tests {
         )
         .expect_err("missing path must fail");
         assert!(err.contains("cwd not accessible"), "got: {err}");
+    }
+
+    #[test]
+    fn spawn_cwd_or_home_keeps_valid_dir() {
+        let dir = tempdir("spawn-orhome-ok");
+        let s = dir.to_string_lossy().into_owned();
+        let (spawn, canonical) =
+            spawn_cwd_or_home(Some(s.clone()), &WorkspaceEnv::Local);
+        assert_eq!(spawn, Some(s));
+        assert_eq!(canonical, Some(dir));
+    }
+
+    #[test]
+    fn spawn_cwd_or_home_falls_back_when_inaccessible() {
+        let mut missing = env::temp_dir();
+        missing.push(format!(
+            "kex-spawn-orhome-missing-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let (spawn, canonical) = spawn_cwd_or_home(
+            Some(missing.to_string_lossy().into_owned()),
+            &WorkspaceEnv::Local,
+        );
+        assert_eq!(spawn, None);
+        assert_eq!(canonical, None);
+    }
+
+    #[test]
+    fn spawn_cwd_or_home_passes_through_empty() {
+        assert_eq!(
+            spawn_cwd_or_home(None, &WorkspaceEnv::Local),
+            (None, None)
+        );
+        assert_eq!(
+            spawn_cwd_or_home(Some("  ".to_owned()), &WorkspaceEnv::Local),
+            (None, None)
+        );
     }
 
     #[test]

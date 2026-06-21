@@ -16,7 +16,7 @@ use std::thread;
 use portable_pty::PtySize;
 use tauri::ipc::{Channel, Response};
 
-use crate::modules::workspace::{validate_spawn_cwd, WorkspaceEnv, WorkspaceRegistry};
+use crate::modules::workspace::{spawn_cwd_or_home, WorkspaceEnv, WorkspaceRegistry};
 use session::Session;
 
 pub struct PtyState {
@@ -65,11 +65,9 @@ pub async fn pty_open(
     let workspace = WorkspaceEnv::from_option(workspace);
     let blocks = blocks.unwrap_or(false);
     // Validate before spawn; register only after spawn succeeds so a failed
-    // spawn never widens the authorization surface.
-    let canonical_cwd = validate_spawn_cwd(cwd.as_deref(), &workspace).map_err(|e| {
-        log::warn!("pty_open: cwd rejected: {e}");
-        e
-    })?;
+    // spawn never widens the authorization surface. A stale or cross-environment
+    // cwd falls back to home rather than failing the open.
+    let (cwd, canonical_cwd) = spawn_cwd_or_home(cwd, &workspace);
     let id = state.next_id.fetch_add(1, Ordering::Relaxed);
     let session = tauri::async_runtime::spawn_blocking(move || {
         session::spawn(id, app, cols, rows, cwd, workspace, blocks, panel_id, on_data, on_exit)
