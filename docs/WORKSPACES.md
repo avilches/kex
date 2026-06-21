@@ -58,6 +58,12 @@ WorkspaceDndProvider    — DndContext wrapper; owns all drag state, handlers, a
                     └── PanelContent      — switches on panel.kind; mounts terminal, editor, etc.
 ```
 
+A `browser` panel with `floating: true` is a special case: `PanelContent` renders a placeholder
+(address bar plus "Dock here" / "Focus window" buttons) instead of the iframe, because the page
+lives in a native `WebviewUrl::External` window. The float/dock/navigate callbacks are threaded
+from `App.tsx` down through `WorkspaceView` → `SplitNodeView` → `PaneView` → `PanelContent` to
+`BrowserPane`; see `docs/FORK.md` (Floating browser windows).
+
 **All workspaces are always mounted.** Inactive workspaces are hidden with `opacity-0 invisible`
 CSS — they are never removed from the React tree. This is required to keep PTYs streaming and
 editor state alive.
