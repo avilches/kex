@@ -19,6 +19,7 @@ export type ShortcutId =
   | "file.copy"
   | "file.cut"
   | "file.paste"
+  | "file.delete"
   | "tab.next"
   | "tab.prev"
   | "tab.selectByIndex"
@@ -172,6 +173,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Paste file",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "v" }],
+  },
+  {
+    id: "file.delete",
+    label: "Delete file",
+    group: "General",
+    defaultBindings: [{ key: "Delete" }],
   },
   {
     id: "file.rename",
