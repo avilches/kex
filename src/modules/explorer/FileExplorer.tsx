@@ -26,7 +26,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useDndMonitor, useDroppable } from "@dnd-kit/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -55,6 +54,7 @@ import { useFileTree } from "./lib/useFileTree";
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
+import { IS_MAC } from "@/lib/platform";
 import { pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -802,28 +802,34 @@ export const FileExplorer = memo(
                         </span>
                       )}
                     </span>
-                    {(() => {
-                      const scId = MODE_SHORTCUT[m.id];
-                      const sc = scId
-                        ? (userShortcuts[scId] ?? (SHORTCUTS_BY_ID.get(scId)?.defaultBindings ?? []))
-                        : [];
-                      const tokens = getBindingTokens(sc[0]);
-                      return tokens.length > 0 ? (
-                        <KbdGroup className="ml-auto shrink-0">
-                          {tokens.map((t, i) => (
-                            <Kbd key={i}>{t}</Kbd>
-                          ))}
-                        </KbdGroup>
-                      ) : null;
-                    })()}
                     {rootMode === m.id && (
                       <HugeiconsIcon
                         icon={Tick02Icon}
                         size={13}
                         strokeWidth={2}
-                        className="mt-0.5 shrink-0 text-primary"
+                        className="mt-0.5 ml-auto shrink-0 text-primary"
                       />
                     )}
+                    {(() => {
+                      const scId = MODE_SHORTCUT[m.id];
+                      const sc = scId
+                        ? (userShortcuts[scId] ??
+                          (SHORTCUTS_BY_ID.get(scId)?.defaultBindings ?? []))
+                        : [];
+                      const tokens = getBindingTokens(sc[0]);
+                      if (tokens.length === 0) return null;
+                      const text = IS_MAC ? tokens.join("") : tokens.join("+");
+                      return (
+                        <span
+                          className={cn(
+                            "mt-0.5 shrink-0 text-[11px] tracking-wide text-muted-foreground",
+                            rootMode !== m.id && "ml-auto",
+                          )}
+                        >
+                          {text}
+                        </span>
+                      );
+                    })()}
                   </DropdownMenuItem>
                 );
               })}
