@@ -19,7 +19,6 @@ import {
   setAutostart,
   setEditorAutoSave,
   setEditorPreviewOnClick,
-  setShowHidden,
   setTerminalCursorBlink,
   setTerminalScrollback,
   setTerminalWebglEnabled,
@@ -37,7 +36,6 @@ export function GeneralSection() {
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const editorPreviewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
-  const showHidden = usePreferencesStore((s) => s.showHidden);
   const terminalWebglEnabled = usePreferencesStore(
     (s) => s.terminalWebglEnabled,
   );
@@ -133,15 +131,6 @@ export function GeneralSection() {
           <Switch
             checked={editorPreviewOnClick}
             onCheckedChange={(v) => void setEditorPreviewOnClick(v)}
-          />
-        </SettingRow>
-        <SettingRow
-          title="Show hidden files"
-          description="Include dot-prefixed files and folders (.env, .gitignore) in explorer and search."
-        >
-          <Switch
-            checked={showHidden}
-            onCheckedChange={(v) => void setShowHidden(v)}
           />
         </SettingRow>
       </div>

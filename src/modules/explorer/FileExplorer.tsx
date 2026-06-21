@@ -997,10 +997,7 @@ export const FileExplorer = memo(
           <Button
             variant="ghost"
             size="icon"
-            className={cn(
-              "size-6 shrink-0 text-muted-foreground hover:text-foreground",
-              showHidden && "text-primary hover:text-primary",
-            )}
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
             onClick={() => void setShowHidden(!showHidden)}
             title={showHidden ? "Hide hidden files" : "Show hidden files"}
             aria-label="Toggle hidden files"
