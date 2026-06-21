@@ -664,6 +664,16 @@ export const FileExplorer = memo(
         target.isContentEditable
       )
         return;
+      if (matchesShortcut(e.nativeEvent, "file.paste", userShortcuts)) {
+        e.preventDefault();
+        if (selectedPath) {
+          void rowActions.pasteEntry(selectedPath, isDirAt(selectedPath) === true);
+        } else {
+          void rowActions.pasteEntry(rootPath, true);
+        }
+        return;
+      }
+
       if (entryPaths.length === 0) return;
 
       const currentIdx = selectedPath ? entryPaths.indexOf(selectedPath) : -1;
@@ -690,15 +700,6 @@ export const FileExplorer = memo(
         const isDir = isDirAt(path);
         if (isDir === undefined) return;
         rowActions.cutEntry(path, isDir ? "dir" : "file");
-        return;
-      }
-      if (matchesShortcut(e.nativeEvent, "file.paste", userShortcuts)) {
-        e.preventDefault();
-        if (selectedPath) {
-          void rowActions.pasteEntry(selectedPath, isDirAt(selectedPath) === true);
-        } else {
-          void rowActions.pasteEntry(rootPath, true);
-        }
         return;
       }
 
