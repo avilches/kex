@@ -38,6 +38,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { DeleteEntryModal } from "./DeleteEntryModal";
 import { ExplorerSearch, type ExplorerSearchHandle } from "./ExplorerSearch";
 import {
   EntryRow,
@@ -55,7 +56,7 @@ import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
 import { IS_MAC } from "@/lib/platform";
-import { pathDirname } from "@/lib/pathUtils";
+import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -387,6 +388,10 @@ export const FileExplorer = memo(
     );
     const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<{
+      path: string;
+      isDir: boolean;
+    } | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const searchRef = useRef<ExplorerSearchHandle>(null);
@@ -478,6 +483,7 @@ export const FileExplorer = memo(
         beginCreate: tree.beginCreate,
         beginDuplicate: tree.beginDuplicate,
         deletePath: tree.deletePath,
+        requestDelete: (path, isDir) => setPendingDelete({ path, isDir }),
         copyEntry: tree.copyEntry,
         cutEntry: tree.cutEntry,
         pasteEntry: tree.pasteEntry,
@@ -658,7 +664,14 @@ export const FileExplorer = memo(
       ROOT_MODES.find((m) => m.id === rootMode) ?? ROOT_MODES[0];
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (tree.renaming || tree.pendingCreate || tree.pendingDuplicate || isSearchOpen) return;
+      if (
+        tree.renaming ||
+        tree.pendingCreate ||
+        tree.pendingDuplicate ||
+        isSearchOpen ||
+        pendingDelete
+      )
+        return;
       const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
@@ -684,6 +697,15 @@ export const FileExplorer = memo(
         if (currentIdx < 0) return;
         e.preventDefault();
         rowActions.beginRename(entryPaths[currentIdx]);
+        return;
+      }
+      if (matchesShortcut(e.nativeEvent, "file.delete", userShortcuts)) {
+        if (currentIdx < 0) return;
+        e.preventDefault();
+        const path = entryPaths[currentIdx];
+        const isDir = isDirAt(path);
+        if (isDir === undefined) return;
+        setPendingDelete({ path, isDir });
         return;
       }
       if (matchesShortcut(e.nativeEvent, "file.copy", userShortcuts)) {
@@ -1180,6 +1202,22 @@ export const FileExplorer = memo(
               </ContextMenu>
             ) : null}
           </>
+        )}
+        {pendingDelete && (
+          <DeleteEntryModal
+            open
+            name={pathBasename(pendingDelete.path)}
+            isDir={pendingDelete.isDir}
+            onCancel={() => setPendingDelete(null)}
+            onDelete={() => {
+              void tree.deletePath(pendingDelete.path);
+              setPendingDelete(null);
+            }}
+            onTrash={() => {
+              void tree.trashPath(pendingDelete.path);
+              setPendingDelete(null);
+            }}
+          />
         )}
       </div>
     );

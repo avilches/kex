@@ -37,7 +37,7 @@ import {
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect } from "react";
 import { InlineInput } from "./InlineInput";
 import {
   copyToClipboard,
@@ -75,6 +75,7 @@ export type RowActions = {
   ) => void;
   beginDuplicate: (sourcePath: string, kind: "file" | "dir") => void;
   deletePath: (path: string) => Promise<void>;
+  requestDelete: (path: string, isDir: boolean) => void;
   copyEntry: (path: string, kind: "file" | "dir") => void;
   cutEntry: (path: string, kind: "file" | "dir") => void;
   pasteEntry: (
@@ -140,7 +141,6 @@ function EntryRowImpl(props: EntryRowProps) {
     isCutSource,
   } = props;
 
-  const [isConfirming, setIsConfirming] = useState(false);
   const { draggingItem } = useWorkspaceDnd();
   const dragSource =
     draggingItem?.kind === "file" && !draggingItem.paneOnly
@@ -455,18 +455,11 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuItem
           className={COMPACT_ITEM}
           variant="destructive"
-          onSelect={(e) => {
-            e.preventDefault();
-            if (isConfirming) {
-              void actions.deletePath(path);
-            } else {
-              setIsConfirming(true);
-            }
-          }}
-          onMouseLeave={() => setTimeout(() => setIsConfirming(false), 1500)}
+          onSelect={() => actions.requestDelete(path, isDir)}
         >
           <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
-          {isConfirming ? "Click again to confirm" : "Delete"}
+          Delete
+          <ShortcutHint id="file.delete" />
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
