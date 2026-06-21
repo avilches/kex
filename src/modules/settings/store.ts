@@ -173,7 +173,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   vimMode: false,
   showHidden: false,
   explorerGitColorScheme: "vscode",
-  scmViewMode: "list",
+  scmViewMode: "tree",
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
   warnOnCloseTabWithRunningProcess: true,
@@ -211,7 +211,7 @@ const shortcutsStore = new LazyStore(SHORTCUTS_STORE_PATH, { defaults: {}, autoS
 const PREFS_CHANGED_EVENT = "kex://prefs-changed";
 
 export function parseScmViewMode(value: unknown): ScmViewMode {
-  return value === "tree" ? "tree" : "list";
+  return value === "list" ? "list" : "tree";
 }
 
 async function writePref<T>(key: string, value: T): Promise<void> {

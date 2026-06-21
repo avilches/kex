@@ -54,13 +54,13 @@ import {
   FolderCloudIcon,
   FolderGitTwoIcon,
   FolderOpenIcon,
+  FolderTreeIcon,
   GitBranchIcon,
   Link01Icon,
   ListViewIcon,
   MinusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
-  StructureFolderIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -611,7 +611,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               side="bottom"
             >
               <HugeiconsIcon
-                icon={scmViewMode === "tree" ? ListViewIcon : StructureFolderIcon}
+                icon={scmViewMode === "tree" ? ListViewIcon : FolderTreeIcon}
                 size={14}
                 strokeWidth={1.85}
               />

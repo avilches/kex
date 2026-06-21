@@ -39,16 +39,16 @@ describe("clampToStep", () => {
 });
 
 describe("scmViewMode", () => {
-  it("defaults to list", () => {
-    expect(DEFAULT_PREFERENCES.scmViewMode).toBe("list");
+  it("defaults to tree", () => {
+    expect(DEFAULT_PREFERENCES.scmViewMode).toBe("tree");
   });
 
-  it("parses only the exact 'tree' string as tree", () => {
+  it("parses only the exact 'list' string as list", () => {
     expect(parseScmViewMode("tree")).toBe("tree");
     expect(parseScmViewMode("list")).toBe("list");
-    expect(parseScmViewMode("TREE")).toBe("list");
-    expect(parseScmViewMode(undefined)).toBe("list");
-    expect(parseScmViewMode(null)).toBe("list");
-    expect(parseScmViewMode(42)).toBe("list");
+    expect(parseScmViewMode("LIST")).toBe("tree");
+    expect(parseScmViewMode(undefined)).toBe("tree");
+    expect(parseScmViewMode(null)).toBe("tree");
+    expect(parseScmViewMode(42)).toBe("tree");
   });
 });
