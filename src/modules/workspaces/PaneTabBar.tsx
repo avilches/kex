@@ -24,7 +24,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, Copy01Icon, CrosshairIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, Copy01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { panelFilePath } from "./lib/panelPath";
 import { native } from "@/lib/native";
@@ -576,6 +576,9 @@ function DraggableTab({
   const isLockable = panel.kind === "terminal" || panel.kind === "editor";
   const isLocked = (panel.kind === "terminal" || panel.kind === "editor") && (panel.locked ?? false);
   const focusFilePath = panelFilePath(panel);
+  const focusTarget =
+    focusFilePath ?? (panel.kind === "terminal" ? (panel.cwd ?? null) : null);
+  const focusIsFolder = focusFilePath === null;
   const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const runningCommand = panel.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
   const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
@@ -927,11 +930,18 @@ function DraggableTab({
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
-            {onFocusOnExplorer && focusFilePath && (
+            {onFocusOnExplorer && focusTarget && (
               <>
-                <ContextMenuItem onSelect={() => onFocusOnExplorer(focusFilePath)}>
+                <ContextMenuItem onSelect={() => onFocusOnExplorer(focusTarget)}>
                   <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
-                  Focus on Explorer
+                  {focusIsFolder
+                    ? "Focus Folder on Explorer"
+                    : "Focus File on Explorer"}
+                  {shortcutLabels["tab.focusOnExplorer"] && (
+                    <ContextMenuShortcut>
+                      {shortcutLabels["tab.focusOnExplorer"]}
+                    </ContextMenuShortcut>
+                  )}
                 </ContextMenuItem>
                 <ContextMenuSeparator />
               </>
@@ -939,6 +949,7 @@ function DraggableTab({
             {onRenamePanel && (
               <>
                 <ContextMenuItem onSelect={() => startRename(panel.id)}>
+                  <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
                   Rename Tab
                   {shortcutLabels["tab.rename"] && (
                     <ContextMenuShortcut>{shortcutLabels["tab.rename"]}</ContextMenuShortcut>
@@ -946,6 +957,7 @@ function DraggableTab({
                 </ContextMenuItem>
                 {panel.title && (
                   <ContextMenuItem onSelect={() => onRenamePanel(panel.id, undefined)}>
+                    <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} strokeWidth={2} />
                     Reset Tab Name
                   </ContextMenuItem>
                 )}
@@ -959,6 +971,7 @@ function DraggableTab({
                   return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
                 })}
               >
+                <HugeiconsIcon icon={isLocked ? SquareUnlock02Icon : LockKeyIcon} size={14} strokeWidth={2} />
                 {isLocked ? "Unlock Tab" : "Lock Tab"}
                 {shortcutLabels["tab.lock"] && (
                   <ContextMenuShortcut>{shortcutLabels["tab.lock"]}</ContextMenuShortcut>
@@ -966,6 +979,7 @@ function DraggableTab({
               </ContextMenuItem>
             )}
             <ContextMenuItem disabled={isLocked} onSelect={() => onClose(panel.id)}>
+              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
               Close Tab
               {!isLocked && shortcutLabels["tab.close"] && (
                 <ContextMenuShortcut>{shortcutLabels["tab.close"]}</ContextMenuShortcut>
@@ -975,33 +989,39 @@ function DraggableTab({
               disabled={panelsCount <= 1}
               onSelect={() => onCloseOtherPanels(panel.id)}
             >
+              <HugeiconsIcon icon={CancelCircleIcon} size={14} strokeWidth={2} />
               Close Other Tabs
             </ContextMenuItem>
             <ContextMenuItem disabled={isLocked} onSelect={onCloseAllPanels}>
+              <HugeiconsIcon icon={CancelSquareIcon} size={14} strokeWidth={2} />
               Close All Tabs
             </ContextMenuItem>
             {hasAgent && (
               <>
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={() => onDetachAgent(panel.id)}>
+                  <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={2} />
                   Detach Claude
                 </ContextMenuItem>
               </>
             )}
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={onNewTerminal}>
+              <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={2} />
               New Terminal Tab
               {shortcutLabels["tab.new"] && (
                 <ContextMenuShortcut>{shortcutLabels["tab.new"]}</ContextMenuShortcut>
               )}
             </ContextMenuItem>
             <ContextMenuItem onSelect={onSplitTerminalRight}>
+              <HugeiconsIcon icon={LayoutRightIcon} size={14} strokeWidth={2} />
               New Terminal Split Right
               {shortcutLabels["pane.splitRight"] && (
                 <ContextMenuShortcut>{shortcutLabels["pane.splitRight"]}</ContextMenuShortcut>
               )}
             </ContextMenuItem>
             <ContextMenuItem onSelect={onSplitTerminalDown}>
+              <HugeiconsIcon icon={LayoutBottomIcon} size={14} strokeWidth={2} />
               New Terminal Split Down
               {shortcutLabels["pane.splitDown"] && (
                 <ContextMenuShortcut>{shortcutLabels["pane.splitDown"]}</ContextMenuShortcut>
@@ -1009,15 +1029,18 @@ function DraggableTab({
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={onNewBrowser}>
+              <HugeiconsIcon icon={BrowserIcon} size={14} strokeWidth={2} />
               New Browser Tab
               {shortcutLabels["tab.newBrowser"] && (
                 <ContextMenuShortcut>{shortcutLabels["tab.newBrowser"]}</ContextMenuShortcut>
               )}
             </ContextMenuItem>
             <ContextMenuItem onSelect={onSplitBrowserRight}>
+              <HugeiconsIcon icon={LayoutRightIcon} size={14} strokeWidth={2} />
               New Browser Split Right
             </ContextMenuItem>
             <ContextMenuItem onSelect={onSplitBrowserDown}>
+              <HugeiconsIcon icon={LayoutBottomIcon} size={14} strokeWidth={2} />
               New Browser Split Down
             </ContextMenuItem>
         </ContextMenuContent>
@@ -1076,6 +1099,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
     "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
     "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
+    "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
   };
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
