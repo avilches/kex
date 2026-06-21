@@ -247,6 +247,18 @@ panels persisted with `floating: true`, and destroyed without docking when their
 State is managed Rust-side in `FloatBrowserState` (`src-tauri/src/modules/float_browser.rs`); the frontend hook is
 `useFloatBrowser` (`src/modules/browser/useFloatBrowser.ts`).
 
+### Focus on Explorer
+
+A tab context-menu action (and `F4` shortcut, group Tabs) that reveals the tab's file or folder in the Explorer:
+"Focus File on Explorer" for file tabs (editor / markdown / git-diff / git-commit-file) and "Focus Folder on Explorer"
+for terminal tabs (their current `cwd`). If the active explorer view already contains the target it is just expanded and
+selected without changing mode; otherwise the explorer switches to File System rooted at the deepest common ancestor
+between the reference fs root and the target (falling back to the target's parent dir when there is no common ancestor,
+e.g. a different Windows drive). The decision is a pure function (`resolveFocusTarget` in
+`src/modules/workspaces/lib/explorerRoot.ts`); revealing is driven reactively by a `revealRequest` prop on `FileExplorer`
+that re-runs as the tree reloads asynchronously, expanding each ancestor until the target is loaded, then selecting and
+scrolling to it without stealing focus from the editor. The context menu also gained icons on every item.
+
 ---
 
 ## Roadmap (planned, not yet built)
