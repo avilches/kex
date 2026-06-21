@@ -793,14 +793,18 @@ In the `virtualizer.getVirtualItems().map(...)` block, add to the `<RowRenderer 
             ) : null}
 ```
 
-8c. Add the two new cases to `RowRenderer`'s switch (after `changes-entry`):
+8c. Unify the entry rows. The existing `StagedEntryRow` and `ChangesEntryRow` differ only by which action buttons they show (driven by mode) and the selected-mode check; the new tree file row is the same thing with depth indent and no directory breadcrumb. Replace all three with a single `EntryRow` (defined in Step 8e). Update `RowRenderer`'s switch so the entry cases and the tree-file case all route to `EntryRow`, and add the `tree-dir` case:
 
 ```tsx
+    case "staged-entry":
+    case "changes-entry":
+    case "tree-file":
+      return <EntryRow {...props} row={row} />;
     case "tree-dir":
       return <TreeDirRow {...props} row={row} />;
-    case "tree-file":
-      return <TreeFileRow {...props} row={row} />;
 ```
+
+Then delete the now-unused `StagedEntryRow` and `ChangesEntryRow` component definitions.
 
 8d. Add the `TreeDirRow` component (place it just after `ChangesSectionHeader`):
 
@@ -853,10 +857,10 @@ function TreeDirRow({
 }
 ```
 
-8e. Add the `TreeFileRow` component (place it after `ChangesEntryRow`). It reuses the same visuals and per-file actions as the section entry rows, picking stage vs unstage from `entry.mode`, indented by depth, and dropping the directory breadcrumb (keeping only the rename `original -> new` hint):
+8e. Add the unified `EntryRow` component (place it where `StagedEntryRow` was, and delete the old `StagedEntryRow`/`ChangesEntryRow`). It backs all three entry row kinds: list `staged-entry` (mode `+`), list `changes-entry` (mode `-`), and tree `tree-file`. Mode comes from `entry.mode` (identical to the old per-component split: staged shows Unstage; unstaged shows Discard + Stage). `depth` indents tree rows (0 for list rows). `showDirname` keeps the directory breadcrumb in list mode and drops it in tree mode (where the tree itself conveys the directory), while a rename always shows the `original -> new` hint:
 
 ```tsx
-const TreeFileRow = memo(function TreeFileRow({
+const EntryRow = memo(function EntryRow({
   row,
   focused,
   selected,
@@ -869,17 +873,24 @@ const TreeFileRow = memo(function TreeFileRow({
   onDiscardEntry,
   onOpenFile,
 }: RowRendererProps & {
-  row: Extract<RowDescriptor, { kind: "tree-file" }>;
+  row: Extract<
+    RowDescriptor,
+    { kind: "staged-entry" } | { kind: "changes-entry" } | { kind: "tree-file" }
+  >;
 }) {
   const entry = row.entry;
   const isStaged = entry.mode === "+";
+  const depth = row.kind === "tree-file" ? row.depth : 0;
+  const showDirname = row.kind !== "tree-file";
   const isSelected =
     selected?.path === entry.path && selected?.mode === entry.mode;
   const fileName = basename(entry.path);
   const iconUrl = fileIconUrl(fileName);
-  const renameLabel = entry.originalPath
+  const pathLabel = entry.originalPath
     ? `${entry.originalPath} → ${entry.path}`
-    : null;
+    : showDirname
+      ? dirname(entry.path)
+      : null;
   const isStageBusy = actionBusy === `stage:${entry.path}`;
   const isUnstageBusy = actionBusy === `unstage:${entry.path}`;
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
@@ -906,7 +917,7 @@ const TreeFileRow = memo(function TreeFileRow({
           role="option"
           aria-selected={isSelected}
           onMouseDown={() => onFocusRow(row.key)}
-          style={{ paddingLeft: 8 + row.depth * 12 }}
+          style={{ paddingLeft: 8 + depth * 12 }}
           className={cn(
             "group relative flex h-[30px] items-center gap-2 rounded-md pr-2 transition-all duration-100",
             focused
@@ -939,7 +950,7 @@ const TreeFileRow = memo(function TreeFileRow({
                   isSelected || focused
                     ? "font-semibold text-foreground"
                     : "font-medium text-foreground/95",
-                  renameLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
+                  pathLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
                 )}
                 style={{
                   color: statusHex ?? undefined,
@@ -948,9 +959,9 @@ const TreeFileRow = memo(function TreeFileRow({
               >
                 {fileName}
               </span>
-              {renameLabel ? (
+              {pathLabel ? (
                 <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-muted-foreground/75">
-                  {renameLabel}
+                  {pathLabel}
                 </span>
               ) : null}
             </div>
@@ -1331,3 +1342,4 @@ git commit -m "feat(source-control): add per-folder actions in tree view"
 - **Spec coverage:** flag + persistence (Task 1), pure compacted tree with `MM` two-leaf rule and ordering (Task 2, tested), single global tree render + collapse + keyboard + toolbar bulk actions (Task 3), per-folder hover actions (Task 4). All spec sections map to a task.
 - **Type consistency:** `buildScmTree`/`flattenScmTree`/`ScmDirNode`/`ScmTreeRow` names are identical across Tasks 2-4. `scmViewMode`/`ScmViewMode`/`setScmViewMode`/`parseScmViewMode` are identical across Tasks 1 and 3. Hook additions `stageEntries`/`unstageEntries`/`requestDiscardEntries` are identical between the type, the implementation, and the call sites.
 - **No placeholders:** every code step contains the full code to paste.
+- **No duplication:** Task 3 unifies the list `staged-entry`/`changes-entry` rows and the tree `tree-file` row into one `EntryRow` (parameterized by `entry.mode`, `depth`, `showDirname`), deleting `StagedEntryRow`/`ChangesEntryRow` rather than adding a third near-duplicate. The 2-line `basename` helper in the pure `scmTree.ts` is intentionally local (the module is dependency-light and cannot import the panel's private helper).
