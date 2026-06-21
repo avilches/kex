@@ -9,9 +9,7 @@ import {
 import {
   ArrowDown01Icon,
   ComputerTerminal01Icon,
-  FileAddIcon,
   Folder01Icon,
-  FolderAddIcon,
   GitBranchIcon,
   HierarchyFilesIcon,
   Home01Icon,
@@ -92,7 +90,6 @@ type Props = {
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
 };
@@ -165,7 +162,7 @@ type Row =
       gitStatusCode: GitStatusCode | null;
     }
   | { kind: "fs-root"; key: string; path: string }
-  | { kind: "fs-up"; key: string }
+  | { kind: "fs-up"; key: string; path: string }
   | { kind: "pending"; key: string; depth: number; pendingKind: "file" | "dir" }
   | { kind: "duplicate"; key: string; depth: number; dupKind: "file" | "dir"; initial: string }
   | {
@@ -191,11 +188,15 @@ function buildRows(
 
   rows.push({ kind: "fs-root", key: `fs-root:${rootPath}`, path: rootPath });
   if (fsNav.filesystem && fsNav.canNavigateUp) {
-    rows.push({ kind: "fs-up", key: "fs-up" });
+    rows.push({ kind: "fs-up", key: "fs-up", path: pathDirname(rootPath) });
   }
   // A create-at-root pending sits below the synthetic header/".." rows, before
-  // the real entries (pendings inside subfolders are emitted by walk()).
-  if (tree.pendingCreate?.parentPath === rootPath) {
+  // the real entries — only when there is no afterPath (afterPath means the
+  // pending is inserted inline during walk(), right after the target sibling).
+  if (
+    tree.pendingCreate?.parentPath === rootPath &&
+    !tree.pendingCreate.afterPath
+  ) {
     rows.push({
       kind: "pending",
       key: `pending:${rootPath}`,
@@ -238,6 +239,19 @@ function buildRows(
           gitignored,
           gitStatusCode,
         });
+        // When creating a sibling after a specific file, insert the pending
+        // row right here rather than at the top of the parent directory.
+        if (
+          tree.pendingCreate?.afterPath === path &&
+          tree.pendingCreate.parentPath === parent
+        ) {
+          rows.push({
+            kind: "pending",
+            key: `pending:${parent}`,
+            depth,
+            pendingKind: tree.pendingCreate.kind,
+          });
+        }
         if (tree.pendingDuplicate?.sourcePath === path) {
           rows.push({
             kind: "duplicate",
@@ -250,7 +264,12 @@ function buildRows(
       }
       if (isDir && expanded) {
         const child = tree.nodes[path];
-        if (tree.pendingCreate?.parentPath === path) {
+        // Only insert pending as first child when there is no afterPath;
+        // with afterPath the pending is placed after the sibling file above.
+        if (
+          tree.pendingCreate?.parentPath === path &&
+          !tree.pendingCreate.afterPath
+        ) {
           rows.push({
             kind: "pending",
             key: `pending:${path}`,
@@ -308,7 +327,6 @@ export const FileExplorer = memo(
       onPathDeleted,
       onRevealInTerminal,
       onNewWorkspaceFromFolder,
-      onAttachToAgent,
       gitStatus,
       onSearchClose,
     },
@@ -402,7 +420,9 @@ export const FileExplorer = memo(
     // The id uses the same "explorer-dir:" prefix so onDragEnd handles it automatically.
     const { draggingItem } = useWorkspaceDnd();
     const internalDragSource =
-      draggingItem?.kind === "file" ? draggingItem.path : null;
+      draggingItem?.kind === "file" && !draggingItem.paneOnly
+        ? draggingItem.path
+        : null;
     const isRootInternalDropValid =
       rootPath !== null &&
       internalDragSource !== null &&
@@ -679,7 +699,6 @@ export const FileExplorer = memo(
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
-              onAttachToAgent={onAttachToAgent}
               onSetAsRoot={onSetAsRoot}
               onEnterFolder={onEnterFolder}
               editorPreviewOnClick={editorPreviewOnClick}
@@ -699,7 +718,7 @@ export const FileExplorer = memo(
             />
           );
         case "fs-up":
-          return <FsUpRow onNavigateUp={onNavigateUp} />;
+          return <FsUpRow path={row.path} onNavigateUp={onNavigateUp} />;
         case "pending":
           return (
             <PendingRow
@@ -807,16 +826,16 @@ export const FileExplorer = memo(
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {(rootMode === "terminal" || rootMode === "git") && rootPath && (
+          {rootMode === "filesystem" && homePath && (
             <Button
               variant="ghost"
               size="icon"
               className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-              onClick={() => onSetAsRoot(rootPath)}
-              title="Set as Workspace root"
-              aria-label="Set as Workspace root"
+              onClick={() => onEnterFolder?.(homePath)}
+              title="Go to home"
+              aria-label="Go to home"
             >
-              <HugeiconsIcon icon={PinIcon} size={13} strokeWidth={2} />
+              <HugeiconsIcon icon={Home01Icon} size={13} strokeWidth={2} />
             </Button>
           )}
 
@@ -829,24 +848,6 @@ export const FileExplorer = memo(
             aria-label="Search files"
           >
             <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={() => tree.beginCreate(rootPath, "file")}
-            title="New file"
-          >
-            <HugeiconsIcon icon={FileAddIcon} size={13} strokeWidth={2} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={() => tree.beginCreate(rootPath, "dir")}
-            title="New folder"
-          >
-            <HugeiconsIcon icon={FolderAddIcon} size={13} strokeWidth={2} />
           </Button>
           <Button
             variant="ghost"
@@ -951,7 +952,6 @@ export const FileExplorer = memo(
               onRequestClose={closeSearch}
               onActiveChange={setIsSearchActive}
               onRevealInTerminal={onRevealInTerminal}
-              onAttachToAgent={onAttachToAgent}
             />
 
             {!isSearchActive ? (

@@ -144,11 +144,7 @@ function BreadcrumbSegment({
     <>
       <BreadcrumbItem>
         <BreadcrumbLink asChild>
-          <button
-            type="button"
-            onClick={onClick}
-            className="cursor-pointer"
-          >
+          <button type="button" onClick={onClick}>
             <Badge
               variant="outline"
               className="gap-1 text-muted-foreground hover:text-foreground"
@@ -206,7 +202,7 @@ function CurrentSegmentDropdown({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <BreadcrumbPage className="flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 text-foreground hover:bg-accent">
+        <BreadcrumbPage className="flex items-center gap-1 rounded-sm px-1 py-0.5 text-foreground hover:bg-accent">
           {label === "~" ? (
             <>
               <HugeiconsIcon

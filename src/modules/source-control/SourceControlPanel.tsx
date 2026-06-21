@@ -46,10 +46,16 @@ import {
   ArrowRight01Icon,
   ArrowUp01Icon,
   CheckmarkCircle01Icon,
+  Copy01Icon,
+  Delete02Icon,
   Download01Icon,
+  File01Icon,
+  FileDiffIcon,
   FolderCloudIcon,
   FolderGitTwoIcon,
+  FolderOpenIcon,
   GitBranchIcon,
+  Link01Icon,
   MinusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
@@ -546,7 +552,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           <button
             type="button"
             onClick={() => onOpenGitGraph()}
-            className="group flex shrink-0 cursor-pointer items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+            className="group flex shrink-0 items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
           >
             <HugeiconsIcon
               icon={GitBranchIcon}
@@ -646,7 +652,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   <TooltipTrigger asChild>
                     <Button
                       size="xs"
-                      className="h-7 cursor-pointer text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
+                      className="h-7 text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
                       disabled={!canCommit}
                       onClick={() => void scm.commit()}
                     >
@@ -668,7 +674,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                     <Button
                       size="xs"
                       variant="secondary"
-                      className="h-7 cursor-pointer text-[11.5px] font-medium disabled:cursor-not-allowed"
+                      className="h-7 text-[11.5px] font-medium disabled:cursor-not-allowed"
                       disabled={!scm.canPush || !!scm.actionBusy}
                       onClick={() => void scm.push()}
                     >
@@ -903,7 +909,7 @@ function StagedSectionHeader({
     <div
       role="button"
       tabIndex={-1}
-      className="group flex h-[30px] cursor-pointer select-none items-center gap-2 px-2 hover:bg-accent/20"
+      className="group flex h-[30px] select-none items-center gap-2 px-2 hover:bg-accent/20"
       onClick={onToggleStagedCollapsed}
     >
       <HugeiconsIcon
@@ -951,7 +957,7 @@ function ChangesSectionHeader({
     <div
       role="button"
       tabIndex={-1}
-      className="group flex h-[30px] cursor-pointer select-none items-center gap-2 px-2 hover:bg-accent/20"
+      className="group flex h-[30px] select-none items-center gap-2 px-2 hover:bg-accent/20"
       onClick={onToggleChangesCollapsed}
     >
       <HugeiconsIcon
@@ -1016,6 +1022,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
   const isBusy = actionBusy === `unstage:${entry.path}`;
   const disabled = actionBusy !== null;
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
+  const previewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
   const statusHex = gitStatusHexColor(entry.statusCode as GitStatusCode, gitColorScheme);
   const absolutePath = repoRoot
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
@@ -1053,8 +1060,9 @@ const StagedEntryRow = memo(function StagedEntryRow({
           />
           <button
             type="button"
-            onClick={() => { onFocusRow(row.key); void onSelectEntry(entry); }}
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+            onClick={() => { onFocusRow(row.key); if (previewOnClick) void onSelectEntry(entry); }}
+            onDoubleClick={() => { if (!previewOnClick) void onSelectEntry(entry); }}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
             {iconUrl ? (
               <img src={iconUrl} alt="" className="size-4 shrink-0" />
@@ -1109,10 +1117,12 @@ const StagedEntryRow = memo(function StagedEntryRow({
           className={COMPACT_ITEM}
           onSelect={() => { onFocusRow(row.key); void onSelectEntry(entry); }}
         >
+          <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />
           Open Diff
         </ContextMenuItem>
         {!isDeleted && onOpenFile && absolutePath ? (
           <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenFile(absolutePath)}>
+            <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open File
           </ContextMenuItem>
         ) : null}
@@ -1122,6 +1132,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
           disabled={disabled}
           onSelect={() => void onUnstageEntry(entry)}
         >
+          <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
           Unstage
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -1129,6 +1140,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"))}
         >
+          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
         </ContextMenuItem>
         {absolutePath ? (
@@ -1136,6 +1148,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
             className={COMPACT_ITEM}
             onSelect={() => void copyToClipboard(absolutePath)}
           >
+            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
             Copy Absolute Path
           </ContextMenuItem>
         ) : null}
@@ -1146,6 +1159,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
               className={COMPACT_ITEM}
               onSelect={() => void revealInFinder(absolutePath)}
             >
+              <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
               {revealLabel}
             </ContextMenuItem>
           </>
@@ -1180,6 +1194,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
   const disabled = actionBusy !== null;
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
+  const previewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
   const statusHex = gitStatusHexColor(entry.statusCode as GitStatusCode, gitColorScheme);
   const absolutePath = repoRoot
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
@@ -1217,8 +1232,9 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           />
           <button
             type="button"
-            onClick={() => { onFocusRow(row.key); void onSelectEntry(entry); }}
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+            onClick={() => { onFocusRow(row.key); if (previewOnClick) void onSelectEntry(entry); }}
+            onDoubleClick={() => { if (!previewOnClick) void onSelectEntry(entry); }}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
             {iconUrl ? (
               <img src={iconUrl} alt="" className="size-4 shrink-0" />
@@ -1285,10 +1301,12 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           className={COMPACT_ITEM}
           onSelect={() => { onFocusRow(row.key); void onSelectEntry(entry); }}
         >
+          <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />
           Open Diff
         </ContextMenuItem>
         {!isDeleted && onOpenFile && absolutePath ? (
           <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenFile(absolutePath)}>
+            <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open File
           </ContextMenuItem>
         ) : null}
@@ -1298,6 +1316,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           disabled={disabled}
           onSelect={() => void onStageEntry(entry)}
         >
+          <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
           Stage
         </ContextMenuItem>
         <ContextMenuItem
@@ -1306,6 +1325,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           disabled={disabled}
           onSelect={() => onDiscardEntry(entry)}
         >
+          <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
           Discard Changes
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -1313,6 +1333,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"))}
         >
+          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
         </ContextMenuItem>
         {absolutePath ? (
@@ -1320,6 +1341,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
             className={COMPACT_ITEM}
             onSelect={() => void copyToClipboard(absolutePath)}
           >
+            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
             Copy Absolute Path
           </ContextMenuItem>
         ) : null}
@@ -1330,6 +1352,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
               className={COMPACT_ITEM}
               onSelect={() => void revealInFinder(absolutePath)}
             >
+              <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
               {revealLabel}
             </ContextMenuItem>
           </>
@@ -1358,7 +1381,7 @@ function IconActionButton({
         <Button
           size="icon-sm"
           variant="ghost"
-          className="size-6 p-3 cursor-pointer rounded-md text-muted-foreground hover:text-foreground disabled:cursor-not-allowed"
+          className="size-6 p-3 rounded-md text-muted-foreground hover:text-foreground disabled:cursor-not-allowed"
           aria-label={label}
           disabled={disabled}
           onClick={onClick}

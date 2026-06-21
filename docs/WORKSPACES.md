@@ -50,7 +50,7 @@ edge) lists workspaces; clicking switches `activeWorkspaceId`.
 
 ```
 WorkspaceDndProvider    — DndContext wrapper; owns all drag state, handlers, and DragOverlay
-  ├── Explorer panel    — TreeRow uses useDraggable for file drag (files only, not directories)
+  ├── Explorer panel    — TreeRow uses useDraggable for file and folder drag (files open editors, folders open terminals)
   └── WorkspaceView     — one per active+inactive workspace (absolute inset-0)
         └── SplitNodeView     — recursive: renders split groups as ResizablePanelGroup, leaves as PaneView
               └── PaneView    — one pane: tab bar + panel content area + drag drop zones
@@ -272,15 +272,23 @@ type DraggingItem =
   Drag-drop splits are also blocked when the workspace already has `workspacePaneLimit` panes
   (configurable in `kex-settings.json`, default `8`).
 - `DragOverlay` (`WorkspaceDndProvider.tsx`): lightweight floating chip showing panel icon + title
-  for tab drags, or a file icon + basename for file drags. `dropAnimation: null` to avoid fighting
-  the layout reflow on drop.
-- `TreeRow` (`explorer/TreeRow.tsx`): `useDraggable({ id: 'file:<path>' })` — only enabled for
-  files, not directories. Applies `opacity-50` during drag, same as `DraggableTab`.
+  for tab drags, or a file/folder icon + basename for file drags. `dropAnimation: null` to avoid
+  fighting the layout reflow on drop.
+- `TreeRow` (`explorer/TreeRow.tsx`): `useDraggable({ id: 'file:<path>' })` for files and
+  `'dir:<path>'` for directories. The synthetic `FsRootRow` and `FsUpRow` (the File System root
+  header and the ".." row) drag as `'dir-pane:<path>'` (root path / parent dir). Applies
+  `opacity-50` during drag, same as `DraggableTab`.
 
 ### Drop resolution (`handleDragEnd` in `WorkspaceDndProvider.tsx`)
 
-The handler first classifies the drag by the `active.id` prefix: `file:` means a file drag from
-the explorer; any other ID is a panel (tab) drag.
+The handler first classifies the drag by the `active.id` prefix: `file:` (file), `dir:` (folder),
+and `dir-pane:` (the synthetic root / ".." rows, treated as a folder) are explorer drags routed to
+`handleFileDragEnd`; any other ID is a panel (tab) drag. The panel opened for an explorer drag comes
+from `panelForDroppedPath(path, isDir)` (pure, in `dropPanel.ts`): a folder yields a `terminal`
+panel rooted at that cwd (matching the explorer's "Open in Terminal"), a file yields an `editor`
+panel. `dir-pane:` drags set `draggingItem.paneOnly`, which excludes them from the internal explorer
+move targets (`explorer-dir:` / `explorer-file:`) so the root and ".." rows can only open a terminal
+in a pane, never move files within the tree.
 
 **Panel drag** — two zone ID formats:
 
@@ -297,19 +305,21 @@ the explorer; any other ID is a panel (tab) drag.
 - directional zones: `splitPaneAndPlace(sourceWorkspaceId, targetPaneId, direction, panelId)` —
   splits the target pane and places the dragged panel in the new half
 
-**File drag** — the handler checks whether a panel with that path is already open in the active
-workspace. If it is, the existing panel is treated as a panel drag (move/reorder) so the tab moves
-to the drop location. If it is not open:
+**File drag** — for a file, the handler checks whether an editor with that path is already open in
+the active workspace. If it is, the existing panel is treated as a panel drag (move/reorder) so the
+tab moves to the drop location. Folder drags always open a fresh terminal (no reuse). When no panel
+is reused:
 
 | Drop target | Action |
 |---|---|
-| `zone:<paneId>:center` | `openPanel(wsId, paneId, editorPanel)` — appends permanent editor tab |
-| `tab-insert:<panelId>:before\|after` | `openPanel(wsId, paneId, editorPanel, index)` — inserts at position |
-| `zone:<paneId>:top\|bottom\|left\|right` | `splitPaneAndOpenFile(wsId, paneId, dir, path)` — splits pane, opens file in new sub-pane |
+| `zone:<paneId>:center` | `openPanel(wsId, paneId, panel)` — appends permanent tab |
+| `tab-insert:<panelId>:before\|after` | `openPanel(wsId, paneId, panel, index)` — inserts at position |
+| `zone:<paneId>:top\|bottom\|left\|right` | `splitPaneAndOpenPanel(wsId, paneId, dir, panel)` — splits pane, opens panel in new sub-pane |
 
-All file-drag panels have `preview: false` (permanent tab) because the drag is an explicit intent.
-`splitPaneAndOpenFile` uses `splitPaneAndInsertPanel` (pure function in `splitNode.ts`) to perform
-the split and new-panel insertion atomically in a single state update.
+`panel` is the editor or terminal produced by `panelForDroppedPath`. Editor panels have
+`preview: false` (permanent tab) because the drag is an explicit intent. `splitPaneAndOpenPanel`
+uses `splitPaneAndInsertPanel` (pure function in `splitNode.ts`) to perform the split and new-panel
+insertion atomically in a single state update.
 
 Both zone types coexist. Tab-border zones take priority when the pointer is over a tab bar (they are
 physically smaller and registered on top). Pane zones handle the content area and pane borders.

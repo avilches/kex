@@ -608,7 +608,7 @@ export function GitHistoryPane({
                   <Button
                     size="xs"
                     variant="ghost"
-                    className="h-6 cursor-pointer text-[11px]"
+                    className="h-6 text-[11px]"
                     onClick={() => void loadMore()}
                   >
                     Retry
@@ -711,7 +711,7 @@ const CommitRow = memo(function CommitRow({
       type="button"
       onClick={(event) => onClick(commit.sha, event)}
       className={cn(
-        "group relative grid h-full w-full cursor-pointer items-center gap-3 border-l-2 border-transparent pr-3 text-left transition-colors",
+        "group relative grid h-full w-full items-center gap-3 border-l-2 border-transparent pr-3 text-left transition-colors",
         active ? "border-l-primary/70 bg-accent/45" : "hover:bg-accent/25",
       )}
       style={{ gridTemplateColumns: gridTemplate }}
@@ -866,7 +866,7 @@ function CommitDetail({
           <Button
             size="xs"
             variant="ghost"
-            className="h-6 cursor-pointer gap-1.5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+            className="h-6 gap-1.5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => {
               void onCopySha(commit.sha);
               setCopied(true);
@@ -879,7 +879,7 @@ function CommitDetail({
             <Button
               size="xs"
               variant="ghost"
-              className="h-6 cursor-pointer gap-1.5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+              className="h-6 gap-1.5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
               onClick={() => void openUrl(webUrl).catch(console.error)}
             >
               <HugeiconsIcon
@@ -934,7 +934,7 @@ function CommitFiles({
         <Button
           size="xs"
           variant="ghost"
-          className="h-6 cursor-pointer text-[11px]"
+          className="h-6 text-[11px]"
           onClick={onRetry}
         >
           Retry
@@ -987,7 +987,7 @@ const FileRow = memo(function FileRow({
     <button
       type="button"
       onClick={onOpen}
-      className="group flex h-7 w-full cursor-pointer items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-accent/40"
+      className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-accent/40"
     >
       {iconUrl ? (
         <img src={iconUrl} alt="" className="size-3.5 shrink-0" />

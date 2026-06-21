@@ -21,7 +21,6 @@ import {
   Link01Icon,
   PinIcon,
   Refresh01Icon,
-  SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useEffect, useState } from "react";
@@ -43,7 +42,7 @@ export type RowActions = {
   beginRename: (path: string) => void;
   commitRename: (newName: string) => void | Promise<void>;
   cancelRename: () => void;
-  beginCreate: (parentPath: string, kind: "file" | "dir") => void;
+  beginCreate: (parentPath: string, kind: "file" | "dir", afterPath?: string) => void;
   beginDuplicate: (sourcePath: string, kind: "file" | "dir") => void;
   deletePath: (path: string) => Promise<void>;
 };
@@ -67,7 +66,6 @@ export type EntryRowProps = {
   onSelectPath: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
   onEnterFolder?: (path: string) => void;
   editorPreviewOnClick: boolean;
@@ -93,7 +91,6 @@ function EntryRowImpl(props: EntryRowProps) {
     onSelectPath,
     onRevealInTerminal,
     onNewWorkspaceFromFolder,
-    onAttachToAgent,
     onSetAsRoot,
     onEnterFolder,
     editorPreviewOnClick,
@@ -101,10 +98,11 @@ function EntryRowImpl(props: EntryRowProps) {
 
   const [isConfirming, setIsConfirming] = useState(false);
   const { draggingItem } = useWorkspaceDnd();
-  const dragSource = draggingItem?.kind === "file" ? draggingItem.path : null;
+  const dragSource =
+    draggingItem?.kind === "file" && !draggingItem.paneOnly ? draggingItem.path : null;
 
-  // Files drag as `file:` (also openable in a pane); folders as `dir:` (move
-  // only, the workspace dnd ignores them for pane opening).
+  // Files drag as `file:`, folders as `dir:`. Both can be dropped on a pane
+  // (file opens an editor, folder opens a terminal) or moved within the tree.
   const {
     attributes,
     listeners,
@@ -164,7 +162,8 @@ function EntryRowImpl(props: EntryRowProps) {
   }, [isOver, isValidDropTarget, isExpanded, actions, path]);
 
   const iconUrl = isDir ? folderIconUrl(name, isExpanded) : fileIconUrl(name);
-  const createTarget = isDir ? path : pathDirname(path) || rootPath;
+  const createParent = isDir ? path : pathDirname(path) || rootPath;
+  const createAfterPath = isDir ? undefined : path;
   const paddingLeft = 6 + depth * 12;
 
   const handleClick = () => {
@@ -205,7 +204,7 @@ function EntryRowImpl(props: EntryRowProps) {
               else onOpenFile(path, true);
             }}
             className={cn(
-              "group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] transition-colors hover:bg-accent/70",
+              "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] transition-colors hover:bg-accent/70",
               isSelected
                 ? "bg-accent text-foreground"
                 : gitignored
@@ -316,14 +315,14 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => actions.beginCreate(createTarget, "file")}
+          onSelect={() => actions.beginCreate(createParent, "file", createAfterPath)}
         >
           <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
           New File
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => actions.beginCreate(createTarget, "dir")}
+          onSelect={() => actions.beginCreate(createParent, "dir", createAfterPath)}
         >
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
           New Folder
@@ -349,14 +348,6 @@ function EntryRowImpl(props: EntryRowProps) {
         >
           <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => onAttachToAgent?.(path)}
-        >
-          <HugeiconsIcon icon={SparklesIcon} size={14} strokeWidth={2} />
-          Attach to Agent
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -443,17 +434,31 @@ export function FsRootRow({
   onBeginCreate,
   onRefresh,
 }: FsRootRowProps) {
+  // Drags only to open a terminal in a pane (`dir-pane:`), never an internal
+  // explorer move. The workspace dnd treats it like a folder; the explorer
+  // move logic ignores it (paneOnly).
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `dir-pane:${path}`,
+    data: { path },
+  });
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
-          className="flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]"
+          ref={setNodeRef}
+          {...listeners}
+          {...attributes}
+          className={cn(
+            "flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
+            isDragging && "opacity-50",
+          )}
           style={{ paddingLeft: 6 }}
           title={path}
         >
           <img
             src={folderIconUrl("", true)}
             alt=""
+            draggable={false}
             className="size-4 shrink-0"
           />
           <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
@@ -543,17 +548,39 @@ export function FsRootRow({
   );
 }
 
-export function FsUpRow({ onNavigateUp }: { onNavigateUp?: () => void }) {
+export function FsUpRow({
+  path,
+  onNavigateUp,
+}: {
+  path: string;
+  onNavigateUp?: () => void;
+}) {
+  // Same as FsRootRow: drag opens a terminal at the parent dir, no internal move.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `dir-pane:${path}`,
+    data: { path },
+  });
   return (
     <button
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
       type="button"
       onDoubleClick={() => onNavigateUp?.()}
       title="Double-click to go up one folder"
-      className="group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70"
+      className={cn(
+        "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
+        isDragging && "opacity-50",
+      )}
       style={{ paddingLeft: 6 }}
     >
       <span className="size-3.5 shrink-0" />
-      <img src={folderIconUrl("", false)} alt="" className="size-4 shrink-0" />
+      <img
+        src={folderIconUrl("", false)}
+        alt=""
+        draggable={false}
+        className="size-4 shrink-0"
+      />
       <span className="min-w-0 flex-1 truncate">..</span>
     </button>
   );

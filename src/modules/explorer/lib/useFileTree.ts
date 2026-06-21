@@ -33,6 +33,7 @@ type TreeState = Record<string, ChildrenState>;
 export type PendingCreate = {
   parentPath: string;
   kind: "file" | "dir";
+  afterPath?: string;
 };
 
 export type PendingDuplicate = {
@@ -318,10 +319,10 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   // --- mutations ---
 
   const beginCreate = useCallback(
-    (parentPath: string, kind: "file" | "dir") => {
+    (parentPath: string, kind: "file" | "dir", afterPath?: string) => {
       setRenaming(null);
       setPendingDuplicate(null);
-      setPendingCreate({ parentPath, kind });
+      setPendingCreate({ parentPath, kind, afterPath });
       // Ensure the parent is expanded so the input row is visible.
       if (rootPath && parentPath !== rootPath) {
         setExpanded((curr) => {
