@@ -1290,6 +1290,29 @@ export default function App() {
     [],
   );
 
+  const showRightPanelTab = useCallback(
+    (tab: "explorer" | "git" | "history") => {
+      const state = usePreferencesStore.getState();
+      if (!state.rightPanelOpen) {
+        void setRightPanelOpen(true);
+      }
+      void setRightPanelActiveTab(tab);
+    },
+    [],
+  );
+
+  const showExplorerWithMode = useCallback(
+    (mode: ExplorerRootMode) => {
+      const state = usePreferencesStore.getState();
+      if (!state.rightPanelOpen) {
+        void setRightPanelOpen(true);
+      }
+      void setRightPanelActiveTab("explorer");
+      handleChangeRootMode(mode);
+    },
+    [handleChangeRootMode],
+  );
+
   const allPanelsFlat = useMemo(() => {
     const panels: Panel[] = [];
     for (const ws of workspaces) {
@@ -1553,7 +1576,14 @@ export default function App() {
       "pane.focusDown": () => focusPaneInDirection("down"),
       "pane.focusLeft": () => focusPaneInDirection("left"),
       "pane.focusRight": () => focusPaneInDirection("right"),
-      "pane.source": () => navigateRightPanelTo("explorer"),
+      "sidebar.toggle": toggleRightPanel,
+      "sidebar.showExplorer": () => showRightPanelTab("explorer"),
+      "sidebar.showGit": () => showRightPanelTab("git"),
+      "sidebar.showHistory": () => showRightPanelTab("history"),
+      "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
+      "explorer.viewPinned": () => showExplorerWithMode("pinned"),
+      "explorer.viewTerminal": () => showExplorerWithMode("terminal"),
+      "explorer.viewGit": () => showExplorerWithMode("git"),
       "explorer.search": () => {
         const state = usePreferencesStore.getState();
         if (state.rightPanelOpen && state.rightPanelActiveTab === "explorer") {
@@ -1574,7 +1604,6 @@ export default function App() {
       "blocks.next": () => navigateFocusedBlocks(1),
       "search.focus": () => searchInlineRef.current?.focus(),
       "settings.open": () => void openSettingsWindow(),
-      "rightPanel.toggle": () => navigateRightPanelTo("git"),
       "notifications.toggle": () => useBellStore.getState().toggle(),
       "window.new": () => void native.openMainWindow(),
       "workspace.prev": () => cycleWorkspace(-1),
@@ -1662,6 +1691,9 @@ export default function App() {
       zoomIn,
       zoomOut,
       zoomReset,
+      toggleRightPanel,
+      showRightPanelTab,
+      showExplorerWithMode,
     ],
   );
 
@@ -1762,13 +1794,13 @@ export default function App() {
         toggleRightPanel();
         break;
       case "toggle_explorer":
-        navigateRightPanelTo("explorer");
+        showRightPanelTab("explorer");
         break;
       case "toggle_git":
-        navigateRightPanelTo("git");
+        showRightPanelTab("git");
         break;
       case "toggle_history":
-        navigateRightPanelTo("history");
+        showRightPanelTab("history");
         break;
       case "toggle_panel_side":
         void setPanelSide(

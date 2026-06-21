@@ -185,7 +185,6 @@ export function createCommandItems(
       group: "Git",
       keywords: ["git", "source control", "changes", "staging", "diff"],
       icon: SourceCodeIcon,
-      shortcutId: "rightPanel.toggle",
       run: ctx.toggleSourceControl,
     },
     {
@@ -232,7 +231,7 @@ export function createCommandItems(
       group: "View",
       keywords: ["sidebar", "panel", "right", "toggle"],
       icon: SidebarLeftIcon,
-      shortcutId: "rightPanel.toggle",
+      shortcutId: "sidebar.toggle",
       run: ctx.toggleSidebar,
     },
   ];
