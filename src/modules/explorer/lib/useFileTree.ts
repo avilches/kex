@@ -372,6 +372,16 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       }
       setRenaming(null);
       setPendingCreate(null);
+      // Collapse the folder first so the name input lands cleanly below the
+      // folder row instead of between it and its children.
+      if (kind === "dir") {
+        setExpanded((curr) => {
+          if (!curr.has(sourcePath)) return curr;
+          const next = new Set(curr);
+          next.delete(sourcePath);
+          return next;
+        });
+      }
       const parts = sourcePath.split(/[\\/]/);
       const baseName = parts[parts.length - 1] ?? sourcePath;
       const parentPath = sourcePath.slice(
