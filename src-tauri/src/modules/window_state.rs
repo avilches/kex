@@ -1,9 +1,14 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::RwLock;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+/// Disk schema version for the index file. Bumped when the on-disk layout
+/// changes in an incompatible way (a mismatching/older file fails to parse and
+/// the app starts fresh).
+const INDEX_VERSION: u32 = 2;
 
 /// Size in PHYSICAL pixels (from `inner_size()`). Position is intentionally not
 /// persisted — reliable cross-monitor restore of position on macOS is unsolved.
@@ -50,51 +55,248 @@ struct WindowStateFile {
     focused_window: Option<String>,
 }
 
+/// On-disk index entry: window geometry plus the ordered ids of its workspaces.
+/// The heavyweight workspace bodies live in `workspaces/<id>.json` so a single
+/// workspace change only rewrites one small file.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IndexEntry {
+    #[serde(flatten)]
+    geometry: WindowGeometry,
+    workspace_ids: Vec<String>,
+    active_index: usize,
+}
+
+/// On-disk index file (`workspaces.json`). `BTreeMap` so serialization is
+/// deterministic and the unchanged-write skip in `save` is reliable.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IndexFile {
+    version: u32,
+    windows: BTreeMap<String, IndexEntry>,
+    window_order: Vec<String>,
+    focused_window: Option<String>,
+}
+
+/// Tracks what is already on disk so `save` only rewrites what changed.
+#[derive(Default)]
+struct DiskCache {
+    /// workspace id -> last serialized body written.
+    written: HashMap<String, String>,
+    /// last serialized index file written.
+    written_index: Option<String>,
+}
+
+/// Workspace ids are used verbatim as filenames; reject anything that could
+/// escape the workspaces directory or otherwise be an unsafe path component.
+fn is_safe_id(id: &str) -> bool {
+    !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// Atomic write: `.tmp` then rename so a crash can't leave a half-written file.
+fn write_atomic(path: &Path, content: &str) -> bool {
+    let tmp = path.with_extension("json.tmp");
+    if std::fs::write(&tmp, content).is_err() {
+        return false;
+    }
+    std::fs::rename(&tmp, path).is_ok()
+}
+
 pub struct WindowStateManager {
     inner: RwLock<WindowStateFile>,
+    /// Path of the index file (`workspaces.json`).
     path: PathBuf,
+    disk: Mutex<DiskCache>,
 }
 
 impl WindowStateManager {
     pub fn new(path: PathBuf) -> Self {
-        Self { inner: RwLock::new(WindowStateFile::default()), path }
+        Self {
+            inner: RwLock::new(WindowStateFile::default()),
+            path,
+            disk: Mutex::new(DiskCache::default()),
+        }
     }
 
-    /// Returns true if the file was loaded successfully.
+    /// Directory holding the per-workspace bodies, alongside the index file.
+    fn workspaces_dir(&self) -> PathBuf {
+        self.path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default()
+            .join("workspaces")
+    }
+
+    /// Delete any `*.json` / leftover `*.tmp` in the workspaces dir whose id is
+    /// not referenced by the index. Recovers space after crashes mid-write.
+    fn gc_orphans(ws_dir: &Path, referenced: &HashSet<String>) {
+        let Ok(rd) = std::fs::read_dir(ws_dir) else { return };
+        for entry in rd.flatten() {
+            let path = entry.path();
+            let ext = path.extension().and_then(|e| e.to_str());
+            if ext == Some("tmp") {
+                let _ = std::fs::remove_file(&path);
+                continue;
+            }
+            if ext != Some("json") {
+                continue;
+            }
+            let keep = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .map(|stem| referenced.contains(stem))
+                .unwrap_or(false);
+            if !keep {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+
+    /// Returns true if the index was loaded successfully. Reconstructs each
+    /// window's full workspace array from `workspaces/<id>.json`, and deletes
+    /// any orphan body files no longer referenced.
     pub fn load(&self) -> bool {
         log::debug!("[window-state] loading from {}", self.path.display());
+        let ws_dir = self.workspaces_dir();
         let Ok(content) = std::fs::read_to_string(&self.path) else {
-            log::debug!("[window-state] file not found or unreadable - starting fresh");
+            log::debug!("[window-state] index not found or unreadable - starting fresh");
+            Self::gc_orphans(&ws_dir, &HashSet::new());
             return false;
         };
-        let Ok(state) = serde_json::from_str::<WindowStateFile>(&content) else {
-            log::warn!("[window-state] file corrupt or wrong schema - starting fresh");
+        let Ok(index) = serde_json::from_str::<IndexFile>(&content) else {
+            log::warn!("[window-state] index corrupt or wrong schema - starting fresh");
+            Self::gc_orphans(&ws_dir, &HashSet::new());
             return false;
+        };
+
+        let mut windows: HashMap<String, WindowEntry> = HashMap::new();
+        let mut referenced: HashSet<String> = HashSet::new();
+        let mut written: HashMap<String, String> = HashMap::new();
+        for (label, ie) in &index.windows {
+            let mut bodies: Vec<Value> = Vec::new();
+            for id in &ie.workspace_ids {
+                if !is_safe_id(id) {
+                    log::warn!("[window-state] skipping unsafe workspace id: {id:?}");
+                    continue;
+                }
+                let file = ws_dir.join(format!("{id}.json"));
+                let Ok(raw) = std::fs::read_to_string(&file) else {
+                    log::warn!("[window-state] workspace body missing for id {id}");
+                    continue;
+                };
+                let Ok(body) = serde_json::from_str::<Value>(&raw) else {
+                    log::warn!("[window-state] workspace body corrupt for id {id}");
+                    continue;
+                };
+                referenced.insert(id.clone());
+                if let Ok(norm) = serde_json::to_string_pretty(&body) {
+                    written.insert(id.clone(), norm);
+                }
+                bodies.push(body);
+            }
+            windows.insert(
+                label.clone(),
+                WindowEntry {
+                    geometry: ie.geometry.clone(),
+                    workspaces: Value::Array(bodies),
+                    active_index: ie.active_index,
+                },
+            );
+        }
+
+        Self::gc_orphans(&ws_dir, &referenced);
+
+        let state = WindowStateFile {
+            version: index.version,
+            windows,
+            window_order: index.window_order,
+            focused_window: index.focused_window,
         };
         log::debug!(
             "[window-state] loaded {} window(s): {:?}",
             state.window_order.len(),
             state.window_order
         );
+        {
+            let mut disk = self.disk.lock().expect("disk cache lock poisoned");
+            disk.written = written;
+            disk.written_index = Some(content);
+        }
         *self.inner.write().expect("window state lock poisoned") = state;
         true
     }
 
-    /// Atomic write: .tmp then rename so crashes can't corrupt the file.
+    /// Writes only what changed: a `workspaces/<id>.json` per modified workspace
+    /// plus the small index file, then deletes bodies no longer referenced.
+    /// Each file is written atomically (`.tmp` then rename).
     pub fn save(&self) {
         let state = self.inner.read().expect("window state lock poisoned").clone();
-        let Ok(json) = serde_json::to_string_pretty(&state) else { return };
-        let tmp = self.path.with_extension("json.tmp");
-        if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if std::fs::write(&tmp, json).is_ok() {
-            let _ = std::fs::rename(&tmp, &self.path);
-            log::debug!(
-                "[window-state] saved - windows: {:?}",
-                state.window_order
+        let ws_dir = self.workspaces_dir();
+        let _ = std::fs::create_dir_all(&ws_dir);
+
+        let mut disk = self.disk.lock().expect("disk cache lock poisoned");
+
+        let mut referenced: HashSet<String> = HashSet::new();
+        let mut index_windows: BTreeMap<String, IndexEntry> = BTreeMap::new();
+        for (label, entry) in &state.windows {
+            let mut ids: Vec<String> = Vec::new();
+            if let Some(bodies) = entry.workspaces.as_array() {
+                for body in bodies {
+                    let Some(id) = body.get("id").and_then(Value::as_str) else {
+                        log::warn!("[window-state] skipping workspace without string id");
+                        continue;
+                    };
+                    if !is_safe_id(id) {
+                        log::warn!("[window-state] skipping unsafe workspace id: {id:?}");
+                        continue;
+                    }
+                    ids.push(id.to_string());
+                    referenced.insert(id.to_string());
+                    let Ok(json) = serde_json::to_string_pretty(body) else { continue };
+                    if disk.written.get(id) != Some(&json)
+                        && write_atomic(&ws_dir.join(format!("{id}.json")), &json)
+                    {
+                        disk.written.insert(id.to_string(), json);
+                    }
+                }
+            }
+            index_windows.insert(
+                label.clone(),
+                IndexEntry {
+                    geometry: entry.geometry.clone(),
+                    workspace_ids: ids,
+                    active_index: entry.active_index,
+                },
             );
         }
+
+        let index = IndexFile {
+            version: INDEX_VERSION,
+            windows: index_windows,
+            window_order: state.window_order.clone(),
+            focused_window: state.focused_window.clone(),
+        };
+        if let Ok(index_json) = serde_json::to_string_pretty(&index) {
+            if disk.written_index.as_deref() != Some(index_json.as_str())
+                && write_atomic(&self.path, &index_json)
+            {
+                disk.written_index = Some(index_json);
+            }
+        }
+
+        // Drop bodies that are no longer referenced by any window.
+        let stale: Vec<String> = disk
+            .written
+            .keys()
+            .filter(|id| !referenced.contains(*id))
+            .cloned()
+            .collect();
+        for id in stale {
+            let _ = std::fs::remove_file(ws_dir.join(format!("{id}.json")));
+            disk.written.remove(&id);
+        }
+
+        log::debug!("[window-state] saved - windows: {:?}", state.window_order);
     }
 
     pub fn window_order(&self) -> Vec<String> {
@@ -238,5 +440,142 @@ mod tests {
         let mgr = WindowStateManager::new(dir.path().join("state.json"));
         mgr.update_geometry("w-ghost", 100, 100, false);
         assert!(mgr.get_entry("w-ghost").is_none());
+    }
+
+    #[test]
+    fn save_writes_one_file_per_workspace_and_a_lean_index() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let mgr = WindowStateManager::new(path.clone());
+        mgr.add_window("w-1".to_string());
+        mgr.update_workspace(
+            "w-1",
+            serde_json::json!([{"id": "ws-aaa", "title": "A"}, {"id": "ws-bbb", "title": "B"}]),
+            1,
+        );
+        mgr.save();
+
+        let ws_dir = dir.path().join("workspaces");
+        assert!(ws_dir.join("ws-aaa.json").exists());
+        assert!(ws_dir.join("ws-bbb.json").exists());
+
+        // The index references ids only; bodies are not inlined.
+        let index = std::fs::read_to_string(&path).unwrap();
+        assert!(index.contains("ws-aaa"));
+        assert!(index.contains("workspaceIds"));
+        assert!(!index.contains("\"title\""));
+    }
+
+    #[test]
+    fn reload_reconstructs_full_workspaces() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let mgr = WindowStateManager::new(path.clone());
+        mgr.add_window("w-1".to_string());
+        let body = serde_json::json!([{"id": "ws-aaa", "title": "A", "paneTree": {"k": 1}}]);
+        mgr.update_workspace("w-1", body.clone(), 0);
+        mgr.save();
+
+        let mgr2 = WindowStateManager::new(path);
+        assert!(mgr2.load());
+        assert_eq!(mgr2.get_entry("w-1").unwrap().workspaces, body);
+    }
+
+    #[test]
+    fn boot_gc_removes_unreferenced_body_files() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let mgr = WindowStateManager::new(path.clone());
+        mgr.add_window("w-1".to_string());
+        mgr.update_workspace("w-1", serde_json::json!([{"id": "ws-keep"}]), 0);
+        mgr.save();
+
+        // Simulate a crash leaving an orphan body behind.
+        let ws_dir = dir.path().join("workspaces");
+        std::fs::write(ws_dir.join("ws-orphan.json"), "{\"id\":\"ws-orphan\"}").unwrap();
+
+        let mgr2 = WindowStateManager::new(path);
+        assert!(mgr2.load());
+        assert!(ws_dir.join("ws-keep.json").exists());
+        assert!(!ws_dir.join("ws-orphan.json").exists());
+    }
+
+    #[test]
+    fn save_deletes_body_when_workspace_is_removed() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let ws_dir = dir.path().join("workspaces");
+        let mgr = WindowStateManager::new(path);
+        mgr.add_window("w-1".to_string());
+        mgr.update_workspace(
+            "w-1",
+            serde_json::json!([{"id": "ws-aaa"}, {"id": "ws-bbb"}]),
+            0,
+        );
+        mgr.save();
+        assert!(ws_dir.join("ws-bbb.json").exists());
+
+        mgr.update_workspace("w-1", serde_json::json!([{"id": "ws-aaa"}]), 0);
+        mgr.save();
+        assert!(ws_dir.join("ws-aaa.json").exists());
+        assert!(!ws_dir.join("ws-bbb.json").exists());
+    }
+
+    #[test]
+    fn load_skips_missing_and_corrupt_bodies() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let mgr = WindowStateManager::new(path.clone());
+        mgr.add_window("w-1".to_string());
+        mgr.update_workspace(
+            "w-1",
+            serde_json::json!([{"id": "ws-good"}, {"id": "ws-bad"}]),
+            0,
+        );
+        mgr.save();
+
+        let ws_dir = dir.path().join("workspaces");
+        std::fs::write(ws_dir.join("ws-bad.json"), "{ not json").unwrap();
+
+        let mgr2 = WindowStateManager::new(path);
+        assert!(mgr2.load());
+        let entry = mgr2.get_entry("w-1").unwrap();
+        assert_eq!(entry.workspaces, serde_json::json!([{"id": "ws-good"}]));
+    }
+
+    #[test]
+    fn save_rejects_unsafe_workspace_ids() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let ws_dir = dir.path().join("workspaces");
+        let mgr = WindowStateManager::new(path);
+        mgr.add_window("w-1".to_string());
+        mgr.update_workspace(
+            "w-1",
+            serde_json::json!([{"id": "../escape"}, {"id": "ws-ok"}]),
+            0,
+        );
+        mgr.save();
+        assert!(ws_dir.join("ws-ok.json").exists());
+        // No traversal: nothing written outside the workspaces dir.
+        assert!(!dir.path().join("escape.json").exists());
+    }
+
+    #[test]
+    fn old_monolithic_format_starts_fresh() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        // Pre-split file: bodies inlined under `workspaces`, no `workspaceIds`.
+        let legacy = serde_json::json!({
+            "version": 0,
+            "windows": { "w-1": { "width": 1280, "height": 800, "maximized": false,
+                "workspaces": [{"id": "ws-x"}], "activeIndex": 0 } },
+            "windowOrder": ["w-1"],
+            "focusedWindow": "w-1"
+        });
+        std::fs::write(&path, serde_json::to_string(&legacy).unwrap()).unwrap();
+        let mgr = WindowStateManager::new(path);
+        assert!(!mgr.load());
+        assert!(mgr.window_order().is_empty());
     }
 }
