@@ -72,7 +72,8 @@ export type Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: boolean;
 };
 
-const STORE_PATH = "kex-settings.json";
+const STORE_PATH = "settings-general.json";
+const SHORTCUTS_STORE_PATH = "settings-shortcuts.json";
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
 const KEY_EDITOR_THEME = "editorTheme";
@@ -151,7 +152,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: false,
 };
 
+// Keybindings live in their own file so reassigning a shortcut never rewrites
+// the (much larger) general settings, and vice versa.
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
+const shortcutsStore = new LazyStore(SHORTCUTS_STORE_PATH, { defaults: {}, autoSave: 200 });
 
 // LazyStore.onChange only fires within the writing process. The settings
 // page lives in a separate webview, so writes there never reach the main
@@ -165,10 +169,22 @@ async function writePref<T>(key: string, value: T): Promise<void> {
   await emit(PREFS_CHANGED_EVENT, { key, value });
 }
 
+async function writeShortcutsPref(
+  value: Record<ShortcutId, KeyBinding[]> | {},
+): Promise<void> {
+  await shortcutsStore.set(KEY_SHORTCUTS, value);
+  await shortcutsStore.save();
+  await emit(PREFS_CHANGED_EVENT, { key: KEY_SHORTCUTS, value });
+}
+
 export async function loadPreferences(): Promise<Preferences> {
-  // Single IPC roundtrip — fetching keys individually fans out to one
-  // `plugin:store|get` per setting and is the dominant boot cost.
-  const entries = await store.entries();
+  // Single IPC roundtrip for general settings — fetching keys individually
+  // fans out to one `plugin:store|get` per setting and is the dominant boot
+  // cost. Shortcuts live in their own file, fetched in parallel.
+  const [entries, shortcutsValue] = await Promise.all([
+    store.entries(),
+    shortcutsStore.get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS),
+  ]);
   const map = new Map<string, unknown>(entries);
   const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
   const result: Preferences = {
@@ -216,9 +232,7 @@ export async function loadPreferences(): Promise<Preferences> {
     agentNotifications:
       get<boolean>(KEY_AGENT_NOTIFICATIONS) ??
       DEFAULT_PREFERENCES.agentNotifications,
-    shortcuts:
-      get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS) ??
-      DEFAULT_PREFERENCES.shortcuts,
+    shortcuts: shortcutsValue ?? DEFAULT_PREFERENCES.shortcuts,
     editorAutoSave:
       get<boolean>(KEY_EDITOR_AUTO_SAVE) ??
       DEFAULT_PREFERENCES.editorAutoSave,
@@ -378,11 +392,11 @@ export async function setAgentNotifications(value: boolean): Promise<void> {
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
-  await writePref(KEY_SHORTCUTS, value);
+  await writeShortcutsPref(value);
 }
 
 export async function resetShortcuts(): Promise<void> {
-  await writePref(KEY_SHORTCUTS, DEFAULT_PREFERENCES.shortcuts);
+  await writeShortcutsPref(DEFAULT_PREFERENCES.shortcuts);
 }
 
 export async function setRightPanelOpen(value: boolean): Promise<void> {
@@ -450,6 +464,10 @@ export async function onPreferencesChange(
     const mapped = PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
+  const unsubShortcuts = await shortcutsStore.onChange<unknown>((key, value) => {
+    const mapped = PREF_KEY_MAP[key];
+    if (mapped) cb(mapped, value);
+  });
   const unsubEvent = await listen<{ key: string; value: unknown }>(
     PREFS_CHANGED_EVENT,
     (e) => {
@@ -459,6 +477,7 @@ export async function onPreferencesChange(
   );
   return () => {
     unsubLocal();
+    unsubShortcuts();
     unsubEvent();
   };
 }
