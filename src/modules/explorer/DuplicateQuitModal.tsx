@@ -44,7 +44,7 @@ export function DuplicateQuitModal() {
 
   return (
     <AlertDialog open={open}>
-      <AlertDialogContent>
+      <AlertDialogContent onEscapeKeyDown={(e) => e.stopPropagation()}>
         <AlertDialogHeader>
           <AlertDialogTitle>Duplication in progress</AlertDialogTitle>
           <AlertDialogDescription>
