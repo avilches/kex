@@ -16,6 +16,9 @@ export type ShortcutId =
   | "tab.lock"
   | "tab.focusOnExplorer"
   | "file.rename"
+  | "file.copy"
+  | "file.cut"
+  | "file.paste"
   | "tab.next"
   | "tab.prev"
   | "tab.selectByIndex"
@@ -151,6 +154,24 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Copy path",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "c" }],
+  },
+  {
+    id: "file.copy",
+    label: "Copy file",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, key: "c" }],
+  },
+  {
+    id: "file.cut",
+    label: "Cut file",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, key: "x" }],
+  },
+  {
+    id: "file.paste",
+    label: "Paste file",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, key: "v" }],
   },
   {
     id: "file.rename",
