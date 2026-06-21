@@ -18,6 +18,8 @@ import {
   Refresh01Icon,
   Search01Icon,
   Tick02Icon,
+  ViewIcon,
+  ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -58,6 +60,7 @@ import { IS_MAC } from "@/lib/platform";
 import { pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setShowHidden } from "@/modules/settings/store";
 import {
   getBindingTokens,
   matchesShortcut,
@@ -382,6 +385,7 @@ export const FileExplorer = memo(
 
     const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+    const showHidden = usePreferencesStore((s) => s.showHidden);
     const editorPreviewOnClick = usePreferencesStore(
       (s) => s.editorPreviewOnClick,
     );
@@ -967,6 +971,23 @@ export const FileExplorer = memo(
             aria-label="Search files"
           >
             <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "size-6 shrink-0 text-muted-foreground hover:text-foreground",
+              showHidden && "text-primary hover:text-primary",
+            )}
+            onClick={() => void setShowHidden(!showHidden)}
+            title={showHidden ? "Hide hidden files" : "Show hidden files"}
+            aria-label="Toggle hidden files"
+          >
+            <HugeiconsIcon
+              icon={showHidden ? ViewIcon : ViewOffSlashIcon}
+              size={13}
+              strokeWidth={2}
+            />
           </Button>
           <Button
             variant="ghost"

@@ -39,6 +39,7 @@ import {
   setPanelSide,
   setRightPanelOpen,
   setRightPanelActiveTab,
+  setShowHidden,
   setWarnOnCloseTabWithRunningProcess,
 } from "@/modules/settings/store";
 import {
@@ -1678,6 +1679,8 @@ export default function App() {
       "explorer.viewPinned": () => showExplorerWithMode("pinned"),
       "explorer.viewTerminal": () => showExplorerWithMode("terminal"),
       "explorer.viewGit": () => showExplorerWithMode("git"),
+      "explorer.toggleHidden": () =>
+        void setShowHidden(!usePreferencesStore.getState().showHidden),
       "explorer.search": () => {
         const state = usePreferencesStore.getState();
         if (state.rightPanelOpen && state.rightPanelActiveTab === "explorer") {

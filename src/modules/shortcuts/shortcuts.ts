@@ -41,6 +41,7 @@ export type ShortcutId =
   | "explorer.viewPinned"
   | "explorer.viewTerminal"
   | "explorer.viewGit"
+  | "explorer.toggleHidden"
   | "notifications.toggle"
   | "window.new"
   | "workspace.new"
@@ -148,6 +149,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Explorer: Follow Git Root",
     group: "Sidebar",
     defaultBindings: [{ ctrl: true, key: "4" }],
+  },
+  {
+    id: "explorer.toggleHidden",
+    label: "Explorer: Toggle Hidden Files",
+    group: "Sidebar",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "." }],
   },
   {
     id: "path.copy",
