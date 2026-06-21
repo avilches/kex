@@ -1312,6 +1312,7 @@ export default function App() {
       tabs: allPanelsFlat,
       activeTerminalLeafCwd: activeCwd,
       explorerRoot,
+      explorerRootMode: activeRootMode,
       launchCwd,
       launchCwdResolved,
       home,
