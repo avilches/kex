@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useDndMonitor, useDroppable } from "@dnd-kit/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -57,7 +58,12 @@ import { cn } from "@/lib/utils";
 import { pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
+import {
+  getBindingTokens,
+  matchesShortcut,
+  SHORTCUTS,
+  type ShortcutId,
+} from "@/modules/shortcuts/shortcuts";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 
@@ -104,6 +110,13 @@ const ROOT_MODES: {
   { id: "terminal", label: "Follow Terminal", icon: ComputerTerminal01Icon },
   { id: "git", label: "Follow Git Root", icon: GitBranchIcon },
 ];
+
+const MODE_SHORTCUT: Record<string, ShortcutId> = {
+  filesystem: "explorer.viewFilesystem",
+  pinned: "explorer.viewPinned",
+  terminal: "explorer.viewTerminal",
+  git: "explorer.viewGit",
+};
 
 type RootModeContext = {
   fsRootPath: string | null;
@@ -781,7 +794,7 @@ export const FileExplorer = memo(
                       strokeWidth={2}
                       className="mt-0.5 shrink-0 text-primary"
                     />
-                    <span className="flex min-w-0 flex-col">
+                    <span className="flex min-w-0 flex-1 flex-col">
                       <span className="text-xs font-medium">{m.label}</span>
                       {info.subtitle && (
                         <span className="break-all text-[11px] text-muted-foreground">
@@ -789,6 +802,20 @@ export const FileExplorer = memo(
                         </span>
                       )}
                     </span>
+                    {(() => {
+                      const scId = MODE_SHORTCUT[m.id];
+                      const sc = scId
+                        ? (userShortcuts[scId] ?? (SHORTCUTS.find((s) => s.id === scId)?.defaultBindings ?? []))
+                        : [];
+                      const tokens = getBindingTokens(sc[0]);
+                      return tokens.length > 0 ? (
+                        <KbdGroup className="ml-auto shrink-0">
+                          {tokens.map((t, i) => (
+                            <Kbd key={i}>{t}</Kbd>
+                          ))}
+                        </KbdGroup>
+                      ) : null;
+                    })()}
                     {rootMode === m.id && (
                       <HugeiconsIcon
                         icon={Tick02Icon}
