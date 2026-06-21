@@ -160,7 +160,7 @@ previous workspaces or pane layout.
   "New Workspace from folder" (creates a new workspace with that folder pinned as its Workspace Root). Neither injects a
   `cd` command into a shell.
 
-- **Background file/folder duplication**: context-menu "Duplicate" on any file or folder opens an inline name input directly below the source row, pre-filled with a non-colliding suggestion (`pepe copy.txt`, `src copy`). Confirming starts a background copy over a `Channel<CopyProgress>` stream (`fs_duplicate`). A global floating progress bar (`DuplicateProgressBar`, bottom-left) shows bytes copied and a cancel button; cancelling mid-copy deletes the partial destination via `fs_duplicate_cancel`. Only one duplication runs at a time. Not present upstream.
+- **Background file/folder duplication**: context-menu "Duplicate" on any file or folder opens an inline name input directly below the source row, pre-filled with a non-colliding suggestion (`pepe copy.txt`, `src copy`). Confirming starts a background copy (`fs_duplicate`) that emits progress as the global event `kex:duplicate-progress`. A global floating progress bar (`DuplicateProgressBar`, bottom-left) shows bytes copied and a cancel button; cancelling mid-copy deletes the partial destination via `fs_duplicate_cancel`. Only one duplication runs at a time. Quitting (Cmd+Q) while a copy is in progress defers the exit and shows a modal in all app windows (main + Settings) with three options: wait for the copy to finish, keep the app open, or cancel the copy and quit immediately. Not present upstream.
 
 ### Technical fixes and refactors
 
