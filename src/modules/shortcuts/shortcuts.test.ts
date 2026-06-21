@@ -198,6 +198,30 @@ describe("tab.lock shortcut", () => {
   });
 });
 
+test("file.delete default binding is a bare Delete key", () => {
+  const s = SHORTCUTS.find((x) => x.id === "file.delete");
+  expect(s).toBeDefined();
+  expect(s!.group).toBe("General");
+  const b = s!.defaultBindings[0];
+  expect(b.key).toBe("Delete");
+  expect(b.meta).toBeFalsy();
+  expect(b.ctrl).toBeFalsy();
+  expect(b.shift).toBeFalsy();
+  expect(b.alt).toBeFalsy();
+});
+
+test("bare Delete keydown matches file.delete", () => {
+  const ev = {
+    key: "Delete",
+    code: "Delete",
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+  } as KeyboardEvent;
+  expect(matchesShortcut(ev, "file.delete")).toBe(true);
+});
+
 describe("tab.selectByIndex binding uniqueness", () => {
   // explorer.viewFilesystem/Pinned/Terminal/Git intentionally use Ctrl+1-4 on
   // all platforms. On macOS, tab.selectByIndex uses Cmd (meta) so there is no

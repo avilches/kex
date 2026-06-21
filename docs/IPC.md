@@ -37,7 +37,8 @@ Shell integration scripts (`scripts/`) are injected at spawn time. Platform dete
 | `fs_create_file` | Create a new file |
 | `fs_create_dir` | Create a new directory (recursive) |
 | `fs_rename` | Rename or move a file/directory |
-| `fs_delete` | Delete a file or directory |
+| `fs_delete` | Delete a file or directory permanently |
+| `fs_trash` | Move a file or directory to the system trash (recoverable); mirrors `fs_delete`. Best-effort: errors on WSL/UNC paths where the Windows Recycle Bin is unavailable (caller falls back to an error toast, never data loss) |
 | `fs_copy` | Copy external files/dirs into a destination directory (recursive, refuses to overwrite). Backs the explorer OS-file-drop; sources are absolute OS paths, only the destination is workspace-resolved |
 | `fs_watch_add` | Start watching a path for changes (emits Tauri events) |
 | `fs_watch_remove` | Stop watching a path |

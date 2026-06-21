@@ -686,6 +686,7 @@ pub fn run() {
             fs::mutate::fs_create_dir,
             fs::mutate::fs_rename,
             fs::mutate::fs_delete,
+            fs::mutate::fs_trash,
             fs::mutate::fs_copy,
             fs::duplicate::fs_duplicate,
             fs::duplicate::fs_duplicate_cancel,
