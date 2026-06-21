@@ -319,6 +319,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   const beginCreate = useCallback(
     (parentPath: string, kind: "file" | "dir") => {
       setRenaming(null);
+      setPendingDuplicate(null);
       setPendingCreate({ parentPath, kind });
       // Ensure the parent is expanded so the input row is visible.
       if (rootPath && parentPath !== rootPath) {
@@ -368,6 +369,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
   const beginDuplicate = useCallback(
     (sourcePath: string, kind: "file" | "dir") => {
+      setRenaming(null);
+      setPendingCreate(null);
       const parts = sourcePath.split(/[\\/]/);
       const baseName = parts[parts.length - 1] ?? sourcePath;
       const parentPath = sourcePath.slice(
@@ -424,6 +427,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
   const beginRename = useCallback((path: string) => {
     setPendingCreate(null);
+    setPendingDuplicate(null);
     setRenaming(path);
   }, []);
 

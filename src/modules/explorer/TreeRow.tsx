@@ -44,6 +44,7 @@ export type RowActions = {
   commitRename: (newName: string) => void | Promise<void>;
   cancelRename: () => void;
   beginCreate: (parentPath: string, kind: "file" | "dir") => void;
+  beginDuplicate: (sourcePath: string, kind: "file" | "dir") => void;
   deletePath: (path: string) => Promise<void>;
 };
 
@@ -327,6 +328,13 @@ function EntryRowImpl(props: EntryRowProps) {
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
           New Folder
         </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => actions.beginDuplicate(path, isDir ? "dir" : "file")}
+        >
+          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          Duplicate
+        </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
@@ -377,6 +385,7 @@ export const EntryRow = memo(EntryRowImpl);
 export type PendingRowProps = {
   depth: number;
   kind: "file" | "dir";
+  initial?: string;
   onCommit: (name: string) => void | Promise<void>;
   onCancel: () => void;
 };
@@ -384,6 +393,7 @@ export type PendingRowProps = {
 export function PendingRow({
   depth,
   kind,
+  initial,
   onCommit,
   onCancel,
 }: PendingRowProps) {
@@ -401,7 +411,7 @@ export function PendingRow({
         className="size-4 shrink-0 opacity-70"
       />
       <InlineInput
-        initial=""
+        initial={initial ?? ""}
         placeholder={kind === "dir" ? "New folder" : "New file"}
         onCommit={onCommit}
         onCancel={onCancel}

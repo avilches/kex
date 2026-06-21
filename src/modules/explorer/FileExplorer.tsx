@@ -167,6 +167,7 @@ type Row =
   | { kind: "fs-root"; key: string; path: string }
   | { kind: "fs-up"; key: string }
   | { kind: "pending"; key: string; depth: number; pendingKind: "file" | "dir" }
+  | { kind: "duplicate"; key: string; depth: number; dupKind: "file" | "dir"; initial: string }
   | {
       kind: "status";
       key: string;
@@ -237,6 +238,15 @@ function buildRows(
           gitignored,
           gitStatusCode,
         });
+        if (tree.pendingDuplicate?.sourcePath === path) {
+          rows.push({
+            kind: "duplicate",
+            key: `dup:${path}`,
+            depth,
+            dupKind: tree.pendingDuplicate.kind,
+            initial: tree.pendingDuplicate.suggestedName,
+          });
+        }
       }
       if (isDir && expanded) {
         const child = tree.nodes[path];
@@ -367,6 +377,7 @@ export const FileExplorer = memo(
       tree.expanded,
       tree.renaming,
       tree.pendingCreate,
+      tree.pendingDuplicate,
       lookupGitStatus,
     ]);
 
@@ -422,6 +433,7 @@ export const FileExplorer = memo(
         commitRename: tree.commitRename,
         cancelRename: tree.cancelRename,
         beginCreate: tree.beginCreate,
+        beginDuplicate: tree.beginDuplicate,
         deletePath: tree.deletePath,
       }),
       [
@@ -430,11 +442,12 @@ export const FileExplorer = memo(
         tree.commitRename,
         tree.cancelRename,
         tree.beginCreate,
+        tree.beginDuplicate,
         tree.deletePath,
       ],
     );
     const renameInProgress =
-      tree.renaming !== null || tree.pendingCreate !== null;
+      tree.renaming !== null || tree.pendingCreate !== null || tree.pendingDuplicate !== null;
 
     const entryPaths = useMemo<string[]>(() => {
       const out: string[] = [];
@@ -562,7 +575,7 @@ export const FileExplorer = memo(
       ROOT_MODES.find((m) => m.id === rootMode) ?? ROOT_MODES[0];
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (tree.renaming || tree.pendingCreate || isSearchOpen) return;
+      if (tree.renaming || tree.pendingCreate || tree.pendingDuplicate || isSearchOpen) return;
       const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
@@ -694,6 +707,16 @@ export const FileExplorer = memo(
               kind={row.pendingKind}
               onCommit={tree.commitCreate}
               onCancel={tree.cancelCreate}
+            />
+          );
+        case "duplicate":
+          return (
+            <PendingRow
+              depth={row.depth}
+              kind={row.dupKind}
+              initial={row.initial}
+              onCommit={tree.commitDuplicate}
+              onCancel={tree.cancelDuplicate}
             />
           );
         case "status":
@@ -991,7 +1014,7 @@ export const FileExplorer = memo(
                 <ContextMenuContent
                   className={COMPACT_CONTENT}
                   onCloseAutoFocus={(e) => {
-                    if (tree.renaming || tree.pendingCreate) e.preventDefault();
+                    if (tree.renaming || tree.pendingCreate || tree.pendingDuplicate) e.preventDefault();
                   }}
                 >
                   {onRevealInTerminal && (
