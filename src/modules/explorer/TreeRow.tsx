@@ -5,8 +5,18 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { cn } from "@/lib/utils";
 import { pathDirname } from "@/lib/pathUtils";
+import { KEY_SEP } from "@/lib/platform";
+import { cn } from "@/lib/utils";
+import { isCopying } from "@/modules/explorer/lib/duplicateStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { GitColorScheme } from "@/modules/settings/store";
+import {
+  getBindingTokens,
+  SHORTCUTS_BY_ID,
+  type ShortcutId,
+} from "@/modules/shortcuts/shortcuts";
+import { useWorkspaceDnd } from "@/modules/workspaces";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   ArrowRight01Icon,
@@ -28,26 +38,17 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useEffect, useState } from "react";
-import { useWorkspaceDnd } from "@/modules/workspaces";
 import { InlineInput } from "./InlineInput";
 import {
   copyToClipboard,
   relativePath,
   revealInFinder,
 } from "./lib/contextActions";
-import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
+import { gitignoreEntryFor } from "./lib/gitignore";
 import { gitStatusHexColor } from "./lib/gitStatusColor";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
-import type { GitColorScheme } from "@/modules/settings/store";
+import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
-import { KEY_SEP } from "@/lib/platform";
-import { isCopying } from "@/modules/explorer/lib/duplicateStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import {
-  getBindingTokens,
-  SHORTCUTS_BY_ID,
-  type ShortcutId,
-} from "@/modules/shortcuts/shortcuts";
 
 function ShortcutHint({ id }: { id: ShortcutId }) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -67,12 +68,19 @@ export type RowActions = {
   beginRename: (path: string) => void;
   commitRename: (newName: string) => void | Promise<void>;
   cancelRename: () => void;
-  beginCreate: (parentPath: string, kind: "file" | "dir", afterPath?: string) => void;
+  beginCreate: (
+    parentPath: string,
+    kind: "file" | "dir",
+    afterPath?: string,
+  ) => void;
   beginDuplicate: (sourcePath: string, kind: "file" | "dir") => void;
   deletePath: (path: string) => Promise<void>;
   copyEntry: (path: string, kind: "file" | "dir") => void;
   cutEntry: (path: string, kind: "file" | "dir") => void;
-  pasteEntry: (targetPath: string, targetIsDir: boolean) => void | Promise<void>;
+  pasteEntry: (
+    targetPath: string,
+    targetIsDir: boolean,
+  ) => void | Promise<void>;
 };
 
 export type EntryRowProps = {
@@ -135,7 +143,9 @@ function EntryRowImpl(props: EntryRowProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const { draggingItem } = useWorkspaceDnd();
   const dragSource =
-    draggingItem?.kind === "file" && !draggingItem.paneOnly ? draggingItem.path : null;
+    draggingItem?.kind === "file" && !draggingItem.paneOnly
+      ? draggingItem.path
+      : null;
 
   // Files drag as `file:`, folders as `dir:`. Both can be dropped on a pane
   // (file opens an editor, folder opens a terminal) or moved within the tree.
@@ -352,14 +362,18 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => actions.beginCreate(createParent, "file", createAfterPath)}
+          onSelect={() =>
+            actions.beginCreate(createParent, "file", createAfterPath)
+          }
         >
           <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
           New File
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => actions.beginCreate(createParent, "dir", createAfterPath)}
+          onSelect={() =>
+            actions.beginCreate(createParent, "dir", createAfterPath)
+          }
         >
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
           New Folder
@@ -419,18 +433,24 @@ function EntryRowImpl(props: EntryRowProps) {
           <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
         </ContextMenuItem>
-        {gitRootPath && onAddToGitignore && (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => onAddToGitignore(path, isDir)}
-            >
-              <HugeiconsIcon icon={ViewOffSlashIcon} size={14} strokeWidth={2} />
-              Add to .gitignore
-            </ContextMenuItem>
-          </>
-        )}
+        {gitRootPath &&
+          onAddToGitignore &&
+          gitignoreEntryFor(gitRootPath, path, isDir) && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                className={COMPACT_ITEM}
+                onSelect={() => onAddToGitignore(path, isDir)}
+              >
+                <HugeiconsIcon
+                  icon={ViewOffSlashIcon}
+                  size={14}
+                  strokeWidth={2}
+                />
+                Add to .gitignore
+              </ContextMenuItem>
+            </>
+          )}
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
