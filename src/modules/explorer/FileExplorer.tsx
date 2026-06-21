@@ -59,7 +59,13 @@ import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import type { GitStatusSnapshot } from "@/lib/native";
-import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
+import {
+  ancestorsToExpand,
+  isUnder,
+  type ExplorerRootMode,
+} from "@/modules/workspaces/lib/explorerRoot";
+
+export type RevealRequest = { path: string; nonce: number };
 
 export type FileExplorerHandle = {
   focus: () => void;
@@ -85,6 +91,7 @@ type Props = {
   workspaceRootPath: string | null;
   workspaceRootExists: boolean;
   activeFilePath?: string | null;
+  revealRequest?: RevealRequest | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
@@ -312,6 +319,7 @@ export const FileExplorer = memo(
       workspaceRootPath,
       workspaceRootExists,
       activeFilePath,
+      revealRequest,
       onOpenFile,
       onPathRenamed,
       onPathDeleted,
@@ -498,6 +506,40 @@ export const FileExplorer = memo(
       setSelectedPath(activeFilePath);
       requestAnimationFrame(() => scrollEntryIntoView(activeFilePath));
     }, [activeFilePath, entryIndexByPath, scrollEntryIntoView]);
+
+    // Focus on Explorer: reveal a file on demand. Root/mode changes reload the
+    // tree asynchronously, so this re-runs as nodes/expanded settle until every
+    // ancestor is loaded, then selects and scrolls (without stealing focus).
+    const revealConsumedRef = useRef<number | null>(null);
+    useEffect(() => {
+      if (!revealRequest) return;
+      if (revealConsumedRef.current === revealRequest.nonce) return;
+      const file = revealRequest.path;
+      if (!rootPath || !isUnder(file, rootPath)) return;
+      if (tree.nodes[rootPath]?.status !== "loaded") return;
+      let pending = false;
+      for (const dir of ancestorsToExpand(rootPath, file)) {
+        if (!tree.expanded.has(dir)) {
+          tree.expand(dir);
+          pending = true;
+        } else if (tree.nodes[dir]?.status !== "loaded") {
+          pending = true;
+        }
+      }
+      if (pending) return;
+      if (!entryIndexByPath.has(file)) return;
+      revealConsumedRef.current = revealRequest.nonce;
+      setSelectedPath(file);
+      requestAnimationFrame(() => scrollEntryIntoView(file));
+    }, [
+      revealRequest,
+      rootPath,
+      tree.nodes,
+      tree.expanded,
+      tree.expand,
+      entryIndexByPath,
+      scrollEntryIntoView,
+    ]);
 
     // A create-at-root pending is a virtualized row near the top; if the list is
     // scrolled away its InlineInput never mounts (and never autofocuses). Bring
