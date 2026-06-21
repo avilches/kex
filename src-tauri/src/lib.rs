@@ -9,17 +9,53 @@ use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEve
 #[derive(Default)]
 struct LaunchDir(Mutex<Option<String>>);
 
-/// Set once the frontend has been asked to flush before an app quit (Cmd+Q),
-/// so the deferred `ExitRequested` is allowed through on the second pass.
+/// Coordinates the two-phase quit flow: deferred once to let the frontend flush,
+/// and optionally deferred again when a duplication is in progress.
 #[derive(Default)]
-struct QuitGuard(AtomicBool);
+pub(crate) struct QuitGuard {
+    /// Set once the frontend has acknowledged and flushed; the next ExitRequested passes through.
+    pub(crate) confirmed: AtomicBool,
+    /// Set while we are waiting for an in-progress duplication to finish before quitting.
+    pub(crate) pending: AtomicBool,
+}
 
 /// Called by the frontend once it has flushed editors and workspace state in
 /// response to `kex:before-quit`, to let the deferred quit proceed.
 #[tauri::command]
 fn confirm_quit(app: tauri::AppHandle) {
-    app.state::<QuitGuard>().0.store(true, Ordering::SeqCst);
+    app.state::<QuitGuard>().confirmed.store(true, Ordering::SeqCst);
     app.exit(0);
+}
+
+/// Dismisses a quit that was deferred because a duplication was in progress
+/// (the "Keep app open" action), so the next quit goes through the normal path.
+#[tauri::command]
+fn cancel_quit(app: tauri::AppHandle) {
+    app.state::<QuitGuard>().pending.store(false, Ordering::SeqCst);
+    let _ = app.emit("kex:duplicate-quit-dismissed", ());
+}
+
+/// Single decision point for an app-quit request, shared by every quit path:
+/// the `ExitRequested` run-event (Linux/Windows) and the custom macOS "Quit"
+/// menu item (macOS Cmd+Q does not raise ExitRequested, tauri#12978). If a
+/// duplication is running, defer and show the modal (emitted once via the
+/// pending swap); otherwise mark the quit confirmed and emit `before-quit` so
+/// the frontend flushes and calls `confirm_quit`.
+fn signal_quit_request(app: &tauri::AppHandle) {
+    if let Some(snap) = app.state::<fs::duplicate::CopyState>().snapshot() {
+        let guard = app.state::<QuitGuard>();
+        if !guard.pending.swap(true, Ordering::SeqCst) {
+            let _ = app.emit(
+                "kex:duplicate-quit-prompt",
+                serde_json::json!({ "name": snap.name, "copied": snap.copied, "total": snap.total }),
+            );
+        }
+        return;
+    }
+    app.state::<QuitGuard>()
+        .confirmed
+        .store(true, Ordering::SeqCst);
+    let _ = app.emit("kex:before-quit", ());
 }
 
 /// macOS-only: handles to menu items whose labels track app state.
@@ -531,7 +567,9 @@ pub fn run() {
                 app.on_menu_event(|app, event| {
                     let id = event.id().as_ref();
                     if id == "quit" {
-                        let _ = app.emit("kex:before-quit", ());
+                        // macOS Cmd+Q lands here, not on ExitRequested, so it must
+                        // run the same duplication check or it would close mid-copy.
+                        signal_quit_request(app);
                         return;
                     }
                     if id == "dock_browser" {
@@ -604,6 +642,7 @@ pub fn run() {
         .manage(shell::ShellState::default())
         .manage(fs::watch::FsWatchState::default())
         .manage(history::HistoryState::default())
+        .manage(fs::duplicate::CopyState::default())
         .manage(fs::grep::ContentSearchState::default())
         .manage(fs::search::FileSearchState::default())
         .manage({
@@ -637,6 +676,8 @@ pub fn run() {
             fs::mutate::fs_rename,
             fs::mutate::fs_delete,
             fs::mutate::fs_copy,
+            fs::duplicate::fs_duplicate,
+            fs::duplicate::fs_duplicate_cancel,
             fs::watch::fs_watch_add,
             fs::watch::fs_watch_remove,
             fs::search::fs_search,
@@ -677,6 +718,7 @@ pub fn run() {
             workspace::workspace_current_dir,
             get_launch_dir,
             confirm_quit,
+            cancel_quit,
             sync_menu,
             open_settings_window,
             open_main_window,
@@ -705,10 +747,12 @@ pub fn run() {
             // Cmd+Q / menu Quit raise ExitRequested at the app level, bypassing
             // each window's CloseRequested (and the JS flush wired to it). Defer
             // the quit once so the frontend can flush dirty editors and workspace
-            // state, then let it proceed on the second pass.
+            // state, then let it proceed on the second pass. If a duplication is
+            // running, show the modal instead and let the copy's completion drive
+            // the final exit.
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 let guard = app_handle.state::<QuitGuard>();
-                if guard.0.load(Ordering::SeqCst) {
+                if guard.confirmed.load(Ordering::SeqCst) {
                     return;
                 }
                 let has_main = app_handle
@@ -718,9 +762,10 @@ pub fn run() {
                 if !has_main {
                     return;
                 }
-                guard.0.store(true, Ordering::SeqCst);
+                // Defer this pass; signal_quit_request decides between the modal
+                // (duplication running) and the normal flush (emit before-quit).
                 api.prevent_exit();
-                let _ = app_handle.emit("kex:before-quit", ());
+                signal_quit_request(app_handle);
             }
         });
 }

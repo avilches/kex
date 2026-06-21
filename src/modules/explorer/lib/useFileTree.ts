@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { pathDirname, pathBasename } from "@/lib/pathUtils";
+import { native } from "@/lib/native";
+import { suggestDuplicateName } from "@/modules/explorer/lib/duplicateName";
+import { isDuplicating } from "@/modules/explorer/lib/duplicateStore";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
 export type DirEntry = {
@@ -26,6 +29,13 @@ export type PendingCreate = {
   parentPath: string;
   kind: "file" | "dir";
   afterPath?: string;
+};
+
+export type PendingDuplicate = {
+  sourcePath: string;
+  parentPath: string;
+  kind: "file" | "dir";
+  suggestedName: string;
 };
 
 export function joinPath(parent: string, name: string): string {
@@ -93,6 +103,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
     null,
   );
+  const [pendingDuplicate, setPendingDuplicate] =
+    useState<PendingDuplicate | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
 
   const expandedRef = useRef(expanded);
@@ -195,10 +207,12 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       setNodes({});
       setExpanded(new Set());
       setPendingCreate(null);
+      setPendingDuplicate(null);
       setRenaming(null);
       return;
     }
     setPendingCreate(null);
+    setPendingDuplicate(null);
     setRenaming(null);
 
     const restored = keepLayoutRef.current ? recallExpansion(rootPath) : [];
@@ -302,6 +316,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   const beginCreate = useCallback(
     (parentPath: string, kind: "file" | "dir", afterPath?: string) => {
       setRenaming(null);
+      setPendingDuplicate(null);
       setPendingCreate({ parentPath, kind, afterPath });
       // Ensure the parent is expanded so the input row is visible.
       if (rootPath && parentPath !== rootPath) {
@@ -349,8 +364,79 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     [pendingCreate, fetchChildren],
   );
 
+  const beginDuplicate = useCallback(
+    (sourcePath: string, kind: "file" | "dir") => {
+      if (isDuplicating()) {
+        toast.error("A duplication is already in progress");
+        return;
+      }
+      setRenaming(null);
+      setPendingCreate(null);
+      // Collapse the folder first so the name input lands cleanly below the
+      // folder row instead of between it and its children.
+      if (kind === "dir") {
+        setExpanded((curr) => {
+          if (!curr.has(sourcePath)) return curr;
+          const next = new Set(curr);
+          next.delete(sourcePath);
+          return next;
+        });
+      }
+      const parts = sourcePath.split(/[\\/]/);
+      const baseName = parts[parts.length - 1] ?? sourcePath;
+      const parentPath = sourcePath.slice(
+        0,
+        sourcePath.length - baseName.length - 1,
+      );
+      const loaded = nodes[parentPath];
+      const siblings =
+        loaded?.status === "loaded" ? loaded.entries.map((e) => e.name) : [];
+      const suggestedName = suggestDuplicateName(baseName, kind, siblings);
+      setPendingDuplicate({ sourcePath, parentPath, kind, suggestedName });
+    },
+    [nodes],
+  );
+
+  const cancelDuplicate = useCallback(() => setPendingDuplicate(null), []);
+
+  const commitDuplicate = useCallback(
+    async (name: string) => {
+      if (!pendingDuplicate) return;
+      const trimmed = name.trim();
+      const { sourcePath, parentPath } = pendingDuplicate;
+      if (!trimmed) {
+        setPendingDuplicate(null);
+        return;
+      }
+      const loaded = nodes[parentPath];
+      const siblings =
+        loaded?.status === "loaded" ? loaded.entries.map((e) => e.name) : [];
+      if (siblings.includes(trimmed)) {
+        toast.error(`Already exists: ${trimmed}`);
+        setPendingDuplicate(null);
+        return;
+      }
+      if (isDuplicating()) {
+        toast.error("A duplication is already in progress");
+        setPendingDuplicate(null);
+        return;
+      }
+      setPendingDuplicate(null);
+      const dest = joinPath(parentPath, trimmed);
+      try {
+        await native.duplicate(sourcePath, dest);
+        await fetchChildren(parentPath);
+      } catch (e) {
+        console.error("fs_duplicate failed:", e);
+        toast.error(`Failed to duplicate ${trimmed}`);
+      }
+    },
+    [pendingDuplicate, nodes, fetchChildren],
+  );
+
   const beginRename = useCallback((path: string) => {
     setPendingCreate(null);
+    setPendingDuplicate(null);
     setRenaming(path);
   }, []);
 
@@ -438,6 +524,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     nodes,
     expanded,
     pendingCreate,
+    pendingDuplicate,
     renaming,
     toggle,
     expand,
@@ -445,6 +532,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     beginCreate,
     cancelCreate,
     commitCreate,
+    beginDuplicate,
+    cancelDuplicate,
+    commitDuplicate,
     beginRename,
     cancelRename,
     commitRename,

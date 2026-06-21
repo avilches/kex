@@ -13,6 +13,8 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { type JSX, useEffect, useState } from "react";
+import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
+import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
@@ -49,6 +51,10 @@ export function SettingsApp() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  useEffect(() => {
+    initDuplicateProgressListener();
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -112,6 +118,7 @@ export function SettingsApp() {
           </div>
         </div>
       </ScrollArea>
+      <DuplicateQuitModal />
     </div>
   );
 }

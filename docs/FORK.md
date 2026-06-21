@@ -160,6 +160,8 @@ previous workspaces or pane layout.
   "New Workspace from folder" (creates a new workspace with that folder pinned as its Workspace Root). Neither injects a
   `cd` command into a shell.
 
+- **Background file/folder duplication**: context-menu "Duplicate" on any file or folder opens an inline name input directly below the source row, pre-filled with a non-colliding suggestion (`pepe copy.txt`, `src copy`). Confirming starts a background copy (`fs_duplicate`) that emits progress as the global event `kex:duplicate-progress`. A global floating progress bar (`DuplicateProgressBar`, bottom-left) shows bytes copied and a cancel button; cancelling mid-copy deletes the partial destination via `fs_duplicate_cancel`. Only one duplication runs at a time. Quitting (Cmd+Q) while a copy is in progress defers the exit and shows a modal in all app windows (main + Settings) with three options: wait for the copy to finish, keep the app open, or cancel the copy and quit immediately. Not present upstream.
+
 ### Technical fixes and refactors
 
 - **WebGL canvas refresh** — after a workspace switch, the `opacity-0` CSS change does not trigger a WebGL repaint. A
@@ -246,6 +248,18 @@ open floats), each enabled only while it applies. Floating windows are recreated
 panels persisted with `floating: true`, and destroyed without docking when their tab, sibling tabs, or workspace close.
 State is managed Rust-side in `FloatBrowserState` (`src-tauri/src/modules/float_browser.rs`); the frontend hook is
 `useFloatBrowser` (`src/modules/browser/useFloatBrowser.ts`).
+
+### Focus on Explorer
+
+A tab context-menu action (and `F4` shortcut, group Tabs) that reveals the tab's file or folder in the Explorer:
+"Focus File on Explorer" for file tabs (editor / markdown / git-diff / git-commit-file) and "Focus Folder on Explorer"
+for terminal tabs (their current `cwd`). If the active explorer view already contains the target it is just expanded and
+selected without changing mode; otherwise the explorer switches to File System rooted at the deepest common ancestor
+between the reference fs root and the target (falling back to the target's parent dir when there is no common ancestor,
+e.g. a different Windows drive). The decision is a pure function (`resolveFocusTarget` in
+`src/modules/workspaces/lib/explorerRoot.ts`); revealing is driven reactively by a `revealRequest` prop on `FileExplorer`
+that re-runs as the tree reloads asynchronously, expanding each ancestor until the target is loaded, then selecting and
+scrolling to it without stealing focus from the editor. The context menu also gained icons on every item.
 
 ---
 

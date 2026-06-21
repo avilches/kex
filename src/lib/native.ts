@@ -156,6 +156,10 @@ export const native = {
     invoke<void>("fs_create_file", { path, workspace: currentWorkspaceEnv() }),
   createDir: (path: string) =>
     invoke<void>("fs_create_dir", { path, workspace: currentWorkspaceEnv() }),
+  duplicate: (source: string, dest: string): Promise<void> =>
+    invoke<void>("fs_duplicate", { source, dest, workspace: currentWorkspaceEnv() }),
+  cancelDuplicate: () => invoke<void>("fs_duplicate_cancel"),
+  cancelQuit: () => invoke<void>("cancel_quit"),
   renameFile: async (from: string, to: string) => {
     try {
       await invoke<void>("git_mv", { from, to, workspace: currentWorkspaceEnv() });
