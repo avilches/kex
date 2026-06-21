@@ -393,6 +393,7 @@ function TerminalHoverCardContent({
   panelPersistentCommand,
   lockShortcut,
   onUpdatePanel,
+  onInputFocusChange,
 }: {
   customTitle: string | undefined;
   cwd: string | undefined;
@@ -402,6 +403,7 @@ function TerminalHoverCardContent({
   panelPersistentCommand: string | undefined;
   lockShortcut: string | null;
   onUpdatePanel: (updater: (p: Panel) => Panel) => void;
+  onInputFocusChange?: (focused: boolean) => void;
 }) {
   const repoRoot = useGitRepoRoot(cwd);
   return (
@@ -427,9 +429,11 @@ function TerminalHoverCardContent({
               onUpdatePanel((p) => ({
                 ...p,
                 restoreOnRestart: checked,
+                // Preserve the typed command when unchecking so re-checking
+                // restores it; on check, preload the running command if empty.
                 persistentCommand: checked
-                  ? (panelPersistentCommand ?? runningCommand ?? "")
-                  : undefined,
+                  ? (panelPersistentCommand ?? runningCommand ?? undefined)
+                  : panelPersistentCommand,
               }));
             }}
           />
@@ -440,9 +444,11 @@ function TerminalHoverCardContent({
             type="text"
             placeholder="command to run (e.g. lazygit)"
             defaultValue={panelPersistentCommand ?? ""}
+            onFocus={() => onInputFocusChange?.(true)}
             onBlur={(e) => {
               const v = e.target.value.trim();
               onUpdatePanel((p) => ({ ...p, persistentCommand: v || undefined }));
+              onInputFocusChange?.(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
@@ -644,10 +650,38 @@ function DraggableTab({
   // and would otherwise dismiss the card mid-hover.
   const pointerInsideRef = useRef(false);
   const contextMenuOpenRef = useRef(false);
+  // Keep the hover open while the run-on-start command input is focused, so it
+  // is not dismissed mid-typing by a pointer leave.
+  const hoverInputFocusedRef = useRef(false);
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
   }, [isRenaming]);
+
+  // When the run-on-start popup closes with an empty command, drop the toggle:
+  // "run on start" with nothing to run is meaningless. Reset to undefined (not
+  // false) so a future agent in this terminal still resumes (it reads `!== false`).
+  const wasHoverOpenRef = useRef(false);
+  const runOnStartCleanup = () => {
+    if (
+      panel.kind === "terminal" &&
+      !hasAgent &&
+      panel.restoreOnRestart &&
+      !panel.persistentCommand?.trim()
+    ) {
+      onUpdatePanel?.(panel.id, (p) => ({
+        ...p,
+        restoreOnRestart: undefined,
+        persistentCommand: undefined,
+      }));
+    }
+  };
+  const runOnStartCleanupRef = useRef(runOnStartCleanup);
+  runOnStartCleanupRef.current = runOnStartCleanup;
+  useEffect(() => {
+    if (wasHoverOpenRef.current && !hoverOpen) runOnStartCleanupRef.current();
+    wasHoverOpenRef.current = hoverOpen;
+  }, [hoverOpen]);
 
   useEffect(() => {
     if (!anyRenaming || isFileRenaming) return;
@@ -733,6 +767,13 @@ function DraggableTab({
               panelPersistentCommand={panel.persistentCommand}
               lockShortcut={shortcutLabels["tab.lock"]}
               onUpdatePanel={(updater) => onUpdatePanel?.(panel.id, updater)}
+              onInputFocusChange={(focused) => {
+                hoverInputFocusedRef.current = focused;
+                if (!focused && !pointerInsideRef.current) {
+                  setHoverOpen(false);
+                  onHoverChange?.(panel.id, false);
+                }
+              }}
             />;
       case "editor":
         return (
@@ -904,7 +945,7 @@ function DraggableTab({
       closeDelay={100}
       onOpenChange={(o) => {
         if (o && (anyRenaming || contextMenuOpenRef.current)) return;
-        if (!o && (pointerInsideRef.current || isFileRenaming)) return;
+        if (!o && (pointerInsideRef.current || isFileRenaming || hoverInputFocusedRef.current)) return;
         setHoverOpen(o);
         onHoverChange?.(panel.id, o);
         if (o) onSnapIntoView?.(panel.id);
