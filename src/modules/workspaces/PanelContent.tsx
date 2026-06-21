@@ -60,6 +60,8 @@ export type PanelCallbacks = {
   onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
   // File rename (editor/markdown tabs — renames the file on disk)
   onRenameFile?: (panelId: string, newName: string) => void;
+  // Reveal an editor/markdown/git file in the explorer tree
+  onFocusOnExplorer?: (filePath: string) => void;
 };
 
 type Props = {

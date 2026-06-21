@@ -36,3 +36,59 @@ export function parentRoot(path: string): string {
   const parent = pathDirname(path);
   return BARE_DRIVE.test(parent) ? `${parent}/` : parent;
 }
+
+function normalizeSep(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
+export function isUnder(path: string, root: string): boolean {
+  const p = normalizeSep(path);
+  const r = normalizeSep(root);
+  return p === r || p.startsWith(r.endsWith("/") ? r : `${r}/`);
+}
+
+export function commonAncestor(a: string, b: string): string | null {
+  const sa = normalizeSep(a).split("/");
+  const sb = normalizeSep(b).split("/");
+  const common: string[] = [];
+  for (let i = 0; i < sa.length && i < sb.length; i++) {
+    if (sa[i] !== sb[i]) break;
+    common.push(sa[i]);
+  }
+  if (common.length === 0) return null;
+  if (common.length === 1) {
+    if (common[0] === "") return "/";
+    if (BARE_DRIVE.test(common[0])) return `${common[0]}/`;
+    return null;
+  }
+  return common.join("/");
+}
+
+export function ancestorsToExpand(root: string, file: string): string[] {
+  const r = normalizeSep(root);
+  let dir = pathDirname(normalizeSep(file));
+  if (!isUnder(dir, r)) return [];
+  const out: string[] = [];
+  while (dir !== r && isUnder(dir, r)) {
+    out.unshift(dir);
+    const parent = pathDirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return out;
+}
+
+export function resolveFocusTarget(input: {
+  file: string;
+  mode: ExplorerRootMode;
+  currentRoot: string | null;
+  fsRoot: string | null;
+  home: string | null;
+}): { nextMode: ExplorerRootMode; nextFsRoot: string } | null {
+  const file = normalizeSep(input.file);
+  if (input.currentRoot && isUnder(file, input.currentRoot)) return null;
+  const fsRef = input.fsRoot ?? input.home;
+  const ca = fsRef ? commonAncestor(fsRef, file) : null;
+  const nextFsRoot = ca ?? pathDirname(file);
+  return { nextMode: "filesystem", nextFsRoot };
+}

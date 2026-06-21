@@ -1,5 +1,9 @@
 import { cn } from "@/lib/utils";
-import { FileExplorer, type FileExplorerHandle } from "@/modules/explorer";
+import {
+  FileExplorer,
+  type FileExplorerHandle,
+  type RevealRequest,
+} from "@/modules/explorer";
 import {
   GitHistoryPane,
   type GitHistorySearchHandle,
@@ -46,6 +50,7 @@ export type RightPanelProps = {
   workspaceRootPath: string | null;
   workspaceRootExists: boolean;
   activeFilePath?: string | null;
+  revealRequest?: RevealRequest | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
@@ -132,6 +137,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               workspaceRootPath={props.workspaceRootPath}
               workspaceRootExists={props.workspaceRootExists}
               activeFilePath={props.activeFilePath}
+              revealRequest={props.revealRequest}
               onOpenFile={props.onOpenFile}
               onPathRenamed={props.onPathRenamed}
               onPathDeleted={props.onPathDeleted}
