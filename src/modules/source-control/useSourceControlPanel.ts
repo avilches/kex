@@ -72,6 +72,9 @@ type SourceControlPanelState = {
   cancelPendingDiscard: () => void;
   stageAllEntries: () => Promise<void>;
   unstageAllEntries: () => Promise<void>;
+  stageEntries: (entries: SourceControlEntry[]) => Promise<void>;
+  unstageEntries: (entries: SourceControlEntry[]) => Promise<void>;
+  requestDiscardEntries: (entries: SourceControlEntry[]) => void;
   commit: () => Promise<void>;
   push: () => Promise<void>;
 };
@@ -563,6 +566,41 @@ export function useSourceControlPanel(
     );
   }, [repo, runMutation, stagedEntries]);
 
+  const stageEntries = useCallback(
+    async (entries: SourceControlEntry[]) => {
+      if (!repo || entries.length === 0) return;
+      const paths = new Set(entries.map((entry) => entry.path));
+      await runMutation(
+        "stage:folder",
+        (s) => optimisticStage(s, paths),
+        () => native.gitStage(repo.repoRoot, [...paths]),
+        [...paths],
+      );
+    },
+    [repo, runMutation],
+  );
+
+  const unstageEntries = useCallback(
+    async (entries: SourceControlEntry[]) => {
+      if (!repo || entries.length === 0) return;
+      const paths = new Set(entries.map((entry) => entry.path));
+      await runMutation(
+        "unstage:folder",
+        (s) => optimisticUnstage(s, paths),
+        () => native.gitUnstage(repo.repoRoot, [...paths]),
+        [...paths],
+      );
+    },
+    [repo, runMutation],
+  );
+
+  const requestDiscardEntries = useCallback(
+    (entries: SourceControlEntry[]) => {
+      if (!repo || summary.busyAction || entries.length === 0) return;
+      setPendingDiscard({ scope: "all", entries });
+    },
+    [repo, summary.busyAction],
+  );
 
   const commit = useCallback(async () => {
     if (!repo || summary.busyAction) return;
@@ -647,6 +685,9 @@ export function useSourceControlPanel(
     cancelPendingDiscard,
     stageAllEntries,
     unstageAllEntries,
+    stageEntries,
+    unstageEntries,
+    requestDiscardEntries,
     commit,
     push,
   };

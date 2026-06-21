@@ -30,7 +30,7 @@ import {
   copyToClipboard,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
-import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
+import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   COMPACT_CONTENT,
   COMPACT_ITEM,
@@ -39,6 +39,7 @@ import { joinPath } from "@/modules/explorer/lib/useFileTree";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setScmViewMode } from "@/modules/settings/store";
 import {
   Add01Icon,
   Alert02Icon,
@@ -47,7 +48,6 @@ import {
   ArrowUp01Icon,
   CheckmarkCircle01Icon,
   Copy01Icon,
-  Delete02Icon,
   Download01Icon,
   File01Icon,
   FileDiffIcon,
@@ -56,9 +56,11 @@ import {
   FolderOpenIcon,
   GitBranchIcon,
   Link01Icon,
+  ListViewIcon,
   MinusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
+  StructureFolderIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -78,6 +80,11 @@ import {
   type DiffSelection,
   type SourceControlEntry,
 } from "./useSourceControlPanel";
+import {
+  buildScmTree,
+  flattenScmTree,
+  type ScmDirNode,
+} from "./scmTree";
 
 type Props = {
   open: boolean;
@@ -99,7 +106,7 @@ const SOURCE_CONTROL_TOOLTIP_CLASS =
 const ROW_HEIGHTS = {
   banner: 32,
   header: 30,
-  entry: 30,
+  entry: 24,
 } as const;
 
 type RowDescriptor =
@@ -107,7 +114,9 @@ type RowDescriptor =
   | { kind: "staged-header"; key: string; count: number }
   | { kind: "staged-entry"; key: string; entry: SourceControlEntry }
   | { kind: "changes-header"; key: string; count: number }
-  | { kind: "changes-entry"; key: string; entry: SourceControlEntry };
+  | { kind: "changes-entry"; key: string; entry: SourceControlEntry }
+  | { kind: "tree-dir"; key: string; collapseKey: string; depth: number; node: ScmDirNode }
+  | { kind: "tree-file"; key: string; depth: number; entry: SourceControlEntry };
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -119,6 +128,17 @@ function dirname(path: string): string {
   const index = normalized.lastIndexOf("/");
   if (index <= 0) return "";
   return normalized.slice(0, index);
+}
+
+function entriesUnderFolder(
+  fullPath: string,
+  entries: SourceControlEntry[],
+): SourceControlEntry[] {
+  const prefix = `${fullPath}/`;
+  return entries.filter((entry) => {
+    const normalized = entry.path.replace(/\\/g, "/");
+    return normalized.startsWith(prefix);
+  });
 }
 
 function upstreamBadgeLabel(upstream: string | null | undefined): string {
@@ -137,22 +157,6 @@ function statusTextClass(code: string): string {
   }
 }
 
-function statusAccentClass(code: string): string {
-  switch (code) {
-    case "A":
-      return "bg-emerald-500/85";
-    case "U":
-      return "bg-teal-500/85";
-    case "M":
-      return "bg-amber-500/85";
-    case "D":
-      return "bg-rose-500/85";
-    case "R":
-      return "bg-sky-500/85";
-    default:
-      return "bg-muted-foreground/40";
-  }
-}
 
 export const SourceControlPanel = memo(function SourceControlPanel({
   open,
@@ -169,6 +173,46 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
   const [stagedCollapsed, setStagedCollapsed] = useState(false);
   const [changesCollapsed, setChangesCollapsed] = useState(false);
+  const scmViewMode = usePreferencesStore((s) => s.scmViewMode);
+  const [treeCollapsed, setTreeCollapsed] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+
+  const toggleTreeDir = useCallback((fullPath: string) => {
+    setTreeCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(fullPath)) next.delete(fullPath);
+      else next.add(fullPath);
+      return next;
+    });
+  }, []);
+
+  const handleStageFolder = useCallback(
+    (node: ScmDirNode) => {
+      void scm.stageEntries(
+        entriesUnderFolder(node.fullPath, scm.unstagedEntries),
+      );
+    },
+    [scm],
+  );
+
+  const handleUnstageFolder = useCallback(
+    (node: ScmDirNode) => {
+      void scm.unstageEntries(
+        entriesUnderFolder(node.fullPath, scm.stagedEntries),
+      );
+    },
+    [scm],
+  );
+
+  const handleDiscardFolder = useCallback(
+    (node: ScmDirNode) => {
+      scm.requestDiscardEntries(
+        entriesUnderFolder(node.fullPath, scm.unstagedEntries),
+      );
+    },
+    [scm],
+  );
 
   useEffect(() => {
     return () => {
@@ -266,6 +310,26 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     if (isDiverged) {
       result.push({ kind: "banner-diverged", key: "banner-diverged" });
     }
+    if (scmViewMode === "tree") {
+      const pushTree = (entries: SourceControlEntry[], prefix: string) => {
+        for (const r of flattenScmTree(buildScmTree(entries), treeCollapsed, prefix)) {
+          if (r.type === "dir") {
+            result.push({ kind: "tree-dir", key: r.key, collapseKey: r.collapseKey, depth: r.depth, node: r.node });
+          } else {
+            result.push({ kind: "tree-file", key: r.key, depth: r.depth, entry: r.entry });
+          }
+        }
+      };
+      if (scm.stagedEntries.length > 0) {
+        result.push({ kind: "staged-header", key: "staged-header", count: scm.stagedEntries.length });
+        if (!stagedCollapsed) pushTree(scm.stagedEntries, "staged/");
+      }
+      if (scm.unstagedEntries.length > 0) {
+        result.push({ kind: "changes-header", key: "changes-header", count: scm.unstagedEntries.length });
+        if (!changesCollapsed) pushTree(scm.unstagedEntries, "changes/");
+      }
+      return result;
+    }
     if (scm.stagedEntries.length > 0) {
       result.push({
         kind: "staged-header",
@@ -291,7 +355,15 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       }
     }
     return result;
-  }, [isDiverged, scm.stagedEntries, scm.unstagedEntries, stagedCollapsed, changesCollapsed]);
+  }, [
+    scmViewMode,
+    isDiverged,
+    scm.stagedEntries,
+    scm.unstagedEntries,
+    treeCollapsed,
+    stagedCollapsed,
+    changesCollapsed,
+  ]);
 
   const rowKeyToIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -315,7 +387,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         case "staged-header":
         case "changes-header": return ROW_HEIGHTS.header;
         case "staged-entry":
-        case "changes-entry": return ROW_HEIGHTS.entry;
+        case "changes-entry":
+        case "tree-dir":
+        case "tree-file": return ROW_HEIGHTS.entry;
       }
     },
     [rows],
@@ -324,7 +398,13 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const focusableIndices = useMemo(() => {
     const out: number[] = [];
     rows.forEach((row, index) => {
-      if (row.kind === "staged-entry" || row.kind === "changes-entry") out.push(index);
+      if (
+        row.kind === "staged-entry" ||
+        row.kind === "changes-entry" ||
+        row.kind === "tree-dir" ||
+        row.kind === "tree-file"
+      )
+        out.push(index);
     });
     return out;
   }, [rows]);
@@ -362,7 +442,10 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     const index = rowKeyToIndex.get(focusedRowKey);
     if (index === undefined) return null;
     const row = rows[index];
-    return row && (row.kind === "staged-entry" || row.kind === "changes-entry")
+    return row &&
+      (row.kind === "staged-entry" ||
+        row.kind === "changes-entry" ||
+        row.kind === "tree-file")
       ? row.entry
       : null;
   }, [focusedRowKey, rowKeyToIndex, rows]);
@@ -393,7 +476,32 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           event.preventDefault();
           moveFocus(-1);
           break;
+        case "ArrowRight":
+        case "ArrowLeft": {
+          if (!focusedRowKey) break;
+          const idx = rowKeyToIndex.get(focusedRowKey);
+          if (idx === undefined) break;
+          const row = rows[idx];
+          if (row?.kind === "tree-dir") {
+            const collapsed = treeCollapsed.has(row.collapseKey);
+            const wantCollapse = event.key === "ArrowLeft";
+            if (collapsed !== wantCollapse) {
+              event.preventDefault();
+              toggleTreeDir(row.collapseKey);
+            }
+          }
+          break;
+        }
         case "Enter": {
+          if (focusedRowKey) {
+            const idx = rowKeyToIndex.get(focusedRowKey);
+            const row = idx === undefined ? null : rows[idx];
+            if (row?.kind === "tree-dir") {
+              event.preventDefault();
+              toggleTreeDir(row.collapseKey);
+              break;
+            }
+          }
           const entry = focusedEntry();
           if (entry) {
             event.preventDefault();
@@ -415,6 +523,10 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           } else if (row?.kind === "changes-entry") {
             event.preventDefault();
             void scm.stageEntry(row.entry);
+          } else if (row?.kind === "tree-file") {
+            event.preventDefault();
+            if (row.entry.mode === "+") void scm.unstageEntry(row.entry);
+            else void scm.stageEntry(row.entry);
           }
           break;
         }
@@ -428,12 +540,15 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           if (row?.kind === "changes-entry") {
             event.preventDefault();
             scm.requestDiscardEntry(row.entry);
+          } else if (row?.kind === "tree-file" && row.entry.mode === "-") {
+            event.preventDefault();
+            scm.requestDiscardEntry(row.entry);
           }
           break;
         }
       }
     },
-    [focusedEntry, focusedRowKey, handleRefresh, moveFocus, rowKeyToIndex, rows, scm],
+    [focusedEntry, focusedRowKey, handleRefresh, moveFocus, rowKeyToIndex, rows, scm, treeCollapsed, toggleTreeDir],
   );
 
   if (!open) return null;
@@ -486,6 +601,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
+            <IconActionButton
+              label={
+                scmViewMode === "tree" ? "Show as list" : "Group by directory"
+              }
+              onClick={() =>
+                void setScmViewMode(scmViewMode === "tree" ? "list" : "tree")
+              }
+              side="bottom"
+            >
+              <HugeiconsIcon
+                icon={scmViewMode === "tree" ? ListViewIcon : StructureFolderIcon}
+                size={14}
+                strokeWidth={1.85}
+              />
+            </IconActionButton>
             <IconActionButton
               label={fetchBusy ? "Fetching…" : "Fetch from remote"}
               disabled={!canFetch}
@@ -744,9 +874,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                             repoRoot={scm.repo?.repoRoot ?? null}
                             stagedCollapsed={stagedCollapsed}
                             changesCollapsed={changesCollapsed}
+                            treeCollapsed={treeCollapsed}
                             onFocusRow={setFocusedRowKey}
                             onToggleStagedCollapsed={() => setStagedCollapsed((v) => !v)}
                             onToggleChangesCollapsed={() => setChangesCollapsed((v) => !v)}
+                            onToggleTreeDir={toggleTreeDir}
+                            onStageFolder={handleStageFolder}
+                            onUnstageFolder={handleUnstageFolder}
+                            onDiscardFolder={handleDiscardFolder}
                             onSelectEntry={scm.selectEntry}
                             onStageEntry={scm.stageEntry}
                             onUnstageEntry={scm.unstageEntry}
@@ -848,9 +983,14 @@ type RowRendererProps = {
   repoRoot: string | null;
   stagedCollapsed: boolean;
   changesCollapsed: boolean;
+  treeCollapsed: ReadonlySet<string>;
   onFocusRow: (key: string | null) => void;
   onToggleStagedCollapsed: () => void;
   onToggleChangesCollapsed: () => void;
+  onToggleTreeDir: (fullPath: string) => void;
+  onStageFolder: (node: ScmDirNode) => void;
+  onUnstageFolder: (node: ScmDirNode) => void;
+  onDiscardFolder: (node: ScmDirNode) => void;
   onSelectEntry: (entry: SourceControlEntry) => Promise<void>;
   onStageEntry: (entry: SourceControlEntry) => Promise<void>;
   onUnstageEntry: (entry: SourceControlEntry) => Promise<void>;
@@ -871,9 +1011,11 @@ const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
     case "changes-header":
       return <ChangesSectionHeader {...props} row={row} />;
     case "staged-entry":
-      return <StagedEntryRow {...props} row={row} />;
     case "changes-entry":
-      return <ChangesEntryRow {...props} row={row} />;
+    case "tree-file":
+      return <EntryRow {...props} row={row} />;
+    case "tree-dir":
+      return <TreeDirRow {...props} row={row} />;
   }
 });
 
@@ -999,177 +1141,86 @@ function ChangesSectionHeader({
   );
 }
 
-const StagedEntryRow = memo(function StagedEntryRow({
+function TreeDirRow({
   row,
   focused,
-  selected,
   actionBusy,
-  repoRoot,
+  treeCollapsed,
   onFocusRow,
-  onSelectEntry,
-  onUnstageEntry,
-  onOpenFile,
+  onToggleTreeDir,
+  onStageFolder,
+  onUnstageFolder,
+  onDiscardFolder,
 }: RowRendererProps & {
-  row: Extract<RowDescriptor, { kind: "staged-entry" }>;
+  row: Extract<RowDescriptor, { kind: "tree-dir" }>;
 }) {
-  const entry = row.entry;
-  const isSelected = selected?.path === entry.path && selected?.mode === "+";
-  const fileName = basename(entry.path);
-  const iconUrl = fileIconUrl(fileName);
-  const pathLabel = entry.originalPath
-    ? `${entry.originalPath} → ${entry.path}`
-    : dirname(entry.path);
-  const isBusy = actionBusy === `unstage:${entry.path}`;
-  const disabled = actionBusy !== null;
-  const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
-  const previewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
-  const statusHex = gitStatusHexColor(entry.statusCode as GitStatusCode, gitColorScheme);
-  const absolutePath = repoRoot
-    ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
-    : null;
-  const isDeleted = entry.statusCode === "D";
-  const revealLabel = IS_MAC ? "Reveal in Finder" : "Reveal in File Manager";
-
+  const node = row.node;
+  const collapsed = treeCollapsed.has(row.collapseKey);
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          id={`scm-row-${row.key}`}
-          data-focused={focused || undefined}
-          data-selected={isSelected || undefined}
-          role="option"
-          aria-selected={isSelected}
-          onMouseDown={() => onFocusRow(row.key)}
-          className={cn(
-            "group relative flex h-[30px] items-center gap-2 rounded-md pl-2 pr-2 transition-all duration-100",
-            focused
-              ? "bg-accent/60"
-              : isSelected
-                ? "bg-accent/55 text-foreground"
-                : "hover:bg-accent/30",
-          )}
+    <div
+      id={`scm-row-${row.key}`}
+      role="button"
+      tabIndex={-1}
+      data-focused={focused || undefined}
+      onMouseDown={() => onFocusRow(row.key)}
+      onClick={() => onToggleTreeDir(row.collapseKey)}
+      style={{ paddingLeft: 6 + row.depth * 12 }}
+      className={cn(
+        "group flex h-6 select-none items-center gap-2 rounded-sm pr-2 text-[13px] transition-colors",
+        focused ? "bg-accent/60" : "hover:bg-accent/30",
+      )}
+    >
+      <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+        <HugeiconsIcon
+          icon={ArrowRight01Icon}
+          size={12}
+          strokeWidth={2.25}
+          className={cn("transition-transform", !collapsed && "rotate-90")}
+        />
+      </span>
+      {(() => {
+        const folderLeaf = node.name.split("/").pop() ?? node.name;
+        return (
+          <img src={folderIconUrl(folderLeaf, !collapsed)} alt="" className="size-4 shrink-0" />
+        );
+      })()}
+      <span className="min-w-0 flex-1 truncate font-medium text-foreground/90">
+        {node.name}
+      </span>
+      <div
+        className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <IconActionButton
+          label="Discard folder changes"
+          disabled={actionBusy !== null}
+          side="top"
+          onClick={() => onDiscardFolder(node)}
         >
-          <span
-            className={cn(
-              "pointer-events-none absolute inset-y-1 left-0 w-[2px] rounded-full transition-opacity",
-              statusHex ? undefined : statusAccentClass(entry.statusCode),
-              isSelected || focused ? "opacity-100" : "opacity-55 group-hover:opacity-95",
-            )}
-            style={statusHex ? { backgroundColor: statusHex } : undefined}
-            aria-hidden
-          />
-          <button
-            type="button"
-            onClick={() => { onFocusRow(row.key); if (previewOnClick) void onSelectEntry(entry); }}
-            onDoubleClick={() => { if (!previewOnClick) void onSelectEntry(entry); }}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          >
-            {iconUrl ? (
-              <img src={iconUrl} alt="" className="size-4 shrink-0" />
-            ) : (
-              <span className="size-4 shrink-0" />
-            )}
-            <div className="flex min-w-0 flex-1 items-baseline gap-1.5 leading-none">
-              <span
-                className={cn(
-                  "truncate text-[12px] leading-tight",
-                  isSelected || focused ? "font-semibold text-foreground" : "font-medium text-foreground/95",
-                  pathLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
-                )}
-                style={{
-                  color: statusHex ?? undefined,
-                  textDecoration: isDeleted ? "line-through" : undefined,
-                }}
-              >
-                {fileName}
-              </span>
-              {pathLabel ? (
-                <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-muted-foreground/75">
-                  {pathLabel}
-                </span>
-              ) : null}
-            </div>
-          </button>
-          <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-data-[focused=true]:opacity-100 group-data-[selected=true]:opacity-100">
-            <IconActionButton
-              label={`Unstage ${entry.path}`}
-              disabled={disabled}
-              side="top"
-              onClick={() => void onUnstageEntry(entry)}
-            >
-              {isBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
-              )}
-            </IconActionButton>
-          </div>
-          <span
-            className={cn("w-5 shrink-0 text-center text-[11px] font-bold font-mono leading-none", !statusHex && statusTextClass(entry.statusCode))}
-            style={statusHex ? { color: statusHex } : undefined}
-          >
-            {entry.statusCode}
-          </span>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent className={COMPACT_CONTENT}>
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => { onFocusRow(row.key); void onSelectEntry(entry); }}
+          <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
+        </IconActionButton>
+        <IconActionButton
+          label="Unstage folder"
+          disabled={actionBusy !== null}
+          side="top"
+          onClick={() => onUnstageFolder(node)}
         >
-          <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />
-          Open Diff
-        </ContextMenuItem>
-        {!isDeleted && onOpenFile && absolutePath ? (
-          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenFile(absolutePath)}>
-            <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
-            Open File
-          </ContextMenuItem>
-        ) : null}
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          disabled={disabled}
-          onSelect={() => void onUnstageEntry(entry)}
+          <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
+        </IconActionButton>
+        <IconActionButton
+          label="Stage folder"
+          disabled={actionBusy !== null}
+          side="top"
+          onClick={() => onStageFolder(node)}
         >
-          <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
-          Unstage
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"))}
-        >
-          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-          Copy Relative Path
-        </ContextMenuItem>
-        {absolutePath ? (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => void copyToClipboard(absolutePath)}
-          >
-            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
-            Copy Absolute Path
-          </ContextMenuItem>
-        ) : null}
-        {!isDeleted && absolutePath ? (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => void revealInFinder(absolutePath)}
-            >
-              <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
-              {revealLabel}
-            </ContextMenuItem>
-          </>
-        ) : null}
-      </ContextMenuContent>
-    </ContextMenu>
+          <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
+        </IconActionButton>
+      </div>
+    </div>
   );
-});
+}
 
-const ChangesEntryRow = memo(function ChangesEntryRow({
+const EntryRow = memo(function EntryRow({
   row,
   focused,
   selected,
@@ -1178,24 +1229,38 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
   onFocusRow,
   onSelectEntry,
   onStageEntry,
+  onUnstageEntry,
   onDiscardEntry,
   onOpenFile,
 }: RowRendererProps & {
-  row: Extract<RowDescriptor, { kind: "changes-entry" }>;
+  row: Extract<
+    RowDescriptor,
+    { kind: "staged-entry" } | { kind: "changes-entry" } | { kind: "tree-file" }
+  >;
 }) {
   const entry = row.entry;
-  const isSelected = selected?.path === entry.path && selected?.mode === "-";
+  const isStaged = entry.mode === "+";
+  const depth = row.kind === "tree-file" ? row.depth : 0;
+  const showDirname = row.kind !== "tree-file";
+  const isSelected =
+    selected?.path === entry.path && selected?.mode === entry.mode;
   const fileName = basename(entry.path);
   const iconUrl = fileIconUrl(fileName);
   const pathLabel = entry.originalPath
     ? `${entry.originalPath} → ${entry.path}`
-    : dirname(entry.path);
+    : showDirname
+      ? dirname(entry.path)
+      : null;
   const isStageBusy = actionBusy === `stage:${entry.path}`;
+  const isUnstageBusy = actionBusy === `unstage:${entry.path}`;
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
   const disabled = actionBusy !== null;
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const previewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
-  const statusHex = gitStatusHexColor(entry.statusCode as GitStatusCode, gitColorScheme);
+  const statusHex = gitStatusHexColor(
+    entry.statusCode as GitStatusCode,
+    gitColorScheme,
+  );
   const absolutePath = repoRoot
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
     : null;
@@ -1212,8 +1277,9 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           role="option"
           aria-selected={isSelected}
           onMouseDown={() => onFocusRow(row.key)}
+          style={{ paddingLeft: 6 + depth * 12 }}
           className={cn(
-            "group relative flex h-[30px] items-center gap-2 rounded-md pl-2 pr-2 transition-all duration-100",
+            "group flex h-6 items-center gap-2 rounded-sm pr-2 text-[13px] transition-colors",
             focused
               ? "bg-accent/60"
               : isSelected
@@ -1221,19 +1287,16 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
                 : "hover:bg-accent/30",
           )}
         >
-          <span
-            className={cn(
-              "pointer-events-none absolute inset-y-1 left-0 w-[2px] rounded-full transition-opacity",
-              statusHex ? undefined : statusAccentClass(entry.statusCode),
-              isSelected || focused ? "opacity-100" : "opacity-55 group-hover:opacity-95",
-            )}
-            style={statusHex ? { backgroundColor: statusHex } : undefined}
-            aria-hidden
-          />
+          <span className="flex size-3.5 shrink-0 items-center justify-center" />
           <button
             type="button"
-            onClick={() => { onFocusRow(row.key); if (previewOnClick) void onSelectEntry(entry); }}
-            onDoubleClick={() => { if (!previewOnClick) void onSelectEntry(entry); }}
+            onClick={() => {
+              onFocusRow(row.key);
+              if (previewOnClick) void onSelectEntry(entry);
+            }}
+            onDoubleClick={() => {
+              if (!previewOnClick) void onSelectEntry(entry);
+            }}
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
             {iconUrl ? (
@@ -1244,8 +1307,10 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
             <div className="flex min-w-0 flex-1 items-baseline gap-1.5 leading-none">
               <span
                 className={cn(
-                  "truncate text-[12px] leading-tight",
-                  isSelected || focused ? "font-semibold text-foreground" : "font-medium text-foreground/95",
+                  "truncate text-[13px] leading-tight",
+                  isSelected || focused
+                    ? "font-semibold text-foreground"
+                    : "font-medium text-foreground/95",
                   pathLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
                 )}
                 style={{
@@ -1263,33 +1328,61 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
             </div>
           </button>
           <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-data-[focused=true]:opacity-100 group-data-[selected=true]:opacity-100">
-            <IconActionButton
-              label={`Discard ${entry.path}`}
-              disabled={disabled}
-              side="top"
-              onClick={() => onDiscardEntry(entry)}
-            >
-              {isDiscardBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
-              )}
-            </IconActionButton>
-            <IconActionButton
-              label={`Stage ${entry.path}`}
-              disabled={disabled}
-              side="top"
-              onClick={() => void onStageEntry(entry)}
-            >
-              {isStageBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
-              )}
-            </IconActionButton>
+            {isStaged ? (
+              <IconActionButton
+                label={`Unstage ${entry.path}`}
+                disabled={disabled}
+                side="top"
+                onClick={() => void onUnstageEntry(entry)}
+              >
+                {isUnstageBusy ? (
+                  <Spinner className="size-3" />
+                ) : (
+                  <HugeiconsIcon
+                    icon={MinusSignIcon}
+                    size={11}
+                    strokeWidth={1.9}
+                  />
+                )}
+              </IconActionButton>
+            ) : (
+              <>
+                <IconActionButton
+                  label={`Discard ${entry.path}`}
+                  disabled={disabled}
+                  side="top"
+                  onClick={() => onDiscardEntry(entry)}
+                >
+                  {isDiscardBusy ? (
+                    <Spinner className="size-3" />
+                  ) : (
+                    <HugeiconsIcon
+                      icon={RemoveSquareIcon}
+                      size={11}
+                      strokeWidth={1.9}
+                    />
+                  )}
+                </IconActionButton>
+                <IconActionButton
+                  label={`Stage ${entry.path}`}
+                  disabled={disabled}
+                  side="top"
+                  onClick={() => void onStageEntry(entry)}
+                >
+                  {isStageBusy ? (
+                    <Spinner className="size-3" />
+                  ) : (
+                    <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
+                  )}
+                </IconActionButton>
+              </>
+            )}
           </div>
           <span
-            className={cn("w-5 shrink-0 text-center text-[11px] font-bold font-mono leading-none", !statusHex && statusTextClass(entry.statusCode))}
+            className={cn(
+              "w-5 shrink-0 text-center text-[11px] font-bold font-mono leading-none",
+              !statusHex && statusTextClass(entry.statusCode),
+            )}
             style={statusHex ? { color: statusHex } : undefined}
           >
             {entry.statusCode}
@@ -1299,35 +1392,53 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
       <ContextMenuContent className={COMPACT_CONTENT}>
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => { onFocusRow(row.key); void onSelectEntry(entry); }}
+          onSelect={() => {
+            onFocusRow(row.key);
+            void onSelectEntry(entry);
+          }}
         >
           <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />
           Open Diff
         </ContextMenuItem>
         {!isDeleted && onOpenFile && absolutePath ? (
-          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenFile(absolutePath)}>
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onOpenFile(absolutePath)}
+          >
             <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open File
           </ContextMenuItem>
         ) : null}
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          disabled={disabled}
-          onSelect={() => void onStageEntry(entry)}
-        >
-          <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-          Stage
-        </ContextMenuItem>
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          variant="destructive"
-          disabled={disabled}
-          onSelect={() => onDiscardEntry(entry)}
-        >
-          <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
-          Discard Changes
-        </ContextMenuItem>
+        {isStaged ? (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            disabled={disabled}
+            onSelect={() => void onUnstageEntry(entry)}
+          >
+            <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
+            Unstage
+          </ContextMenuItem>
+        ) : (
+          <>
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              disabled={disabled}
+              onSelect={() => void onStageEntry(entry)}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+              Stage
+            </ContextMenuItem>
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              disabled={disabled}
+              onSelect={() => onDiscardEntry(entry)}
+            >
+              <HugeiconsIcon icon={RemoveSquareIcon} size={14} strokeWidth={2} />
+              Discard
+            </ContextMenuItem>
+          </>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
