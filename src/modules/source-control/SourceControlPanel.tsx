@@ -46,10 +46,16 @@ import {
   ArrowRight01Icon,
   ArrowUp01Icon,
   CheckmarkCircle01Icon,
+  Copy01Icon,
+  Delete02Icon,
   Download01Icon,
+  File01Icon,
+  FileDiffIcon,
   FolderCloudIcon,
   FolderGitTwoIcon,
+  FolderOpenIcon,
   GitBranchIcon,
+  Link01Icon,
   MinusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
@@ -1111,10 +1117,12 @@ const StagedEntryRow = memo(function StagedEntryRow({
           className={COMPACT_ITEM}
           onSelect={() => { onFocusRow(row.key); void onSelectEntry(entry); }}
         >
+          <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />
           Open Diff
         </ContextMenuItem>
         {!isDeleted && onOpenFile && absolutePath ? (
           <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenFile(absolutePath)}>
+            <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open File
           </ContextMenuItem>
         ) : null}
@@ -1124,6 +1132,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
           disabled={disabled}
           onSelect={() => void onUnstageEntry(entry)}
         >
+          <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
           Unstage
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -1131,6 +1140,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"))}
         >
+          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
         </ContextMenuItem>
         {absolutePath ? (
@@ -1138,6 +1148,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
             className={COMPACT_ITEM}
             onSelect={() => void copyToClipboard(absolutePath)}
           >
+            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
             Copy Absolute Path
           </ContextMenuItem>
         ) : null}
@@ -1148,6 +1159,7 @@ const StagedEntryRow = memo(function StagedEntryRow({
               className={COMPACT_ITEM}
               onSelect={() => void revealInFinder(absolutePath)}
             >
+              <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
               {revealLabel}
             </ContextMenuItem>
           </>
@@ -1289,10 +1301,12 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           className={COMPACT_ITEM}
           onSelect={() => { onFocusRow(row.key); void onSelectEntry(entry); }}
         >
+          <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />
           Open Diff
         </ContextMenuItem>
         {!isDeleted && onOpenFile && absolutePath ? (
           <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenFile(absolutePath)}>
+            <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open File
           </ContextMenuItem>
         ) : null}
@@ -1302,6 +1316,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           disabled={disabled}
           onSelect={() => void onStageEntry(entry)}
         >
+          <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
           Stage
         </ContextMenuItem>
         <ContextMenuItem
@@ -1310,6 +1325,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           disabled={disabled}
           onSelect={() => onDiscardEntry(entry)}
         >
+          <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
           Discard Changes
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -1317,6 +1333,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"))}
         >
+          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
         </ContextMenuItem>
         {absolutePath ? (
@@ -1324,6 +1341,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
             className={COMPACT_ITEM}
             onSelect={() => void copyToClipboard(absolutePath)}
           >
+            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
             Copy Absolute Path
           </ContextMenuItem>
         ) : null}
@@ -1334,6 +1352,7 @@ const ChangesEntryRow = memo(function ChangesEntryRow({
               className={COMPACT_ITEM}
               onSelect={() => void revealInFinder(absolutePath)}
             >
+              <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
               {revealLabel}
             </ContextMenuItem>
           </>
