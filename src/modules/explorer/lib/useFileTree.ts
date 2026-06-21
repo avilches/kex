@@ -7,6 +7,11 @@ import { pathDirname, pathBasename } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 import { suggestDuplicateName } from "@/modules/explorer/lib/duplicateName";
 import { isCopying } from "@/modules/explorer/lib/duplicateStore";
+import {
+  type ClipboardEntry,
+  planPaste,
+  resolveDestDir,
+} from "@/modules/explorer/lib/clipboardPaste";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
 export type DirEntry = {
@@ -106,6 +111,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   const [pendingDuplicate, setPendingDuplicate] =
     useState<PendingDuplicate | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [clipboard, setClipboard] = useState<ClipboardEntry | null>(null);
+  const clipboardRef = useRef<ClipboardEntry | null>(null);
+  clipboardRef.current = clipboard;
 
   const expandedRef = useRef(expanded);
   const nodesRef = useRef(nodes);
@@ -434,6 +442,94 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     [pendingDuplicate, nodes, fetchChildren],
   );
 
+  const copyEntry = useCallback((path: string, kind: "file" | "dir") => {
+    setClipboard({ path, kind, mode: "copy" });
+  }, []);
+
+  const cutEntry = useCallback((path: string, kind: "file" | "dir") => {
+    setClipboard({ path, kind, mode: "cut" });
+  }, []);
+
+  const expandDir = (dir: string) =>
+    setExpanded((curr) => {
+      if (curr.has(dir)) return curr;
+      const next = new Set(curr);
+      next.add(dir);
+      return next;
+    });
+
+  const pasteEntry = useCallback(
+    async (targetPath: string, targetIsDir: boolean) => {
+      const clip = clipboardRef.current;
+      if (!clip) return;
+      if (isCopying()) {
+        toast.error("A copy is already in progress");
+        return;
+      }
+      const destDir = resolveDestDir(targetPath, targetIsDir);
+
+      let existingNames: string[] = [];
+      try {
+        const entries = await invoke<DirEntry[]>("fs_read_dir", {
+          path: destDir,
+          showHidden: true,
+          gitDecorations: false,
+          workspace: currentWorkspaceEnv(),
+        });
+        existingNames = entries.map((e) => e.name);
+      } catch (e) {
+        console.error("fs_read_dir (paste) failed:", e);
+        toast.error("Failed to read the destination folder");
+        return;
+      }
+
+      const plan = planPaste(clip, destDir, existingNames);
+      const baseName = pathBasename(clip.path);
+
+      if (plan.action === "error") {
+        toast.error(
+          plan.reason === "self-nest"
+            ? "Cannot paste a folder into itself"
+            : `Already exists: ${baseName}`,
+        );
+        return;
+      }
+      if (plan.action === "noop") {
+        setClipboard(null);
+        return;
+      }
+
+      const dest = joinPath(destDir, plan.name);
+
+      if (plan.action === "copy") {
+        try {
+          await native.duplicate(clip.path, dest);
+          await fetchChildren(destDir);
+          expandDir(destDir);
+        } catch (e) {
+          console.error("fs_duplicate (paste) failed:", e);
+          toast.error(`Failed to paste ${baseName}`);
+        }
+        return;
+      }
+
+      try {
+        await native.renameFile(clip.path, dest);
+        options?.onPathRenamed?.(clip.path, dest);
+        await Promise.all([
+          fetchChildren(dirname(clip.path)),
+          fetchChildren(destDir),
+        ]);
+        expandDir(destDir);
+        setClipboard(null);
+      } catch (e) {
+        console.error("fs_rename (paste) failed:", e);
+        toast.error(`Failed to move ${baseName}`);
+      }
+    },
+    [fetchChildren, options],
+  );
+
   const beginRename = useCallback((path: string) => {
     setPendingCreate(null);
     setPendingDuplicate(null);
@@ -526,6 +622,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     pendingCreate,
     pendingDuplicate,
     renaming,
+    clipboard,
     toggle,
     expand,
     refresh,
@@ -535,6 +632,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     beginDuplicate,
     cancelDuplicate,
     commitDuplicate,
+    copyEntry,
+    cutEntry,
+    pasteEntry,
     beginRename,
     cancelRename,
     commitRename,
