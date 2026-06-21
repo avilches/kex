@@ -6,7 +6,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { pathDirname, pathBasename } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 import { suggestDuplicateName } from "@/modules/explorer/lib/duplicateName";
-import { isDuplicating } from "@/modules/explorer/lib/duplicateStore";
+import { isCopying } from "@/modules/explorer/lib/duplicateStore";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
 export type DirEntry = {
@@ -366,7 +366,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
   const beginDuplicate = useCallback(
     (sourcePath: string, kind: "file" | "dir") => {
-      if (isDuplicating()) {
+      if (isCopying()) {
         toast.error("A duplication is already in progress");
         return;
       }
@@ -416,7 +416,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         setPendingDuplicate(null);
         return;
       }
-      if (isDuplicating()) {
+      if (isCopying()) {
         toast.error("A duplication is already in progress");
         setPendingDuplicate(null);
         return;
