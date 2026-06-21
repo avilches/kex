@@ -75,6 +75,22 @@ pub fn fs_delete(path: String, workspace: Option<WorkspaceEnv>) -> Result<(), St
     })
 }
 
+/// Moves a file or directory to the system trash. Unlike `fs_delete` this is
+/// recoverable from the OS trash/recycle bin.
+#[tauri::command]
+pub fn fs_trash(path: String, workspace: Option<WorkspaceEnv>) -> Result<(), String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let p = resolve_path(&path, &workspace);
+    std::fs::symlink_metadata(&p).map_err(|e| {
+        log::debug!("fs_trash stat({}) failed: {e}", p.display());
+        e.to_string()
+    })?;
+    trash::delete(&p).map_err(|e| {
+        log::warn!("fs_trash({}) failed: {e}", p.display());
+        e.to_string()
+    })
+}
+
 fn copy_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
     if src.is_dir() {
         std::fs::create_dir(dst)?;
@@ -231,6 +247,18 @@ mod tests {
         assert!(!sub.exists());
 
         let err = fs_delete(s(dir.path().join("missing")), None).unwrap_err();
+        assert!(!err.is_empty());
+    }
+
+    #[test]
+    fn trash_moves_file_out_of_original_location() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("trash-me.txt");
+        std::fs::write(&f, b"bye").unwrap();
+        fs_trash(s(f.clone()), None).expect("trash file");
+        assert!(!f.exists(), "file must be gone from its original path");
+
+        let err = fs_trash(s(dir.path().join("missing")), None).unwrap_err();
         assert!(!err.is_empty());
     }
 
