@@ -24,6 +24,7 @@ import {
   buildSharedExtensions,
   languageCompartment,
   vimCompartment,
+  wrapCompartment,
 } from "./lib/extensions";
 import { resolveLanguage } from "./lib/languageResolver";
 import { EDITOR_THEME_EXT } from "./lib/themes";
@@ -79,6 +80,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const editorThemeId = usePreferencesStore((s) => s.editorTheme);
     const vimMode = usePreferencesStore((s) => s.vimMode);
+    const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
     const languageRef = useRef<string | null>(null);
     const themeExt =
       EDITOR_THEME_EXT[editorThemeId] ?? EDITOR_THEME_EXT.atomone;
@@ -136,6 +138,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         })),
         ...buildSharedExtensions(),
         languageCompartment.of([]),
+        wrapCompartment.of(
+          usePreferencesStore.getState().editorWordWrap
+            ? EditorView.lineWrapping
+            : [],
+        ),
         keymap.of([
           {
             key: "Mod-s",
@@ -160,6 +167,16 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         effects: vimCompartment.reconfigure(vimMode ? Prec.highest(vim()) : []),
       });
     }, [vimMode]);
+
+    useEffect(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: wrapCompartment.reconfigure(
+          editorWordWrap ? EditorView.lineWrapping : [],
+        ),
+      });
+    }, [editorWordWrap]);
 
     useEffect(() => {
       const ext = path.split(".").pop()?.toLowerCase() ?? null;

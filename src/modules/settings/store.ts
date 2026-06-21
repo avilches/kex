@@ -52,6 +52,7 @@ export type Preferences = {
   editorLineHeight: number;
   autostart: boolean;
   vimMode: boolean;
+  editorWordWrap: boolean;
   showHidden: boolean;
   explorerGitColorScheme: GitColorScheme;
   scmViewMode: ScmViewMode;
@@ -91,6 +92,7 @@ const KEY_EDITOR_LETTER_SPACING = "editorLetterSpacing";
 const KEY_EDITOR_LINE_HEIGHT = "editorLineHeight";
 const KEY_AUTOSTART = "autostart";
 const KEY_VIM_MODE = "vimMode";
+const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
@@ -171,6 +173,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorLineHeight: EDITOR_LINE_HEIGHT_DEFAULT,
   autostart: false,
   vimMode: false,
+  editorWordWrap: false,
   showHidden: false,
   explorerGitColorScheme: "vscode",
   scmViewMode: "tree",
@@ -256,6 +259,8 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.editorLineHeight,
     autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
+    editorWordWrap:
+      get<boolean>(KEY_EDITOR_WORD_WRAP) ?? DEFAULT_PREFERENCES.editorWordWrap,
     showHidden:
       get<boolean>(KEY_SHOW_HIDDEN) ??
       get<boolean>(LEGACY_KEY_SHOW_HIDDEN_DIRS) ??
@@ -417,6 +422,10 @@ export async function setVimMode(value: boolean): Promise<void> {
   await writePref(KEY_VIM_MODE, value);
 }
 
+export async function setEditorWordWrap(value: boolean): Promise<void> {
+  await writePref(KEY_EDITOR_WORD_WRAP, value);
+}
+
 export async function setShowHidden(value: boolean): Promise<void> {
   await writePref(KEY_SHOW_HIDDEN, value);
 }
@@ -572,6 +581,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_LINE_HEIGHT]: "editorLineHeight",
   [KEY_AUTOSTART]: "autostart",
   [KEY_VIM_MODE]: "vimMode",
+  [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
   [KEY_SHOW_HIDDEN]: "showHidden",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",

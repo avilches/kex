@@ -18,6 +18,7 @@ import {
   setAgentNotifications,
   setAutostart,
   setEditorAutoSave,
+  setEditorWordWrap,
   setEditorPreviewOnClick,
   setTerminalCursorBlink,
   setTerminalScrollback,
@@ -34,6 +35,7 @@ import { SettingRow } from "../components/SettingRow";
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
   const vimMode = usePreferencesStore((s) => s.vimMode);
+  const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const editorPreviewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
   const terminalWebglEnabled = usePreferencesStore(
@@ -109,6 +111,15 @@ export function GeneralSection() {
           <Switch
             checked={vimMode}
             onCheckedChange={(v) => void setVimMode(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Word wrap"
+          description="Wrap long lines instead of scrolling horizontally."
+        >
+          <Switch
+            checked={editorWordWrap}
+            onCheckedChange={(v) => void setEditorWordWrap(v)}
           />
         </SettingRow>
         <SettingRow
