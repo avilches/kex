@@ -141,12 +141,24 @@ previous workspaces or pane layout.
   focusing an editor no longer reroots the explorer (the upstream per-editor root override was removed). Pure logic in
   `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspace-state.json` (`explorerRootMode`,
   `pinnedRoot`).
+- **Root path header (all modes)** — the tree is prefixed by a non-collapsible header row showing the current root's
+  full path, left-truncated when long so the tail stays visible (a leading LRM keeps the leading `/` from being
+  reordered by the rtl-based truncation). The selector trigger shows the active mode's label and icon rather than the
+  folder name. The header has its own context menu (Set as Workspace Root, New Workspace from folder, Open in Terminal,
+  Reveal in Finder, New File/Folder, Copy Path, Refresh); in Workspace Root mode the "Set as Workspace Root" entry is
+  disabled and reads "This is the Workspace Root".
 - **Navigable File System root** — in File System mode the root is navigable per workspace: double-clicking a folder
-  enters it, an Up button climbs to the parent (capped at the filesystem or drive root), and a Home button returns to
-  the user's home directory. The current root is stored as `fsRoot` in `workspace-state.json` (default home). A
-  JSON-only preference `keepFolderLayoutOnChangeExplorerRoot` (default `false`) controls whether the per-root tree
-  expansion layout is restored on root change or the tree starts collapsed. These controls appear only in File System
-  mode; the other three root modes are unaffected.
+  enters it. On top of the shared path header, File System adds a `..` folder-style row (hidden at the filesystem or
+  drive root) whose double-click climbs to the parent directory; the selector uses the hierarchy icon and its subtitle
+  shows the current root path. If the current root is deleted while shown, the explorer silently relocates to the
+  nearest existing ancestor instead of showing a recovery state. The current root is stored as `fsRoot` in
+  `workspace-state.json` (default home). A JSON-only preference `keepFolderLayoutOnChangeExplorerRoot` (default `false`)
+  controls whether the per-root tree expansion layout is restored on root change or the tree starts collapsed. The `..`
+  row appears only in File System mode; the other three root modes are unaffected.
+- **Folder context actions** — a folder's context menu offers "Open in Terminal" (opens a new terminal tab in the
+  current workspace's active pane, spawned directly with the folder as cwd, leaving the explorer view untouched) and
+  "New Workspace from folder" (creates a new workspace with that folder pinned as its Workspace Root). Neither injects a
+  `cd` command into a shell.
 
 ### Technical fixes and refactors
 

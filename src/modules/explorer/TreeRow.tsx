@@ -12,6 +12,7 @@ import {
   ArrowRight01Icon,
   ComputerTerminal01Icon,
   Copy01Icon,
+  DashboardSquareAddIcon,
   Delete02Icon,
   File01Icon,
   FileAddIcon,
@@ -19,6 +20,7 @@ import {
   FolderOpenIcon,
   Link01Icon,
   PinIcon,
+  Refresh01Icon,
   SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -63,6 +65,7 @@ export type EntryRowProps = {
   onOpenFile: (path: string, pin?: boolean) => void;
   onSelectPath: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
   onEnterFolder?: (path: string) => void;
@@ -88,6 +91,7 @@ function EntryRowImpl(props: EntryRowProps) {
     onOpenFile,
     onSelectPath,
     onRevealInTerminal,
+    onNewWorkspaceFromFolder,
     onAttachToAgent,
     onSetAsRoot,
     onEnterFolder,
@@ -266,6 +270,19 @@ function EntryRowImpl(props: EntryRowProps) {
             Set as Workspace Root
           </ContextMenuItem>
         )}
+        {isDir && onNewWorkspaceFromFolder && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onNewWorkspaceFromFolder(path)}
+          >
+            <HugeiconsIcon
+              icon={DashboardSquareAddIcon}
+              size={14}
+              strokeWidth={2}
+            />
+            New Workspace from folder
+          </ContextMenuItem>
+        )}
         {!isDir && (
           <ContextMenuItem
             className={COMPACT_ITEM}
@@ -390,6 +407,145 @@ export function PendingRow({
         onCancel={onCancel}
       />
     </div>
+  );
+}
+
+// A left-to-right mark anchors the leading "/" so the rtl-based left-truncation
+// does not reorder it (otherwise "/Users/foo" renders as "Users/foo/").
+const LRM = "\u200e";
+
+export type FsRootRowProps = {
+  path: string;
+  isWorkspaceRoot: boolean;
+  onSetAsRoot?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
+  onRevealInTerminal?: (path: string) => void;
+  onBeginCreate?: (parentPath: string, kind: "file" | "dir") => void;
+  onRefresh?: (path: string) => void;
+};
+
+export function FsRootRow({
+  path,
+  isWorkspaceRoot,
+  onSetAsRoot,
+  onNewWorkspaceFromFolder,
+  onRevealInTerminal,
+  onBeginCreate,
+  onRefresh,
+}: FsRootRowProps) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className="flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]"
+          style={{ paddingLeft: 6 }}
+          title={path}
+        >
+          <img
+            src={folderIconUrl("", true)}
+            alt=""
+            className="size-4 shrink-0"
+          />
+          <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground/90 [direction:rtl]">
+            {LRM + path}
+          </span>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className={COMPACT_CONTENT}>
+        {onSetAsRoot && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            disabled={isWorkspaceRoot}
+            onSelect={() => onSetAsRoot(path)}
+          >
+            <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
+            {isWorkspaceRoot
+              ? "This is the Workspace Root"
+              : "Set as Workspace Root"}
+          </ContextMenuItem>
+        )}
+        {onNewWorkspaceFromFolder && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onNewWorkspaceFromFolder(path)}
+          >
+            <HugeiconsIcon
+              icon={DashboardSquareAddIcon}
+              size={14}
+              strokeWidth={2}
+            />
+            New Workspace from folder
+          </ContextMenuItem>
+        )}
+        <ContextMenuSeparator />
+        {onRevealInTerminal && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onRevealInTerminal(path)}
+          >
+            <HugeiconsIcon
+              icon={ComputerTerminal01Icon}
+              size={14}
+              strokeWidth={2}
+            />
+            Open in Terminal
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => void revealInFinder(path)}
+        >
+          <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
+          Reveal in Finder
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => onBeginCreate?.(path, "file")}
+        >
+          <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
+          New File
+        </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => onBeginCreate?.(path, "dir")}
+        >
+          <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
+          New Folder
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => void copyToClipboard(path)}
+        >
+          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          Copy Path
+        </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => onRefresh?.(path)}
+        >
+          <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />
+          Refresh
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+export function FsUpRow({ onNavigateUp }: { onNavigateUp?: () => void }) {
+  return (
+    <button
+      type="button"
+      onDoubleClick={() => onNavigateUp?.()}
+      title="Double-click to go up one folder"
+      className="group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70"
+      style={{ paddingLeft: 6 }}
+    >
+      <span className="size-3.5 shrink-0" />
+      <img src={folderIconUrl("", false)} alt="" className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">..</span>
+    </button>
   );
 }
 

@@ -37,10 +37,10 @@ export type RightPanelProps = {
   onSetAsRoot: (path: string) => void;
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
-  onNavigateHome?: () => void;
+  onFsRootMissing?: (path: string) => void;
   canNavigateUp: boolean;
-  isAtHome: boolean;
   homePath: string | null;
+  fsRootPath: string | null;
   terminalCwdPath: string | null;
   gitRootPath: string | null;
   workspaceRootPath: string | null;
@@ -50,6 +50,7 @@ export type RightPanelProps = {
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
   onExplorerSearchClose?: () => void;
   // SourceControlPanel props
@@ -123,10 +124,10 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               onSetAsRoot={props.onSetAsRoot}
               onEnterFolder={props.onEnterFolder}
               onNavigateUp={props.onNavigateUp}
-              onNavigateHome={props.onNavigateHome}
+              onFsRootMissing={props.onFsRootMissing}
               canNavigateUp={props.canNavigateUp}
-              isAtHome={props.isAtHome}
               homePath={props.homePath}
+              fsRootPath={props.fsRootPath}
               terminalCwdPath={props.terminalCwdPath}
               gitRootPath={props.gitRootPath}
               workspaceRootPath={props.workspaceRootPath}
@@ -136,6 +137,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               onPathRenamed={props.onPathRenamed}
               onPathDeleted={props.onPathDeleted}
               onRevealInTerminal={props.onRevealInTerminal}
+              onNewWorkspaceFromFolder={props.onNewWorkspaceFromFolder}
               onAttachToAgent={props.onAttachToAgent}
               gitStatus={props.sourceControl.status}
               onSearchClose={props.onExplorerSearchClose}

@@ -496,7 +496,7 @@ export default function App() {
     explorerRoot !== null &&
     !isFilesystemRoot(explorerRoot);
 
-  const isAtHome = explorerRoot === home;
+  const fsRootPath = fsFolderRoot ?? home;
 
   const handleChangeRootMode = useCallback(
     (mode: ExplorerRootMode) => {
@@ -520,11 +520,23 @@ export default function App() {
     setFsRoot(activeWorkspace.id, parentRoot(explorerRoot));
   }, [activeWorkspace, activeRootMode, explorerRoot, setFsRoot]);
 
-  const handleNavigateHome = useCallback(() => {
-    if (activeWorkspace && activeRootMode === "filesystem" && home) {
-      setFsRoot(activeWorkspace.id, home);
-    }
-  }, [activeWorkspace, activeRootMode, home, setFsRoot]);
+  const handleFsRootMissing = useCallback(
+    async (brokenPath: string) => {
+      if (!activeWorkspace || activeRootMode !== "filesystem") return;
+      let candidate = brokenPath;
+      while (!isFilesystemRoot(candidate)) {
+        candidate = parentRoot(candidate);
+        try {
+          await native.fsStat(candidate);
+          break;
+        } catch {
+          // keep climbing toward the filesystem/drive root, which always exists
+        }
+      }
+      setFsRoot(activeWorkspace.id, candidate);
+    },
+    [activeWorkspace, activeRootMode, setFsRoot],
+  );
 
   const handleEnterFolder = useCallback(
     (path: string) => {
@@ -1315,25 +1327,35 @@ export default function App() {
     [activePanelId],
   );
 
-  const cdInNewWorkspace = useCallback(
+  const openFolderInTerminal = useCallback(
+    (path: string) => {
+      if (!activeWorkspace) return;
+      const panelId = newPanelId();
+      openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+        id: panelId,
+        kind: "terminal",
+        cwd: path,
+      });
+      setTimeout(() => terminalHandles.current.get(panelId)?.focus(), 80);
+    },
+    [activeWorkspace, openPanel],
+  );
+
+  const newWorkspaceFromFolder = useCallback(
     (path: string) => {
       const wsId = addWorkspace(path);
+      setPinnedRoot(wsId, path);
       setTimeout(() => {
         const ws = workspacesRef.current.find((w) => w.id === wsId);
         if (!ws) return;
         const pane = allPanes(ws.paneTree)[0];
-        if (!pane) return;
-        const panel = pane.activePanelId
+        const panel = pane?.activePanelId
           ? pane.panels.find((p) => p.id === pane.activePanelId)
-          : pane.panels[0];
-        if (!panel) return;
-        const t = terminalHandles.current.get(panel.id);
-        if (!t) return;
-        t.write(`cd ${quoteShellArg(path)}\r`);
-        t.focus();
+          : pane?.panels[0];
+        if (panel) terminalHandles.current.get(panel.id)?.focus();
       }, 80);
     },
-    [addWorkspace],
+    [addWorkspace, setPinnedRoot],
   );
 
   const openContentHit = useCallback(
@@ -1912,10 +1934,10 @@ export default function App() {
                         onSetAsRoot={handleSetAsRoot}
                         onEnterFolder={handleEnterFolder}
                         onNavigateUp={handleNavigateUp}
-                        onNavigateHome={handleNavigateHome}
+                        onFsRootMissing={handleFsRootMissing}
                         canNavigateUp={canNavigateUp}
-                        isAtHome={isAtHome}
                         homePath={home}
+                        fsRootPath={fsRootPath}
                         terminalCwdPath={terminalRootCwd}
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
@@ -1924,7 +1946,8 @@ export default function App() {
                         onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
-                        onRevealInTerminal={cdInNewWorkspace}
+                        onRevealInTerminal={openFolderInTerminal}
+                        onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onExplorerSearchClose={onExplorerSearchClose}
                         sourceControl={sourceControl}
                         onOpenDiff={openGitDiffInPanel}
@@ -1990,10 +2013,10 @@ export default function App() {
                         onSetAsRoot={handleSetAsRoot}
                         onEnterFolder={handleEnterFolder}
                         onNavigateUp={handleNavigateUp}
-                        onNavigateHome={handleNavigateHome}
+                        onFsRootMissing={handleFsRootMissing}
                         canNavigateUp={canNavigateUp}
-                        isAtHome={isAtHome}
                         homePath={home}
+                        fsRootPath={fsRootPath}
                         terminalCwdPath={terminalRootCwd}
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
@@ -2002,7 +2025,8 @@ export default function App() {
                         onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
-                        onRevealInTerminal={cdInNewWorkspace}
+                        onRevealInTerminal={openFolderInTerminal}
+                        onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onExplorerSearchClose={onExplorerSearchClose}
                         sourceControl={sourceControl}
                         onOpenDiff={openGitDiffInPanel}

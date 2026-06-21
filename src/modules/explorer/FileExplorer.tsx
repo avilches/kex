@@ -8,12 +8,12 @@ import {
 } from "@/components/ui/context-menu";
 import {
   ArrowDown01Icon,
-  ArrowUp01Icon,
   ComputerTerminal01Icon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
   GitBranchIcon,
+  HierarchyFilesIcon,
   Home01Icon,
   PinIcon,
   PinOffIcon,
@@ -41,10 +41,15 @@ import {
   useState,
 } from "react";
 import { ExplorerSearch, type ExplorerSearchHandle } from "./ExplorerSearch";
-import { EntryRow, PendingRow, StatusRow, type RowActions } from "./TreeRow";
-import { InlineInput } from "./InlineInput";
+import {
+  EntryRow,
+  FsRootRow,
+  FsUpRow,
+  PendingRow,
+  StatusRow,
+  type RowActions,
+} from "./TreeRow";
 import { copyToClipboard, revealInFinder } from "./lib/contextActions";
-import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { useFileTree } from "./lib/useFileTree";
@@ -73,10 +78,10 @@ type Props = {
   onSetAsRoot: (path: string) => void;
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
-  onNavigateHome?: () => void;
+  onFsRootMissing?: (path: string) => void;
   canNavigateUp: boolean;
-  isAtHome: boolean;
   homePath: string | null;
+  fsRootPath: string | null;
   terminalCwdPath: string | null;
   gitRootPath: string | null;
   workspaceRootPath: string | null;
@@ -86,6 +91,7 @@ type Props = {
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
@@ -96,14 +102,14 @@ const ROOT_MODES: {
   label: string;
   icon: typeof Search01Icon;
 }[] = [
-  { id: "filesystem", label: "File System", icon: Home01Icon },
+  { id: "filesystem", label: "File System", icon: HierarchyFilesIcon },
   { id: "pinned", label: "Workspace Root", icon: PinIcon },
   { id: "terminal", label: "Follow Terminal", icon: ComputerTerminal01Icon },
   { id: "git", label: "Follow Git Root", icon: GitBranchIcon },
 ];
 
 type RootModeContext = {
-  homePath: string | null;
+  fsRootPath: string | null;
   workspaceRootPath: string | null;
   workspaceRootExists: boolean;
   terminalCwdPath: string | null;
@@ -116,7 +122,7 @@ function rootModeInfo(
 ): { subtitle: string | null; disabled: boolean } {
   switch (id) {
     case "filesystem":
-      return { subtitle: ctx.homePath, disabled: false };
+      return { subtitle: ctx.fsRootPath, disabled: false };
     case "pinned":
       if (!ctx.workspaceRootPath)
         return {
@@ -158,6 +164,8 @@ type Row =
       gitignored: boolean;
       gitStatusCode: GitStatusCode | null;
     }
+  | { kind: "fs-root"; key: string; path: string }
+  | { kind: "fs-up"; key: string }
   | { kind: "pending"; key: string; depth: number; pendingKind: "file" | "dir" }
   | {
       kind: "status";
@@ -170,18 +178,30 @@ type Row =
 const ROW_HEIGHT = 24;
 const OVERSCAN = 8;
 
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : path;
-}
 
 function buildRows(
   rootPath: string,
   tree: ReturnType<typeof useFileTree>,
   lookup: (path: string) => GitStatusCode | null,
+  fsNav: { filesystem: boolean; canNavigateUp: boolean },
 ): { rows: Row[]; entryIndexByPath: Map<string, number> } {
   const rows: Row[] = [];
   const entryIndexByPath = new Map<string, number>();
+
+  rows.push({ kind: "fs-root", key: `fs-root:${rootPath}`, path: rootPath });
+  if (fsNav.filesystem && fsNav.canNavigateUp) {
+    rows.push({ kind: "fs-up", key: "fs-up" });
+  }
+  // A create-at-root pending sits below the synthetic header/".." rows, before
+  // the real entries (pendings inside subfolders are emitted by walk()).
+  if (tree.pendingCreate?.parentPath === rootPath) {
+    rows.push({
+      kind: "pending",
+      key: `pending:${rootPath}`,
+      depth: 0,
+      pendingKind: tree.pendingCreate.kind,
+    });
+  }
 
   const walk = (parent: string, depth: number, parentIgnored: boolean) => {
     const node = tree.nodes[parent];
@@ -264,10 +284,10 @@ export const FileExplorer = memo(
       onSetAsRoot,
       onEnterFolder,
       onNavigateUp,
-      onNavigateHome,
+      onFsRootMissing,
       canNavigateUp,
-      isAtHome,
       homePath,
+      fsRootPath,
       terminalCwdPath,
       gitRootPath,
       workspaceRootPath,
@@ -277,6 +297,7 @@ export const FileExplorer = memo(
       onPathRenamed,
       onPathDeleted,
       onRevealInTerminal,
+      onNewWorkspaceFromFolder,
       onAttachToAgent,
       gitStatus,
       onSearchClose,
@@ -331,12 +352,17 @@ export const FileExplorer = memo(
           rows: [] as Row[],
           entryIndexByPath: new Map<string, number>(),
         };
-      return buildRows(rootPath, tree, lookupGitStatus);
+      return buildRows(rootPath, tree, lookupGitStatus, {
+        filesystem: rootMode === "filesystem",
+        canNavigateUp,
+      });
       // `tree` is intentionally omitted: its identity changes every render, but
       // the listed fields are the only inputs buildRows actually reads.
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
       rootPath,
+      rootMode,
+      canNavigateUp,
       tree.nodes,
       tree.expanded,
       tree.renaming,
@@ -453,6 +479,34 @@ export const FileExplorer = memo(
       requestAnimationFrame(() => scrollEntryIntoView(activeFilePath));
     }, [activeFilePath, entryIndexByPath, scrollEntryIntoView]);
 
+    // A create-at-root pending is a virtualized row near the top; if the list is
+    // scrolled away its InlineInput never mounts (and never autofocuses). Bring
+    // it into view once when it appears. `align: "auto"` is a no-op if visible.
+    const pendingParent = tree.pendingCreate?.parentPath ?? null;
+    const lastPendingScrollRef = useRef<string | null>(null);
+    useEffect(() => {
+      if (!pendingParent) {
+        lastPendingScrollRef.current = null;
+        return;
+      }
+      if (lastPendingScrollRef.current === pendingParent) return;
+      const idx = rows.findIndex((r) => r.kind === "pending");
+      if (idx >= 0) {
+        lastPendingScrollRef.current = pendingParent;
+        virtualizer.scrollToIndex(idx, { align: "auto", behavior: "smooth" });
+      }
+    }, [pendingParent, rows, virtualizer]);
+
+    // When the File System root no longer exists on disk (e.g. it was deleted
+    // from under us), climb to the nearest existing ancestor instead of showing
+    // a dead-end. The actual resolution lives in App (it needs fs access).
+    const rootStatus = rootPath ? tree.nodes[rootPath]?.status : undefined;
+    useEffect(() => {
+      if (rootMode === "filesystem" && rootStatus === "error" && rootPath) {
+        onFsRootMissing?.(rootPath);
+      }
+    }, [rootMode, rootStatus, rootPath, onFsRootMissing]);
+
     useImperativeHandle(
       ref,
       () => ({
@@ -504,8 +558,8 @@ export const FileExplorer = memo(
     }
 
     const root = tree.nodes[rootPath];
-    const pendingAtRoot =
-      tree.pendingCreate?.parentPath === rootPath ? tree.pendingCreate : null;
+    const activeMode =
+      ROOT_MODES.find((m) => m.id === rootMode) ?? ROOT_MODES[0];
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (tree.renaming || tree.pendingCreate || isSearchOpen) return;
@@ -611,6 +665,7 @@ export const FileExplorer = memo(
               onOpenFile={onOpenFile}
               onSelectPath={setSelectedPath}
               onRevealInTerminal={onRevealInTerminal}
+              onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
               onAttachToAgent={onAttachToAgent}
               onSetAsRoot={onSetAsRoot}
               onEnterFolder={onEnterFolder}
@@ -618,6 +673,20 @@ export const FileExplorer = memo(
             />
           );
         }
+        case "fs-root":
+          return (
+            <FsRootRow
+              path={row.path}
+              isWorkspaceRoot={rootMode === "pinned"}
+              onSetAsRoot={onSetAsRoot}
+              onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
+              onRevealInTerminal={onRevealInTerminal}
+              onBeginCreate={tree.beginCreate}
+              onRefresh={tree.refresh}
+            />
+          );
+        case "fs-up":
+          return <FsUpRow onNavigateUp={onNavigateUp} />;
         case "pending":
           return (
             <PendingRow
@@ -646,34 +715,6 @@ export const FileExplorer = memo(
         onKeyDown={handleKeyDown}
       >
         <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-1.5">
-          {rootMode === "filesystem" && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-6 shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
-                onClick={() => onNavigateUp?.()}
-                disabled={!canNavigateUp}
-                title="Up one folder"
-                aria-label="Up one folder"
-              >
-                <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={2} />
-              </Button>
-              {!isAtHome && homePath != null && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-                  onClick={() => onNavigateHome?.()}
-                  title="Go to home folder"
-                  aria-label="Go to home folder"
-                >
-                  <HugeiconsIcon icon={Home01Icon} size={13} strokeWidth={2} />
-                </Button>
-              )}
-              <div className="mx-0.5 h-4 w-px shrink-0 bg-border/60" />
-            </>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -682,15 +723,12 @@ export const FileExplorer = memo(
                 title={rootPath ?? undefined}
               >
                 <HugeiconsIcon
-                  icon={
-                    (ROOT_MODES.find((m) => m.id === rootMode) ?? ROOT_MODES[0])
-                      .icon
-                  }
+                  icon={activeMode.icon}
                   size={13}
                   strokeWidth={2}
                   className="shrink-0 text-primary"
                 />
-                <span className="truncate">{basename(rootPath)}</span>
+                <span className="truncate">{activeMode.label}</span>
                 <HugeiconsIcon
                   icon={ArrowDown01Icon}
                   size={12}
@@ -705,7 +743,7 @@ export const FileExplorer = memo(
             >
               {ROOT_MODES.map((m) => {
                 const info = rootModeInfo(m.id, {
-                  homePath,
+                  fsRootPath,
                   workspaceRootPath,
                   workspaceRootExists,
                   terminalCwdPath,
@@ -877,58 +915,8 @@ export const FileExplorer = memo(
             </div>
           </div>
         ) : rootMode === "filesystem" && root?.status === "error" ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-            <HugeiconsIcon
-              icon={Folder01Icon}
-              size={26}
-              strokeWidth={1.8}
-              className="text-muted-foreground"
-            />
-            <div className="text-sm font-medium text-foreground">
-              Folder not found
-            </div>
-            <div className="break-all text-[11px] text-muted-foreground">
-              {rootPath}
-            </div>
-            <div className="mt-2 flex w-full flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => onNavigateHome?.()}
-                className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
-              >
-                <HugeiconsIcon
-                  icon={Home01Icon}
-                  size={14}
-                  strokeWidth={2}
-                  className="mt-0.5 shrink-0 text-primary"
-                />
-                <span className="flex min-w-0 flex-col">
-                  <span className="font-medium">Go to home folder</span>
-                  {homePath && (
-                    <span className="break-all text-[10px] text-muted-foreground">
-                      {homePath}
-                    </span>
-                  )}
-                </span>
-              </button>
-              {canNavigateUp && (
-                <button
-                  type="button"
-                  onClick={() => onNavigateUp?.()}
-                  className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
-                >
-                  <HugeiconsIcon
-                    icon={ArrowUp01Icon}
-                    size={14}
-                    strokeWidth={2}
-                    className="mt-0.5 shrink-0 text-primary"
-                  />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="font-medium">Up one folder</span>
-                  </span>
-                </button>
-              )}
-            </div>
+          <div className="flex flex-1 items-center justify-center px-4 py-10 text-center text-[11px] text-muted-foreground">
+            Locating nearest existing folder…
           </div>
         ) : (
           <>
@@ -958,33 +946,6 @@ export const FileExplorer = memo(
                         "rounded-sm ring-1 ring-inset ring-primary/50",
                     )}
                   >
-                    {pendingAtRoot ? (
-                      <div
-                        className="flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]"
-                        style={{ paddingLeft: 6 }}
-                      >
-                        <span className="size-3.5 shrink-0" />
-                        <img
-                          src={
-                            pendingAtRoot.kind === "dir"
-                              ? folderIconUrl("", false)
-                              : fileIconUrl("untitled")
-                          }
-                          alt=""
-                          className="size-4 shrink-0 opacity-70"
-                        />
-                        <InlineInput
-                          initial=""
-                          placeholder={
-                            pendingAtRoot.kind === "dir"
-                              ? "New folder"
-                              : "New file"
-                          }
-                          onCommit={tree.commitCreate}
-                          onCancel={tree.cancelCreate}
-                        />
-                      </div>
-                    ) : null}
                     {root?.status === "loading" && (
                       <div className="px-3 py-2 text-[11px] text-muted-foreground">
                         Loading…
