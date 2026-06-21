@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { native } from "@/lib/native";
 import type { SidebarViewId } from "@/modules/sidebar";
+import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 import { useSourceControl } from "./useSourceControl";
 
 type PanelItem = {
@@ -14,6 +15,7 @@ type Params = {
   tabs: PanelItem[];
   activeTerminalLeafCwd: string | null;
   explorerRoot: string | null;
+  explorerRootMode: ExplorerRootMode;
   launchCwd: string | null;
   launchCwdResolved: boolean;
   home: string | null;
@@ -35,6 +37,7 @@ export function useSourceControlContext({
   tabs,
   activeTerminalLeafCwd,
   explorerRoot,
+  explorerRootMode,
   launchCwd,
   launchCwdResolved,
   home,
@@ -46,6 +49,15 @@ export function useSourceControlContext({
     ? (launchCwd ?? home ?? null)
     : null;
   const sourceControlContextPath = (() => {
+    // In pinned/filesystem modes the displayed folder is fixed; use it as the
+    // git context so file decorations (and the SC panel) always reflect the
+    // nearest repo to the explorer root rather than wherever the terminal is.
+    if (
+      explorerRootMode === "pinned" ||
+      explorerRootMode === "filesystem"
+    ) {
+      return explorerRoot ?? workspaceFallbackPath;
+    }
     if (activeTab?.kind === "terminal") {
       return activeTerminalLeafCwd ?? explorerRoot ?? workspaceFallbackPath;
     }
