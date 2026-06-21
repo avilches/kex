@@ -48,7 +48,8 @@ import {
 } from "@/modules/shortcuts";
 import { useSourceControlContext } from "@/modules/source-control";
 import { StatusBar } from "@/modules/statusbar";
-import { DuplicateProgressBar } from "@/modules/explorer";
+import { DuplicateProgressBar, DuplicateQuitModal } from "@/modules/explorer";
+import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import {
   clearFocusedTerminal,
   disposeSession,
@@ -306,6 +307,10 @@ export default function App() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  useEffect(() => {
+    initDuplicateProgressListener();
+  }, []);
 
   const rightPanelRef = useRef<RightPanelHandle>(null);
   const rightPanelOpen = usePreferencesStore((s) => s.rightPanelOpen);
@@ -2048,6 +2053,7 @@ export default function App() {
           )}
 
           <DuplicateProgressBar />
+          <DuplicateQuitModal />
 
           <AgentNotificationsBridge
             workspaces={workspaces}
