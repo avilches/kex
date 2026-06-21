@@ -10,6 +10,7 @@ import { pathDirname } from "@/lib/pathUtils";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   ArrowRight01Icon,
+  ClipboardIcon,
   ComputerTerminal01Icon,
   Copy01Icon,
   DashboardSquareAddIcon,
@@ -19,8 +20,10 @@ import {
   FolderAddIcon,
   FolderOpenIcon,
   Link01Icon,
+  PencilEdit01Icon,
   PinIcon,
   Refresh01Icon,
+  Scissor01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useEffect, useState } from "react";
@@ -36,6 +39,27 @@ import { gitStatusHexColor } from "./lib/gitStatusColor";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
+import { KEY_SEP } from "@/lib/platform";
+import { isCopying } from "@/modules/explorer/lib/duplicateStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  getBindingTokens,
+  SHORTCUTS_BY_ID,
+  type ShortcutId,
+} from "@/modules/shortcuts/shortcuts";
+
+function ShortcutHint({ id }: { id: ShortcutId }) {
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const binding =
+    userShortcuts[id]?.[0] ?? SHORTCUTS_BY_ID.get(id)?.defaultBindings[0];
+  const tokens = getBindingTokens(binding);
+  if (tokens.length === 0) return null;
+  return (
+    <span className="ml-auto pl-3 text-[11px] tracking-wide text-muted-foreground">
+      {tokens.join(KEY_SEP)}
+    </span>
+  );
+}
 
 export type RowActions = {
   toggle: (path: string) => void;
@@ -45,6 +69,9 @@ export type RowActions = {
   beginCreate: (parentPath: string, kind: "file" | "dir", afterPath?: string) => void;
   beginDuplicate: (sourcePath: string, kind: "file" | "dir") => void;
   deletePath: (path: string) => Promise<void>;
+  copyEntry: (path: string, kind: "file" | "dir") => void;
+  cutEntry: (path: string, kind: "file" | "dir") => void;
+  pasteEntry: (targetPath: string, targetIsDir: boolean) => void | Promise<void>;
 };
 
 export type EntryRowProps = {
@@ -69,6 +96,8 @@ export type EntryRowProps = {
   onSetAsRoot?: (path: string) => void;
   onEnterFolder?: (path: string) => void;
   editorPreviewOnClick: boolean;
+  hasClipboard: boolean;
+  isCutSource: boolean;
 };
 
 function EntryRowImpl(props: EntryRowProps) {
@@ -94,6 +123,8 @@ function EntryRowImpl(props: EntryRowProps) {
     onSetAsRoot,
     onEnterFolder,
     editorPreviewOnClick,
+    hasClipboard,
+    isCutSource,
   } = props;
 
   const [isConfirming, setIsConfirming] = useState(false);
@@ -211,6 +242,7 @@ function EntryRowImpl(props: EntryRowProps) {
                   ? "text-muted-foreground/70"
                   : "text-foreground/85",
               isDragging && "opacity-50",
+              isCutSource && "opacity-50",
               (isDropTarget || isExternalDropTarget || isFileDropTarget) &&
                 "bg-primary/10 ring-1 ring-primary/60",
             )}
@@ -329,6 +361,39 @@ function EntryRowImpl(props: EntryRowProps) {
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
+          onSelect={() => actions.cutEntry(path, isDir ? "dir" : "file")}
+        >
+          <HugeiconsIcon icon={Scissor01Icon} size={14} strokeWidth={2} />
+          Cut
+          <ShortcutHint id="file.cut" />
+        </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => actions.copyEntry(path, isDir ? "dir" : "file")}
+        >
+          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          Copy
+          <ShortcutHint id="file.copy" />
+        </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          disabled={!hasClipboard || isCopying()}
+          onSelect={() => void actions.pasteEntry(path, isDir)}
+        >
+          <HugeiconsIcon icon={ClipboardIcon} size={14} strokeWidth={2} />
+          Paste
+          <ShortcutHint id="file.paste" />
+        </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => actions.beginRename(path)}
+        >
+          <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
+          Rename
+          <ShortcutHint id="file.rename" />
+        </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
           onSelect={() => actions.beginDuplicate(path, isDir ? "dir" : "file")}
         >
           <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
@@ -423,6 +488,8 @@ export type FsRootRowProps = {
   onRevealInTerminal?: (path: string) => void;
   onBeginCreate?: (parentPath: string, kind: "file" | "dir") => void;
   onRefresh?: (path: string) => void;
+  onPaste?: (targetPath: string, targetIsDir: boolean) => void | Promise<void>;
+  canPaste?: boolean;
 };
 
 export function FsRootRow({
@@ -433,6 +500,8 @@ export function FsRootRow({
   onRevealInTerminal,
   onBeginCreate,
   onRefresh,
+  onPaste,
+  canPaste,
 }: FsRootRowProps) {
   // Drags only to open a terminal in a pane (`dir-pane:`), never an internal
   // explorer move. The workspace dnd treats it like a folder; the explorer
@@ -527,6 +596,15 @@ export function FsRootRow({
         >
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
           New Folder
+        </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          disabled={!canPaste || isCopying()}
+          onSelect={() => void onPaste?.(path, true)}
+        >
+          <HugeiconsIcon icon={ClipboardIcon} size={14} strokeWidth={2} />
+          Paste
+          <ShortcutHint id="file.paste" />
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem

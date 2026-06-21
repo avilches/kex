@@ -1,11 +1,42 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, it, test } from "vitest";
+import { MOD_PROP } from "@/lib/platform";
 import {
   getShortcutLabel,
+  matchesShortcut,
   SHORTCUTS,
   matchBinding,
   type KeyBinding,
   type ShortcutId,
 } from "./shortcuts";
+
+function keyEvent(key: string, shift = false): KeyboardEvent {
+  return {
+    key,
+    ctrlKey: MOD_PROP === "ctrl",
+    metaKey: MOD_PROP === "meta",
+    shiftKey: shift,
+    altKey: false,
+    repeat: false,
+  } as unknown as KeyboardEvent;
+}
+
+describe("file clipboard shortcuts", () => {
+  it("Mod+C matches file.copy", () => {
+    expect(matchesShortcut(keyEvent("c"), "file.copy")).toBe(true);
+  });
+  it("Mod+Shift+C does not match file.copy", () => {
+    expect(matchesShortcut(keyEvent("c", true), "file.copy")).toBe(false);
+  });
+  it("Mod+Shift+C still matches path.copy (no conflict)", () => {
+    expect(matchesShortcut(keyEvent("c", true), "path.copy")).toBe(true);
+  });
+  it("Mod+X matches file.cut", () => {
+    expect(matchesShortcut(keyEvent("x"), "file.cut")).toBe(true);
+  });
+  it("Mod+V matches file.paste", () => {
+    expect(matchesShortcut(keyEvent("v"), "file.paste")).toBe(true);
+  });
+});
 
 describe("getShortcutLabel", () => {
   test("returns platform-appropriate label for tab.close with no user override", () => {

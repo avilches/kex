@@ -375,7 +375,7 @@ src/
     │   ├── components/            — NotificationBell
     │   ├── lib/                   — route, notify, agentIcon, agentSessionRestore
     │   └── store/                 — agentStore
-    ├── explorer/                  — File tree, fuzzy search, icons, inline rename, background duplication with progress emitted as the global event `kex:duplicate-progress` (so every app window, including Settings, can render it) and a global floating progress bar (`DuplicateProgressBar`, bottom-left) with cancel support (cancel deletes the partial copy). Quitting (Cmd+Q) while a copy is running is intercepted by Rust, which defers the exit and emits `kex:duplicate-quit-prompt` to all windows; the resulting modal offers wait, keep-open (`cancel_quit`), or cancel-copy-and-quit.
+    ├── explorer/                  — File tree, fuzzy search, icons, inline rename, internal clipboard copy/cut/paste (copy reuses the duplicate background task, cut uses `fs_rename`/`git_mv`), background duplication with progress emitted as the global event `kex:duplicate-progress` (so every app window, including Settings, can render it) and a global floating progress bar (`DuplicateProgressBar`, bottom-left) with cancel support (cancel deletes the partial copy). Quitting (Cmd+Q) while a copy is running is intercepted by Rust, which defers the exit and emits `kex:duplicate-quit-prompt` to all windows; the resulting modal offers wait, keep-open (`cancel_quit`), or cancel-copy-and-quit.
     ├── source-control/            — Git stage/commit/push panel
     ├── git-history/               — Commit graph, per-file diffs
     ├── header/                    — Top bar, inline search

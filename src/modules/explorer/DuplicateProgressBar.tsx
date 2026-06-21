@@ -11,7 +11,7 @@ export function DuplicateProgressBar() {
 
   return (
     <div className="absolute bottom-9 left-2 z-50 flex items-center gap-2 rounded-md border border-border bg-popover/95 px-3 py-1.5 text-xs text-foreground shadow-md backdrop-blur">
-      <span className="max-w-48 truncate">Duplicating {name}</span>
+      <span className="max-w-48 truncate">Copying {name}</span>
       <div className="h-1.5 w-28 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full bg-primary transition-[width] duration-150"

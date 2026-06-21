@@ -32,7 +32,7 @@ function getSnapshot(): DuplicateSnapshot {
   return snapshot;
 }
 
-export function isDuplicating(): boolean {
+export function isCopying(): boolean {
   return snapshot !== null;
 }
 
