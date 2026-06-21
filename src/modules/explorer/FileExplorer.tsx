@@ -596,8 +596,12 @@ export const FileExplorer = memo(
         }
       }
       if (pending) return;
-      if (!entryIndexByPath.has(file)) return;
+      // Ancestors are expanded and settled: the request is handled regardless of
+      // whether the target is representable. A hidden file (showHidden off) or a
+      // file under a hidden folder never enters entryIndexByPath; consuming here
+      // avoids re-expanding the ancestors on every later collapse/expand.
       revealConsumedRef.current = revealRequest.nonce;
+      if (!entryIndexByPath.has(file)) return;
       setSelectedPath(file);
       requestAnimationFrame(() => scrollEntryIntoView(file));
     }, [
