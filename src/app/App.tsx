@@ -93,10 +93,12 @@ import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   resolveExplorerRoot,
+  resolveFocusTarget,
   isFilesystemRoot,
   parentRoot,
   type ExplorerRootMode,
 } from "@/modules/workspaces/lib/explorerRoot";
+import type { RevealRequest } from "@/modules/explorer";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -307,6 +309,9 @@ export default function App() {
   }, [init]);
 
   const rightPanelRef = useRef<RightPanelHandle>(null);
+  const [revealRequest, setRevealRequest] = useState<RevealRequest | null>(
+    null,
+  );
   const rightPanelOpen = usePreferencesStore((s) => s.rightPanelOpen);
   const rightPanelActiveTab = usePreferencesStore((s) => s.rightPanelActiveTab);
   const panelSide = usePreferencesStore((s) => s.panelSide);
@@ -545,6 +550,36 @@ export default function App() {
       }
     },
     [activeWorkspace, activeRootMode, setFsRoot],
+  );
+
+  const handleFocusOnExplorer = useCallback(
+    (file: string) => {
+      void setRightPanelOpen(true);
+      void setRightPanelActiveTab("explorer");
+      if (activeWorkspace) {
+        const target = resolveFocusTarget({
+          file,
+          mode: activeRootMode,
+          currentRoot: explorerRoot,
+          fsRoot: fsFolderRoot,
+          home,
+        });
+        if (target) {
+          setExplorerRootMode(activeWorkspace.id, target.nextMode);
+          setFsRoot(activeWorkspace.id, target.nextFsRoot);
+        }
+      }
+      setRevealRequest((r) => ({ path: file, nonce: (r?.nonce ?? 0) + 1 }));
+    },
+    [
+      activeWorkspace,
+      activeRootMode,
+      explorerRoot,
+      fsFolderRoot,
+      home,
+      setExplorerRootMode,
+      setFsRoot,
+    ],
   );
 
   // Whether the saved workspace root still exists on disk, so the selector can
@@ -1118,6 +1153,7 @@ export default function App() {
       onRenameFile: (panelId, newName) => {
         void handleRenameFileFromTab(panelId, newName);
       },
+      onFocusOnExplorer: (filePath) => handleFocusOnExplorer(filePath),
     }),
     [
       activePanelId,
@@ -1131,6 +1167,7 @@ export default function App() {
       activeWorkspace,
       openPanel,
       handleRenameFileFromTab,
+      handleFocusOnExplorer,
     ],
   );
 
@@ -1936,6 +1973,7 @@ export default function App() {
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
                         activeFilePath={explorerActiveFilePath ?? null}
+                        revealRequest={revealRequest}
                         onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
@@ -2015,6 +2053,7 @@ export default function App() {
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
                         activeFilePath={explorerActiveFilePath ?? null}
+                        revealRequest={revealRequest}
                         onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
