@@ -51,6 +51,11 @@ import { StatusBar } from "@/modules/statusbar";
 import { DuplicateProgressBar, DuplicateQuitModal } from "@/modules/explorer";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import {
+  appendGitignoreEntry,
+  gitignoreEntryFor,
+  hasGitignoreEntry,
+} from "@/modules/explorer/lib/gitignore";
+import {
   clearFocusedTerminal,
   disposeSession,
   navigateFocusedBlocks,
@@ -1286,6 +1291,51 @@ export default function App() {
     editorRefs: editorHandles,
   });
 
+  const handleAddToGitignore = useCallback(
+    async (path: string, isDir: boolean) => {
+      if (!gitRoot) return;
+      const entry = gitignoreEntryFor(gitRoot, path, isDir);
+      if (!entry) return;
+      const gitignorePath = `${gitRoot}/.gitignore`;
+
+      // When .gitignore is open in an editor the buffer is the source of truth:
+      // edit it there so unsaved changes are never clobbered, regardless of
+      // autosave. The user saves it like any other edit.
+      const open = editorPanelsRef.current.find((p) => p.path === gitignorePath);
+      const handle = open ? editorHandles.current.get(open.id) : undefined;
+      if (handle) {
+        const buffer = handle.getContent();
+        if (buffer != null) {
+          if (hasGitignoreEntry(buffer, entry)) {
+            toast.info(`${entry} is already in .gitignore`);
+          } else {
+            handle.insertAtEnd(
+              appendGitignoreEntry(buffer, entry).slice(buffer.length),
+            );
+          }
+          openFileInPanel(gitignorePath, true);
+          return;
+        }
+      }
+
+      // Not open (or not mounted yet): append on disk idempotently, then reveal.
+      let content = "";
+      try {
+        const res = await native.readFile(gitignorePath);
+        if (res.kind === "text") content = res.content;
+      } catch {
+        // No .gitignore yet: start from an empty file.
+      }
+      if (hasGitignoreEntry(content, entry)) {
+        toast.info(`${entry} is already in .gitignore`);
+      } else {
+        await native.writeFile(gitignorePath, appendGitignoreEntry(content, entry));
+      }
+      openFileInPanel(gitignorePath, true);
+    },
+    [gitRoot, openFileInPanel],
+  );
+
   // ── useThemeFileEditing ───────────────────────────────────────────────────
 
   useThemeFileEditing({
@@ -2027,6 +2077,7 @@ export default function App() {
                         onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={openFolderInTerminal}
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
+                        onAddToGitignore={handleAddToGitignore}
                         onExplorerSearchClose={onExplorerSearchClose}
                         sourceControl={sourceControl}
                         onOpenDiff={openGitDiffInPanel}
@@ -2107,6 +2158,7 @@ export default function App() {
                         onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={openFolderInTerminal}
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
+                        onAddToGitignore={handleAddToGitignore}
                         onExplorerSearchClose={onExplorerSearchClose}
                         sourceControl={sourceControl}
                         onOpenDiff={openGitDiffInPanel}

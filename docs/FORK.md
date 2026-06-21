@@ -160,6 +160,8 @@ previous workspaces or pane layout.
   "New Workspace from folder" (creates a new workspace with that folder pinned as its Workspace Root). Neither injects a
   `cd` command into a shell.
 
+- **Add to .gitignore**: a file/folder context action (shown only inside a git repo) that appends an anchored entry to the repo-root `.gitignore`, idempotently. If `.gitignore` is already open in an editor, the line is inserted into that buffer (marking the tab dirty) instead of writing to disk, so unsaved edits are never clobbered. Pure helpers in `modules/explorer/lib/gitignore.ts` (tested). Not present upstream.
+
 - **Background file/folder duplication**: context-menu "Duplicate" on any file or folder opens an inline name input directly below the source row, pre-filled with a non-colliding suggestion (`pepe copy.txt`, `src copy`). Confirming starts a background copy (`fs_duplicate`) that emits progress as the global event `kex:duplicate-progress`. A global floating progress bar (`DuplicateProgressBar`, bottom-left) shows bytes copied and a cancel button; cancelling mid-copy deletes the partial destination via `fs_duplicate_cancel`. Only one duplication runs at a time. Quitting (Cmd+Q) while a copy is in progress defers the exit and shows a modal in all app windows (main + Settings) with three options: wait for the copy to finish, keep the app open, or cancel the copy and quit immediately. Not present upstream.
 
 ### Technical fixes and refactors
