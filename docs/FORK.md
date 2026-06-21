@@ -160,6 +160,8 @@ previous workspaces or pane layout.
   "New Workspace from folder" (creates a new workspace with that folder pinned as its Workspace Root). Neither injects a
   `cd` command into a shell.
 
+- **Background file/folder duplication**: context-menu "Duplicate" on any file or folder opens an inline name input directly below the source row, pre-filled with a non-colliding suggestion (`pepe copy.txt`, `src copy`). Confirming starts a background copy over a `Channel<CopyProgress>` stream (`fs_duplicate`). A global floating progress bar (`DuplicateProgressBar`, bottom-left) shows bytes copied and a cancel button; cancelling mid-copy deletes the partial destination via `fs_duplicate_cancel`. Only one duplication runs at a time. Not present upstream.
+
 ### Technical fixes and refactors
 
 - **WebGL canvas refresh** — after a workspace switch, the `opacity-0` CSS change does not trigger a WebGL repaint. A

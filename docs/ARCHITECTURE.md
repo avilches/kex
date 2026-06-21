@@ -373,7 +373,7 @@ src/
     │   ├── components/            — NotificationBell
     │   ├── lib/                   — route, notify, agentIcon, agentSessionRestore
     │   └── store/                 — agentStore
-    ├── explorer/                  — File tree, fuzzy search, icons, inline rename
+    ├── explorer/                  — File tree, fuzzy search, icons, inline rename, background duplication with streaming progress (`fs_duplicate` channel) and a global floating progress bar (`DuplicateProgressBar`, bottom-left) with cancel-with-undo (cancel deletes the partial copy)
     ├── source-control/            — Git stage/commit/push panel
     ├── git-history/               — Commit graph, per-file diffs
     ├── header/                    — Top bar, inline search
