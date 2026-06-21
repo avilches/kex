@@ -76,6 +76,7 @@ type Session = {
   snapshot: string | null;
   searchQuery: string | null;
   dormantRing: DormantRing;
+  pendingInput: string;
   hasSlot: boolean;
   blocks: boolean;
   blockMode: BlockMode;
@@ -142,22 +143,47 @@ function clearAgentSessionForLeaf(leafId: string): void {
   useAgentStore.getState().setStatus(leafId, "idle");
 }
 
+export const PENDING_INPUT_MAX = 256 * 1024;
+
+// Input typed before the pty attaches is queued and flushed on attach. Cap the
+// queue so a large paste into a still-spawning pane can't grow it without bound;
+// an append that would overflow is dropped whole rather than truncated.
+export function boundedPendingInput(
+  current: string,
+  data: string,
+  max = PENDING_INPUT_MAX,
+): string {
+  if (current.length + data.length > max) return current;
+  return current + data;
+}
+
+function queuePendingInput(s: Session, data: string): void {
+  s.pendingInput = boundedPendingInput(s.pendingInput, data);
+}
+
 export function writeToSession(leafId: string, data: string): boolean {
   const s = sessions.get(leafId);
-  if (!s || !s.pty) return false;
+  if (!s || s.shellExited) return false;
   clearAgentSessionForLeaf(leafId);
-  void s.pty.write(data);
+  if (s.pty) {
+    void s.pty.write(data);
+    return true;
+  }
+  queuePendingInput(s, data);
   return true;
 }
 
 export function submitToLeaf(leafId: string, text: string): void {
   const s = sessions.get(leafId);
-  if (!s?.pty) return;
+  if (!s || s.shellExited) return;
   s.everSubmitted = true;
   clearAgentSessionForLeaf(leafId);
   // Bracketed paste keeps a multiline command atomic; trailing CR runs it.
-  if (text.includes("\n")) s.pty.write(`\x1b[200~${text}\x1b[201~\r`);
-  else s.pty.write(`${text}\r`);
+  const data = text.includes("\n")
+    ? `\x1b[200~${text}\x1b[201~\r`
+    : `${text}\r`;
+  if (s.pty) void s.pty.write(data);
+  else queuePendingInput(s, data);
 }
 
 export function interruptLeaf(leafId: string): void {
@@ -305,7 +331,8 @@ configureRendererPool({
         if (session && (data === "\x03" || data === "\x1b")) {
           useAgentStore.getState().setStatus(leafId, "idle");
         }
-        s.pty?.write(data);
+        if (s.pty) void s.pty.write(data);
+        else queuePendingInput(s, data);
       },
       resizePty: (cols, rows) => {
         s.cols = cols;
@@ -368,6 +395,7 @@ function ensureSession(
     snapshot: null,
     searchQuery: null,
     dormantRing: new DormantRing(),
+    pendingInput: "",
     hasSlot: false,
     blocks,
     blockMode: "prompt",
@@ -416,6 +444,7 @@ async function openPtyForSession(
       onExit: (code) => {
         s.shellExited = true;
         s.pty = null;
+        s.pendingInput = "";
         const slot = getSlotForLeaf(leafId);
         if (slot) slot.term.options.disableStdin = true;
         if (s.callbacks.onExit) s.callbacks.onExit(code);
@@ -573,6 +602,10 @@ function attachSession(
             return;
           }
           s.pty = pty;
+          if (s.pendingInput) {
+            void pty.write(s.pendingInput);
+            s.pendingInput = "";
+          }
           if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
           if (!runOnStart) return;
           if (plan) {
@@ -621,6 +654,7 @@ export async function respawnSession(
   s.dormantRing = new DormantRing();
   s.shellExited = false;
   s.pendingExit = null;
+  s.pendingInput = "";
   s.altScreenAtRelease = false;
   clearOscTitle(leafId);
 
@@ -646,6 +680,10 @@ export async function respawnSession(
     return;
   }
   s.pty = pty;
+  if (s.pendingInput) {
+    void pty.write(s.pendingInput);
+    s.pendingInput = "";
+  }
   if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
 }
 
@@ -669,6 +707,7 @@ export function disposeSession(leafId: string): void {
   s.snapshot = null;
   s.pty?.close();
   s.pty = null;
+  s.pendingInput = "";
   clearOscTitle(leafId);
   sessions.delete(leafId);
   blockViewportListeners.delete(leafId);
@@ -813,7 +852,12 @@ export function useTerminalSession({
   }, [leafId, visible, focused, blocks]);
 
   const write = useCallback(
-    (data: string) => sessions.get(leafId)?.pty?.write(data),
+    (data: string) => {
+      const s = sessions.get(leafId);
+      if (!s || s.shellExited) return;
+      if (s.pty) void s.pty.write(data);
+      else queuePendingInput(s, data);
+    },
     [leafId],
   );
 
