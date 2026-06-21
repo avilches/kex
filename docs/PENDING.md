@@ -42,6 +42,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [F7](pending/features/F7-tab-bar-style-en-settings.md) — Exponer el estilo de tab bar en Settings
 - [F8](pending/features/F8-explorer-navegacion-teclado.md) — Navegacion del explorer por teclado
 - [F9](pending/features/F9-explorer-operaciones-fichero.md) — Operaciones de fichero en el explorer (duplicar, copiar/pegar, cortar, borrar) + limpieza del menu
+- [F10](pending/features/F10-confirm-quit-proceso-vivo.md) — Confirmar salida de la app con un proceso de terminal vivo (upstream d782f7d, aplazado en sync 2026-06-22)
 
 ## Mejoras (`docs/pending/improvements/`)
 
