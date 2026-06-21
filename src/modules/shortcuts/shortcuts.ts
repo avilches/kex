@@ -24,13 +24,19 @@ export type ShortcutId =
   | "pane.focusDown"
   | "pane.focusLeft"
   | "pane.focusRight"
-  | "pane.source"
   | "terminal.clear"
   | "blocks.prev"
   | "blocks.next"
   | "search.focus"
   | "explorer.search"
-  | "rightPanel.toggle"
+  | "sidebar.toggle"
+  | "sidebar.showExplorer"
+  | "sidebar.showGit"
+  | "sidebar.showHistory"
+  | "explorer.viewFilesystem"
+  | "explorer.viewPinned"
+  | "explorer.viewTerminal"
+  | "explorer.viewGit"
   | "notifications.toggle"
   | "window.new"
   | "workspace.new"
@@ -48,6 +54,7 @@ export type ShortcutId =
 
 export type ShortcutGroup =
   | "General"
+  | "Sidebar"
   | "Tabs"
   | "Panes"
   | "Terminal"
@@ -89,6 +96,54 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Open settings",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "," }],
+  },
+  {
+    id: "sidebar.toggle",
+    label: "Toggle Sidebar",
+    group: "Sidebar",
+    defaultBindings: [],
+  },
+  {
+    id: "sidebar.showExplorer",
+    label: "Show Explorer",
+    group: "Sidebar",
+    defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
+  },
+  {
+    id: "sidebar.showGit",
+    label: "Show Git Changes",
+    group: "Sidebar",
+    defaultBindings: [{ [MOD_PROP]: true, key: "g" }],
+  },
+  {
+    id: "sidebar.showHistory",
+    label: "Show Git History",
+    group: "Sidebar",
+    defaultBindings: [],
+  },
+  {
+    id: "explorer.viewFilesystem",
+    label: "Explorer: File System",
+    group: "Sidebar",
+    defaultBindings: [{ ctrl: true, key: "1" }],
+  },
+  {
+    id: "explorer.viewPinned",
+    label: "Explorer: Workspace Root",
+    group: "Sidebar",
+    defaultBindings: [{ ctrl: true, key: "2" }],
+  },
+  {
+    id: "explorer.viewTerminal",
+    label: "Explorer: Follow Terminal",
+    group: "Sidebar",
+    defaultBindings: [{ ctrl: true, key: "3" }],
+  },
+  {
+    id: "explorer.viewGit",
+    label: "Explorer: Follow Git Root",
+    group: "Sidebar",
+    defaultBindings: [{ ctrl: true, key: "4" }],
   },
   {
     id: "path.copy",
@@ -190,12 +245,6 @@ export const SHORTCUTS: Shortcut[] = [
       : [{ ctrl: true, alt: true, key: "ArrowRight" }],
   },
   {
-    id: "pane.source",
-    label: "Toggle Explorer panel",
-    group: "Panes",
-    defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
-  },
-  {
     id: "terminal.clear",
     label: "Clear terminal",
     group: "Terminal",
@@ -247,12 +296,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Find",
     group: "Search",
     defaultBindings: [{ [MOD_PROP]: true, key: "f" }],
-  },
-  {
-    id: "rightPanel.toggle",
-    label: "Toggle Git panel",
-    group: "View",
-    defaultBindings: [{ [MOD_PROP]: true, key: "g" }],
   },
   {
     id: "notifications.toggle",
@@ -343,6 +386,7 @@ export const SHORTCUTS: Shortcut[] = [
 
 export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "General",
+  "Sidebar",
   "Tabs",
   "Panes",
   "Terminal",
