@@ -27,9 +27,11 @@ import {
   applyFontFamily,
   applyFontSize,
   applyLetterSpacing,
+  applyLineHeight,
   applyTheme as applyPoolTheme,
   applyScrollback,
   applyWebglPreference,
+  renderFontSize,
   configureRendererPool,
   disposeLeafSlot,
   focusSlot,
@@ -761,7 +763,7 @@ export function useTerminalSession({
   const fontSize = usePreferencesStore((p) => p.terminalFontSize);
   const zoomLevel = usePreferencesStore((p) => p.zoomLevel);
   useEffect(() => {
-    applyFontSize(Math.max(4, Math.round(fontSize * zoomLevel)));
+    applyFontSize(renderFontSize(fontSize, zoomLevel));
   }, [fontSize, zoomLevel]);
 
   const fontFamily = usePreferencesStore((p) => p.terminalFontFamily);
@@ -773,6 +775,11 @@ export function useTerminalSession({
   useEffect(() => {
     applyLetterSpacing(letterSpacing);
   }, [letterSpacing]);
+
+  const lineHeight = usePreferencesStore((p) => p.terminalLineHeight);
+  useEffect(() => {
+    applyLineHeight(lineHeight);
+  }, [lineHeight]);
 
   const scrollback = usePreferencesStore((p) => p.terminalScrollback);
   useEffect(() => {

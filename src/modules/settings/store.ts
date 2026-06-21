@@ -44,6 +44,10 @@ export type Preferences = {
   theme: ThemePref;
   themeId: string;
   editorTheme: EditorThemeId;
+  editorFontFamily: string;
+  editorFontSize: number;
+  editorLetterSpacing: number;
+  editorLineHeight: number;
   autostart: boolean;
   vimMode: boolean;
   showHidden: boolean;
@@ -54,6 +58,7 @@ export type Preferences = {
   terminalFontFamily: string;
   terminalLetterSpacing: number;
   terminalFontSize: number;
+  terminalLineHeight: number;
   terminalScrollback: number;
   lastWslDistro: string | null;
   zoomLevel: number;
@@ -77,6 +82,10 @@ const SHORTCUTS_STORE_PATH = "settings-shortcuts.json";
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
 const KEY_EDITOR_THEME = "editorTheme";
+const KEY_EDITOR_FONT_FAMILY = "editorFontFamily";
+const KEY_EDITOR_FONT_SIZE = "editorFontSize";
+const KEY_EDITOR_LETTER_SPACING = "editorLetterSpacing";
+const KEY_EDITOR_LINE_HEIGHT = "editorLineHeight";
 const KEY_AUTOSTART = "autostart";
 const KEY_VIM_MODE = "vimMode";
 const KEY_SHOW_HIDDEN = "showHidden";
@@ -88,6 +97,7 @@ const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
+const KEY_TERMINAL_LINE_HEIGHT = "terminalLineHeight";
 const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_ZOOM_LEVEL = "zoomLevel";
@@ -105,13 +115,40 @@ const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 
-export const TERMINAL_FONT_SIZE_DEFAULT = 14;
+export const TERMINAL_FONT_SIZE_DEFAULT = 13;
 export const TERMINAL_FONT_SIZE_MIN = 8;
-export const TERMINAL_FONT_SIZE_MAX = 32;
+export const TERMINAL_FONT_SIZE_MAX = 18;
 
-export const TERMINAL_FONT_SIZES = [
-  10, 12, 13, 14, 15, 16, 18, 20, 22, 24,
-] as const;
+export const EDITOR_FONT_SIZE_DEFAULT = 12;
+export const EDITOR_FONT_SIZE_MIN = 8;
+export const EDITOR_FONT_SIZE_MAX = 18;
+
+export const FONT_SIZE_STEP = 0.5;
+
+export const LETTER_SPACING_MIN = -4;
+export const LETTER_SPACING_MAX = 4;
+export const LETTER_SPACING_STEP = 0.5;
+export const LETTER_SPACING_DEFAULT = 0;
+
+export const LINE_HEIGHT_MIN = 0.8;
+export const LINE_HEIGHT_MAX = 1.8;
+export const LINE_HEIGHT_STEP = 0.1;
+export const TERMINAL_LINE_HEIGHT_DEFAULT = 1.2;
+export const EDITOR_LINE_HEIGHT_DEFAULT = 1.5;
+
+// Snap to the slider step, clamp to range, and strip float drift (0.30000004).
+export function clampToStep(
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  fallback: number,
+): number {
+  if (!Number.isFinite(value)) return fallback;
+  const snapped = Math.round(value / step) * step;
+  const clamped = Math.min(max, Math.max(min, snapped));
+  return Math.round(clamped * 100) / 100;
+}
 
 export const TERMINAL_SCROLLBACK_DEFAULT = 2000;
 export const TERMINAL_SCROLLBACK_MIN = 200;
@@ -124,6 +161,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   themeId: DEFAULT_THEME_ID,
   editorTheme: "atomone",
+  editorFontFamily: "",
+  editorFontSize: EDITOR_FONT_SIZE_DEFAULT,
+  editorLetterSpacing: LETTER_SPACING_DEFAULT,
+  editorLineHeight: EDITOR_LINE_HEIGHT_DEFAULT,
   autostart: false,
   vimMode: false,
   showHidden: false,
@@ -132,8 +173,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalCursorBlink: false,
   warnOnCloseTabWithRunningProcess: true,
   terminalFontFamily: "",
-  terminalLetterSpacing: 0,
+  terminalLetterSpacing: LETTER_SPACING_DEFAULT,
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
+  terminalLineHeight: TERMINAL_LINE_HEIGHT_DEFAULT,
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
   lastWslDistro: null,
   zoomLevel: 1.0,
@@ -192,6 +234,17 @@ export async function loadPreferences(): Promise<Preferences> {
     themeId: get<string>(KEY_THEME_ID) ?? DEFAULT_PREFERENCES.themeId,
     editorTheme:
       get<EditorThemeId>(KEY_EDITOR_THEME) ?? DEFAULT_PREFERENCES.editorTheme,
+    editorFontFamily:
+      get<string>(KEY_EDITOR_FONT_FAMILY) ??
+      DEFAULT_PREFERENCES.editorFontFamily,
+    editorFontSize:
+      get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
+    editorLetterSpacing:
+      get<number>(KEY_EDITOR_LETTER_SPACING) ??
+      DEFAULT_PREFERENCES.editorLetterSpacing,
+    editorLineHeight:
+      get<number>(KEY_EDITOR_LINE_HEIGHT) ??
+      DEFAULT_PREFERENCES.editorLineHeight,
     autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
     showHidden:
@@ -221,6 +274,9 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalFontSize:
       get<number>(KEY_TERMINAL_FONT_SIZE) ??
       DEFAULT_PREFERENCES.terminalFontSize,
+    terminalLineHeight:
+      get<number>(KEY_TERMINAL_LINE_HEIGHT) ??
+      DEFAULT_PREFERENCES.terminalLineHeight,
     terminalScrollback: clampScrollback(
       get<number>(KEY_TERMINAL_SCROLLBACK) ??
         DEFAULT_PREFERENCES.terminalScrollback,
@@ -300,6 +356,49 @@ export async function setEditorTheme(value: EditorThemeId): Promise<void> {
   await writePref(KEY_EDITOR_THEME, value);
 }
 
+export async function setEditorFontFamily(value: string): Promise<void> {
+  await writePref(KEY_EDITOR_FONT_FAMILY, value.trim());
+}
+
+export async function setEditorFontSize(value: number): Promise<void> {
+  await writePref(
+    KEY_EDITOR_FONT_SIZE,
+    clampToStep(
+      value,
+      EDITOR_FONT_SIZE_MIN,
+      EDITOR_FONT_SIZE_MAX,
+      FONT_SIZE_STEP,
+      EDITOR_FONT_SIZE_DEFAULT,
+    ),
+  );
+}
+
+export async function setEditorLetterSpacing(value: number): Promise<void> {
+  await writePref(
+    KEY_EDITOR_LETTER_SPACING,
+    clampToStep(
+      value,
+      LETTER_SPACING_MIN,
+      LETTER_SPACING_MAX,
+      LETTER_SPACING_STEP,
+      LETTER_SPACING_DEFAULT,
+    ),
+  );
+}
+
+export async function setEditorLineHeight(value: number): Promise<void> {
+  await writePref(
+    KEY_EDITOR_LINE_HEIGHT,
+    clampToStep(
+      value,
+      LINE_HEIGHT_MIN,
+      LINE_HEIGHT_MAX,
+      LINE_HEIGHT_STEP,
+      EDITOR_LINE_HEIGHT_DEFAULT,
+    ),
+  );
+}
+
 export async function setAutostart(value: boolean): Promise<void> {
   await writePref(KEY_AUTOSTART, value);
 }
@@ -333,18 +432,42 @@ export async function setTerminalFontFamily(value: string): Promise<void> {
 }
 
 export async function setTerminalLetterSpacing(value: number): Promise<void> {
-  const clamped = Number.isFinite(value) ? Math.max(-10, Math.min(10, Math.round(value))) : 0;
-  await writePref(KEY_TERMINAL_LETTER_SPACING, clamped);
+  await writePref(
+    KEY_TERMINAL_LETTER_SPACING,
+    clampToStep(
+      value,
+      LETTER_SPACING_MIN,
+      LETTER_SPACING_MAX,
+      LETTER_SPACING_STEP,
+      LETTER_SPACING_DEFAULT,
+    ),
+  );
 }
 
 export async function setTerminalFontSize(value: number): Promise<void> {
-  const clamped = Number.isFinite(value)
-    ? Math.min(
-        TERMINAL_FONT_SIZE_MAX,
-        Math.max(TERMINAL_FONT_SIZE_MIN, Math.round(value)),
-      )
-    : TERMINAL_FONT_SIZE_DEFAULT;
-  await writePref(KEY_TERMINAL_FONT_SIZE, clamped);
+  await writePref(
+    KEY_TERMINAL_FONT_SIZE,
+    clampToStep(
+      value,
+      TERMINAL_FONT_SIZE_MIN,
+      TERMINAL_FONT_SIZE_MAX,
+      FONT_SIZE_STEP,
+      TERMINAL_FONT_SIZE_DEFAULT,
+    ),
+  );
+}
+
+export async function setTerminalLineHeight(value: number): Promise<void> {
+  await writePref(
+    KEY_TERMINAL_LINE_HEIGHT,
+    clampToStep(
+      value,
+      LINE_HEIGHT_MIN,
+      LINE_HEIGHT_MAX,
+      LINE_HEIGHT_STEP,
+      TERMINAL_LINE_HEIGHT_DEFAULT,
+    ),
+  );
 }
 
 function clampScrollback(value: number): number {
@@ -429,6 +552,10 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_THEME]: "theme",
   [KEY_THEME_ID]: "themeId",
   [KEY_EDITOR_THEME]: "editorTheme",
+  [KEY_EDITOR_FONT_FAMILY]: "editorFontFamily",
+  [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
+  [KEY_EDITOR_LETTER_SPACING]: "editorLetterSpacing",
+  [KEY_EDITOR_LINE_HEIGHT]: "editorLineHeight",
   [KEY_AUTOSTART]: "autostart",
   [KEY_VIM_MODE]: "vimMode",
   [KEY_SHOW_HIDDEN]: "showHidden",
@@ -439,6 +566,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
   [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
   [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
+  [KEY_TERMINAL_LINE_HEIGHT]: "terminalLineHeight",
   [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",

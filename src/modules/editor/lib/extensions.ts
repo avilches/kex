@@ -29,9 +29,10 @@ export function buildSharedExtensions(): Extension[] {
         padding: "8px",
       },
       ".cm-scroller": {
-        fontFamily: defaultMonoFontFamily(),
-        fontSize: "calc(13px * var(--app-zoom, 1))",
-        lineHeight: "1.55",
+        fontFamily: `var(--editor-font-family, ${defaultMonoFontFamily()})`,
+        fontSize: "calc(var(--editor-font-size, 12px) * var(--app-zoom, 1))",
+        letterSpacing: "var(--editor-letter-spacing, 0px)",
+        lineHeight: "var(--editor-line-height, 1.5)",
         backgroundColor: "transparent !important",
       },
       ".cm-content": {

@@ -1,21 +1,34 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { defaultMonoFontFamily } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  TERMINAL_FONT_SIZES,
+  TERMINAL_FONT_SIZE_DEFAULT,
+  TERMINAL_FONT_SIZE_MIN,
+  TERMINAL_FONT_SIZE_MAX,
+  EDITOR_FONT_SIZE_DEFAULT,
+  EDITOR_FONT_SIZE_MIN,
+  EDITOR_FONT_SIZE_MAX,
+  FONT_SIZE_STEP,
+  LETTER_SPACING_MIN,
+  LETTER_SPACING_MAX,
+  LETTER_SPACING_STEP,
+  LETTER_SPACING_DEFAULT,
+  LINE_HEIGHT_MIN,
+  LINE_HEIGHT_MAX,
+  LINE_HEIGHT_STEP,
+  TERMINAL_LINE_HEIGHT_DEFAULT,
+  EDITOR_LINE_HEIGHT_DEFAULT,
   setTerminalFontFamily,
   setTerminalFontSize,
   setTerminalLetterSpacing,
+  setTerminalLineHeight,
+  setEditorFontFamily,
+  setEditorFontSize,
+  setEditorLetterSpacing,
+  setEditorLineHeight,
   setZoomLevel,
   setPanelSide,
   setExplorerGitColorScheme,
@@ -43,8 +56,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
-
-const LETTER_SPACINGS = [-4, -3, -2, -1, 0, 1, 2, 3, 4] as const;
 
 const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIcon }[] = [
   { id: "system", label: "System", icon: ComputerIcon },
@@ -83,6 +94,11 @@ export function ThemesSection() {
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const terminalLetterSpacing = usePreferencesStore((s) => s.terminalLetterSpacing);
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
+  const terminalLineHeight = usePreferencesStore((s) => s.terminalLineHeight);
+  const editorFontFamily = usePreferencesStore((s) => s.editorFontFamily);
+  const editorFontSize = usePreferencesStore((s) => s.editorFontSize);
+  const editorLetterSpacing = usePreferencesStore((s) => s.editorLetterSpacing);
+  const editorLineHeight = usePreferencesStore((s) => s.editorLineHeight);
 
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const panelSide = usePreferencesStore((s) => s.panelSide);
@@ -231,45 +247,84 @@ export function ThemesSection() {
         <Label>Terminal</Label>
         <FontFamilyInput
           value={terminalFontFamily}
+          defaultFamily={defaultMonoFontFamily()}
           onChange={(v) => void setTerminalFontFamily(v)}
         />
-        <SettingRow title="Font size" description="Terminal text size.">
-          <Select
-            value={String(terminalFontSize)}
-            onValueChange={(v) => void setTerminalFontSize(Number(v))}
-          >
-            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TERMINAL_FONT_SIZES.map((size) => (
-                <SelectItem key={size} value={String(size)} className="text-[12px]">
-                  {size} px
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingRow>
-        <SettingRow
+        <SliderRow
+          title="Font size"
+          description="Terminal text size."
+          value={terminalFontSize}
+          min={TERMINAL_FONT_SIZE_MIN}
+          max={TERMINAL_FONT_SIZE_MAX}
+          step={FONT_SIZE_STEP}
+          defaultValue={TERMINAL_FONT_SIZE_DEFAULT}
+          format={formatPx}
+          onChange={(v) => void setTerminalFontSize(v)}
+        />
+        <SliderRow
           title="Letter spacing"
-          description="Extra horizontal space between characters (px). Use negative values to tighten Nerd Fonts."
-        >
-          <Select
-            value={String(terminalLetterSpacing)}
-            onValueChange={(v) => void setTerminalLetterSpacing(Number(v))}
-          >
-            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LETTER_SPACINGS.map((v) => (
-                <SelectItem key={v} value={String(v)} className="text-[12px]">
-                  {v > 0 ? `+${v}` : v} px
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingRow>
+          description="Extra horizontal space between characters. Use negative values to tighten Nerd Fonts."
+          value={terminalLetterSpacing}
+          min={LETTER_SPACING_MIN}
+          max={LETTER_SPACING_MAX}
+          step={LETTER_SPACING_STEP}
+          defaultValue={LETTER_SPACING_DEFAULT}
+          format={formatSignedPx}
+          onChange={(v) => void setTerminalLetterSpacing(v)}
+        />
+        <SliderRow
+          title="Line height"
+          description="Vertical space per row, as a multiple of the font size."
+          value={terminalLineHeight}
+          min={LINE_HEIGHT_MIN}
+          max={LINE_HEIGHT_MAX}
+          step={LINE_HEIGHT_STEP}
+          defaultValue={TERMINAL_LINE_HEIGHT_DEFAULT}
+          format={formatRatio}
+          onChange={(v) => void setTerminalLineHeight(v)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Editor</Label>
+        <FontFamilyInput
+          value={editorFontFamily}
+          defaultFamily={defaultMonoFontFamily()}
+          onChange={(v) => void setEditorFontFamily(v)}
+        />
+        <SliderRow
+          title="Font size"
+          description="File editor text size."
+          value={editorFontSize}
+          min={EDITOR_FONT_SIZE_MIN}
+          max={EDITOR_FONT_SIZE_MAX}
+          step={FONT_SIZE_STEP}
+          defaultValue={EDITOR_FONT_SIZE_DEFAULT}
+          format={formatPx}
+          onChange={(v) => void setEditorFontSize(v)}
+        />
+        <SliderRow
+          title="Letter spacing"
+          description="Extra horizontal space between characters."
+          value={editorLetterSpacing}
+          min={LETTER_SPACING_MIN}
+          max={LETTER_SPACING_MAX}
+          step={LETTER_SPACING_STEP}
+          defaultValue={LETTER_SPACING_DEFAULT}
+          format={formatSignedPx}
+          onChange={(v) => void setEditorLetterSpacing(v)}
+        />
+        <SliderRow
+          title="Line height"
+          description="Vertical space per row, as a multiple of the font size."
+          value={editorLineHeight}
+          min={LINE_HEIGHT_MIN}
+          max={LINE_HEIGHT_MAX}
+          step={LINE_HEIGHT_STEP}
+          defaultValue={EDITOR_LINE_HEIGHT_DEFAULT}
+          format={formatRatio}
+          onChange={(v) => void setEditorLineHeight(v)}
+        />
       </div>
 
       <div
@@ -408,44 +463,122 @@ export function ThemesSection() {
 
 function FontFamilyInput({
   value,
+  defaultFamily,
   onChange,
 }: {
   value: string;
+  defaultFamily: string;
   onChange: (v: string) => void;
 }) {
-  const [draft, setDraft] = useState(value);
+  // An empty stored preference means "platform default": show that default
+  // verbatim so the user always sees what is actually rendering, and restore it
+  // if they clear the field.
+  const [draft, setDraft] = useState(value || defaultFamily);
 
   useEffect(() => {
-    setDraft(value);
-  }, [value]);
+    setDraft(value || defaultFamily);
+  }, [value, defaultFamily]);
 
   const commit = () => {
     const next = draft.trim();
+    if (next === "" || next === defaultFamily) {
+      setDraft(defaultFamily);
+      if (value !== "") onChange("");
+      return;
+    }
     setDraft(next);
     if (next !== value) onChange(next);
   };
 
+  const isDefault = value === "";
+
   return (
     <SettingRow
       title="Font family"
-      description='Comma-separated list with per-glyph fallback. Leave empty for the platform default. Set a Nerd Font (e.g. "MesloLGS NF") first for prompt icons.'
+      description='Comma-separated list with per-glyph fallback. Clear it to restore the platform default. Set a Nerd Font (e.g. "MesloLGS NF") first for prompt icons.'
     >
-      <Input
-        type="text"
-        value={draft}
-        placeholder={defaultMonoFontFamily()}
-        spellCheck={false}
-        autoCorrect="off"
-        autoCapitalize="off"
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.currentTarget.blur();
-          }
-        }}
-        className="h-8 w-56 rounded-md border border-border bg-background px-2.5 text-[12px] md:text-[12px] outline-none focus:border-foreground/40 focus-visible:ring-0 focus-visible:border-foreground/40"
-      />
+      <div className="flex items-center gap-2">
+        <Input
+          type="text"
+          value={draft}
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            }
+          }}
+          className="h-8 w-56 rounded-md border border-border bg-background px-2.5 text-[12px] md:text-[12px] outline-none focus:border-foreground/40 focus-visible:ring-0 focus-visible:border-foreground/40"
+        />
+        <button
+          type="button"
+          title="Reset to default"
+          disabled={isDefault}
+          onClick={() => {
+            setDraft(defaultFamily);
+            onChange("");
+          }}
+          className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+        >
+          <HugeiconsIcon icon={Refresh01Icon} size={11} />
+        </button>
+      </div>
+    </SettingRow>
+  );
+}
+
+const formatPx = (v: number) => `${v} px`;
+const formatSignedPx = (v: number) => `${v > 0 ? "+" : ""}${v} px`;
+const formatRatio = (v: number) => v.toFixed(1);
+
+function SliderRow({
+  title,
+  description,
+  value,
+  min,
+  max,
+  step,
+  defaultValue,
+  format,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  defaultValue: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <SettingRow title={title} description={description}>
+      <div className="flex items-center gap-2">
+        <Slider
+          value={[value]}
+          min={min}
+          max={max}
+          step={step}
+          onValueChange={(v) => onChange(v[0] ?? defaultValue)}
+          className="w-32"
+        />
+        <span className="w-12 shrink-0 text-right tabular-nums text-[11px] text-muted-foreground">
+          {format(value)}
+        </span>
+        <button
+          type="button"
+          title="Reset to default"
+          disabled={value === defaultValue}
+          onClick={() => onChange(defaultValue)}
+          className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+        >
+          <HugeiconsIcon icon={Refresh01Icon} size={11} />
+        </button>
+      </div>
     </SettingRow>
   );
 }

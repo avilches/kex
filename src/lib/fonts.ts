@@ -6,7 +6,7 @@ import symbolsNerdFontUrl from "@/assets/fonts/SymbolsNerdFontMono-Regular.woff2
 // falls back per glyph through the list, so prompt icons missing from the
 // first font still resolve from any installed Nerd Font or system symbol font.
 const MAC_STACK =
-  '"JetBrains Mono", Menlo, Monaco, "Courier New", "Symbols Nerd Font Mono", monospace';
+  'Menlo, "JetBrains Mono", Monaco, "Courier New", "Symbols Nerd Font Mono", monospace';
 const WINDOWS_STACK =
   '"JetBrains Mono", Consolas, "Courier New", "Symbols Nerd Font Mono", monospace';
 const LINUX_STACK =

@@ -160,12 +160,19 @@ function getRecycler(): HTMLDivElement {
   return el;
 }
 
+// xterm renders fractional sizes fine; snap to half-pixels so the 0.5 px font
+// slider has a visible effect even at non-integer zoom.
+export function renderFontSize(size: number, zoom: number): number {
+  return Math.max(4, Math.round(size * zoom * 2) / 2);
+}
+
 function termOptions() {
   const prefs = usePreferencesStore.getState();
   return {
     fontFamily: resolveMonoFontFamily(prefs.terminalFontFamily),
     letterSpacing: prefs.terminalLetterSpacing,
-    fontSize: Math.max(4, Math.round(prefs.terminalFontSize * prefs.zoomLevel)),
+    fontSize: renderFontSize(prefs.terminalFontSize, prefs.zoomLevel),
+    lineHeight: prefs.terminalLineHeight,
     theme: buildTerminalTheme(),
     cursorBlink: false,
     cursorStyle: "bar" as const,
@@ -802,6 +809,20 @@ export function applyFontSize(size: number): void {
   for (const slot of slots) {
     if (slot.term.options.fontSize === size) continue;
     slot.term.options.fontSize = size;
+    slot.fitAddon.fit();
+    if (slot.currentLeafId !== null) {
+      slot.lastCols = slot.term.cols;
+      slot.lastRows = slot.term.rows;
+      const bridge = adapter?.resolveLeaf(slot.currentLeafId);
+      bridge?.resizePty(slot.term.cols, slot.term.rows);
+    }
+  }
+}
+
+export function applyLineHeight(lineHeight: number): void {
+  for (const slot of slots) {
+    if (slot.term.options.lineHeight === lineHeight) continue;
+    slot.term.options.lineHeight = lineHeight;
     slot.fitAddon.fit();
     if (slot.currentLeafId !== null) {
       slot.lastCols = slot.term.cols;

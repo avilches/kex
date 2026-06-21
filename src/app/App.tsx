@@ -11,6 +11,7 @@ import { native } from "@/lib/native";
 import { newPanelId } from "@/lib/ids";
 import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
+import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
 import { isMarkdownPath } from "@/lib/utils";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
@@ -222,6 +223,7 @@ export default function App() {
   const pendingGotoLine = useRef<Map<string, number>>(new Map());
 
   const { zoomIn, zoomOut, zoomReset } = useZoom();
+  useEditorFont();
   useTerminalFileDrop();
 
   // ── Workspace state persistence ───────────────────────────────────────────
