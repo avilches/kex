@@ -609,6 +609,7 @@ pub fn run() {
         .manage(shell::ShellState::default())
         .manage(fs::watch::FsWatchState::default())
         .manage(history::HistoryState::default())
+        .manage(fs::duplicate::CopyState::default())
         .manage(fs::grep::ContentSearchState::default())
         .manage(fs::search::FileSearchState::default())
         .manage({
@@ -642,6 +643,8 @@ pub fn run() {
             fs::mutate::fs_rename,
             fs::mutate::fs_delete,
             fs::mutate::fs_copy,
+            fs::duplicate::fs_duplicate,
+            fs::duplicate::fs_duplicate_cancel,
             fs::watch::fs_watch_add,
             fs::watch::fs_watch_remove,
             fs::search::fs_search,
