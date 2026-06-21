@@ -16,6 +16,9 @@ import { useDuplicateProgress } from "@/modules/explorer/lib/duplicateStore";
 export function DuplicateQuitModal() {
   const [open, setOpen] = useState(false);
   const [promptName, setPromptName] = useState("");
+  // True once "Cancel copy & quit" is clicked: aborting can take a moment, so
+  // we disable the buttons and swap the bar for a "Canceling..." indicator.
+  const [canceling, setCanceling] = useState(false);
   const progress = useDuplicateProgress();
 
   useEffect(() => {
@@ -24,6 +27,7 @@ export function DuplicateQuitModal() {
         "kex:duplicate-quit-prompt",
         (e) => {
           setPromptName(e.payload.name);
+          setCanceling(false);
           setOpen(true);
         },
       ),
@@ -52,17 +56,32 @@ export function DuplicateQuitModal() {
             finishes.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-150"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
+        {canceling ? (
+          <p className="py-0.5 text-center text-xs text-muted-foreground">
+            Canceling...
+          </p>
+        ) : (
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-150"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        )}
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => void native.cancelQuit()}>
+          <AlertDialogCancel
+            disabled={canceling}
+            onClick={() => void native.cancelQuit()}
+          >
             Keep app open
           </AlertDialogCancel>
-          <AlertDialogAction onClick={() => void native.cancelDuplicate()}>
+          <AlertDialogAction
+            disabled={canceling}
+            onClick={() => {
+              setCanceling(true);
+              void native.cancelDuplicate();
+            }}
+          >
             Cancel copy &amp; quit
           </AlertDialogAction>
         </AlertDialogFooter>
