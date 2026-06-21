@@ -49,6 +49,10 @@ export type EditorPaneHandle = {
   /** Apply CodeMirror's undo/redo commands. */
   undo: () => void;
   redo: () => void;
+  /** Current buffer text, or null when the view is not mounted yet. */
+  getContent: () => string | null;
+  /** Insert text at the end of the document as a normal edit (marks dirty). */
+  insertAtEnd: (text: string) => void;
 };
 
 type Props = {
@@ -240,6 +244,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         redo: () => {
           const view = cmRef.current?.view;
           if (view) redo(view);
+        },
+        getContent: () => cmRef.current?.view?.state.doc.toString() ?? null,
+        insertAtEnd: (text: string) => {
+          const view = cmRef.current?.view;
+          if (!view) return;
+          view.dispatch({
+            changes: { from: view.state.doc.length, insert: text },
+          });
         },
       }),
       [path, applyPendingGoto],

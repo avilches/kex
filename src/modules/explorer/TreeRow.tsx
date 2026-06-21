@@ -21,6 +21,7 @@ import {
   Link01Icon,
   PinIcon,
   Refresh01Icon,
+  ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useEffect, useState } from "react";
@@ -67,6 +68,8 @@ export type EntryRowProps = {
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
+  onAddToGitignore?: (path: string, isDir: boolean) => void;
+  gitRootPath?: string | null;
   onEnterFolder?: (path: string) => void;
   editorPreviewOnClick: boolean;
 };
@@ -92,6 +95,8 @@ function EntryRowImpl(props: EntryRowProps) {
     onRevealInTerminal,
     onNewWorkspaceFromFolder,
     onSetAsRoot,
+    onAddToGitignore,
+    gitRootPath,
     onEnterFolder,
     editorPreviewOnClick,
   } = props;
@@ -349,6 +354,18 @@ function EntryRowImpl(props: EntryRowProps) {
           <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
         </ContextMenuItem>
+        {gitRootPath && onAddToGitignore && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              onSelect={() => onAddToGitignore(path, isDir)}
+            >
+              <HugeiconsIcon icon={ViewOffSlashIcon} size={14} strokeWidth={2} />
+              Add to .gitignore
+            </ContextMenuItem>
+          </>
+        )}
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}

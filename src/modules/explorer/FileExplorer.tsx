@@ -103,6 +103,7 @@ type Props = {
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
+  onAddToGitignore?: (path: string, isDir: boolean) => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
 };
@@ -348,6 +349,7 @@ export const FileExplorer = memo(
       onPathDeleted,
       onRevealInTerminal,
       onNewWorkspaceFromFolder,
+      onAddToGitignore,
       gitStatus,
       onSearchClose,
     },
@@ -755,6 +757,8 @@ export const FileExplorer = memo(
               onRevealInTerminal={onRevealInTerminal}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
               onSetAsRoot={onSetAsRoot}
+              onAddToGitignore={onAddToGitignore}
+              gitRootPath={gitRootPath}
               onEnterFolder={onEnterFolder}
               editorPreviewOnClick={editorPreviewOnClick}
             />
