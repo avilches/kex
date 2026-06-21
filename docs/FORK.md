@@ -165,6 +165,8 @@ previous workspaces or pane layout.
 
 - **Background file/folder duplication**: context-menu "Duplicate" on any file or folder opens an inline name input directly below the source row, pre-filled with a non-colliding suggestion (`pepe copy.txt`, `src copy`). Confirming starts a background copy (`fs_duplicate`) that emits progress as the global event `kex:duplicate-progress`. A global floating progress bar (`DuplicateProgressBar`, bottom-left) shows bytes copied and a cancel button; cancelling mid-copy deletes the partial destination via `fs_duplicate_cancel`. Only one duplication runs at a time. Quitting (Cmd+Q) while a copy is in progress defers the exit and shows a modal in all app windows (main + Settings) with three options: wait for the copy to finish, keep the app open, or cancel the copy and quit immediately. Not present upstream.
 
+- **Source Control directory Tree view**: the Source Control panel gains an IntelliJ-style directory Tree view toggle (not present upstream). A toolbar button switches between List mode (staged/unstaged sections) and Tree mode (single global directory tree with compacted single-child chains). The chosen mode is persisted as `scmViewMode` in the settings store. In Tree mode, bulk Stage all / Unstage all / Discard all actions appear in the toolbar; per-file hover actions and keyboard shortcuts (`s`/space, `d`, `Enter`, `ArrowLeft`/`ArrowRight`) work in both modes.
+
 ### Technical fixes and refactors
 
 - **WebGL canvas refresh** — after a workspace switch, the `opacity-0` CSS change does not trigger a WebGL repaint. A
