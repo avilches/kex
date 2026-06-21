@@ -42,7 +42,7 @@ export type RowActions = {
   beginRename: (path: string) => void;
   commitRename: (newName: string) => void | Promise<void>;
   cancelRename: () => void;
-  beginCreate: (parentPath: string, kind: "file" | "dir") => void;
+  beginCreate: (parentPath: string, kind: "file" | "dir", afterPath?: string) => void;
   deletePath: (path: string) => Promise<void>;
 };
 
@@ -161,7 +161,8 @@ function EntryRowImpl(props: EntryRowProps) {
   }, [isOver, isValidDropTarget, isExpanded, actions, path]);
 
   const iconUrl = isDir ? folderIconUrl(name, isExpanded) : fileIconUrl(name);
-  const createTarget = isDir ? path : pathDirname(path) || rootPath;
+  const createParent = isDir ? path : pathDirname(path) || rootPath;
+  const createAfterPath = isDir ? undefined : path;
   const paddingLeft = 6 + depth * 12;
 
   const handleClick = () => {
@@ -313,14 +314,14 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => actions.beginCreate(createTarget, "file")}
+          onSelect={() => actions.beginCreate(createParent, "file", createAfterPath)}
         >
           <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
           New File
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => actions.beginCreate(createTarget, "dir")}
+          onSelect={() => actions.beginCreate(createParent, "dir", createAfterPath)}
         >
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
           New Folder

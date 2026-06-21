@@ -190,8 +190,12 @@ function buildRows(
     rows.push({ kind: "fs-up", key: "fs-up", path: pathDirname(rootPath) });
   }
   // A create-at-root pending sits below the synthetic header/".." rows, before
-  // the real entries (pendings inside subfolders are emitted by walk()).
-  if (tree.pendingCreate?.parentPath === rootPath) {
+  // the real entries — only when there is no afterPath (afterPath means the
+  // pending is inserted inline during walk(), right after the target sibling).
+  if (
+    tree.pendingCreate?.parentPath === rootPath &&
+    !tree.pendingCreate.afterPath
+  ) {
     rows.push({
       kind: "pending",
       key: `pending:${rootPath}`,
@@ -234,10 +238,28 @@ function buildRows(
           gitignored,
           gitStatusCode,
         });
+        // When creating a sibling after a specific file, insert the pending
+        // row right here rather than at the top of the parent directory.
+        if (
+          tree.pendingCreate?.afterPath === path &&
+          tree.pendingCreate.parentPath === parent
+        ) {
+          rows.push({
+            kind: "pending",
+            key: `pending:${parent}`,
+            depth,
+            pendingKind: tree.pendingCreate.kind,
+          });
+        }
       }
       if (isDir && expanded) {
         const child = tree.nodes[path];
-        if (tree.pendingCreate?.parentPath === path) {
+        // Only insert pending as first child when there is no afterPath;
+        // with afterPath the pending is placed after the sibling file above.
+        if (
+          tree.pendingCreate?.parentPath === path &&
+          !tree.pendingCreate.afterPath
+        ) {
           rows.push({
             kind: "pending",
             key: `pending:${path}`,
