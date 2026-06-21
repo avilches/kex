@@ -35,6 +35,29 @@ fn cancel_quit(app: tauri::AppHandle) {
     let _ = app.emit("kex:duplicate-quit-dismissed", ());
 }
 
+/// Single decision point for an app-quit request, shared by every quit path:
+/// the `ExitRequested` run-event (Linux/Windows) and the custom macOS "Quit"
+/// menu item (macOS Cmd+Q does not raise ExitRequested, tauri#12978). If a
+/// duplication is running, defer and show the modal (emitted once via the
+/// pending swap); otherwise mark the quit confirmed and emit `before-quit` so
+/// the frontend flushes and calls `confirm_quit`.
+fn signal_quit_request(app: &tauri::AppHandle) {
+    if let Some(snap) = app.state::<fs::duplicate::CopyState>().snapshot() {
+        let guard = app.state::<QuitGuard>();
+        if !guard.pending.swap(true, Ordering::SeqCst) {
+            let _ = app.emit(
+                "kex:duplicate-quit-prompt",
+                serde_json::json!({ "name": snap.name, "copied": snap.copied, "total": snap.total }),
+            );
+        }
+        return;
+    }
+    app.state::<QuitGuard>()
+        .confirmed
+        .store(true, Ordering::SeqCst);
+    let _ = app.emit("kex:before-quit", ());
+}
+
 /// macOS-only: handles to menu items whose labels track app state.
 #[cfg(target_os = "macos")]
 struct DynMenuItems {
@@ -549,7 +572,9 @@ pub fn run() {
                 app.on_menu_event(|app, event| {
                     let id = event.id().as_ref();
                     if id == "quit" {
-                        let _ = app.emit("kex:before-quit", ());
+                        // macOS Cmd+Q lands here, not on ExitRequested, so it must
+                        // run the same duplication check or it would close mid-copy.
+                        signal_quit_request(app);
                         return;
                     }
                     if id == "dock_browser" {
@@ -742,21 +767,10 @@ pub fn run() {
                 if !has_main {
                     return;
                 }
-                let copy = app_handle.state::<fs::duplicate::CopyState>();
-                if let Some(snap) = copy.snapshot() {
-                    api.prevent_exit();
-                    // Use swap so we only emit the prompt once per quit attempt.
-                    if !guard.pending.swap(true, Ordering::SeqCst) {
-                        let _ = app_handle.emit(
-                            "kex:duplicate-quit-prompt",
-                            serde_json::json!({ "name": snap.name, "copied": snap.copied, "total": snap.total }),
-                        );
-                    }
-                    return;
-                }
-                guard.confirmed.store(true, Ordering::SeqCst);
+                // Defer this pass; signal_quit_request decides between the modal
+                // (duplication running) and the normal flush (emit before-quit).
                 api.prevent_exit();
-                let _ = app_handle.emit("kex:before-quit", ());
+                signal_quit_request(app_handle);
             }
         });
 }
