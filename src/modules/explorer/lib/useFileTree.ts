@@ -585,6 +585,22 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     [fetchChildren, options],
   );
 
+  const trashPath = useCallback(
+    async (path: string) => {
+      try {
+        await invoke("fs_trash", { path, workspace: currentWorkspaceEnv() });
+        options?.onPathDeleted?.(path);
+        await fetchChildren(dirname(path));
+      } catch (e) {
+        console.error("fs_trash failed:", e);
+        toast.error(`Failed to move "${pathBasename(path)}" to trash`, {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      }
+    },
+    [fetchChildren, options],
+  );
+
   const movePath = useCallback(
     async (from: string, toDir: string) => {
       const name = pathBasename(from);
@@ -639,6 +655,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     cancelRename,
     commitRename,
     deletePath,
+    trashPath,
     movePath,
     joinPath,
   };
