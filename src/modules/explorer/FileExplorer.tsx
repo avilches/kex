@@ -110,6 +110,7 @@ type Props = {
   onAddToGitignore?: (path: string, isDir: boolean) => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
+  active?: boolean;
 };
 
 const ROOT_MODES: {
@@ -356,6 +357,7 @@ export const FileExplorer = memo(
       onAddToGitignore,
       gitStatus,
       onSearchClose,
+      active = true,
     },
     ref,
   ) {
@@ -550,6 +552,29 @@ export const FileExplorer = memo(
       setSelectedPath(activeFilePath);
       requestAnimationFrame(() => scrollEntryIntoView(activeFilePath));
     }, [activeFilePath, entryIndexByPath, scrollEntryIntoView]);
+
+    // A pending rename/create/duplicate must not outlive its inline input being
+    // interactable: while one is active, renameInProgress blocks every click in
+    // the tree. The input commits on blur, but hiding the explorer (visibility)
+    // or navigating away does not always fire blur, leaving the state stuck and
+    // the tree unclickable with no visible input. Discard it on those handoffs.
+    const discardPending = useCallback(() => {
+      tree.cancelRename();
+      tree.cancelCreate();
+      tree.cancelDuplicate();
+    }, [tree.cancelRename, tree.cancelCreate, tree.cancelDuplicate]);
+
+    // Switching the right panel to Git/History keeps the explorer mounted but
+    // hidden (CSS), so the pending state would survive and block clicks on return.
+    useEffect(() => {
+      if (!active) discardPending();
+    }, [active, discardPending]);
+
+    // Focus-on-Explorer (F4) navigates to a file; a half-typed rename is stale.
+    const revealNonce = revealRequest?.nonce;
+    useEffect(() => {
+      if (revealNonce != null) discardPending();
+    }, [revealNonce, discardPending]);
 
     // Focus on Explorer: reveal a file on demand. Root/mode changes reload the
     // tree asynchronously, so this re-runs as nodes/expanded settle until every

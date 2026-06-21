@@ -123,6 +123,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
           >
             <FileExplorer
               ref={explorerRef}
+              active={activeTab === "explorer"}
               rootPath={props.rootPath}
               rootMode={props.rootMode}
               onChangeRootMode={props.onChangeRootMode}
