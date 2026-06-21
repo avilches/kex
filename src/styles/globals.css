@@ -139,6 +139,14 @@
   html {
     @apply font-sans;
     }
+  /* Tailwind v4 preflight sets `cursor: pointer` on every button/[role=button].
+   * This app uses the arrow cursor for buttons and list rows; only real links
+   * (<a>) keep the pointer. Override the preflight here; per-element
+   * `cursor-pointer` utilities still win where genuinely wanted. */
+  button,
+  [role="button"] {
+    cursor: default;
+    }
 }
 
 :root {

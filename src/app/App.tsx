@@ -142,7 +142,7 @@ export default function App() {
     movePanel,
     reorderPanel,
     splitPaneAndPlace,
-    splitPaneAndOpenFile,
+    splitPaneAndOpenPanel,
     openPanel,
     activatePanel,
     closePanel,
@@ -1903,14 +1903,7 @@ export default function App() {
               onMovePanel={movePanel}
               onReorderPanel={reorderPanel}
               onSplitPaneAndPlace={splitPaneAndPlace}
-              onSplitPaneAndOpenFile={(
-                workspaceId,
-                targetPaneId,
-                direction,
-                path,
-              ) =>
-                splitPaneAndOpenFile(workspaceId, targetPaneId, direction, path)
-              }
+              onSplitPaneAndOpenPanel={splitPaneAndOpenPanel}
               onOpenPanel={openPanel}
             >
               <ResizablePanelGroup

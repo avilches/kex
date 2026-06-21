@@ -227,7 +227,7 @@ function ShortcutRow({
           <>
             <div
               onClick={onStartRecording}
-              className="flex min-w-[100px] cursor-pointer items-center justify-end gap-1"
+              className="flex min-w-[100px] items-center justify-end gap-1"
             >
               {hasBindings ? (
                 <KbdGroup>
@@ -292,7 +292,7 @@ function ActionButton({
       type="button"
       onClick={onClick}
       title={title}
-      className="flex size-[22px] cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+      className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
     >
       {children}
     </button>

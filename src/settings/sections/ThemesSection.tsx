@@ -167,7 +167,7 @@ export function ThemesSection() {
               title="Reset to default"
               disabled={zoomLevel === 1.0}
               onClick={() => void setZoomLevel(1.0)}
-              className="flex size-[22px] cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+              className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
             >
               <HugeiconsIcon icon={Refresh01Icon} size={11} />
             </button>

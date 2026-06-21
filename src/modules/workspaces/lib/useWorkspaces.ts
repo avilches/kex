@@ -256,11 +256,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const splitPaneAndOpenFile = useCallback((
+  const splitPaneAndOpenPanel = useCallback((
     workspaceId: string,
     targetPaneId: string,
     direction: "left" | "right" | "top" | "bottom",
-    path: string,
+    panel: Panel,
   ) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -271,7 +271,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
         const freshPaneId = newPaneId();
         const freshSplitId = newSplitId();
-        const panel: Panel = { id: newPanelId(), kind: "editor", path, preview: false, dirty: false };
         const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, panel);
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };
@@ -495,7 +494,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     movePanel,
     reorderPanel,
     splitPaneAndPlace,
-    splitPaneAndOpenFile,
+    splitPaneAndOpenPanel,
     openPanel,
     activatePanel,
     closePanel,

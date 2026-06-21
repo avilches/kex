@@ -236,7 +236,7 @@ function EditorHoverContent({
       />
       {onLockToggle !== undefined && (
         <div className="mt-1.5 border-t border-border/40 pt-1.5">
-          <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+          <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
             <input
               type="checkbox"
               className="size-3 accent-primary"
@@ -366,7 +366,7 @@ function AgentHoverCardContent({
         </div>
       )}
       <div className="mt-1.5 border-t border-border/40 pt-1.5">
-        <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+        <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
           <input
             type="checkbox"
             className="size-3 accent-primary"
@@ -416,7 +416,7 @@ function TerminalHoverCardContent({
         )}
       </HoverTable>
       <div className="mt-1.5 space-y-1 border-t border-border/40 pt-1.5">
-        <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+        <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
           <input
             type="checkbox"
             className="size-3 accent-primary"
@@ -451,7 +451,7 @@ function TerminalHoverCardContent({
             className="h-6 w-full rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-primary"
           />
         )}
-        <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+        <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
           <input
             type="checkbox"
             className="size-3 accent-primary"
@@ -858,7 +858,7 @@ function DraggableTab({
         <button
           type="button"
           className={cn(
-            "ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded hover:bg-muted",
+            "ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded hover:bg-muted",
             lockFlashActive
               ? "scale-125 text-amber-400 transition-[color,transform] duration-300"
               : "text-foreground transition-colors",
@@ -875,7 +875,7 @@ function DraggableTab({
       ) : (
         <button
           type="button"
-          className="ml-0.5 flex size-[16px] shrink-0 cursor-pointer items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+          className="ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();

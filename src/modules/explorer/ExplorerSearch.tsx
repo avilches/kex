@@ -61,7 +61,6 @@ type Props = {
   onRequestClose: () => void;
   onActiveChange?: (active: boolean) => void;
   onRevealInTerminal?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
 };
 
 export type ExplorerSearchHandle = {
@@ -76,7 +75,6 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
   onRequestClose,
   onActiveChange,
   onRevealInTerminal,
-  onAttachToAgent,
 }: Props,
   ref,
 ) {
@@ -369,13 +367,6 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 onSelect={() => contextHit && void copyToClipboard(contextHit.path)}
               >
                 Copy Path
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => onAttachToAgent?.(contextHit?.path ?? "")}
-              >
-                Attach to Agent
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>

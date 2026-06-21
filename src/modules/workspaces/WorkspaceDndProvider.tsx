@@ -9,19 +9,21 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { File01Icon } from "@hugeicons/core-free-icons";
+import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { panelForDroppedPath } from "./lib/dropPanel";
 import { allPanes, findPanelPane } from "./lib/splitNode";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { basename, panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel, Workspace } from "./lib/types";
 import type { UseWorkspacesReturn } from "./lib/useWorkspaces";
-import { newPanelId } from "@/lib/ids";
 
 type DraggingItem =
   | { kind: "panel"; panel: Panel; workspaceId: string }
-  | { kind: "file"; path: string };
+  // paneOnly: drags that may only open a terminal in a pane (the explorer's
+  // synthetic root and ".." rows), never participate in internal explorer moves.
+  | { kind: "file"; path: string; isDir: boolean; paneOnly?: boolean };
 
 type WorkspaceDndContextValue = {
   draggingItem: DraggingItem | null;
@@ -49,12 +51,7 @@ type Props = {
   onMovePanel: UseWorkspacesReturn["movePanel"];
   onReorderPanel: UseWorkspacesReturn["reorderPanel"];
   onSplitPaneAndPlace: UseWorkspacesReturn["splitPaneAndPlace"];
-  onSplitPaneAndOpenFile: (
-    workspaceId: string,
-    targetPaneId: string,
-    direction: "left" | "right" | "top" | "bottom",
-    path: string,
-  ) => void;
+  onSplitPaneAndOpenPanel: UseWorkspacesReturn["splitPaneAndOpenPanel"];
   onOpenPanel: UseWorkspacesReturn["openPanel"];
   children: ReactNode;
 };
@@ -65,7 +62,7 @@ export function WorkspaceDndProvider({
   onMovePanel,
   onReorderPanel,
   onSplitPaneAndPlace,
-  onSplitPaneAndOpenFile,
+  onSplitPaneAndOpenPanel,
   onOpenPanel,
   children,
 }: Props) {
@@ -99,11 +96,15 @@ export function WorkspaceDndProvider({
     dragIndexRef.current = buildDragIndex();
     const activeId = String(event.active.id);
     if (activeId.startsWith("file:")) {
-      setDraggingItem({ kind: "file", path: activeId.slice(5) });
+      setDraggingItem({ kind: "file", path: activeId.slice(5), isDir: false });
+      return;
+    }
+    if (activeId.startsWith("dir-pane:")) {
+      setDraggingItem({ kind: "file", path: activeId.slice(9), isDir: true, paneOnly: true });
       return;
     }
     if (activeId.startsWith("dir:")) {
-      setDraggingItem({ kind: "file", path: activeId.slice(4) });
+      setDraggingItem({ kind: "file", path: activeId.slice(4), isDir: true });
       return;
     }
     const entry = dragIndexRef.current.get(activeId);
@@ -135,7 +136,10 @@ export function WorkspaceDndProvider({
 
     const idx = dragIndexRef.current;
     const activeId = String(event.active.id);
-    const isFileDrag = activeId.startsWith("file:");
+    const isFileDrag =
+      activeId.startsWith("file:") ||
+      activeId.startsWith("dir:") ||
+      activeId.startsWith("dir-pane:");
 
     const targetEntry = idx.get(refPanelId);
     if (!targetEntry) { setTabInsertPaneId(null); return; }
@@ -168,22 +172,35 @@ export function WorkspaceDndProvider({
     const overId = String(over.id);
 
     if (activeId.startsWith("file:")) {
-      handleFileDragEnd(activeId.slice(5), overId, idx);
+      handleFileDragEnd(activeId.slice(5), overId, idx, false);
+      return;
+    }
+    if (activeId.startsWith("dir-pane:")) {
+      handleFileDragEnd(activeId.slice(9), overId, idx, true);
+      return;
+    }
+    if (activeId.startsWith("dir:")) {
+      handleFileDragEnd(activeId.slice(4), overId, idx, true);
       return;
     }
 
     handlePanelDragEnd(activeId, overId, idx);
   }
 
-  function handleFileDragEnd(filePath: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>) {
+  function handleFileDragEnd(filePath: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>, isDir: boolean) {
     const activeWs = workspaces.find((ws) => ws.id === activeWorkspaceIdRef.current);
     if (!activeWs) return;
     const panes = allPanes(activeWs.paneTree);
 
+    // Folders open a fresh terminal at that cwd; files reuse an already-open editor.
+    const makePanel = (): Panel => panelForDroppedPath(filePath, isDir);
+
     let existingPanelId: string | null = null;
-    for (const pane of panes) {
-      const found = pane.panels.find((p) => p.kind === "editor" && p.path === filePath);
-      if (found) { existingPanelId = found.id; break; }
+    if (!isDir) {
+      for (const pane of panes) {
+        const found = pane.panels.find((p) => p.kind === "editor" && p.path === filePath);
+        if (found) { existingPanelId = found.id; break; }
+      }
     }
 
     if (overId.startsWith("tab-insert:")) {
@@ -211,8 +228,7 @@ export function WorkspaceDndProvider({
           onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId, insertionIndex);
         }
       } else {
-        const panel: Panel = { id: newPanelId(), kind: "editor", path: filePath, preview: false, dirty: false };
-        onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, panel, insertionIndex);
+        onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, makePanel(), insertionIndex);
       }
       return;
     }
@@ -231,8 +247,7 @@ export function WorkspaceDndProvider({
         if (sourcePaneId === targetPaneId) return;
         onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId);
       } else {
-        const panel: Panel = { id: newPanelId(), kind: "editor", path: filePath, preview: false, dirty: false };
-        onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, panel);
+        onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, makePanel());
       }
     } else {
       const { workspacePaneLimit } = usePreferencesStore.getState();
@@ -240,7 +255,7 @@ export function WorkspaceDndProvider({
       if (existingPanelId) {
         onSplitPaneAndPlace(activeWorkspaceIdRef.current, targetPaneId, zone, existingPanelId);
       } else {
-        onSplitPaneAndOpenFile(activeWorkspaceIdRef.current, targetPaneId, zone, filePath);
+        onSplitPaneAndOpenPanel(activeWorkspaceIdRef.current, targetPaneId, zone, makePanel());
       }
     }
   }
@@ -320,7 +335,7 @@ export function WorkspaceDndProvider({
         {draggingItem?.kind === "file" && (
           <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
             <span className="shrink-0 opacity-70">
-              <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={1.5} />
+              <HugeiconsIcon icon={draggingItem.isDir ? Folder01Icon : File01Icon} size={14} strokeWidth={1.5} />
             </span>
             <span className="max-w-[120px] truncate">{basename(draggingItem.path)}</span>
           </div>
