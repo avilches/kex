@@ -64,7 +64,6 @@ export type ShortcutGroup =
   | "Tabs"
   | "Panes"
   | "Terminal"
-  | "Search"
   | "View"
   | "Editor";
 
@@ -86,20 +85,44 @@ export type Shortcut = {
 
 export const SHORTCUTS: Shortcut[] = [
   {
+    id: "window.new",
+    label: "New Window",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "n" }],
+  },
+  {
+    id: "workspace.new",
+    label: "New Workspace",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, key: "n" }],
+  },
+  {
+    id: "workspace.prev",
+    label: "Previous Workspace",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowUp" }],
+  },
+  {
+    id: "workspace.next",
+    label: "Next Workspace",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowDown" }],
+  },
+  {
     id: "commandPalette.open",
-    label: "Open command palette",
+    label: "Open Command Palette",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
   },
   {
     id: "commandPalette.content",
-    label: "Find in files",
+    label: "Find in Files",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "p" }],
   },
   {
     id: "settings.open",
-    label: "Open settings",
+    label: "Open Settings",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "," }],
   },
@@ -158,105 +181,111 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "." }],
   },
   {
+    id: "explorer.search",
+    label: "Search Files",
+    group: "Sidebar",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
+  },
+  {
     id: "path.copy",
-    label: "Copy path",
+    label: "Copy Path",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "c" }],
   },
   {
     id: "file.copy",
-    label: "Copy file",
+    label: "Copy File",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "c" }],
   },
   {
     id: "file.cut",
-    label: "Cut file",
+    label: "Cut File",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "x" }],
   },
   {
     id: "file.paste",
-    label: "Paste file",
+    label: "Paste File",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "v" }],
   },
   {
     id: "file.delete",
-    label: "Delete file",
+    label: "Delete File",
     group: "General",
     defaultBindings: [{ key: "Delete" }],
   },
   {
     id: "file.rename",
-    label: "Rename file",
+    label: "Rename File",
     group: "General",
     defaultBindings: [{ key: "F2" }],
   },
   {
     id: "tab.new",
-    label: "New terminal tab",
+    label: "New Terminal Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
   },
   {
     id: "tab.newBlock",
-    label: "New Blocks terminal",
+    label: "New Blocks Terminal",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
   },
   {
     id: "tab.newBrowser",
-    label: "New browser tab",
+    label: "New Browser Tab",
     group: "Tabs",
     // Cmd/Ctrl+P now opens the command palette, so the browser moves here.
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "o" }],
   },
   {
     id: "tab.newEditor",
-    label: "New editor tab",
+    label: "New Editor Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "o" }],
   },
   {
     id: "tab.close",
-    label: "Close tab or pane",
+    label: "Close Tab or Pane",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "w" }],
   },
   {
     id: "tab.rename",
-    label: "Rename tab",
+    label: "Rename Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
   },
   {
     id: "tab.lock",
-    label: "Lock tab (prevent close)",
+    label: "Lock Tab (Prevent Close)",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "l" }],
   },
   {
     id: "tab.focusOnExplorer",
-    label: "Focus tab file or folder in explorer",
+    label: "Focus Tab File or Folder in Explorer",
     group: "Tabs",
     defaultBindings: [{ key: "F4" }],
   },
   {
     id: "pane.splitRight",
-    label: "Split pane right",
+    label: "Split Pane Right",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "d" }],
   },
   {
     id: "pane.splitDown",
-    label: "Split pane down",
+    label: "Split Pane Down",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "d" }],
   },
   {
     id: "pane.focusUp",
-    label: "Focus pane above",
+    label: "Focus Pane Above",
     group: "Panes",
     defaultBindings: IS_MAC
       ? [{ meta: true, ctrl: true, key: "ArrowUp" }]
@@ -264,7 +293,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "pane.focusDown",
-    label: "Focus pane below",
+    label: "Focus Pane Below",
     group: "Panes",
     defaultBindings: IS_MAC
       ? [{ meta: true, ctrl: true, key: "ArrowDown" }]
@@ -272,7 +301,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "pane.focusLeft",
-    label: "Focus pane to the left",
+    label: "Focus Pane to the Left",
     group: "Panes",
     defaultBindings: IS_MAC
       ? [{ meta: true, ctrl: true, key: "ArrowLeft" }]
@@ -280,7 +309,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "pane.focusRight",
-    label: "Focus pane to the right",
+    label: "Focus Pane to the Right",
     group: "Panes",
     defaultBindings: IS_MAC
       ? [{ meta: true, ctrl: true, key: "ArrowRight" }]
@@ -288,7 +317,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "terminal.clear",
-    label: "Clear terminal",
+    label: "Clear Terminal",
     group: "Terminal",
     // macOS Terminal's ⌘K (clear scrollback, keep the prompt). Default only on
     // macOS — on other platforms Ctrl+K is readline's kill-line, so we leave it
@@ -297,46 +326,40 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "blocks.prev",
-    label: "Previous command block",
+    label: "Previous Command Block",
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "ArrowUp" }],
     allowRepeat: true,
   },
   {
     id: "blocks.next",
-    label: "Next command block",
+    label: "Next Command Block",
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "ArrowDown" }],
     allowRepeat: true,
   },
   {
     id: "tab.next",
-    label: "Next tab",
+    label: "Next Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowRight" }],
   },
   {
     id: "tab.prev",
-    label: "Previous tab",
+    label: "Previous Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowLeft" }],
   },
   {
     id: "tab.selectByIndex",
-    label: "Jump to tab 1–9",
+    label: "Jump to Tab 1–9",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
-    id: "explorer.search",
-    label: "Search files",
-    group: "Search",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
-  },
-  {
     id: "search.focus",
     label: "Find",
-    group: "Search",
+    group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "f" }],
   },
   {
@@ -347,33 +370,9 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "notifications.jumpToLast",
-    label: "Jump to latest notification",
+    label: "Jump to Latest Notification",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, key: "i" }],
-  },
-  {
-    id: "workspace.new",
-    label: "New workspace",
-    group: "General",
-    defaultBindings: [{ [MOD_PROP]: true, key: "n" }],
-  },
-  {
-    id: "window.new",
-    label: "New window",
-    group: "General",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "n" }],
-  },
-  {
-    id: "workspace.prev",
-    label: "Previous workspace",
-    group: "General",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowUp" }],
-  },
-  {
-    id: "workspace.next",
-    label: "Next workspace",
-    group: "General",
-    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowDown" }],
   },
   {
     id: "view.zoomIn",
@@ -397,13 +396,13 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "view.zoomReset",
-    label: "Reset zoom",
+    label: "Reset Zoom",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, key: "0" }],
   },
   {
     id: "view.zenMode",
-    label: "Toggle zen mode",
+    label: "Toggle Zen Mode",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "z" }],
   },
@@ -433,7 +432,6 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "Panes",
   "Terminal",
   "View",
-  "Search",
   "Editor",
 ];
 
