@@ -130,7 +130,7 @@ function rootModeInfo(
     case "pinned":
       if (!ctx.workspaceRootPath)
         return {
-          subtitle: "Set a new workspace root in the explorer",
+          subtitle: "No workspace defined yet. Set a new one in the explorer",
           disabled: true,
         };
       if (!ctx.workspaceRootExists)
@@ -894,7 +894,7 @@ export const FileExplorer = memo(
                 : "Folder not found"}
             </div>
             <div className="break-all text-[11px] text-muted-foreground">
-              {workspaceRootPath ?? "Set a new workspace root in the explorer"}
+              {workspaceRootPath ?? "No workspace defined yet. Set a new one in the explorer"}
             </div>
             <div className="mt-2 flex w-full flex-col gap-2">
               <button
