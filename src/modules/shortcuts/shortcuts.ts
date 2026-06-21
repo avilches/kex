@@ -101,7 +101,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "sidebar.toggle",
     label: "Toggle Sidebar",
     group: "Sidebar",
-    defaultBindings: [],
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "b" }],
   },
   {
     id: "sidebar.showExplorer",
@@ -119,7 +119,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "sidebar.showHistory",
     label: "Show Git History",
     group: "Sidebar",
-    defaultBindings: [],
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "h" }],
   },
   {
     id: "explorer.viewFilesystem",
