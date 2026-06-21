@@ -58,6 +58,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 
 ## Contexto adicional (`docs/pending/`)
 
+- [MODAL_MESSAGES.md](pending/MODAL_MESSAGES.md) — Mensajes de modales destructivos (discard por caso + feedback de resultado)
 - [BUGS.md](pending/BUGS.md) — Resumen ejecutivo de todos los bugs
 - [DOCS.md](pending/DOCS.md) — Notas de documentacion pendiente
 - [README.md](pending/README.md) — Descripcion general del contenido de pending
