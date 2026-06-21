@@ -879,7 +879,7 @@ export const FileExplorer = memo(
         ) : rootMode === "filesystem" && root?.status === "error" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
             <HugeiconsIcon
-              icon={PinOffIcon}
+              icon={Folder01Icon}
               size={26}
               strokeWidth={1.8}
               className="text-muted-foreground"
