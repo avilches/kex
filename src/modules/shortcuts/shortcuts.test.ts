@@ -4,6 +4,7 @@ import {
   SHORTCUTS,
   matchBinding,
   type KeyBinding,
+  type ShortcutId,
 } from "./shortcuts";
 
 describe("getShortcutLabel", () => {
@@ -167,7 +168,18 @@ describe("tab.lock shortcut", () => {
 });
 
 describe("tab.selectByIndex binding uniqueness", () => {
-  test("only tab.selectByIndex binds to Cmd/Ctrl+1 through Cmd/Ctrl+9", () => {
+  // explorer.viewFilesystem/Pinned/Terminal/Git intentionally use Ctrl+1-4 on
+  // all platforms. On macOS, tab.selectByIndex uses Cmd (meta) so there is no
+  // conflict. On Linux/Windows both use Ctrl -- the user can reassign via
+  // Settings. These are the only known exceptions.
+  const DIGIT_EXCEPTIONS = new Set<ShortcutId>([
+    "explorer.viewFilesystem",
+    "explorer.viewPinned",
+    "explorer.viewTerminal",
+    "explorer.viewGit",
+  ]);
+
+  test("only tab.selectByIndex and known explorer.view* bind to Cmd/Ctrl+1-9", () => {
     const tabSelectByIndex = SHORTCUTS.find(
       (s) => s.id === "tab.selectByIndex"
     );
@@ -175,7 +187,7 @@ describe("tab.selectByIndex binding uniqueness", () => {
 
     const digitPattern = /^[1-9]$/;
     const otherShortcuts = SHORTCUTS.filter(
-      (s) => s.id !== "tab.selectByIndex"
+      (s) => s.id !== "tab.selectByIndex" && !DIGIT_EXCEPTIONS.has(s.id)
     );
 
     for (const other of otherShortcuts) {
