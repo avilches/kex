@@ -48,6 +48,7 @@ import {
 } from "@/modules/shortcuts";
 import { useSourceControlContext } from "@/modules/source-control";
 import { StatusBar } from "@/modules/statusbar";
+import { DuplicateProgressBar } from "@/modules/explorer";
 import {
   clearFocusedTerminal,
   disposeSession,
@@ -2052,6 +2053,8 @@ export default function App() {
               privateActive={false}
             />
           )}
+
+          <DuplicateProgressBar />
 
           <AgentNotificationsBridge
             workspaces={workspaces}
