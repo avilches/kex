@@ -329,6 +329,7 @@ export default function App() {
   const rightPanelActiveTab = usePreferencesStore((s) => s.rightPanelActiveTab);
   const panelSide = usePreferencesStore((s) => s.panelSide);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
+  const showHidden = usePreferencesStore((s) => s.showHidden);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
 
@@ -1907,6 +1908,9 @@ export default function App() {
       case "toggle_history":
         showRightPanelTab("history");
         break;
+      case "toggle_hidden":
+        void setShowHidden(!usePreferencesStore.getState().showHidden);
+        break;
       case "toggle_panel_side":
         void setPanelSide(
           usePreferencesStore.getState().panelSide === "left"
@@ -1940,9 +1944,10 @@ export default function App() {
         sidebarOpen: rightPanelOpen,
         activeTab: rightPanelActiveTab,
         panelSide,
+        showHidden,
       },
     }).catch(() => {});
-  }, [editorAutoSave, rightPanelOpen, rightPanelActiveTab, panelSide]);
+  }, [editorAutoSave, rightPanelOpen, rightPanelActiveTab, panelSide, showHidden]);
 
   // ── Command palette ───────────────────────────────────────────────────────
 

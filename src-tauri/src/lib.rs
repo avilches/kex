@@ -66,6 +66,7 @@ struct DynMenuItems {
     explorer: tauri::menu::CheckMenuItem<tauri::Wry>,
     git: tauri::menu::CheckMenuItem<tauri::Wry>,
     history: tauri::menu::CheckMenuItem<tauri::Wry>,
+    show_hidden: tauri::menu::CheckMenuItem<tauri::Wry>,
     panel_side: tauri::menu::MenuItem<tauri::Wry>,
     dock_browser: tauri::menu::MenuItem<tauri::Wry>,
     dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
@@ -84,6 +85,7 @@ struct MenuState {
     sidebar_open: bool,
     active_tab: String,
     panel_side: String,
+    show_hidden: bool,
 }
 
 #[tauri::command]
@@ -103,6 +105,7 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
         let _ = items.explorer.set_checked(on("explorer"));
         let _ = items.git.set_checked(on("git"));
         let _ = items.history.set_checked(on("history"));
+        let _ = items.show_hidden.set_checked(state.show_hidden);
         let _ = items.panel_side.set_text(if state.panel_side == "left" {
             "Move Sidebar to Right"
         } else {
@@ -518,6 +521,11 @@ pub fn run() {
                 let history = CheckMenuItemBuilder::with_id("toggle_history", "Git History")
                     .checked(false)
                     .build(app)?;
+                let show_hidden =
+                    CheckMenuItemBuilder::with_id("toggle_hidden", "Show Hidden Files")
+                        .accelerator("Cmd+Shift+.")
+                        .checked(false)
+                        .build(app)?;
                 let panel_side =
                     MenuItemBuilder::with_id("toggle_panel_side", "Move Sidebar to Left")
                         .build(app)?;
@@ -526,6 +534,8 @@ pub fn run() {
                     .item(&explorer)
                     .item(&git)
                     .item(&history)
+                    .separator()
+                    .item(&show_hidden)
                     .separator()
                     .item(&panel_side)
                     .build()?;
@@ -559,6 +569,7 @@ pub fn run() {
                     explorer,
                     git,
                     history,
+                    show_hidden,
                     panel_side,
                     dock_browser,
                     dock_all_browsers,
