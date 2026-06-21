@@ -145,7 +145,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   rightPanelOpen: true,
   rightPanelWidth: 240,
   rightPanelActiveTab: "explorer",
-  panelSide: "right",
+  panelSide: "left",
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
