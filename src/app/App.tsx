@@ -99,6 +99,7 @@ import {
   type ExplorerRootMode,
 } from "@/modules/workspaces/lib/explorerRoot";
 import type { RevealRequest } from "@/modules/explorer";
+import { panelFilePath } from "@/modules/workspaces/lib/panelPath";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -1654,6 +1655,13 @@ export default function App() {
             return p;
           });
       },
+      "tab.focusOnExplorer": () => {
+        if (!activePanel) return;
+        const target =
+          panelFilePath(activePanel) ??
+          (activePanel.kind === "terminal" ? (activePanel.cwd ?? null) : null);
+        if (target) handleFocusOnExplorer(target);
+      },
       "path.copy": () => {
         if (!activePanel) return;
         let path: string | undefined;
@@ -1684,6 +1692,7 @@ export default function App() {
       cycleWorkspace,
       activatePanel,
       handleCloseActivePanel,
+      handleFocusOnExplorer,
       openNewTerminal,
       openNewBlock,
       addWorkspace,

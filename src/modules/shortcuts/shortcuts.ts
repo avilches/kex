@@ -14,6 +14,7 @@ export type ShortcutId =
   | "tab.close"
   | "tab.rename"
   | "tab.lock"
+  | "tab.focusOnExplorer"
   | "file.rename"
   | "tab.next"
   | "tab.prev"
@@ -144,6 +145,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Lock tab (prevent close)",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "l" }],
+  },
+  {
+    id: "tab.focusOnExplorer",
+    label: "Focus tab file or folder in explorer",
+    group: "Tabs",
+    defaultBindings: [{ key: "F4" }],
   },
   {
     id: "pane.splitRight",
