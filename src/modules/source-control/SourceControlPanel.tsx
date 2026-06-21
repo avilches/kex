@@ -131,6 +131,17 @@ function dirname(path: string): string {
   return normalized.slice(0, index);
 }
 
+function entriesUnderFolder(
+  fullPath: string,
+  entries: SourceControlEntry[],
+): SourceControlEntry[] {
+  const prefix = `${fullPath}/`;
+  return entries.filter((entry) => {
+    const normalized = entry.path.replace(/\\/g, "/");
+    return normalized.startsWith(prefix);
+  });
+}
+
 function upstreamBadgeLabel(upstream: string | null | undefined): string {
   if (!upstream) return "No upstream";
   return upstream;
@@ -193,6 +204,33 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       return next;
     });
   }, []);
+
+  const handleStageFolder = useCallback(
+    (node: ScmDirNode) => {
+      void scm.stageEntries(
+        entriesUnderFolder(node.fullPath, scm.unstagedEntries),
+      );
+    },
+    [scm],
+  );
+
+  const handleUnstageFolder = useCallback(
+    (node: ScmDirNode) => {
+      void scm.unstageEntries(
+        entriesUnderFolder(node.fullPath, scm.stagedEntries),
+      );
+    },
+    [scm],
+  );
+
+  const handleDiscardFolder = useCallback(
+    (node: ScmDirNode) => {
+      scm.requestDiscardEntries(
+        entriesUnderFolder(node.fullPath, scm.unstagedEntries),
+      );
+    },
+    [scm],
+  );
 
   useEffect(() => {
     return () => {
@@ -905,6 +943,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                             onToggleStagedCollapsed={() => setStagedCollapsed((v) => !v)}
                             onToggleChangesCollapsed={() => setChangesCollapsed((v) => !v)}
                             onToggleTreeDir={toggleTreeDir}
+                            onStageFolder={handleStageFolder}
+                            onUnstageFolder={handleUnstageFolder}
+                            onDiscardFolder={handleDiscardFolder}
                             onSelectEntry={scm.selectEntry}
                             onStageEntry={scm.stageEntry}
                             onUnstageEntry={scm.unstageEntry}
@@ -1011,6 +1052,9 @@ type RowRendererProps = {
   onToggleStagedCollapsed: () => void;
   onToggleChangesCollapsed: () => void;
   onToggleTreeDir: (fullPath: string) => void;
+  onStageFolder: (node: ScmDirNode) => void;
+  onUnstageFolder: (node: ScmDirNode) => void;
+  onDiscardFolder: (node: ScmDirNode) => void;
   onSelectEntry: (entry: SourceControlEntry) => Promise<void>;
   onStageEntry: (entry: SourceControlEntry) => Promise<void>;
   onUnstageEntry: (entry: SourceControlEntry) => Promise<void>;
@@ -1164,9 +1208,13 @@ function ChangesSectionHeader({
 function TreeDirRow({
   row,
   focused,
+  actionBusy,
   treeCollapsed,
   onFocusRow,
   onToggleTreeDir,
+  onStageFolder,
+  onUnstageFolder,
+  onDiscardFolder,
 }: RowRendererProps & {
   row: Extract<RowDescriptor, { kind: "tree-dir" }>;
 }) {
@@ -1201,6 +1249,35 @@ function TreeDirRow({
       <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/90">
         {node.name}
       </span>
+      <div
+        className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <IconActionButton
+          label="Discard folder changes"
+          disabled={actionBusy !== null}
+          side="top"
+          onClick={() => onDiscardFolder(node)}
+        >
+          <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
+        </IconActionButton>
+        <IconActionButton
+          label="Unstage folder"
+          disabled={actionBusy !== null}
+          side="top"
+          onClick={() => onUnstageFolder(node)}
+        >
+          <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
+        </IconActionButton>
+        <IconActionButton
+          label="Stage folder"
+          disabled={actionBusy !== null}
+          side="top"
+          onClick={() => onStageFolder(node)}
+        >
+          <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
+        </IconActionButton>
+      </div>
       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/55">
         {node.fileCount}
       </span>
