@@ -139,7 +139,7 @@ Events emitted by `float_browser.rs` to the **origin window** (not broadcast):
 
 | Event | Payload | Trigger |
 |---|---|---|
-| `kex:float-dock` | `{ panelId, currentUrl }` | Floating window closed via X button, `float_browser_dock` command, or "Dock to Kex" menu item |
+| `kex:float-dock` | `{ panelId, currentUrl }` | Floating window closed via X button, `float_browser_dock` command, or the "Dock Browser" / "Dock All Browsers" Window menu items |
 | `kex:float-navigated` | `{ panelId, url }` | Each page load completion (`PageLoadEvent::Finished`) in the floating window |
 
 ---

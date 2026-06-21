@@ -228,8 +228,9 @@ Browser panels can be opened as native `WebviewUrl::External` windows (WKWebView
 bypassing iframe X-Frame-Options restrictions that block sites like localhost dev servers or third-party apps. The panel
 stays as a placeholder in its pane showing an editable address bar; typing a URL drives the floating window via
 `float_browser_navigate`, and in-window navigation flows back through the `kex:float-navigated` event so the address bar
-and persisted `panel.url` stay in sync. Dock back through any of three paths: the float window X button, the "Dock here"
-button in the placeholder, or the macOS "Dock to Kex" Window menu item. Floating windows are recreated on app restart for
+and persisted `panel.url` stay in sync. Dock back through any of these paths: the float window X button, the "Dock here"
+button in the placeholder, or the macOS Window menu items "Dock Browser" (the focused float) and "Dock All Browsers" (all
+open floats), each enabled only while it applies. Floating windows are recreated on app restart for
 panels persisted with `floating: true`, and destroyed without docking when their tab, sibling tabs, or workspace close.
 State is managed Rust-side in `FloatBrowserState` (`src-tauri/src/modules/float_browser.rs`); the frontend hook is
 `useFloatBrowser` (`src/modules/browser/useFloatBrowser.ts`).

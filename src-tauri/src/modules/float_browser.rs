@@ -12,15 +12,16 @@ pub struct FloatMeta {
 pub struct FloatBrowserState {
     // panel_id -> meta
     pub panels: Mutex<HashMap<String, FloatMeta>>,
-    // panel_id of the float window that last had OS focus (for menu "Dock to Kex")
-    pub last_focused_panel_id: Mutex<Option<String>>,
+    // panel_id of the float window that currently holds OS focus, or None when a
+    // non-float window is focused. Drives the "Dock Browser" menu item.
+    pub focused_float_panel_id: Mutex<Option<String>>,
 }
 
 impl Default for FloatBrowserState {
     fn default() -> Self {
         Self {
             panels: Mutex::new(HashMap::new()),
-            last_focused_panel_id: Mutex::new(None),
+            focused_float_panel_id: Mutex::new(None),
         }
     }
 }
@@ -92,14 +93,23 @@ pub fn float_browser_open(
     .build()
     .map_err(|e| e.to_string())?;
 
-    // Track last focused float window for the "Dock to Kex" menu item
+    // Track which float window holds OS focus so the "Dock Browser" menu item
+    // reflects the active float and greys out when focus leaves it.
     window.on_window_event({
         let app_f = app_focus.clone();
         let pid = panel_id_focus.clone();
         move |event| {
-            if let WindowEvent::Focused(true) = event {
+            if let WindowEvent::Focused(focused) = event {
                 let st = app_f.state::<FloatBrowserState>();
-                *st.last_focused_panel_id.lock().unwrap() = Some(pid.clone());
+                {
+                    let mut cur = st.focused_float_panel_id.lock().unwrap();
+                    if *focused {
+                        *cur = Some(pid.clone());
+                    } else if cur.as_deref() == Some(pid.as_str()) {
+                        *cur = None;
+                    }
+                }
+                crate::refresh_dock_menu(&app_f);
             }
         }
     });
@@ -122,6 +132,7 @@ pub fn float_browser_open(
             },
         );
     }
+    crate::refresh_dock_menu(&app);
 
     Ok(())
 }
@@ -140,11 +151,12 @@ pub fn do_dock_and_destroy(
         if map.remove(panel_id).is_none() {
             return;
         }
-        let mut focused = st.last_focused_panel_id.lock().unwrap();
+        let mut focused = st.focused_float_panel_id.lock().unwrap();
         if focused.as_deref() == Some(panel_id) {
             *focused = None;
         }
     }
+    crate::refresh_dock_menu(app);
 
     let current_url = app
         .get_webview_window(win_label)
@@ -164,6 +176,36 @@ pub fn do_dock_and_destroy(
     }
 }
 
+/// Dock the float window that currently holds OS focus, if any.
+pub fn dock_focused(app: &AppHandle) {
+    let st = app.state::<FloatBrowserState>();
+    let panel_id = st.focused_float_panel_id.lock().unwrap().clone();
+    let Some(pid) = panel_id else { return };
+    let origin = {
+        let map = st.panels.lock().unwrap();
+        map.get(&pid).map(|m| m.origin_window_label.clone())
+    };
+    if let Some(origin_label) = origin {
+        let label = window_label(&pid);
+        do_dock_and_destroy(app, &pid, &origin_label, &label);
+    }
+}
+
+/// Dock every open float window back to its origin.
+pub fn dock_all(app: &AppHandle) {
+    let st = app.state::<FloatBrowserState>();
+    let entries: Vec<(String, String)> = {
+        let map = st.panels.lock().unwrap();
+        map.iter()
+            .map(|(pid, m)| (pid.clone(), m.origin_window_label.clone()))
+            .collect()
+    };
+    for (pid, origin) in entries {
+        let label = window_label(&pid);
+        do_dock_and_destroy(app, &pid, &origin, &label);
+    }
+}
+
 #[tauri::command]
 pub fn float_browser_close(
     app: AppHandle,
@@ -174,11 +216,12 @@ pub fn float_browser_close(
     {
         let mut map = state.panels.lock().unwrap();
         map.remove(&panel_id);
-        let mut focused = state.last_focused_panel_id.lock().unwrap();
+        let mut focused = state.focused_float_panel_id.lock().unwrap();
         if focused.as_deref() == Some(&panel_id) {
             *focused = None;
         }
     }
+    crate::refresh_dock_menu(&app);
     if let Some(window) = app.get_webview_window(&label) {
         window.destroy().map_err(|e| e.to_string())?;
     }

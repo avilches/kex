@@ -31,6 +31,8 @@ struct DynMenuItems {
     git: tauri::menu::MenuItem<tauri::Wry>,
     history: tauri::menu::MenuItem<tauri::Wry>,
     panel_side: tauri::menu::MenuItem<tauri::Wry>,
+    dock_browser: tauri::menu::MenuItem<tauri::Wry>,
+    dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
 }
 
 #[cfg(target_os = "macos")]
@@ -84,6 +86,25 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
     #[cfg(not(target_os = "macos"))]
     let _ = (app, state);
 }
+
+/// Keep the Window menu's dock items in sync with the float-browser state:
+/// "Dock Browser" is enabled only while a float holds focus, "Dock All Browsers"
+/// while any float is open. macOS-only; a no-op elsewhere.
+#[cfg(target_os = "macos")]
+pub fn refresh_dock_menu(app: &tauri::AppHandle) {
+    let st = app.state::<float_browser::FloatBrowserState>();
+    let has_focused = st.focused_float_panel_id.lock().unwrap().is_some();
+    let has_any = !st.panels.lock().unwrap().is_empty();
+    let handles = app.state::<MenuHandles>();
+    let guard = handles.0.lock().expect("MenuHandles mutex poisoned");
+    if let Some(items) = guard.as_ref() {
+        let _ = items.dock_browser.set_enabled(has_focused);
+        let _ = items.dock_all_browsers.set_enabled(has_any);
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn refresh_dock_menu(_app: &tauri::AppHandle) {}
 
 #[tauri::command]
 fn get_launch_dir(state: State<'_, LaunchDir>) -> Option<String> {
@@ -478,13 +499,20 @@ pub fn run() {
                     .item(&panel_side)
                     .build()?;
 
-                // Window
-                let dock_to_kex = MenuItemBuilder::with_id("dock_to_kex", "Dock to Kex")
+                // Window (dock items start disabled; refresh_dock_menu enables them
+                // while float browser windows exist / hold focus)
+                let dock_browser = MenuItemBuilder::with_id("dock_browser", "Dock Browser")
+                    .enabled(false)
                     .build(app)?;
+                let dock_all_browsers =
+                    MenuItemBuilder::with_id("dock_all_browsers", "Dock All Browsers")
+                        .enabled(false)
+                        .build(app)?;
                 let window_menu = SubmenuBuilder::new(app, "Window")
                     .minimize()
                     .separator()
-                    .item(&dock_to_kex)
+                    .item(&dock_browser)
+                    .item(&dock_all_browsers)
                     .separator()
                     .close_window()
                     .build()?;
@@ -501,6 +529,8 @@ pub fn run() {
                     git,
                     history,
                     panel_side,
+                    dock_browser,
+                    dock_all_browsers,
                 }))));
 
                 app.on_menu_event(|app, event| {
@@ -509,19 +539,12 @@ pub fn run() {
                         let _ = app.emit("kex:before-quit", ());
                         return;
                     }
-                    if id == "dock_to_kex" {
-                        let st = app.state::<float_browser::FloatBrowserState>();
-                        let panel_id = st.last_focused_panel_id.lock().unwrap().clone();
-                        if let Some(pid) = panel_id {
-                            let label = float_browser::window_label(&pid);
-                            let origin = {
-                                let map = st.panels.lock().unwrap();
-                                map.get(&pid).map(|m| m.origin_window_label.clone())
-                            };
-                            if let Some(origin_label) = origin {
-                                float_browser::do_dock_and_destroy(app, &pid, &origin_label, &label);
-                            }
-                        }
+                    if id == "dock_browser" {
+                        float_browser::dock_focused(app);
+                        return;
+                    }
+                    if id == "dock_all_browsers" {
+                        float_browser::dock_all(app);
                         return;
                     }
                     // Route the action to the current window only, so it never fans
