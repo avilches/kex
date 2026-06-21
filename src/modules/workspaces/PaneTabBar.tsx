@@ -24,8 +24,9 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, Copy01Icon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, Copy01Icon, CrosshairIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
+import { panelFilePath } from "./lib/panelPath";
 import { native } from "@/lib/native";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
@@ -492,6 +493,7 @@ type Props = {
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
   onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
   onRenameFile?: (panelId: string, newName: string) => void;
+  onFocusOnExplorer?: (filePath: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
 };
@@ -520,6 +522,7 @@ function DraggableTab({
   onRenamePanel,
   onUpdatePanel,
   onRenameFile,
+  onFocusOnExplorer,
   onHoverChange,
   onSnapIntoView,
   closeHoverToken,
@@ -550,6 +553,7 @@ function DraggableTab({
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
   onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
   onRenameFile?: (panelId: string, newName: string) => void;
+  onFocusOnExplorer?: (filePath: string) => void;
   onHoverChange?: (panelId: string, open: boolean) => void;
   onSnapIntoView?: (panelId: string) => void;
   closeHoverToken: number;
@@ -571,6 +575,7 @@ function DraggableTab({
   const active = panel.id === activePanelId;
   const isLockable = panel.kind === "terminal" || panel.kind === "editor";
   const isLocked = (panel.kind === "terminal" || panel.kind === "editor") && (panel.locked ?? false);
+  const focusFilePath = panelFilePath(panel);
   const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const runningCommand = panel.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
   const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
@@ -922,6 +927,15 @@ function DraggableTab({
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+            {onFocusOnExplorer && focusFilePath && (
+              <>
+                <ContextMenuItem onSelect={() => onFocusOnExplorer(focusFilePath)}>
+                  <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
+                  Focus on Explorer
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+              </>
+            )}
             {onRenamePanel && (
               <>
                 <ContextMenuItem onSelect={() => startRename(panel.id)}>
@@ -1050,7 +1064,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onRenameFile, gitStatus, gitColorScheme }: Props) {
+export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onRenameFile, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -1256,6 +1270,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           onRenamePanel={onRenamePanel}
           onUpdatePanel={onUpdatePanel}
           onRenameFile={onRenameFile}
+          onFocusOnExplorer={onFocusOnExplorer}
           onHoverChange={(panelId, open) => {
             if (open) hoverOpenPanelsRef.current.add(panelId);
             else hoverOpenPanelsRef.current.delete(panelId);
