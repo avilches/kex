@@ -39,6 +39,12 @@ impl Default for PtyState {
     }
 }
 
+impl PtyState {
+    pub(super) fn take(&self, id: u32) -> Option<Arc<Session>> {
+        self.sessions.write().unwrap().remove(&id)
+    }
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn pty_open(
@@ -89,6 +95,24 @@ pub async fn pty_open(
         .entry(window_label.clone())
         .or_default()
         .push(id);
+    // The shell can exit before this insert (instant failure, `exit` in an rc
+    // file); the waiter's reap then ran with the id absent. Re-check and reap
+    // here so the pseudoconsole isn't stranded.
+    let exited = state
+        .sessions
+        .read()
+        .unwrap()
+        .get(&id)
+        .map(|s| s.exited.load(Ordering::Acquire))
+        .unwrap_or(false);
+    if exited {
+        if let Some(s) = state.take(id) {
+            thread::Builder::new()
+                .name(format!("kex-pty-drop-{id}"))
+                .spawn(move || session::drop_session(s))
+                .expect("spawn pty drop thread");
+        }
+    }
     log::info!("pty opened id={id} cols={cols} rows={rows} window={window_label}");
     Ok(id)
 }
