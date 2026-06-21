@@ -8,6 +8,8 @@ export type TabBarStyle = "connected" | "pill";
 
 export type GitColorScheme = "vscode" | "jetbrains";
 
+export type ScmViewMode = "list" | "tree";
+
 export const DEFAULT_THEME_ID = "kex-default";
 
 export const EDITOR_THEMES = [
@@ -52,6 +54,7 @@ export type Preferences = {
   vimMode: boolean;
   showHidden: boolean;
   explorerGitColorScheme: GitColorScheme;
+  scmViewMode: ScmViewMode;
   terminalWebglEnabled: boolean;
   terminalCursorBlink: boolean;
   warnOnCloseTabWithRunningProcess: boolean;
@@ -91,6 +94,7 @@ const KEY_VIM_MODE = "vimMode";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
+const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
@@ -169,6 +173,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   vimMode: false,
   showHidden: false,
   explorerGitColorScheme: "vscode",
+  scmViewMode: "list",
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
   warnOnCloseTabWithRunningProcess: true,
@@ -204,6 +209,10 @@ const shortcutsStore = new LazyStore(SHORTCUTS_STORE_PATH, { defaults: {}, autoS
 // window's subscribers. Mirror every setter through a Tauri event so any
 // window can listen.
 const PREFS_CHANGED_EVENT = "kex://prefs-changed";
+
+export function parseScmViewMode(value: unknown): ScmViewMode {
+  return value === "tree" ? "tree" : "list";
+}
 
 async function writePref<T>(key: string, value: T): Promise<void> {
   await store.set(key, value);
@@ -256,6 +265,7 @@ export async function loadPreferences(): Promise<Preferences> {
       if (v === "vscode" || v === "jetbrains") return v;
       return DEFAULT_PREFERENCES.explorerGitColorScheme;
     })(),
+    scmViewMode: parseScmViewMode(get<string>(KEY_SCM_VIEW_MODE)),
     terminalWebglEnabled:
       get<boolean>(KEY_TERMINAL_WEBGL_ENABLED) ??
       DEFAULT_PREFERENCES.terminalWebglEnabled,
@@ -415,6 +425,10 @@ export async function setExplorerGitColorScheme(value: GitColorScheme): Promise<
   await writePref(KEY_EXPLORER_GIT_COLOR_SCHEME, value);
 }
 
+export async function setScmViewMode(value: ScmViewMode): Promise<void> {
+  await writePref(KEY_SCM_VIEW_MODE, value);
+}
+
 export async function setTerminalWebglEnabled(value: boolean): Promise<void> {
   await writePref(KEY_TERMINAL_WEBGL_ENABLED, value);
 }
@@ -560,6 +574,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_VIM_MODE]: "vimMode",
   [KEY_SHOW_HIDDEN]: "showHidden",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
+  [KEY_SCM_VIEW_MODE]: "scmViewMode",
   [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
   [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
   [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",

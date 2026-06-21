@@ -7,6 +7,8 @@ import {
   LINE_HEIGHT_MIN,
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_STEP,
+  parseScmViewMode,
+  DEFAULT_PREFERENCES,
 } from "./store";
 
 describe("clampToStep", () => {
@@ -33,5 +35,20 @@ describe("clampToStep", () => {
   it("falls back when the value is not finite", () => {
     expect(clampToStep(Number.NaN, 8, 18, 0.5, 14)).toBe(14);
     expect(clampToStep(Number.POSITIVE_INFINITY, 8, 18, 0.5, 13)).toBe(13);
+  });
+});
+
+describe("scmViewMode", () => {
+  it("defaults to list", () => {
+    expect(DEFAULT_PREFERENCES.scmViewMode).toBe("list");
+  });
+
+  it("parses only the exact 'tree' string as tree", () => {
+    expect(parseScmViewMode("tree")).toBe("tree");
+    expect(parseScmViewMode("list")).toBe("list");
+    expect(parseScmViewMode("TREE")).toBe("list");
+    expect(parseScmViewMode(undefined)).toBe("list");
+    expect(parseScmViewMode(null)).toBe("list");
+    expect(parseScmViewMode(42)).toBe("list");
   });
 });
