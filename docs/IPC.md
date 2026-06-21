@@ -132,8 +132,8 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 |---|---|
 | `open_settings_window` | Open (or focus) the Settings window, optionally deep-linking a tab |
 | `open_main_window` | Open a new main window with a fresh `w-<hex>` label |
-| `window_get_state` | Return the saved `WindowEntry` (workspaces + geometry) for a given window label |
-| `window_save_workspace_state` | Persist workspace list and active index for a window label to `workspaces.json` |
+| `window_get_state` | Return the saved `WindowEntry` (workspaces + geometry) for a given window label, reconstructed from the `workspaces.json` index plus the per-workspace `workspaces/<id>.json` bodies |
+| `window_save_workspace_state` | Persist workspace list and active index for a window label; writes the lean `workspaces.json` index plus one `workspaces/<id>.json` per changed workspace |
 | `get_launch_dir` | Return the CLI launch directory (drained on first call) |
 | `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |

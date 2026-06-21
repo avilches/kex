@@ -35,11 +35,20 @@ otherwise the file's parent dir) and consumed by `resolveActiveExplorerRoot`, wh
 compatibility: a panel without it falls back to the file's parent dir (or the ambient root for
 non-file panels).
 
-State is persisted per-window to `workspaces.json` via the `window_save_workspace_state` IPC
-command, debounced 800ms on every mutation. Each window reads its own saved state on mount via
-`window_get_state`. The Rust side stores `workspaces` as an untyped `serde_json::Value`
-(`window_state.rs`), so any panel field added on the frontend (such as `explorerRoot`) round-trips
-through save and restore without a Rust-side schema change or migration. Window size is restored
+State is persisted per-window via the `window_save_workspace_state` IPC command, debounced 800ms on
+every mutation. Each window reads its own saved state on mount via `window_get_state`. The on-disk
+layout is split: `workspaces.json` is a lean index (per-window geometry, active index, and the
+ordered list of `workspaceIds`), and each workspace body lives in its own `workspaces/<id>.json`.
+`save` writes only the workspace files whose serialized body changed plus the index, so editing one
+workspace no longer rewrites every other one. On boot, `load` reconstructs each window's full
+workspace array from the referenced body files and deletes any orphan `workspaces/*.json` no longer
+in the index (recovers space after a crash mid-write); unreferenced bodies are also removed on every
+`save`. Workspace ids are validated (`is_safe_id`) before being used as filenames, so a malformed id
+can never escape the `workspaces/` directory. The Rust side still keeps `workspaces` in memory as an
+untyped `serde_json::Value` (`window_state.rs`) and the IPC contract is unchanged, so any panel field
+added on the frontend (such as `explorerRoot`) round-trips through save and restore without a
+Rust-side schema change or migration. The split is an incompatible disk format (`INDEX_VERSION`), so
+a pre-split monolithic `workspaces.json` fails to parse and the app starts fresh. Window size is restored
 via `restore_window_geometry` IPC called from `main.tsx` before `show()`. Window position is not
 restored (see [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md)). The workspace sidebar (52px, left
 edge) lists workspaces; clicking switches `activeWorkspaceId`.
@@ -255,7 +264,7 @@ type DraggingItem =
   corresponding gap renders a 2px `bg-primary` vertical line indicating the insertion point.
 - `DropZone` (`PaneView.tsx`): `useDroppable` per zone. Zones are rendered only during an active
   drag. The set of zones depends on the target pane's pixel dimensions, read from a `ResizeObserver`
-  and compared against `paneSplitLimit` (configurable in `kex-settings.json`, default
+  and compared against `paneSplitLimit` (configurable in `settings-general.json`, default
   `{ width: 250, height: 250 }`):
   - **width < limit AND height < limit**: only `center`, covering the full pane (`inset-0`).
   - **width < limit only**: `top`, `bottom`, `center` — horizontal splits disabled.
@@ -270,7 +279,7 @@ type DraggingItem =
   `SplitNodeView` to `PaneView`, forcing the center zone highlight on the target pane to signal that
   the tab will move there.
   Drag-drop splits are also blocked when the workspace already has `workspacePaneLimit` panes
-  (configurable in `kex-settings.json`, default `8`).
+  (configurable in `settings-general.json`, default `8`).
 - `DragOverlay` (`WorkspaceDndProvider.tsx`): lightweight floating chip showing panel icon + title
   for tab drags, or a file/folder icon + basename for file drags. `dropAnimation: null` to avoid
   fighting the layout reflow on drop.
