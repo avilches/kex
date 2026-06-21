@@ -61,7 +61,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   getBindingTokens,
   matchesShortcut,
-  SHORTCUTS,
+  SHORTCUTS_BY_ID,
   type ShortcutId,
 } from "@/modules/shortcuts/shortcuts";
 import type { GitStatusSnapshot } from "@/lib/native";
@@ -805,7 +805,7 @@ export const FileExplorer = memo(
                     {(() => {
                       const scId = MODE_SHORTCUT[m.id];
                       const sc = scId
-                        ? (userShortcuts[scId] ?? (SHORTCUTS.find((s) => s.id === scId)?.defaultBindings ?? []))
+                        ? (userShortcuts[scId] ?? (SHORTCUTS_BY_ID.get(scId)?.defaultBindings ?? []))
                         : [];
                       const tokens = getBindingTokens(sc[0]);
                       return tokens.length > 0 ? (
