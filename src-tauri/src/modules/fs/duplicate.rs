@@ -5,20 +5,25 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::ipc::Channel;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 const BUF_SIZE: usize = 256 * 1024;
 const EMIT_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CopyProgress {
+pub struct DuplicateProgressEvent {
+    pub name: String,
     pub copied: u64,
     pub total: u64,
-    pub done: bool,
-    pub cancelled: bool,
-    pub error: Option<String>,
+    pub active: bool,
+}
+
+#[derive(Clone)]
+pub struct CopySnapshot {
+    pub name: String,
+    pub copied: u64,
+    pub total: u64,
 }
 
 #[derive(Debug)]
@@ -38,6 +43,13 @@ impl From<std::io::Error> for CopyError {
 #[derive(Default)]
 pub struct CopyState {
     job: Mutex<Option<Arc<AtomicBool>>>,
+    current: Mutex<Option<CopySnapshot>>,
+}
+
+impl CopyState {
+    pub fn snapshot(&self) -> Option<CopySnapshot> {
+        self.current.lock().unwrap().clone()
+    }
 }
 
 fn dir_size(p: &Path) -> u64 {
@@ -143,10 +155,10 @@ fn cleanup(dst: &Path) {
 #[tauri::command]
 pub async fn fs_duplicate(
     state: State<'_, CopyState>,
+    app: AppHandle,
     source: String,
     dest: String,
     workspace: Option<WorkspaceEnv>,
-    on_progress: Channel<CopyProgress>,
 ) -> Result<(), String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     let src = resolve_path(&source, &workspace);
@@ -168,60 +180,65 @@ pub async fn fs_duplicate(
         *slot = Some(cancel.clone());
     }
 
+    let name = dest.split(['/', '\\']).next_back().unwrap_or(&dest).to_string();
     let total = dir_size(&src);
-    let _ = on_progress.send(CopyProgress {
+
+    // Store initial snapshot and emit initial event.
+    *state.current.lock().unwrap() = Some(CopySnapshot { name: name.clone(), copied: 0, total });
+    let _ = app.emit("kex:duplicate-progress", DuplicateProgressEvent {
+        name: name.clone(),
         copied: 0,
         total,
-        done: false,
-        cancelled: false,
-        error: None,
+        active: true,
     });
 
+    let app_clone = app.clone();
+    let name_clone = name.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let mut last_emit = Instant::now();
         let mut emit = |copied: u64| {
             if last_emit.elapsed() >= EMIT_INTERVAL {
                 last_emit = Instant::now();
-                let _ = on_progress.send(CopyProgress {
+                let _ = app_clone.emit("kex:duplicate-progress", DuplicateProgressEvent {
+                    name: name_clone.clone(),
                     copied,
                     total,
-                    done: false,
-                    cancelled: false,
-                    error: None,
+                    active: true,
                 });
             }
         };
         let outcome = copy_job(&src, &dst, total, &cancel, &mut emit);
-        let (final_progress, result) = match outcome {
+        let (final_event, result) = match outcome {
             Ok(()) => (
-                CopyProgress { copied: total, total, done: true, cancelled: false, error: None },
+                DuplicateProgressEvent { name: name_clone.clone(), copied: total, total, active: false },
                 Ok(()),
             ),
             Err(CopyError::Cancelled) => {
                 cleanup(&dst);
-                (CopyProgress { copied: 0, total, done: true, cancelled: true, error: None }, Ok(()))
+                (DuplicateProgressEvent { name: name_clone.clone(), copied: 0, total, active: false }, Ok(()))
             }
             Err(CopyError::Io(e)) => {
                 cleanup(&dst);
                 let msg = e.clone();
-                (CopyProgress { copied: 0, total, done: true, cancelled: false, error: Some(e) }, Err(msg))
+                (DuplicateProgressEvent { name: name_clone.clone(), copied: 0, total, active: false }, Err(msg))
             }
             // dst existed before we touched it; do not delete it.
             Err(CopyError::DestExists) => {
                 let msg = format!("already exists: {}", dst.display());
                 (
-                    CopyProgress { copied: 0, total, done: true, cancelled: false, error: Some(msg.clone()) },
+                    DuplicateProgressEvent { name: name_clone.clone(), copied: 0, total, active: false },
                     Err(msg),
                 )
             }
         };
-        let _ = on_progress.send(final_progress);
+        let _ = app_clone.emit("kex:duplicate-progress", final_event);
         result
     })
     .await
     .map_err(|e| e.to_string());
 
     *state.job.lock().unwrap() = None;
+    *state.current.lock().unwrap() = None;
 
     match result {
         Ok(Ok(())) => Ok(()),
