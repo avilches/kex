@@ -46,6 +46,8 @@ Shell integration scripts (`scripts/`) are injected at spawn time. Platform dete
 | `fs_grep` | Content search via `grep-*` crates |
 | `fs_grep_interactive` | Streaming grep for command palette content search |
 | `fs_glob` | Glob pattern matching |
+| `fs_duplicate(source, dest, workspace, on_progress: Channel<CopyProgress>)` | Copy a file or directory from `source` to `dest` (both workspace-resolved). Streams `CopyProgress { copied, total, done, cancelled, error }` events on the channel. Only one duplication can run at a time; a second call returns an error while one is in progress. If the destination already exists the command returns an error without touching it. On cancel or IO error, any partially created destination is deleted. |
+| `fs_duplicate_cancel` | Signal the active duplication to abort. The copy loop checks the flag before each chunk and directory entry; cleanup of the partial destination runs inside the blocking task and is reported via the final `CopyProgress` event (cancelled=true). No-op if no duplication is running. |
 
 ---
 

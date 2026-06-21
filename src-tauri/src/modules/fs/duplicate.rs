@@ -25,6 +25,8 @@ pub struct CopyProgress {
 pub enum CopyError {
     Cancelled,
     Io(String),
+    // The top-level destination already existed before we touched it; cleanup must not run.
+    DestExists,
 }
 
 impl From<std::io::Error> for CopyError {
@@ -55,6 +57,8 @@ fn dir_size(p: &Path) -> u64 {
 /// Recursively copies `src` to `dst` with a 256 KB buffer, invoking `on_bytes`
 /// with the running total after each chunk and after each completed file.
 /// Checks `cancel` before every chunk and every directory entry.
+/// Returns `CopyError::DestExists` if the top-level destination already exists,
+/// so the caller knows not to run cleanup on a path it never created.
 fn copy_job(
     src: &Path,
     dst: &Path,
@@ -63,12 +67,13 @@ fn copy_job(
     on_bytes: &mut dyn FnMut(u64),
 ) -> Result<(), CopyError> {
     let mut copied: u64 = 0;
-    copy_inner(src, dst, cancel, &mut copied, on_bytes)
+    copy_inner(src, dst, true, cancel, &mut copied, on_bytes)
 }
 
 fn copy_inner(
     src: &Path,
     dst: &Path,
+    toplevel: bool,
     cancel: &Arc<AtomicBool>,
     copied: &mut u64,
     on_bytes: &mut dyn FnMut(u64),
@@ -77,15 +82,36 @@ fn copy_inner(
         return Err(CopyError::Cancelled);
     }
     if src.is_dir() {
-        std::fs::create_dir(dst)?;
+        // create_dir already fails with AlreadyExists if dst exists; map that
+        // to DestExists at the top level so cleanup is skipped.
+        if let Err(e) = std::fs::create_dir(dst) {
+            if toplevel && e.kind() == std::io::ErrorKind::AlreadyExists {
+                return Err(CopyError::DestExists);
+            }
+            return Err(CopyError::Io(e.to_string()));
+        }
         for entry in std::fs::read_dir(src)? {
             let entry = entry?;
-            copy_inner(&entry.path(), &dst.join(entry.file_name()), cancel, copied, on_bytes)?;
+            copy_inner(&entry.path(), &dst.join(entry.file_name()), false, cancel, copied, on_bytes)?;
         }
         Ok(())
     } else {
         let mut reader = std::fs::File::open(src)?;
-        let mut writer = std::fs::File::create(dst)?;
+        // At the top level use create_new so we never silently overwrite a file
+        // that appeared in the race window between the caller's existence check
+        // and this open. Nested files inside a freshly created dir cannot
+        // pre-exist, so a normal create is fine for them.
+        let mut writer = if toplevel {
+            std::fs::OpenOptions::new().write(true).create_new(true).open(dst).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::AlreadyExists {
+                    CopyError::DestExists
+                } else {
+                    CopyError::Io(e.to_string())
+                }
+            })?
+        } else {
+            std::fs::File::create(dst)?
+        };
         let mut buf = vec![0u8; BUF_SIZE];
         loop {
             if cancel.load(Ordering::Acquire) {
@@ -166,19 +192,31 @@ pub async fn fs_duplicate(
             }
         };
         let outcome = copy_job(&src, &dst, total, &cancel, &mut emit);
-        let final_progress = match &outcome {
-            Ok(()) => CopyProgress { copied: total, total, done: true, cancelled: false, error: None },
+        let (final_progress, result) = match outcome {
+            Ok(()) => (
+                CopyProgress { copied: total, total, done: true, cancelled: false, error: None },
+                Ok(()),
+            ),
             Err(CopyError::Cancelled) => {
                 cleanup(&dst);
-                CopyProgress { copied: 0, total, done: true, cancelled: true, error: None }
+                (CopyProgress { copied: 0, total, done: true, cancelled: true, error: None }, Ok(()))
             }
             Err(CopyError::Io(e)) => {
                 cleanup(&dst);
-                CopyProgress { copied: 0, total, done: true, cancelled: false, error: Some(e.clone()) }
+                let msg = e.clone();
+                (CopyProgress { copied: 0, total, done: true, cancelled: false, error: Some(e) }, Err(msg))
+            }
+            // dst existed before we touched it; do not delete it.
+            Err(CopyError::DestExists) => {
+                let msg = format!("already exists: {}", dst.display());
+                (
+                    CopyProgress { copied: 0, total, done: true, cancelled: false, error: Some(msg.clone()) },
+                    Err(msg),
+                )
             }
         };
         let _ = on_progress.send(final_progress);
-        outcome
+        result
     })
     .await
     .map_err(|e| e.to_string());
@@ -187,8 +225,7 @@ pub async fn fs_duplicate(
 
     match result {
         Ok(Ok(())) => Ok(()),
-        Ok(Err(CopyError::Cancelled)) => Ok(()),
-        Ok(Err(CopyError::Io(e))) => Err(e),
+        Ok(Err(e)) => Err(e),
         Err(e) => Err(e),
     }
 }
@@ -281,5 +318,38 @@ mod tests {
         copy_job(&src, &dst, total, &cancel, &mut |p| last = p).expect("copy");
         assert_eq!(last, total);
         assert_eq!(total, 200_000);
+    }
+
+    #[test]
+    fn dest_exists_returns_error_and_leaves_it_intact() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // File case: dst exists as a file with known content.
+        let src_file = dir.path().join("src.txt");
+        let dst_file = dir.path().join("dst.txt");
+        std::fs::write(&src_file, b"source").unwrap();
+        std::fs::write(&dst_file, b"original").unwrap();
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let err = copy_job(&src_file, &dst_file, 6, &cancel, &mut |_| {}).unwrap_err();
+        assert!(matches!(err, CopyError::DestExists), "expected DestExists for file, got {:?}", err);
+        // The pre-existing file must be untouched.
+        assert_eq!(std::fs::read(&dst_file).unwrap(), b"original", "dst file must not be modified");
+
+        // Dir case: dst exists as a directory with known content.
+        let src_dir = dir.path().join("src_dir");
+        let dst_dir = dir.path().join("dst_dir");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(src_dir.join("f.txt"), b"src").unwrap();
+        std::fs::create_dir_all(&dst_dir).unwrap();
+        std::fs::write(dst_dir.join("keep.txt"), b"keeper").unwrap();
+
+        let cancel2 = Arc::new(AtomicBool::new(false));
+        let total2 = count_bytes(&src_dir);
+        let err2 = copy_job(&src_dir, &dst_dir, total2, &cancel2, &mut |_| {}).unwrap_err();
+        assert!(matches!(err2, CopyError::DestExists), "expected DestExists for dir, got {:?}", err2);
+        // The pre-existing directory and its contents must survive.
+        assert!(dst_dir.exists(), "dst dir must still exist");
+        assert_eq!(std::fs::read(dst_dir.join("keep.txt")).unwrap(), b"keeper", "dst dir contents must not be deleted");
     }
 }
