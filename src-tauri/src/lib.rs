@@ -26,10 +26,10 @@ fn confirm_quit(app: tauri::AppHandle) {
 #[cfg(target_os = "macos")]
 struct DynMenuItems {
     autosave: tauri::menu::MenuItem<tauri::Wry>,
-    sidebar: tauri::menu::MenuItem<tauri::Wry>,
-    explorer: tauri::menu::MenuItem<tauri::Wry>,
-    git: tauri::menu::MenuItem<tauri::Wry>,
-    history: tauri::menu::MenuItem<tauri::Wry>,
+    sidebar: tauri::menu::CheckMenuItem<tauri::Wry>,
+    explorer: tauri::menu::CheckMenuItem<tauri::Wry>,
+    git: tauri::menu::CheckMenuItem<tauri::Wry>,
+    history: tauri::menu::CheckMenuItem<tauri::Wry>,
     panel_side: tauri::menu::MenuItem<tauri::Wry>,
     dock_browser: tauri::menu::MenuItem<tauri::Wry>,
     dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
@@ -62,21 +62,11 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
         } else {
             "Enable Autosave"
         });
-        let _ = items.sidebar.set_text(if state.sidebar_open {
-            "Hide Sidebar"
-        } else {
-            "Show Sidebar"
-        });
+        let _ = items.sidebar.set_checked(state.sidebar_open);
         let on = |tab: &str| state.sidebar_open && state.active_tab == tab;
-        let _ = items
-            .explorer
-            .set_text(if on("explorer") { "Hide Explorer" } else { "Show Explorer" });
-        let _ = items
-            .git
-            .set_text(if on("git") { "Hide Git" } else { "Show Git" });
-        let _ = items
-            .history
-            .set_text(if on("history") { "Hide History" } else { "Show History" });
+        let _ = items.explorer.set_checked(on("explorer"));
+        let _ = items.git.set_checked(on("git"));
+        let _ = items.history.set_checked(on("history"));
         let _ = items.panel_side.set_text(if state.panel_side == "left" {
             "Move Sidebar to Right"
         } else {
@@ -415,7 +405,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 use tauri::menu::{
-                    MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder,
+                    CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, PredefinedMenuItem,
+                    SubmenuBuilder,
                 };
 
                 // Kex (app menu)
@@ -476,17 +467,21 @@ pub fn run() {
                     .select_all()
                     .build()?;
 
-                // View (labels synced from the frontend via sync_menu)
-                let sidebar =
-                    MenuItemBuilder::with_id("toggle_sidebar", "Hide Sidebar").build(app)?;
-                let explorer = MenuItemBuilder::with_id("toggle_explorer", "Hide Explorer")
+                // View (checkmarks synced from the frontend via sync_menu)
+                let sidebar = CheckMenuItemBuilder::with_id("toggle_sidebar", "Sidebar")
+                    .checked(false)
+                    .build(app)?;
+                let explorer = CheckMenuItemBuilder::with_id("toggle_explorer", "Explorer")
                     .accelerator("Cmd+E")
+                    .checked(false)
                     .build(app)?;
-                let git = MenuItemBuilder::with_id("toggle_git", "Show Git")
+                let git = CheckMenuItemBuilder::with_id("toggle_git", "Git Changes")
                     .accelerator("Cmd+G")
+                    .checked(false)
                     .build(app)?;
-                let history =
-                    MenuItemBuilder::with_id("toggle_history", "Show History").build(app)?;
+                let history = CheckMenuItemBuilder::with_id("toggle_history", "Git History")
+                    .checked(false)
+                    .build(app)?;
                 let panel_side =
                     MenuItemBuilder::with_id("toggle_panel_side", "Move Sidebar to Left")
                         .build(app)?;
