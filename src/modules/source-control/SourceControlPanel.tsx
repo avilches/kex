@@ -30,7 +30,7 @@ import {
   copyToClipboard,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
-import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
+import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   COMPACT_CONTENT,
   COMPACT_ITEM,
@@ -51,7 +51,6 @@ import {
   Download01Icon,
   File01Icon,
   FileDiffIcon,
-  Folder01Icon,
   FolderCloudIcon,
   FolderGitTwoIcon,
   FolderOpenIcon,
@@ -107,7 +106,7 @@ const SOURCE_CONTROL_TOOLTIP_CLASS =
 const ROW_HEIGHTS = {
   banner: 32,
   header: 30,
-  entry: 30,
+  entry: 24,
 } as const;
 
 type RowDescriptor =
@@ -155,23 +154,6 @@ function statusTextClass(code: string): string {
     case "D": return "text-rose-500/85";
     case "R": return "text-sky-500/85";
     default: return "text-muted-foreground/60";
-  }
-}
-
-function statusAccentClass(code: string): string {
-  switch (code) {
-    case "A":
-      return "bg-emerald-500/85";
-    case "U":
-      return "bg-teal-500/85";
-    case "M":
-      return "bg-amber-500/85";
-    case "D":
-      return "bg-rose-500/85";
-    case "R":
-      return "bg-sky-500/85";
-    default:
-      return "bg-muted-foreground/40";
   }
 }
 
@@ -1228,25 +1210,27 @@ function TreeDirRow({
       data-focused={focused || undefined}
       onMouseDown={() => onFocusRow(row.key)}
       onClick={() => onToggleTreeDir(node.fullPath)}
-      style={{ paddingLeft: 8 + row.depth * 12 }}
+      style={{ paddingLeft: 6 + row.depth * 12 }}
       className={cn(
-        "group flex h-[30px] select-none items-center gap-1.5 rounded-md pr-2 transition-colors",
+        "group flex h-6 select-none items-center gap-2 rounded-sm pr-2 text-[13px] transition-colors",
         focused ? "bg-accent/60" : "hover:bg-accent/30",
       )}
     >
-      <HugeiconsIcon
-        icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
-        size={10}
-        strokeWidth={2.3}
-        className="shrink-0 text-muted-foreground"
-      />
-      <HugeiconsIcon
-        icon={collapsed ? Folder01Icon : FolderOpenIcon}
-        size={13}
-        strokeWidth={1.85}
-        className="shrink-0 text-muted-foreground/80"
-      />
-      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/90">
+      <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+        <HugeiconsIcon
+          icon={ArrowRight01Icon}
+          size={12}
+          strokeWidth={2.25}
+          className={cn("transition-transform", !collapsed && "rotate-90")}
+        />
+      </span>
+      {(() => {
+        const folderLeaf = node.name.split("/").pop() ?? node.name;
+        return (
+          <img src={folderIconUrl(folderLeaf, !collapsed)} alt="" className="size-4 shrink-0" />
+        );
+      })()}
+      <span className="min-w-0 flex-1 truncate font-medium text-foreground/90">
         {node.name}
       </span>
       <div
@@ -1342,9 +1326,9 @@ const EntryRow = memo(function EntryRow({
           role="option"
           aria-selected={isSelected}
           onMouseDown={() => onFocusRow(row.key)}
-          style={{ paddingLeft: 8 + depth * 12 }}
+          style={{ paddingLeft: 6 + depth * 12 }}
           className={cn(
-            "group relative flex h-[30px] items-center gap-2 rounded-md pr-2 transition-all duration-100",
+            "group flex h-6 items-center gap-2 rounded-sm pr-2 text-[13px] transition-colors",
             focused
               ? "bg-accent/60"
               : isSelected
@@ -1352,17 +1336,7 @@ const EntryRow = memo(function EntryRow({
                 : "hover:bg-accent/30",
           )}
         >
-          <span
-            className={cn(
-              "pointer-events-none absolute inset-y-1 left-0 w-[2px] rounded-full transition-opacity",
-              statusHex ? undefined : statusAccentClass(entry.statusCode),
-              isSelected || focused
-                ? "opacity-100"
-                : "opacity-55 group-hover:opacity-95",
-            )}
-            style={statusHex ? { backgroundColor: statusHex } : undefined}
-            aria-hidden
-          />
+          <span className="flex size-3.5 shrink-0 items-center justify-center" />
           <button
             type="button"
             onClick={() => {
@@ -1382,7 +1356,7 @@ const EntryRow = memo(function EntryRow({
             <div className="flex min-w-0 flex-1 items-baseline gap-1.5 leading-none">
               <span
                 className={cn(
-                  "truncate text-[12px] leading-tight",
+                  "truncate text-[13px] leading-tight",
                   isSelected || focused
                     ? "font-semibold text-foreground"
                     : "font-medium text-foreground/95",
