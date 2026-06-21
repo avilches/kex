@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 const BUF_SIZE: usize = 256 * 1024;
 const EMIT_INTERVAL: Duration = Duration::from_millis(50);
@@ -239,6 +239,13 @@ pub async fn fs_duplicate(
 
     *state.job.lock().unwrap() = None;
     *state.current.lock().unwrap() = None;
+
+    // If the user tried to quit while this copy was running, let the app exit now
+    // that the slot is clear. Both "wait for it to finish" and "cancel copy & quit"
+    // paths reach here; cancel sets the pending flag, copy ends, and this fires.
+    if app.state::<crate::QuitGuard>().pending.load(Ordering::SeqCst) {
+        let _ = app.emit("kex:before-quit", ());
+    }
 
     match result {
         Ok(Ok(())) => Ok(()),
