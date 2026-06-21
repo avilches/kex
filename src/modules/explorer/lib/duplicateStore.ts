@@ -1,32 +1,26 @@
 import { useSyncExternalStore } from "react";
+import { listen } from "@tauri-apps/api/event";
 
-export type DuplicateSnapshot = {
-  name: string;
-  copied: number;
-  total: number;
-} | null;
+export type DuplicateSnapshot = { name: string; copied: number; total: number } | null;
+
+type ProgressEvent = { name: string; copied: number; total: number; active: boolean };
 
 let snapshot: DuplicateSnapshot = null;
 const listeners = new Set<() => void>();
+let started = false;
 
 function notify(): void {
   for (const l of listeners) l();
 }
 
-export function startDuplicate(name: string): void {
-  snapshot = { name, copied: 0, total: 0 };
-  notify();
-}
-
-export function updateDuplicate(copied: number, total: number): void {
-  if (!snapshot) return;
-  snapshot = { name: snapshot.name, copied, total };
-  notify();
-}
-
-export function finishDuplicate(): void {
-  snapshot = null;
-  notify();
+export function initDuplicateProgressListener(): void {
+  if (started) return;
+  started = true;
+  void listen<ProgressEvent>("kex:duplicate-progress", (e) => {
+    const p = e.payload;
+    snapshot = p.active ? { name: p.name, copied: p.copied, total: p.total } : null;
+    notify();
+  });
 }
 
 function subscribe(l: () => void): () => void {

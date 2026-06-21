@@ -1,4 +1,4 @@
-import { invoke, Channel } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 
 export type ReadResult =
@@ -123,14 +123,6 @@ export type GitDiscardEntry = {
   untracked: boolean;
 };
 
-export type CopyProgress = {
-  copied: number;
-  total: number;
-  done: boolean;
-  cancelled: boolean;
-  error: string | null;
-};
-
 export const native = {
   workspaceCurrentDir: () => invoke<string>("workspace_current_dir"),
   workspaceAuthorize: (path: string) =>
@@ -164,21 +156,10 @@ export const native = {
     invoke<void>("fs_create_file", { path, workspace: currentWorkspaceEnv() }),
   createDir: (path: string) =>
     invoke<void>("fs_create_dir", { path, workspace: currentWorkspaceEnv() }),
-  duplicate: (
-    source: string,
-    dest: string,
-    onProgress: (p: CopyProgress) => void,
-  ): Promise<void> => {
-    const onProgressCh = new Channel<CopyProgress>();
-    onProgressCh.onmessage = onProgress;
-    return invoke<void>("fs_duplicate", {
-      source,
-      dest,
-      workspace: currentWorkspaceEnv(),
-      onProgress: onProgressCh,
-    });
-  },
+  duplicate: (source: string, dest: string): Promise<void> =>
+    invoke<void>("fs_duplicate", { source, dest, workspace: currentWorkspaceEnv() }),
   cancelDuplicate: () => invoke<void>("fs_duplicate_cancel"),
+  cancelQuit: () => invoke<void>("cancel_quit"),
   renameFile: async (from: string, to: string) => {
     try {
       await invoke<void>("git_mv", { from, to, workspace: currentWorkspaceEnv() });

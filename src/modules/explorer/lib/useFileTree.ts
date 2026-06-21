@@ -6,12 +6,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { pathDirname, pathBasename } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 import { suggestDuplicateName } from "@/modules/explorer/lib/duplicateName";
-import {
-  startDuplicate,
-  updateDuplicate,
-  finishDuplicate,
-  isDuplicating,
-} from "@/modules/explorer/lib/duplicateStore";
+import { isDuplicating } from "@/modules/explorer/lib/duplicateStore";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
 export type DirEntry = {
@@ -418,20 +413,12 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       }
       setPendingDuplicate(null);
       const dest = joinPath(parentPath, trimmed);
-      startDuplicate(trimmed);
       try {
-        await native.duplicate(sourcePath, dest, (p) => {
-          if (p.done) return;
-          updateDuplicate(p.copied, p.total);
-        });
+        await native.duplicate(sourcePath, dest);
         await fetchChildren(parentPath);
       } catch (e) {
         console.error("fs_duplicate failed:", e);
-        toast.error(`Failed to duplicate ${trimmed}`, {
-          description: e instanceof Error ? e.message : String(e),
-        });
-      } finally {
-        finishDuplicate();
+        toast.error(`Failed to duplicate ${trimmed}`);
       }
     },
     [pendingDuplicate, nodes, fetchChildren],
