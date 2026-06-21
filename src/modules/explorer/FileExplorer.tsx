@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/context-menu";
 import {
   ArrowDown01Icon,
+  ArrowUp01Icon,
   ComputerTerminal01Icon,
   FileAddIcon,
   Folder01Icon,
@@ -70,6 +71,11 @@ type Props = {
   rootMode: ExplorerRootMode;
   onChangeRootMode: (mode: ExplorerRootMode) => void;
   onSetAsRoot: (path: string) => void;
+  onEnterFolder?: (path: string) => void;
+  onNavigateUp?: () => void;
+  onNavigateHome?: () => void;
+  canNavigateUp: boolean;
+  isAtHome: boolean;
   homePath: string | null;
   terminalCwdPath: string | null;
   gitRootPath: string | null;
@@ -256,6 +262,11 @@ export const FileExplorer = memo(
       rootMode,
       onChangeRootMode,
       onSetAsRoot,
+      onEnterFolder,
+      onNavigateUp,
+      onNavigateHome,
+      canNavigateUp,
+      isAtHome,
       homePath,
       terminalCwdPath,
       gitRootPath,
@@ -602,6 +613,7 @@ export const FileExplorer = memo(
               onRevealInTerminal={onRevealInTerminal}
               onAttachToAgent={onAttachToAgent}
               onSetAsRoot={onSetAsRoot}
+              onEnterFolder={onEnterFolder}
               editorPreviewOnClick={editorPreviewOnClick}
             />
           );
@@ -634,6 +646,34 @@ export const FileExplorer = memo(
         onKeyDown={handleKeyDown}
       >
         <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-1.5">
+          {rootMode === "filesystem" && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                onClick={() => onNavigateUp?.()}
+                disabled={!canNavigateUp}
+                title="Up one folder"
+                aria-label="Up one folder"
+              >
+                <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={2} />
+              </Button>
+              {!isAtHome && homePath != null && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => onNavigateHome?.()}
+                  title="Go to home folder"
+                  aria-label="Go to home folder"
+                >
+                  <HugeiconsIcon icon={Home01Icon} size={13} strokeWidth={2} />
+                </Button>
+              )}
+              <div className="mx-0.5 h-4 w-px shrink-0 bg-border/60" />
+            </>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -834,6 +874,60 @@ export const FileExplorer = memo(
                   )}
                 </span>
               </button>
+            </div>
+          </div>
+        ) : rootMode === "filesystem" && root?.status === "error" ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+            <HugeiconsIcon
+              icon={Folder01Icon}
+              size={26}
+              strokeWidth={1.8}
+              className="text-muted-foreground"
+            />
+            <div className="text-sm font-medium text-foreground">
+              Folder not found
+            </div>
+            <div className="break-all text-[11px] text-muted-foreground">
+              {rootPath}
+            </div>
+            <div className="mt-2 flex w-full flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigateHome?.()}
+                className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
+              >
+                <HugeiconsIcon
+                  icon={Home01Icon}
+                  size={14}
+                  strokeWidth={2}
+                  className="mt-0.5 shrink-0 text-primary"
+                />
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-medium">Go to home folder</span>
+                  {homePath && (
+                    <span className="break-all text-[10px] text-muted-foreground">
+                      {homePath}
+                    </span>
+                  )}
+                </span>
+              </button>
+              {canNavigateUp && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateUp?.()}
+                  className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
+                >
+                  <HugeiconsIcon
+                    icon={ArrowUp01Icon}
+                    size={14}
+                    strokeWidth={2}
+                    className="mt-0.5 shrink-0 text-primary"
+                  />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="font-medium">Up one folder</span>
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         ) : (

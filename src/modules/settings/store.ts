@@ -69,6 +69,7 @@ export type Preferences = {
   tabBarStyle: TabBarStyle;
   workspacePaneLimit: number;
   paneSplitLimit: PaneSplitLimit;
+  keepFolderLayoutOnChangeExplorerRoot: boolean;
 };
 
 const STORE_PATH = "kex-settings.json";
@@ -101,6 +102,7 @@ const KEY_PANEL_SIDE = "panelSide";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
+const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -146,6 +148,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
+  keepFolderLayoutOnChangeExplorerRoot: false,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -254,12 +257,16 @@ export async function loadPreferences(): Promise<Preferences> {
       }
       return DEFAULT_PREFERENCES.paneSplitLimit;
     })(),
+    keepFolderLayoutOnChangeExplorerRoot:
+      get<boolean>(KEY_KEEP_FOLDER_LAYOUT) ??
+      DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot,
   };
 
   // Persist any config keys that weren't present so they're discoverable in the JSON.
   const configDefaults: [string, unknown][] = [];
   if (!map.has(KEY_WORKSPACE_PANE_LIMIT)) configDefaults.push([KEY_WORKSPACE_PANE_LIMIT, DEFAULT_PREFERENCES.workspacePaneLimit]);
   if (!map.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
+  if (!map.has(KEY_KEEP_FOLDER_LAYOUT)) configDefaults.push([KEY_KEEP_FOLDER_LAYOUT, DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot]);
   if (configDefaults.length > 0) {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
   }

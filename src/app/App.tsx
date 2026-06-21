@@ -93,6 +93,8 @@ import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   resolveExplorerRoot,
+  isFilesystemRoot,
+  parentRoot,
   type ExplorerRootMode,
 } from "@/modules/workspaces/lib/explorerRoot";
 
@@ -150,6 +152,7 @@ export default function App() {
     setWorkspaceCwd,
     setExplorerRootMode,
     setPinnedRoot,
+    setFsRoot,
     setTerminalRunningCommand,
     setPanelView,
     findPanelGlobal,
@@ -473,6 +476,7 @@ export default function App() {
     (activeWorkspace ? (gitRootByWs[activeWorkspace.id] ?? null) : null);
 
   const workspaceRootPath = activeWorkspace?.pinnedRoot ?? null;
+  const fsFolderRoot = activeWorkspace?.fsRoot ?? null;
 
   const explorerRoot = useMemo<string | null>(
     () =>
@@ -481,10 +485,18 @@ export default function App() {
         terminalCwd: terminalRootCwd,
         gitRoot,
         pinnedRoot: workspaceRootPath,
+        fsRoot: fsFolderRoot,
         home,
       }),
-    [activeRootMode, terminalRootCwd, gitRoot, workspaceRootPath, home],
+    [activeRootMode, terminalRootCwd, gitRoot, workspaceRootPath, fsFolderRoot, home],
   );
+
+  const canNavigateUp =
+    activeRootMode === "filesystem" &&
+    explorerRoot !== null &&
+    !isFilesystemRoot(explorerRoot);
+
+  const isAtHome = explorerRoot === home;
 
   const handleChangeRootMode = useCallback(
     (mode: ExplorerRootMode) => {
@@ -498,6 +510,29 @@ export default function App() {
       if (activeWorkspace) setPinnedRoot(activeWorkspace.id, path);
     },
     [activeWorkspace, setPinnedRoot],
+  );
+
+  const handleNavigateUp = useCallback(() => {
+    if (!activeWorkspace || activeRootMode !== "filesystem" || !explorerRoot) {
+      return;
+    }
+    if (isFilesystemRoot(explorerRoot)) return;
+    setFsRoot(activeWorkspace.id, parentRoot(explorerRoot));
+  }, [activeWorkspace, activeRootMode, explorerRoot, setFsRoot]);
+
+  const handleNavigateHome = useCallback(() => {
+    if (activeWorkspace && activeRootMode === "filesystem" && home) {
+      setFsRoot(activeWorkspace.id, home);
+    }
+  }, [activeWorkspace, activeRootMode, home, setFsRoot]);
+
+  const handleEnterFolder = useCallback(
+    (path: string) => {
+      if (activeWorkspace && activeRootMode === "filesystem") {
+        setFsRoot(activeWorkspace.id, path);
+      }
+    },
+    [activeWorkspace, activeRootMode, setFsRoot],
   );
 
   // Whether the saved workspace root still exists on disk, so the selector can
@@ -1875,6 +1910,11 @@ export default function App() {
                         rootMode={activeRootMode}
                         onChangeRootMode={handleChangeRootMode}
                         onSetAsRoot={handleSetAsRoot}
+                        onEnterFolder={handleEnterFolder}
+                        onNavigateUp={handleNavigateUp}
+                        onNavigateHome={handleNavigateHome}
+                        canNavigateUp={canNavigateUp}
+                        isAtHome={isAtHome}
                         homePath={home}
                         terminalCwdPath={terminalRootCwd}
                         gitRootPath={gitRoot}
@@ -1948,6 +1988,11 @@ export default function App() {
                         rootMode={activeRootMode}
                         onChangeRootMode={handleChangeRootMode}
                         onSetAsRoot={handleSetAsRoot}
+                        onEnterFolder={handleEnterFolder}
+                        onNavigateUp={handleNavigateUp}
+                        onNavigateHome={handleNavigateHome}
+                        canNavigateUp={canNavigateUp}
+                        isAtHome={isAtHome}
                         homePath={home}
                         terminalCwdPath={terminalRootCwd}
                         gitRootPath={gitRoot}

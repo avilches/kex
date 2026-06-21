@@ -65,6 +65,7 @@ export type EntryRowProps = {
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
+  onEnterFolder?: (path: string) => void;
   editorPreviewOnClick: boolean;
 };
 
@@ -89,6 +90,7 @@ function EntryRowImpl(props: EntryRowProps) {
     onRevealInTerminal,
     onAttachToAgent,
     onSetAsRoot,
+    onEnterFolder,
     editorPreviewOnClick,
   } = props;
 
@@ -193,7 +195,10 @@ function EntryRowImpl(props: EntryRowProps) {
             type="button"
             data-fs-path={path}
             onClick={handleClick}
-            onDoubleClick={() => !isDir && onOpenFile(path, true)}
+            onDoubleClick={() => {
+              if (isDir) onEnterFolder?.(path);
+              else onOpenFile(path, true);
+            }}
             className={cn(
               "group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] transition-colors hover:bg-accent/70",
               isSelected
