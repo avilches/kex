@@ -48,7 +48,7 @@ Shell integration scripts (`scripts/`) are injected at spawn time. Platform dete
 | `fs_glob` | Glob pattern matching |
 | `fs_duplicate(source, dest, workspace)` | Copy a file or directory from `source` to `dest` (both workspace-resolved). Emits progress as the global app event `kex:duplicate-progress` (see Events below). Only one duplication can run at a time; a second call returns an error while one is in progress. If the destination already exists the command returns an error without touching it. On cancel or IO error, any partially created destination is deleted. When a quit is pending (deferred because a copy was running), emits `kex:before-quit` on completion so the app can proceed with the exit. |
 | `fs_duplicate_cancel` | Signal the active duplication to abort. The copy loop checks the flag before each chunk and directory entry; cleanup of the partial destination runs inside the blocking task and is reported via the final `kex:duplicate-progress` event (`active: false`). No-op if no duplication is running. |
-| `cancel_quit` | Clear the deferred-quit flag set when the user tries to quit during an active duplication ("Keep app open" action). Emits `kex:duplicate-quit-dismissed` to close the modal in all windows. No-op if no quit is pending. |
+| `cancel_quit` | Clear the deferred-quit flag set when the user tries to quit during an active duplication ("Keep app open" action), then emit `kex:duplicate-quit-dismissed` to close the modal in all windows. The dismiss event is always emitted; if no quit was pending it harmlessly closes a modal that is not open. |
 
 ### Duplication Tauri events
 

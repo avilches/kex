@@ -117,6 +117,20 @@ progreso pasa a ser un **evento global de app**.
 - Montado en `App.tsx` y en `SettingsApp.tsx`. El init del listener de progreso tambien se llama en
   ambos entry points para que el modal tenga progreso en cualquier ventana.
 
+## Limitaciones aceptadas (races conocidos)
+
+- **Keep-open vs fin de copia**: `quit_pending` (leido por `fs_duplicate` al terminar) y `cancel_quit`
+  (que lo pone a false) son atomicos `SeqCst` no acoplados por un lock. Si el usuario pulsa "Keep
+  app open" en la ventana sub-milisegundo en la que la copia ya termino y `fs_duplicate` ya leyo
+  `pending == true`, la app cierra pese al click. No hay perdida de datos: el cierre pasa por el
+  flush normal (`kex:before-quit` -> flush editores/workspace -> `confirm_quit`). Se acepta como
+  race documentado: la ventana es practicamente imposible de provocar y el resultado es un cierre
+  limpio, no destructivo.
+- **Cerrar todas las ventanas principales con Settings abierta durante una copia**: el handler de
+  `ExitRequested` solo difiere el quit si existe una ventana principal (`w-`). Si el usuario cierra
+  todas las principales con una copia en curso y solo queda Settings, un Cmd+Q sale de inmediato
+  (sin modal, abortando la copia). Edge case aceptado.
+
 ## Fuera de alcance (YAGNI)
 
 - Mostrar el modal en float browser windows (webs externas, imposible montar React propio).
