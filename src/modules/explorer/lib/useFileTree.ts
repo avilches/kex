@@ -10,6 +10,7 @@ import {
   startDuplicate,
   updateDuplicate,
   finishDuplicate,
+  isDuplicating,
 } from "@/modules/explorer/lib/duplicateStore";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
@@ -369,6 +370,10 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
   const beginDuplicate = useCallback(
     (sourcePath: string, kind: "file" | "dir") => {
+      if (isDuplicating()) {
+        toast.error("A duplication is already in progress");
+        return;
+      }
       setRenaming(null);
       setPendingCreate(null);
       const parts = sourcePath.split(/[\\/]/);
@@ -402,6 +407,12 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         loaded?.status === "loaded" ? loaded.entries.map((e) => e.name) : [];
       if (siblings.includes(trimmed)) {
         toast.error(`Already exists: ${trimmed}`);
+        setPendingDuplicate(null);
+        return;
+      }
+      if (isDuplicating()) {
+        toast.error("A duplication is already in progress");
+        setPendingDuplicate(null);
         return;
       }
       setPendingDuplicate(null);

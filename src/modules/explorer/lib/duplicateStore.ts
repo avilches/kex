@@ -38,6 +38,10 @@ function getSnapshot(): DuplicateSnapshot {
   return snapshot;
 }
 
+export function isDuplicating(): boolean {
+  return snapshot !== null;
+}
+
 export function useDuplicateProgress(): DuplicateSnapshot {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
