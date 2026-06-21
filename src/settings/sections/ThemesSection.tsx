@@ -1,5 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { defaultMonoFontFamily } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
@@ -32,9 +40,14 @@ import {
   setZoomLevel,
   setPanelSide,
   setExplorerGitColorScheme,
+  setEditorTheme,
+  EDITOR_THEME_AUTO,
+  EDITOR_THEME_LABELS,
+  EDITOR_THEME_MODE,
+  EDITOR_THEMES,
 } from "@/modules/settings/store";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
-import type { ThemePref } from "@/modules/settings/store";
+import type { EditorThemePref, ThemePref } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import { deleteCustomTheme, saveCustomTheme } from "@/modules/theme/customThemes";
 import { listBuiltinThemes } from "@/modules/theme/themes";
@@ -95,6 +108,7 @@ export function ThemesSection() {
   const terminalLetterSpacing = usePreferencesStore((s) => s.terminalLetterSpacing);
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
   const terminalLineHeight = usePreferencesStore((s) => s.terminalLineHeight);
+  const editorThemePref = usePreferencesStore((s) => s.editorTheme);
   const editorFontFamily = usePreferencesStore((s) => s.editorFontFamily);
   const editorFontSize = usePreferencesStore((s) => s.editorFontSize);
   const editorLetterSpacing = usePreferencesStore((s) => s.editorLetterSpacing);
@@ -287,6 +301,44 @@ export function ThemesSection() {
 
       <div className="flex flex-col gap-2">
         <Label>Editor</Label>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[12px]">Editor theme</span>
+            <span className="text-[11px] text-muted-foreground">
+              Syntax colors for the code editor. Auto follows the app theme.
+            </span>
+          </div>
+          <Select
+            value={editorThemePref}
+            onValueChange={(v) => void setEditorTheme(v as EditorThemePref)}
+          >
+            <SelectTrigger size="sm" className="h-8 w-44 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EDITOR_THEME_AUTO} className="text-[12px]">
+                Auto (match app theme)
+              </SelectItem>
+              <SelectSeparator />
+              {[...EDITOR_THEMES]
+                .sort(
+                  (a, b) =>
+                    (EDITOR_THEME_MODE[a] === resolvedMode ? 0 : 1) -
+                    (EDITOR_THEME_MODE[b] === resolvedMode ? 0 : 1),
+                )
+                .map((id) => (
+                  <SelectItem
+                    key={id}
+                    value={id}
+                    disabled={EDITOR_THEME_MODE[id] !== resolvedMode}
+                    className="text-[12px]"
+                  >
+                    {EDITOR_THEME_LABELS[id]}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
         <FontFamilyInput
           value={editorFontFamily}
           defaultFamily={defaultMonoFontFamily()}
@@ -328,6 +380,7 @@ export function ThemesSection() {
       </div>
 
       <div
+        role="presentation"
         className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/60 p-3"
         onDragOver={(e) => {
           e.preventDefault();
