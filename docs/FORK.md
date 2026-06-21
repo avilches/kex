@@ -316,3 +316,15 @@ These phases are designed but not fully implemented:
   - bb155d2 (tab enter animation): POSPUESTO. Portable a PaneTabBar, pero ese fichero estaba bajo un WIP de rename de pestanas (ya descartado por el usuario); se retoma cuando se quiera.
 - El resto del scope aceptado (Bucket B completo, C1/C2/C3/C5) ya estaba aplicado de sesiones previas.
 - Quality suite completa (cierre): check-types OK, lint exit 0 (85 warnings preexistentes), 180 tests, vite build OK; Rust cargo clippy OK, cargo test --locked OK.
+
+#### 2026-06-21
+
+- Upstream HEAD: b656fe3816d0ddaefb17e7acff5e16889f6e939a
+- Commits revisados: 8e1c4743fb4efcf1f3d089457c32dc1326552683..b656fe3816d0ddaefb17e7acff5e16889f6e939a (34 commits reales, 0 merges)
+- Outcome: work plan creado en docs/upstream-2026-06-21.md (pendiente de ejecucion)
+- Changes applied: none -- pending plan execution. El agente que ejecute el plan debe actualizar esta entrada con las listas reales de aplicado/saltado/rechazado.
+- Bucket B candidatos (bug fixes / perf): git stage con directorio padre borrado (0eac4a6, cherry-pick limpio); explorer cerrar menu tras borrar (7baee7c); buffer de input pre-attach del pty acotado (7f972aa + a1fca84); reap de sesion pty al salir el hijo (1691e73); fish cwd con starship (2711841); fallback monospace para fuentes custom (6019e04); perf bundle drop tokenlens + woff dedup parcial (cbe1ad4).
+- Bucket C a evaluar: mas resaltado de sintaxis + Dockerfile + Vue (b7eb8d6/90aeab5/b656fe3, cherry-pick viable); handler OSC 52 clipboard (0c647c4, implicacion de seguridad); confirmar salida con proceso de terminal vivo (d782f7d); selector de tema del editor + temas nuevos (35f8711 + 1afe8d5); restaurar env WSL al reabrir (4a6d803, entrelazado con spaces, extraer parte Rust); bumps de dependabot (re-derivar nativamente, no cherry-pick).
+- Changes skipped (removed surface): AI (3 commits: modelos Grok/Opus 4.8/GPT-5.5, proveedores STT Groq/Whisper, entitlement de microfono); Spaces/Tabs (6 commits: MRU switcher Ctrl+Tab, drag-reorder de tabs, switcher HUD, close dialog por space); infra upstream (config CodeRabbit, bump v0.8.1, badges README, Nix sources).
+- New features rejected: ninguna confirmada todavia (pendiente de decisiones del usuario en la ejecucion del plan).
+- Nota (consulta del usuario): el upstream NO esta trabajando en el modulo git history en este rango. El unico cambio git es el fix de staging (0eac4a6, git/utils.rs); git-history/ y los comandos git_log/git_show_commit no se tocan.
