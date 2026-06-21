@@ -10,6 +10,7 @@ import type { BlockMode } from "../block/lib/modeMachine";
 import {
   createShellIntegrationState,
   registerCwdHandler,
+  registerOsc52ClipboardHandler,
   registerPromptTracker,
   registerTitleHandler,
 } from "./osc-handlers";
@@ -512,9 +513,11 @@ function bindLeafToSlot(leafId: string, s: Session): void {
           if (s.blockMode === "prompt") s.inputFocus?.();
         };
         term.textarea?.addEventListener("focus", onGridFocus);
+        const osc52 = registerOsc52ClipboardHandler(term);
         return [
           () => {
             s.blockDecorations = null;
+            osc52();
             deco.dispose();
             term.textarea?.removeEventListener("focus", onGridFocus);
           },
@@ -537,7 +540,8 @@ function bindLeafToSlot(leafId: string, s: Session): void {
         shellState,
       );
       const titleDispose = registerTitleHandler(term, (t) => setOscTitle(leafId, t));
-      return [prompt.dispose, cwd, titleDispose];
+      const osc52 = registerOsc52ClipboardHandler(term);
+      return [prompt.dispose, cwd, titleDispose, osc52];
     },
     onSearchReady: (addon) => s.callbacks.onSearchReady?.(addon),
   });
