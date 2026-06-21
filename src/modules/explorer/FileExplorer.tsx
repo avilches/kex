@@ -476,6 +476,9 @@ export const FileExplorer = memo(
         beginCreate: tree.beginCreate,
         beginDuplicate: tree.beginDuplicate,
         deletePath: tree.deletePath,
+        copyEntry: tree.copyEntry,
+        cutEntry: tree.cutEntry,
+        pasteEntry: tree.pasteEntry,
       }),
       [
         tree.toggle,
@@ -485,6 +488,9 @@ export const FileExplorer = memo(
         tree.beginCreate,
         tree.beginDuplicate,
         tree.deletePath,
+        tree.copyEntry,
+        tree.cutEntry,
+        tree.pasteEntry,
       ],
     );
     const renameInProgress =
@@ -668,6 +674,33 @@ export const FileExplorer = memo(
         rowActions.beginRename(entryPaths[currentIdx]);
         return;
       }
+      if (matchesShortcut(e.nativeEvent, "file.copy", userShortcuts)) {
+        if (currentIdx < 0) return;
+        e.preventDefault();
+        const path = entryPaths[currentIdx];
+        const isDir = isDirAt(path);
+        if (isDir === undefined) return;
+        rowActions.copyEntry(path, isDir ? "dir" : "file");
+        return;
+      }
+      if (matchesShortcut(e.nativeEvent, "file.cut", userShortcuts)) {
+        if (currentIdx < 0) return;
+        e.preventDefault();
+        const path = entryPaths[currentIdx];
+        const isDir = isDirAt(path);
+        if (isDir === undefined) return;
+        rowActions.cutEntry(path, isDir ? "dir" : "file");
+        return;
+      }
+      if (matchesShortcut(e.nativeEvent, "file.paste", userShortcuts)) {
+        e.preventDefault();
+        if (selectedPath) {
+          void rowActions.pasteEntry(selectedPath, isDirAt(selectedPath) === true);
+        } else {
+          void rowActions.pasteEntry(rootPath, true);
+        }
+        return;
+      }
 
       const move = (next: number) => {
         const clamped = Math.max(0, Math.min(entryPaths.length - 1, next));
@@ -757,6 +790,10 @@ export const FileExplorer = memo(
               onSetAsRoot={onSetAsRoot}
               onEnterFolder={onEnterFolder}
               editorPreviewOnClick={editorPreviewOnClick}
+              hasClipboard={tree.clipboard !== null}
+              isCutSource={
+                tree.clipboard?.mode === "cut" && tree.clipboard.path === row.path
+              }
             />
           );
         }
@@ -770,6 +807,8 @@ export const FileExplorer = memo(
               onRevealInTerminal={onRevealInTerminal}
               onBeginCreate={tree.beginCreate}
               onRefresh={tree.refresh}
+              onPaste={tree.pasteEntry}
+              canPaste={tree.clipboard !== null}
             />
           );
         case "fs-up":
