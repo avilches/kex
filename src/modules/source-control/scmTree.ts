@@ -11,7 +11,7 @@ export type ScmDirNode = {
 export type ScmTreeNode = ScmDirNode | ScmFileNode;
 
 export type ScmTreeRow =
-  | { type: "dir"; key: string; depth: number; node: ScmDirNode }
+  | { type: "dir"; key: string; collapseKey: string; depth: number; node: ScmDirNode }
   | { type: "file"; key: string; depth: number; entry: SourceControlEntry };
 
 type RawNode = {
@@ -108,17 +108,25 @@ export function buildScmTree(entries: SourceControlEntry[]): ScmTreeNode[] {
 export function flattenScmTree(
   nodes: ScmTreeNode[],
   collapsed: ReadonlySet<string>,
+  keyPrefix = "",
   depth = 0,
 ): ScmTreeRow[] {
   const rows: ScmTreeRow[] = [];
   for (const node of nodes) {
     if (node.type === "dir") {
-      rows.push({ type: "dir", key: `dir:${node.fullPath}`, depth, node });
-      if (!collapsed.has(node.fullPath)) {
-        rows.push(...flattenScmTree(node.children, collapsed, depth + 1));
+      const collapseKey = `${keyPrefix}${node.fullPath}`;
+      rows.push({
+        type: "dir",
+        key: `${keyPrefix}dir:${node.fullPath}`,
+        collapseKey,
+        depth,
+        node,
+      });
+      if (!collapsed.has(collapseKey)) {
+        rows.push(...flattenScmTree(node.children, collapsed, keyPrefix, depth + 1));
       }
     } else {
-      rows.push({ type: "file", key: node.entry.key, depth, entry: node.entry });
+      rows.push({ type: "file", key: `${keyPrefix}${node.entry.key}`, depth, entry: node.entry });
     }
   }
   return rows;

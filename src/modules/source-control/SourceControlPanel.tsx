@@ -115,7 +115,7 @@ type RowDescriptor =
   | { kind: "staged-entry"; key: string; entry: SourceControlEntry }
   | { kind: "changes-header"; key: string; count: number }
   | { kind: "changes-entry"; key: string; entry: SourceControlEntry }
-  | { kind: "tree-dir"; key: string; depth: number; node: ScmDirNode }
+  | { kind: "tree-dir"; key: string; collapseKey: string; depth: number; node: ScmDirNode }
   | { kind: "tree-file"; key: string; depth: number; entry: SourceControlEntry };
 
 function basename(path: string): string {
@@ -311,26 +311,22 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       result.push({ kind: "banner-diverged", key: "banner-diverged" });
     }
     if (scmViewMode === "tree") {
-      const tree = buildScmTree([
-        ...scm.stagedEntries,
-        ...scm.unstagedEntries,
-      ]);
-      for (const row of flattenScmTree(tree, treeCollapsed)) {
-        if (row.type === "dir") {
-          result.push({
-            kind: "tree-dir",
-            key: row.key,
-            depth: row.depth,
-            node: row.node,
-          });
-        } else {
-          result.push({
-            kind: "tree-file",
-            key: row.key,
-            depth: row.depth,
-            entry: row.entry,
-          });
+      const pushTree = (entries: SourceControlEntry[], prefix: string) => {
+        for (const r of flattenScmTree(buildScmTree(entries), treeCollapsed, prefix)) {
+          if (r.type === "dir") {
+            result.push({ kind: "tree-dir", key: r.key, collapseKey: r.collapseKey, depth: r.depth, node: r.node });
+          } else {
+            result.push({ kind: "tree-file", key: r.key, depth: r.depth, entry: r.entry });
+          }
         }
+      };
+      if (scm.stagedEntries.length > 0) {
+        result.push({ kind: "staged-header", key: "staged-header", count: scm.stagedEntries.length });
+        if (!stagedCollapsed) pushTree(scm.stagedEntries, "staged/");
+      }
+      if (scm.unstagedEntries.length > 0) {
+        result.push({ kind: "changes-header", key: "changes-header", count: scm.unstagedEntries.length });
+        if (!changesCollapsed) pushTree(scm.unstagedEntries, "changes/");
       }
       return result;
     }
@@ -487,11 +483,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           if (idx === undefined) break;
           const row = rows[idx];
           if (row?.kind === "tree-dir") {
-            const collapsed = treeCollapsed.has(row.node.fullPath);
+            const collapsed = treeCollapsed.has(row.collapseKey);
             const wantCollapse = event.key === "ArrowLeft";
             if (collapsed !== wantCollapse) {
               event.preventDefault();
-              toggleTreeDir(row.node.fullPath);
+              toggleTreeDir(row.collapseKey);
             }
           }
           break;
@@ -502,7 +498,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             const row = idx === undefined ? null : rows[idx];
             if (row?.kind === "tree-dir") {
               event.preventDefault();
-              toggleTreeDir(row.node.fullPath);
+              toggleTreeDir(row.collapseKey);
               break;
             }
           }
@@ -620,48 +616,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 strokeWidth={1.85}
               />
             </IconActionButton>
-            {scmViewMode === "tree" &&
-            scm.panelState === "ready" &&
-            !scm.allClean ? (
-              <>
-                <IconActionButton
-                  label="Stage all changes"
-                  disabled={
-                    scm.unstagedEntries.length === 0 || !!scm.actionBusy
-                  }
-                  onClick={() => void scm.stageAllEntries()}
-                  side="bottom"
-                >
-                  <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.85} />
-                </IconActionButton>
-                <IconActionButton
-                  label="Unstage all"
-                  disabled={scm.stagedEntries.length === 0 || !!scm.actionBusy}
-                  onClick={() => void scm.unstageAllEntries()}
-                  side="bottom"
-                >
-                  <HugeiconsIcon
-                    icon={MinusSignIcon}
-                    size={14}
-                    strokeWidth={1.85}
-                  />
-                </IconActionButton>
-                <IconActionButton
-                  label="Discard all changes"
-                  disabled={
-                    scm.unstagedEntries.length === 0 || !!scm.actionBusy
-                  }
-                  onClick={() => scm.requestDiscardAll()}
-                  side="bottom"
-                >
-                  <HugeiconsIcon
-                    icon={RemoveSquareIcon}
-                    size={14}
-                    strokeWidth={1.85}
-                  />
-                </IconActionButton>
-              </>
-            ) : null}
             <IconActionButton
               label={fetchBusy ? "Fetching…" : "Fetch from remote"}
               disabled={!canFetch}
@@ -1201,7 +1155,7 @@ function TreeDirRow({
   row: Extract<RowDescriptor, { kind: "tree-dir" }>;
 }) {
   const node = row.node;
-  const collapsed = treeCollapsed.has(node.fullPath);
+  const collapsed = treeCollapsed.has(row.collapseKey);
   return (
     <div
       id={`scm-row-${row.key}`}
@@ -1209,7 +1163,7 @@ function TreeDirRow({
       tabIndex={-1}
       data-focused={focused || undefined}
       onMouseDown={() => onFocusRow(row.key)}
-      onClick={() => onToggleTreeDir(node.fullPath)}
+      onClick={() => onToggleTreeDir(row.collapseKey)}
       style={{ paddingLeft: 6 + row.depth * 12 }}
       className={cn(
         "group flex h-6 select-none items-center gap-2 rounded-sm pr-2 text-[13px] transition-colors",
@@ -1262,9 +1216,6 @@ function TreeDirRow({
           <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
         </IconActionButton>
       </div>
-      <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/55">
-        {node.fileCount}
-      </span>
     </div>
   );
 }

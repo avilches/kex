@@ -100,4 +100,24 @@ describe("flattenScmTree", () => {
     expect(collapsed).toHaveLength(1);
     expect(collapsed[0].type).toBe("dir");
   });
+
+  it("scopes keys and collapse checks by keyPrefix", () => {
+    const tree = buildScmTree([entry("src/a/x.ts")]);
+
+    const rows = flattenScmTree(tree, new Set(), "staged/");
+    expect(rows).toHaveLength(2);
+    const dirRow = rows[0];
+    expect(dirRow.type).toBe("dir");
+    if (dirRow.type === "dir") {
+      expect(dirRow.key).toBe("staged/dir:src/a");
+      expect(dirRow.collapseKey).toBe("staged/src/a");
+    }
+    const fileRow = rows[1];
+    expect(fileRow.type).toBe("file");
+    expect(fileRow.key).toBe("staged/-:src/a/x.ts");
+
+    const collapsedRows = flattenScmTree(tree, new Set(["staged/src/a"]), "staged/");
+    expect(collapsedRows).toHaveLength(1);
+    expect(collapsedRows[0].type).toBe("dir");
+  });
 });
