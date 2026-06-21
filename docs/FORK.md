@@ -158,7 +158,8 @@ previous workspaces or pane layout.
 - **Folder context actions** — a folder's context menu offers "Open in Terminal" (opens a new terminal tab in the
   current workspace's active pane, spawned directly with the folder as cwd, leaving the explorer view untouched) and
   "New Workspace from folder" (creates a new workspace with that folder pinned as its Workspace Root). Neither injects a
-  `cd` command into a shell.
+  `cd` command into a shell. A file's context menu also offers "Open in Terminal", spawning the terminal in the file's
+  parent directory.
 
 - **Add to .gitignore**: a file/folder context action (shown only inside a git repo) that appends an anchored entry to the repo-root `.gitignore`, idempotently. If `.gitignore` is already open in an editor, the line is inserted into that buffer (marking the tab dirty) instead of writing to disk, so unsaved edits are never clobbered. Pure helpers in `modules/explorer/lib/gitignore.ts` (tested). Not present upstream.
 
