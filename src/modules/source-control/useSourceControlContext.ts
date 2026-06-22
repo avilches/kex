@@ -16,9 +16,9 @@ type Params = {
 };
 
 /**
- * Resolves the source-control context path off the active tab and feeds the
- * source-control summary. When git is not active the badge tracks a stable
- * per-session path so tab switches / cd don't re-fire git IPC.
+ * Resolves the source-control repo from the explorer root and feeds the
+ * source-control summary. Resolution is unconditional so the rail badge and the
+ * explorer git status stay populated regardless of the active right-panel tab.
  */
 export function useSourceControlContext({
   explorerRoot,
