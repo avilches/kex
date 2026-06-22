@@ -167,6 +167,7 @@ export default function App() {
     setFsRoot,
     setTerminalRunningCommand,
     setPanelView,
+    setPanelWordWrapOverride,
     findPanelGlobal,
     resetWorkspaces,
   } = useWorkspaces(initialOpts);
@@ -1099,6 +1100,10 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) setPanelView(found.workspace.id, panelId, mode);
       },
+      onSetWordWrap: (panelId, value) => {
+        const found = findPanelGlobal(panelId);
+        if (found) setPanelWordWrapOverride(found.workspace.id, panelId, value);
+      },
       registerEditorHandle: (panelId, h) => {
         if (h) {
           editorHandles.current.set(panelId, h);
@@ -1162,6 +1167,7 @@ export default function App() {
       setWorkspaceCwd,
       setTerminalRunningCommand,
       setPanelView,
+      setPanelWordWrapOverride,
       updatePanelData,
       activeWorkspace,
       openPanel,

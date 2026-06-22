@@ -1,4 +1,4 @@
-import { isMarkdownPath } from "@/lib/utils";
+import { isMarkdownPath, shouldWrapByDefault } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
 import { EditorOverlayBar } from "@/modules/editor";
@@ -48,6 +48,8 @@ export type PanelCallbacks = {
   registerEditorHandle?: (panelId: string, handle: EditorPaneHandle | null) => void;
   // Markdown callbacks
   onSetMarkdownView?: (panelId: string, mode: "rendered" | "raw") => void;
+  // Editor word wrap override (per panel)
+  onSetWordWrap?: (panelId: string, value: boolean) => void;
   // Browser callbacks
   onBrowserUrlChange?: (panelId: string, url: string) => void;
   registerBrowserHandle?: (panelId: string, handle: BrowserPaneHandle | null) => void;
@@ -102,12 +104,18 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
         />
       );
 
-    case "editor":
+    case "editor": {
+      const wordWrap = panel.wordWrapOverride ?? shouldWrapByDefault(panel.path);
+      const wrap = {
+        value: wordWrap,
+        onToggle: () => callbacks.onSetWordWrap?.(panel.id, !wordWrap),
+      };
       return (
         <Suspense fallback={null}>
           <div className="relative h-full w-full">
             {isMarkdownPath(panel.path) ? (
               <EditorOverlayBar
+                wrap={wrap}
                 view={{
                   mode: "raw",
                   onChange: (mode) => callbacks.onSetMarkdownView?.(panel.id, mode),
@@ -116,7 +124,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                 }}
               />
             ) : (
-              <EditorOverlayBar />
+              <EditorOverlayBar wrap={wrap} />
             )}
             <EditorPane
               ref={(h: EditorPaneHandle | null) => {
@@ -124,12 +132,14 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                 callbacks.registerEditorHandle?.(panel.id, h);
               }}
               path={panel.path}
+              wordWrap={wordWrap}
               onDirtyChange={(dirty: boolean) => callbacks.onEditorDirtyChange?.(panel.id, dirty)}
               onClose={() => callbacks.onEditorClose?.(panel.id)}
             />
           </div>
         </Suspense>
       );
+    }
 
     case "browser":
       return (
@@ -162,7 +172,8 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
         </Suspense>
       );
 
-    case "git-diff":
+    case "git-diff": {
+      const wordWrap = panel.wordWrapOverride ?? shouldWrapByDefault(panel.path);
       return (
         <Suspense fallback={null}>
           <GitDiffPane
@@ -174,11 +185,15 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               originalPath: panel.originalPath,
             }}
             active={visible}
+            wordWrap={wordWrap}
+            onToggleWordWrap={() => callbacks.onSetWordWrap?.(panel.id, !wordWrap)}
           />
         </Suspense>
       );
+    }
 
-    case "git-commit-file":
+    case "git-commit-file": {
+      const wordWrap = panel.wordWrapOverride ?? shouldWrapByDefault(panel.path);
       return (
         <Suspense fallback={null}>
           <GitDiffPane
@@ -190,9 +205,12 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               originalPath: panel.originalPath,
             }}
             active={visible}
+            wordWrap={wordWrap}
+            onToggleWordWrap={() => callbacks.onSetWordWrap?.(panel.id, !wordWrap)}
           />
         </Suspense>
       );
+    }
 
     case "git-history":
       return (

@@ -10,9 +10,10 @@ type Props = {
     renderedDisabled?: boolean;
     renderedHint?: string;
   };
+  wrap?: { value: boolean; onToggle: () => void };
 };
 
-export function EditorOverlayBar({ view }: Props) {
+export function EditorOverlayBar({ view, wrap }: Props) {
   // Word wrap acts on the text editor (CodeMirror); it has no meaning in the
   // rendered markdown preview, so hide the toggle there.
   const showWrap = view?.mode !== "rendered";
@@ -50,8 +51,8 @@ export function EditorOverlayBar({ view }: Props) {
           </button>
         </div>
       )}
-      {view && showWrap && <div className="h-4 w-px bg-border/60" />}
-      {showWrap && <WrapToggleButton />}
+      {view && showWrap && wrap && <div className="h-4 w-px bg-border/60" />}
+      {showWrap && wrap && <WrapToggleButton value={wrap.value} onToggle={wrap.onToggle} />}
     </div>
   );
 }

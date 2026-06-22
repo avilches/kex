@@ -446,7 +446,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // panel; absence means "use the default for this file type".
   const setPanelWordWrapOverride = useCallback((workspaceId: string, panelId: string, value: boolean) => {
     updatePanelData(workspaceId, panelId, (p) =>
-      p.kind === "editor" ? { ...p, wordWrapOverride: value } : p,
+      p.kind === "editor" || p.kind === "git-diff" || p.kind === "git-commit-file"
+        ? { ...p, wordWrapOverride: value }
+        : p,
     );
   }, [updatePanelData]);
 
