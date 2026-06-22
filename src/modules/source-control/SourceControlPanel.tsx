@@ -115,7 +115,14 @@ type RowDescriptor =
   | { kind: "staged-entry"; key: string; entry: SourceControlEntry }
   | { kind: "changes-header"; key: string; count: number }
   | { kind: "changes-entry"; key: string; entry: SourceControlEntry }
-  | { kind: "tree-dir"; key: string; collapseKey: string; depth: number; node: ScmDirNode }
+  | {
+      kind: "tree-dir";
+      key: string;
+      collapseKey: string;
+      depth: number;
+      node: ScmDirNode;
+      section: "staged" | "changes";
+    }
   | { kind: "tree-file"; key: string; depth: number; entry: SourceControlEntry };
 
 function basename(path: string): string {
@@ -311,10 +318,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       result.push({ kind: "banner-diverged", key: "banner-diverged" });
     }
     if (scmViewMode === "tree") {
-      const pushTree = (entries: SourceControlEntry[], prefix: string) => {
+      const pushTree = (
+        entries: SourceControlEntry[],
+        prefix: string,
+        section: "staged" | "changes",
+      ) => {
         for (const r of flattenScmTree(buildScmTree(entries), treeCollapsed, prefix)) {
           if (r.type === "dir") {
-            result.push({ kind: "tree-dir", key: r.key, collapseKey: r.collapseKey, depth: r.depth, node: r.node });
+            result.push({ kind: "tree-dir", key: r.key, collapseKey: r.collapseKey, depth: r.depth, node: r.node, section });
           } else {
             result.push({ kind: "tree-file", key: r.key, depth: r.depth, entry: r.entry });
           }
@@ -322,11 +333,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       };
       if (scm.stagedEntries.length > 0) {
         result.push({ kind: "staged-header", key: "staged-header", count: scm.stagedEntries.length });
-        if (!stagedCollapsed) pushTree(scm.stagedEntries, "staged/");
+        if (!stagedCollapsed) pushTree(scm.stagedEntries, "staged/", "staged");
       }
       if (scm.unstagedEntries.length > 0) {
         result.push({ kind: "changes-header", key: "changes-header", count: scm.unstagedEntries.length });
-        if (!changesCollapsed) pushTree(scm.unstagedEntries, "changes/");
+        if (!changesCollapsed) pushTree(scm.unstagedEntries, "changes/", "changes");
       }
       return result;
     }
@@ -1191,30 +1202,35 @@ function TreeDirRow({
         className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <IconActionButton
-          label="Discard folder changes"
-          disabled={actionBusy !== null}
-          side="top"
-          onClick={() => onDiscardFolder(node)}
-        >
-          <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
-        </IconActionButton>
-        <IconActionButton
-          label="Unstage folder"
-          disabled={actionBusy !== null}
-          side="top"
-          onClick={() => onUnstageFolder(node)}
-        >
-          <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
-        </IconActionButton>
-        <IconActionButton
-          label="Stage folder"
-          disabled={actionBusy !== null}
-          side="top"
-          onClick={() => onStageFolder(node)}
-        >
-          <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
-        </IconActionButton>
+        {row.section === "staged" ? (
+          <IconActionButton
+            label="Unstage folder"
+            disabled={actionBusy !== null}
+            side="top"
+            onClick={() => onUnstageFolder(node)}
+          >
+            <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
+          </IconActionButton>
+        ) : (
+          <>
+            <IconActionButton
+              label="Discard folder changes"
+              disabled={actionBusy !== null}
+              side="top"
+              onClick={() => onDiscardFolder(node)}
+            >
+              <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
+            </IconActionButton>
+            <IconActionButton
+              label="Stage folder"
+              disabled={actionBusy !== null}
+              side="top"
+              onClick={() => onStageFolder(node)}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
+            </IconActionButton>
+          </>
+        )}
       </div>
     </div>
   );
