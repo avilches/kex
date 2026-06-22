@@ -1,7 +1,7 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
-import type { Panel } from "./lib/types";
+import { type Panel, isAutofocusPanel, isLockablePanel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
@@ -596,12 +596,11 @@ function DraggableTab({
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
   const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${panel.id}:after`, disabled: !isWorkspaceActive });
   const active = panel.id === activePanelId;
-  const isLockable = panel.kind === "terminal" || panel.kind === "editor";
-  const isLocked = (panel.kind === "terminal" || panel.kind === "editor") && (panel.locked ?? false);
+  const isLockable = isLockablePanel(panel);
+  const isLocked = isLockablePanel(panel) && (panel.locked ?? false);
   const focusFilePath = panelFilePath(panel);
   const focusTarget =
     focusFilePath ?? (panel.kind === "terminal" ? (panel.cwd ?? null) : null);
-  const focusIsFolder = focusFilePath === null;
   const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const runningCommand = panel.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
   const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
@@ -921,12 +920,12 @@ function DraggableTab({
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null
       )}
-      {panel.kind === "terminal" && panel.autofocus && (
+      {isAutofocusPanel(panel) && panel.autofocus && (
         <span
-          className="ml-0.5 shrink-0 text-muted-foreground/70"
-          title="Autofocus: this terminal drives the sidebar"
+          className="ml-0.5 shrink-0 text-primary"
+          title="Autofocus: this tab drives the sidebar"
         >
-          <HugeiconsIcon icon={CrosshairIcon} size={11} strokeWidth={1.75} />
+          <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
         </span>
       )}
       {isLocked ? (
@@ -997,22 +996,6 @@ function DraggableTab({
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
-            {onFocusOnExplorer && focusTarget && (
-              <>
-                <ContextMenuItem onSelect={() => onFocusOnExplorer(focusTarget)}>
-                  <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
-                  {focusIsFolder
-                    ? "Focus Folder on Explorer"
-                    : "Focus File on Explorer"}
-                  {shortcutLabels["tab.focusOnExplorer"] && (
-                    <ContextMenuShortcut>
-                      {shortcutLabels["tab.focusOnExplorer"]}
-                    </ContextMenuShortcut>
-                  )}
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-              </>
-            )}
             {onRenamePanel && (
               <>
                 <ContextMenuItem onSelect={() => startRename(panel.id)}>
@@ -1026,6 +1009,49 @@ function DraggableTab({
                   <ContextMenuItem onSelect={() => onRenamePanel(panel.id, undefined)}>
                     <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} strokeWidth={2} />
                     Reset Tab Name
+                  </ContextMenuItem>
+                )}
+                <ContextMenuSeparator />
+              </>
+            )}
+            {((onFocusOnExplorer && focusTarget) || isAutofocusPanel(panel)) && (
+              <>
+                {onFocusOnExplorer && focusTarget && (
+                  <ContextMenuItem
+                    disabled={isAutofocusPanel(panel) && (panel.autofocus ?? false)}
+                    onSelect={() => onFocusOnExplorer(focusTarget)}
+                  >
+                    <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
+                    Focus on Sidebar
+                    {shortcutLabels["tab.focusOnExplorer"] && (
+                      <ContextMenuShortcut>
+                        {shortcutLabels["tab.focusOnExplorer"]}
+                      </ContextMenuShortcut>
+                    )}
+                  </ContextMenuItem>
+                )}
+                {isAutofocusPanel(panel) && (
+                  <ContextMenuItem
+                    onSelect={() =>
+                      onUpdatePanel?.(panel.id, (p) =>
+                        isAutofocusPanel(p)
+                          ? { ...p, autofocus: !p.autofocus }
+                          : p,
+                      )
+                    }
+                  >
+                    <HugeiconsIcon
+                      icon={CrosshairIcon}
+                      size={14}
+                      strokeWidth={2}
+                      className={panel.autofocus ? "text-primary" : undefined}
+                    />
+                    Autofocus Sidebar
+                    {shortcutLabels["tab.toggleAutofocus"] && (
+                      <ContextMenuShortcut>
+                        {shortcutLabels["tab.toggleAutofocus"]}
+                      </ContextMenuShortcut>
+                    )}
                   </ContextMenuItem>
                 )}
                 <ContextMenuSeparator />
@@ -1167,6 +1193,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
     "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
     "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
+    "tab.toggleAutofocus": getShortcutLabel("tab.toggleAutofocus", userShortcuts),
   };
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 

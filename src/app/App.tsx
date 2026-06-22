@@ -108,6 +108,7 @@ import {
 } from "@/modules/workspaces/lib/explorerRoot";
 import type { RevealRequest } from "@/modules/explorer";
 import { panelFilePath } from "@/modules/workspaces/lib/panelPath";
+import { isAutofocusPanel, isLockablePanel } from "@/modules/workspaces/lib/types";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -511,7 +512,7 @@ export default function App() {
   );
 
   const focusSidebar = useCallback(
-    (folder: string, opts: { fromF4: boolean }) => {
+    (folder: string, opts: { fromShortcut: boolean }) => {
       const ws = activeWorkspace;
       if (!ws) return;
       void native
@@ -533,7 +534,7 @@ export default function App() {
           setRevealRequest((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
         });
 
-      if (opts.fromF4) {
+      if (opts.fromShortcut) {
         const state = usePreferencesStore.getState();
         if (!state.rightPanelOpen) void setRightPanelOpen(true);
         if (state.rightPanelActiveTab === "history") {
@@ -551,18 +552,25 @@ export default function App() {
     ],
   );
 
-  const prevActivePanelIdRef = useRef<string | null>(null);
+  // Drive the sidebar when the ACTIVE panel becomes an autofocus terminal,
+  // whether by gaining focus or by turning autofocus on while already focused
+  // (shortcut / hover / context menu). Toggling autofocus on a non-active tab
+  // does nothing here because the active panel does not change. The startup
+  // mount is skipped so restoring a session never auto-fires.
+  const prevAutofocusSignalRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    const prev = prevActivePanelIdRef.current;
-    prevActivePanelIdRef.current = activePanelId;
-    if (prev === null) return; // skip initial mount
-    if (prev === activePanelId) return;
-    if (
-      activePanel?.kind === "terminal" &&
-      activePanel.autofocus &&
-      activePanel.cwd
-    ) {
-      focusSidebar(activePanel.cwd, { fromF4: false });
+    const ap = activePanel;
+    const target =
+      ap && isAutofocusPanel(ap) && ap.autofocus
+        ? (panelFilePath(ap) ??
+          (ap.kind === "terminal" ? (ap.cwd ?? null) : null))
+        : null;
+    const signal = target ? activePanelId : null;
+    const prev = prevAutofocusSignalRef.current;
+    prevAutofocusSignalRef.current = signal;
+    if (prev === undefined) return; // skip initial mount
+    if (signal && signal !== prev && target) {
+      focusSidebar(target, { fromShortcut: false });
     }
   }, [activePanelId, activePanel, focusSidebar]);
 
@@ -1061,7 +1069,7 @@ export default function App() {
               found.panel.kind === "terminal" &&
               found.panel.autofocus
             ) {
-              focusSidebar(cwd, { fromF4: false });
+              focusSidebar(cwd, { fromShortcut: false });
             }
           }
         }
@@ -1144,7 +1152,7 @@ export default function App() {
       onRenameFile: (panelId, newName) => {
         void handleRenameFileFromTab(panelId, newName);
       },
-      onFocusOnExplorer: (filePath) => focusSidebar(filePath, { fromF4: false }),
+      onFocusOnExplorer: (filePath) => focusSidebar(filePath, { fromShortcut: true }),
     }),
     [
       activePanelId,
@@ -1691,22 +1699,21 @@ export default function App() {
         );
       },
       "tab.lock": () => {
-        if (!activePanelId) return;
-        if (activePanel?.kind !== "terminal" && activePanel?.kind !== "editor")
+        if (!activePanelId || !activePanel || !isLockablePanel(activePanel))
           return;
         const found = findPanelGlobal(activePanelId);
         if (found)
           updatePanelData(found.workspace.id, activePanelId, (p) => {
-            if (p.kind === "terminal") return { ...p, locked: !p.locked };
+            if (!isLockablePanel(p)) return p;
+            const newLocked = !p.locked;
             if (p.kind === "editor") {
-              const newLocked = !p.locked;
               return {
                 ...p,
                 locked: newLocked,
                 ...(newLocked ? { preview: false } : {}),
               };
             }
-            return p;
+            return { ...p, locked: newLocked };
           });
       },
       "tab.focusOnExplorer": () => {
@@ -1714,7 +1721,16 @@ export default function App() {
         const target =
           panelFilePath(activePanel) ??
           (activePanel.kind === "terminal" ? (activePanel.cwd ?? null) : null);
-        if (target) focusSidebar(target, { fromF4: true });
+        if (target) focusSidebar(target, { fromShortcut: true });
+      },
+      "tab.toggleAutofocus": () => {
+        if (!activePanelId || !activePanel || !isAutofocusPanel(activePanel))
+          return;
+        const found = findPanelGlobal(activePanelId);
+        if (found)
+          updatePanelData(found.workspace.id, activePanelId, (p) =>
+            isAutofocusPanel(p) ? { ...p, autofocus: !p.autofocus } : p,
+          );
       },
       "path.copy": () => {
         if (!activePanel) return;
