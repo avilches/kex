@@ -6,7 +6,6 @@ import {
   isUnder,
   parentRoot,
   resolveExplorerRoot,
-  resolveFocusTarget,
   resolveSidebarTarget,
   migrateExplorerRootMode,
 } from "./explorerRoot";
@@ -113,70 +112,6 @@ describe("ancestorsToExpand", () => {
   });
   it("returns empty when the file is not under root", () => {
     expect(ancestorsToExpand("/a/b", "/x/y/file.ts")).toEqual([]);
-  });
-});
-
-describe("resolveFocusTarget", () => {
-  const file = "/home/u/proj/src/deep/file.ts";
-
-  it("returns null when the current view already contains the file", () => {
-    expect(
-      resolveFocusTarget({
-        file,
-        mode: "filesystem",
-        currentRoot: "/home/u/proj",
-        fsRoot: null,
-        home: "/home/u",
-      }),
-    ).toBeNull();
-  });
-
-  it("switches to filesystem using the common ancestor when the view does not contain the file", () => {
-    expect(
-      resolveFocusTarget({
-        file,
-        mode: "filesystem",
-        currentRoot: "/other/repo",
-        fsRoot: "/home/u/notes",
-        home: "/home/u",
-      }),
-    ).toEqual({ nextMode: "filesystem", nextFsRoot: "/home/u" });
-  });
-
-  it("keeps the fsRoot when it already contains the file", () => {
-    expect(
-      resolveFocusTarget({
-        file,
-        mode: "filesystem",
-        currentRoot: "/tmp",
-        fsRoot: "/home/u/proj",
-        home: "/home/u",
-      }),
-    ).toEqual({ nextMode: "filesystem", nextFsRoot: "/home/u/proj" });
-  });
-
-  it("uses home as the reference when fsRoot is null", () => {
-    expect(
-      resolveFocusTarget({
-        file,
-        mode: "pinned",
-        currentRoot: null,
-        fsRoot: null,
-        home: "/home/u",
-      }),
-    ).toEqual({ nextMode: "filesystem", nextFsRoot: "/home/u" });
-  });
-
-  it("falls back to the file's parent dir when there is no common ancestor", () => {
-    expect(
-      resolveFocusTarget({
-        file: "C:/work/a/file.ts",
-        mode: "filesystem",
-        currentRoot: "D:/x",
-        fsRoot: "D:/x",
-        home: "D:/x",
-      }),
-    ).toEqual({ nextMode: "filesystem", nextFsRoot: "C:/work/a" });
   });
 });
 

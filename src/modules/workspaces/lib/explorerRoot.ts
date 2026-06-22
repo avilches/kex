@@ -72,21 +72,6 @@ export function ancestorsToExpand(root: string, file: string): string[] {
   return out;
 }
 
-export function resolveFocusTarget(input: {
-  file: string;
-  mode: ExplorerRootMode;
-  currentRoot: string | null;
-  fsRoot: string | null;
-  home: string | null;
-}): { nextMode: ExplorerRootMode; nextFsRoot: string } | null {
-  const file = normalizeSep(input.file);
-  if (input.currentRoot && isUnder(file, input.currentRoot)) return null;
-  const fsRef = input.fsRoot ?? input.home;
-  const ca = fsRef ? commonAncestor(fsRef, file) : null;
-  const nextFsRoot = ca ?? pathDirname(file);
-  return { nextMode: "filesystem", nextFsRoot };
-}
-
 export function resolveSidebarTarget(input: {
   folder: string;
   workspaceRoot: string | null;

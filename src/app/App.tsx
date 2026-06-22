@@ -1098,7 +1098,11 @@ export default function App() {
             found.pane.activePanelId === panelId;
           if (isFocused) {
             setWorkspaceCwd(found.workspace.id, cwd);
-            if (found.panel.kind === "terminal" && found.panel.autofocus) {
+            if (
+              found.workspace.id === activeWorkspace?.id &&
+              found.panel.kind === "terminal" &&
+              found.panel.autofocus
+            ) {
               focusSidebar(cwd, { fromF4: false });
             }
           }

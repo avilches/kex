@@ -145,7 +145,7 @@ previous workspaces or pane layout.
 - **Per-terminal autofocus (sidebar-driving terminal)** -- replaces the removed "Follow Terminal" / "Follow Git Root"
   modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab hover card)
   drives both the Explorer root and the Source Control / Git History repo when it gains focus or its cwd changes while
-  focused. F4 (`sidebar.focusTerminal`) does the same anchoring unconditionally regardless of autofocus, and
+  focused. F4 (`tab.focusOnExplorer`) does the same anchoring unconditionally regardless of autofocus, and
   additionally opens the right panel if closed and switches away from Git History. Both F4 and autofocus use the same
   cascade: folder under workspace root -> Workspace Root mode; else under a git repo -> File System rooted at that git
   root; else File System at the common ancestor / dirname. The git repo for Source Control / Git History is resolved
