@@ -102,7 +102,7 @@ import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   resolveExplorerRoot,
-  resolveFocusTarget,
+  resolveSidebarTarget,
   isFilesystemRoot,
   parentRoot,
   type ExplorerRootMode,
@@ -438,63 +438,19 @@ export default function App() {
     }
   }, [rightPanelOpen, rightPanelActiveTab]);
 
-  // ── Last known terminal cwd for explorer root / new workspace inheritance ──
-
-  const lastTerminalCwdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (activeCwd) lastTerminalCwdRef.current = activeCwd;
-  }, [activeCwd]);
-
   const activeRootMode: ExplorerRootMode =
     activeWorkspace?.explorerRootMode ?? "filesystem";
 
-  const terminalRootCwd = useMemo<string | null>(() => {
-    if (activeCwd) return activeCwd;
-    if (lastTerminalCwdRef.current) return lastTerminalCwdRef.current;
-    for (const ws of workspaces) {
-      for (const pane of allPanes(ws.paneTree)) {
-        for (const panel of pane.panels) {
-          if (panel.kind === "terminal" && panel.cwd) return panel.cwd;
-        }
-      }
-    }
-    return null;
-  }, [activeCwd, workspaces]);
+  // Git root that drives Source Control / Git History. Per-workspace, runtime
+  // only. Set explicitly by focusSidebar (F4 / autofocus), never by a reactive
+  // effect on the active terminal. null means "no repo" (panel shows empty).
+  const [gitRootByWs, setGitRootByWs] = useState<Record<string, string | null>>(
+    {},
+  );
 
-  // Git root of the current cwd, plus a per-workspace last-known fallback that
-  // survives leaving a repo. Runtime only; re-derived from cwd on restart.
-  const [currentGitRoot, setCurrentGitRoot] = useState<string | null>(null);
-  const [gitRootByWs, setGitRootByWs] = useState<Record<string, string>>({});
-  useEffect(() => {
-    if (!terminalRootCwd) {
-      setCurrentGitRoot(null);
-      return;
-    }
-    const ws = activeWorkspace;
-    let cancelled = false;
-    void native
-      .gitResolveRepo(terminalRootCwd)
-      .then((info) => {
-        if (cancelled) return;
-        const root = info?.repoRoot ?? null;
-        setCurrentGitRoot(root);
-        if (root && ws) {
-          setGitRootByWs((prev) =>
-            prev[ws.id] === root ? prev : { ...prev, [ws.id]: root },
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setCurrentGitRoot(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [terminalRootCwd, activeWorkspace]);
-
-  const gitRoot =
-    currentGitRoot ??
-    (activeWorkspace ? (gitRootByWs[activeWorkspace.id] ?? null) : null);
+  const gitRoot = activeWorkspace
+    ? (gitRootByWs[activeWorkspace.id] ?? null)
+    : null;
 
   const workspaceRootPath = activeWorkspace?.pinnedRoot ?? null;
   const fsFolderRoot = activeWorkspace?.fsRoot ?? null;
@@ -509,6 +465,33 @@ export default function App() {
       }),
     [activeRootMode, workspaceRootPath, fsFolderRoot, home],
   );
+
+  // Resolve git root once per workspace from the persisted explorer root when it
+  // has never been set. Restores Source Control on startup without autofocus.
+  useEffect(() => {
+    const ws = activeWorkspace;
+    if (!ws || gitRootByWs[ws.id] !== undefined) return;
+    const base = explorerRoot;
+    if (!base) return;
+    let cancelled = false;
+    void native
+      .gitResolveRepo(base)
+      .then((info) => {
+        if (cancelled) return;
+        setGitRootByWs((prev) =>
+          prev[ws.id] !== undefined ? prev : { ...prev, [ws.id]: info?.repoRoot ?? null },
+        );
+      })
+      .catch(() => {
+        if (!cancelled)
+          setGitRootByWs((prev) =>
+            prev[ws.id] !== undefined ? prev : { ...prev, [ws.id]: null },
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorkspace, explorerRoot, gitRootByWs]);
 
   const canNavigateUp =
     activeRootMode === "filesystem" &&
@@ -566,29 +549,43 @@ export default function App() {
     [activeWorkspace, activeRootMode, setFsRoot],
   );
 
-  const handleFocusOnExplorer = useCallback(
-    (file: string) => {
-      void setRightPanelOpen(true);
-      void setRightPanelActiveTab("explorer");
-      if (activeWorkspace) {
-        const target = resolveFocusTarget({
-          file,
-          mode: activeRootMode,
-          currentRoot: explorerRoot,
-          fsRoot: fsFolderRoot,
-          home,
+  const focusSidebar = useCallback(
+    (folder: string, opts: { fromF4: boolean }) => {
+      const ws = activeWorkspace;
+      if (!ws) return;
+      void native
+        .gitResolveRepo(folder)
+        .then((info) => {
+          const resolvedGitRoot = info?.repoRoot ?? null;
+          setGitRootByWs((prev) => ({ ...prev, [ws.id]: resolvedGitRoot }));
+          const target = resolveSidebarTarget({
+            folder,
+            workspaceRoot: workspaceRootPath,
+            gitRoot: resolvedGitRoot,
+            currentFsRoot: fsFolderRoot,
+            home,
+          });
+          setExplorerRootMode(ws.id, target.mode);
+          if (target.mode === "filesystem" && target.fsRoot) {
+            setFsRoot(ws.id, target.fsRoot);
+          }
+          setRevealRequest((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
+        })
+        .catch(() => {
+          setGitRootByWs((prev) => ({ ...prev, [ws.id]: null }));
         });
-        if (target) {
-          setExplorerRootMode(activeWorkspace.id, target.nextMode);
-          setFsRoot(activeWorkspace.id, target.nextFsRoot);
+
+      if (opts.fromF4) {
+        const state = usePreferencesStore.getState();
+        if (!state.rightPanelOpen) void setRightPanelOpen(true);
+        if (state.rightPanelActiveTab === "history") {
+          void setRightPanelActiveTab("explorer");
         }
       }
-      setRevealRequest((r) => ({ path: file, nonce: (r?.nonce ?? 0) + 1 }));
     },
     [
       activeWorkspace,
-      activeRootMode,
-      explorerRoot,
+      workspaceRootPath,
       fsFolderRoot,
       home,
       setExplorerRootMode,
@@ -1167,7 +1164,7 @@ export default function App() {
       onRenameFile: (panelId, newName) => {
         void handleRenameFileFromTab(panelId, newName);
       },
-      onFocusOnExplorer: (filePath) => handleFocusOnExplorer(filePath),
+      onFocusOnExplorer: (filePath) => focusSidebar(filePath, { fromF4: false }),
     }),
     [
       activePanelId,
@@ -1181,7 +1178,7 @@ export default function App() {
       activeWorkspace,
       openPanel,
       handleRenameFileFromTab,
-      handleFocusOnExplorer,
+      focusSidebar,
     ],
   );
 
@@ -1748,7 +1745,7 @@ export default function App() {
         const target =
           panelFilePath(activePanel) ??
           (activePanel.kind === "terminal" ? (activePanel.cwd ?? null) : null);
-        if (target) handleFocusOnExplorer(target);
+        if (target) focusSidebar(target, { fromF4: true });
       },
       "path.copy": () => {
         if (!activePanel) return;
@@ -1780,7 +1777,7 @@ export default function App() {
       cycleWorkspace,
       activatePanel,
       handleCloseActivePanel,
-      handleFocusOnExplorer,
+      focusSidebar,
       openNewTerminal,
       openNewBlock,
       addWorkspace,
