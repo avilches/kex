@@ -212,15 +212,10 @@ html[data-chrome="borderless"] #settings-root {
  * children rather than relying on native overflow scrollbars. Both code paths exist
  * across versions, so we hide both.
  */
-.xterm .scrollbar,
-.xterm .scrollbar.vertical,
-.xterm .scrollbar.horizontal {
-  display: none !important;
-  visibility: hidden !important;
-  width: 0 !important;
-  height: 0 !important;
-  pointer-events: none !important;
-}
+/* Terminal reflows to the pane width (FitAddon), so it never scrolls sideways:
+ * keep the horizontal bar hidden and the legacy native viewport bar hidden. The
+ * vertical bar is xterm's own ScrollableElement slider (an absolutely-positioned
+ * overlay that does not steal columns); we keep it and recolor it below. */
 .xterm .xterm-viewport,
 .xterm-viewport {
   scrollbar-width: none !important;
@@ -232,6 +227,23 @@ html[data-chrome="borderless"] #settings-root {
   height: 0 !important;
   display: none !important;
 }
+/* xterm's own overlay scrollbar (VSCode ScrollableElement). Its slider class is
+ * just `slider` (no vertical/horizontal modifier) and xterm injects an inline
+ * <style> setting the slider background, so we override with !important. The
+ * terminal reflows to the pane width (FitAddon) so no horizontal bar is created. */
+.xterm .xterm-scrollable-element > .scrollbar {
+  width: 8px !important;
+}
+.xterm .xterm-scrollable-element > .scrollbar > .slider {
+  width: 8px !important;
+  left: 0 !important;
+  background: color-mix(in srgb, var(--foreground) 26%, transparent) !important;
+  border-radius: 9999px !important;
+}
+.xterm .xterm-scrollable-element > .scrollbar > .slider:hover,
+.xterm .xterm-scrollable-element > .scrollbar > .slider.active {
+  background: color-mix(in srgb, var(--foreground) 45%, transparent) !important;
+}
 .xterm,
 .xterm-screen,
 .xterm:focus,
@@ -239,16 +251,17 @@ html[data-chrome="borderless"] #settings-root {
   outline: none !important;
 }
 
-.cm-editor,
-.cm-scroller {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-}
-.cm-editor::-webkit-scrollbar,
-.cm-scroller::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-  display: none !important;
+/* Thin standard scrollbar (scrollbar-width / scrollbar-color, supported by every
+ * webview we target: WKWebView, WebKitGTK, WebView2). Used by the editor and git
+ * diff (.cm-scroller) and by any pane that opts in via the .thin-scrollbar class
+ * (e.g. the markdown preview). The global kill switch sets `scrollbar-width: none`
+ * on `html *`, which WKWebView honors and which overrides any `::-webkit-scrollbar`
+ * styling, so the bar can only come back by overriding that property here. The
+ * horizontal bar only shows on overflow, i.e. word wrap off in the editor. */
+.cm-scroller,
+.thin-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: color-mix(in srgb, var(--foreground) 38%, transparent) transparent !important;
 }
 
 body {
@@ -323,7 +336,7 @@ html *::after {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-html *::-webkit-scrollbar {
+html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
   width: 0;
   height: 0;
   display: none;

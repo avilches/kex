@@ -27,6 +27,7 @@ export function buildSharedExtensions(): Extension[] {
         color: "var(--foreground)",
         outline: "none",
         padding: "8px",
+        paddingRight: "0",
       },
       ".cm-scroller": {
         fontFamily: `var(--editor-font-family, ${defaultMonoFontFamily()})`,
@@ -38,6 +39,7 @@ export function buildSharedExtensions(): Extension[] {
       ".cm-content": {
         caretColor: "var(--foreground)",
         backgroundColor: "transparent !important",
+        paddingRight: "8px",
       },
       ".cm-gutters": {
         backgroundColor: "transparent !important",
