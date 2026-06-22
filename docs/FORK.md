@@ -284,7 +284,7 @@ The word wrap setting for editors was moved from the Settings window to a floati
 - `WrapToggleButton` toggles the global `editorWordWrap` preference. The preference is shared by code editors, markdown editors, and the git diff pane (`GitDiffPane`). The diff pane previously kept its own local wrap state; it now reads from the global preference.
 - The `Rendered | Edit` view toggle (markdown panels only, label changed from `Rendered | Raw`). The underlying value `"raw"` is unchanged; only the visible label differs.
 
-Plain code editor panels render `EditorOverlayBar` without the view toggle. The wrap button is always visible (including while in Rendered mode for markdown panels).
+Plain code editor panels render `EditorOverlayBar` without the view toggle. The wrap button shows in code and markdown edit (raw) panels, but is hidden in the markdown Rendered preview, where word wrap has nothing to act on.
 
 ### Thin scrollbars
 
