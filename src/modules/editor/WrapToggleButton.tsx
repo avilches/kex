@@ -4,7 +4,7 @@ import { setEditorWordWrap } from "@/modules/settings/store";
 import { TextWrapIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-export function WrapToggleButton({ className }: { className?: string }) {
+export function WrapToggleButton() {
   const wordWrap = usePreferencesStore((s) => s.editorWordWrap);
   return (
     <button
@@ -16,7 +16,6 @@ export function WrapToggleButton({ className }: { className?: string }) {
         wordWrap
           ? "text-foreground"
           : "text-muted-foreground hover:text-foreground",
-        className,
       )}
     >
       <HugeiconsIcon icon={TextWrapIcon} size={12} />
