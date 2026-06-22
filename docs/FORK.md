@@ -284,7 +284,11 @@ The word wrap setting for editors was moved from the Settings window to a floati
 - `WrapToggleButton` toggles the global `editorWordWrap` preference. The preference is shared by code editors, markdown editors, and the git diff pane (`GitDiffPane`). The diff pane previously kept its own local wrap state; it now reads from the global preference.
 - The `Rendered | Edit` view toggle (markdown panels only, label changed from `Rendered | Raw`). The underlying value `"raw"` is unchanged; only the visible label differs.
 
-Plain code editor panels render `EditorOverlayBar` without the view toggle. The wrap button is always visible (including while in Rendered mode for markdown panels).
+Plain code editor panels render `EditorOverlayBar` without the view toggle. The wrap button shows in code and markdown edit (raw) panels, but is hidden in the markdown Rendered preview, where word wrap has nothing to act on.
+
+### Thin scrollbars
+
+The global kill switch in `globals.css` hides every native scrollbar (chunky Chromium bars on Linux/Windows, a flashing WKWebView overlay on macOS). Thin, theme-colored scrollbars are now opted back in where they help: the editor and git diff (`.cm-scroller`), the markdown preview, the file explorer, the source control panel, and the git history (side panel and tab). They use the standard `scrollbar-width: thin` / `scrollbar-color` exposed as a reusable `.thin-scrollbar` utility; this matters because the kill switch's `scrollbar-width: none` overrides any `::-webkit-scrollbar` styling in WKWebView, so the standard property is the only reliable way to bring the bar back. The terminal recolors xterm's own overlay slider instead. Bars are thin and stay visible while content overflows (not auto-hide), colored from the theme `--foreground`. The editor's right padding was moved to `.cm-content` so the bar sits flush against the panel edge.
 
 ---
 

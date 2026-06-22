@@ -80,7 +80,7 @@ export function MarkdownPreviewPane({ path, visible, onSetView }: Props) {
       )}
     >
       <EditorOverlayBar view={{ mode: "rendered", onChange: onSetView }} />
-      <div className="flex-1 overflow-auto px-6 py-4">
+      <div className="thin-scrollbar min-h-0 flex-1 overflow-auto px-6 py-4">
         {status.kind === "loading" && (
           <p className="text-[12px] text-muted-foreground">Loading…</p>
         )}

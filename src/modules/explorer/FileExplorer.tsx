@@ -1162,7 +1162,7 @@ export const FileExplorer = memo(
                     }}
                     data-explorer-drop=""
                     className={cn(
-                      "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]",
+                      "thin-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]",
                       rootIsDropTarget &&
                         "rounded-sm ring-1 ring-inset ring-primary/50",
                     )}
