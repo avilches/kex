@@ -1199,7 +1199,7 @@ function TreeDirRow({
         {node.name}
       </span>
       <div
-        className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+        className="hidden shrink-0 items-center gap-0.5 group-hover:flex"
         onClick={(e) => e.stopPropagation()}
       >
         {row.section === "staged" ? (
@@ -1343,7 +1343,7 @@ const EntryRow = memo(function EntryRow({
               ) : null}
             </div>
           </button>
-          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-data-[focused=true]:opacity-100 group-data-[selected=true]:opacity-100">
+          <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex group-data-[focused=true]:flex group-data-[selected=true]:flex">
             {isStaged ? (
               <IconActionButton
                 label={`Unstage ${entry.path}`}
