@@ -9,7 +9,7 @@ type WindowEntry = { workspaces: Workspace[]; activeIndex: number };
 
 let cached: SavedState | null = null;
 
-function sanitizePanel(p: Panel): Panel {
+export function sanitizePanel(p: Panel): Panel {
   // Migrate the legacy "preview" panel kind (renamed to "browser") so sessions
   // saved before the rename still restore.
   if ((p as { kind: string }).kind === "preview") {
