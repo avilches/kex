@@ -73,7 +73,6 @@ import {
   findPane,
   findPaneInDirection,
   panelTitle,
-  type Panel,
   type PanelCallbacks,
   type Rect,
   useWorkspaces,
@@ -441,17 +440,6 @@ export default function App() {
   const activeRootMode: ExplorerRootMode =
     activeWorkspace?.explorerRootMode ?? "filesystem";
 
-  // Git root that drives Source Control / Git History. Per-workspace, runtime
-  // only. Set explicitly by focusSidebar (F4 / autofocus), never by a reactive
-  // effect on the active terminal. null means "no repo" (panel shows empty).
-  const [gitRootByWs, setGitRootByWs] = useState<Record<string, string | null>>(
-    {},
-  );
-
-  const gitRoot = activeWorkspace
-    ? (gitRootByWs[activeWorkspace.id] ?? null)
-    : null;
-
   const workspaceRootPath = activeWorkspace?.pinnedRoot ?? null;
   const fsFolderRoot = activeWorkspace?.fsRoot ?? null;
 
@@ -465,33 +453,6 @@ export default function App() {
       }),
     [activeRootMode, workspaceRootPath, fsFolderRoot, home],
   );
-
-  // Resolve git root once per workspace from the persisted explorer root when it
-  // has never been set. Restores Source Control on startup without autofocus.
-  useEffect(() => {
-    const ws = activeWorkspace;
-    if (!ws || gitRootByWs[ws.id] !== undefined) return;
-    const base = explorerRoot;
-    if (!base) return;
-    let cancelled = false;
-    void native
-      .gitResolveRepo(base)
-      .then((info) => {
-        if (cancelled) return;
-        setGitRootByWs((prev) =>
-          prev[ws.id] !== undefined ? prev : { ...prev, [ws.id]: info?.repoRoot ?? null },
-        );
-      })
-      .catch(() => {
-        if (!cancelled)
-          setGitRootByWs((prev) =>
-            prev[ws.id] !== undefined ? prev : { ...prev, [ws.id]: null },
-          );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeWorkspace, explorerRoot, gitRootByWs]);
 
   const canNavigateUp =
     activeRootMode === "filesystem" &&
@@ -555,9 +516,9 @@ export default function App() {
       if (!ws) return;
       void native
         .gitResolveRepo(folder)
+        .catch(() => null)
         .then((info) => {
           const resolvedGitRoot = info?.repoRoot ?? null;
-          setGitRootByWs((prev) => ({ ...prev, [ws.id]: resolvedGitRoot }));
           const target = resolveSidebarTarget({
             folder,
             workspaceRoot: workspaceRootPath,
@@ -570,9 +531,6 @@ export default function App() {
             setFsRoot(ws.id, target.fsRoot);
           }
           setRevealRequest((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
-        })
-        .catch(() => {
-          setGitRootByWs((prev) => ({ ...prev, [ws.id]: null }));
         });
 
       if (opts.fromF4) {
@@ -1312,51 +1270,6 @@ export default function App() {
     editorRefs: editorHandles,
   });
 
-  const handleAddToGitignore = useCallback(
-    async (path: string, isDir: boolean) => {
-      if (!gitRoot) return;
-      const entry = gitignoreEntryFor(gitRoot, path, isDir);
-      if (!entry) return;
-      const gitignorePath = `${gitRoot}/.gitignore`;
-
-      // When .gitignore is open in an editor the buffer is the source of truth:
-      // edit it there so unsaved changes are never clobbered, regardless of
-      // autosave. The user saves it like any other edit.
-      const open = editorPanelsRef.current.find((p) => p.path === gitignorePath);
-      const handle = open ? editorHandles.current.get(open.id) : undefined;
-      if (handle) {
-        const buffer = handle.getContent();
-        if (buffer != null) {
-          if (hasGitignoreEntry(buffer, entry)) {
-            toast.info(`${entry} is already in .gitignore`);
-          } else {
-            handle.insertAtEnd(
-              appendGitignoreEntry(buffer, entry).slice(buffer.length),
-            );
-          }
-          openFileInPanel(gitignorePath, true);
-          return;
-        }
-      }
-
-      // Not open (or not mounted yet): append on disk idempotently, then reveal.
-      let content = "";
-      try {
-        const res = await native.readFile(gitignorePath);
-        if (res.kind === "text") content = res.content;
-      } catch {
-        // No .gitignore yet: start from an empty file.
-      }
-      if (hasGitignoreEntry(content, entry)) {
-        toast.info(`${entry} is already in .gitignore`);
-      } else {
-        await native.writeFile(gitignorePath, appendGitignoreEntry(content, entry));
-      }
-      openFileInPanel(gitignorePath, true);
-    },
-    [gitRoot, openFileInPanel],
-  );
-
   // ── useThemeFileEditing ───────────────────────────────────────────────────
 
   useThemeFileEditing({
@@ -1428,30 +1341,64 @@ export default function App() {
     [handleChangeRootMode],
   );
 
-  const allPanelsFlat = useMemo(() => {
-    const panels: Panel[] = [];
-    for (const ws of workspaces) {
-      for (const pane of allPanes(ws.paneTree)) {
-        for (const p of pane.panels) panels.push(p);
-      }
-    }
-    return panels;
-  }, [workspaces]);
-
   const { sourceControl, toggleSourceControl, openGitGraphFromContext } =
     useSourceControlContext({
-      activeTab: activePanel ?? undefined,
-      tabs: allPanelsFlat,
-      activeTerminalLeafCwd: activeCwd,
       explorerRoot,
-      explorerRootMode: activeRootMode,
       launchCwd,
       launchCwdResolved,
       home,
-      sidebarView: "source-control",
       cycleSidebarView: () => navigateRightPanelTo("git"),
       openCommitHistoryTab: openGitHistoryInPanel,
     });
+
+  // Git root for explorer tree decorations and the gitignore action follows the
+  // same repo Source Control resolves from explorerRoot (single source of truth).
+  const gitRoot = sourceControl.repo?.repoRoot ?? null;
+
+  const handleAddToGitignore = useCallback(
+    async (path: string, isDir: boolean) => {
+      if (!gitRoot) return;
+      const entry = gitignoreEntryFor(gitRoot, path, isDir);
+      if (!entry) return;
+      const gitignorePath = `${gitRoot}/.gitignore`;
+
+      // When .gitignore is open in an editor the buffer is the source of truth:
+      // edit it there so unsaved changes are never clobbered, regardless of
+      // autosave. The user saves it like any other edit.
+      const open = editorPanelsRef.current.find((p) => p.path === gitignorePath);
+      const handle = open ? editorHandles.current.get(open.id) : undefined;
+      if (handle) {
+        const buffer = handle.getContent();
+        if (buffer != null) {
+          if (hasGitignoreEntry(buffer, entry)) {
+            toast.info(`${entry} is already in .gitignore`);
+          } else {
+            handle.insertAtEnd(
+              appendGitignoreEntry(buffer, entry).slice(buffer.length),
+            );
+          }
+          openFileInPanel(gitignorePath, true);
+          return;
+        }
+      }
+
+      // Not open (or not mounted yet): append on disk idempotently, then reveal.
+      let content = "";
+      try {
+        const res = await native.readFile(gitignorePath);
+        if (res.kind === "text") content = res.content;
+      } catch {
+        // No .gitignore yet: start from an empty file.
+      }
+      if (hasGitignoreEntry(content, entry)) {
+        toast.info(`${entry} is already in .gitignore`);
+      } else {
+        await native.writeFile(gitignorePath, appendGitignoreEntry(content, entry));
+      }
+      openFileInPanel(gitignorePath, true);
+    },
+    [gitRoot, openFileInPanel],
+  );
 
   // ── Terminal helpers ──────────────────────────────────────────────────────
 
