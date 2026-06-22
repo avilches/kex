@@ -1,8 +1,14 @@
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import fs from "node:fs";
 import path from "path";
-import { defineConfig, type PluginOption, type UserConfig } from "vite";
+import {
+  defineConfig,
+  searchForWorkspaceRoot,
+  type PluginOption,
+  type UserConfig,
+} from "vite";
 import Inspect from "vite-plugin-inspect";
 
 const host = process.env.TAURI_DEV_HOST;
@@ -140,6 +146,16 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
     port: 1420,
     strictPort: true,
     host: host || false,
+    // Worktrees symlink node_modules back to the main repo, so font/asset
+    // realpaths land outside the worktree root and Vite serves a 403. Allow
+    // the resolved node_modules path explicitly (a no-op for the main repo,
+    // where realpathSync returns a path already inside the workspace root).
+    fs: {
+      allow: [
+        searchForWorkspaceRoot(process.cwd()),
+        fs.realpathSync(path.resolve(__dirname, "node_modules")),
+      ],
+    },
     hmr: host
       ? {
           protocol: "ws",
