@@ -593,6 +593,21 @@ export default function App() {
     ],
   );
 
+  const prevActivePanelIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevActivePanelIdRef.current;
+    prevActivePanelIdRef.current = activePanelId;
+    if (prev === null) return; // skip initial mount
+    if (prev === activePanelId) return;
+    if (
+      activePanel?.kind === "terminal" &&
+      activePanel.autofocus &&
+      activePanel.cwd
+    ) {
+      focusSidebar(activePanel.cwd, { fromF4: false });
+    }
+  }, [activePanelId, activePanel, focusSidebar]);
+
   // Whether the saved workspace root still exists on disk, so the selector can
   // disable the option when it is unset or missing.
   const [workspaceRootExists, setWorkspaceRootExists] = useState(false);
@@ -1078,11 +1093,14 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) {
           setTerminalPanelCwd(found.workspace.id, panelId, cwd);
-          if (
+          const isFocused =
             found.workspace.activePaneId === found.pane.id &&
-            found.pane.activePanelId === panelId
-          ) {
+            found.pane.activePanelId === panelId;
+          if (isFocused) {
             setWorkspaceCwd(found.workspace.id, cwd);
+            if (found.panel.kind === "terminal" && found.panel.autofocus) {
+              focusSidebar(cwd, { fromF4: false });
+            }
           }
         }
       },
