@@ -197,9 +197,6 @@ function useGitRepoRoot(dir: string | undefined): string | null {
 
 function EditorHoverContent({
   absPath,
-  panelLocked,
-  lockShortcut,
-  onLockToggle,
   onRename,
   isRenaming,
   fileRenameRef,
@@ -207,9 +204,6 @@ function EditorHoverContent({
   onRenameCancel,
 }: {
   absPath: string;
-  panelLocked?: boolean;
-  lockShortcut?: string | null;
-  onLockToggle?: () => void;
   onRename?: () => void;
   isRenaming?: boolean;
   fileRenameRef?: React.Ref<HTMLInputElement>;
@@ -235,24 +229,6 @@ function EditorHoverContent({
         onRenameCommit={onRenameCommit}
         onRenameCancel={onRenameCancel}
       />
-      {onLockToggle !== undefined && (
-        <div className="mt-1.5 border-t border-border/40 pt-1.5">
-          <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
-            <input
-              type="checkbox"
-              className="size-3 accent-primary"
-              checked={panelLocked ?? false}
-              onChange={onLockToggle}
-            />
-            <span className="text-muted-foreground">Lock tab (prevent close)</span>
-            {lockShortcut && (
-              <span className="ml-auto shrink-0 text-[12px] text-muted-foreground/60">
-                {lockShortcut}
-              </span>
-            )}
-          </label>
-        </div>
-      )}
     </div>
   );
 }
@@ -388,22 +364,16 @@ function TerminalHoverCardContent({
   customTitle,
   cwd,
   runningCommand,
-  panelLocked,
-  panelAutofocus,
   panelRestoreOnRestart,
   panelPersistentCommand,
-  lockShortcut,
   onUpdatePanel,
   onInputFocusChange,
 }: {
   customTitle: string | undefined;
   cwd: string | undefined;
   runningCommand: string | null;
-  panelLocked: boolean;
-  panelAutofocus: boolean;
   panelRestoreOnRestart: boolean;
   panelPersistentCommand: string | undefined;
-  lockShortcut: string | null;
   onUpdatePanel: (updater: (p: Panel) => Panel) => void;
   onInputFocusChange?: (focused: boolean) => void;
 }) {
@@ -421,21 +391,6 @@ function TerminalHoverCardContent({
         )}
       </HoverTable>
       <div className="mt-1.5 space-y-1 border-t border-border/40 pt-1.5">
-        <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
-          <input
-            type="checkbox"
-            className="size-3 accent-primary"
-            checked={panelAutofocus}
-            onChange={(e) => {
-              onUpdatePanel((p) =>
-                p.kind === "terminal"
-                  ? { ...p, autofocus: e.target.checked }
-                  : p,
-              );
-            }}
-          />
-          <span className="text-muted-foreground">Autofocus folder in sidebar</span>
-        </label>
         <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
           <input
             type="checkbox"
@@ -475,22 +430,6 @@ function TerminalHoverCardContent({
             className="h-6 w-full rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-primary"
           />
         )}
-        <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
-          <input
-            type="checkbox"
-            className="size-3 accent-primary"
-            checked={panelLocked}
-            onChange={(e) => {
-              onUpdatePanel((p) => ({ ...p, locked: e.target.checked }));
-            }}
-          />
-          <span className="text-muted-foreground">Lock tab (prevent close)</span>
-          {lockShortcut && (
-            <span className="ml-auto shrink-0 text-[12px] text-muted-foreground/60">
-              {lockShortcut}
-            </span>
-          )}
-        </label>
       </div>
     </div>
   );
@@ -778,11 +717,8 @@ function DraggableTab({
               customTitle={panel.title}
               cwd={panel.cwd}
               runningCommand={runningCommand}
-              panelLocked={panel.locked ?? false}
-              panelAutofocus={panel.autofocus ?? false}
               panelRestoreOnRestart={panel.restoreOnRestart ?? false}
               panelPersistentCommand={panel.persistentCommand}
-              lockShortcut={shortcutLabels["tab.lock"]}
               onUpdatePanel={(updater) => onUpdatePanel?.(panel.id, updater)}
               onInputFocusChange={(focused) => {
                 hoverInputFocusedRef.current = focused;
@@ -796,12 +732,6 @@ function DraggableTab({
         return (
           <EditorHoverContent
             absPath={panel.path}
-            panelLocked={panel.locked ?? false}
-            lockShortcut={shortcutLabels["tab.lock"]}
-            onLockToggle={() => onUpdatePanel?.(panel.id, (p) => {
-              const newLocked = !(panel.locked ?? false);
-              return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
-            })}
             onRename={isFileRenaming ? undefined : handleRenameFromHover}
             isRenaming={isFileRenaming}
             fileRenameRef={fileRenameInputRef}
