@@ -442,6 +442,14 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, [updatePanelData]);
 
+  // Per-panel override of the type-based word wrap default. Persists with the
+  // panel; absence means "use the default for this file type".
+  const setPanelWordWrapOverride = useCallback((workspaceId: string, panelId: string, value: boolean) => {
+    updatePanelData(workspaceId, panelId, (p) =>
+      p.kind === "editor" ? { ...p, wordWrapOverride: value } : p,
+    );
+  }, [updatePanelData]);
+
   const setWorkspaceCwd = useCallback((workspaceId: string, cwd: string) => {
     const normalized = cwd.length > 1 ? cwd.replace(/\/$/, "") : cwd;
     setWorkspaces((prev) =>
@@ -518,6 +526,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setFsRoot,
     setTerminalRunningCommand,
     setPanelView,
+    setPanelWordWrapOverride,
     findPanelGlobal,
     findPaneGlobal,
     resetWorkspaces,
