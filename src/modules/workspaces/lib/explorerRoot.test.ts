@@ -7,6 +7,8 @@ import {
   parentRoot,
   resolveExplorerRoot,
   resolveFocusTarget,
+  resolveSidebarTarget,
+  migrateExplorerRootMode,
 } from "./explorerRoot";
 
 describe("resolveExplorerRoot", () => {
@@ -208,5 +210,79 @@ describe("resolveFocusTarget", () => {
         home: "D:/x",
       }),
     ).toEqual({ nextMode: "filesystem", nextFsRoot: "C:/work/a" });
+  });
+});
+
+describe("resolveSidebarTarget", () => {
+  const home = "/Users/me";
+
+  it("uses pinned mode when the folder is under the workspace root", () => {
+    const t = resolveSidebarTarget({
+      folder: "/a/b/c/d",
+      workspaceRoot: "/a/b",
+      gitRoot: "/a/b",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "pinned", fsRoot: null });
+  });
+
+  it("treats the workspace root folder itself as under it", () => {
+    const t = resolveSidebarTarget({
+      folder: "/a/b",
+      workspaceRoot: "/a/b",
+      gitRoot: null,
+      currentFsRoot: null,
+      home,
+    });
+    expect(t.mode).toBe("pinned");
+  });
+
+  it("uses the git root as filesystem root when outside the workspace root", () => {
+    const t = resolveSidebarTarget({
+      folder: "/x/repo/src/inner",
+      workspaceRoot: "/a/b",
+      gitRoot: "/x/repo",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "filesystem", fsRoot: "/x/repo" });
+  });
+
+  it("falls back to the common ancestor with the current fs root", () => {
+    const t = resolveSidebarTarget({
+      folder: "/x/y/z",
+      workspaceRoot: null,
+      gitRoot: null,
+      currentFsRoot: "/x/other",
+      home,
+    });
+    expect(t).toEqual({ mode: "filesystem", fsRoot: "/x" });
+  });
+
+  it("falls back to the folder dirname when there is no common ancestor", () => {
+    const t = resolveSidebarTarget({
+      folder: "/x/y/z",
+      workspaceRoot: null,
+      gitRoot: null,
+      currentFsRoot: null,
+      home: null,
+    });
+    expect(t).toEqual({ mode: "filesystem", fsRoot: "/x/y" });
+  });
+});
+
+describe("migrateExplorerRootMode", () => {
+  it("maps removed modes to filesystem", () => {
+    expect(migrateExplorerRootMode("terminal")).toBe("filesystem");
+    expect(migrateExplorerRootMode("git")).toBe("filesystem");
+  });
+  it("keeps valid modes", () => {
+    expect(migrateExplorerRootMode("filesystem")).toBe("filesystem");
+    expect(migrateExplorerRootMode("pinned")).toBe("pinned");
+  });
+  it("returns undefined for missing/unknown", () => {
+    expect(migrateExplorerRootMode(undefined)).toBeUndefined();
+    expect(migrateExplorerRootMode("bogus")).toBeUndefined();
   });
 });

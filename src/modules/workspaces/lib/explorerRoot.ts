@@ -92,3 +92,30 @@ export function resolveFocusTarget(input: {
   const nextFsRoot = ca ?? pathDirname(file);
   return { nextMode: "filesystem", nextFsRoot };
 }
+
+export function resolveSidebarTarget(input: {
+  folder: string;
+  workspaceRoot: string | null;
+  gitRoot: string | null;
+  currentFsRoot: string | null;
+  home: string | null;
+}): { mode: ExplorerRootMode; fsRoot: string | null } {
+  const folder = normalizeSep(input.folder);
+  if (input.workspaceRoot && isUnder(folder, normalizeSep(input.workspaceRoot))) {
+    return { mode: "pinned", fsRoot: null };
+  }
+  if (input.gitRoot && isUnder(folder, normalizeSep(input.gitRoot))) {
+    return { mode: "filesystem", fsRoot: normalizeSep(input.gitRoot) };
+  }
+  const fsRef = input.currentFsRoot ?? input.home;
+  const ca = fsRef ? commonAncestor(fsRef, folder) : null;
+  return { mode: "filesystem", fsRoot: ca ?? pathDirname(folder) };
+}
+
+export function migrateExplorerRootMode(
+  mode: string | undefined,
+): ExplorerRootMode | undefined {
+  if (mode === "terminal" || mode === "git") return "filesystem";
+  if (mode === "filesystem" || mode === "pinned") return mode;
+  return undefined;
+}
