@@ -514,9 +514,23 @@ export const FileExplorer = memo(
     });
 
     const scrollEntryIntoView = useCallback(
-      (path: string) => {
+      (path: string, opts?: { topRatio?: number }) => {
         const index = entryIndexByPath.get(path);
         if (index === undefined) return;
+        // topRatio anchors the row at a fixed fraction down the viewport instead
+        // of just nudging it into view, so a deep target is not left at the very
+        // bottom. Falls back to "auto" if the row has not been measured yet.
+        if (opts?.topRatio !== undefined) {
+          const measured = virtualizer.getOffsetForIndex(index, "start");
+          if (measured) {
+            const viewport = scrollRef.current?.clientHeight ?? 0;
+            virtualizer.scrollToOffset(
+              Math.max(0, measured[0] - viewport * opts.topRatio),
+              { align: "start" },
+            );
+            return;
+          }
+        }
         virtualizer.scrollToIndex(index, { align: "auto" });
       },
       [entryIndexByPath, virtualizer],
@@ -604,9 +618,10 @@ export const FileExplorer = memo(
       tree.cancelDuplicate,
     ]);
 
-    // Focus on Explorer: reveal a file on demand. Root/mode changes reload the
-    // tree asynchronously, so this re-runs as nodes/expanded settle until every
-    // ancestor is loaded, then selects and scrolls (without stealing focus).
+    // Focus on Explorer: reveal a file or folder on demand. Root/mode changes
+    // reload the tree asynchronously, so this re-runs as nodes/expanded settle
+    // until every ancestor is loaded, then selects and scrolls (without stealing
+    // focus).
     const revealConsumedRef = useRef<number | null>(null);
     useEffect(() => {
       if (!revealRequest) return;
@@ -624,6 +639,12 @@ export const FileExplorer = memo(
         }
       }
       if (pending) return;
+      // When the reveal target is itself a folder, expand it so its contents are
+      // visible, not just its row. The parent ancestor is now loaded, so isDirAt
+      // is reliable here; files report false and are left untouched.
+      if (isDirAt(file) === true && !tree.expanded.has(file)) {
+        tree.expand(file);
+      }
       // Ancestors are expanded and settled: the request is handled regardless of
       // whether the target is representable. A hidden file (showHidden off) or a
       // file under a hidden folder never enters entryIndexByPath; consuming here
@@ -631,7 +652,7 @@ export const FileExplorer = memo(
       revealConsumedRef.current = revealRequest.nonce;
       if (!entryIndexByPath.has(file)) return;
       setSelectedPath(file);
-      requestAnimationFrame(() => scrollEntryIntoView(file));
+      requestAnimationFrame(() => scrollEntryIntoView(file, { topRatio: 0.2 }));
     }, [
       revealRequest,
       rootPath,
@@ -639,6 +660,7 @@ export const FileExplorer = memo(
       tree.expanded,
       tree.expand,
       entryIndexByPath,
+      isDirAt,
       scrollEntryIntoView,
     ]);
 
