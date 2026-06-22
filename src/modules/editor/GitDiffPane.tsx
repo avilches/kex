@@ -1,13 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { TextWrapIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { unifiedMergeView } from "@codemirror/merge";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { WrapToggleButton } from "./WrapToggleButton";
 import { buildSharedExtensions, languageCompartment, wrapCompartment } from "./lib/extensions";
 import {
   fetchCommitDiff,
@@ -132,7 +132,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
   const [state, setState] = useState<LoadState>(() =>
     active ? loadStateFromCache(source) : { kind: "idle" },
   );
-  const [wordWrap, setWordWrap] = useState(false);
+  const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
 
   const key = cacheKey(source);
   const originalPath = source.originalPath;
@@ -208,7 +208,11 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     () => [
       ...SHARED_EXT,
       languageCompartment.of(initialLang ?? []),
-      wrapCompartment.of([]),
+      wrapCompartment.of(
+        usePreferencesStore.getState().editorWordWrap
+          ? EditorView.lineWrapping
+          : [],
+      ),
       ...READONLY_EXT,
       unifiedMergeView({
         original: originalContent,
@@ -228,10 +232,10 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     if (!view) return;
     view.dispatch({
       effects: wrapCompartment.reconfigure(
-        wordWrap ? EditorView.lineWrapping : [],
+        editorWordWrap ? EditorView.lineWrapping : [],
       ),
     });
-  }, [wordWrap]);
+  }, [editorWordWrap]);
 
   // Resolve and apply syntax highlighting asynchronously when the language pack
   // isn't cached yet. This must wait until the editor is actually mounted
@@ -299,14 +303,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
               </span>
             </>
           ) : null}
-          <button
-            type="button"
-            title={wordWrap ? "Disable word wrap" : "Enable word wrap"}
-            onClick={() => setWordWrap((v) => !v)}
-            className={`flex size-[22px] items-center justify-center rounded transition-colors ${wordWrap ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <HugeiconsIcon icon={TextWrapIcon} size={12} />
-          </button>
+          <WrapToggleButton />
         </div>
       </div>
 

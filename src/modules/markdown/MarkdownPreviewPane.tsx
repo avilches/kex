@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
-import { MarkdownViewToggle } from "./MarkdownViewToggle";
+import { EditorOverlayBar } from "@/modules/editor";
 
 type ReadResult =
   | { kind: "text"; content: string; size: number }
@@ -79,7 +79,7 @@ export function MarkdownPreviewPane({ path, visible, onSetView }: Props) {
         !visible && "pointer-events-none",
       )}
     >
-      <MarkdownViewToggle mode="rendered" onChange={onSetView} />
+      <EditorOverlayBar view={{ mode: "rendered", onChange: onSetView }} />
       <div className="flex-1 overflow-auto px-6 py-4">
         {status.kind === "loading" && (
           <p className="text-[12px] text-muted-foreground">Loading…</p>

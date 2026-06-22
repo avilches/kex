@@ -404,7 +404,7 @@ src/
 
 All panel kinds follow the same never-unmount rule. Panels live inside panes; panes are nodes of a binary split tree inside a workspace. The workspace sidebar (left, 52px) lists workspaces; the right panel holds Explorer, Source Control, and Git History.
 
-Markdown files open in their rendered view (`kind: "markdown"`) by default; a floating Rendered/Raw toggle (`MarkdownViewToggle`) flips a single panel in place between `markdown` and `editor` via `setPanelView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty).
+Markdown files open in their rendered view (`kind: "markdown"`) by default; a floating `Rendered | Edit` toggle (`EditorOverlayBar`) flips a single panel in place between `markdown` and `editor` via `setPanelView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty). `EditorOverlayBar` also hosts `WrapToggleButton`, which controls the global `editorWordWrap` preference shared by code editors, markdown editors, and the git diff pane.
 
 A `browser` panel carries an optional `floating` flag. When set, the panel is shown in a native `WebviewUrl::External` window (managed Rust-side by `FloatBrowserState`) and its in-pane slot renders a placeholder with an editable address bar instead of the iframe. See `docs/FORK.md` (Floating browser windows) for the full lifecycle.
 
