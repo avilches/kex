@@ -13,43 +13,10 @@ import {
 
 describe("resolveExplorerRoot", () => {
   const base = {
-    terminalCwd: "/proj/sub",
-    gitRoot: "/proj",
     pinnedRoot: "/pinned",
     fsRoot: null as string | null,
     home: "/home/u",
   };
-
-  it("terminal mode follows the terminal cwd", () => {
-    expect(resolveExplorerRoot({ ...base, mode: "terminal" })).toBe("/proj/sub");
-  });
-
-  it("terminal mode falls back to home when no cwd", () => {
-    expect(
-      resolveExplorerRoot({ ...base, mode: "terminal", terminalCwd: null }),
-    ).toBe("/home/u");
-  });
-
-  it("git mode uses the known git root", () => {
-    expect(resolveExplorerRoot({ ...base, mode: "git" })).toBe("/proj");
-  });
-
-  it("git mode falls back to terminal cwd when no git root", () => {
-    expect(resolveExplorerRoot({ ...base, mode: "git", gitRoot: null })).toBe(
-      "/proj/sub",
-    );
-  });
-
-  it("git mode falls back to home when no git root and no cwd", () => {
-    expect(
-      resolveExplorerRoot({
-        ...base,
-        mode: "git",
-        gitRoot: null,
-        terminalCwd: null,
-      }),
-    ).toBe("/home/u");
-  });
 
   it("filesystem mode returns fsRoot when set", () => {
     expect(
@@ -156,7 +123,7 @@ describe("resolveFocusTarget", () => {
     expect(
       resolveFocusTarget({
         file,
-        mode: "git",
+        mode: "filesystem",
         currentRoot: "/home/u/proj",
         fsRoot: null,
         home: "/home/u",
@@ -168,7 +135,7 @@ describe("resolveFocusTarget", () => {
     expect(
       resolveFocusTarget({
         file,
-        mode: "git",
+        mode: "filesystem",
         currentRoot: "/other/repo",
         fsRoot: "/home/u/notes",
         home: "/home/u",
@@ -180,7 +147,7 @@ describe("resolveFocusTarget", () => {
     expect(
       resolveFocusTarget({
         file,
-        mode: "terminal",
+        mode: "filesystem",
         currentRoot: "/tmp",
         fsRoot: "/home/u/proj",
         home: "/home/u",
@@ -204,7 +171,7 @@ describe("resolveFocusTarget", () => {
     expect(
       resolveFocusTarget({
         file: "C:/work/a/file.ts",
-        mode: "terminal",
+        mode: "filesystem",
         currentRoot: "D:/x",
         fsRoot: "D:/x",
         home: "D:/x",

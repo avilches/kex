@@ -45,7 +45,6 @@ export type RightPanelProps = {
   canNavigateUp: boolean;
   homePath: string | null;
   fsRootPath: string | null;
-  terminalCwdPath: string | null;
   gitRootPath: string | null;
   workspaceRootPath: string | null;
   workspaceRootExists: boolean;
@@ -134,7 +133,6 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               canNavigateUp={props.canNavigateUp}
               homePath={props.homePath}
               fsRootPath={props.fsRootPath}
-              terminalCwdPath={props.terminalCwdPath}
               gitRootPath={props.gitRootPath}
               workspaceRootPath={props.workspaceRootPath}
               workspaceRootExists={props.workspaceRootExists}

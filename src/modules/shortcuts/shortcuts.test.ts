@@ -223,15 +223,13 @@ test("bare Delete keydown matches file.delete", () => {
 });
 
 describe("tab.selectByIndex binding uniqueness", () => {
-  // explorer.viewFilesystem/Pinned/Terminal/Git intentionally use Ctrl+1-4 on
-  // all platforms. On macOS, tab.selectByIndex uses Cmd (meta) so there is no
-  // conflict. On Linux/Windows both use Ctrl -- the user can reassign via
-  // Settings. These are the only known exceptions.
+  // explorer.viewFilesystem/Pinned intentionally use Ctrl+1-2 on all platforms.
+  // On macOS, tab.selectByIndex uses Cmd (meta) so there is no conflict.
+  // On Linux/Windows both use Ctrl -- the user can reassign via Settings.
+  // These are the only known exceptions.
   const DIGIT_EXCEPTIONS = new Set<ShortcutId>([
     "explorer.viewFilesystem",
     "explorer.viewPinned",
-    "explorer.viewTerminal",
-    "explorer.viewGit",
   ]);
 
   test("only tab.selectByIndex and known explorer.view* bind to Cmd/Ctrl+1-9", () => {

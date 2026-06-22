@@ -446,7 +446,7 @@ export default function App() {
   }, [activeCwd]);
 
   const activeRootMode: ExplorerRootMode =
-    activeWorkspace?.explorerRootMode ?? "terminal";
+    activeWorkspace?.explorerRootMode ?? "filesystem";
 
   const terminalRootCwd = useMemo<string | null>(() => {
     if (activeCwd) return activeCwd;
@@ -503,13 +503,11 @@ export default function App() {
     () =>
       resolveExplorerRoot({
         mode: activeRootMode,
-        terminalCwd: terminalRootCwd,
-        gitRoot,
         pinnedRoot: workspaceRootPath,
         fsRoot: fsFolderRoot,
         home,
       }),
-    [activeRootMode, terminalRootCwd, gitRoot, workspaceRootPath, fsFolderRoot, home],
+    [activeRootMode, workspaceRootPath, fsFolderRoot, home],
   );
 
   const canNavigateUp =
@@ -1680,8 +1678,6 @@ export default function App() {
       "sidebar.showHistory": () => showRightPanelTab("history"),
       "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
       "explorer.viewPinned": () => showExplorerWithMode("pinned"),
-      "explorer.viewTerminal": () => showExplorerWithMode("terminal"),
-      "explorer.viewGit": () => showExplorerWithMode("git"),
       "explorer.toggleHidden": () =>
         void setShowHidden(!usePreferencesStore.getState().showHidden),
       "explorer.search": () => {
@@ -2076,7 +2072,6 @@ export default function App() {
                         canNavigateUp={canNavigateUp}
                         homePath={home}
                         fsRootPath={fsRootPath}
-                        terminalCwdPath={terminalRootCwd}
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
@@ -2157,7 +2152,6 @@ export default function App() {
                         canNavigateUp={canNavigateUp}
                         homePath={home}
                         fsRootPath={fsRootPath}
-                        terminalCwdPath={terminalRootCwd}
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}

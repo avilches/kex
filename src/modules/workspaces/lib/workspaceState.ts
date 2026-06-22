@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { migrateExplorerRootMode } from "./explorerRoot";
 import type { Panel, SplitNode, Workspace } from "./types";
 
 type SavedState = { workspaces: Workspace[]; activeIndex: number };
@@ -27,7 +28,11 @@ function sanitizeTree(node: SplitNode): SplitNode {
 }
 
 function sanitizeWorkspace(w: Workspace): Workspace {
-  return { ...w, paneTree: sanitizeTree(w.paneTree) };
+  return {
+    ...w,
+    explorerRootMode: migrateExplorerRootMode(w.explorerRootMode),
+    paneTree: sanitizeTree(w.paneTree),
+  };
 }
 
 export async function initWorkspaceState(): Promise<void> {
