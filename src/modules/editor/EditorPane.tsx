@@ -58,6 +58,7 @@ export type EditorPaneHandle = {
 
 type Props = {
   path: string;
+  wordWrap: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onClose?: () => void;
@@ -70,7 +71,7 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onClose }, ref) {
+  function EditorPane({ path, wordWrap, onDirtyChange, onSaved, onClose }, ref) {
     const { doc, onChange, save, reload } = useDocument({
       path,
       onDirtyChange,
@@ -78,8 +79,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const cmRef = useRef<ReactCodeMirrorRef>(null);
+    const wordWrapRef = useRef(wordWrap);
+    wordWrapRef.current = wordWrap;
     const vimMode = usePreferencesStore((s) => s.vimMode);
-    const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
     const languageRef = useRef<string | null>(null);
     const themeExt = useEditorThemeExt();
 
@@ -136,11 +138,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         })),
         ...buildSharedExtensions(),
         languageCompartment.of([]),
-        wrapCompartment.of(
-          usePreferencesStore.getState().editorWordWrap
-            ? EditorView.lineWrapping
-            : [],
-        ),
+        wrapCompartment.of(wordWrapRef.current ? EditorView.lineWrapping : []),
         keymap.of([
           {
             key: "Mod-s",
@@ -171,10 +169,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       if (!view) return;
       view.dispatch({
         effects: wrapCompartment.reconfigure(
-          editorWordWrap ? EditorView.lineWrapping : [],
+          wordWrap ? EditorView.lineWrapping : [],
         ),
       });
-    }, [editorWordWrap]);
+    }, [wordWrap]);
 
     useEffect(() => {
       const ext = path.split(".").pop()?.toLowerCase() ?? null;
