@@ -266,6 +266,15 @@ e.g. a different Windows drive). The decision is a pure function (`resolveFocusT
 that re-runs as the tree reloads asynchronously, expanding each ancestor until the target is loaded, then selecting and
 scrolling to it without stealing focus from the editor. The context menu also gained icons on every item.
 
+### Word wrap floating bar
+
+The word wrap setting for editors was moved from the Settings window to a floating action bar (`EditorOverlayBar`) rendered over the editor panel. `EditorOverlayBar` replaces `MarkdownViewToggle` (removed) and hosts two controls:
+
+- `WrapToggleButton` — toggles the global `editorWordWrap` preference. The preference is shared by code editors, markdown editors, and the git diff pane (`GitDiffPane`). The diff pane previously kept its own local wrap state; it now reads from the global preference.
+- The `Rendered | Edit` view toggle (markdown panels only, label changed from `Rendered | Raw`). The underlying value `"raw"` is unchanged; only the visible label differs.
+
+Plain code editor panels render `EditorOverlayBar` without the view toggle. The wrap button is always visible (including while in Rendered mode for markdown panels).
+
 ---
 
 ## Roadmap (planned, not yet built)
@@ -308,7 +317,7 @@ These phases are designed but not fully implemented:
   - C8 (a9493ec): atajo `tab.newBlock` = Cmd+Shift+T cableado a `openNewBlock`. El commit upstream tocaba TabBar.tsx (inexistente en el fork); reimplementado en shortcuts.ts + App.tsx. La entrada de command palette ya existia; se le anadio el shortcutId.
   - C6 (b3000f2): watermark de primer uso (`BlockWatermark.tsx`) sobre un block terminal sin comandos; se desvanece al primer comando. Gate `blockWatermarkState` + `hasAnyBlock()` en BlockDecorations (con tests). Hints ADAPTADOS al fork (sin AI): historial, autocomplete, blocks.prev/next, tab.newBlock. El upstream referenciaba terminal.toggleInput y ai.toggle (inexistentes aqui). El refactor de hover que traia este commit ya estaba hecho en el fork (C5).
   - C7 (a10a63c + cd3c85c): hide-live-toolbar (el chrome del bloque aparece solo al terminar), focus-on-open del input, y copy-grid-selection (Cmd+C sobre seleccion del grid con el input enfocado, via onCopyCapture + leafGridSelection con keys string). Extra: Escape en el input limpia la seleccion de bloque (onEscape nuevo en shellEditor).
-  - C4 (66f77c4): markdown rendered/raw toggle. isMarkdownPath + MarkdownViewToggle portados; conmutacion reimplementada como `setPanelView` en useWorkspaces (muta un Panel entre kind "markdown" y "editor", gateada por dirty). Los .md abren renderizados por defecto desde el explorer. Eliminado el menu contextual "Open Preview" (redundante) y su threading. NOTA: MarkdownViewToggle se importa del fichero directo en PanelContent, no del barrel, para no arrastrar streamdown al bundle eager (eager-budget.test).
+  - C4 (66f77c4): markdown rendered/raw toggle. isMarkdownPath portado; conmutacion reimplementada como `setPanelView` en useWorkspaces (muta un Panel entre kind "markdown" y "editor", gateada por dirty). Los .md abren renderizados por defecto desde el explorer. Eliminado el menu contextual "Open Preview" (redundante) y su threading. El componente `MarkdownViewToggle` del upstream fue sustituido posteriormente por `EditorOverlayBar` (ver seccion "Word wrap floating bar" mas abajo).
 - Bug arreglado: BUG-37 (Cmd+U fantasma). Eliminado el shortcut muerto terminal.toggleInput ("Toggle Shell / AI input", residuo del modo AI), el evento TOGGLE_BLOCK_INPUT_EVENT (sin listener) y el hint enganoso. A peticion del usuario se recupero solo el hint visual estilo Cmd+U en el prompt (decorativo, sin accion ni atajo en Settings); el toggle real blocks<->normal queda anotado en docs/TODO.md (requiere integracion de shell dinamica + persistencia tipo tmux porque TERAX_BLOCKS se lee solo al arrancar la shell).
 - Items opcionales re-decididos (cierre del sync):
   - 731da51 (header polish): APLICADO. Hover `hover:bg-accent hover:text-foreground` en el boton Command palette y divisores suavizados `bg-border` -> `bg-border/70`. El resto del commit (bloque spaceSwitcher+TabBar) no existe en el fork.
