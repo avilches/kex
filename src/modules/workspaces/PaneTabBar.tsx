@@ -389,6 +389,7 @@ function TerminalHoverCardContent({
   cwd,
   runningCommand,
   panelLocked,
+  panelAutofocus,
   panelRestoreOnRestart,
   panelPersistentCommand,
   lockShortcut,
@@ -399,6 +400,7 @@ function TerminalHoverCardContent({
   cwd: string | undefined;
   runningCommand: string | null;
   panelLocked: boolean;
+  panelAutofocus: boolean;
   panelRestoreOnRestart: boolean;
   panelPersistentCommand: string | undefined;
   lockShortcut: string | null;
@@ -419,6 +421,21 @@ function TerminalHoverCardContent({
         )}
       </HoverTable>
       <div className="mt-1.5 space-y-1 border-t border-border/40 pt-1.5">
+        <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+          <input
+            type="checkbox"
+            className="size-3 accent-primary"
+            checked={panelAutofocus}
+            onChange={(e) => {
+              onUpdatePanel((p) =>
+                p.kind === "terminal"
+                  ? { ...p, autofocus: e.target.checked }
+                  : p,
+              );
+            }}
+          />
+          <span className="text-muted-foreground">Autofocus folder in sidebar</span>
+        </label>
         <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
           <input
             type="checkbox"
@@ -763,6 +780,7 @@ function DraggableTab({
               cwd={panel.cwd}
               runningCommand={runningCommand}
               panelLocked={panel.locked ?? false}
+              panelAutofocus={panel.autofocus ?? false}
               panelRestoreOnRestart={panel.restoreOnRestart ?? false}
               panelPersistentCommand={panel.persistentCommand}
               lockShortcut={shortcutLabels["tab.lock"]}
@@ -902,6 +920,14 @@ function DraggableTab({
         ) : agentSession?.status === "waiting" ? (
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null
+      )}
+      {panel.kind === "terminal" && panel.autofocus && (
+        <span
+          className="ml-0.5 shrink-0 text-muted-foreground/70"
+          title="Autofocus: this terminal drives the sidebar"
+        >
+          <HugeiconsIcon icon={CrosshairIcon} size={11} strokeWidth={1.75} />
+        </span>
       )}
       {isLocked ? (
         <button
