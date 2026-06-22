@@ -13,7 +13,8 @@ use crate::modules::git::types::{
     TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
-    authorized_repo_root, canonical_dir, resolve_within_repo, split_upstream, ResolvedGitDirectory,
+    authorized_repo_root, canonical_dir, dir_path_for, resolve_within_repo, split_upstream,
+    ResolvedGitDirectory,
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
@@ -22,7 +23,7 @@ pub fn resolve_repo(
     cwd: &str,
     workspace: &WorkspaceEnv,
 ) -> Result<Option<GitRepoInfo>> {
-    let cwd = canonical_dir(registry, cwd, workspace)?;
+    let cwd = canonical_dir(registry, &dir_path_for(cwd, workspace), workspace)?;
     if !registry.is_authorized(&cwd.local_path) {
         return Err(GitError::PathOutsideWorkspace(cwd.local_path));
     }
@@ -84,7 +85,7 @@ pub fn panel_snapshot(
     cwd: &str,
     workspace: &WorkspaceEnv,
 ) -> Result<GitPanelSnapshot> {
-    let cwd = canonical_dir(registry, cwd, workspace)?;
+    let cwd = canonical_dir(registry, &dir_path_for(cwd, workspace), workspace)?;
     if !registry.is_authorized(&cwd.local_path) {
         return Err(GitError::PathOutsideWorkspace(cwd.local_path));
     }
@@ -1162,6 +1163,36 @@ mod tests {
 
         let result = super::mv(&registry, &from, &to, &WorkspaceEnv::Local);
         assert!(result.is_err(), "expected error for untracked file");
+    }
+
+    #[test]
+    fn resolve_repo_from_file_in_nested_repo_picks_nearest() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let inner = dir.path().join("inner");
+        std::fs::create_dir(&inner).unwrap();
+        git_init_with_commit(&inner);
+        Cmd::new("git")
+            .args(["checkout", "-b", "nested"])
+            .current_dir(&inner)
+            .status()
+            .unwrap();
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let file = inner.join("a.txt").to_string_lossy().into_owned();
+        let info = super::resolve_repo(&registry, &file, &WorkspaceEnv::Local)
+            .unwrap()
+            .expect("expected a repo for a file inside the nested repo");
+
+        assert_eq!(info.branch, "nested");
+        assert!(
+            info.repo_root.replace('\\', "/").ends_with("/inner"),
+            "expected the nested repo root, got: {}",
+            info.repo_root
+        );
     }
 
     #[test]

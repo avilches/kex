@@ -80,11 +80,24 @@ export function resolveSidebarTarget(input: {
   home: string | null;
 }): { mode: ExplorerRootMode; fsRoot: string | null } {
   const folder = normalizeSep(input.folder);
-  if (input.workspaceRoot && isUnder(folder, normalizeSep(input.workspaceRoot))) {
+  const pinned = input.workspaceRoot ? normalizeSep(input.workspaceRoot) : null;
+  const gitRoot = input.gitRoot ? normalizeSep(input.gitRoot) : null;
+  // A git repo nested strictly inside the pinned root re-roots the explorer to it
+  // so the explorer, source control and history all reflect the nested repo.
+  if (
+    pinned &&
+    gitRoot &&
+    gitRoot !== pinned &&
+    isUnder(gitRoot, pinned) &&
+    isUnder(folder, gitRoot)
+  ) {
+    return { mode: "filesystem", fsRoot: gitRoot };
+  }
+  if (pinned && isUnder(folder, pinned)) {
     return { mode: "pinned", fsRoot: null };
   }
-  if (input.gitRoot && isUnder(folder, normalizeSep(input.gitRoot))) {
-    return { mode: "filesystem", fsRoot: normalizeSep(input.gitRoot) };
+  if (gitRoot && isUnder(folder, gitRoot)) {
+    return { mode: "filesystem", fsRoot: gitRoot };
   }
   const fsRef = input.currentFsRoot ?? input.home;
   const ca = fsRef ? commonAncestor(fsRef, folder) : null;
