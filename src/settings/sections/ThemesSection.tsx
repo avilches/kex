@@ -301,44 +301,6 @@ export function ThemesSection() {
 
       <div className="flex flex-col gap-2">
         <Label>Editor</Label>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-col">
-            <span className="text-[12px]">Editor theme</span>
-            <span className="text-[11px] text-muted-foreground">
-              Syntax colors for the code editor. Auto follows the app theme.
-            </span>
-          </div>
-          <Select
-            value={editorThemePref}
-            onValueChange={(v) => void setEditorTheme(v as EditorThemePref)}
-          >
-            <SelectTrigger size="sm" className="h-8 w-44 text-[12px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={EDITOR_THEME_AUTO} className="text-[12px]">
-                Auto (match app theme)
-              </SelectItem>
-              <SelectSeparator />
-              {[...EDITOR_THEMES]
-                .sort(
-                  (a, b) =>
-                    (EDITOR_THEME_MODE[a] === resolvedMode ? 0 : 1) -
-                    (EDITOR_THEME_MODE[b] === resolvedMode ? 0 : 1),
-                )
-                .map((id) => (
-                  <SelectItem
-                    key={id}
-                    value={id}
-                    disabled={EDITOR_THEME_MODE[id] !== resolvedMode}
-                    className="text-[12px]"
-                  >
-                    {EDITOR_THEME_LABELS[id]}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
         <FontFamilyInput
           value={editorFontFamily}
           defaultFamily={defaultMonoFontFamily()}
@@ -507,6 +469,44 @@ export function ThemesSection() {
               </button>
             );
           })}
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[12px]">Editor theme</span>
+            <span className="text-[11px] text-muted-foreground">
+              Syntax colors for the code editor. Auto follows the app theme.
+            </span>
+          </div>
+          <Select
+            value={editorThemePref}
+            onValueChange={(v) => void setEditorTheme(v as EditorThemePref)}
+          >
+            <SelectTrigger size="sm" className="h-8 w-44 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EDITOR_THEME_AUTO} className="text-[12px]">
+                Auto (match app theme)
+              </SelectItem>
+              <SelectSeparator />
+              {[...EDITOR_THEMES]
+                .sort(
+                  (a, b) =>
+                    (EDITOR_THEME_MODE[a] === resolvedMode ? 0 : 1) -
+                    (EDITOR_THEME_MODE[b] === resolvedMode ? 0 : 1),
+                )
+                .map((id) => (
+                  <SelectItem
+                    key={id}
+                    value={id}
+                    disabled={EDITOR_THEME_MODE[id] !== resolvedMode}
+                    className="text-[12px]"
+                  >
+                    {EDITOR_THEME_LABELS[id]}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
