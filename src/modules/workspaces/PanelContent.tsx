@@ -1,7 +1,7 @@
 import { isMarkdownPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
-import { MarkdownViewToggle } from "@/modules/markdown/MarkdownViewToggle";
+import { EditorOverlayBar } from "@/modules/editor";
 import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -106,13 +106,17 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       return (
         <Suspense fallback={null}>
           <div className="relative h-full w-full">
-            {isMarkdownPath(panel.path) && (
-              <MarkdownViewToggle
-                mode="raw"
-                onChange={(mode) => callbacks.onSetMarkdownView?.(panel.id, mode)}
-                renderedDisabled={panel.dirty}
-                renderedHint="Save to preview"
+            {isMarkdownPath(panel.path) ? (
+              <EditorOverlayBar
+                view={{
+                  mode: "raw",
+                  onChange: (mode) => callbacks.onSetMarkdownView?.(panel.id, mode),
+                  renderedDisabled: panel.dirty,
+                  renderedHint: "Save to preview",
+                }}
               />
+            ) : (
+              <EditorOverlayBar />
             )}
             <EditorPane
               ref={(h: EditorPaneHandle | null) => {
