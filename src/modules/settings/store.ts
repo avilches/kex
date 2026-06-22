@@ -113,6 +113,7 @@ export type Preferences = {
   vimMode: boolean;
   editorWordWrap: boolean;
   showHidden: boolean;
+  autofocusNewTabs: boolean;
   explorerGitColorScheme: GitColorScheme;
   scmViewMode: ScmViewMode;
   terminalWebglEnabled: boolean;
@@ -154,6 +155,7 @@ const KEY_VIM_MODE = "vimMode";
 const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
+const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
@@ -234,6 +236,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   vimMode: false,
   editorWordWrap: false,
   showHidden: false,
+  autofocusNewTabs: false,
   explorerGitColorScheme: "vscode",
   scmViewMode: "tree",
   terminalWebglEnabled: true,
@@ -327,6 +330,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_SHOW_HIDDEN) ??
       get<boolean>(LEGACY_KEY_SHOW_HIDDEN_DIRS) ??
       DEFAULT_PREFERENCES.showHidden,
+    autofocusNewTabs:
+      get<boolean>(KEY_AUTOFOCUS_NEW_TABS) ??
+      DEFAULT_PREFERENCES.autofocusNewTabs,
     explorerGitColorScheme: (() => {
       const v = get<string>(KEY_EXPLORER_GIT_COLOR_SCHEME);
       if (v === "vscode" || v === "jetbrains") return v;
@@ -492,6 +498,10 @@ export async function setShowHidden(value: boolean): Promise<void> {
   await writePref(KEY_SHOW_HIDDEN, value);
 }
 
+export async function setAutofocusNewTabs(value: boolean): Promise<void> {
+  await writePref(KEY_AUTOFOCUS_NEW_TABS, value);
+}
+
 export async function setExplorerGitColorScheme(value: GitColorScheme): Promise<void> {
   await writePref(KEY_EXPLORER_GIT_COLOR_SCHEME, value);
 }
@@ -645,6 +655,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_VIM_MODE]: "vimMode",
   [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
   [KEY_SHOW_HIDDEN]: "showHidden",
+  [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
   [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",

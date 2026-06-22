@@ -19,9 +19,19 @@ import {
   updateDivider,
   updatePane,
 } from "./splitNode";
-import type { Panel, PaneNode, Workspace } from "./types";
+import { type Panel, type PaneNode, type Workspace, isAutofocusPanel } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newPanelId } from "@/lib/ids";
+
+// New autofocus-capable tabs inherit the "autofocus in new tabs" preference,
+// unless they already carry an explicit flag. Restored tabs never pass through
+// here, so their persisted flag is preserved.
+function withNewTabAutofocus(panel: Panel): Panel {
+  if (!isAutofocusPanel(panel) || panel.autofocus !== undefined) return panel;
+  return usePreferencesStore.getState().autofocusNewTabs
+    ? { ...panel, autofocus: true }
+    : panel;
+}
 
 export function applyExplorerRootMode(
   workspaces: Workspace[],
@@ -271,7 +281,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
         const freshPaneId = newPaneId();
         const freshSplitId = newSplitId();
-        const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, panel);
+        const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, withNewTabAutofocus(panel));
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };
       }),
@@ -281,6 +291,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Panel operations ──────────────────────────────────────────────────────
 
   const openPanel = useCallback((workspaceId: string, paneId: string, panel: Panel, insertionIndex?: number) => {
+    const newPanel = withNewTabAutofocus(panel);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -291,8 +302,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
               ? Math.min(insertionIndex, p.panels.length)
               : p.panels.length;
             const newPanels = [...p.panels];
-            newPanels.splice(idx, 0, panel);
-            return { ...p, panels: newPanels, activePanelId: panel.id };
+            newPanels.splice(idx, 0, newPanel);
+            return { ...p, panels: newPanels, activePanelId: newPanel.id };
           }),
         };
       }),

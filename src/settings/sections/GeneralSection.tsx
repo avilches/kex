@@ -16,6 +16,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   TERMINAL_SCROLLBACK_PRESETS,
   setAgentNotifications,
+  setAutofocusNewTabs,
   setAutostart,
   setEditorAutoSave,
   setEditorPreviewOnClick,
@@ -33,6 +34,7 @@ import { SettingRow } from "../components/SettingRow";
 
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
+  const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const editorPreviewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
@@ -99,6 +101,18 @@ export function GeneralSection() {
         title="General"
         description="Mode, editor, and startup."
       />
+
+      <div className="flex flex-col gap-2">
+        <SettingRow
+          title="Enable autofocus in new tabs"
+          description="Tabs with autofocus refresh the sidebar when selected. You can toggle autofocus per tab from its context menu."
+        >
+          <Switch
+            checked={autofocusNewTabs}
+            onCheckedChange={(v) => void setAutofocusNewTabs(v)}
+          />
+        </SettingRow>
+      </div>
 
       <div className="flex flex-col gap-2">
         <Label>Editor</Label>
