@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { pathBasename } from "@/lib/pathUtils";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
@@ -44,8 +45,9 @@ import {
   Add01Icon,
   Alert02Icon,
   ArrowDown01Icon,
+  ArrowDown02Icon,
   ArrowRight01Icon,
-  ArrowUp01Icon,
+  ArrowUp02Icon,
   CheckmarkCircle01Icon,
   Copy01Icon,
   Download01Icon,
@@ -587,19 +589,19 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   {scm.status.ahead > 0 ? (
                     <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
                       <HugeiconsIcon
-                        icon={ArrowUp01Icon}
-                        size={9}
-                        strokeWidth={2.2}
+                        icon={ArrowUp02Icon}
+                        size={11}
+                        strokeWidth={2}
                       />
                       {scm.status.ahead}
                     </span>
                   ) : null}
                   {scm.status.behind > 0 ? (
-                    <span className="inline-flex items-center gap-0.5 text-rose-600 dark:text-rose-400">
+                    <span className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400">
                       <HugeiconsIcon
-                        icon={ArrowDown01Icon}
-                        size={9}
-                        strokeWidth={2.2}
+                        icon={ArrowDown02Icon}
+                        size={11}
+                        strokeWidth={2}
                       />
                       {scm.status.behind}
                     </span>
@@ -615,22 +617,24 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             {scm.repo ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    <HugeiconsIcon
-                      icon={Link01Icon}
-                      size={9}
-                      strokeWidth={2.2}
-                    />
-                    {scm.repo.isWorktree ? "linked worktree" : "main worktree"}
+                  <span className="inline-flex w-fit min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {scm.repo.isWorktree ? (
+                      <HugeiconsIcon
+                        icon={Link01Icon}
+                        size={9}
+                        strokeWidth={2.2}
+                        className="shrink-0"
+                      />
+                    ) : null}
+                    <span className="truncate">
+                      {pathBasename(scm.repo.repoRoot)}
+                    </span>
                   </span>
                 </TooltipTrigger>
                 <TooltipContent
                   side="bottom"
                   className={cn(SOURCE_CONTROL_TOOLTIP_CLASS, "text-[10.5px]")}
                 >
-                  {scm.repo.isWorktree
-                    ? "Linked worktree at "
-                    : "Main worktree at "}
                   {scm.repo.repoRoot}
                 </TooltipContent>
               </Tooltip>
