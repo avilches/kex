@@ -73,7 +73,6 @@ import {
   findPane,
   findPaneInDirection,
   panelTitle,
-  type Panel,
   type PanelCallbacks,
   type Rect,
   useWorkspaces,
@@ -102,7 +101,7 @@ import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   resolveExplorerRoot,
-  resolveFocusTarget,
+  resolveSidebarTarget,
   isFilesystemRoot,
   parentRoot,
   type ExplorerRootMode,
@@ -438,63 +437,8 @@ export default function App() {
     }
   }, [rightPanelOpen, rightPanelActiveTab]);
 
-  // ── Last known terminal cwd for explorer root / new workspace inheritance ──
-
-  const lastTerminalCwdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (activeCwd) lastTerminalCwdRef.current = activeCwd;
-  }, [activeCwd]);
-
   const activeRootMode: ExplorerRootMode =
-    activeWorkspace?.explorerRootMode ?? "terminal";
-
-  const terminalRootCwd = useMemo<string | null>(() => {
-    if (activeCwd) return activeCwd;
-    if (lastTerminalCwdRef.current) return lastTerminalCwdRef.current;
-    for (const ws of workspaces) {
-      for (const pane of allPanes(ws.paneTree)) {
-        for (const panel of pane.panels) {
-          if (panel.kind === "terminal" && panel.cwd) return panel.cwd;
-        }
-      }
-    }
-    return null;
-  }, [activeCwd, workspaces]);
-
-  // Git root of the current cwd, plus a per-workspace last-known fallback that
-  // survives leaving a repo. Runtime only; re-derived from cwd on restart.
-  const [currentGitRoot, setCurrentGitRoot] = useState<string | null>(null);
-  const [gitRootByWs, setGitRootByWs] = useState<Record<string, string>>({});
-  useEffect(() => {
-    if (!terminalRootCwd) {
-      setCurrentGitRoot(null);
-      return;
-    }
-    const ws = activeWorkspace;
-    let cancelled = false;
-    void native
-      .gitResolveRepo(terminalRootCwd)
-      .then((info) => {
-        if (cancelled) return;
-        const root = info?.repoRoot ?? null;
-        setCurrentGitRoot(root);
-        if (root && ws) {
-          setGitRootByWs((prev) =>
-            prev[ws.id] === root ? prev : { ...prev, [ws.id]: root },
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setCurrentGitRoot(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [terminalRootCwd, activeWorkspace]);
-
-  const gitRoot =
-    currentGitRoot ??
-    (activeWorkspace ? (gitRootByWs[activeWorkspace.id] ?? null) : null);
+    activeWorkspace?.explorerRootMode ?? "filesystem";
 
   const workspaceRootPath = activeWorkspace?.pinnedRoot ?? null;
   const fsFolderRoot = activeWorkspace?.fsRoot ?? null;
@@ -503,13 +447,11 @@ export default function App() {
     () =>
       resolveExplorerRoot({
         mode: activeRootMode,
-        terminalCwd: terminalRootCwd,
-        gitRoot,
         pinnedRoot: workspaceRootPath,
         fsRoot: fsFolderRoot,
         home,
       }),
-    [activeRootMode, terminalRootCwd, gitRoot, workspaceRootPath, fsFolderRoot, home],
+    [activeRootMode, workspaceRootPath, fsFolderRoot, home],
   );
 
   const canNavigateUp =
@@ -568,35 +510,61 @@ export default function App() {
     [activeWorkspace, activeRootMode, setFsRoot],
   );
 
-  const handleFocusOnExplorer = useCallback(
-    (file: string) => {
-      void setRightPanelOpen(true);
-      void setRightPanelActiveTab("explorer");
-      if (activeWorkspace) {
-        const target = resolveFocusTarget({
-          file,
-          mode: activeRootMode,
-          currentRoot: explorerRoot,
-          fsRoot: fsFolderRoot,
-          home,
+  const focusSidebar = useCallback(
+    (folder: string, opts: { fromF4: boolean }) => {
+      const ws = activeWorkspace;
+      if (!ws) return;
+      void native
+        .gitResolveRepo(folder)
+        .catch(() => null)
+        .then((info) => {
+          const resolvedGitRoot = info?.repoRoot ?? null;
+          const target = resolveSidebarTarget({
+            folder,
+            workspaceRoot: workspaceRootPath,
+            gitRoot: resolvedGitRoot,
+            currentFsRoot: fsFolderRoot,
+            home,
+          });
+          setExplorerRootMode(ws.id, target.mode);
+          if (target.mode === "filesystem" && target.fsRoot) {
+            setFsRoot(ws.id, target.fsRoot);
+          }
+          setRevealRequest((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
         });
-        if (target) {
-          setExplorerRootMode(activeWorkspace.id, target.nextMode);
-          setFsRoot(activeWorkspace.id, target.nextFsRoot);
+
+      if (opts.fromF4) {
+        const state = usePreferencesStore.getState();
+        if (!state.rightPanelOpen) void setRightPanelOpen(true);
+        if (state.rightPanelActiveTab === "history") {
+          void setRightPanelActiveTab("explorer");
         }
       }
-      setRevealRequest((r) => ({ path: file, nonce: (r?.nonce ?? 0) + 1 }));
     },
     [
       activeWorkspace,
-      activeRootMode,
-      explorerRoot,
+      workspaceRootPath,
       fsFolderRoot,
       home,
       setExplorerRootMode,
       setFsRoot,
     ],
   );
+
+  const prevActivePanelIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevActivePanelIdRef.current;
+    prevActivePanelIdRef.current = activePanelId;
+    if (prev === null) return; // skip initial mount
+    if (prev === activePanelId) return;
+    if (
+      activePanel?.kind === "terminal" &&
+      activePanel.autofocus &&
+      activePanel.cwd
+    ) {
+      focusSidebar(activePanel.cwd, { fromF4: false });
+    }
+  }, [activePanelId, activePanel, focusSidebar]);
 
   // Whether the saved workspace root still exists on disk, so the selector can
   // disable the option when it is unset or missing.
@@ -1083,11 +1051,18 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) {
           setTerminalPanelCwd(found.workspace.id, panelId, cwd);
-          if (
+          const isFocused =
             found.workspace.activePaneId === found.pane.id &&
-            found.pane.activePanelId === panelId
-          ) {
+            found.pane.activePanelId === panelId;
+          if (isFocused) {
             setWorkspaceCwd(found.workspace.id, cwd);
+            if (
+              found.workspace.id === activeWorkspace?.id &&
+              found.panel.kind === "terminal" &&
+              found.panel.autofocus
+            ) {
+              focusSidebar(cwd, { fromF4: false });
+            }
           }
         }
       },
@@ -1169,7 +1144,7 @@ export default function App() {
       onRenameFile: (panelId, newName) => {
         void handleRenameFileFromTab(panelId, newName);
       },
-      onFocusOnExplorer: (filePath) => handleFocusOnExplorer(filePath),
+      onFocusOnExplorer: (filePath) => focusSidebar(filePath, { fromF4: false }),
     }),
     [
       activePanelId,
@@ -1183,7 +1158,7 @@ export default function App() {
       activeWorkspace,
       openPanel,
       handleRenameFileFromTab,
-      handleFocusOnExplorer,
+      focusSidebar,
     ],
   );
 
@@ -1295,51 +1270,6 @@ export default function App() {
     editorRefs: editorHandles,
   });
 
-  const handleAddToGitignore = useCallback(
-    async (path: string, isDir: boolean) => {
-      if (!gitRoot) return;
-      const entry = gitignoreEntryFor(gitRoot, path, isDir);
-      if (!entry) return;
-      const gitignorePath = `${gitRoot}/.gitignore`;
-
-      // When .gitignore is open in an editor the buffer is the source of truth:
-      // edit it there so unsaved changes are never clobbered, regardless of
-      // autosave. The user saves it like any other edit.
-      const open = editorPanelsRef.current.find((p) => p.path === gitignorePath);
-      const handle = open ? editorHandles.current.get(open.id) : undefined;
-      if (handle) {
-        const buffer = handle.getContent();
-        if (buffer != null) {
-          if (hasGitignoreEntry(buffer, entry)) {
-            toast.info(`${entry} is already in .gitignore`);
-          } else {
-            handle.insertAtEnd(
-              appendGitignoreEntry(buffer, entry).slice(buffer.length),
-            );
-          }
-          openFileInPanel(gitignorePath, true);
-          return;
-        }
-      }
-
-      // Not open (or not mounted yet): append on disk idempotently, then reveal.
-      let content = "";
-      try {
-        const res = await native.readFile(gitignorePath);
-        if (res.kind === "text") content = res.content;
-      } catch {
-        // No .gitignore yet: start from an empty file.
-      }
-      if (hasGitignoreEntry(content, entry)) {
-        toast.info(`${entry} is already in .gitignore`);
-      } else {
-        await native.writeFile(gitignorePath, appendGitignoreEntry(content, entry));
-      }
-      openFileInPanel(gitignorePath, true);
-    },
-    [gitRoot, openFileInPanel],
-  );
-
   // ── useThemeFileEditing ───────────────────────────────────────────────────
 
   useThemeFileEditing({
@@ -1411,30 +1341,64 @@ export default function App() {
     [handleChangeRootMode],
   );
 
-  const allPanelsFlat = useMemo(() => {
-    const panels: Panel[] = [];
-    for (const ws of workspaces) {
-      for (const pane of allPanes(ws.paneTree)) {
-        for (const p of pane.panels) panels.push(p);
-      }
-    }
-    return panels;
-  }, [workspaces]);
-
   const { sourceControl, toggleSourceControl, openGitGraphFromContext } =
     useSourceControlContext({
-      activeTab: activePanel ?? undefined,
-      tabs: allPanelsFlat,
-      activeTerminalLeafCwd: activeCwd,
       explorerRoot,
-      explorerRootMode: activeRootMode,
       launchCwd,
       launchCwdResolved,
       home,
-      sidebarView: "source-control",
       cycleSidebarView: () => navigateRightPanelTo("git"),
       openCommitHistoryTab: openGitHistoryInPanel,
     });
+
+  // Git root for explorer tree decorations and the gitignore action follows the
+  // same repo Source Control resolves from explorerRoot (single source of truth).
+  const gitRoot = sourceControl.repo?.repoRoot ?? null;
+
+  const handleAddToGitignore = useCallback(
+    async (path: string, isDir: boolean) => {
+      if (!gitRoot) return;
+      const entry = gitignoreEntryFor(gitRoot, path, isDir);
+      if (!entry) return;
+      const gitignorePath = `${gitRoot}/.gitignore`;
+
+      // When .gitignore is open in an editor the buffer is the source of truth:
+      // edit it there so unsaved changes are never clobbered, regardless of
+      // autosave. The user saves it like any other edit.
+      const open = editorPanelsRef.current.find((p) => p.path === gitignorePath);
+      const handle = open ? editorHandles.current.get(open.id) : undefined;
+      if (handle) {
+        const buffer = handle.getContent();
+        if (buffer != null) {
+          if (hasGitignoreEntry(buffer, entry)) {
+            toast.info(`${entry} is already in .gitignore`);
+          } else {
+            handle.insertAtEnd(
+              appendGitignoreEntry(buffer, entry).slice(buffer.length),
+            );
+          }
+          openFileInPanel(gitignorePath, true);
+          return;
+        }
+      }
+
+      // Not open (or not mounted yet): append on disk idempotently, then reveal.
+      let content = "";
+      try {
+        const res = await native.readFile(gitignorePath);
+        if (res.kind === "text") content = res.content;
+      } catch {
+        // No .gitignore yet: start from an empty file.
+      }
+      if (hasGitignoreEntry(content, entry)) {
+        toast.info(`${entry} is already in .gitignore`);
+      } else {
+        await native.writeFile(gitignorePath, appendGitignoreEntry(content, entry));
+      }
+      openFileInPanel(gitignorePath, true);
+    },
+    [gitRoot, openFileInPanel],
+  );
 
   // ── Terminal helpers ──────────────────────────────────────────────────────
 
@@ -1680,8 +1644,6 @@ export default function App() {
       "sidebar.showHistory": () => showRightPanelTab("history"),
       "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
       "explorer.viewPinned": () => showExplorerWithMode("pinned"),
-      "explorer.viewTerminal": () => showExplorerWithMode("terminal"),
-      "explorer.viewGit": () => showExplorerWithMode("git"),
       "explorer.toggleHidden": () =>
         void setShowHidden(!usePreferencesStore.getState().showHidden),
       "explorer.search": () => {
@@ -1752,7 +1714,7 @@ export default function App() {
         const target =
           panelFilePath(activePanel) ??
           (activePanel.kind === "terminal" ? (activePanel.cwd ?? null) : null);
-        if (target) handleFocusOnExplorer(target);
+        if (target) focusSidebar(target, { fromF4: true });
       },
       "path.copy": () => {
         if (!activePanel) return;
@@ -1784,7 +1746,7 @@ export default function App() {
       cycleWorkspace,
       activatePanel,
       handleCloseActivePanel,
-      handleFocusOnExplorer,
+      focusSidebar,
       openNewTerminal,
       openNewBlock,
       addWorkspace,
@@ -2076,7 +2038,6 @@ export default function App() {
                         canNavigateUp={canNavigateUp}
                         homePath={home}
                         fsRootPath={fsRootPath}
-                        terminalCwdPath={terminalRootCwd}
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
@@ -2157,7 +2118,6 @@ export default function App() {
                         canNavigateUp={canNavigateUp}
                         homePath={home}
                         fsRootPath={fsRootPath}
-                        terminalCwdPath={terminalRootCwd}
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}

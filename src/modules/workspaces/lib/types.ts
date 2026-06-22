@@ -2,7 +2,7 @@ import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 
 export type Panel =
   | { id: string; kind: "terminal"; cwd?: string; title?: string; blocks?: boolean;
-      locked?: boolean; restoreOnRestart?: boolean; persistentCommand?: string }
+      locked?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; autofocus?: boolean }
   | { id: string; kind: "editor"; path: string; title?: string; dirty: boolean; preview: boolean; locked?: boolean }
   | { id: string; kind: "browser";         url: string;   title?: string; floating?: boolean }
   | { id: string; kind: "markdown";        path: string;  title?: string }

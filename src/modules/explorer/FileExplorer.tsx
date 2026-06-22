@@ -8,9 +8,7 @@ import {
 } from "@/components/ui/context-menu";
 import {
   ArrowDown01Icon,
-  ComputerTerminal01Icon,
   Folder01Icon,
-  GitBranchIcon,
   HierarchyFilesIcon,
   Home01Icon,
   PinIcon,
@@ -96,7 +94,6 @@ type Props = {
   canNavigateUp: boolean;
   homePath: string | null;
   fsRootPath: string | null;
-  terminalCwdPath: string | null;
   gitRootPath: string | null;
   workspaceRootPath: string | null;
   workspaceRootExists: boolean;
@@ -120,23 +117,17 @@ const ROOT_MODES: {
 }[] = [
   { id: "filesystem", label: "File System", icon: HierarchyFilesIcon },
   { id: "pinned", label: "Workspace Root", icon: PinIcon },
-  { id: "terminal", label: "Follow Terminal", icon: ComputerTerminal01Icon },
-  { id: "git", label: "Follow Git Root", icon: GitBranchIcon },
 ];
 
 const MODE_SHORTCUT: Record<string, ShortcutId> = {
   filesystem: "explorer.viewFilesystem",
   pinned: "explorer.viewPinned",
-  terminal: "explorer.viewTerminal",
-  git: "explorer.viewGit",
 };
 
 type RootModeContext = {
   fsRootPath: string | null;
   workspaceRootPath: string | null;
   workspaceRootExists: boolean;
-  terminalCwdPath: string | null;
-  gitRootPath: string | null;
 };
 
 function rootModeInfo(
@@ -155,13 +146,6 @@ function rootModeInfo(
       if (!ctx.workspaceRootExists)
         return { subtitle: "Folder not found", disabled: true };
       return { subtitle: ctx.workspaceRootPath, disabled: false };
-    case "terminal":
-      return { subtitle: ctx.terminalCwdPath, disabled: false };
-    case "git":
-      return {
-        subtitle: ctx.gitRootPath ?? "No git repository in the current path",
-        disabled: false,
-      };
   }
 }
 
@@ -343,7 +327,6 @@ export const FileExplorer = memo(
       canNavigateUp,
       homePath,
       fsRootPath,
-      terminalCwdPath,
       gitRootPath,
       workspaceRootPath,
       workspaceRootExists,
@@ -987,8 +970,6 @@ export const FileExplorer = memo(
                   fsRootPath,
                   workspaceRootPath,
                   workspaceRootExists,
-                  terminalCwdPath,
-                  gitRootPath,
                 });
                 return (
                   <DropdownMenuItem
@@ -1111,44 +1092,6 @@ export const FileExplorer = memo(
               {workspaceRootPath ?? "No workspace defined yet. Set a new one in the explorer"}
             </div>
             <div className="mt-2 flex w-full flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => onChangeRootMode("terminal")}
-                className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
-              >
-                <HugeiconsIcon
-                  icon={ComputerTerminal01Icon}
-                  size={14}
-                  strokeWidth={2}
-                  className="mt-0.5 shrink-0 text-primary"
-                />
-                <span className="flex min-w-0 flex-col">
-                  <span className="font-medium">Follow Terminal</span>
-                  {terminalCwdPath && (
-                    <span className="break-all text-[10px] text-muted-foreground">
-                      {terminalCwdPath}
-                    </span>
-                  )}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeRootMode("git")}
-                className="flex items-start gap-2 rounded-md border border-border/60 px-3 py-2 text-left text-xs transition-colors hover:bg-card"
-              >
-                <HugeiconsIcon
-                  icon={GitBranchIcon}
-                  size={14}
-                  strokeWidth={2}
-                  className="mt-0.5 shrink-0 text-primary"
-                />
-                <span className="flex min-w-0 flex-col">
-                  <span className="font-medium">Follow Git Root</span>
-                  <span className="break-all text-[10px] text-muted-foreground">
-                    {gitRootPath ?? "No git repository in the current path"}
-                  </span>
-                </span>
-              </button>
               <button
                 type="button"
                 onClick={() => onChangeRootMode("filesystem")}

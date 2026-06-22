@@ -135,12 +135,23 @@ previous workspaces or pane layout.
   pane wins, tie-broken by perpendicular overlap). Hard stop at borders; no wrap-around. Replaces the old cyclic
   `Cmd+[` / `Cmd+]` shortcuts.
 - **Explorer root modes** — the explorer root is no longer hardwired to the active terminal cwd. A per-workspace mode
-  (selector above the tree) picks among File System (home), Workspace Root (set via "Set as workspace root" on any
-  folder), Follow Terminal (default), and Follow Git Root. Each option in the selector shows its resolved path; the
-  Workspace Root option is disabled when unset or missing. The mode is the single source of truth for the root, so
-  focusing an editor no longer reroots the explorer (the upstream per-editor root override was removed). Pure logic in
+  (selector above the tree) picks between File System (home, navigable) and Workspace Root (set via "Set as workspace
+  root" on any folder). The upstream "Follow Terminal" and "Follow Git Root" modes are removed; their reactive
+  behavior is replaced by the explicit per-terminal autofocus mechanism (see below). The Workspace Root option is
+  disabled when unset or missing. The mode is the single source of truth for the root, so focusing an editor no
+  longer reroots the explorer (the upstream per-editor root override was removed). Pure logic in
   `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspace-state.json` (`explorerRootMode`,
   `pinnedRoot`).
+- **Per-terminal autofocus (sidebar-driving terminal)** -- replaces the removed "Follow Terminal" / "Follow Git Root"
+  modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab hover card)
+  drives both the Explorer root and the Source Control / Git History repo when it gains focus or its cwd changes while
+  focused. F4 (`tab.focusOnExplorer`) does the same anchoring unconditionally regardless of autofocus, and
+  additionally opens the right panel if closed and switches away from Git History. Both F4 and autofocus use the same
+  cascade: folder under workspace root -> Workspace Root mode; else under a git repo -> File System rooted at that git
+  root; else File System at the common ancestor / dirname. The git repo for Source Control / Git History is resolved
+  from the same folder (`git_resolve_repo`), stored per workspace as `gitRootByWs`, and is `null` when no repo is
+  found. Unlike the old reactive Follow modes, autofocus never fires on app boot and never switches sidebar tabs or
+  opens the panel automatically. The `autofocus` flag is persisted in `workspace-state.json`.
 - **Root path header (all modes)** — the tree is prefixed by a non-collapsible header row showing the current root's
   full path, left-truncated when long so the tail stays visible (a leading LRM keeps the leading `/` from being
   reordered by the rtl-based truncation). The selector trigger shows the active mode's label and icon rather than the
@@ -154,7 +165,7 @@ previous workspaces or pane layout.
   nearest existing ancestor instead of showing a recovery state. The current root is stored as `fsRoot` in
   `workspace-state.json` (default home). A JSON-only preference `keepFolderLayoutOnChangeExplorerRoot` (default `false`)
   controls whether the per-root tree expansion layout is restored on root change or the tree starts collapsed. The `..`
-  row appears only in File System mode; the other three root modes are unaffected.
+  row appears only in File System mode; Workspace Root mode is unaffected.
 - **Folder context actions** — a folder's context menu offers "Open in Terminal" (opens a new terminal tab in the
   current workspace's active pane, spawned directly with the folder as cwd, leaving the explorer view untouched) and
   "New Workspace from folder" (creates a new workspace with that folder pinned as its Workspace Root). Neither injects a

@@ -1,11 +1,9 @@
 import { pathDirname } from "@/lib/pathUtils";
 
-export type ExplorerRootMode = "terminal" | "git" | "filesystem" | "pinned";
+export type ExplorerRootMode = "filesystem" | "pinned";
 
 export type ResolveExplorerRootInput = {
   mode: ExplorerRootMode;
-  terminalCwd: string | null;
-  gitRoot: string | null;
   pinnedRoot: string | null;
   fsRoot: string | null;
   home: string | null;
@@ -13,15 +11,11 @@ export type ResolveExplorerRootInput = {
 
 export function resolveExplorerRoot(r: ResolveExplorerRootInput): string | null {
   switch (r.mode) {
-    case "filesystem":
-      return r.fsRoot ?? r.home;
     case "pinned":
       return r.pinnedRoot;
-    case "git":
-      return r.gitRoot ?? r.terminalCwd ?? r.home;
-    case "terminal":
+    case "filesystem":
     default:
-      return r.terminalCwd ?? r.home;
+      return r.fsRoot ?? r.home;
   }
 }
 
@@ -78,17 +72,29 @@ export function ancestorsToExpand(root: string, file: string): string[] {
   return out;
 }
 
-export function resolveFocusTarget(input: {
-  file: string;
-  mode: ExplorerRootMode;
-  currentRoot: string | null;
-  fsRoot: string | null;
+export function resolveSidebarTarget(input: {
+  folder: string;
+  workspaceRoot: string | null;
+  gitRoot: string | null;
+  currentFsRoot: string | null;
   home: string | null;
-}): { nextMode: ExplorerRootMode; nextFsRoot: string } | null {
-  const file = normalizeSep(input.file);
-  if (input.currentRoot && isUnder(file, input.currentRoot)) return null;
-  const fsRef = input.fsRoot ?? input.home;
-  const ca = fsRef ? commonAncestor(fsRef, file) : null;
-  const nextFsRoot = ca ?? pathDirname(file);
-  return { nextMode: "filesystem", nextFsRoot };
+}): { mode: ExplorerRootMode; fsRoot: string | null } {
+  const folder = normalizeSep(input.folder);
+  if (input.workspaceRoot && isUnder(folder, normalizeSep(input.workspaceRoot))) {
+    return { mode: "pinned", fsRoot: null };
+  }
+  if (input.gitRoot && isUnder(folder, normalizeSep(input.gitRoot))) {
+    return { mode: "filesystem", fsRoot: normalizeSep(input.gitRoot) };
+  }
+  const fsRef = input.currentFsRoot ?? input.home;
+  const ca = fsRef ? commonAncestor(fsRef, folder) : null;
+  return { mode: "filesystem", fsRoot: ca ?? pathDirname(folder) };
+}
+
+export function migrateExplorerRootMode(
+  mode: string | undefined,
+): ExplorerRootMode | undefined {
+  if (mode === "terminal" || mode === "git") return "filesystem";
+  if (mode === "filesystem" || mode === "pinned") return mode;
+  return undefined;
 }

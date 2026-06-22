@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { migrateExplorerRootMode } from "./explorerRoot";
 import type { Panel, SplitNode, Workspace } from "./types";
 
 type SavedState = { workspaces: Workspace[]; activeIndex: number };
@@ -9,7 +10,7 @@ type WindowEntry = { workspaces: Workspace[]; activeIndex: number };
 
 let cached: SavedState | null = null;
 
-function sanitizePanel(p: Panel): Panel {
+export function sanitizePanel(p: Panel): Panel {
   // Migrate the legacy "preview" panel kind (renamed to "browser") so sessions
   // saved before the rename still restore.
   if ((p as { kind: string }).kind === "preview") {
@@ -27,7 +28,11 @@ function sanitizeTree(node: SplitNode): SplitNode {
 }
 
 function sanitizeWorkspace(w: Workspace): Workspace {
-  return { ...w, paneTree: sanitizeTree(w.paneTree) };
+  return {
+    ...w,
+    explorerRootMode: migrateExplorerRootMode(w.explorerRootMode),
+    paneTree: sanitizeTree(w.paneTree),
+  };
 }
 
 export async function initWorkspaceState(): Promise<void> {

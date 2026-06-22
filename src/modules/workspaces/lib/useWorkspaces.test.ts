@@ -12,8 +12,8 @@ const ws = (over: Partial<Workspace> = {}): Workspace => ({
 
 describe("applyExplorerRootMode", () => {
   it("sets the mode on the matching workspace only", () => {
-    const out = applyExplorerRootMode([ws(), ws({ id: "w2" })], "w1", "git");
-    expect(out[0].explorerRootMode).toBe("git");
+    const out = applyExplorerRootMode([ws(), ws({ id: "w2" })], "w1", "filesystem");
+    expect(out[0].explorerRootMode).toBe("filesystem");
     expect(out[1].explorerRootMode).toBeUndefined();
   });
 });

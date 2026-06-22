@@ -40,8 +40,6 @@ export type ShortcutId =
   | "sidebar.showHistory"
   | "explorer.viewFilesystem"
   | "explorer.viewPinned"
-  | "explorer.viewTerminal"
-  | "explorer.viewGit"
   | "explorer.toggleHidden"
   | "notifications.toggle"
   | "window.new"
@@ -161,18 +159,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Explorer: Workspace Root",
     group: "Sidebar",
     defaultBindings: [{ ctrl: true, key: "2" }],
-  },
-  {
-    id: "explorer.viewTerminal",
-    label: "Explorer: Follow Terminal",
-    group: "Sidebar",
-    defaultBindings: [{ ctrl: true, key: "3" }],
-  },
-  {
-    id: "explorer.viewGit",
-    label: "Explorer: Follow Git Root",
-    group: "Sidebar",
-    defaultBindings: [{ ctrl: true, key: "4" }],
   },
   {
     id: "explorer.toggleHidden",

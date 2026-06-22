@@ -6,48 +6,16 @@ import {
   isUnder,
   parentRoot,
   resolveExplorerRoot,
-  resolveFocusTarget,
+  resolveSidebarTarget,
+  migrateExplorerRootMode,
 } from "./explorerRoot";
 
 describe("resolveExplorerRoot", () => {
   const base = {
-    terminalCwd: "/proj/sub",
-    gitRoot: "/proj",
     pinnedRoot: "/pinned",
     fsRoot: null as string | null,
     home: "/home/u",
   };
-
-  it("terminal mode follows the terminal cwd", () => {
-    expect(resolveExplorerRoot({ ...base, mode: "terminal" })).toBe("/proj/sub");
-  });
-
-  it("terminal mode falls back to home when no cwd", () => {
-    expect(
-      resolveExplorerRoot({ ...base, mode: "terminal", terminalCwd: null }),
-    ).toBe("/home/u");
-  });
-
-  it("git mode uses the known git root", () => {
-    expect(resolveExplorerRoot({ ...base, mode: "git" })).toBe("/proj");
-  });
-
-  it("git mode falls back to terminal cwd when no git root", () => {
-    expect(resolveExplorerRoot({ ...base, mode: "git", gitRoot: null })).toBe(
-      "/proj/sub",
-    );
-  });
-
-  it("git mode falls back to home when no git root and no cwd", () => {
-    expect(
-      resolveExplorerRoot({
-        ...base,
-        mode: "git",
-        gitRoot: null,
-        terminalCwd: null,
-      }),
-    ).toBe("/home/u");
-  });
 
   it("filesystem mode returns fsRoot when set", () => {
     expect(
@@ -147,66 +115,76 @@ describe("ancestorsToExpand", () => {
   });
 });
 
-describe("resolveFocusTarget", () => {
-  const file = "/home/u/proj/src/deep/file.ts";
+describe("resolveSidebarTarget", () => {
+  const home = "/Users/me";
 
-  it("returns null when the current view already contains the file", () => {
-    expect(
-      resolveFocusTarget({
-        file,
-        mode: "git",
-        currentRoot: "/home/u/proj",
-        fsRoot: null,
-        home: "/home/u",
-      }),
-    ).toBeNull();
+  it("uses pinned mode when the folder is under the workspace root", () => {
+    const t = resolveSidebarTarget({
+      folder: "/a/b/c/d",
+      workspaceRoot: "/a/b",
+      gitRoot: "/a/b",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "pinned", fsRoot: null });
   });
 
-  it("switches to filesystem using the common ancestor when the view does not contain the file", () => {
-    expect(
-      resolveFocusTarget({
-        file,
-        mode: "git",
-        currentRoot: "/other/repo",
-        fsRoot: "/home/u/notes",
-        home: "/home/u",
-      }),
-    ).toEqual({ nextMode: "filesystem", nextFsRoot: "/home/u" });
+  it("treats the workspace root folder itself as under it", () => {
+    const t = resolveSidebarTarget({
+      folder: "/a/b",
+      workspaceRoot: "/a/b",
+      gitRoot: null,
+      currentFsRoot: null,
+      home,
+    });
+    expect(t.mode).toBe("pinned");
   });
 
-  it("keeps the fsRoot when it already contains the file", () => {
-    expect(
-      resolveFocusTarget({
-        file,
-        mode: "terminal",
-        currentRoot: "/tmp",
-        fsRoot: "/home/u/proj",
-        home: "/home/u",
-      }),
-    ).toEqual({ nextMode: "filesystem", nextFsRoot: "/home/u/proj" });
+  it("uses the git root as filesystem root when outside the workspace root", () => {
+    const t = resolveSidebarTarget({
+      folder: "/x/repo/src/inner",
+      workspaceRoot: "/a/b",
+      gitRoot: "/x/repo",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "filesystem", fsRoot: "/x/repo" });
   });
 
-  it("uses home as the reference when fsRoot is null", () => {
-    expect(
-      resolveFocusTarget({
-        file,
-        mode: "pinned",
-        currentRoot: null,
-        fsRoot: null,
-        home: "/home/u",
-      }),
-    ).toEqual({ nextMode: "filesystem", nextFsRoot: "/home/u" });
+  it("falls back to the common ancestor with the current fs root", () => {
+    const t = resolveSidebarTarget({
+      folder: "/x/y/z",
+      workspaceRoot: null,
+      gitRoot: null,
+      currentFsRoot: "/x/other",
+      home,
+    });
+    expect(t).toEqual({ mode: "filesystem", fsRoot: "/x" });
   });
 
-  it("falls back to the file's parent dir when there is no common ancestor", () => {
-    expect(
-      resolveFocusTarget({
-        file: "C:/work/a/file.ts",
-        mode: "terminal",
-        currentRoot: "D:/x",
-        fsRoot: "D:/x",
-        home: "D:/x",
-      }),
-    ).toEqual({ nextMode: "filesystem", nextFsRoot: "C:/work/a" });
+  it("falls back to the folder dirname when there is no common ancestor", () => {
+    const t = resolveSidebarTarget({
+      folder: "/x/y/z",
+      workspaceRoot: null,
+      gitRoot: null,
+      currentFsRoot: null,
+      home: null,
+    });
+    expect(t).toEqual({ mode: "filesystem", fsRoot: "/x/y" });
+  });
+});
+
+describe("migrateExplorerRootMode", () => {
+  it("maps removed modes to filesystem", () => {
+    expect(migrateExplorerRootMode("terminal")).toBe("filesystem");
+    expect(migrateExplorerRootMode("git")).toBe("filesystem");
+  });
+  it("keeps valid modes", () => {
+    expect(migrateExplorerRootMode("filesystem")).toBe("filesystem");
+    expect(migrateExplorerRootMode("pinned")).toBe("pinned");
+  });
+  it("returns undefined for missing/unknown", () => {
+    expect(migrateExplorerRootMode(undefined)).toBeUndefined();
+    expect(migrateExplorerRootMode("bogus")).toBeUndefined();
   });
 });
