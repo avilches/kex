@@ -253,6 +253,7 @@ export function useSourceControl(
                 branch: status.branch,
                 upstream: status.upstream,
                 isDetached: status.isDetached,
+                isWorktree: repo?.isWorktree ?? false,
               };
             }
           } catch {

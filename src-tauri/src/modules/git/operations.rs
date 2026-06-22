@@ -31,6 +31,18 @@ pub fn resolve_repo(
     resolve_repo_in_authorized(registry, &cwd)
 }
 
+/// A linked worktree has a git dir under `<common>/worktrees/<name>`, so its
+/// `--git-dir` differs from `--git-common-dir`; the main worktree reports the
+/// same path for both. One git call, run at the repo root.
+fn is_linked_worktree(root: &ResolvedGitDirectory) -> Result<bool> {
+    let lines = git_stdout_lines(
+        &root.workspace,
+        &root.git_path,
+        ["rev-parse", "--git-dir", "--git-common-dir"],
+    )?;
+    Ok(matches!((lines.first(), lines.get(1)), (Some(a), Some(b)) if a != b))
+}
+
 fn resolve_repo_in_authorized(
     registry: &WorkspaceRegistry,
     cwd: &ResolvedGitDirectory,
@@ -72,11 +84,14 @@ fn resolve_repo_in_authorized(
         ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
     )?;
 
+    let is_worktree = is_linked_worktree(&canonical_root)?;
+
     Ok(Some(GitRepoInfo {
         repo_root: canonical_root.git_path,
         branch: head.clone(),
         upstream,
         is_detached: head == "HEAD",
+        is_worktree,
     }))
 }
 
@@ -110,6 +125,7 @@ pub fn panel_snapshot(
         branch: status.branch.clone(),
         upstream: status.upstream.clone(),
         is_detached: status.is_detached,
+        is_worktree: is_linked_worktree(&canonical_root)?,
     };
     Ok(GitPanelSnapshot {
         repo: Some(repo),
@@ -1193,6 +1209,37 @@ mod tests {
             "expected the nested repo root, got: {}",
             info.repo_root
         );
+    }
+
+    #[test]
+    fn resolve_repo_flags_linked_worktree() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let main = super::resolve_repo(
+            &registry,
+            &dir.path().to_string_lossy(),
+            &WorkspaceEnv::Local,
+        )
+        .unwrap()
+        .expect("expected a repo for the main worktree");
+        assert!(!main.is_worktree, "main worktree should not be flagged");
+
+        let wt = dir.path().join("wt");
+        Cmd::new("git")
+            .args(["worktree", "add", "-b", "feature", wt.to_str().unwrap()])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+
+        let linked = super::resolve_repo(&registry, &wt.to_string_lossy(), &WorkspaceEnv::Local)
+            .unwrap()
+            .expect("expected a repo for the linked worktree");
+        assert!(linked.is_worktree, "linked worktree should be flagged");
+        assert_eq!(linked.branch, "feature");
     }
 
     #[test]

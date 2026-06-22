@@ -42,6 +42,7 @@ export type GitRepoInfo = {
   branch: string;
   upstream: string | null;
   isDetached: boolean;
+  isWorktree: boolean;
 };
 
 export type GitChangedFile = {

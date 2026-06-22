@@ -581,6 +581,26 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               />
               <span className="max-w-[140px] truncate">{repoLabel}</span>
             </div>
+            {scm.repo?.isWorktree ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <HugeiconsIcon
+                      icon={Link01Icon}
+                      size={9}
+                      strokeWidth={2.2}
+                    />
+                    worktree
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  className={cn(SOURCE_CONTROL_TOOLTIP_CLASS, "text-[10.5px]")}
+                >
+                  Linked worktree at {scm.repo.repoRoot}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
             {scm.status && (scm.status.ahead > 0 || scm.status.behind > 0) ? (
               <div className="flex shrink-0 items-center gap-0.5 text-[10px] font-semibold tabular-nums leading-none text-muted-foreground">
                 {scm.status.ahead > 0 ? (

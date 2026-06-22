@@ -14,6 +14,7 @@ pub struct GitRepoInfo {
     pub branch: String,
     pub upstream: Option<String>,
     pub is_detached: bool,
+    pub is_worktree: bool,
 }
 
 #[derive(Serialize)]
