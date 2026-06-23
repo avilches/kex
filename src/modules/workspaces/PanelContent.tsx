@@ -11,8 +11,6 @@ import {
   setEditorAutocompletion,
   setEditorBracketMatching,
   setEditorCloseBrackets,
-  setEditorCursorBlink,
-  setEditorHighlightActiveLine,
   setEditorScrollPastEnd,
   setEditorViewForExt,
 } from "@/modules/settings/store";
@@ -41,11 +39,9 @@ const GLOBAL_TOGGLE_SETTERS: Record<
   EditorGlobalToggleKey,
   (value: boolean) => Promise<void>
 > = {
-  highlightActiveLine: setEditorHighlightActiveLine,
   bracketMatching: setEditorBracketMatching,
   closeBrackets: setEditorCloseBrackets,
   autocompletion: setEditorAutocompletion,
-  cursorBlink: setEditorCursorBlink,
   scrollPastEnd: setEditorScrollPastEnd,
 };
 
@@ -103,20 +99,16 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
-  const highlightActiveLine = usePreferencesStore((s) => s.editorHighlightActiveLine);
   const bracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
-  const cursorBlink = usePreferencesStore((s) => s.editorCursorBlink);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
 
   const globalToggles = {
     value: {
-      highlightActiveLine,
       bracketMatching,
       closeBrackets,
       autocompletion,
-      cursorBlink,
       scrollPastEnd,
     },
     onToggle: (key: EditorGlobalToggleKey, value: boolean) =>

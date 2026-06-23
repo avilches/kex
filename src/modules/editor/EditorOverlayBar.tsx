@@ -4,36 +4,32 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  EDITOR_INDENT_SIZES,
+  clampIndentSize,
+  EDITOR_INDENT_MAX,
+  EDITOR_INDENT_MIN,
   type EditorViewSettings,
 } from "./lib/editorViewSettings";
 
 type MarkdownViewMode = "rendered" | "raw";
 
 export type EditorGlobalToggleKey =
-  | "highlightActiveLine"
   | "bracketMatching"
   | "closeBrackets"
   | "autocompletion"
-  | "cursorBlink"
   | "scrollPastEnd";
 
 export type EditorGlobalToggles = Record<EditorGlobalToggleKey, boolean>;
 
 const GLOBAL_TOGGLE_LABELS: [EditorGlobalToggleKey, string][] = [
-  ["highlightActiveLine", "Highlight active line"],
   ["bracketMatching", "Bracket matching"],
   ["closeBrackets", "Auto close brackets"],
   ["autocompletion", "Autocompletion"],
-  ["cursorBlink", "Cursor blinking"],
   ["scrollPastEnd", "Scroll past end"],
 ];
 
@@ -118,23 +114,23 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
             >
               Indent with tabs
             </DropdownMenuCheckboxItem>
-            <DropdownMenuLabel className="text-[11px] text-muted-foreground">
-              Indent size
-            </DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={String(v.indentSize)}
-              onValueChange={(val) => set({ indentSize: Number(val) })}
-            >
-              {EDITOR_INDENT_SIZES.map((n) => (
-                <DropdownMenuRadioItem
-                  key={n}
-                  value={String(n)}
-                  onSelect={keepOpen}
-                >
-                  {n} spaces
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
+            <div className="flex items-center justify-between gap-2 px-2.5 py-1">
+              <span className="text-[12px]">Indent size</span>
+              <input
+                type="number"
+                min={EDITOR_INDENT_MIN}
+                max={EDITOR_INDENT_MAX}
+                value={v.indentSize}
+                onFocus={(e) => e.currentTarget.select()}
+                onKeyDown={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10);
+                  if (Number.isNaN(n)) return;
+                  set({ indentSize: clampIndentSize(n) });
+                }}
+                className="h-6 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
+              />
+            </div>
             {globalToggles && (
               <>
                 <DropdownMenuSeparator />

@@ -144,11 +144,11 @@ export type Preferences = {
   agentNotifications: boolean;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
-  editorAutoSaveDelay: number;
+  editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-general.json
   editorPreviewOnClick: boolean;
   editorViewByExt: EditorViewMap;
   editorScrollPastEnd: boolean;
-  editorHighlightActiveLine: boolean;
+  editorHighlightActiveLine: boolean; // JSON-only: no settings UI, edit settings-general.json
   editorBracketMatching: boolean;
   editorCloseBrackets: boolean;
   editorAutocompletion: boolean;
@@ -157,9 +157,9 @@ export type Preferences = {
   rightPanelActiveTab: "explorer" | "git" | "history";
   panelSide: "left" | "right";
   tabBarStyle: TabBarStyle;
-  workspacePaneLimit: number;
-  paneSplitLimit: PaneSplitLimit;
-  keepFolderLayoutOnChangeExplorerRoot: boolean;
+  workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
+  paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
+  keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
 };
 
 const STORE_PATH = "settings-general.json";
@@ -807,10 +807,6 @@ export async function setEditorViewForExt(
 
 export async function setEditorScrollPastEnd(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_SCROLL_PAST_END, value);
-}
-
-export async function setEditorHighlightActiveLine(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE, value);
 }
 
 export async function setEditorBracketMatching(value: boolean): Promise<void> {

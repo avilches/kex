@@ -9,7 +9,13 @@ export type EditorViewSettings = {
 
 export type EditorViewMap = Record<string, Partial<EditorViewSettings>>;
 
-export const EDITOR_INDENT_SIZES = [2, 4, 8] as const;
+export const EDITOR_INDENT_MIN = 1;
+export const EDITOR_INDENT_MAX = 12;
+
+export function clampIndentSize(n: number): number {
+  if (!Number.isFinite(n)) return 4;
+  return Math.min(EDITOR_INDENT_MAX, Math.max(EDITOR_INDENT_MIN, Math.round(n)));
+}
 
 const PROSE_EXTS = new Set(["md", "markdown", "mdx", "txt", "text"]);
 

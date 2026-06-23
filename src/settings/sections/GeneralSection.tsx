@@ -40,7 +40,6 @@ import {
   setEditorCursorBlink,
   setEditorCursorBlinkRate,
   setEditorCursorStyle,
-  setEditorHighlightActiveLine,
   setEditorPreviewOnClick,
   setEditorScrollPastEnd,
   setTerminalCursorBlink,
@@ -114,7 +113,6 @@ export function GeneralSection() {
   );
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
   const editorScrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
-  const editorHighlightActiveLine = usePreferencesStore((s) => s.editorHighlightActiveLine);
   const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
   const editorCloseBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const editorAutocompletion = usePreferencesStore((s) => s.editorAutocompletion);
@@ -199,9 +197,6 @@ export function GeneralSection() {
         </SettingRow>
         <SettingRow title="Scroll past end" description="Allow scrolling beyond the last line.">
           <Switch checked={editorScrollPastEnd} onCheckedChange={(v) => void setEditorScrollPastEnd(v)} />
-        </SettingRow>
-        <SettingRow title="Highlight active line" description="Highlight the line the cursor is on.">
-          <Switch checked={editorHighlightActiveLine} onCheckedChange={(v) => void setEditorHighlightActiveLine(v)} />
         </SettingRow>
         <SettingRow title="Bracket matching" description="Highlight the bracket matching the one at the cursor.">
           <Switch checked={editorBracketMatching} onCheckedChange={(v) => void setEditorBracketMatching(v)} />
