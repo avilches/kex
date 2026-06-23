@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EyeIcon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { Edit02Icon, EyeIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   clampIndentSize,
@@ -176,8 +176,9 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
           )}
         >
           <HugeiconsIcon
-            icon={view.mode === "raw" ? PencilEdit01Icon : EyeIcon}
-            size={12}
+            icon={view.mode === "raw" ? Edit02Icon : EyeIcon}
+            size={13}
+            strokeWidth={2}
           />
         </button>
       )}
