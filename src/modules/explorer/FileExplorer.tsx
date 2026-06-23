@@ -1286,7 +1286,7 @@ export const FileExplorer = memo(
                         size={14}
                         strokeWidth={2}
                       />
-                      New Workspace from folder
+                      New Workspace from Folder
                     </ContextMenuItem>
                   )}
                   {onRevealInTerminal && (

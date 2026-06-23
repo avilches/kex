@@ -330,7 +330,7 @@ function EntryRowImpl(props: EntryRowProps) {
               size={14}
               strokeWidth={2}
             />
-            New Workspace from folder
+            New Workspace from Folder
           </ContextMenuItem>
         )}
         {!isDir && (
@@ -594,7 +594,7 @@ export function FsRootRow({
               size={14}
               strokeWidth={2}
             />
-            New Workspace from folder
+            New Workspace from Folder
           </ContextMenuItem>
         )}
         {onRevealInTerminal && (

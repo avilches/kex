@@ -415,7 +415,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                     size={14}
                     strokeWidth={2}
                   />
-                  New Workspace from folder
+                  New Workspace from Folder
                 </ContextMenuItem>
               )}
               <ContextMenuItem
