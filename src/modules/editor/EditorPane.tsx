@@ -102,6 +102,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const closeBracketsPref = usePreferencesStore((s) => s.editorCloseBrackets);
     const autocompletionPref = usePreferencesStore((s) => s.editorAutocompletion);
     const cursorBlinkPref = usePreferencesStore((s) => s.editorCursorBlink);
+    const cursorBlinkRatePref = usePreferencesStore((s) => s.editorCursorBlinkRate);
     const cursorStylePref = usePreferencesStore((s) => s.editorCursorStyle);
     const languageRef = useRef<string | null>(null);
     const themeExt = useEditorThemeExt();
@@ -154,6 +155,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             closeBrackets: s.editorCloseBrackets,
             autocompletion: s.editorAutocompletion,
             cursorBlink: s.editorCursorBlink,
+            cursorBlinkRate: s.editorCursorBlinkRate,
             cursorStyle: s.editorCursorStyle,
           }),
           languageCompartment.of([]),
@@ -239,8 +241,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     useEffect(() => {
       const v = cmRef.current?.view;
       if (!v) return;
-      v.dispatch({ effects: cursorBlinkCompartment.reconfigure(cursorBlinkExt(cursorBlinkPref)) });
-    }, [cursorBlinkPref]);
+      v.dispatch({ effects: cursorBlinkCompartment.reconfigure(cursorBlinkExt(cursorBlinkPref, cursorBlinkRatePref)) });
+    }, [cursorBlinkPref, cursorBlinkRatePref]);
 
     useEffect(() => {
       const v = cmRef.current?.view;

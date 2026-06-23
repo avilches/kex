@@ -49,6 +49,7 @@ export type SharedExtConfig = {
   closeBrackets: boolean;
   autocompletion: boolean;
   cursorBlink: boolean;
+  cursorBlinkRate: number;
   cursorStyle: CursorStyle;
 };
 
@@ -65,7 +66,7 @@ export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
     closeBracketsCompartment.of(cfg.closeBrackets ? closeBrackets() : []),
     autocompletionCompartment.of(cfg.autocompletion ? autocompletion() : []),
     scrollPastEndCompartment.of(cfg.scrollPastEnd ? scrollPastEnd() : []),
-    cursorBlinkCompartment.of(cursorBlinkExt(cfg.cursorBlink)),
+    cursorBlinkCompartment.of(cursorBlinkExt(cfg.cursorBlink, cfg.cursorBlinkRate)),
     cursorStyleCompartment.of(cursorStyleExt(cfg.cursorStyle)),
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {

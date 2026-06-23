@@ -127,6 +127,7 @@ export type Preferences = {
   terminalWebglEnabled: boolean;
   terminalCursorBlink: boolean;
   editorCursorBlink: boolean;
+  editorCursorBlinkRate: number;
   editorCursorStyle: CursorStyle;
   warnOnCloseTabWithRunningProcess: boolean;
   terminalFontFamily: string;
@@ -179,6 +180,7 @@ const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_EDITOR_CURSOR_BLINK = "editorCursorBlink";
+const KEY_EDITOR_CURSOR_BLINK_RATE = "editorCursorBlinkRate";
 const KEY_EDITOR_CURSOR_STYLE = "editorCursorStyle";
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
@@ -279,6 +281,12 @@ export const SCROLL_SENSITIVITY_MAX = 5;
 export const SCROLL_SENSITIVITY_STEP = 1;
 export const SCROLL_SENSITIVITY_DEFAULT = 1;
 
+// Editor caret blink period, in ms. Lower is faster. Only used when blink is on.
+export const EDITOR_BLINK_RATE_MIN = 200;
+export const EDITOR_BLINK_RATE_MAX = 2000;
+export const EDITOR_BLINK_RATE_STEP = 100;
+export const EDITOR_BLINK_RATE_DEFAULT = 1200;
+
 export function parseCursorStyle(value: unknown): CursorStyle {
   return typeof value === "string" &&
     (CURSOR_STYLES as readonly string[]).includes(value)
@@ -309,6 +317,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
   editorCursorBlink: false,
+  editorCursorBlinkRate: EDITOR_BLINK_RATE_DEFAULT,
   editorCursorStyle: "bar",
   warnOnCloseTabWithRunningProcess: true,
   terminalFontFamily: "",
@@ -424,6 +433,14 @@ export async function loadPreferences(): Promise<Preferences> {
     editorCursorBlink:
       get<boolean>(KEY_EDITOR_CURSOR_BLINK) ??
       DEFAULT_PREFERENCES.editorCursorBlink,
+    editorCursorBlinkRate: clampToStep(
+      get<number>(KEY_EDITOR_CURSOR_BLINK_RATE) ??
+        DEFAULT_PREFERENCES.editorCursorBlinkRate,
+      EDITOR_BLINK_RATE_MIN,
+      EDITOR_BLINK_RATE_MAX,
+      EDITOR_BLINK_RATE_STEP,
+      EDITOR_BLINK_RATE_DEFAULT,
+    ),
     editorCursorStyle: parseCursorStyle(get<string>(KEY_EDITOR_CURSOR_STYLE)),
     warnOnCloseTabWithRunningProcess:
       get<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
@@ -633,6 +650,19 @@ export async function setTerminalCursorBlink(value: boolean): Promise<void> {
 
 export async function setEditorCursorBlink(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_CURSOR_BLINK, value);
+}
+
+export async function setEditorCursorBlinkRate(value: number): Promise<void> {
+  await writePref(
+    KEY_EDITOR_CURSOR_BLINK_RATE,
+    clampToStep(
+      value,
+      EDITOR_BLINK_RATE_MIN,
+      EDITOR_BLINK_RATE_MAX,
+      EDITOR_BLINK_RATE_STEP,
+      EDITOR_BLINK_RATE_DEFAULT,
+    ),
+  );
 }
 
 export async function setEditorCursorStyle(value: CursorStyle): Promise<void> {
@@ -852,6 +882,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
   [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
   [KEY_EDITOR_CURSOR_BLINK]: "editorCursorBlink",
+  [KEY_EDITOR_CURSOR_BLINK_RATE]: "editorCursorBlinkRate",
   [KEY_EDITOR_CURSOR_STYLE]: "editorCursorStyle",
   [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",

@@ -2,12 +2,16 @@ import { type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { CursorStyle } from "@/modules/settings/store";
 
-// CodeMirror's default caret blinks (~1.2s). Disable it by killing the
-// animation on the cursor layer; enabling just restores the default.
-export function cursorBlinkExt(blink: boolean): Extension {
-  if (blink) return [];
+// CodeMirror animates the caret layer to blink. Off kills the animation;
+// on drives its period from the configured rate (lower ms = faster blink).
+export function cursorBlinkExt(blink: boolean, rateMs: number): Extension {
+  if (!blink) {
+    return EditorView.theme({
+      ".cm-cursorLayer": { animation: "none !important" },
+    });
+  }
   return EditorView.theme({
-    ".cm-cursorLayer": { animation: "none !important" },
+    ".cm-cursorLayer": { animationDuration: `${rateMs}ms !important` },
   });
 }
 

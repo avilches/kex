@@ -25,6 +25,10 @@ import {
   SCROLL_SENSITIVITY_STEP,
   CURSOR_WIDTH_MAX,
   CURSOR_WIDTH_MIN,
+  EDITOR_BLINK_RATE_DEFAULT,
+  EDITOR_BLINK_RATE_MAX,
+  EDITOR_BLINK_RATE_MIN,
+  EDITOR_BLINK_RATE_STEP,
   TERMINAL_SCROLLBACK_PRESETS,
   setAgentNotifications,
   setAutofocusNewTabs,
@@ -34,6 +38,7 @@ import {
   setEditorBracketMatching,
   setEditorCloseBrackets,
   setEditorCursorBlink,
+  setEditorCursorBlinkRate,
   setEditorCursorStyle,
   setEditorHighlightActiveLine,
   setEditorPreviewOnClick,
@@ -114,6 +119,7 @@ export function GeneralSection() {
   const editorCloseBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const editorAutocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const editorCursorBlink = usePreferencesStore((s) => s.editorCursorBlink);
+  const editorCursorBlinkRate = usePreferencesStore((s) => s.editorCursorBlinkRate);
   const editorCursorStyle = usePreferencesStore((s) => s.editorCursorStyle);
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
   const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
@@ -209,6 +215,19 @@ export function GeneralSection() {
         <SettingRow title="Cursor blinking" description="Blink the editor cursor.">
           <Switch checked={editorCursorBlink} onCheckedChange={(v) => void setEditorCursorBlink(v)} />
         </SettingRow>
+        {editorCursorBlink && (
+          <SliderRow
+            title="Cursor blink rate"
+            description="Blink period of the editor caret. Lower is faster."
+            value={editorCursorBlinkRate}
+            min={EDITOR_BLINK_RATE_MIN}
+            max={EDITOR_BLINK_RATE_MAX}
+            step={EDITOR_BLINK_RATE_STEP}
+            defaultValue={EDITOR_BLINK_RATE_DEFAULT}
+            format={(v) => `${v} ms`}
+            onChange={(v) => void setEditorCursorBlinkRate(v)}
+          />
+        )}
         <SettingRow title="Cursor style" description="Editor caret shape.">
           <Select value={editorCursorStyle} onValueChange={(v) => void setEditorCursorStyle(v as CursorStyle)}>
             <SelectTrigger size="sm" className="h-8 w-28 text-[12px]"><SelectValue /></SelectTrigger>
