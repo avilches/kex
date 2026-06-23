@@ -34,21 +34,6 @@ Requiere crear un componente generico de HoverCard o especializarlo por `panel.k
 
 ---
 
-## Tabs de editor/preview: guardar cwd y sincronizar con el explorer
-
-Estado: PARCIAL (auditado 2026-06-23). Hay un puente one-way: al activar un panel editor/git-diff con `autofocus`, `App.tsx:562-576` extrae `panelFilePath()` y sincroniza el explorer hacia esa ruta. Lo que FALTA: los tipos `editor` y `browser` NO guardan `cwd` (`types.ts:6-7`), asi que no hay sincronizacion para el panel `browser` ni persistencia de la carpeta de trabajo del fichero. Anadir `cwd?: string` a esos kinds, rellenarlo al abrir, e incluirlos como fuente en el computo de `explorerRoot`.
-
-Hoy los tabs de editor y preview no almacenan `cwd`. Cuando el usuario abre un fichero en el editor o carga una URL en el preview, no hay forma de saber en que carpeta estaba trabajando, y el explorer no se actualiza al volver a ese tab.
-
-Comportamiento deseado:
-- Al abrir un fichero en el editor, guardar la carpeta del fichero como `cwd` en el panel.
-- Al activar un panel de editor/preview, si tiene `cwd`, sincronizar el explorer con ese path (igual que ya hace con los terminales via OSC 7).
-- Esto permite que el explorer muestre el arbol de la carpeta del fichero activo en lugar de quedarse anclado al ultimo terminal visitado.
-
-Implementacion (boceto): extender el tipo `Panel` para que editor y preview puedan llevar `cwd?: string`, rellenarlo al abrir el panel, y en el hook de seleccion de panel activo (`useExplorerRoot` o equivalente en `App.tsx`) incluir los paneles de editor/preview como fuente de `explorerRoot`.
-
----
-
 ## Notas Markdown + Marcadores (giro de producto)
 
 Plan completo y fuente de verdad: [NOTES_AND_BOOKMARKS_PLAN.md](NOTES_AND_BOOKMARKS_PLAN.md). Incluye especificacion, modelos de datos, 6 fases con rutas concretas, esqueletos de codigo (TS y Rust), criterios de aceptacion y comandos de verificacion por fase.
@@ -86,50 +71,6 @@ Fase 0 del plan (refactor habilitador): columna derecha data-driven (registro de
 - `docs/BUILD.md`: solo si cambia el build (chunk lazy de Milkdown o dep nueva).
 
 ---
-
-## Explorer: lock a carpeta fija (no seguir el cwd del terminal)
-
-Estado: PARCIAL (auditado 2026-06-23). El modelo y la logica YA existen: `Workspace.explorerRootMode` + `pinnedRoot` + `fsRoot` (`types.ts`), `resolveExplorerRoot()` y el computo de `explorerRoot` (`App.tsx:442`), `setPinnedRoot()` / `applyPinnedRoot()` (`useWorkspaces.ts`) y `handleSetAsRoot()` (`App.tsx`). Lo que FALTA es solo la UX: icono de candado en el header del explorer (mostrar el path fijado y soltarlo con click) y los items de menu contextual "Fijar explorador aqui" / "Fijar al raiz de git" (`git_resolve_repo`). El boceto de modelo de abajo ya esta cubierto por `pinnedRoot`; implementar solo la capa de UI.
-
-### Motivacion
-
-Hoy el explorer sigue automaticamente el `cwd` del terminal activo (`explorerRoot` en `app.tsx:273`). Esto es util por defecto, pero molesta cuando el usuario quiere tener el explorer anclado a una carpeta concreta (la raiz del repo, un workspace concreto, etc.) mientras navega libremente por el sistema de ficheros desde el terminal.
-
-### Modelo propuesto
-
-Dos modos para el explorer, elegibles por el usuario:
-
-- **Auto** (comportamiento actual): el explorer sigue el cwd del terminal activo.
-- **Locked**: el explorer se queda fijo en una carpeta que el usuario elige explicitamente y no se mueve aunque el terminal cambie de directorio.
-
-El estado locked se almacena por workspace (no globalmente), de forma que cada workspace puede tener su propio root fijo. Se persiste en `workspace-state.json` junto al resto del estado del workspace.
-
-### UX de activacion / desactivacion
-
-Tres formas de activar el lock:
-1. **Menu contextual en una carpeta del explorer** -- "Fijar explorador a esta carpeta" / "Fijar al raiz de git".
-2. **Icono de candado en el header del explorer** -- cuando esta activo muestra el path fijado y permite soltar el lock con un click.
-3. **Al crear un workspace** (opcional a valorar) -- dialogo inicial con "Carpeta del explorador: auto | elegir fija".
-
-### Caso especial: git root con worktrees
-
-"Fijar al raiz de git" debe resolver el raiz real del repositorio, no el cwd. Usar `git_resolve_repo` (ya existe en IPC) sobre el cwd actual. Si el cwd esta dentro de un worktree (`/repo/.git/worktrees/<nombre>`), `git_resolve_repo` devuelve el git root correcto (`/repo`), por lo que el comportamiento de worktrees esta cubierto sin logica adicional.
-
-### Implementacion (boceto)
-
-1. Anadir `lockedExplorerRoot: string | null` al modelo de workspace (`src/modules/workspaces/`). `null` = modo auto.
-2. En `app.tsx`, modificar `explorerRoot` para que cuando el workspace activo tenga `lockedExplorerRoot != null`, retorne ese valor en lugar de `activeCwd`.
-3. Menu contextual en `TreeRow.tsx` / `FileExplorer.tsx`: dos items nuevos -- "Fijar explorador aqui" (llama a `setLockedExplorerRoot(path)`) y "Fijar al raiz de git" (llama a `git_resolve_repo(path)` y luego `setLockedExplorerRoot(repoRoot)`).
-4. Header del explorer (`FileExplorer.tsx`): anadir icono de candado junto al nombre de la carpeta raiz. Cuando `lockedExplorerRoot != null` el icono esta activo y muestra un tooltip con el path; click lo pone a null (vuelve a auto).
-5. Persistencia: incluir `lockedExplorerRoot` en la serializacion del workspace.
-
-### Lo que NO cambia
-
-- El terminal sigue funcionando con total libertad (el cwd del terminal y el explorerRoot son independientes cuando locked).
-- Si no hay lock, el comportamiento es identico al actual.
-
----
-
 
 ## Explorer: arrastrar DESDE el explorer HACIA el SO (Finder/Explorer)
 
@@ -172,7 +113,7 @@ La barra de titulo superior esta practicamente vacia. Se podria aprovechar para 
 
 1. **Nombre/label del workspace**: texto libre que el usuario puede poner a cada workspace ("backend API", "cliente web", "infra", ...), visible en la barra superior y en la pestaña de la barra lateral.
 2. **Ultima notificacion del tab activo**: el ultimo mensaje de agente (Claude Code, Codex) en el tab activo, sin tener que ir al panel de notificaciones.
-3. **PR de la rama actual**: rama git del panel activo y, si hay remote configurado, el PR asociado (consultar via `gh pr view --json number,title,url` o la API de GitHub).
+3. **PR de la rama actual**: rama git del panel activo y, si hay remote configurado, el PR asociado (consultar via `gh pr view --json number,title,url` o la API de GitHub). Spec + plan accionable en [F14](pending/features/F14-pr-de-la-rama-actual.md) (IPC `git_current_pr`, gh con fallback a REST via ureq; base tecnica de F13).
 
 ### Dependencias
 

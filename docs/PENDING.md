@@ -16,7 +16,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-08](pending/bugs/BUG-08-fuga-procesos-background-shellstate.md) — Fuga de procesos background en ShellState
 - [BUG-12](pending/bugs/BUG-12-toctou-auto-autorizacion-repo-root.md) — TOCTOU en auto-autorizacion de repo root
 - [BUG-13](pending/bugs/BUG-13-deteccion-binario-8kb-incoherente.md) — Deteccion de binario con 8 KB incoherente
-- [BUG-14](pending/bugs/BUG-14-git-show-truncamiento-blobs-memoria.md) — git show: truncamiento de blobs en memoria
+- [BUG-14](pending/bugs/BUG-14-git-show-truncamiento-blobs-memoria.md) — git show: truncamiento de blobs en memoria (alcance reducido: el diff principal ya propaga `truncated` via `diff_inner`; solo afecta el flujo git-history/commit-file)
 - [BUG-15](pending/bugs/BUG-15-usefiletree-callbacks-inestables.md) — useFileTree: callbacks inestables
 - [BUG-17](pending/bugs/BUG-17-busqueda-ipc-sin-cancelacion.md) — Busqueda IPC sin cancelacion (fs_search resuelto; fs_grep_interactive pendiente)
 - [BUG-18](pending/bugs/BUG-18-race-refetch-fs-changed-explorer.md) — Race entre refetch y fs-changed en explorer
@@ -34,12 +34,11 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [F5](pending/features/F5-reabrir-tab-cerrado.md) — Reabrir tab cerrado
 - [F6](pending/features/F6-scrollback-persistente.md) — Scrollback persistente
 - [F7](pending/features/F7-tab-bar-style-en-settings.md) — Exponer el estilo de tab bar en Settings
-- [F8](pending/features/F8-explorer-navegacion-teclado.md) — Navegacion del explorer por teclado
-- [F9](pending/features/F9-explorer-operaciones-fichero.md) — Operaciones de fichero en el explorer (duplicar, copiar/pegar, cortar, borrar) + limpieza del menu
 - [F10](pending/features/F10-confirm-quit-proceso-vivo.md) — Confirmar salida de la app con un proceso de terminal vivo (upstream d782f7d, aplazado en sync 2026-06-22)
 - [F11](pending/features/F11-launcher-ide-externo.md) - URGENTE: boton para abrir el proyecto en un IDE/editor/terminal externo (estilo Supacode/Emdash/Nimbalyst)
 - [F12](pending/features/F12-boton-run-proyecto-workspace.md) - URGENTE: boton Run para ejecutar el proyecto del workspace (run configs por workspace)
 - [F13](pending/features/F13-workspace-mostrar-prs-repo.md) - Workspace: mostrar PRs del repo (lista de PRs via gh CLI / GitHub API)
+- [F14](pending/features/F14-pr-de-la-rama-actual.md) - PR de la rama actual (IPC `git_current_pr`, gh con fallback a REST via ureq). Base tecnica de F13 y del punto 3 de "barra superior" en TODO.md
 
 ## Mejoras (`docs/pending/improvements/`)
 
@@ -48,7 +47,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [M4](pending/improvements/M4-cancelacion-busqueda-ipc.md) — Cancelacion de busqueda IPC
 - [M5](pending/improvements/M5-diff-grandes-worker.md) — Diffs grandes en Web Worker
 - [M6](pending/improvements/M6-reaping-bg-procs-y-registry.md) — Reaping de procesos background y registry
-- [M7](pending/improvements/M7-quick-wins.md) — Quick wins varios (parcial: ~7/15 ya hechos; quedan items 2, 3, 9, 10, 13, 14)
+- [M7](pending/improvements/M7-quick-wins.md) — Quick wins varios (parcial: ~11/15 ya hechos; quedan items 5 (parcial), 13, 14)
 - [M8](pending/improvements/M8-release-appimage-wayland-updater-sig.md) — Adoptar sistema de release de AppImage del upstream (fix libwayland + sig race-free)
 - [M9](pending/improvements/M9-rebind-rename-f2-shift-f6.md) — Rebind del atajo de rename: F2 -> Shift+F6
 - [M10](pending/improvements/M10-rendimiento-busqueda-ficheros.md) — Rendimiento de la busqueda de ficheros (fs_search async/paralelo/cancelable + tuning de contenido)
