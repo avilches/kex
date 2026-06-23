@@ -130,6 +130,7 @@ export type Preferences = {
   editorCursorBlinkRate: number;
   editorCursorStyle: CursorStyle;
   warnOnCloseTabWithRunningProcess: boolean;
+  warnOnCloseWorkspace: boolean;
   terminalFontFamily: string;
   terminalLetterSpacing: number;
   terminalFontSize: number;
@@ -183,6 +184,7 @@ const KEY_EDITOR_CURSOR_BLINK = "editorCursorBlink";
 const KEY_EDITOR_CURSOR_BLINK_RATE = "editorCursorBlinkRate";
 const KEY_EDITOR_CURSOR_STYLE = "editorCursorStyle";
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
+const KEY_WARN_ON_CLOSE_WORKSPACE = "warnOnCloseWorkspace";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
@@ -320,6 +322,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorCursorBlinkRate: EDITOR_BLINK_RATE_DEFAULT,
   editorCursorStyle: "bar",
   warnOnCloseTabWithRunningProcess: true,
+  warnOnCloseWorkspace: true,
   terminalFontFamily: "",
   terminalLetterSpacing: LETTER_SPACING_DEFAULT,
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
@@ -445,6 +448,9 @@ export async function loadPreferences(): Promise<Preferences> {
     warnOnCloseTabWithRunningProcess:
       get<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
       DEFAULT_PREFERENCES.warnOnCloseTabWithRunningProcess,
+    warnOnCloseWorkspace:
+      get<boolean>(KEY_WARN_ON_CLOSE_WORKSPACE) ??
+      DEFAULT_PREFERENCES.warnOnCloseWorkspace,
     terminalFontFamily:
       get<string>(KEY_TERMINAL_FONT_FAMILY) ??
       DEFAULT_PREFERENCES.terminalFontFamily,
@@ -673,6 +679,10 @@ export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promi
   await writePref(KEY_WARN_ON_CLOSE_RUNNING, value);
 }
 
+export async function setWarnOnCloseWorkspace(value: boolean): Promise<void> {
+  await writePref(KEY_WARN_ON_CLOSE_WORKSPACE, value);
+}
+
 export async function setTerminalFontFamily(value: string): Promise<void> {
   await writePref(KEY_TERMINAL_FONT_FAMILY, value.trim());
 }
@@ -881,6 +891,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_CURSOR_BLINK_RATE]: "editorCursorBlinkRate",
   [KEY_EDITOR_CURSOR_STYLE]: "editorCursorStyle",
   [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",
+  [KEY_WARN_ON_CLOSE_WORKSPACE]: "warnOnCloseWorkspace",
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
   [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
   [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
