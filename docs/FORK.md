@@ -281,7 +281,7 @@ scrolling to it without stealing focus from the editor. The context menu also ga
 
 The word wrap setting for editors was moved from the Settings window to a floating action bar (`EditorOverlayBar`) rendered over the editor panel. `EditorOverlayBar` replaces `MarkdownViewToggle` (removed) and hosts two controls:
 
-- `WrapToggleButton` toggles the global `editorWordWrap` preference. The preference is shared by code editors, markdown editors, and the git diff pane (`GitDiffPane`). The diff pane previously kept its own local wrap state; it now reads from the global preference.
+- `WrapToggleButton` toggles word wrap for the current panel. Word wrap defaults by file type: prose (`.md`, `.markdown`, `.mdx`, `.txt`, `.text`, via `shouldWrapByDefault`) opens wrapped, code and everything else unwrapped. The toggle sets a per-panel `wordWrapOverride` (persisted with the workspace), so the effective wrap is `override ?? type default`. This replaced the old global `editorWordWrap` preference (removed). The same override and toggle apply to editor panels and to the git diff / commit-file panes, which share the button.
 - The `Rendered | Edit` view toggle (markdown panels only, label changed from `Rendered | Raw`). The underlying value `"raw"` is unchanged; only the visible label differs.
 
 Plain code editor panels render `EditorOverlayBar` without the view toggle. The wrap button shows in code and markdown edit (raw) panels, but is hidden in the markdown Rendered preview, where word wrap has nothing to act on.

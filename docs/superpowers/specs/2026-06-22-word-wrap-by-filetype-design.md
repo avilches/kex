@@ -57,10 +57,13 @@ export function shouldWrapByDefault(path: string): boolean {
 
 ### Git diff
 
-- `GitDiffPane` ya conoce el path del fichero diffeado. Sustituye la lectura del global por
-  `shouldWrapByDefault(filePath)` en la init y reconfigure de su `wrapCompartment`.
-- El diff no expone toggle de wrap, asi que no necesita override por panel: solo el default
-  por tipo.
+- `GitDiffPane` ya conoce el path del fichero diffeado y tiene su propio `WrapToggleButton`
+  en la cabecera. Recibe `wordWrap` (efectivo) y `onToggleWordWrap` como props desde
+  `PanelContent`, sustituyendo la lectura del global en la init y reconfigure de su
+  `wrapCompartment`.
+- Igual que el editor: los paneles `git-diff` y `git-commit-file` ganan `wordWrapOverride?` y
+  el toggle del diff escribe ese override por panel (`setPanelWordWrapOverride` acepta los
+  tres kinds).
 
 ### Limpieza del global
 
