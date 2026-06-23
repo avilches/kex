@@ -486,6 +486,7 @@ export default function App() {
 
   const handleFsRootMissing = useCallback(
     async (brokenPath: string) => {
+      console.warn("[KEXDBG] handleFsRootMissing broken=", brokenPath);
       if (!activeWorkspace || activeRootMode !== "filesystem") return;
       let candidate = brokenPath;
       while (!isFilesystemRoot(candidate)) {
@@ -497,6 +498,7 @@ export default function App() {
           // keep climbing toward the filesystem/drive root, which always exists
         }
       }
+      console.warn("[KEXDBG] handleFsRootMissing -> setFsRoot candidate=", candidate);
       setFsRoot(activeWorkspace.id, candidate);
     },
     [activeWorkspace, activeRootMode, setFsRoot],
@@ -527,6 +529,14 @@ export default function App() {
             currentFsRoot: fsFolderRoot,
             home,
           });
+          console.warn(
+            "[KEXDBG] focusSidebar folder=",
+            folder,
+            "gitRoot=",
+            resolvedGitRoot,
+            "-> target=",
+            JSON.stringify(target),
+          );
           setExplorerRootMode(ws.id, target.mode);
           if (target.mode === "filesystem" && target.fsRoot) {
             setFsRoot(ws.id, target.fsRoot);

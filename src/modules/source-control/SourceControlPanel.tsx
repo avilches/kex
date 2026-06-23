@@ -54,10 +54,10 @@ import {
   File01Icon,
   FileDiffIcon,
   FolderCloudIcon,
-  FolderGitTwoIcon,
   FolderOpenIcon,
   FolderTreeIcon,
   GitBranchIcon,
+  GitCommitIcon,
   Link01Icon,
   ListViewIcon,
   MinusSignIcon,
@@ -575,9 +575,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         <header className="flex shrink-0 items-start justify-between gap-1 border-b border-border/60 px-1.5 py-1">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex h-6 min-w-0 items-center gap-1.5">
-              <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-0.5 text-[11.5px] font-medium leading-none text-foreground transition-colors hover:bg-foreground/10">
+              <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-0.5 text-[11.5px] font-medium leading-none text-foreground">
                 <HugeiconsIcon
-                  icon={FolderGitTwoIcon}
+                  icon={GitBranchIcon}
                   size={12}
                   strokeWidth={1.9}
                   className="shrink-0 text-muted-foreground"
@@ -617,12 +617,12 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             {scm.repo ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="inline-flex w-fit min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="inline-flex w-fit min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground">
                     {scm.repo.isWorktree ? (
                       <HugeiconsIcon
                         icon={Link01Icon}
-                        size={9}
-                        strokeWidth={2.2}
+                        size={12}
+                        strokeWidth={1.9}
                         className="shrink-0"
                       />
                     ) : null}
@@ -715,30 +715,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
               )}
             </IconActionButton>
+            {onOpenGitGraph ? (
+              <IconActionButton
+                label="Log"
+                onClick={() => onOpenGitGraph()}
+                side="bottom"
+              >
+                <HugeiconsIcon
+                  icon={GitCommitIcon}
+                  size={14}
+                  strokeWidth={1.85}
+                />
+              </IconActionButton>
+            ) : null}
           </div>
         </header>
-
-        {onOpenGitGraph ? (
-          <button
-            type="button"
-            onClick={() => onOpenGitGraph()}
-            className="group flex shrink-0 items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
-          >
-            <HugeiconsIcon
-              icon={GitBranchIcon}
-              size={13}
-              strokeWidth={1.85}
-              className="shrink-0"
-            />
-            <span className="flex-1 text-[12px] font-medium">Commit Graph</span>
-            <HugeiconsIcon
-              icon={ArrowRight01Icon}
-              size={12}
-              strokeWidth={2}
-              className="shrink-0 opacity-50 transition-transform group-hover:translate-x-0.5"
-            />
-          </button>
-        ) : null}
 
         {scm.panelState === "loading" ? (
           <PanelCenter title="Loading repository" />

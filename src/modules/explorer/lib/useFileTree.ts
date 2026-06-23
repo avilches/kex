@@ -201,6 +201,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         watchRemove(toUnwatch);
       }
     } catch (e) {
+      console.error("[KEXDBG] fetchChildren error path=", path, "err=", e);
       setNodes((s) => ({
         ...s,
         [path]: { status: "error", message: String(e) },
@@ -269,6 +270,14 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     const loadedPaths = Object.entries(nodes)
       .filter(([, state]) => state.status === "loaded")
       .map(([path]) => path);
+    console.log(
+      "[KEXDBG] showHidden effect: showHidden=",
+      showHidden,
+      "rootPath=",
+      rootPath,
+      "loadedPaths=",
+      loadedPaths,
+    );
     for (const path of loadedPaths) void fetchChildren(path);
     // Re-list loaded directories when visibility prefs change.
     // `nodes` is intentionally omitted so ordinary tree edits don't refetch

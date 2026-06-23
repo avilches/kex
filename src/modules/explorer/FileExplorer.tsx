@@ -687,10 +687,20 @@ export const FileExplorer = memo(
     // a dead-end. The actual resolution lives in App (it needs fs access).
     const rootStatus = rootPath ? tree.nodes[rootPath]?.status : undefined;
     useEffect(() => {
+      console.warn(
+        "[KEXDBG] FileExplorer render: rootPath=",
+        rootPath,
+        "rootMode=",
+        rootMode,
+        "rootStatus=",
+        rootStatus,
+        "canNavigateUp=",
+        canNavigateUp,
+      );
       if (rootMode === "filesystem" && rootStatus === "error" && rootPath) {
         onFsRootMissing?.(rootPath);
       }
-    }, [rootMode, rootStatus, rootPath, onFsRootMissing]);
+    }, [rootMode, rootStatus, rootPath, onFsRootMissing, canNavigateUp]);
 
     useImperativeHandle(
       ref,
