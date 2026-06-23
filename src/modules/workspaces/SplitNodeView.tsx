@@ -9,6 +9,7 @@ import type { PanelCallbacks } from "./PanelContent";
 import type { SplitNode } from "./lib/types";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
+import type { WelcomeActions } from "./EmptyPaneWelcome";
 
 type Props = {
   node: SplitNode;
@@ -38,6 +39,7 @@ type Props = {
   onDockBrowserPanel?: (panelId: string) => void;
   onFocusFloatBrowserPanel?: (panelId: string) => void;
   onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
+  welcomeActions?: WelcomeActions;
 };
 
 export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, ...rest }: Props) {
@@ -80,6 +82,7 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, .
         onDockBrowserPanel={rest.onDockBrowserPanel}
         onFocusFloatBrowserPanel={rest.onFocusFloatBrowserPanel}
       onNavigateFloatBrowserPanel={rest.onNavigateFloatBrowserPanel}
+        welcomeActions={rest.welcomeActions}
       />
     );
   }

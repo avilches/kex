@@ -79,6 +79,7 @@ import {
   useWorkspaces,
   WorkspaceView,
 } from "@/modules/workspaces";
+import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -1603,6 +1604,28 @@ export default function App() {
     onSplitTerminalDownStable(activeWorkspace.id, activeWorkspace.activePaneId);
   }, [activeWorkspace, onSplitTerminalDownStable]);
 
+  const handleExplorerSearch = useCallback(() => {
+    const state = usePreferencesStore.getState();
+    if (state.rightPanelOpen && state.rightPanelActiveTab === "explorer") {
+      rightPanelRef.current?.toggleExplorerSearch?.();
+    } else {
+      pendingExplorerSearch.current = true;
+      void setRightPanelOpen(true);
+      void setRightPanelActiveTab("explorer");
+    }
+  }, [setRightPanelOpen, setRightPanelActiveTab]);
+
+  const welcomeActions = useMemo<WelcomeActions>(
+    () => ({
+      onNewTerminal: () => openNewTerminal(),
+      onNewBrowser: () => openBrowserInPanel(""),
+      onSearchFiles: handleExplorerSearch,
+      onCommandPalette: () => openCommandPalette("commands"),
+      onSettings: () => void openSettingsWindow(),
+    }),
+    [openNewTerminal, openBrowserInPanel, handleExplorerSearch, openCommandPalette],
+  );
+
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
       "commandPalette.open": () => openCommandPalette("commands"),
@@ -1687,19 +1710,7 @@ export default function App() {
       "explorer.viewPinned": () => showExplorerWithMode("pinned"),
       "explorer.toggleHidden": () =>
         void setShowHidden(!usePreferencesStore.getState().showHidden),
-      "explorer.search": () => {
-        const state = usePreferencesStore.getState();
-        if (state.rightPanelOpen && state.rightPanelActiveTab === "explorer") {
-          // Panel already visible on explorer: toggle search open/closed.
-          rightPanelRef.current?.toggleExplorerSearch?.();
-        } else {
-          // Panel closed or on another tab: open it, switch to explorer,
-          // then open search once the async IPC resolves and the panel mounts.
-          pendingExplorerSearch.current = true;
-          void setRightPanelOpen(true);
-          void setRightPanelActiveTab("explorer");
-        }
-      },
+      "explorer.search": handleExplorerSearch,
       "terminal.clear": () => {
         clearFocusedTerminal();
       },
@@ -2141,6 +2152,7 @@ export default function App() {
                         onDockBrowserPanel={onDockBrowserPanel}
                         onFocusFloatBrowserPanel={onFocusFloatBrowserPanel}
                         onNavigateFloatBrowserPanel={onNavigateFloatBrowserPanel}
+                        welcomeActions={welcomeActions}
                       />
                     </div>
 

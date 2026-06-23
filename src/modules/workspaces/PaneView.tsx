@@ -1,6 +1,7 @@
 import { useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { EmptyPaneWelcome, type WelcomeActions } from "./EmptyPaneWelcome";
 import { PaneTabBar } from "./PaneTabBar";
 import { PanelContent } from "./PanelContent";
 import type { PanelCallbacks } from "./PanelContent";
@@ -37,6 +38,7 @@ type Props = {
   onDockBrowserPanel?: (panelId: string) => void;
   onFocusFloatBrowserPanel?: (panelId: string) => void;
   onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
+  welcomeActions?: WelcomeActions;
 };
 
 function DropZone({
@@ -165,6 +167,7 @@ export const PaneView = memo(function PaneView({
   onDockBrowserPanel,
   onFocusFloatBrowserPanel,
   onNavigateFloatBrowserPanel,
+  welcomeActions,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
@@ -288,11 +291,14 @@ export const PaneView = memo(function PaneView({
             />
           </div>
         ))}
-        {pane.panels.length === 0 && (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Empty pane — click + to add a terminal
-          </div>
-        )}
+        {pane.panels.length === 0 &&
+          (welcomeActions ? (
+            <EmptyPaneWelcome actions={welcomeActions} />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Empty pane - click + to add a terminal
+            </div>
+          ))}
 
         {dimOpacity > 0 && (
           <div
