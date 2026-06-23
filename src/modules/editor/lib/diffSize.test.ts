@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLines, isDiffTooLarge } from "./diffSize";
+import { clampPatchPreview, countLines, isDiffTooLarge } from "./diffSize";
 
 describe("countLines", () => {
   it("counts a single line for empty input", () => {
@@ -28,5 +28,29 @@ describe("isDiffTooLarge", () => {
     const manyShortLines = "a\n".repeat(5001);
     expect(manyShortLines.length).toBeLessThan(256 * 1024);
     expect(isDiffTooLarge("", manyShortLines)).toBe(true);
+  });
+});
+
+describe("clampPatchPreview", () => {
+  it("returns the patch untouched when under the limit", () => {
+    const patch = "a\nb\nc";
+    expect(clampPatchPreview(patch, 500)).toEqual({ text: patch, hiddenLines: 0 });
+  });
+
+  it("keeps exactly maxLines and reports the hidden count", () => {
+    const patch = Array.from({ length: 600 }, (_, i) => `line ${i}`).join("\n");
+    const { text, hiddenLines } = clampPatchPreview(patch, 500);
+    expect(countLines(text)).toBe(500);
+    expect(hiddenLines).toBe(100);
+  });
+
+  it("counts a trailing newline correctly", () => {
+    const patch = `${"x\n".repeat(600)}`; // 600 lines, trailing newline
+    const { hiddenLines } = clampPatchPreview(patch, 500);
+    expect(hiddenLines).toBe(100);
+  });
+
+  it("handles empty input", () => {
+    expect(clampPatchPreview("", 500)).toEqual({ text: "", hiddenLines: 0 });
   });
 });

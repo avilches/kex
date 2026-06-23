@@ -25,7 +25,11 @@ import {
   commitDiffKey,
 } from "./lib/diffCache";
 import { resolveEditorView } from "./lib/editorViewSettings";
-import { isDiffTooLarge } from "./lib/diffSize";
+import {
+  PATCH_PREVIEW_MAX_LINES,
+  clampPatchPreview,
+  isDiffTooLarge,
+} from "./lib/diffSize";
 import { resolveLanguage, resolveLanguageSync } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 
@@ -284,6 +288,11 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     [useFallback, fallbackPatch],
   );
 
+  const patchPreview = useMemo(
+    () => clampPatchPreview(fallbackPatch),
+    [fallbackPatch],
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col rounded-md border border-border/60 bg-background">
       <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-border/60 px-3">
@@ -346,9 +355,15 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
           </div>
         ) : useFallback ? (
           <ScrollArea className="h-full">
-            <pre className="min-h-full whitespace-pre-wrap wrap-break-word p-4 font-mono text-[12px] leading-relaxed text-muted-foreground">
-              {fallbackPatch || "Diff preview is not available for this file."}
+            <pre className="whitespace-pre-wrap wrap-break-word p-4 font-mono text-[12px] leading-relaxed text-muted-foreground">
+              {patchPreview.text || "Diff preview is not available for this file."}
             </pre>
+            {patchPreview.hiddenLines > 0 ? (
+              <div className="border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
+                Preview limited to the first {PATCH_PREVIEW_MAX_LINES} lines (
+                {patchPreview.hiddenLines} more). Open the file to see the full diff.
+              </div>
+            ) : null}
           </ScrollArea>
         ) : (
           <CodeMirror
