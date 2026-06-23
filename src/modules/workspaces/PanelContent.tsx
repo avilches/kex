@@ -1,13 +1,21 @@
 import { isMarkdownPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
-import { EditorOverlayBar } from "@/modules/editor";
+import { EditorOverlayBar, type EditorGlobalToggleKey } from "@/modules/editor";
 import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useRef } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
-import { setEditorViewForExt } from "@/modules/settings/store";
+import {
+  setEditorAutocompletion,
+  setEditorBracketMatching,
+  setEditorCloseBrackets,
+  setEditorCursorBlink,
+  setEditorHighlightActiveLine,
+  setEditorScrollPastEnd,
+  setEditorViewForExt,
+} from "@/modules/settings/store";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Panel } from "./lib/types";
 
@@ -28,6 +36,18 @@ const BrowserPane = lazy(() =>
 const GitHistoryPane = lazy(() =>
   import("@/modules/git-history/GitHistoryPane").then((m) => ({ default: m.GitHistoryPane as ComponentType<any> })),
 );
+
+const GLOBAL_TOGGLE_SETTERS: Record<
+  EditorGlobalToggleKey,
+  (value: boolean) => Promise<void>
+> = {
+  highlightActiveLine: setEditorHighlightActiveLine,
+  bracketMatching: setEditorBracketMatching,
+  closeBrackets: setEditorCloseBrackets,
+  autocompletion: setEditorAutocompletion,
+  cursorBlink: setEditorCursorBlink,
+  scrollPastEnd: setEditorScrollPastEnd,
+};
 
 type CommitFileDiffOpenInput = {
   repoRoot: string;
@@ -83,6 +103,25 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
+  const highlightActiveLine = usePreferencesStore((s) => s.editorHighlightActiveLine);
+  const bracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
+  const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
+  const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
+  const cursorBlink = usePreferencesStore((s) => s.editorCursorBlink);
+  const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
+
+  const globalToggles = {
+    value: {
+      highlightActiveLine,
+      bracketMatching,
+      closeBrackets,
+      autocompletion,
+      cursorBlink,
+      scrollPastEnd,
+    },
+    onToggle: (key: EditorGlobalToggleKey, value: boolean) =>
+      void GLOBAL_TOGGLE_SETTERS[key](value),
+  };
 
   switch (panel.kind) {
     case "terminal":
@@ -119,6 +158,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
             {isMarkdownPath(panel.path) ? (
               <EditorOverlayBar
                 viewToggles={viewToggles}
+                globalToggles={globalToggles}
                 view={{
                   mode: "raw",
                   onChange: (mode) => callbacks.onSetMarkdownView?.(panel.id, mode),
@@ -127,7 +167,10 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                 }}
               />
             ) : (
-              <EditorOverlayBar viewToggles={viewToggles} />
+              <EditorOverlayBar
+                viewToggles={viewToggles}
+                globalToggles={globalToggles}
+              />
             )}
             <EditorPane
               ref={(h: EditorPaneHandle | null) => {
