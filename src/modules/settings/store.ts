@@ -10,6 +10,15 @@ export type GitColorScheme = "vscode" | "jetbrains";
 
 export type ScmViewMode = "list" | "tree";
 
+export type CursorStyle = "bar" | "block" | "underline";
+
+export type CursorInactiveStyle =
+  | "outline"
+  | "block"
+  | "bar"
+  | "underline"
+  | "none";
+
 export const DEFAULT_THEME_ID = "kex-default";
 
 export const EDITOR_THEMES = [
@@ -123,6 +132,10 @@ export type Preferences = {
   terminalFontSize: number;
   terminalLineHeight: number;
   terminalScrollback: number;
+  terminalCursorStyle: CursorStyle;
+  terminalCursorInactiveStyle: CursorInactiveStyle;
+  terminalCursorWidth: number;
+  terminalScrollSensitivity: number;
   lastWslDistro: string | null;
   zoomLevel: number;
   agentNotifications: boolean;
@@ -164,6 +177,10 @@ const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
 const KEY_TERMINAL_LINE_HEIGHT = "terminalLineHeight";
 const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
+const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
+const KEY_TERMINAL_CURSOR_INACTIVE_STYLE = "terminalCursorInactiveStyle";
+const KEY_TERMINAL_CURSOR_WIDTH = "terminalCursorWidth";
+const KEY_TERMINAL_SCROLL_SENSITIVITY = "terminalScrollSensitivity";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
@@ -222,6 +239,44 @@ export const TERMINAL_SCROLLBACK_PRESETS = [
   500, 1000, 2000, 5000, 10_000, 25_000,
 ] as const;
 
+export const CURSOR_STYLES = ["bar", "block", "underline"] as const;
+export const CURSOR_STYLE_DEFAULT: CursorStyle = "bar";
+
+export const CURSOR_INACTIVE_STYLES = [
+  "outline",
+  "block",
+  "bar",
+  "underline",
+  "none",
+] as const;
+export const CURSOR_INACTIVE_STYLE_DEFAULT: CursorInactiveStyle = "outline";
+
+// xterm only honors cursorWidth for the bar cursor; it is CSS px.
+export const CURSOR_WIDTH_MIN = 1;
+export const CURSOR_WIDTH_MAX = 4;
+export const CURSOR_WIDTH_STEP = 1;
+export const CURSOR_WIDTH_DEFAULT = 1;
+
+// Multiplier applied to wheel deltas; 1 is xterm's default feel.
+export const SCROLL_SENSITIVITY_MIN = 1;
+export const SCROLL_SENSITIVITY_MAX = 5;
+export const SCROLL_SENSITIVITY_STEP = 1;
+export const SCROLL_SENSITIVITY_DEFAULT = 1;
+
+export function parseCursorStyle(value: unknown): CursorStyle {
+  return typeof value === "string" &&
+    (CURSOR_STYLES as readonly string[]).includes(value)
+    ? (value as CursorStyle)
+    : CURSOR_STYLE_DEFAULT;
+}
+
+export function parseCursorInactiveStyle(value: unknown): CursorInactiveStyle {
+  return typeof value === "string" &&
+    (CURSOR_INACTIVE_STYLES as readonly string[]).includes(value)
+    ? (value as CursorInactiveStyle)
+    : CURSOR_INACTIVE_STYLE_DEFAULT;
+}
+
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   themeId: DEFAULT_THEME_ID,
@@ -244,6 +299,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
   terminalLineHeight: TERMINAL_LINE_HEIGHT_DEFAULT,
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
+  terminalCursorStyle: CURSOR_STYLE_DEFAULT,
+  terminalCursorInactiveStyle: CURSOR_INACTIVE_STYLE_DEFAULT,
+  terminalCursorWidth: CURSOR_WIDTH_DEFAULT,
+  terminalScrollSensitivity: SCROLL_SENSITIVITY_DEFAULT,
   lastWslDistro: null,
   zoomLevel: 1.0,
   agentNotifications: true,
@@ -358,6 +417,26 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalScrollback: clampScrollback(
       get<number>(KEY_TERMINAL_SCROLLBACK) ??
         DEFAULT_PREFERENCES.terminalScrollback,
+    ),
+    terminalCursorStyle: parseCursorStyle(get<string>(KEY_TERMINAL_CURSOR_STYLE)),
+    terminalCursorInactiveStyle: parseCursorInactiveStyle(
+      get<string>(KEY_TERMINAL_CURSOR_INACTIVE_STYLE),
+    ),
+    terminalCursorWidth: clampToStep(
+      get<number>(KEY_TERMINAL_CURSOR_WIDTH) ??
+        DEFAULT_PREFERENCES.terminalCursorWidth,
+      CURSOR_WIDTH_MIN,
+      CURSOR_WIDTH_MAX,
+      CURSOR_WIDTH_STEP,
+      CURSOR_WIDTH_DEFAULT,
+    ),
+    terminalScrollSensitivity: clampToStep(
+      get<number>(KEY_TERMINAL_SCROLL_SENSITIVITY) ??
+        DEFAULT_PREFERENCES.terminalScrollSensitivity,
+      SCROLL_SENSITIVITY_MIN,
+      SCROLL_SENSITIVITY_MAX,
+      SCROLL_SENSITIVITY_STEP,
+      SCROLL_SENSITIVITY_DEFAULT,
     ),
     lastWslDistro:
       get<string | null>(KEY_LAST_WSL_DISTRO) ??
@@ -568,6 +647,47 @@ export async function setTerminalScrollback(value: number): Promise<void> {
   await writePref(KEY_TERMINAL_SCROLLBACK, clampScrollback(value));
 }
 
+export async function setTerminalCursorStyle(value: CursorStyle): Promise<void> {
+  await writePref(KEY_TERMINAL_CURSOR_STYLE, parseCursorStyle(value));
+}
+
+export async function setTerminalCursorInactiveStyle(
+  value: CursorInactiveStyle,
+): Promise<void> {
+  await writePref(
+    KEY_TERMINAL_CURSOR_INACTIVE_STYLE,
+    parseCursorInactiveStyle(value),
+  );
+}
+
+export async function setTerminalCursorWidth(value: number): Promise<void> {
+  await writePref(
+    KEY_TERMINAL_CURSOR_WIDTH,
+    clampToStep(
+      value,
+      CURSOR_WIDTH_MIN,
+      CURSOR_WIDTH_MAX,
+      CURSOR_WIDTH_STEP,
+      CURSOR_WIDTH_DEFAULT,
+    ),
+  );
+}
+
+export async function setTerminalScrollSensitivity(
+  value: number,
+): Promise<void> {
+  await writePref(
+    KEY_TERMINAL_SCROLL_SENSITIVITY,
+    clampToStep(
+      value,
+      SCROLL_SENSITIVITY_MIN,
+      SCROLL_SENSITIVITY_MAX,
+      SCROLL_SENSITIVITY_STEP,
+      SCROLL_SENSITIVITY_DEFAULT,
+    ),
+  );
+}
+
 export async function setLastWslDistro(value: string | null): Promise<void> {
   await writePref(KEY_LAST_WSL_DISTRO, value);
 }
@@ -656,6 +776,10 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
   [KEY_TERMINAL_LINE_HEIGHT]: "terminalLineHeight",
   [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",
+  [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
+  [KEY_TERMINAL_CURSOR_INACTIVE_STYLE]: "terminalCursorInactiveStyle",
+  [KEY_TERMINAL_CURSOR_WIDTH]: "terminalCursorWidth",
+  [KEY_TERMINAL_SCROLL_SENSITIVITY]: "terminalScrollSensitivity",
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",

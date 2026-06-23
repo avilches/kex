@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   clampToStep,
+  CURSOR_INACTIVE_STYLE_DEFAULT,
+  CURSOR_STYLE_DEFAULT,
   LETTER_SPACING_MIN,
   LETTER_SPACING_MAX,
   LETTER_SPACING_STEP,
   LINE_HEIGHT_MIN,
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_STEP,
+  parseCursorInactiveStyle,
+  parseCursorStyle,
   parseScmViewMode,
   DEFAULT_PREFERENCES,
 } from "./store";
@@ -35,6 +39,47 @@ describe("clampToStep", () => {
   it("falls back when the value is not finite", () => {
     expect(clampToStep(Number.NaN, 8, 18, 0.5, 14)).toBe(14);
     expect(clampToStep(Number.POSITIVE_INFINITY, 8, 18, 0.5, 13)).toBe(13);
+  });
+});
+
+describe("parseCursorStyle", () => {
+  it("accepts the three valid xterm styles", () => {
+    expect(parseCursorStyle("bar")).toBe("bar");
+    expect(parseCursorStyle("block")).toBe("block");
+    expect(parseCursorStyle("underline")).toBe("underline");
+  });
+
+  it("falls back to the default for anything else", () => {
+    expect(CURSOR_STYLE_DEFAULT).toBe("bar");
+    expect(parseCursorStyle("outline")).toBe(CURSOR_STYLE_DEFAULT);
+    expect(parseCursorStyle("BAR")).toBe(CURSOR_STYLE_DEFAULT);
+    expect(parseCursorStyle(undefined)).toBe(CURSOR_STYLE_DEFAULT);
+    expect(parseCursorStyle(42)).toBe(CURSOR_STYLE_DEFAULT);
+  });
+});
+
+describe("parseCursorInactiveStyle", () => {
+  it("accepts every valid xterm inactive style", () => {
+    for (const s of ["outline", "block", "bar", "underline", "none"]) {
+      expect(parseCursorInactiveStyle(s)).toBe(s);
+    }
+  });
+
+  it("falls back to the default for anything else", () => {
+    expect(CURSOR_INACTIVE_STYLE_DEFAULT).toBe("outline");
+    expect(parseCursorInactiveStyle("dotted")).toBe(
+      CURSOR_INACTIVE_STYLE_DEFAULT,
+    );
+    expect(parseCursorInactiveStyle(null)).toBe(CURSOR_INACTIVE_STYLE_DEFAULT);
+  });
+});
+
+describe("terminal cursor and scroll defaults", () => {
+  it("match xterm's baseline behavior", () => {
+    expect(DEFAULT_PREFERENCES.terminalCursorStyle).toBe("bar");
+    expect(DEFAULT_PREFERENCES.terminalCursorInactiveStyle).toBe("outline");
+    expect(DEFAULT_PREFERENCES.terminalCursorWidth).toBe(1);
+    expect(DEFAULT_PREFERENCES.terminalScrollSensitivity).toBe(1);
   });
 });
 
