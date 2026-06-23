@@ -11,6 +11,8 @@ export type GitColorScheme = "vscode" | "jetbrains";
 
 export type ScmViewMode = "list" | "tree";
 
+export type CursorStyle = "bar" | "block" | "underline";
+
 export const DEFAULT_THEME_ID = "kex-default";
 
 export const EDITOR_THEMES = [
@@ -118,6 +120,9 @@ export type Preferences = {
   scmViewMode: ScmViewMode;
   terminalWebglEnabled: boolean;
   terminalCursorBlink: boolean;
+  editorCursorBlink: boolean;
+  editorCursorStyle: CursorStyle;
+  terminalCursorStyle: CursorStyle;
   warnOnCloseTabWithRunningProcess: boolean;
   terminalFontFamily: string;
   terminalLetterSpacing: number;
@@ -167,6 +172,9 @@ const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
+const KEY_EDITOR_CURSOR_BLINK = "editorCursorBlink";
+const KEY_EDITOR_CURSOR_STYLE = "editorCursorStyle";
+const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
@@ -258,6 +266,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   scmViewMode: "tree",
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
+  editorCursorBlink: false,
+  editorCursorStyle: "bar",
+  terminalCursorStyle: "bar",
   warnOnCloseTabWithRunningProcess: true,
   terminalFontFamily: "",
   terminalLetterSpacing: LETTER_SPACING_DEFAULT,
@@ -302,6 +313,10 @@ const PREFS_CHANGED_EVENT = "kex://prefs-changed";
 
 export function parseScmViewMode(value: unknown): ScmViewMode {
   return value === "list" ? "list" : "tree";
+}
+
+function parseCursorStyle(v: unknown, fallback: CursorStyle): CursorStyle {
+  return v === "bar" || v === "block" || v === "underline" ? v : fallback;
 }
 
 async function writePref<T>(key: string, value: T): Promise<void> {
@@ -368,6 +383,17 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalCursorBlink:
       get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
       DEFAULT_PREFERENCES.terminalCursorBlink,
+    editorCursorBlink:
+      get<boolean>(KEY_EDITOR_CURSOR_BLINK) ??
+      DEFAULT_PREFERENCES.editorCursorBlink,
+    editorCursorStyle: parseCursorStyle(
+      get<string>(KEY_EDITOR_CURSOR_STYLE),
+      DEFAULT_PREFERENCES.editorCursorStyle,
+    ),
+    terminalCursorStyle: parseCursorStyle(
+      get<string>(KEY_TERMINAL_CURSOR_STYLE),
+      DEFAULT_PREFERENCES.terminalCursorStyle,
+    ),
     warnOnCloseTabWithRunningProcess:
       get<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
       DEFAULT_PREFERENCES.warnOnCloseTabWithRunningProcess,
@@ -567,6 +593,18 @@ export async function setTerminalCursorBlink(value: boolean): Promise<void> {
   await writePref(KEY_TERMINAL_CURSOR_BLINK, value);
 }
 
+export async function setEditorCursorBlink(value: boolean): Promise<void> {
+  await writePref(KEY_EDITOR_CURSOR_BLINK, value);
+}
+
+export async function setEditorCursorStyle(value: CursorStyle): Promise<void> {
+  await writePref(KEY_EDITOR_CURSOR_STYLE, value);
+}
+
+export async function setTerminalCursorStyle(value: CursorStyle): Promise<void> {
+  await writePref(KEY_TERMINAL_CURSOR_STYLE, value);
+}
+
 export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promise<void> {
   await writePref(KEY_WARN_ON_CLOSE_RUNNING, value);
 }
@@ -747,6 +785,9 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
   [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
   [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
+  [KEY_EDITOR_CURSOR_BLINK]: "editorCursorBlink",
+  [KEY_EDITOR_CURSOR_STYLE]: "editorCursorStyle",
+  [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
   [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
   [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
