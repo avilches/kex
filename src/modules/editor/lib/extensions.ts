@@ -20,7 +20,6 @@ import { cursorBlinkExt, cursorStyleExt } from "./cursorExtensions";
 export const languageCompartment = new Compartment();
 export const readOnlyCompartment = new Compartment();
 export const wrapCompartment = new Compartment();
-export const vimCompartment = new Compartment();
 export const lineNumbersCompartment = new Compartment();
 export const whitespaceCompartment = new Compartment();
 export const foldGutterCompartment = new Compartment();
@@ -53,7 +52,6 @@ export type SharedExtConfig = {
   autocompletion: boolean;
   cursorBlink: boolean;
   cursorStyle: CursorStyle;
-  vimActive: boolean;
 };
 
 export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
@@ -70,7 +68,7 @@ export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
     autocompletionCompartment.of(cfg.autocompletion ? autocompletion() : []),
     scrollPastEndCompartment.of(cfg.scrollPastEnd ? scrollPastEnd() : []),
     cursorBlinkCompartment.of(cursorBlinkExt(cfg.cursorBlink)),
-    cursorStyleCompartment.of(cursorStyleExt(cfg.cursorStyle, cfg.vimActive)),
+    cursorStyleCompartment.of(cursorStyleExt(cfg.cursorStyle)),
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
         backgroundColor: "transparent !important",
@@ -120,19 +118,6 @@ export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
       },
       ".cm-cursor, .cm-dropCursor": {
         borderLeftColor: "var(--foreground)",
-      },
-      // Vim normal-mode block cursor -- translucent foreground, no rose hue.
-      ".cm-fat-cursor": {
-        background:
-          "color-mix(in srgb, var(--foreground) 35%, transparent) !important",
-        outline:
-          "1px solid color-mix(in srgb, var(--foreground) 55%, transparent) !important",
-        color: "var(--foreground) !important",
-      },
-      "&:not(.cm-focused) .cm-fat-cursor": {
-        background: "transparent !important",
-        outline:
-          "1px solid color-mix(in srgb, var(--foreground) 35%, transparent) !important",
       },
       ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection":
         {

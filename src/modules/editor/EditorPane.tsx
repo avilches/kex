@@ -7,7 +7,7 @@ import {
   SearchQuery,
   setSearchQuery,
 } from "@codemirror/search";
-import { type Extension, Prec } from "@codemirror/state";
+import { type Extension } from "@codemirror/state";
 import {
   EditorView,
   highlightActiveLine,
@@ -16,7 +16,6 @@ import {
   scrollPastEnd,
 } from "@codemirror/view";
 import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
-import { vim } from "@replit/codemirror-vim";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import {
   forwardRef,
@@ -43,7 +42,6 @@ import {
   lineNumbersCompartment,
   lineNumbersExt,
   scrollPastEndCompartment,
-  vimCompartment,
   whitespaceCompartment,
   wrapCompartment,
 } from "./lib/extensions";
@@ -51,10 +49,7 @@ import { resolveEditorView } from "./lib/editorViewSettings";
 import { resolveLanguage } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 import { useDocument } from "./lib/useDocument";
-import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
 import { cursorBlinkExt, cursorStyleExt } from "./lib/cursorExtensions";
-
-initVimGlobals();
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
@@ -83,7 +78,6 @@ type Props = {
   path: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
-  onClose?: () => void;
 };
 
 function formatBytes(n: number): string {
@@ -93,7 +87,7 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onClose }, ref) {
+  function EditorPane({ path, onDirtyChange, onSaved }, ref) {
     const { doc, onChange, save, reload } = useDocument({
       path,
       onDirtyChange,
@@ -101,7 +95,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const cmRef = useRef<ReactCodeMirrorRef>(null);
-    const vimMode = usePreferencesStore((s) => s.vimMode);
     const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
     const indentSize = usePreferencesStore((s) => s.editorIndentSize);
     const indentWithTabs = usePreferencesStore((s) => s.editorIndentWithTabs);
@@ -124,8 +117,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     saveRef.current = save;
     const onSavedRef = useRef(onSaved);
     onSavedRef.current = onSaved;
-    const onCloseRef = useRef(onClose);
-    onCloseRef.current = onClose;
 
     const pathRef = useRef(path);
     pathRef.current = path;
@@ -157,16 +148,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         const s = usePreferencesStore.getState();
         const v0 = resolveEditorView(pathRef.current, s.editorViewByExt);
         return [
-          vimCompartment.of(s.vimMode ? Prec.highest(vim()) : []),
-          vimHandlersExtension(() => ({
-            save: () => {
-              void (async () => {
-                await saveRef.current();
-                onSavedRef.current?.();
-              })();
-            },
-            close: () => onCloseRef.current?.(),
-          })),
           ...buildSharedExtensions({
             view: v0,
             indentSize: s.editorIndentSize,
@@ -178,7 +159,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             autocompletion: s.editorAutocompletion,
             cursorBlink: s.editorCursorBlink,
             cursorStyle: s.editorCursorStyle,
-            vimActive: s.vimMode,
           }),
           languageCompartment.of([]),
           wrapCompartment.of(v0.wrap ? EditorView.lineWrapping : []),
@@ -199,14 +179,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       },
       [],
     );
-
-    useEffect(() => {
-      const v = cmRef.current?.view;
-      if (!v) return;
-      v.dispatch({
-        effects: vimCompartment.reconfigure(vimMode ? Prec.highest(vim()) : []),
-      });
-    }, [vimMode]);
 
     useEffect(() => {
       const v = cmRef.current?.view;
@@ -277,8 +249,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     useEffect(() => {
       const v = cmRef.current?.view;
       if (!v) return;
-      v.dispatch({ effects: cursorStyleCompartment.reconfigure(cursorStyleExt(cursorStylePref, vimMode)) });
-    }, [cursorStylePref, vimMode]);
+      v.dispatch({ effects: cursorStyleCompartment.reconfigure(cursorStyleExt(cursorStylePref)) });
+    }, [cursorStylePref]);
 
     useEffect(() => {
       const ext = path.split(".").pop()?.toLowerCase() ?? null;

@@ -110,7 +110,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
   `osc-handlers.ts` parses OSC 7 (with Windows drive-letter normalization: `/C:/Users/foo` → `C:/Users/foo`) and OSC 133
   markers. The xterm color palette is driven by the central theme engine (`modules/theme`), not a local table.
 - **editor/** — CodeMirror 6 stack (`EditorStack` mirrors `TerminalStack`). `extensions.ts` configures language modes;
-  supports vim mode and prebuilt themes (Tokyo Night, Nord, GitHub, Atom One, Aura, Copilot, Xcode, Gruvbox Dark).
+  supports prebuilt themes (Tokyo Night, Nord, GitHub, Atom One, Aura, Copilot, Xcode, Gruvbox Dark).
 - **explorer/** — file tree with Material/Catppuccin icons (`iconResolver.ts`), fuzzy search, keyboard nav, inline
   rename, context actions. Backslash-aware `basename`.
 - **browser/** — web browser tab (address bar + navigation, `browser` panel kind); also surfaces the auto-detected

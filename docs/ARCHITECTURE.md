@@ -56,7 +56,7 @@ Kex uses a strict **two-process model**. The Rust process owns all OS access. Th
 │  WebView (React + TypeScript)                               │
 │                                                             │
 │  terminal/      — xterm.js (WebGL), PTY bridge, OSC parsing │
-│  editor/        — CodeMirror 6, diffs, vim                  │
+│  editor/        — CodeMirror 6, diffs                       │
 │  explorer/      — File tree, fuzzy search                   │
 │  source-control/  — Git stage/commit/push UI                │
 │  git-history/   — Commit graph, per-file diffs              │
@@ -101,8 +101,6 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 **CodeMirror 6.** A proper code editor, not a textarea. Syntax highlighting, bracket matching, line numbers, code folding, multi-cursor, and tab/indent handling work correctly.
 
 **Language support.** TypeScript / JavaScript (JSX/TSX), Rust, Python, Go, HTML, CSS, JSON, Markdown, PHP, C/C++/Java/C# (via legacy modes), and more. Language is detected from the file extension and the appropriate language pack is loaded on demand.
-
-**Vim mode.** Opt-in via settings. Uses `@replit/codemirror-vim` which implements the Vim keybinding model inside CodeMirror. Normal/insert/visual modes, motions, operators, and `:` commands work. Not a full Vim emulation, but covers the common workflow.
 
 **Ten built-in editor themes**, independent from the app theme: Atom One Dark, Aura, Copilot, GitHub Dark, GitHub Light, Gruvbox Dark, Nord, Tokyo Night, Xcode Dark, Xcode Light.
 
@@ -379,7 +377,7 @@ src/
 └── modules/
     ├── terminal/                  — xterm.js stack, PTY bridge, OSC parsing (7/133/0/2), blocks, oscTitleStore
     │   └── block/                 — Block overlay, shell input, mode machine, history
-    ├── editor/                    — CodeMirror 6 stack, diffs, vim. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. Global editor settings (indent size, indent with tabs, scroll past end, highlight active line, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences and are applied via CodeMirror compartments so they update live without rebuilding editor state.
+    ├── editor/                    — CodeMirror 6 stack, diffs. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. Global editor settings (indent size, indent with tabs, scroll past end, highlight active line, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences and are applied via CodeMirror compartments so they update live without rebuilding editor state.
     ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)
     │   ├── components/            — NotificationBell
     │   ├── lib/                   — route, notify, agentIcon, agentSessionRestore

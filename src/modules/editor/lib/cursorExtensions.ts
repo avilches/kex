@@ -12,13 +12,9 @@ export function cursorBlinkExt(blink: boolean): Extension {
 }
 
 // The editor is monospace, so a fixed 1ch width aligns the block/underline
-// caret with the glyph cell. Translucent fill keeps the character readable,
-// matching the vim fat-cursor look. Vim manages its own caret, so skip there.
-export function cursorStyleExt(
-  style: CursorStyle,
-  vimActive: boolean,
-): Extension {
-  if (vimActive || style === "bar") return [];
+// caret with the glyph cell. Translucent fill keeps the character readable.
+export function cursorStyleExt(style: CursorStyle): Extension {
+  if (style === "bar") return [];
   if (style === "block") {
     return EditorView.theme({
       ".cm-cursor.cm-cursor-primary": {

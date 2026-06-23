@@ -34,7 +34,6 @@ import {
   setTerminalCursorStyle,
   setTerminalScrollback,
   setTerminalWebglEnabled,
-  setVimMode,
   setWarnOnCloseTabWithRunningProcess,
   type CursorStyle,
 } from "@/modules/settings/store";
@@ -47,7 +46,6 @@ import { SettingRow } from "../components/SettingRow";
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
   const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
-  const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const editorPreviewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
   const terminalWebglEnabled = usePreferencesStore(
@@ -138,15 +136,6 @@ export function GeneralSection() {
 
       <div className="flex flex-col gap-2">
         <Label>Editor</Label>
-        <SettingRow
-          title="Vim mode"
-          description="Enable Vim keybindings in the code editor."
-        >
-          <Switch
-            checked={vimMode}
-            onCheckedChange={(v) => void setVimMode(v)}
-          />
-        </SettingRow>
         <SettingRow
           title="Auto save"
           description="Save files when editor loses focus, tab or app closes and every X seconds."

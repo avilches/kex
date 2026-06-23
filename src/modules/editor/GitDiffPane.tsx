@@ -228,7 +228,6 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
         autocompletion: s.editorAutocompletion,
         cursorBlink: s.editorCursorBlink,
         cursorStyle: s.editorCursorStyle,
-        vimActive: false,
       }),
       languageCompartment.of(initialLang ?? []),
       wrapCompartment.of(v0.wrap ? EditorView.lineWrapping : []),
