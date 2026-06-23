@@ -52,3 +52,9 @@ describe("scmViewMode", () => {
     expect(parseScmViewMode(42)).toBe("tree");
   });
 });
+
+describe("editorViewByExt default", () => {
+  it("defaults to an empty map", () => {
+    expect(DEFAULT_PREFERENCES.editorViewByExt).toEqual({});
+  });
+});

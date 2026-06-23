@@ -1,4 +1,5 @@
 import type { KeyBinding, ShortcutId } from "@/modules/shortcuts/shortcuts";
+import type { EditorViewMap, EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 
@@ -130,6 +131,7 @@ export type Preferences = {
   editorAutoSave: boolean;
   editorAutoSaveDelay: number;
   editorPreviewOnClick: boolean;
+  editorViewByExt: EditorViewMap;
   rightPanelOpen: boolean;
   rightPanelWidth: number;
   rightPanelActiveTab: "explorer" | "git" | "history";
@@ -171,6 +173,7 @@ const KEY_SHORTCUTS = "shortcuts";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
 const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
 const KEY_EDITOR_PREVIEW_ON_CLICK = "editorPreviewOnClick";
+const KEY_EDITOR_VIEW_BY_EXT = "editorViewByExt";
 const KEY_RIGHT_PANEL_OPEN = "rightPanelOpen";
 const KEY_RIGHT_PANEL_WIDTH = "rightPanelWidth";
 const KEY_RIGHT_PANEL_ACTIVE_TAB = "rightPanelActiveTab";
@@ -251,6 +254,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorAutoSave: false,
   editorAutoSaveDelay: 15000,
   editorPreviewOnClick: true,
+  editorViewByExt: {},
   rightPanelOpen: true,
   rightPanelWidth: 240,
   rightPanelActiveTab: "explorer",
@@ -377,6 +381,12 @@ export async function loadPreferences(): Promise<Preferences> {
     editorPreviewOnClick:
       get<boolean>(KEY_EDITOR_PREVIEW_ON_CLICK) ??
       DEFAULT_PREFERENCES.editorPreviewOnClick,
+    editorViewByExt: (() => {
+      const v = get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT);
+      return v && typeof v === "object" && !Array.isArray(v)
+        ? v
+        : DEFAULT_PREFERENCES.editorViewByExt;
+    })(),
     rightPanelOpen:
       get<boolean>(KEY_RIGHT_PANEL_OPEN) ?? DEFAULT_PREFERENCES.rightPanelOpen,
     rightPanelWidth: (() => {
@@ -593,6 +603,16 @@ export async function setEditorPreviewOnClick(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_PREVIEW_ON_CLICK, value);
 }
 
+export async function setEditorViewForExt(
+  ext: string,
+  value: EditorViewSettings,
+): Promise<void> {
+  const current =
+    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+  const next = { ...current, [ext]: value };
+  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+}
+
 export async function setAgentNotifications(value: boolean): Promise<void> {
   await writePref(KEY_AGENT_NOTIFICATIONS, value);
 }
@@ -663,6 +683,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
   [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",
   [KEY_EDITOR_PREVIEW_ON_CLICK]: "editorPreviewOnClick",
+  [KEY_EDITOR_VIEW_BY_EXT]: "editorViewByExt",
   [KEY_RIGHT_PANEL_OPEN]: "rightPanelOpen",
   [KEY_RIGHT_PANEL_WIDTH]: "rightPanelWidth",
   [KEY_RIGHT_PANEL_ACTIVE_TAB]: "rightPanelActiveTab",
