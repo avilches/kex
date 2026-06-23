@@ -2,10 +2,10 @@
 
 Cada bug es un fichero autocontenido y accionable por un agente en `docs/pending/bugs/`. Un agente puede ejecutar cualquiera de forma aislada: cada fichero incluye contexto del proyecto, ubicación `archivo:línea`, problema, impacto, fix concreto, criterios de aceptación, comandos de verificación y el test a añadir si toca un subsistema core.
 
-Total: 28 bugs. 5 high, 12 medium, 11 low. Los marcados con asterisco se verificaron a mano.
+Total: 27 bugs. 5 high, 11 medium, 11 low. Los marcados con asterisco se verificaron a mano.
 
 > Auditoria 2026-06-23: eliminados por estar ya corregidos en el codigo: BUG-20 (pty_open autoriza post-spawn), BUG-27 (countDiffLines es fallback valido), BUG-30 (errores fs/autosave ya con toast), BUG-34 (cd quoting ya usa comillas dobles). Ver `AUDIT-2026-06-23.md`.
-> Arreglados despues de la auditoria: BUG-28 (parser descarta entradas con path vacio en status truncado), BUG-05 (guardia de diff grande tambien por numero de lineas).
+> Arreglados despues de la auditoria: BUG-28 (parser descarta entradas con path vacio en status truncado), BUG-05 (guardia de diff grande tambien por numero de lineas), BUG-11 (el cliente ya muestra un badge cuando el diff llega truncado).
 
 ## High
 
@@ -24,7 +24,6 @@ Total: 28 bugs. 5 high, 12 medium, 11 low. Los marcados con asterisco se verific
 | BUG-08 | Fuga: bg procs nunca removidos del mapa (memoria) | [bugs/BUG-08-fuga-procesos-background-shellstate.md](bugs/BUG-08-fuga-procesos-background-shellstate.md) |
 | BUG-09 | DnD context value sin memoizar: cascada de re-renders | [bugs/BUG-09-dnd-provider-context-value-rerenders.md](bugs/BUG-09-dnd-provider-context-value-rerenders.md) |
 | BUG-10 | Persistencia serializa el árbol en cada `cd`/comando | [bugs/BUG-10-persistencia-serializa-arbol-completo.md](bugs/BUG-10-persistencia-serializa-arbol-completo.md) |
-| BUG-11 | El flag `truncated` se ignora en el cliente | [bugs/BUG-11-flag-truncated-ignorado-cliente.md](bugs/BUG-11-flag-truncated-ignorado-cliente.md) |
 | BUG-12 | TOCTOU: auto-autorización del repo root ascendente | [bugs/BUG-12-toctou-auto-autorizacion-repo-root.md](bugs/BUG-12-toctou-auto-autorizacion-repo-root.md) |
 | BUG-13 | Detección de binario solo 8 KB: incoherencia | [bugs/BUG-13-deteccion-binario-8kb-incoherente.md](bugs/BUG-13-deteccion-binario-8kb-incoherente.md) |
 | BUG-14 | `git show` no propaga truncamiento de blobs (memoria) | [bugs/BUG-14-git-show-truncamiento-blobs-memoria.md](bugs/BUG-14-git-show-truncamiento-blobs-memoria.md) |

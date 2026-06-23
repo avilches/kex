@@ -103,7 +103,7 @@ function countDiffLines(patch: string): { added: number; removed: number } {
 type LoadState =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "loaded"; originalContent: string; modifiedContent: string; isBinary: boolean; fallbackPatch: string }
+  | { kind: "loaded"; originalContent: string; modifiedContent: string; isBinary: boolean; fallbackPatch: string; truncated: boolean }
   | { kind: "error"; message: string };
 
 function cacheKey(source: WorkingSource | CommitSource): string {
@@ -123,6 +123,7 @@ function loadStateFromCache(
     modifiedContent: hit.modifiedContent,
     isBinary: hit.isBinary,
     fallbackPatch: hit.fallbackPatch,
+    truncated: hit.truncated,
   };
 }
 
@@ -172,6 +173,7 @@ export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordW
           modifiedContent: res.modifiedContent,
           isBinary: res.isBinary,
           fallbackPatch: res.fallbackPatch,
+          truncated: res.truncated,
         });
       })
       .catch((err) => {
@@ -197,6 +199,7 @@ export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordW
   const modifiedContent = loaded?.modifiedContent ?? "";
   const isBinary = loaded?.isBinary ?? false;
   const fallbackPatch = loaded?.fallbackPatch ?? "";
+  const truncated = loaded?.truncated ?? false;
 
   const isTooLarge = useMemo(
     () => isDiffTooLarge(originalContent, modifiedContent),
@@ -279,6 +282,15 @@ export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordW
           ) : isTooLarge ? (
             <Badge variant="secondary" className="text-[10px]">
               Large file / patch view
+            </Badge>
+          ) : null}
+          {truncated ? (
+            <Badge
+              variant="secondary"
+              className="text-[10px] text-amber-600 dark:text-amber-400"
+              title="The diff exceeded the size limit and was truncated; content may be incomplete."
+            >
+              Truncated
             </Badge>
           ) : null}
           <span
