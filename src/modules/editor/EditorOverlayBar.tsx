@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Edit02Icon, EyeIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import { DocumentCodeIcon, EyeIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   clampIndentSize,
@@ -165,8 +165,8 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
             view.renderedDisabled && view.mode === "raw"
               ? view.renderedHint
               : view.mode === "raw"
-                ? "Edit mode"
-                : "Preview mode"
+                ? "Preview"
+                : "Edit"
           }
           className={cn(
             "flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground",
@@ -176,7 +176,7 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
           )}
         >
           <HugeiconsIcon
-            icon={view.mode === "raw" ? Edit02Icon : EyeIcon}
+            icon={view.mode === "raw" ? EyeIcon : DocumentCodeIcon}
             size={13}
             strokeWidth={2}
           />
