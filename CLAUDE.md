@@ -38,6 +38,7 @@ Al anadir un ajuste al editor hay que ubicarlo segun su alcance:
 
 - **Ajuste por extension de archivo** (vive en `editorViewByExt`, resuelto con `resolveEditorView`): SIEMPRE va en el menu contextual del editor (el dropdown `[...]` de `EditorOverlayBar`), en su seccion "por extension". No va en la ventana de Settings (esa es global).
 - **Ajuste global del editor** (preferencia top-level del store): va en DOS sitios: en su grupo "Global" del menu contextual `[...]` y tambien en la ventana de Settings (`GeneralSection`).
+- **Ajuste solo-JSON**: algunas preferencias no tienen UI y se editan a mano en `settings-general.json`. Marcalas con un comentario `// JSON-only` en el tipo `Preferences` de `store.ts` y listalas en `docs/ARCHITECTURE.md`. Hoy son `editorHighlightActiveLine`, `editorAutoSaveDelay`, `workspacePaneLimit`, `paneSplitLimit`, `keepFolderLayoutOnChangeExplorerRoot`.
 
 Asi el usuario puede tocar lo visual rapido desde el editor y la configuracion global queda accesible tanto en contexto como en la pantalla de ajustes.
 
