@@ -1,26 +1,76 @@
 import { defaultMonoFontFamily } from "@/lib/fonts";
-import { indentUnit } from "@codemirror/language";
+import type { CursorStyle } from "@/modules/settings/store";
+import { bracketMatching, foldGutter, indentUnit } from "@codemirror/language";
 import { lintGutter } from "@codemirror/lint";
 import { search } from "@codemirror/search";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
+import {
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightWhitespace,
+  lineNumbers,
+  scrollPastEnd,
+} from "@codemirror/view";
+import type { EditorViewSettings } from "./editorViewSettings";
+import { cursorBlinkExt, cursorStyleExt } from "./cursorExtensions";
 
 // Compartments allow runtime reconfiguration without rebuilding state.
 export const languageCompartment = new Compartment();
 export const readOnlyCompartment = new Compartment();
 export const wrapCompartment = new Compartment();
 export const vimCompartment = new Compartment();
+export const lineNumbersCompartment = new Compartment();
+export const whitespaceCompartment = new Compartment();
+export const foldGutterCompartment = new Compartment();
+export const indentCompartment = new Compartment();
+export const activeLineCompartment = new Compartment();
+export const bracketMatchingCompartment = new Compartment();
+export const closeBracketsCompartment = new Compartment();
+export const autocompletionCompartment = new Compartment();
+export const scrollPastEndCompartment = new Compartment();
+export const cursorBlinkCompartment = new Compartment();
+export const cursorStyleCompartment = new Compartment();
 
-// Only what basicSetup doesn't already cover, to avoid duplicate extensions.
-// basicSetup gives us line numbers, fold gutter, history, indentOnInput,
-// bracketMatching, closeBrackets, autocompletion, highlightActiveLine,
-// highlightSelectionMatches and the search keymap.
-export function buildSharedExtensions(): Extension[] {
+export function indentExt(size: number, withTabs: boolean): Extension {
+  const unit = withTabs ? "\t" : " ".repeat(size);
+  return [indentUnit.of(unit), EditorState.tabSize.of(size)];
+}
+
+export function lineNumbersExt(on: boolean): Extension {
+  return on ? [lineNumbers(), highlightActiveLineGutter()] : [];
+}
+
+export type SharedExtConfig = {
+  view: EditorViewSettings;
+  indentSize: number;
+  indentWithTabs: boolean;
+  scrollPastEnd: boolean;
+  highlightActiveLine: boolean;
+  bracketMatching: boolean;
+  closeBrackets: boolean;
+  autocompletion: boolean;
+  cursorBlink: boolean;
+  cursorStyle: CursorStyle;
+  vimActive: boolean;
+};
+
+export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
   return [
-    indentUnit.of("  "),
-    EditorState.tabSize.of(2),
+    indentCompartment.of(indentExt(cfg.indentSize, cfg.indentWithTabs)),
     search({ top: true }),
     lintGutter(),
+    lineNumbersCompartment.of(lineNumbersExt(cfg.view.lineNumbers)),
+    foldGutterCompartment.of(cfg.view.foldGutter ? foldGutter() : []),
+    whitespaceCompartment.of(cfg.view.whitespace ? highlightWhitespace() : []),
+    activeLineCompartment.of(cfg.highlightActiveLine ? highlightActiveLine() : []),
+    bracketMatchingCompartment.of(cfg.bracketMatching ? bracketMatching() : []),
+    closeBracketsCompartment.of(cfg.closeBrackets ? closeBrackets() : []),
+    autocompletionCompartment.of(cfg.autocompletion ? autocompletion() : []),
+    scrollPastEndCompartment.of(cfg.scrollPastEnd ? scrollPastEnd() : []),
+    cursorBlinkCompartment.of(cursorBlinkExt(cfg.cursorBlink)),
+    cursorStyleCompartment.of(cursorStyleExt(cfg.cursorStyle, cfg.vimActive)),
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
         backgroundColor: "transparent !important",
@@ -71,7 +121,7 @@ export function buildSharedExtensions(): Extension[] {
       ".cm-cursor, .cm-dropCursor": {
         borderLeftColor: "var(--foreground)",
       },
-      // Vim normal-mode block cursor — translucent foreground, no rose hue.
+      // Vim normal-mode block cursor -- translucent foreground, no rose hue.
       ".cm-fat-cursor": {
         background:
           "color-mix(in srgb, var(--foreground) 35%, transparent) !important",
