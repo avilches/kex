@@ -32,6 +32,7 @@ import { fileIconUrl } from "./lib/iconResolver";
 import {
   copyToClipboard,
   relativePath,
+  REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
@@ -371,7 +372,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 onSelect={() => contextHit && void revealInFinder(contextHit.path)}
               >
                 <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
-                Reveal in Finder
+                {REVEAL_LABEL}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem

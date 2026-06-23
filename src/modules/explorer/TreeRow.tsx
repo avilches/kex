@@ -42,6 +42,7 @@ import { InlineInput } from "./InlineInput";
 import {
   copyToClipboard,
   relativePath,
+  REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
 import { gitignoreEntryFor } from "./lib/gitignore";
@@ -359,7 +360,7 @@ function EntryRowImpl(props: EntryRowProps) {
           onSelect={() => void revealInFinder(path)}
         >
           <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
-          Reveal in Finder
+          {REVEAL_LABEL}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -612,7 +613,7 @@ export function FsRootRow({
           onSelect={() => void revealInFinder(path)}
         >
           <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
-          Reveal in Finder
+          {REVEAL_LABEL}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -718,7 +719,7 @@ export function FsUpRow({
           onSelect={() => void revealInFinder(path)}
         >
           <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
-          Reveal in Finder
+          {REVEAL_LABEL}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem

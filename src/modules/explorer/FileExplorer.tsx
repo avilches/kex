@@ -53,7 +53,11 @@ import {
   StatusRow,
   type RowActions,
 } from "./TreeRow";
-import { copyToClipboard, revealInFinder } from "./lib/contextActions";
+import {
+  copyToClipboard,
+  REVEAL_LABEL,
+  revealInFinder,
+} from "./lib/contextActions";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { useFileTree } from "./lib/useFileTree";
@@ -1248,7 +1252,7 @@ export const FileExplorer = memo(
                       size={14}
                       strokeWidth={2}
                     />
-                    Reveal in Finder
+                    {REVEAL_LABEL}
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem

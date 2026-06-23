@@ -1,4 +1,9 @@
+import { IS_MAC } from "@/lib/platform";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+
+export const REVEAL_LABEL = IS_MAC
+  ? "Reveal in Finder"
+  : "Reveal in File Manager";
 
 export async function copyToClipboard(text: string): Promise<void> {
   try {
