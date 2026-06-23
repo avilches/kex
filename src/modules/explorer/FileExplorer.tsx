@@ -8,8 +8,10 @@ import {
 } from "@/components/ui/context-menu";
 import {
   ArrowDown01Icon,
+  ClipboardIcon,
   ComputerTerminal01Icon,
   CopySlashIcon,
+  DashboardSquareAddIcon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
@@ -1230,6 +1232,31 @@ export const FileExplorer = memo(
                     if (tree.renaming || tree.pendingCreate || tree.pendingDuplicate) e.preventDefault();
                   }}
                 >
+                  {onSetAsRoot && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      disabled={rootMode === "pinned"}
+                      onSelect={() => onSetAsRoot(rootPath)}
+                    >
+                      <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
+                      {rootMode === "pinned"
+                        ? "This is the Workspace Root"
+                        : "Set as Workspace Root"}
+                    </ContextMenuItem>
+                  )}
+                  {onNewWorkspaceFromFolder && (
+                    <ContextMenuItem
+                      className={COMPACT_ITEM}
+                      onSelect={() => onNewWorkspaceFromFolder(rootPath)}
+                    >
+                      <HugeiconsIcon
+                        icon={DashboardSquareAddIcon}
+                        size={14}
+                        strokeWidth={2}
+                      />
+                      New Workspace from folder
+                    </ContextMenuItem>
+                  )}
                   {onRevealInTerminal && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
@@ -1272,6 +1299,19 @@ export const FileExplorer = memo(
                       strokeWidth={2}
                     />
                     New Folder
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    disabled={tree.clipboard === null}
+                    onSelect={() => void tree.pasteEntry(rootPath, true)}
+                  >
+                    <HugeiconsIcon
+                      icon={ClipboardIcon}
+                      size={14}
+                      strokeWidth={2}
+                    />
+                    Paste
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
