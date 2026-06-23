@@ -1,5 +1,9 @@
 import { resolveMonoFontFamily } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import type {
+  CursorInactiveStyle,
+  CursorStyle,
+} from "@/modules/settings/store";
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
@@ -175,8 +179,10 @@ function termOptions() {
     lineHeight: prefs.terminalLineHeight,
     theme: buildTerminalTheme(),
     cursorBlink: false,
-    cursorStyle: "bar" as const,
-    cursorInactiveStyle: "outline" as const,
+    cursorStyle: prefs.terminalCursorStyle,
+    cursorInactiveStyle: prefs.terminalCursorInactiveStyle,
+    cursorWidth: prefs.terminalCursorWidth,
+    scrollSensitivity: prefs.terminalScrollSensitivity,
     scrollback: prefs.terminalScrollback,
     allowProposedApi: true,
     // VS Code defaults: pixel-perfect box drawing / powerline glyphs and
@@ -860,6 +866,34 @@ export function applyScrollback(value: number): void {
   for (const slot of slots) {
     if (slot.term.options.scrollback === value) continue;
     slot.term.options.scrollback = value;
+  }
+}
+
+export function applyCursorStyle(style: CursorStyle): void {
+  for (const slot of slots) {
+    if (slot.term.options.cursorStyle === style) continue;
+    slot.term.options.cursorStyle = style;
+  }
+}
+
+export function applyCursorInactiveStyle(style: CursorInactiveStyle): void {
+  for (const slot of slots) {
+    if (slot.term.options.cursorInactiveStyle === style) continue;
+    slot.term.options.cursorInactiveStyle = style;
+  }
+}
+
+export function applyCursorWidth(width: number): void {
+  for (const slot of slots) {
+    if (slot.term.options.cursorWidth === width) continue;
+    slot.term.options.cursorWidth = width;
+  }
+}
+
+export function applyScrollSensitivity(value: number): void {
+  for (const slot of slots) {
+    if (slot.term.options.scrollSensitivity === value) continue;
+    slot.term.options.scrollSensitivity = value;
   }
 }
 

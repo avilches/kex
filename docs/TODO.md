@@ -277,3 +277,17 @@ No es un quick win: hoy no existe filtro por path en ninguna capa.
 4. **Gating**: mostrar la accion solo si el fichero esta dentro de un repo (`git_resolve_repo`, cacheado por root del explorer).
 
 Beneficio extra: el filtro por path en `git_log` habilita despues "ver un commit concreto de un fichero" y otros flujos de historial por fichero.
+
+---
+
+## Terminal: opciones de configuracion adicionales
+
+Estado: pendiente (anotado 2026-06-22).
+
+Continuacion de la tanda de ajustes de terminal (cursor style, inactive style, cursor width, scroll sensitivity) ya implementados. Tres opciones mas que comparten el mismo patron de plumbing: campo en `Preferences` + default + parse/clamp + setter + entrada en `PREF_KEY_MAP` (`src/modules/settings/store.ts`), funcion `apply*` en `src/modules/terminal/lib/rendererPool.ts`, effect en `useTerminalSession.ts`, y control en `GeneralSection.tsx`.
+
+1. **Campana (bell)**: hoy no se hace nada con la senial de campana. xterm expone el evento `term.onBell`. Opciones: silenciosa (por defecto), visual (flash breve del terminal) y/o sonido. Requiere implementar el efecto (a diferencia de las opciones anteriores, que solo pasan un valor a xterm): suscribirse a `onBell` en `createSlot` y disparar el modo elegido.
+
+2. **Confirmar pegado multilinea (paste protection)**: avisar antes de pegar texto que contiene saltos de linea, para evitar ejecutar comandos sin querer. Encaja con la politica de "validar en cada boundary" y reusa el patron del dialogo de "warn on close". Interceptar el paste (handler de xterm / clipboard) y mostrar confirmacion cuando el texto pegado tenga `\n`.
+
+3. **Copy on select / paste con boton derecho**: comportamiento estilo terminal clasico (copiar automaticamente al seleccionar, pegar con click derecho). Dos toggles independientes. xterm da `onSelectionChange` para copy-on-select; el paste con boton derecho se cablea en el handler de contextmenu del host del slot.
