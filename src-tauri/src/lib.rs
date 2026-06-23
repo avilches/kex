@@ -289,7 +289,7 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
     let builder = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url_path.into()))
         .title("Settings")
-        .inner_size(600.0, 700.0)
+        .inner_size(780.0, 720.0)
         .resizable(false)
         .visible(false)
         .always_on_top(true);

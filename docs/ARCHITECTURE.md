@@ -208,7 +208,7 @@ Hooks must be installed via "Set up Claude Code" (notification bell popover) for
 
 Settings open in a separate window (not a panel in the main window). Deep-linking is supported — `openSettingsWindow("shortcuts")` opens directly to the Shortcuts section. The settings window is `always_on_top` relative to the main window.
 
-Sections: General, Themes, Shortcuts, About.
+Navigation is a left vertical sidebar. Sections: General, Editor, Terminal, Appearance, Themes, Shortcuts, About. General holds tabs, explorer, agents, and startup; Editor and Terminal each own their font, behavior, and cursor settings; Appearance holds zoom, sidebar position, and Git file colors; Themes holds the color mode, theme picker, and editor (syntax) theme.
 
 ---
 

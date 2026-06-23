@@ -66,7 +66,7 @@ export function AboutSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="About" description="" />
+      <SectionHeader title="About" />
 
       <div className="flex items-center gap-4 rounded-xl border border-border/60 bg-card/60 p-5">
         <img src="/logo.png" alt="" className="size-12" draggable={false} />

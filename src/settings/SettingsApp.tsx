@@ -1,14 +1,18 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WindowControls } from "@/components/WindowControls";
+import { cn } from "@/lib/utils";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  Cancel01Icon,
+  ColorsIcon,
+  ComputerTerminal01Icon,
   InformationCircleIcon,
+  KeyboardIcon,
   PaintBoardIcon,
   Settings01Icon,
-  KeyboardIcon,
+  SourceCodeIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -16,24 +20,29 @@ import { type JSX, useEffect, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
+import { AppearanceSection } from "./sections/AppearanceSection";
+import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
+import { TerminalSection } from "./sections/TerminalSection";
 import { ThemesSection } from "./sections/ThemesSection";
 
-const TABS: { id: SettingsTab; label: string; icon: typeof Settings01Icon, component: () => JSX.Element }[] =
-  [
-    { id: "general", label: "General", icon: Settings01Icon, component: GeneralSection },
-    { id: "themes", label: "Appearance", icon: PaintBoardIcon, component: ThemesSection },
-    { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },
-    { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
-  ];
-
-const VALID_TABS: SettingsTab[] = [
-  "general",
-  "themes",
-  "shortcuts",
-  "about",
+const SECTIONS: {
+  id: SettingsTab;
+  label: string;
+  icon: typeof Settings01Icon;
+  component: () => JSX.Element;
+}[] = [
+  { id: "general", label: "General", icon: Settings01Icon, component: GeneralSection },
+  { id: "editor", label: "Editor", icon: SourceCodeIcon, component: EditorSection },
+  { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon, component: TerminalSection },
+  { id: "appearance", label: "Appearance", icon: PaintBoardIcon, component: AppearanceSection },
+  { id: "themes", label: "Themes", icon: ColorsIcon, component: ThemesSection },
+  { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },
+  { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
 ];
+
+const VALID_TABS: SettingsTab[] = SECTIONS.map((s) => s.id);
 
 function readInitialTab(): SettingsTab {
   if (typeof window === "undefined") return "general";
@@ -46,7 +55,7 @@ function readInitialTab(): SettingsTab {
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsTab>(readInitialTab);
   const init = usePreferencesStore((s) => s.init);
-  const ActiveSection = TABS.find(t => t.id === active)?.component;
+  const ActiveSection = SECTIONS.find((s) => s.id === active)?.component;
 
   useEffect(() => {
     void init();
@@ -82,42 +91,69 @@ export function SettingsApp() {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground select-none">
-      <header
-        data-tauri-drag-region
-        className={`relative flex h-11 shrink-0 items-center border-b border-border/60 bg-card/60 ${IS_MAC ? "pr-3 pl-22" : "pr-0 pl-3"
-          }`}
-      >
-        <Tabs
-          value={active}
-          onValueChange={(v) => setActive(v as SettingsTab)}
-          orientation="horizontal"
-          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+    <div className="flex h-screen overflow-hidden bg-background text-foreground select-none">
+      <aside className="flex w-48 shrink-0 flex-col border-r border-border/60 bg-card/40">
+        <div
           data-tauri-drag-region
-        >
-          <TabsList className="pointer-events-auto h-7 bg-muted/40 px-2">
-            {TABS.map((t) => (
-              <TabsTrigger
-                key={t.id}
-                value={t.id}
-                className="h-6 gap-1.5 px-2.5 text-[11.5px]"
+          className={`shrink-0 ${IS_MAC ? "h-11" : "h-3"}`}
+        />
+        <nav className="flex flex-col gap-0.5 px-2 pb-2">
+          {SECTIONS.map((s) => {
+            const isActive = s.id === active;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActive(s.id)}
+                className={cn(
+                  "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[12.5px] transition-colors",
+                  isActive
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                )}
               >
-                <HugeiconsIcon icon={t.icon} size={12} strokeWidth={1.75} />
-                <span>{t.label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        {USE_CUSTOM_WINDOW_CONTROLS && <WindowControls closeOnly />}
-      </header>
+                <HugeiconsIcon icon={s.icon} size={14} strokeWidth={1.75} />
+                <span>{s.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
 
-      <ScrollArea type="auto" className="min-h-0 flex-1">
-        <div className="px-8 pt-6 pb-7">
-          <div className="mx-auto w-full max-w-160">
-            {ActiveSection && <ActiveSection />}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {USE_CUSTOM_WINDOW_CONTROLS ? (
+          <header
+            data-tauri-drag-region
+            className="relative flex h-11 shrink-0 items-center justify-end border-b border-border/60 bg-card/60 px-3"
+          >
+            <WindowControls closeOnly />
+          </header>
+        ) : (
+          <div
+            data-tauri-drag-region
+            className="relative flex h-9 shrink-0 items-center justify-end px-2"
+          >
+            <button
+              type="button"
+              title="Close"
+              aria-label="Close settings"
+              onClick={() => void getCurrentWebviewWindow().close()}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={2} />
+            </button>
           </div>
-        </div>
-      </ScrollArea>
+        )}
+
+        <ScrollArea type="auto" className="min-h-0 flex-1">
+          <div className="px-8 pt-2 pb-7">
+            <div className="mx-auto w-full max-w-160">
+              {ActiveSection && <ActiveSection />}
+            </div>
+          </div>
+        </ScrollArea>
+      </div>
+
       <DuplicateQuitModal />
     </div>
   );
