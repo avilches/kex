@@ -27,7 +27,7 @@ function sanitizeTree(node: SplitNode): SplitNode {
   return { ...node, first: sanitizeTree(node.first), second: sanitizeTree(node.second) };
 }
 
-function sanitizeWorkspace(w: Workspace): Workspace {
+export function sanitizeWorkspace(w: Workspace): Workspace {
   return {
     ...w,
     explorerRootMode: migrateExplorerRootMode(w.explorerRootMode),

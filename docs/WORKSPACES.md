@@ -27,6 +27,13 @@ A `Panel` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `mark
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
 its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`).
 
+A pane may have an empty `panels` array with `activePanelId: null`. This state is valid only for
+the sole pane of a workspace (when the workspace has no split). When the last tab is closed in a
+split pane, `applyClosePanel` (the pure entry point for tab close in `splitNode.ts`) collapses the
+empty half and promotes the sibling - only the root pane of a single-pane workspace is left empty,
+where it renders a welcome screen. This invariant is locked by a unit test in
+`workspaceState.test.ts`: `sanitizeWorkspace` must round-trip an empty pane without dropping it.
+
 `editor` and `markdown` panels also carry an optional `explorerRoot`: the folder the explorer and
 git context jump to while that tab is active. It is captured when the file is opened
 (`resolveOpenRoot` in `lib/explorerRoot.ts`: the current explorer root if the file is inside it,

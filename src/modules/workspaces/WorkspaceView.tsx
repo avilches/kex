@@ -8,6 +8,7 @@ import type { PanelCallbacks } from "./PanelContent";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
+import type { WelcomeActions } from "./EmptyPaneWelcome";
 
 type Props = {
   workspaces: Workspace[];
@@ -30,6 +31,7 @@ type Props = {
   onDockBrowserPanel?: (panelId: string) => void;
   onFocusFloatBrowserPanel?: (panelId: string) => void;
   onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
+  welcomeActions?: WelcomeActions;
 };
 
 export function WorkspaceView({
@@ -87,6 +89,7 @@ export function WorkspaceView({
             onDockBrowserPanel={rest.onDockBrowserPanel}
             onFocusFloatBrowserPanel={rest.onFocusFloatBrowserPanel}
       onNavigateFloatBrowserPanel={rest.onNavigateFloatBrowserPanel}
+            welcomeActions={rest.welcomeActions}
           />
         </div>
       ))}

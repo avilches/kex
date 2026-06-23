@@ -128,8 +128,7 @@ previous workspaces or pane layout.
   original, the equivalent was `Cmd+T` for a new tab.
 - **Adjacent tab activation on close** — closing a panel activates the panel to its right (if any), then to its left.
   More natural than the original behavior of always activating the last panel.
-- **Workspace auto-close** — closing the last panel in a workspace closes the workspace itself (unless it is the last
-  workspace).
+- **Workspaces without tabs** — closing the last tab no longer closes the workspace. Instead, the sole pane of the workspace becomes empty and renders a welcome screen with quick actions (new terminal, open file). A workspace is closed only by an explicit action (the close shortcut or the sidebar close button), gated by the `warnOnCloseWorkspace` preference (toggle in Settings > General). Closing the last workspace quits the app. Not present in upstream Terax.
 - **Directional pane focus shortcuts** — `Cmd+Ctrl+Arrow` (Mac) / `Ctrl+Alt+Arrow` (non-Mac) moves focus to the
   geometrically adjacent pane in the given direction. Uses `findPaneInDirection` (spatial scoring on DOM rects: closest
   pane wins, tie-broken by perpendicular overlap). Hard stop at borders; no wrap-around. Replaces the old cyclic

@@ -26,6 +26,9 @@ type Props = {
   pendingDeletePanels: PanelInfo[] | null;
   onCancelDeleteClose: () => void;
   onConfirmDeleteClose: () => void;
+  pendingCloseWorkspace: { id: string; isLast: boolean } | null;
+  onCancelCloseWorkspace: () => void;
+  onConfirmCloseWorkspace: (dontAskAgain: boolean) => void;
 };
 
 /** Confirmation dialogs for closing dirty editors and terminals with live processes. */
@@ -40,12 +43,19 @@ export function CloseDialogs({
   pendingDeletePanels,
   onCancelDeleteClose,
   onConfirmDeleteClose,
+  pendingCloseWorkspace,
+  onCancelCloseWorkspace,
+  onConfirmCloseWorkspace,
 }: Props) {
   const [dontAskAgain, setDontAskAgain] = useState(false);
 
   useEffect(() => {
     if (pendingTerminalClosePanel) setDontAskAgain(false);
   }, [pendingTerminalClosePanel]);
+
+  useEffect(() => {
+    if (pendingCloseWorkspace) setDontAskAgain(false);
+  }, [pendingCloseWorkspace]);
 
   return (
     <>
@@ -117,6 +127,40 @@ export function CloseDialogs({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => onConfirmTerminalClose(dontAskAgain)}
+              autoFocus
+            >
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingCloseWorkspace !== null}
+        onOpenChange={(open) => !open && onCancelCloseWorkspace()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close this workspace?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingCloseWorkspace?.isLast
+                ? "This is the last workspace. Closing it will quit the app."
+                : "The workspace and all of its tabs will be closed."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            <Checkbox
+              checked={dontAskAgain}
+              onCheckedChange={(v) => setDontAskAgain(v === true)}
+            />
+            Don't ask me again
+          </label>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={onCancelCloseWorkspace}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => onConfirmCloseWorkspace(dontAskAgain)}
               autoFocus
             >
               Close

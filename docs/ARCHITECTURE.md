@@ -77,6 +77,8 @@ There are two separate WebView windows: the main window (`index.html`) and the s
 
 **Workspace/Pane/Panel model.** The center area uses a three-level hierarchy: Workspaces (listed in a 52px vertical sidebar on the left) contain a binary pane tree; each pane holds a tab strip of panels. Panels are never unmounted when you switch between them — each PTY keeps receiving output in the background. Switching to a panel that has been running a command shows you the complete, up-to-date buffer instantly.
 
+A workspace can exist with no open tabs. Closing the last tab in the sole pane of a workspace empties that pane instead of destroying the workspace; the empty pane renders a welcome screen with quick actions (new terminal, open file). A workspace is removed only by an explicit close action (the close shortcut on an empty workspace, or the sidebar close button), gated by the `warnOnCloseWorkspace` preference (toggle in Settings > General). Closing the last workspace quits the app. Panes inside a split still collapse when their last tab is closed - only the sole pane of a workspace stays empty.
+
 **Native PTY via `portable-pty`.** Not a wrapper around `script` or `expect`. Kex spawns a real pseudo-terminal, so TUI apps (vim, htop, tmux, lazygit, etc.) work correctly, including mouse input and true color.
 
 **Shell integration.** Kex injects init scripts at shell startup that emit OSC 7 (current working directory) and OSC 133 sequences (prompt boundaries, command start, command end, exit code). This enables:

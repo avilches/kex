@@ -42,6 +42,7 @@ import {
   setRightPanelActiveTab,
   setShowHidden,
   setWarnOnCloseTabWithRunningProcess,
+  setWarnOnCloseWorkspace,
 } from "@/modules/settings/store";
 import {
   useGlobalShortcuts,
@@ -78,6 +79,7 @@ import {
   useWorkspaces,
   WorkspaceView,
 } from "@/modules/workspaces";
+import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -409,6 +411,21 @@ export default function App() {
   // without re-triggering effects that depend on the callback identity.
   const handleCloseWorkspaceRef = useRef(handleCloseWorkspace);
   handleCloseWorkspaceRef.current = handleCloseWorkspace;
+
+  const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState<
+    { id: string; isLast: boolean } | null
+  >(null);
+
+  const requestCloseWorkspace = useCallback((wsId: string) => {
+    if (usePreferencesStore.getState().warnOnCloseWorkspace) {
+      setPendingCloseWorkspace({
+        id: wsId,
+        isLast: workspacesRef.current.length === 1,
+      });
+    } else {
+      void handleCloseWorkspaceRef.current(wsId);
+    }
+  }, []);
 
   const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
   const setWorkspaceEnv = useWorkspaceEnvStore((s) => s.setEnv);
@@ -1515,7 +1532,12 @@ export default function App() {
   const [zenMode, setZenMode] = useState(false);
 
   const handleCloseActivePanel = useCallback(() => {
-    if (!activeWorkspace || !activePanelId) return;
+    if (!activeWorkspace) return;
+    if (!activePanelId) {
+      // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
+      requestCloseWorkspace(activeWorkspace.id);
+      return;
+    }
     if (
       (activePanel?.kind === "terminal" || activePanel?.kind === "editor") &&
       activePanel.locked
@@ -1524,7 +1546,7 @@ export default function App() {
       return;
     }
     closePanelsRef.current([activePanelId]);
-  }, [activeWorkspace, activePanelId, activePanel]);
+  }, [activeWorkspace, activePanelId, activePanel, requestCloseWorkspace]);
 
   const handleCloseOtherPanels = useCallback(() => {
     if (!activePane || !activePanelId) return;
@@ -1581,6 +1603,28 @@ export default function App() {
     if (!activeWorkspace) return;
     onSplitTerminalDownStable(activeWorkspace.id, activeWorkspace.activePaneId);
   }, [activeWorkspace, onSplitTerminalDownStable]);
+
+  const handleExplorerSearch = useCallback(() => {
+    const state = usePreferencesStore.getState();
+    if (state.rightPanelOpen && state.rightPanelActiveTab === "explorer") {
+      rightPanelRef.current?.toggleExplorerSearch?.();
+    } else {
+      pendingExplorerSearch.current = true;
+      void setRightPanelOpen(true);
+      void setRightPanelActiveTab("explorer");
+    }
+  }, [setRightPanelOpen, setRightPanelActiveTab]);
+
+  const welcomeActions = useMemo<WelcomeActions>(
+    () => ({
+      onNewTerminal: () => openNewTerminal(),
+      onNewBrowser: () => openBrowserInPanel(""),
+      onSearchFiles: handleExplorerSearch,
+      onCommandPalette: () => openCommandPalette("commands"),
+      onSettings: () => void openSettingsWindow(),
+    }),
+    [openNewTerminal, openBrowserInPanel, handleExplorerSearch, openCommandPalette],
+  );
 
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
@@ -1666,19 +1710,7 @@ export default function App() {
       "explorer.viewPinned": () => showExplorerWithMode("pinned"),
       "explorer.toggleHidden": () =>
         void setShowHidden(!usePreferencesStore.getState().showHidden),
-      "explorer.search": () => {
-        const state = usePreferencesStore.getState();
-        if (state.rightPanelOpen && state.rightPanelActiveTab === "explorer") {
-          // Panel already visible on explorer: toggle search open/closed.
-          rightPanelRef.current?.toggleExplorerSearch?.();
-        } else {
-          // Panel closed or on another tab: open it, switch to explorer,
-          // then open search once the async IPC resolves and the panel mounts.
-          pendingExplorerSearch.current = true;
-          void setRightPanelOpen(true);
-          void setRightPanelActiveTab("explorer");
-        }
-      },
+      "explorer.search": handleExplorerSearch,
       "terminal.clear": () => {
         clearFocusedTerminal();
       },
@@ -2034,7 +2066,7 @@ export default function App() {
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(home ?? undefined)}
               onReorder={reorderWorkspaces}
-              onClose={(wsId) => handleCloseWorkspaceRef.current(wsId)}
+              onClose={(wsId) => requestCloseWorkspace(wsId)}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
@@ -2120,6 +2152,7 @@ export default function App() {
                         onDockBrowserPanel={onDockBrowserPanel}
                         onFocusFloatBrowserPanel={onFocusFloatBrowserPanel}
                         onNavigateFloatBrowserPanel={onNavigateFloatBrowserPanel}
+                        welcomeActions={welcomeActions}
                       />
                     </div>
 
@@ -2231,6 +2264,14 @@ export default function App() {
             pendingDeletePanels={pendingDeletePanels}
             onCancelDeleteClose={cancelDeleteClose}
             onConfirmDeleteClose={confirmDeleteClose}
+            pendingCloseWorkspace={pendingCloseWorkspace}
+            onCancelCloseWorkspace={() => setPendingCloseWorkspace(null)}
+            onConfirmCloseWorkspace={(dontAskAgain) => {
+              const id = pendingCloseWorkspace?.id;
+              setPendingCloseWorkspace(null);
+              if (dontAskAgain) void setWarnOnCloseWorkspace(false);
+              if (id) void handleCloseWorkspaceRef.current(id);
+            }}
           />
         </div>
       </TooltipProvider>
