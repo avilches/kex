@@ -54,6 +54,7 @@ export type ShortcutId =
   | "settings.open"
   | "editor.undo"
   | "editor.redo"
+  | "editor.markdown.toggleView"
   | "path.copy"
   | "notifications.jumpToLast";
 
@@ -404,6 +405,12 @@ export const SHORTCUTS: Shortcut[] = [
   // them — they don't have App-level handlers, so `useGlobalShortcuts` falls
   // through without `preventDefault`, leaving CodeMirror to handle the event.
   // Also excluded from the customization UI in ShortcutsSection.
+  {
+    id: "editor.markdown.toggleView",
+    label: "Toggle Markdown Preview",
+    group: "Editor",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "v" }],
+  },
   {
     id: "editor.undo",
     label: "Undo",

@@ -1619,6 +1619,18 @@ export default function App() {
           useFileRenameStore.getState().trigger(activePanelId);
         }
       },
+      "editor.markdown.toggleView": () => {
+        if (!activePanel || !activePanelId || !activeWorkspaceId) return;
+        if (activePanel.kind === "markdown") {
+          setPanelView(activeWorkspaceId, activePanelId, "raw");
+        } else if (
+          activePanel.kind === "editor" &&
+          isMarkdownPath(activePanel.path) &&
+          !activePanel.dirty
+        ) {
+          setPanelView(activeWorkspaceId, activePanelId, "rendered");
+        }
+      },
       "tab.next": () => {
         if (!activeWorkspace || !activePane) return;
         const panels = activePane.panels;
@@ -1787,6 +1799,12 @@ export default function App() {
     (id: ShortcutId, e: KeyboardEvent) => {
       if (id === "editor.undo" || id === "editor.redo") {
         return activePanel?.kind !== "editor";
+      }
+      if (id === "editor.markdown.toggleView") {
+        return !(
+          activePanel?.kind === "markdown" ||
+          (activePanel?.kind === "editor" && isMarkdownPath(activePanel.path))
+        );
       }
       if (id === "terminal.clear") {
         const target =
