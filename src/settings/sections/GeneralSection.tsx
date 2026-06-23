@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/tooltip";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  EDITOR_INDENT_SIZES,
   TERMINAL_SCROLLBACK_PRESETS,
   setAgentNotifications,
   setAutofocusNewTabs,
@@ -26,8 +25,6 @@ import {
   setEditorCursorBlink,
   setEditorCursorStyle,
   setEditorHighlightActiveLine,
-  setEditorIndentSize,
-  setEditorIndentWithTabs,
   setEditorPreviewOnClick,
   setEditorScrollPastEnd,
   setTerminalCursorBlink,
@@ -59,8 +56,6 @@ export function GeneralSection() {
     (s) => s.warnOnCloseTabWithRunningProcess,
   );
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
-  const editorIndentSize = usePreferencesStore((s) => s.editorIndentSize);
-  const editorIndentWithTabs = usePreferencesStore((s) => s.editorIndentWithTabs);
   const editorScrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
   const editorHighlightActiveLine = usePreferencesStore((s) => s.editorHighlightActiveLine);
   const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
@@ -144,19 +139,6 @@ export function GeneralSection() {
             checked={editorAutoSave}
             onCheckedChange={(v) => void setEditorAutoSave(v)}
           />
-        </SettingRow>
-        <SettingRow title="Indentation size" description="Spaces per indent level (also the tab width).">
-          <Select value={String(editorIndentSize)} onValueChange={(v) => void setEditorIndentSize(Number(v))}>
-            <SelectTrigger size="sm" className="h-8 w-24 text-[12px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {EDITOR_INDENT_SIZES.map((n) => (
-                <SelectItem key={n} value={String(n)} className="text-[12px]">{n}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingRow>
-        <SettingRow title="Indent with tabs" description="Insert tab characters instead of spaces.">
-          <Switch checked={editorIndentWithTabs} onCheckedChange={(v) => void setEditorIndentWithTabs(v)} />
         </SettingRow>
         <SettingRow title="Scroll past end" description="Allow scrolling beyond the last line.">
           <Switch checked={editorScrollPastEnd} onCheckedChange={(v) => void setEditorScrollPastEnd(v)} />

@@ -25,6 +25,8 @@ describe("defaultsForExt", () => {
         lineNumbers: false,
         whitespace: false,
         foldGutter: false,
+        indentSize: 4,
+        indentWithTabs: false,
       });
     }
   });
@@ -35,6 +37,8 @@ describe("defaultsForExt", () => {
         lineNumbers: true,
         whitespace: false,
         foldGutter: true,
+        indentSize: 4,
+        indentWithTabs: false,
       });
     }
   });
@@ -51,6 +55,8 @@ describe("resolveEditorView", () => {
       lineNumbers: false,
       whitespace: false,
       foldGutter: true,
+      indentSize: 4,
+      indentWithTabs: false,
     });
   });
   it("isolates extensions from each other", () => {

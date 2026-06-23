@@ -96,8 +96,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     reloadRef.current = reload;
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
-    const indentSize = usePreferencesStore((s) => s.editorIndentSize);
-    const indentWithTabs = usePreferencesStore((s) => s.editorIndentWithTabs);
     const scrollPastEndPref = usePreferencesStore((s) => s.editorScrollPastEnd);
     const highlightActiveLinePref = usePreferencesStore((s) => s.editorHighlightActiveLine);
     const bracketMatchingPref = usePreferencesStore((s) => s.editorBracketMatching);
@@ -150,8 +148,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         return [
           ...buildSharedExtensions({
             view: v0,
-            indentSize: s.editorIndentSize,
-            indentWithTabs: s.editorIndentWithTabs,
             scrollPastEnd: s.editorScrollPastEnd,
             highlightActiveLine: s.editorHighlightActiveLine,
             bracketMatching: s.editorBracketMatching,
@@ -207,8 +203,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     useEffect(() => {
       const v = cmRef.current?.view;
       if (!v) return;
-      v.dispatch({ effects: indentCompartment.reconfigure(indentExt(indentSize, indentWithTabs)) });
-    }, [indentSize, indentWithTabs]);
+      v.dispatch({ effects: indentCompartment.reconfigure(indentExt(view.indentSize, view.indentWithTabs)) });
+    }, [view.indentSize, view.indentWithTabs]);
 
     useEffect(() => {
       const v = cmRef.current?.view;

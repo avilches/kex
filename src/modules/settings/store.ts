@@ -136,8 +136,6 @@ export type Preferences = {
   editorAutoSaveDelay: number;
   editorPreviewOnClick: boolean;
   editorViewByExt: EditorViewMap;
-  editorIndentSize: number;
-  editorIndentWithTabs: boolean;
   editorScrollPastEnd: boolean;
   editorHighlightActiveLine: boolean;
   editorBracketMatching: boolean;
@@ -187,8 +185,6 @@ const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
 const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
 const KEY_EDITOR_PREVIEW_ON_CLICK = "editorPreviewOnClick";
 const KEY_EDITOR_VIEW_BY_EXT = "editorViewByExt";
-const KEY_EDITOR_INDENT_SIZE = "editorIndentSize";
-const KEY_EDITOR_INDENT_WITH_TABS = "editorIndentWithTabs";
 const KEY_EDITOR_SCROLL_PAST_END = "editorScrollPastEnd";
 const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "editorHighlightActiveLine";
 const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
@@ -224,8 +220,6 @@ export const LINE_HEIGHT_STEP = 0.1;
 export const TERMINAL_LINE_HEIGHT_DEFAULT = 1.2;
 export const EDITOR_LINE_HEIGHT_DEFAULT = 1.5;
 
-export const EDITOR_INDENT_SIZES = [2, 4, 8] as const;
-export const EDITOR_INDENT_SIZE_DEFAULT = 4;
 
 // Snap to the slider step, clamp to range, and strip float drift (0.30000004).
 export function clampToStep(
@@ -280,8 +274,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorAutoSaveDelay: 15000,
   editorPreviewOnClick: true,
   editorViewByExt: {},
-  editorIndentSize: EDITOR_INDENT_SIZE_DEFAULT,
-  editorIndentWithTabs: false,
   editorScrollPastEnd: false,
   editorHighlightActiveLine: true,
   editorBracketMatching: true,
@@ -433,15 +425,6 @@ export async function loadPreferences(): Promise<Preferences> {
         ? v
         : DEFAULT_PREFERENCES.editorViewByExt;
     })(),
-    editorIndentSize: (() => {
-      const v = get<number>(KEY_EDITOR_INDENT_SIZE);
-      return v === 2 || v === 4 || v === 8
-        ? v
-        : DEFAULT_PREFERENCES.editorIndentSize;
-    })(),
-    editorIndentWithTabs:
-      get<boolean>(KEY_EDITOR_INDENT_WITH_TABS) ??
-      DEFAULT_PREFERENCES.editorIndentWithTabs,
     editorScrollPastEnd:
       get<boolean>(KEY_EDITOR_SCROLL_PAST_END) ??
       DEFAULT_PREFERENCES.editorScrollPastEnd,
@@ -691,14 +674,6 @@ export async function setEditorViewForExt(
   await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
 }
 
-export async function setEditorIndentSize(value: number): Promise<void> {
-  const v = value === 2 || value === 4 || value === 8 ? value : 4;
-  await writePref(KEY_EDITOR_INDENT_SIZE, v);
-}
-
-export async function setEditorIndentWithTabs(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_INDENT_WITH_TABS, value);
-}
 
 export async function setEditorScrollPastEnd(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_SCROLL_PAST_END, value);
@@ -793,8 +768,6 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",
   [KEY_EDITOR_PREVIEW_ON_CLICK]: "editorPreviewOnClick",
   [KEY_EDITOR_VIEW_BY_EXT]: "editorViewByExt",
-  [KEY_EDITOR_INDENT_SIZE]: "editorIndentSize",
-  [KEY_EDITOR_INDENT_WITH_TABS]: "editorIndentWithTabs",
   [KEY_EDITOR_SCROLL_PAST_END]: "editorScrollPastEnd",
   [KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE]: "editorHighlightActiveLine",
   [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",

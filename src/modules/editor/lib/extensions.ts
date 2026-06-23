@@ -43,8 +43,6 @@ export function lineNumbersExt(on: boolean): Extension {
 
 export type SharedExtConfig = {
   view: EditorViewSettings;
-  indentSize: number;
-  indentWithTabs: boolean;
   scrollPastEnd: boolean;
   highlightActiveLine: boolean;
   bracketMatching: boolean;
@@ -56,7 +54,7 @@ export type SharedExtConfig = {
 
 export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
   return [
-    indentCompartment.of(indentExt(cfg.indentSize, cfg.indentWithTabs)),
+    indentCompartment.of(indentExt(cfg.view.indentSize, cfg.view.indentWithTabs)),
     search({ top: true }),
     lintGutter(),
     lineNumbersCompartment.of(lineNumbersExt(cfg.view.lineNumbers)),

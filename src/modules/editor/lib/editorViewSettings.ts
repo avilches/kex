@@ -3,9 +3,13 @@ export type EditorViewSettings = {
   lineNumbers: boolean;
   whitespace: boolean;
   foldGutter: boolean;
+  indentSize: number;
+  indentWithTabs: boolean;
 };
 
 export type EditorViewMap = Record<string, Partial<EditorViewSettings>>;
+
+export const EDITOR_INDENT_SIZES = [2, 4, 8] as const;
 
 const PROSE_EXTS = new Set(["md", "markdown", "mdx", "txt", "text"]);
 
@@ -14,6 +18,8 @@ const PROSE_DEFAULTS: EditorViewSettings = {
   lineNumbers: false,
   whitespace: false,
   foldGutter: false,
+  indentSize: 4,
+  indentWithTabs: false,
 };
 
 const CODE_DEFAULTS: EditorViewSettings = {
@@ -21,6 +27,8 @@ const CODE_DEFAULTS: EditorViewSettings = {
   lineNumbers: true,
   whitespace: false,
   foldGutter: true,
+  indentSize: 4,
+  indentWithTabs: false,
 };
 
 export function extOf(path: string): string {

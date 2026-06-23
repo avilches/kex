@@ -219,8 +219,6 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     return [
       ...buildSharedExtensions({
         view: v0,
-        indentSize: s.editorIndentSize,
-        indentWithTabs: s.editorIndentWithTabs,
         scrollPastEnd: s.editorScrollPastEnd,
         highlightActiveLine: s.editorHighlightActiveLine,
         bracketMatching: s.editorBracketMatching,
