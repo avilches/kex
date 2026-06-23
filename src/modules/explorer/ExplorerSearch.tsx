@@ -10,7 +10,7 @@ import {
 import {
   Cancel01Icon,
   ComputerTerminal01Icon,
-  Copy01Icon,
+  CopySlashIcon,
   File01Icon,
   Folder01Icon,
   FolderOpenIcon,
@@ -389,7 +389,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 className={COMPACT_ITEM}
                 onSelect={() => contextHit && void copyToClipboard(contextHit.path)}
               >
-                <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+                <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
                 Copy Absolute Path
               </ContextMenuItem>
             </ContextMenuContent>

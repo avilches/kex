@@ -23,6 +23,8 @@ import {
   ClipboardIcon,
   ComputerTerminal01Icon,
   Copy01Icon,
+  Copy02Icon,
+  CopySlashIcon,
   DashboardSquareAddIcon,
   Delete02Icon,
   File01Icon,
@@ -419,7 +421,7 @@ function EntryRowImpl(props: EntryRowProps) {
           className={COMPACT_ITEM}
           onSelect={() => actions.beginDuplicate(path, isDir ? "dir" : "file")}
         >
-          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          <HugeiconsIcon icon={Copy02Icon} size={14} strokeWidth={2} />
           Duplicate
         </ContextMenuItem>
         <ContextMenuSeparator />
@@ -434,7 +436,7 @@ function EntryRowImpl(props: EntryRowProps) {
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(path)}
         >
-          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
           Copy Absolute Path
         </ContextMenuItem>
         {gitRootPath &&
@@ -645,7 +647,7 @@ export function FsRootRow({
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(path)}
         >
-          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
           Copy Absolute Path
         </ContextMenuItem>
         <ContextMenuItem
@@ -726,7 +728,7 @@ export function FsUpRow({
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(path)}
         >
-          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
           Copy Absolute Path
         </ContextMenuItem>
       </ContextMenuContent>

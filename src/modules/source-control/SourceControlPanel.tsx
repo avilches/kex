@@ -49,7 +49,7 @@ import {
   ArrowRight01Icon,
   ArrowUp02Icon,
   CheckmarkCircle01Icon,
-  Copy01Icon,
+  CopySlashIcon,
   Download01Icon,
   File01Icon,
   FileDiffIcon,
@@ -1475,7 +1475,7 @@ const EntryRow = memo(function EntryRow({
             className={COMPACT_ITEM}
             onSelect={() => void copyToClipboard(absolutePath)}
           >
-            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+            <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
             Copy Absolute Path
           </ContextMenuItem>
         ) : null}

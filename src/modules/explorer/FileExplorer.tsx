@@ -9,7 +9,7 @@ import {
 import {
   ArrowDown01Icon,
   ComputerTerminal01Icon,
-  Copy01Icon,
+  CopySlashIcon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
@@ -1278,7 +1278,7 @@ export const FileExplorer = memo(
                     className={COMPACT_ITEM}
                     onSelect={() => void copyToClipboard(rootPath)}
                   >
-                    <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+                    <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
                     Copy Absolute Path
                   </ContextMenuItem>
                   <ContextMenuItem
