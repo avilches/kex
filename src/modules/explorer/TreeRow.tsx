@@ -666,10 +666,12 @@ export function FsUpRow({
   path,
   onNavigateUp,
   onRevealInTerminal,
+  onRefresh,
 }: {
   path: string;
   onNavigateUp?: () => void;
   onRevealInTerminal?: (path: string) => void;
+  onRefresh?: () => void;
 }) {
   // Same as FsRootRow: drag opens a terminal at the parent dir, no internal move.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -731,6 +733,12 @@ export function FsUpRow({
           <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
           Copy Absolute Path
         </ContextMenuItem>
+        {onRefresh && (
+          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onRefresh()}>
+            <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />
+            Refresh
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

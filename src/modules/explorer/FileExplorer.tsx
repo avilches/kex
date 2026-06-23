@@ -966,6 +966,7 @@ export const FileExplorer = memo(
               path={row.path}
               onNavigateUp={onNavigateUp}
               onRevealInTerminal={onRevealInTerminal}
+              onRefresh={() => tree.refresh(rootPath)}
             />
           );
         case "pending":
