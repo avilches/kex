@@ -1,5 +1,6 @@
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { redo, undo } from "@codemirror/commands";
+import { bracketMatching, foldGutter } from "@codemirror/language";
 import {
   findNext,
   findPrevious,
@@ -7,7 +8,14 @@ import {
   setSearchQuery,
 } from "@codemirror/search";
 import { type Extension, Prec } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import {
+  EditorView,
+  highlightActiveLine,
+  highlightWhitespace,
+  keymap,
+  scrollPastEnd,
+} from "@codemirror/view";
+import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
 import { vim } from "@replit/codemirror-vim";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import {
@@ -21,15 +29,30 @@ import {
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { pathBasename } from "@/lib/pathUtils";
 import {
+  activeLineCompartment,
+  autocompletionCompartment,
+  bracketMatchingCompartment,
   buildSharedExtensions,
+  closeBracketsCompartment,
+  cursorBlinkCompartment,
+  cursorStyleCompartment,
+  foldGutterCompartment,
+  indentCompartment,
+  indentExt,
   languageCompartment,
+  lineNumbersCompartment,
+  lineNumbersExt,
+  scrollPastEndCompartment,
   vimCompartment,
+  whitespaceCompartment,
   wrapCompartment,
 } from "./lib/extensions";
+import { resolveEditorView } from "./lib/editorViewSettings";
 import { resolveLanguage } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 import { useDocument } from "./lib/useDocument";
 import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
+import { cursorBlinkExt, cursorStyleExt } from "./lib/cursorExtensions";
 
 initVimGlobals();
 
@@ -58,7 +81,6 @@ export type EditorPaneHandle = {
 
 type Props = {
   path: string;
-  wordWrap: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onClose?: () => void;
@@ -71,7 +93,7 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, wordWrap, onDirtyChange, onSaved, onClose }, ref) {
+  function EditorPane({ path, onDirtyChange, onSaved, onClose }, ref) {
     const { doc, onChange, save, reload } = useDocument({
       path,
       onDirtyChange,
@@ -79,11 +101,21 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const cmRef = useRef<ReactCodeMirrorRef>(null);
-    const wordWrapRef = useRef(wordWrap);
-    wordWrapRef.current = wordWrap;
     const vimMode = usePreferencesStore((s) => s.vimMode);
+    const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
+    const indentSize = usePreferencesStore((s) => s.editorIndentSize);
+    const indentWithTabs = usePreferencesStore((s) => s.editorIndentWithTabs);
+    const scrollPastEndPref = usePreferencesStore((s) => s.editorScrollPastEnd);
+    const highlightActiveLinePref = usePreferencesStore((s) => s.editorHighlightActiveLine);
+    const bracketMatchingPref = usePreferencesStore((s) => s.editorBracketMatching);
+    const closeBracketsPref = usePreferencesStore((s) => s.editorCloseBrackets);
+    const autocompletionPref = usePreferencesStore((s) => s.editorAutocompletion);
+    const cursorBlinkPref = usePreferencesStore((s) => s.editorCursorBlink);
+    const cursorStylePref = usePreferencesStore((s) => s.editorCursorStyle);
     const languageRef = useRef<string | null>(null);
     const themeExt = useEditorThemeExt();
+
+    const view = resolveEditorView(path, editorViewByExt);
 
     // Stabilize save + onSaved via refs so the extensions array never changes
     // identity — a new identity makes @uiw/react-codemirror reconfigure the
@@ -103,16 +135,16 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     statusRef.current = doc.status;
 
     const applyPendingGoto = useCallback(() => {
-      const view = cmRef.current?.view;
+      const cmView = cmRef.current?.view;
       const line = pendingLineRef.current;
-      if (!view || line == null || statusRef.current !== "ready") return;
-      const target = Math.max(1, Math.min(line, view.state.doc.lines));
-      const at = view.state.doc.line(target).from;
-      view.dispatch({
+      if (!cmView || line == null || statusRef.current !== "ready") return;
+      const target = Math.max(1, Math.min(line, cmView.state.doc.lines));
+      const at = cmView.state.doc.line(target).from;
+      cmView.dispatch({
         selection: { anchor: at },
         effects: EditorView.scrollIntoView(at, { y: "center" }),
       });
-      view.focus();
+      cmView.focus();
       pendingLineRef.current = null;
     }, []);
 
@@ -121,58 +153,132 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }, [doc.status, applyPendingGoto]);
 
     const extensions = useMemo(
-      () => [
-        // basicSetup is added before user extensions by @uiw/react-codemirror,
-        // so we must elevate vim's precedence to win the keymap.
-        vimCompartment.of(
-          usePreferencesStore.getState().vimMode ? Prec.highest(vim()) : [],
-        ),
-        vimHandlersExtension(() => ({
-          save: () => {
-            void (async () => {
-              await saveRef.current();
-              onSavedRef.current?.();
-            })();
-          },
-          close: () => onCloseRef.current?.(),
-        })),
-        ...buildSharedExtensions(),
-        languageCompartment.of([]),
-        wrapCompartment.of(wordWrapRef.current ? EditorView.lineWrapping : []),
-        keymap.of([
-          {
-            key: "Mod-s",
-            preventDefault: true,
-            run: () => {
+      () => {
+        const s = usePreferencesStore.getState();
+        const v0 = resolveEditorView(pathRef.current, s.editorViewByExt);
+        return [
+          vimCompartment.of(s.vimMode ? Prec.highest(vim()) : []),
+          vimHandlersExtension(() => ({
+            save: () => {
               void (async () => {
                 await saveRef.current();
                 onSavedRef.current?.();
               })();
-              return true;
             },
-          },
-        ]),
-      ],
+            close: () => onCloseRef.current?.(),
+          })),
+          ...buildSharedExtensions({
+            view: v0,
+            indentSize: s.editorIndentSize,
+            indentWithTabs: s.editorIndentWithTabs,
+            scrollPastEnd: s.editorScrollPastEnd,
+            highlightActiveLine: s.editorHighlightActiveLine,
+            bracketMatching: s.editorBracketMatching,
+            closeBrackets: s.editorCloseBrackets,
+            autocompletion: s.editorAutocompletion,
+            cursorBlink: s.editorCursorBlink,
+            cursorStyle: s.editorCursorStyle,
+            vimActive: s.vimMode,
+          }),
+          languageCompartment.of([]),
+          wrapCompartment.of(v0.wrap ? EditorView.lineWrapping : []),
+          keymap.of([
+            {
+              key: "Mod-s",
+              preventDefault: true,
+              run: () => {
+                void (async () => {
+                  await saveRef.current();
+                  onSavedRef.current?.();
+                })();
+                return true;
+              },
+            },
+          ]),
+        ];
+      },
       [],
     );
 
     useEffect(() => {
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({
         effects: vimCompartment.reconfigure(vimMode ? Prec.highest(vim()) : []),
       });
     }, [vimMode]);
 
     useEffect(() => {
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
-        effects: wrapCompartment.reconfigure(
-          wordWrap ? EditorView.lineWrapping : [],
-        ),
-      });
-    }, [wordWrap]);
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: wrapCompartment.reconfigure(view.wrap ? EditorView.lineWrapping : []) });
+    }, [view.wrap]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: lineNumbersCompartment.reconfigure(lineNumbersExt(view.lineNumbers)) });
+    }, [view.lineNumbers]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: foldGutterCompartment.reconfigure(view.foldGutter ? foldGutter() : []) });
+    }, [view.foldGutter]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: whitespaceCompartment.reconfigure(view.whitespace ? highlightWhitespace() : []) });
+    }, [view.whitespace]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: indentCompartment.reconfigure(indentExt(indentSize, indentWithTabs)) });
+    }, [indentSize, indentWithTabs]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: scrollPastEndCompartment.reconfigure(scrollPastEndPref ? scrollPastEnd() : []) });
+    }, [scrollPastEndPref]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: activeLineCompartment.reconfigure(highlightActiveLinePref ? highlightActiveLine() : []) });
+    }, [highlightActiveLinePref]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: bracketMatchingCompartment.reconfigure(bracketMatchingPref ? bracketMatching() : []) });
+    }, [bracketMatchingPref]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: closeBracketsCompartment.reconfigure(closeBracketsPref ? closeBrackets() : []) });
+    }, [closeBracketsPref]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: autocompletionCompartment.reconfigure(autocompletionPref ? autocompletion() : []) });
+    }, [autocompletionPref]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: cursorBlinkCompartment.reconfigure(cursorBlinkExt(cursorBlinkPref)) });
+    }, [cursorBlinkPref]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: cursorStyleCompartment.reconfigure(cursorStyleExt(cursorStylePref, vimMode)) });
+    }, [cursorStylePref, vimMode]);
 
     useEffect(() => {
       const ext = path.split(".").pop()?.toLowerCase() ?? null;
@@ -191,9 +297,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       };
       void resolve().then((extension) => {
         if (cancelled) return;
-        const view = cmRef.current?.view;
-        if (!view) return;
-        view.dispatch({
+        const v = cmRef.current?.view;
+        if (!v) return;
+        v.dispatch({
           effects: languageCompartment.reconfigure(extension),
         });
       });
@@ -206,27 +312,27 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       ref,
       () => ({
         setQuery: (q: string) => {
-          const view = cmRef.current?.view;
-          if (!view) return;
-          view.dispatch({
+          const v = cmRef.current?.view;
+          if (!v) return;
+          v.dispatch({
             effects: setSearchQuery.of(
               new SearchQuery({ search: q, caseSensitive: false }),
             ),
           });
-          if (q) findNext(view);
+          if (q) findNext(v);
         },
         findNext: () => {
-          const view = cmRef.current?.view;
-          if (view) findNext(view);
+          const v = cmRef.current?.view;
+          if (v) findNext(v);
         },
         findPrevious: () => {
-          const view = cmRef.current?.view;
-          if (view) findPrevious(view);
+          const v = cmRef.current?.view;
+          if (v) findPrevious(v);
         },
         clearQuery: () => {
-          const view = cmRef.current?.view;
-          if (!view) return;
-          view.dispatch({
+          const v = cmRef.current?.view;
+          if (!v) return;
+          v.dispatch({
             effects: setSearchQuery.of(new SearchQuery({ search: "" })),
           });
         },
@@ -238,11 +344,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           onSavedRef.current?.();
         },
         getSelection: () => {
-          const view = cmRef.current?.view;
-          if (!view) return null;
-          const { from, to } = view.state.selection.main;
+          const v = cmRef.current?.view;
+          if (!v) return null;
+          const { from, to } = v.state.selection.main;
           if (from === to) return null;
-          return view.state.sliceDoc(from, to);
+          return v.state.sliceDoc(from, to);
         },
         getPath: () => path,
         reload: () => reloadRef.current(),
@@ -251,19 +357,19 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           applyPendingGoto();
         },
         undo: () => {
-          const view = cmRef.current?.view;
-          if (view) undo(view);
+          const v = cmRef.current?.view;
+          if (v) undo(v);
         },
         redo: () => {
-          const view = cmRef.current?.view;
-          if (view) redo(view);
+          const v = cmRef.current?.view;
+          if (v) redo(v);
         },
         getContent: () => cmRef.current?.view?.state.doc.toString() ?? null,
         insertAtEnd: (text: string) => {
-          const view = cmRef.current?.view;
-          if (!view) return;
-          view.dispatch({
-            changes: { from: view.state.doc.length, insert: text },
+          const v = cmRef.current?.view;
+          if (!v) return;
+          v.dispatch({
+            changes: { from: v.state.doc.length, insert: text },
           });
         },
       }),
@@ -360,13 +466,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           height="100%"
           className="flex-1 min-h-0 overflow-hidden"
           basicSetup={{
-            lineNumbers: true,
-            highlightActiveLineGutter: true,
-            foldGutter: true,
-            bracketMatching: true,
-            closeBrackets: true,
-            autocompletion: true,
-            highlightActiveLine: true,
+            lineNumbers: false,
+            highlightActiveLineGutter: false,
+            foldGutter: false,
+            bracketMatching: false,
+            closeBrackets: false,
+            autocompletion: false,
+            highlightActiveLine: false,
             highlightSelectionMatches: true,
             searchKeymap: true,
           }}
