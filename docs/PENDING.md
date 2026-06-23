@@ -22,7 +22,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-15](pending/bugs/BUG-15-usefiletree-callbacks-inestables.md) — useFileTree: callbacks inestables
 - [BUG-17](pending/bugs/BUG-17-busqueda-ipc-sin-cancelacion.md) — Busqueda IPC sin cancelacion (fs_search resuelto; fs_grep_interactive pendiente)
 - [BUG-18](pending/bugs/BUG-18-race-refetch-fs-changed-explorer.md) — Race entre refetch y fs-changed en explorer
-- [BUG-28](pending/bugs/BUG-28-parse-renamed-empty-path-truncated.md) — parse renamed: empty path en truncado
 - [BUG-38](pending/bugs/BUG-38-busqueda-cmdF-incompleta.md) - Cmd+F: no busca en markdown/git-diff (terminal y editor resueltos)
 - [BUG-39](pending/bugs/BUG-39-file-search-ux-poco-clara.md) - Busqueda de ficheros: UX poco clara (no es bug de codigo; los atajos funcionan, falta descubribilidad: tratar como mejora de UI)
 - [BUG-40](pending/bugs/BUG-40-stage-unstage-all-incompleto.md) — Stage all / unstage all no procesa todos los ficheros (la logica de pathspecs parece correcta; el sintoma cuelga probablemente de BUG-06, renames sin original_rel. Reproducir antes de fix)

@@ -2,9 +2,10 @@
 
 Cada bug es un fichero autocontenido y accionable por un agente en `docs/pending/bugs/`. Un agente puede ejecutar cualquiera de forma aislada: cada fichero incluye contexto del proyecto, ubicación `archivo:línea`, problema, impacto, fix concreto, criterios de aceptación, comandos de verificación y el test a añadir si toca un subsistema core.
 
-Total: 30 bugs. 6 high, 12 medium, 12 low. Los marcados con asterisco se verificaron a mano.
+Total: 29 bugs. 6 high, 12 medium, 11 low. Los marcados con asterisco se verificaron a mano.
 
 > Auditoria 2026-06-23: eliminados por estar ya corregidos en el codigo: BUG-20 (pty_open autoriza post-spawn), BUG-27 (countDiffLines es fallback valido), BUG-30 (errores fs/autosave ya con toast), BUG-34 (cd quoting ya usa comillas dobles). Ver `AUDIT-2026-06-23.md`.
+> Arreglados despues de la auditoria: BUG-28 (parser descarta entradas con path vacio en status truncado).
 
 ## High
 
@@ -44,7 +45,6 @@ Total: 30 bugs. 6 high, 12 medium, 12 low. Los marcados con asterisco se verific
 | BUG-24 | `respawnSession`: bytes del pty viejo en vuelo | [bugs/BUG-24-respawnsession-dormantring-bytes-en-vuelo.md](bugs/BUG-24-respawnsession-dormantring-bytes-en-vuelo.md) |
 | BUG-25 | Doble `destroy()` en carrera al cerrar | [bugs/BUG-25-doble-destroy-cierre-ultimo-panel.md](bugs/BUG-25-doble-destroy-cierre-ultimo-panel.md) |
 | BUG-26 | Effect del diff depende de `source` inestable | [bugs/BUG-26-diff-effect-source-dep-recreated.md](bugs/BUG-26-diff-effect-source-dep-recreated.md) |
-| BUG-28 | `parse_renamed`: path vacío en truncamiento | [bugs/BUG-28-parse-renamed-empty-path-truncated.md](bugs/BUG-28-parse-renamed-empty-path-truncated.md) |
 | BUG-29 | Split de paths por `"/"` (cross-platform) | [bugs/BUG-29-path-split-forward-slash-only.md](bugs/BUG-29-path-split-forward-slash-only.md) |
 | BUG-31 | Preview de tema obsoleto tras cerrar la paleta | [bugs/BUG-31-theme-preview-stale-after-close.md](bugs/BUG-31-theme-preview-stale-after-close.md) |
 | BUG-32 | `tab.selectByIndex` salta el guard de key | [bugs/BUG-32-selectbyindex-matcher-skips-key-guard.md](bugs/BUG-32-selectbyindex-matcher-skips-key-guard.md) |

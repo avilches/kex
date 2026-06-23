@@ -78,6 +78,9 @@ fn skip_fields(s: &str, n: usize) -> Option<&str> {
 fn parse_ordinary(rest: &str) -> Option<GitChangedFile> {
     let xy = rest.get(..2)?;
     let path = skip_fields(rest, 7)?;
+    if path.is_empty() {
+        return None;
+    }
     let (i, w) = xy_chars(xy);
     Some(make_file(i, w, path, None))
 }
@@ -85,6 +88,11 @@ fn parse_ordinary(rest: &str) -> Option<GitChangedFile> {
 fn parse_renamed(rest: &str, orig_path: String) -> Option<GitChangedFile> {
     let xy = rest.get(..2)?;
     let after = skip_fields(rest, 8)?;
+    // A truncated rename record can lose its trailing original-path token; drop
+    // it rather than emit an entry with an empty name.
+    if after.is_empty() || orig_path.is_empty() {
+        return None;
+    }
     let (i, w) = xy_chars(xy);
     Some(make_file(i, w, after, Some(orig_path)))
 }
@@ -92,6 +100,9 @@ fn parse_renamed(rest: &str, orig_path: String) -> Option<GitChangedFile> {
 fn parse_unmerged(rest: &str) -> Option<GitChangedFile> {
     let xy = rest.get(..2)?;
     let path = skip_fields(rest, 9)?;
+    if path.is_empty() {
+        return None;
+    }
     let (i, w) = xy_chars(xy);
     Some(make_file(i, w, path, None))
 }
@@ -278,6 +289,26 @@ mod tests {
         // Truncated `1 ` record (no fields/path) and a too-short XY must not panic
         // and must not produce a file; valid entries around them still parse.
         let parsed = parse_porcelain_v2("1 .M\0? ok.rs\0");
+        assert_eq!(parsed.files.len(), 1);
+        assert_eq!(parsed.files[0].path, "ok.rs");
+    }
+
+    // A rename whose stream was cut before its original-path token must not yield
+    // an entry with original_path == Some("").
+    #[test]
+    fn truncated_rename_without_orig_token_is_dropped() {
+        let parsed =
+            parse_porcelain_v2("2 R. N... 100644 100644 100644 abc def R100 new.rs\0");
+        assert!(parsed.files.is_empty());
+    }
+
+    // An ordinary record padded to exactly the field count but with no path must
+    // not produce a nameless entry; surrounding valid entries still parse.
+    #[test]
+    fn ordinary_with_empty_path_is_dropped() {
+        let parsed = parse_porcelain_v2(
+            "1 .M N... 100644 100644 100644 abc def \0? ok.rs\0",
+        );
         assert_eq!(parsed.files.len(), 1);
         assert_eq!(parsed.files[0].path, "ok.rs");
     }
