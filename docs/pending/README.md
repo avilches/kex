@@ -8,7 +8,7 @@ Método: 6 agentes de auditoría especializados en paralelo (backend core, git, 
 
 Todo está en ficheros markdown autocontenidos y accionables por un agente de forma aislada: cada uno incluye contexto del proyecto, ubicación `archivo:línea`, problema, fix concreto, criterios de aceptación y comandos de verificación.
 
-- **[BUGS.md](BUGS.md)** - índice de los 34 bugs (6 high, 12 medium, 16 low). Cada bug es un fichero en **bugs/BUG-NN-*.md** ejecutable por separado.
+- **[BUGS.md](BUGS.md)** - índice de los 30 bugs (6 high, 12 medium, 12 low). Cada bug es un fichero en **bugs/BUG-NN-*.md** ejecutable por separado.
 - **[DOCS.md](DOCS.md)** - discrepancias entre documentación y código (3 críticas, 1 high, 5 menores).
 - **features/** - una spec accionable por feature (F1-F6).
 - **improvements/** - una spec accionable por mejora (M1-M7).
@@ -34,7 +34,6 @@ Para lanzar un agente sobre un item concreto basta con apuntarlo al fichero, por
 
 | ID | Título | Impacto | Esfuerzo |
 | --- | --- | --- | --- |
-| [M1](improvements/M1-memoizacion-arbol-workspaces.md) | Memoización del árbol + estado efímero fuera de persistencia | Alto | Medio |
 | [M2](improvements/M2-lazy-modulo-agents.md) | Módulo agents perezoso (coherencia no-agentes) | Medio | Bajo-medio |
 | [M3](improvements/M3-hunks-estructurados-backend.md) | Hunks estructurados desde el backend | Alto | Alto |
 | [M4](improvements/M4-cancelacion-busqueda-ipc.md) | Cancelación end-to-end de búsqueda IPC | Medio | Medio |
@@ -46,7 +45,7 @@ Para lanzar un agente sobre un item concreto basta con apuntarlo al fichero, por
 
 1. **Verdad de la doc primero:** corregir DOCS.md (D3-D4). La decisión sobre autorización fs ya está documentada en `docs/ARCHITECTURE.md §4.2`.
 2. **Hacer la feature estrella real:** BUG-02 (CRLF) → F1 (side-by-side) → F3 (navegación) → F2 (stage por hunk). Apoyar con M3 (hunks backend) y M5 (grandes).
-3. **Rendimiento y memoria:** M1 (memoización), M6 (reaping), M2 (agents perezoso), BUG-08/10.
+3. **Rendimiento y memoria:** M6 (reaping), M2 (agents perezoso), BUG-08/10. (M1 memoización: ya hecha, ver `AUDIT-2026-06-23.md`.)
 4. **Pulido continuo:** M7 quick wins y los bugs low.
 
 ## Decisiones abiertas

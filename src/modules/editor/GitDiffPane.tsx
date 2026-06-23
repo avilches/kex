@@ -25,6 +25,7 @@ import {
   commitDiffKey,
 } from "./lib/diffCache";
 import { resolveEditorView } from "./lib/editorViewSettings";
+import { isDiffTooLarge } from "./lib/diffSize";
 import { resolveLanguage, resolveLanguageSync } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 
@@ -49,8 +50,6 @@ type Props = {
   chipLabel?: string;
   active: boolean;
 };
-
-const LARGE_FILE_THRESHOLD = 256 * 1024;
 
 const READONLY_EXT = [
   EditorState.readOnly.of(true),
@@ -111,7 +110,7 @@ function countDiffLines(patch: string): { added: number; removed: number } {
 type LoadState =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "loaded"; originalContent: string; modifiedContent: string; isBinary: boolean; fallbackPatch: string }
+  | { kind: "loaded"; originalContent: string; modifiedContent: string; isBinary: boolean; fallbackPatch: string; truncated: boolean }
   | { kind: "error"; message: string };
 
 function cacheKey(source: WorkingSource | CommitSource): string {
@@ -131,6 +130,7 @@ function loadStateFromCache(
     modifiedContent: hit.modifiedContent,
     isBinary: hit.isBinary,
     fallbackPatch: hit.fallbackPatch,
+    truncated: hit.truncated,
   };
 }
 
@@ -178,6 +178,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
           modifiedContent: res.modifiedContent,
           isBinary: res.isBinary,
           fallbackPatch: res.fallbackPatch,
+          truncated: res.truncated,
         });
       })
       .catch((err) => {
@@ -203,10 +204,12 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
   const modifiedContent = loaded?.modifiedContent ?? "";
   const isBinary = loaded?.isBinary ?? false;
   const fallbackPatch = loaded?.fallbackPatch ?? "";
+  const truncated = loaded?.truncated ?? false;
 
-  const isTooLarge =
-    originalContent.length > LARGE_FILE_THRESHOLD ||
-    modifiedContent.length > LARGE_FILE_THRESHOLD;
+  const isTooLarge = useMemo(
+    () => isDiffTooLarge(originalContent, modifiedContent),
+    [originalContent, modifiedContent],
+  );
   const useFallback = isBinary || isTooLarge;
 
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
@@ -297,6 +300,15 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
           ) : isTooLarge ? (
             <Badge variant="secondary" className="text-[10px]">
               Large file / patch view
+            </Badge>
+          ) : null}
+          {truncated ? (
+            <Badge
+              variant="secondary"
+              className="text-[10px] text-amber-600 dark:text-amber-400"
+              title="The diff exceeded the size limit and was truncated; content may be incomplete."
+            >
+              Truncated
             </Badge>
           ) : null}
           <span

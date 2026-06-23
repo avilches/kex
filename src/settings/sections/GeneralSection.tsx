@@ -15,7 +15,16 @@ import {
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  CURSOR_INACTIVE_STYLES,
   CURSOR_STYLES,
+  type CursorInactiveStyle,
+  type CursorStyle,
+  SCROLL_SENSITIVITY_DEFAULT,
+  SCROLL_SENSITIVITY_MAX,
+  SCROLL_SENSITIVITY_MIN,
+  SCROLL_SENSITIVITY_STEP,
+  CURSOR_WIDTH_MAX,
+  CURSOR_WIDTH_MIN,
   TERMINAL_SCROLLBACK_PRESETS,
   setAgentNotifications,
   setAutofocusNewTabs,
@@ -30,24 +39,37 @@ import {
   setEditorPreviewOnClick,
   setEditorScrollPastEnd,
   setTerminalCursorBlink,
+  setTerminalCursorInactiveStyle,
   setTerminalCursorStyle,
+  setTerminalCursorWidth,
+  setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalWebglEnabled,
   setWarnOnCloseTabWithRunningProcess,
-  type CursorStyle,
 } from "@/modules/settings/store";
 import { invoke } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
+import { SliderRow } from "../components/SliderRow";
 
-// A tiny cell that mimics how the cursor looks for each style.
-function CursorGlyph({ kind }: { kind: CursorStyle }) {
-  const shape: Record<CursorStyle, string> = {
+// A tiny cell that mimics how the cursor looks for each xterm style.
+function CursorGlyph({
+  kind,
+}: {
+  kind: CursorStyle | CursorInactiveStyle;
+}) {
+  if (kind === "none") {
+    return (
+      <span className="ml-auto text-[10px] text-muted-foreground/70">off</span>
+    );
+  }
+  const shape: Record<Exclude<CursorInactiveStyle, "none">, string> = {
     bar: "border-l-2 border-current",
     block: "bg-current",
     underline: "border-b-2 border-current",
+    outline: "border border-current",
   };
   return (
     <span
@@ -72,6 +94,16 @@ export function GeneralSection() {
     (s) => s.terminalCursorBlink,
   );
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
+  const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
+  const terminalCursorInactiveStyle = usePreferencesStore(
+    (s) => s.terminalCursorInactiveStyle,
+  );
+  const terminalCursorWidth = usePreferencesStore(
+    (s) => s.terminalCursorWidth,
+  );
+  const terminalScrollSensitivity = usePreferencesStore(
+    (s) => s.terminalScrollSensitivity,
+  );
   const warnOnCloseRunning = usePreferencesStore(
     (s) => s.warnOnCloseTabWithRunningProcess,
   );
@@ -83,7 +115,6 @@ export function GeneralSection() {
   const editorAutocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const editorCursorBlink = usePreferencesStore((s) => s.editorCursorBlink);
   const editorCursorStyle = usePreferencesStore((s) => s.editorCursorStyle);
-  const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
   const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
 
@@ -256,34 +287,107 @@ export function GeneralSection() {
             onCheckedChange={(v) => void setTerminalCursorBlink(v)}
           />
         </SettingRow>
-        <SettingRow title="Cursor style" description="Terminal caret shape.">
-          <Select value={terminalCursorStyle} onValueChange={(v) => void setTerminalCursorStyle(v as CursorStyle)}>
-            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CURSOR_STYLES.map((style) => (
-                <SelectItem
-                  key={style}
-                  value={style}
-                  className="text-[12px] [&>span:last-child]:w-full"
-                >
-                  <span className="capitalize">{style}</span>
-                  <CursorGlyph kind={style} />
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingRow>
         <SettingRow
-          title="Warn when closing a tab with a running process"
-          description="Confirm before closing a terminal that still has a process running."
+          title="Cursor style"
+          description="Shape of the cursor when the terminal is focused and unfocused."
         >
-          <Switch
-            checked={warnOnCloseRunning}
-            onCheckedChange={(v) =>
-              void setWarnOnCloseTabWithRunningProcess(v)
-            }
-          />
+          <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-muted-foreground">Active</span>
+              <Select
+                value={terminalCursorStyle}
+                onValueChange={(v) =>
+                  void setTerminalCursorStyle(v as CursorStyle)
+                }
+              >
+                <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURSOR_STYLES.map((style) => (
+                    <SelectItem
+                      key={style}
+                      value={style}
+                      className="text-[12px] [&>span:last-child]:w-full"
+                    >
+                      <span className="capitalize">{style}</span>
+                      <CursorGlyph kind={style} />
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-muted-foreground">
+                Inactive
+              </span>
+              <Select
+                value={terminalCursorInactiveStyle}
+                onValueChange={(v) =>
+                  void setTerminalCursorInactiveStyle(
+                    v as CursorInactiveStyle,
+                  )
+                }
+              >
+                <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURSOR_INACTIVE_STYLES.map((style) => (
+                    <SelectItem
+                      key={style}
+                      value={style}
+                      className="text-[12px] [&>span:last-child]:w-full"
+                    >
+                      <span className="capitalize">{style}</span>
+                      <CursorGlyph kind={style} />
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </SettingRow>
+        {terminalCursorStyle === "bar" && (
+          <SettingRow
+            title="Cursor width"
+            description="Thickness of the bar cursor, in pixels."
+          >
+            <Select
+              value={String(terminalCursorWidth)}
+              onValueChange={(v) => void setTerminalCursorWidth(Number(v))}
+            >
+              <SelectTrigger size="sm" className="h-8 w-36 text-[12px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from(
+                  { length: CURSOR_WIDTH_MAX - CURSOR_WIDTH_MIN + 1 },
+                  (_, i) => CURSOR_WIDTH_MIN + i,
+                ).map((px) => (
+                  <SelectItem
+                    key={px}
+                    value={String(px)}
+                    className="text-[12px]"
+                  >
+                    {px} px
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingRow>
+        )}
+        <SliderRow
+          title="Scroll sensitivity"
+          description="Multiplier for mouse-wheel and trackpad scrolling. Higher scrolls more per gesture."
+          value={terminalScrollSensitivity}
+          min={SCROLL_SENSITIVITY_MIN}
+          max={SCROLL_SENSITIVITY_MAX}
+          step={SCROLL_SENSITIVITY_STEP}
+          defaultValue={SCROLL_SENSITIVITY_DEFAULT}
+          format={(v) => `${v}×`}
+          onChange={(v) => void setTerminalScrollSensitivity(v)}
+        />
         <SettingRow
           title="Scrollback"
           description="Lines of history kept per terminal. Higher uses more RAM (~3 KB / line)."
@@ -307,6 +411,17 @@ export function GeneralSection() {
               ))}
             </SelectContent>
           </Select>
+        </SettingRow>
+        <SettingRow
+          title="Warn when closing a tab with a running process"
+          description="Confirm before closing a terminal that still has a process running."
+        >
+          <Switch
+            checked={warnOnCloseRunning}
+            onCheckedChange={(v) =>
+              void setWarnOnCloseTabWithRunningProcess(v)
+            }
+          />
         </SettingRow>
       </div>
 

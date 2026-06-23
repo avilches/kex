@@ -11,10 +11,13 @@ import {
   Cancel01Icon,
   ComputerTerminal01Icon,
   CopySlashIcon,
+  DashboardSquareAddIcon,
   File01Icon,
   Folder01Icon,
   FolderOpenIcon,
+  HierarchyFilesIcon,
   Link01Icon,
+  PinIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -28,6 +31,7 @@ import {
   useState,
 } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { pathDirname } from "@/lib/pathUtils";
 import { fileIconUrl } from "./lib/iconResolver";
 import {
   copyToClipboard,
@@ -67,6 +71,9 @@ type Props = {
   onRequestClose: () => void;
   onActiveChange?: (active: boolean) => void;
   onRevealInTerminal?: (path: string) => void;
+  onRevealInExplorer?: (path: string) => void;
+  onSetAsRoot?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
 };
 
 export type ExplorerSearchHandle = {
@@ -81,6 +88,9 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
   onRequestClose,
   onActiveChange,
   onRevealInTerminal,
+  onRevealInExplorer,
+  onSetAsRoot,
+  onNewWorkspaceFromFolder,
 }: Props,
   ref,
 ) {
@@ -351,13 +361,19 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                   onSelect={() => onOpenFile(contextHit.path)}
                 >
                   <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
-                  Open
+                  Open File
                 </ContextMenuItem>
               )}
-              {contextHit?.is_dir && onRevealInTerminal && (
+              {contextHit && onRevealInTerminal && (
                 <ContextMenuItem
                   className={COMPACT_ITEM}
-                  onSelect={() => onRevealInTerminal(contextHit.path)}
+                  onSelect={() =>
+                    onRevealInTerminal(
+                      contextHit.is_dir
+                        ? contextHit.path
+                        : pathDirname(contextHit.path) || rootPath,
+                    )
+                  }
                 >
                   <HugeiconsIcon
                     icon={ComputerTerminal01Icon}
@@ -365,6 +381,41 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                     strokeWidth={2}
                   />
                   Open in Terminal
+                </ContextMenuItem>
+              )}
+              {contextHit && onRevealInExplorer && (
+                <ContextMenuItem
+                  className={COMPACT_ITEM}
+                  onSelect={() => onRevealInExplorer(contextHit.path)}
+                >
+                  <HugeiconsIcon
+                    icon={HierarchyFilesIcon}
+                    size={14}
+                    strokeWidth={2}
+                  />
+                  Reveal in Explorer
+                </ContextMenuItem>
+              )}
+              {contextHit?.is_dir && onSetAsRoot && (
+                <ContextMenuItem
+                  className={COMPACT_ITEM}
+                  onSelect={() => onSetAsRoot(contextHit.path)}
+                >
+                  <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
+                  Set as Workspace Root
+                </ContextMenuItem>
+              )}
+              {contextHit?.is_dir && onNewWorkspaceFromFolder && (
+                <ContextMenuItem
+                  className={COMPACT_ITEM}
+                  onSelect={() => onNewWorkspaceFromFolder(contextHit.path)}
+                >
+                  <HugeiconsIcon
+                    icon={DashboardSquareAddIcon}
+                    size={14}
+                    strokeWidth={2}
+                  />
+                  New Workspace from Folder
                 </ContextMenuItem>
               )}
               <ContextMenuItem

@@ -4,6 +4,8 @@ Features e ideas a implementar en el futuro. Cada item enlaza a su plan o spec d
 
 Bugs, features y mejoras ya auditadas y priorizadas viven aparte, en [PENDING.md](PENDING.md).
 
+> Auditoria 2026-06-23 contra el codigo: se elimino "redimensionar la ventana no persiste el tamano" (ya implementado en `window_state.rs` + `restore_window_geometry`). Varias ideas resultaron PARCIALES (el modelo ya existe, falta UI): ver notas de estado en cada seccion y el detalle en [pending/AUDIT-2026-06-23.md](pending/AUDIT-2026-06-23.md).
+
 ---
 
 ## Popup de agente: fecha original de la sesion Claude
@@ -20,9 +22,7 @@ Ficheros implicados: `src-tauri/src/modules/agent/session_store.rs` (lectura del
 
 ## Popup de informacion para todos los tipos de tab
 
-Estado: pendiente (anotado 2026-06-16).
-
-Hoy el HoverCard con metadata solo aparece en tabs de agente (`hasAgent`). Extenderlo a todos los tipos de panel con informacion relevante segun el `kind`:
+Estado: PARCIAL (auditado 2026-06-23, anotado 2026-06-16). El HoverCard generico YA cubre todos los `kind` en `PaneTabBar.tsx` (`hoverBody`): terminal/agente y editor/markdown estan ricos; git-diff y git-commit-file usan `GitFileHoverContent`. Lo que FALTA es completar la metadata de `git-history` (hoy solo repo root: anadir rama activa) y `browser` (hoy solo URL: anadir estado de conexion al dev server). Texto original conservado abajo como referencia de que mostrar por kind:
 
 - **terminal**: cwd actual, pty id (util para debug).
 - **editor**: ruta completa del fichero, estado dirty, ultima modificacion.
@@ -36,7 +36,7 @@ Requiere crear un componente generico de HoverCard o especializarlo por `panel.k
 
 ## Tabs de editor/preview: guardar cwd y sincronizar con el explorer
 
-Estado: idea anotada (2026-06-14).
+Estado: PARCIAL (auditado 2026-06-23). Hay un puente one-way: al activar un panel editor/git-diff con `autofocus`, `App.tsx:562-576` extrae `panelFilePath()` y sincroniza el explorer hacia esa ruta. Lo que FALTA: los tipos `editor` y `browser` NO guardan `cwd` (`types.ts:6-7`), asi que no hay sincronizacion para el panel `browser` ni persistencia de la carpeta de trabajo del fichero. Anadir `cwd?: string` a esos kinds, rellenarlo al abrir, e incluirlos como fuente en el computo de `explorerRoot`.
 
 Hoy los tabs de editor y preview no almacenan `cwd`. Cuando el usuario abre un fichero en el editor o carga una URL en el preview, no hay forma de saber en que carpeta estaba trabajando, y el explorer no se actualiza al volver a ese tab.
 
@@ -89,7 +89,7 @@ Fase 0 del plan (refactor habilitador): columna derecha data-driven (registro de
 
 ## Explorer: lock a carpeta fija (no seguir el cwd del terminal)
 
-Estado: pendiente de implementar.
+Estado: PARCIAL (auditado 2026-06-23). El modelo y la logica YA existen: `Workspace.explorerRootMode` + `pinnedRoot` + `fsRoot` (`types.ts`), `resolveExplorerRoot()` y el computo de `explorerRoot` (`App.tsx:442`), `setPinnedRoot()` / `applyPinnedRoot()` (`useWorkspaces.ts`) y `handleSetAsRoot()` (`App.tsx`). Lo que FALTA es solo la UX: icono de candado en el header del explorer (mostrar el path fijado y soltarlo con click) y los items de menu contextual "Fijar explorador aqui" / "Fijar al raiz de git" (`git_resolve_repo`). El boceto de modelo de abajo ya esta cubierto por `pinnedRoot`; implementar solo la capa de UI.
 
 ### Motivacion
 
@@ -164,7 +164,7 @@ Total estimado: ~2h. Riesgo principal: comportamiento en Linux.
 
 ## Workspace: label de texto + barra superior con contexto
 
-Estado: idea anotada.
+Estado: PARCIAL (auditado 2026-06-23). El modelo `Workspace` YA tiene `title: string` editable y persistido (`types.ts:48`). Lo que FALTA es la presentacion en la barra superior. El label es lo mas sencillo y ya tiene datos; las otras dos piezas (ultima notificacion del tab, PR de la rama) siguen pendientes y tienen dependencias (agentStore notifs, GitHub API) que merecen items separados.
 
 ### Motivacion
 
@@ -183,14 +183,6 @@ La barra de titulo superior esta practicamente vacia. Se podria aprovechar para 
 ### Prioridad
 
 Bajo. El label del workspace es lo mas sencillo y util de lo tres; empezar por ahi si se implementa.
-
----
-
-## Bug: redimensionar la ventana no persiste el tamaño
-
-Estado: sin investigar (anotado 2026-06-14).
-
-Al redimensionar la ventana principal, el tamaño no se guarda o no se restaura en el siguiente arranque. Puede que el sync con el upstream (rama `sync/upstream-2026-06-13`) lo haya roto. Investigar si el problema esta en la escritura (el plugin `tauri-plugin-window-state` no guarda) o en la lectura (no restaura al iniciar). Revisar la configuracion del plugin en `lib.rs` y `Cargo.toml`, y si el sync elimino o cambio algo relacionado.
 
 ---
 
@@ -277,3 +269,17 @@ No es un quick win: hoy no existe filtro por path en ninguna capa.
 4. **Gating**: mostrar la accion solo si el fichero esta dentro de un repo (`git_resolve_repo`, cacheado por root del explorer).
 
 Beneficio extra: el filtro por path en `git_log` habilita despues "ver un commit concreto de un fichero" y otros flujos de historial por fichero.
+
+---
+
+## Terminal: opciones de configuracion adicionales
+
+Estado: pendiente (anotado 2026-06-22).
+
+Continuacion de la tanda de ajustes de terminal (cursor style, inactive style, cursor width, scroll sensitivity) ya implementados. Tres opciones mas que comparten el mismo patron de plumbing: campo en `Preferences` + default + parse/clamp + setter + entrada en `PREF_KEY_MAP` (`src/modules/settings/store.ts`), funcion `apply*` en `src/modules/terminal/lib/rendererPool.ts`, effect en `useTerminalSession.ts`, y control en `GeneralSection.tsx`.
+
+1. **Campana (bell)**: hoy no se hace nada con la senial de campana. xterm expone el evento `term.onBell`. Opciones: silenciosa (por defecto), visual (flash breve del terminal) y/o sonido. Requiere implementar el efecto (a diferencia de las opciones anteriores, que solo pasan un valor a xterm): suscribirse a `onBell` en `createSlot` y disparar el modo elegido.
+
+2. **Confirmar pegado multilinea (paste protection)**: avisar antes de pegar texto que contiene saltos de linea, para evitar ejecutar comandos sin querer. Encaja con la politica de "validar en cada boundary" y reusa el patron del dialogo de "warn on close". Interceptar el paste (handler de xterm / clipboard) y mostrar confirmacion cuando el texto pegado tenga `\n`.
+
+3. **Copy on select / paste con boton derecho**: comportamiento estilo terminal clasico (copiar automaticamente al seleccionar, pegar con click derecho). Dos toggles independientes. xterm da `onSelectionChange` para copy-on-select; el paste con boton derecho se cablea en el handler de contextmenu del host del slot.

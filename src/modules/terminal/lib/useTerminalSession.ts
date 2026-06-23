@@ -25,13 +25,16 @@ import "../block/block.css";
 import {
   acquireSlot,
   applyCursorBlink,
+  applyCursorInactiveStyle,
   applyCursorStyle,
+  applyCursorWidth,
   applyFontFamily,
   applyFontSize,
   applyLetterSpacing,
   applyLineHeight,
   applyTheme as applyPoolTheme,
   applyScrollback,
+  applyScrollSensitivity,
   applyWebglPreference,
   renderFontSize,
   configureRendererPool,
@@ -844,6 +847,25 @@ export function useTerminalSession({
   useEffect(() => {
     applyCursorStyle(cursorStyle);
   }, [cursorStyle]);
+
+  const cursorInactiveStyle = usePreferencesStore(
+    (p) => p.terminalCursorInactiveStyle,
+  );
+  useEffect(() => {
+    applyCursorInactiveStyle(cursorInactiveStyle);
+  }, [cursorInactiveStyle]);
+
+  const cursorWidth = usePreferencesStore((p) => p.terminalCursorWidth);
+  useEffect(() => {
+    applyCursorWidth(cursorWidth);
+  }, [cursorWidth]);
+
+  const scrollSensitivity = usePreferencesStore(
+    (p) => p.terminalScrollSensitivity,
+  );
+  useEffect(() => {
+    applyScrollSensitivity(scrollSensitivity);
+  }, [scrollSensitivity]);
 
   useEffect(() => {
     const s = sessions.get(leafId);
