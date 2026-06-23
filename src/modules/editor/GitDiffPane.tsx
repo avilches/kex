@@ -1,13 +1,22 @@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { unifiedMergeView } from "@codemirror/merge";
+import { foldGutter } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { EditorView, highlightWhitespace } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { WrapToggleButton } from "./WrapToggleButton";
-import { buildSharedExtensions, languageCompartment, wrapCompartment } from "./lib/extensions";
+import {
+  buildSharedExtensions,
+  foldGutterCompartment,
+  languageCompartment,
+  lineNumbersCompartment,
+  lineNumbersExt,
+  whitespaceCompartment,
+  wrapCompartment,
+} from "./lib/extensions";
 import {
   fetchCommitDiff,
   fetchWorkingDiff,
@@ -15,6 +24,7 @@ import {
   workingDiffKey,
   commitDiffKey,
 } from "./lib/diffCache";
+import { resolveEditorView } from "./lib/editorViewSettings";
 import { resolveLanguage, resolveLanguageSync } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 
@@ -38,13 +48,10 @@ type Props = {
   source: WorkingSource | CommitSource;
   chipLabel?: string;
   active: boolean;
-  wordWrap: boolean;
-  onToggleWordWrap: () => void;
 };
 
 const LARGE_FILE_THRESHOLD = 256 * 1024;
 
-const SHARED_EXT = buildSharedExtensions();
 const READONLY_EXT = [
   EditorState.readOnly.of(true),
   EditorView.editable.of(false),
@@ -127,10 +134,8 @@ function loadStateFromCache(
   };
 }
 
-export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordWrap }: Props) {
+export function GitDiffPane({ source, chipLabel, active }: Props) {
   const cmRef = useRef<ReactCodeMirrorRef>(null);
-  const wordWrapRef = useRef(wordWrap);
-  wordWrapRef.current = wordWrap;
   const themeExt = useEditorThemeExt();
   const [state, setState] = useState<LoadState>(() =>
     active ? loadStateFromCache(source) : { kind: "idle" },
@@ -204,35 +209,51 @@ export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordW
     modifiedContent.length > LARGE_FILE_THRESHOLD;
   const useFallback = isBinary || isTooLarge;
 
+  const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
+  const view = resolveEditorView(path, editorViewByExt);
+
   const initialLang = useMemo(() => resolveLanguageSync(path), [path]);
-  const extensions = useMemo(
-    () => [
-      ...SHARED_EXT,
-      languageCompartment.of(initialLang ?? []),
-      wrapCompartment.of(wordWrapRef.current ? EditorView.lineWrapping : []),
-      ...READONLY_EXT,
-      unifiedMergeView({
-        original: originalContent,
-        mergeControls: false,
-        highlightChanges: true,
-        gutter: true,
-        syntaxHighlightDeletions: true,
-        collapseUnchanged: { margin: 3, minSize: 6 },
+  const extensions = useMemo(() => {
+    const s = usePreferencesStore.getState();
+    const v0 = resolveEditorView(path, s.editorViewByExt);
+    return [
+      ...buildSharedExtensions({
+        view: v0,
+        indentSize: s.editorIndentSize,
+        indentWithTabs: s.editorIndentWithTabs,
+        scrollPastEnd: s.editorScrollPastEnd,
+        highlightActiveLine: s.editorHighlightActiveLine,
+        bracketMatching: s.editorBracketMatching,
+        closeBrackets: s.editorCloseBrackets,
+        autocompletion: s.editorAutocompletion,
+        cursorBlink: s.editorCursorBlink,
+        cursorStyle: s.editorCursorStyle,
+        vimActive: false,
       }),
+      languageCompartment.of(initialLang ?? []),
+      wrapCompartment.of(v0.wrap ? EditorView.lineWrapping : []),
+      ...READONLY_EXT,
+      unifiedMergeView({ original: originalContent, mergeControls: false, highlightChanges: true, gutter: true, syntaxHighlightDeletions: true, collapseUnchanged: { margin: 3, minSize: 6 } }),
       DIFF_THEME,
-    ],
-    [originalContent, initialLang],
-  );
+    ];
+  }, [originalContent, initialLang, path]);
 
   useEffect(() => {
-    const view = cmRef.current?.view;
-    if (!view) return;
-    view.dispatch({
-      effects: wrapCompartment.reconfigure(
-        wordWrap ? EditorView.lineWrapping : [],
-      ),
-    });
-  }, [wordWrap]);
+    const v = cmRef.current?.view; if (!v) return;
+    v.dispatch({ effects: wrapCompartment.reconfigure(view.wrap ? EditorView.lineWrapping : []) });
+  }, [view.wrap]);
+  useEffect(() => {
+    const v = cmRef.current?.view; if (!v) return;
+    v.dispatch({ effects: lineNumbersCompartment.reconfigure(lineNumbersExt(view.lineNumbers)) });
+  }, [view.lineNumbers]);
+  useEffect(() => {
+    const v = cmRef.current?.view; if (!v) return;
+    v.dispatch({ effects: foldGutterCompartment.reconfigure(view.foldGutter ? foldGutter() : []) });
+  }, [view.foldGutter]);
+  useEffect(() => {
+    const v = cmRef.current?.view; if (!v) return;
+    v.dispatch({ effects: whitespaceCompartment.reconfigure(view.whitespace ? highlightWhitespace() : []) });
+  }, [view.whitespace]);
 
   // Resolve and apply syntax highlighting asynchronously when the language pack
   // isn't cached yet. This must wait until the editor is actually mounted
@@ -296,11 +317,10 @@ export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordW
                 +{stats.added}
               </span>
               <span className="text-rose-600 dark:text-rose-400">
-                −{stats.removed}
+                -{stats.removed}
               </span>
             </>
           ) : null}
-          <WrapToggleButton value={wordWrap} onToggle={onToggleWordWrap} />
         </div>
       </div>
 
@@ -308,7 +328,7 @@ export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordW
         {state.kind === "loading" || state.kind === "idle" ? (
           <div className="flex h-full items-center justify-center gap-2 text-[11px] text-muted-foreground">
             <Spinner className="size-3" />
-            Loading diff…
+            Loading diff...
           </div>
         ) : state.kind === "error" ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-[11.5px] text-destructive">
@@ -330,10 +350,13 @@ export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordW
             height="100%"
             className="h-full"
             basicSetup={{
-              lineNumbers: true,
-              foldGutter: true,
+              lineNumbers: false,
+              foldGutter: false,
               highlightActiveLine: false,
               highlightActiveLineGutter: false,
+              bracketMatching: false,
+              closeBrackets: false,
+              autocompletion: false,
               searchKeymap: true,
             }}
           />
