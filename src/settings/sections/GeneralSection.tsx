@@ -12,8 +12,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  CURSOR_STYLES,
   TERMINAL_SCROLLBACK_PRESETS,
   setAgentNotifications,
   setAutofocusNewTabs,
@@ -39,6 +41,24 @@ import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
+
+// A tiny cell that mimics how the cursor looks for each style.
+function CursorGlyph({ kind }: { kind: CursorStyle }) {
+  const shape: Record<CursorStyle, string> = {
+    bar: "border-l-2 border-current",
+    block: "bg-current",
+    underline: "border-b-2 border-current",
+  };
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "ml-auto inline-block h-3.5 w-2.5 text-foreground/70",
+        shape[kind],
+      )}
+    />
+  );
+}
 
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
@@ -162,9 +182,16 @@ export function GeneralSection() {
           <Select value={editorCursorStyle} onValueChange={(v) => void setEditorCursorStyle(v as CursorStyle)}>
             <SelectTrigger size="sm" className="h-8 w-28 text-[12px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="bar" className="text-[12px]">Bar</SelectItem>
-              <SelectItem value="block" className="text-[12px]">Block</SelectItem>
-              <SelectItem value="underline" className="text-[12px]">Underline</SelectItem>
+              {CURSOR_STYLES.map((style) => (
+                <SelectItem
+                  key={style}
+                  value={style}
+                  className="text-[12px] [&>span:last-child]:w-full"
+                >
+                  <span className="capitalize">{style}</span>
+                  <CursorGlyph kind={style} />
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </SettingRow>
@@ -233,9 +260,16 @@ export function GeneralSection() {
           <Select value={terminalCursorStyle} onValueChange={(v) => void setTerminalCursorStyle(v as CursorStyle)}>
             <SelectTrigger size="sm" className="h-8 w-28 text-[12px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="bar" className="text-[12px]">Bar</SelectItem>
-              <SelectItem value="block" className="text-[12px]">Block</SelectItem>
-              <SelectItem value="underline" className="text-[12px]">Underline</SelectItem>
+              {CURSOR_STYLES.map((style) => (
+                <SelectItem
+                  key={style}
+                  value={style}
+                  className="text-[12px] [&>span:last-child]:w-full"
+                >
+                  <span className="capitalize">{style}</span>
+                  <CursorGlyph kind={style} />
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </SettingRow>

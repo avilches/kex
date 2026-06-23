@@ -12,6 +12,7 @@ export type GitColorScheme = "vscode" | "jetbrains";
 export type ScmViewMode = "list" | "tree";
 
 export type CursorStyle = "bar" | "block" | "underline";
+export const CURSOR_STYLES = ["bar", "block", "underline"] as const;
 
 export const DEFAULT_THEME_ID = "kex-default";
 
