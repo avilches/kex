@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import { EyeIcon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   clampIndentSize,
@@ -157,36 +157,29 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
       )}
       {view && showToggles && v && <div className="h-4 w-px bg-border/60" />}
       {view && (
-        <div className="inline-flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => view.onChange("raw")}
-            className={cn(
-              "rounded px-2 py-0.5 transition-colors",
-              view.mode === "raw"
-                ? "bg-accent text-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => view.onChange("rendered")}
-            disabled={view.renderedDisabled}
-            title={view.renderedDisabled ? view.renderedHint : undefined}
-            className={cn(
-              "rounded px-2 py-0.5 transition-colors",
-              view.mode === "rendered"
-                ? "bg-accent text-foreground"
-                : "text-muted-foreground hover:text-foreground",
-              view.renderedDisabled &&
-                "cursor-not-allowed opacity-40 hover:text-muted-foreground",
-            )}
-          >
-            Rendered
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => view.onChange(view.mode === "raw" ? "rendered" : "raw")}
+          disabled={view.renderedDisabled && view.mode === "raw"}
+          title={
+            view.renderedDisabled && view.mode === "raw"
+              ? view.renderedHint
+              : view.mode === "raw"
+                ? "Edit mode"
+                : "Preview mode"
+          }
+          className={cn(
+            "flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground",
+            view.renderedDisabled &&
+              view.mode === "raw" &&
+              "cursor-not-allowed opacity-40 hover:text-muted-foreground",
+          )}
+        >
+          <HugeiconsIcon
+            icon={view.mode === "raw" ? PencilEdit01Icon : EyeIcon}
+            size={12}
+          />
+        </button>
       )}
     </div>
   );
