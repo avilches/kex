@@ -25,6 +25,7 @@ import "../block/block.css";
 import {
   acquireSlot,
   applyCursorBlink,
+  applyCursorStyle,
   applyFontFamily,
   applyFontSize,
   applyLetterSpacing,
@@ -838,6 +839,11 @@ export function useTerminalSession({
   useEffect(() => {
     applyCursorBlink(cursorBlink);
   }, [cursorBlink]);
+
+  const cursorStyle = usePreferencesStore((p) => p.terminalCursorStyle);
+  useEffect(() => {
+    applyCursorStyle(cursorStyle);
+  }, [cursorStyle]);
 
   useEffect(() => {
     const s = sessions.get(leafId);

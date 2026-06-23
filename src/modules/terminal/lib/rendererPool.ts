@@ -1,5 +1,6 @@
 import { resolveMonoFontFamily } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { CursorStyle } from "@/modules/settings/store";
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
@@ -69,6 +70,7 @@ let windowActive =
   (!document.hidden && document.hasFocus());
 let windowActivityBound = false;
 let cursorBlinkEnabled = false;
+let cursorStyle: CursorStyle = "bar";
 
 function bindWindowActivityListeners(): void {
   if (windowActivityBound || typeof window === "undefined") return;
@@ -175,7 +177,7 @@ function termOptions() {
     lineHeight: prefs.terminalLineHeight,
     theme: buildTerminalTheme(),
     cursorBlink: false,
-    cursorStyle: "bar" as const,
+    cursorStyle: cursorStyle,
     cursorInactiveStyle: "outline" as const,
     scrollback: prefs.terminalScrollback,
     allowProposedApi: true,
@@ -879,6 +881,14 @@ export function setSlotFocused(leafId: string, focused: boolean): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return;
   applyCursorBlinkOnSlot(slot, focused);
+}
+
+export function applyCursorStyle(style: CursorStyle): void {
+  cursorStyle = style;
+  for (const slot of slots) {
+    if (slot.term.options.cursorStyle === style) continue;
+    slot.term.options.cursorStyle = style;
+  }
 }
 
 export function applyCursorBlink(enabled: boolean): void {
