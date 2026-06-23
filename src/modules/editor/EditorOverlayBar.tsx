@@ -19,8 +19,24 @@ export function EditorOverlayBar({ view, wrap }: Props) {
   const showWrap = view?.mode !== "rendered";
   return (
     <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-md border border-border/60 bg-card/85 p-0.5 text-[11px] shadow-sm backdrop-blur">
+      {showWrap && wrap && (
+        <WrapToggleButton value={wrap.value} onToggle={wrap.onToggle} />
+      )}
+      {view && showWrap && wrap && <div className="h-4 w-px bg-border/60" />}
       {view && (
         <div className="inline-flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => view.onChange("raw")}
+            className={cn(
+              "rounded px-2 py-0.5 transition-colors",
+              view.mode === "raw"
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Edit
+          </button>
           <button
             type="button"
             onClick={() => view.onChange("rendered")}
@@ -37,22 +53,8 @@ export function EditorOverlayBar({ view, wrap }: Props) {
           >
             Rendered
           </button>
-          <button
-            type="button"
-            onClick={() => view.onChange("raw")}
-            className={cn(
-              "rounded px-2 py-0.5 transition-colors",
-              view.mode === "raw"
-                ? "bg-accent text-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Edit
-          </button>
         </div>
       )}
-      {view && showWrap && wrap && <div className="h-4 w-px bg-border/60" />}
-      {showWrap && wrap && <WrapToggleButton value={wrap.value} onToggle={wrap.onToggle} />}
     </div>
   );
 }
