@@ -2,6 +2,8 @@
 
 Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `docs/pending/`.
 
+> Auditoria 2026-06-23 contra el codigo: ver [AUDIT-2026-06-23.md](pending/AUDIT-2026-06-23.md) para el detalle de que se elimino (ya corregido), que cambio de estado y que sigue vigente.
+
 ---
 
 ## Bugs (`docs/pending/bugs/`)
@@ -20,15 +22,10 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-15](pending/bugs/BUG-15-usefiletree-callbacks-inestables.md) — useFileTree: callbacks inestables
 - [BUG-17](pending/bugs/BUG-17-busqueda-ipc-sin-cancelacion.md) — Busqueda IPC sin cancelacion (fs_search resuelto; fs_grep_interactive pendiente)
 - [BUG-18](pending/bugs/BUG-18-race-refetch-fs-changed-explorer.md) — Race entre refetch y fs-changed en explorer
-- [BUG-20](pending/bugs/BUG-20-pty-open-autoriza-cwd-aunque-spawn-falle.md) — pty_open autoriza cwd aunque spawn falle
-- [BUG-27](pending/bugs/BUG-27-countdifflines-heuristic-not-numstat.md) — countDiffLines: heuristica, no numstat
 - [BUG-28](pending/bugs/BUG-28-parse-renamed-empty-path-truncated.md) — parse renamed: empty path en truncado
-- [BUG-30](pending/bugs/BUG-30-fs-mutations-autosave-swallow-errors.md) — fs mutations + autosave silencian errores
-- [BUG-34](pending/bugs/BUG-34-cd-quoting-breaks-cmd-fallback.md) — cd quoting rompe fallback a cmd.exe
 - [BUG-38](pending/bugs/BUG-38-busqueda-cmdF-incompleta.md) - Cmd+F: no busca en markdown/git-diff (terminal y editor resueltos)
-- [BUG-39](pending/bugs/BUG-39-file-search-ux-poco-clara.md) - Busqueda de ficheros: UX poco clara (solo via Cmd+P + #?)
-- [BUG-40](pending/bugs/BUG-40-stage-unstage-all-incompleto.md) — Stage all / unstage all no procesa todos los ficheros
-- [BUG-41](pending/bugs/BUG-41-explore-root-por-editor-restore.md) — Explore root por editor: persistencia y restore sin verificar
+- [BUG-39](pending/bugs/BUG-39-file-search-ux-poco-clara.md) - Busqueda de ficheros: UX poco clara (no es bug de codigo; los atajos funcionan, falta descubribilidad: tratar como mejora de UI)
+- [BUG-40](pending/bugs/BUG-40-stage-unstage-all-incompleto.md) — Stage all / unstage all no procesa todos los ficheros (la logica de pathspecs parece correcta; el sintoma cuelga probablemente de BUG-06, renames sin original_rel. Reproducir antes de fix)
 - [BUG-42](pending/bugs/BUG-42-borrar-fichero-con-editor-abierto.md) — Borrar un fichero con el editor abierto (sin verificar)
 - [BUG-43](pending/bugs/BUG-43-restore-claude-code-con-worktree.md) — Restore de Claude Code cuando ha creado un worktree (sin verificar)
 
@@ -46,13 +43,12 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 
 ## Mejoras (`docs/pending/improvements/`)
 
-- [M1](pending/improvements/M1-memoizacion-arbol-workspaces.md) — Memoizacion del arbol de workspaces
 - [M2](pending/improvements/M2-lazy-modulo-agents.md) — Lazy loading del modulo agents
 - [M3](pending/improvements/M3-hunks-estructurados-backend.md) — Hunks estructurados en backend
 - [M4](pending/improvements/M4-cancelacion-busqueda-ipc.md) — Cancelacion de busqueda IPC
 - [M5](pending/improvements/M5-diff-grandes-worker.md) — Diffs grandes en Web Worker
 - [M6](pending/improvements/M6-reaping-bg-procs-y-registry.md) — Reaping de procesos background y registry
-- [M7](pending/improvements/M7-quick-wins.md) — Quick wins varios
+- [M7](pending/improvements/M7-quick-wins.md) — Quick wins varios (parcial: ~7/15 ya hechos; quedan items 2, 3, 9, 10, 13, 14)
 - [M8](pending/improvements/M8-release-appimage-wayland-updater-sig.md) — Adoptar sistema de release de AppImage del upstream (fix libwayland + sig race-free)
 - [M9](pending/improvements/M9-rebind-rename-f2-shift-f6.md) — Rebind del atajo de rename: F2 -> Shift+F6
 - [M10](pending/improvements/M10-rendimiento-busqueda-ficheros.md) — Rendimiento de la busqueda de ficheros (fs_search async/paralelo/cancelable + tuning de contenido)

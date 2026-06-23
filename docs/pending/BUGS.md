@@ -2,7 +2,9 @@
 
 Cada bug es un fichero autocontenido y accionable por un agente en `docs/pending/bugs/`. Un agente puede ejecutar cualquiera de forma aislada: cada fichero incluye contexto del proyecto, ubicación `archivo:línea`, problema, impacto, fix concreto, criterios de aceptación, comandos de verificación y el test a añadir si toca un subsistema core.
 
-Total: 34 bugs. 6 high, 12 medium, 16 low. Los marcados con asterisco se verificaron a mano.
+Total: 30 bugs. 6 high, 12 medium, 12 low. Los marcados con asterisco se verificaron a mano.
+
+> Auditoria 2026-06-23: eliminados por estar ya corregidos en el codigo: BUG-20 (pty_open autoriza post-spawn), BUG-27 (countDiffLines es fallback valido), BUG-30 (errores fs/autosave ya con toast), BUG-34 (cd quoting ya usa comillas dobles). Ver `AUDIT-2026-06-23.md`.
 
 ## High
 
@@ -36,21 +38,17 @@ Total: 34 bugs. 6 high, 12 medium, 16 low. Los marcados con asterisco se verific
 
 | ID | Título | Fichero |
 | --- | --- | --- |
-| BUG-20 | `pty_open` autoriza la cwd aunque el spawn falle | [bugs/BUG-20-pty-open-autoriza-cwd-aunque-spawn-falle.md](bugs/BUG-20-pty-open-autoriza-cwd-aunque-spawn-falle.md) |
 | BUG-21 | `WorkspaceRegistry` sin cota, `is_authorized` O(n) | [bugs/BUG-21-workspaceregistry-sin-cota-on.md](bugs/BUG-21-workspaceregistry-sin-cota-on.md) |
 | BUG-22 | Debug `DEBUG_PANE_SIZE` activo en producción | [bugs/BUG-22-debug-pane-size-en-produccion.md](bugs/BUG-22-debug-pane-size-en-produccion.md) |
 | BUG-23 | `console.log` en el hot path de persistencia | [bugs/BUG-23-console-log-persistencia-produccion.md](bugs/BUG-23-console-log-persistencia-produccion.md) |
 | BUG-24 | `respawnSession`: bytes del pty viejo en vuelo | [bugs/BUG-24-respawnsession-dormantring-bytes-en-vuelo.md](bugs/BUG-24-respawnsession-dormantring-bytes-en-vuelo.md) |
 | BUG-25 | Doble `destroy()` en carrera al cerrar | [bugs/BUG-25-doble-destroy-cierre-ultimo-panel.md](bugs/BUG-25-doble-destroy-cierre-ultimo-panel.md) |
 | BUG-26 | Effect del diff depende de `source` inestable | [bugs/BUG-26-diff-effect-source-dep-recreated.md](bugs/BUG-26-diff-effect-source-dep-recreated.md) |
-| BUG-27 | `countDiffLines` heurístico en vez de numstat | [bugs/BUG-27-countdifflines-heuristic-not-numstat.md](bugs/BUG-27-countdifflines-heuristic-not-numstat.md) |
 | BUG-28 | `parse_renamed`: path vacío en truncamiento | [bugs/BUG-28-parse-renamed-empty-path-truncated.md](bugs/BUG-28-parse-renamed-empty-path-truncated.md) |
 | BUG-29 | Split de paths por `"/"` (cross-platform) | [bugs/BUG-29-path-split-forward-slash-only.md](bugs/BUG-29-path-split-forward-slash-only.md) |
-| BUG-30 | fs/autosave tragan errores (solo console) | [bugs/BUG-30-fs-mutations-autosave-swallow-errors.md](bugs/BUG-30-fs-mutations-autosave-swallow-errors.md) |
 | BUG-31 | Preview de tema obsoleto tras cerrar la paleta | [bugs/BUG-31-theme-preview-stale-after-close.md](bugs/BUG-31-theme-preview-stale-after-close.md) |
 | BUG-32 | `tab.selectByIndex` salta el guard de key | [bugs/BUG-32-selectbyindex-matcher-skips-key-guard.md](bugs/BUG-32-selectbyindex-matcher-skips-key-guard.md) |
 | BUG-33 | `segmentsFromCwd` case-sensitive en Windows | [bugs/BUG-33-segmentsfromcwd-case-sensitive-home-windows.md](bugs/BUG-33-segmentsfromcwd-case-sensitive-home-windows.md) |
-| BUG-34 | Quoting de `cd` roto en cmd.exe | [bugs/BUG-34-cd-quoting-breaks-cmd-fallback.md](bugs/BUG-34-cd-quoting-breaks-cmd-fallback.md) |
 | BUG-35 | `usePresence` re-entrancy latente | [bugs/BUG-35-usepresence-mounted-in-deps-reentrancy.md](bugs/BUG-35-usepresence-mounted-in-deps-reentrancy.md) |
 
 ---
