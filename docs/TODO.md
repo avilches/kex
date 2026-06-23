@@ -22,9 +22,7 @@ Ficheros implicados: `src-tauri/src/modules/agent/session_store.rs` (lectura del
 
 ## Popup de informacion para todos los tipos de tab
 
-Estado: pendiente (anotado 2026-06-16).
-
-Estado: PARCIAL (auditado 2026-06-23). El HoverCard generico YA cubre todos los `kind` en `PaneTabBar.tsx` (`hoverBody`): terminal/agente y editor/markdown estan ricos; git-diff y git-commit-file usan `GitFileHoverContent`. Lo que FALTA es completar la metadata de `git-history` (hoy solo repo root: anadir rama activa) y `browser` (hoy solo URL: anadir estado de conexion al dev server). Texto original conservado abajo como referencia de que mostrar por kind:
+Estado: PARCIAL (auditado 2026-06-23, anotado 2026-06-16). El HoverCard generico YA cubre todos los `kind` en `PaneTabBar.tsx` (`hoverBody`): terminal/agente y editor/markdown estan ricos; git-diff y git-commit-file usan `GitFileHoverContent`. Lo que FALTA es completar la metadata de `git-history` (hoy solo repo root: anadir rama activa) y `browser` (hoy solo URL: anadir estado de conexion al dev server). Texto original conservado abajo como referencia de que mostrar por kind:
 
 - **terminal**: cwd actual, pty id (util para debug).
 - **editor**: ruta completa del fichero, estado dirty, ultima modificacion.
