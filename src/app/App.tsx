@@ -42,6 +42,7 @@ import {
   setRightPanelActiveTab,
   setShowHidden,
   setWarnOnCloseTabWithRunningProcess,
+  setWarnOnCloseWorkspace,
 } from "@/modules/settings/store";
 import {
   useGlobalShortcuts,
@@ -409,6 +410,21 @@ export default function App() {
   // without re-triggering effects that depend on the callback identity.
   const handleCloseWorkspaceRef = useRef(handleCloseWorkspace);
   handleCloseWorkspaceRef.current = handleCloseWorkspace;
+
+  const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState<
+    { id: string; isLast: boolean } | null
+  >(null);
+
+  const requestCloseWorkspace = useCallback((wsId: string) => {
+    if (usePreferencesStore.getState().warnOnCloseWorkspace) {
+      setPendingCloseWorkspace({
+        id: wsId,
+        isLast: workspacesRef.current.length === 1,
+      });
+    } else {
+      void handleCloseWorkspaceRef.current(wsId);
+    }
+  }, []);
 
   const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
   const setWorkspaceEnv = useWorkspaceEnvStore((s) => s.setEnv);
@@ -1515,7 +1531,12 @@ export default function App() {
   const [zenMode, setZenMode] = useState(false);
 
   const handleCloseActivePanel = useCallback(() => {
-    if (!activeWorkspace || !activePanelId) return;
+    if (!activeWorkspace) return;
+    if (!activePanelId) {
+      // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
+      requestCloseWorkspace(activeWorkspace.id);
+      return;
+    }
     if (
       (activePanel?.kind === "terminal" || activePanel?.kind === "editor") &&
       activePanel.locked
@@ -1524,7 +1545,7 @@ export default function App() {
       return;
     }
     closePanelsRef.current([activePanelId]);
-  }, [activeWorkspace, activePanelId, activePanel]);
+  }, [activeWorkspace, activePanelId, activePanel, requestCloseWorkspace]);
 
   const handleCloseOtherPanels = useCallback(() => {
     if (!activePane || !activePanelId) return;
@@ -2034,7 +2055,7 @@ export default function App() {
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(home ?? undefined)}
               onReorder={reorderWorkspaces}
-              onClose={(wsId) => handleCloseWorkspaceRef.current(wsId)}
+              onClose={(wsId) => requestCloseWorkspace(wsId)}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
@@ -2231,6 +2252,14 @@ export default function App() {
             pendingDeletePanels={pendingDeletePanels}
             onCancelDeleteClose={cancelDeleteClose}
             onConfirmDeleteClose={confirmDeleteClose}
+            pendingCloseWorkspace={pendingCloseWorkspace}
+            onCancelCloseWorkspace={() => setPendingCloseWorkspace(null)}
+            onConfirmCloseWorkspace={(dontAskAgain) => {
+              const id = pendingCloseWorkspace?.id;
+              setPendingCloseWorkspace(null);
+              if (dontAskAgain) void setWarnOnCloseWorkspace(false);
+              if (id) void handleCloseWorkspaceRef.current(id);
+            }}
           />
         </div>
       </TooltipProvider>
