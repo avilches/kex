@@ -8,7 +8,12 @@ import {
 } from "@/components/ui/context-menu";
 import {
   ArrowDown01Icon,
+  ComputerTerminal01Icon,
+  Copy01Icon,
+  FileAddIcon,
   Folder01Icon,
+  FolderAddIcon,
+  FolderOpenIcon,
   HierarchyFilesIcon,
   Home01Icon,
   PinIcon,
@@ -922,7 +927,13 @@ export const FileExplorer = memo(
             />
           );
         case "fs-up":
-          return <FsUpRow path={row.path} onNavigateUp={onNavigateUp} />;
+          return (
+            <FsUpRow
+              path={row.path}
+              onNavigateUp={onNavigateUp}
+              onRevealInTerminal={onRevealInTerminal}
+            />
+          );
         case "pending":
           return (
             <PendingRow
@@ -1220,6 +1231,11 @@ export const FileExplorer = memo(
                       className={COMPACT_ITEM}
                       onSelect={() => onRevealInTerminal(rootPath)}
                     >
+                      <HugeiconsIcon
+                        icon={ComputerTerminal01Icon}
+                        size={14}
+                        strokeWidth={2}
+                      />
                       Open in Terminal
                     </ContextMenuItem>
                   )}
@@ -1227,6 +1243,11 @@ export const FileExplorer = memo(
                     className={COMPACT_ITEM}
                     onSelect={() => void revealInFinder(rootPath)}
                   >
+                    <HugeiconsIcon
+                      icon={FolderOpenIcon}
+                      size={14}
+                      strokeWidth={2}
+                    />
                     Reveal in Finder
                   </ContextMenuItem>
                   <ContextMenuSeparator />
@@ -1234,12 +1255,18 @@ export const FileExplorer = memo(
                     className={COMPACT_ITEM}
                     onSelect={() => tree.beginCreate(rootPath, "file")}
                   >
+                    <HugeiconsIcon icon={FileAddIcon} size={14} strokeWidth={2} />
                     New File
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => tree.beginCreate(rootPath, "dir")}
                   >
+                    <HugeiconsIcon
+                      icon={FolderAddIcon}
+                      size={14}
+                      strokeWidth={2}
+                    />
                     New Folder
                   </ContextMenuItem>
                   <ContextMenuSeparator />
@@ -1247,12 +1274,18 @@ export const FileExplorer = memo(
                     className={COMPACT_ITEM}
                     onSelect={() => void copyToClipboard(rootPath)}
                   >
-                    Copy Path
+                    <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+                    Copy Absolute Path
                   </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => tree.refresh(rootPath)}
                   >
+                    <HugeiconsIcon
+                      icon={Refresh01Icon}
+                      size={14}
+                      strokeWidth={2}
+                    />
                     Refresh
                   </ContextMenuItem>
                 </ContextMenuContent>

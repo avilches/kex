@@ -9,7 +9,12 @@ import {
 } from "@/components/ui/context-menu";
 import {
   Cancel01Icon,
+  ComputerTerminal01Icon,
+  Copy01Icon,
+  File01Icon,
   Folder01Icon,
+  FolderOpenIcon,
+  Link01Icon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -344,6 +349,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                   className={COMPACT_ITEM}
                   onSelect={() => onOpenFile(contextHit.path)}
                 >
+                  <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
                   Open
                 </ContextMenuItem>
               )}
@@ -352,6 +358,11 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                   className={COMPACT_ITEM}
                   onSelect={() => onRevealInTerminal(contextHit.path)}
                 >
+                  <HugeiconsIcon
+                    icon={ComputerTerminal01Icon}
+                    size={14}
+                    strokeWidth={2}
+                  />
                   Open in Terminal
                 </ContextMenuItem>
               )}
@@ -359,14 +370,26 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 className={COMPACT_ITEM}
                 onSelect={() => contextHit && void revealInFinder(contextHit.path)}
               >
+                <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
                 Reveal in Finder
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
                 className={COMPACT_ITEM}
+                onSelect={() =>
+                  contextHit &&
+                  void copyToClipboard(relativePath(rootPath, contextHit.path))
+                }
+              >
+                <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
+                Copy Relative Path
+              </ContextMenuItem>
+              <ContextMenuItem
+                className={COMPACT_ITEM}
                 onSelect={() => contextHit && void copyToClipboard(contextHit.path)}
               >
-                Copy Path
+                <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+                Copy Absolute Path
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>

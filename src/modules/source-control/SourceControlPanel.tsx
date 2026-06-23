@@ -58,6 +58,7 @@ import {
   FolderTreeIcon,
   GitBranchIcon,
   GitCommitIcon,
+  GitForkIcon,
   Link01Icon,
   ListViewIcon,
   MinusSignIcon,
@@ -99,11 +100,8 @@ type Props = {
     originalPath: string | null;
     title?: string;
   }) => void;
-  onOpenFile?: (absolutePath: string) => void;
+  onOpenFile?: (absolutePath: string, pin?: boolean) => void;
 };
-
-const SOURCE_CONTROL_TOOLTIP_CLASS =
-  "border border-border/70 bg-zinc-950 text-zinc-100 shadow-lg shadow-black/30 dark:border-border/60 dark:bg-zinc-950 dark:text-zinc-100";
 
 const ROW_HEIGHTS = {
   banner: 32,
@@ -575,7 +573,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         <header className="flex shrink-0 items-start justify-between gap-1 border-b border-border/60 px-1.5 py-1">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex h-6 min-w-0 items-center gap-1.5">
-              <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-0.5 text-[11.5px] font-medium leading-none text-foreground">
+              <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-tight text-foreground">
                 <HugeiconsIcon
                   icon={GitBranchIcon}
                   size={12}
@@ -620,7 +618,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   <span className="inline-flex w-fit min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground">
                     {scm.repo.isWorktree ? (
                       <HugeiconsIcon
-                        icon={Link01Icon}
+                        icon={GitForkIcon}
                         size={12}
                         strokeWidth={1.9}
                         className="shrink-0"
@@ -633,7 +631,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </TooltipTrigger>
                 <TooltipContent
                   side="bottom"
-                  className={cn(SOURCE_CONTROL_TOOLTIP_CLASS, "text-[10.5px]")}
+                  className="text-[10.5px]"
                 >
                   {scm.repo.repoRoot}
                 </TooltipContent>
@@ -648,7 +646,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               onClick={() =>
                 void setScmViewMode(scmViewMode === "tree" ? "list" : "tree")
               }
-              side="bottom"
             >
               <HugeiconsIcon
                 icon={scmViewMode === "tree" ? ListViewIcon : FolderTreeIcon}
@@ -660,7 +657,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               label={fetchBusy ? "Fetching…" : "Fetch from remote"}
               disabled={!canFetch}
               onClick={handleFetch}
-              side="bottom"
             >
               {fetchBusy ? (
                 <Spinner className="size-3" />
@@ -686,7 +682,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               }
               disabled={!canPull}
               onClick={handlePull}
-              side="bottom"
             >
               {pullBusy ? (
                 <Spinner className="size-3" />
@@ -702,7 +697,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               label="Refresh source control"
               disabled={isRefreshing || !!scm.actionBusy}
               onClick={handleRefresh}
-              side="bottom"
             >
               {isRefreshing ? (
                 <Spinner className="size-3.5" />
@@ -719,7 +713,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               <IconActionButton
                 label="Log"
                 onClick={() => onOpenGitGraph()}
-                side="bottom"
               >
                 <HugeiconsIcon
                   icon={GitCommitIcon}
@@ -822,10 +815,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   </TooltipTrigger>
                   <TooltipContent
                     side="bottom"
-                    className={cn(
-                      SOURCE_CONTROL_TOOLTIP_CLASS,
-                      "text-[10.5px]",
-                    )}
+                    className="text-[10.5px]"
                   >
                     {commitHint}
                   </TooltipContent>
@@ -844,10 +834,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   </TooltipTrigger>
                   <TooltipContent
                     side="bottom"
-                    className={cn(
-                      SOURCE_CONTROL_TOOLTIP_CLASS,
-                      "max-w-64 text-[10.5px]",
-                    )}
+                    className="max-w-64 text-[10.5px]"
                   >
                     {pushDisabledReason}
                   </TooltipContent>
@@ -1029,7 +1016,7 @@ type RowRendererProps = {
   onStageAll: () => Promise<void>;
   onUnstageAll: () => Promise<void>;
   onDiscardAll: () => void;
-  onOpenFile?: (absolutePath: string) => void;
+  onOpenFile?: (absolutePath: string, pin?: boolean) => void;
 };
 
 const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
@@ -1101,7 +1088,6 @@ function StagedSectionHeader({
         <IconActionButton
           label="Unstage all"
           disabled={actionBusy !== null}
-          side="bottom"
           onClick={() => void onUnstageAll()}
         >
           <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
@@ -1149,7 +1135,6 @@ function ChangesSectionHeader({
         <IconActionButton
           label="Discard all changes"
           disabled={actionBusy !== null}
-          side="bottom"
           onClick={() => onDiscardAll()}
         >
           <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
@@ -1157,7 +1142,6 @@ function ChangesSectionHeader({
         <IconActionButton
           label="Stage all changes"
           disabled={actionBusy !== null}
-          side="bottom"
           onClick={() => void onStageAll()}
         >
           <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
@@ -1226,7 +1210,6 @@ function TreeDirRow({
           <IconActionButton
             label="Unstage folder"
             disabled={actionBusy !== null}
-            side="top"
             onClick={() => onUnstageFolder(node)}
           >
             <HugeiconsIcon icon={MinusSignIcon} size={11} strokeWidth={1.9} />
@@ -1236,7 +1219,6 @@ function TreeDirRow({
             <IconActionButton
               label="Discard folder changes"
               disabled={actionBusy !== null}
-              side="top"
               onClick={() => onDiscardFolder(node)}
             >
               <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
@@ -1244,7 +1226,6 @@ function TreeDirRow({
             <IconActionButton
               label="Stage folder"
               disabled={actionBusy !== null}
-              side="top"
               onClick={() => onStageFolder(node)}
             >
               <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
@@ -1368,7 +1349,6 @@ const EntryRow = memo(function EntryRow({
               <IconActionButton
                 label={`Unstage ${entry.path}`}
                 disabled={disabled}
-                side="top"
                 onClick={() => void onUnstageEntry(entry)}
               >
                 {isUnstageBusy ? (
@@ -1386,7 +1366,6 @@ const EntryRow = memo(function EntryRow({
                 <IconActionButton
                   label={`Discard ${entry.path}`}
                   disabled={disabled}
-                  side="top"
                   onClick={() => onDiscardEntry(entry)}
                 >
                   {isDiscardBusy ? (
@@ -1402,7 +1381,6 @@ const EntryRow = memo(function EntryRow({
                 <IconActionButton
                   label={`Stage ${entry.path}`}
                   disabled={disabled}
-                  side="top"
                   onClick={() => void onStageEntry(entry)}
                 >
                   {isStageBusy ? (
@@ -1439,10 +1417,19 @@ const EntryRow = memo(function EntryRow({
         {!isDeleted && onOpenFile && absolutePath ? (
           <ContextMenuItem
             className={COMPACT_ITEM}
-            onSelect={() => onOpenFile(absolutePath)}
+            onSelect={() => onOpenFile(absolutePath, true)}
           >
             <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open File
+          </ContextMenuItem>
+        ) : null}
+        {!isDeleted && absolutePath ? (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => void revealInFinder(absolutePath)}
+          >
+            <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
+            {revealLabel}
           </ContextMenuItem>
         ) : null}
         <ContextMenuSeparator />
@@ -1492,18 +1479,6 @@ const EntryRow = memo(function EntryRow({
             Copy Absolute Path
           </ContextMenuItem>
         ) : null}
-        {!isDeleted && absolutePath ? (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => void revealInFinder(absolutePath)}
-            >
-              <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
-              {revealLabel}
-            </ContextMenuItem>
-          </>
-        ) : null}
       </ContextMenuContent>
     </ContextMenu>
   );
@@ -1512,37 +1487,26 @@ const EntryRow = memo(function EntryRow({
 function IconActionButton({
   label,
   disabled,
-  side = "left",
   onClick,
   children,
 }: {
   label: string;
   disabled?: boolean;
-  side?: "left" | "top" | "right" | "bottom";
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className="size-6 p-3 rounded-md text-muted-foreground hover:text-foreground disabled:cursor-not-allowed"
-          aria-label={label}
-          disabled={disabled}
-          onClick={onClick}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent
-        side={side}
-        className={cn(SOURCE_CONTROL_TOOLTIP_CLASS, "text-[10.5px]")}
-      >
-        {label}
-      </TooltipContent>
-    </Tooltip>
+    <Button
+      size="icon-sm"
+      variant="ghost"
+      className="size-6 p-3 rounded-md text-muted-foreground hover:text-foreground disabled:cursor-not-allowed"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
   );
 }
 

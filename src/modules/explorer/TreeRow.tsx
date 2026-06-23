@@ -380,6 +380,7 @@ function EntryRowImpl(props: EntryRowProps) {
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
           New Folder
         </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
           onSelect={() => actions.cutEntry(path, isDir ? "dir" : "file")}
@@ -423,17 +424,17 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(path)}
-        >
-          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
-          Copy Path
-        </ContextMenuItem>
-        <ContextMenuItem
-          className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(relativePath(rootPath, path))}
         >
           <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
+        </ContextMenuItem>
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => void copyToClipboard(path)}
+        >
+          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          Copy Absolute Path
         </ContextMenuItem>
         {gitRootPath &&
           onAddToGitignore &&
@@ -593,7 +594,6 @@ export function FsRootRow({
             New Workspace from folder
           </ContextMenuItem>
         )}
-        <ContextMenuSeparator />
         {onRevealInTerminal && (
           <ContextMenuItem
             className={COMPACT_ITEM}
@@ -629,6 +629,7 @@ export function FsRootRow({
           <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
           New Folder
         </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
           disabled={!canPaste || isCopying()}
@@ -644,7 +645,7 @@ export function FsRootRow({
           onSelect={() => void copyToClipboard(path)}
         >
           <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
-          Copy Path
+          Copy Absolute Path
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
@@ -661,9 +662,11 @@ export function FsRootRow({
 export function FsUpRow({
   path,
   onNavigateUp,
+  onRevealInTerminal,
 }: {
   path: string;
   onNavigateUp?: () => void;
+  onRevealInTerminal?: (path: string) => void;
 }) {
   // Same as FsRootRow: drag opens a terminal at the parent dir, no internal move.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -671,28 +674,62 @@ export function FsUpRow({
     data: { path },
   });
   return (
-    <button
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      type="button"
-      onDoubleClick={() => onNavigateUp?.()}
-      title="Double-click to go up one folder"
-      className={cn(
-        "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
-        isDragging && "opacity-50",
-      )}
-      style={{ paddingLeft: 6 }}
-    >
-      <span className="size-3.5 shrink-0" />
-      <img
-        src={folderIconUrl("", false)}
-        alt=""
-        draggable={false}
-        className="size-4 shrink-0"
-      />
-      <span className="min-w-0 flex-1 truncate">..</span>
-    </button>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <button
+          ref={setNodeRef}
+          {...listeners}
+          {...attributes}
+          type="button"
+          onDoubleClick={() => onNavigateUp?.()}
+          title="Double-click to go up one folder"
+          className={cn(
+            "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
+            isDragging && "opacity-50",
+          )}
+          style={{ paddingLeft: 6 }}
+        >
+          <span className="size-3.5 shrink-0" />
+          <img
+            src={folderIconUrl("", false)}
+            alt=""
+            draggable={false}
+            className="size-4 shrink-0"
+          />
+          <span className="min-w-0 flex-1 truncate">..</span>
+        </button>
+      </ContextMenuTrigger>
+      <ContextMenuContent className={COMPACT_CONTENT}>
+        {onRevealInTerminal && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onRevealInTerminal(path)}
+          >
+            <HugeiconsIcon
+              icon={ComputerTerminal01Icon}
+              size={14}
+              strokeWidth={2}
+            />
+            Open in Terminal
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => void revealInFinder(path)}
+        >
+          <HugeiconsIcon icon={FolderOpenIcon} size={14} strokeWidth={2} />
+          Reveal in Finder
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className={COMPACT_ITEM}
+          onSelect={() => void copyToClipboard(path)}
+        >
+          <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+          Copy Absolute Path
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
