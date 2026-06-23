@@ -7,6 +7,7 @@ import { pathDirname, pathBasename } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 import { suggestDuplicateName } from "@/modules/explorer/lib/duplicateName";
 import { isCopying } from "@/modules/explorer/lib/duplicateStore";
+import { removedChildDirs } from "@/modules/explorer/lib/treePrune";
 import {
   type ClipboardEntry,
   planPaste,
@@ -151,9 +152,12 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       setNodes((s) => ({ ...s, [path]: { status: "loading" } }));
     }
     try {
+      // Capture once so the prune decision uses the same visibility the listing
+      // was taken with, even if the preference flips during the await.
+      const showHidden = showHiddenRef.current;
       const entries = await invoke<DirEntry[]>("fs_read_dir", {
         path,
-        showHidden: showHiddenRef.current,
+        showHidden,
         gitDecorations: gitDecorationsRef.current,
         workspace: currentWorkspaceEnv(),
       });
@@ -166,10 +170,12 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       const liveDirs = new Set(
         entries.filter((e) => e.kind === "dir").map((e) => joinPath(path, e.name)),
       );
-      const removedRoots: string[] = [];
-      for (const key of Object.keys(nodesRef.current)) {
-        if (dirname(key) === path && !liveDirs.has(key)) removedRoots.push(key);
-      }
+      const removedRoots = removedChildDirs(
+        path,
+        liveDirs,
+        Object.keys(nodesRef.current),
+        showHidden,
+      );
       const dead = new Set<string>();
       if (removedRoots.length > 0) {
         const candidates = new Set<string>([
