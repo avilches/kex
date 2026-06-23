@@ -399,6 +399,16 @@ export const FileExplorer = memo(
       setIsSearchOpen(false);
       onSearchClose?.();
     }, [onSearchClose]);
+    const [searchReveal, setSearchReveal] = useState<RevealRequest | null>(null);
+    const searchRevealNonce = useRef(0);
+    const revealInExplorer = useCallback(
+      (path: string) => {
+        searchRevealNonce.current += 1;
+        setSearchReveal({ path, nonce: searchRevealNonce.current });
+        closeSearch();
+      },
+      [closeSearch],
+    );
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -629,51 +639,69 @@ export const FileExplorer = memo(
       tree.cancelDuplicate,
     ]);
 
-    // Focus on Explorer: reveal a file or folder on demand. Root/mode changes
-    // reload the tree asynchronously, so this re-runs as nodes/expanded settle
-    // until every ancestor is loaded, then selects and scrolls (without stealing
-    // focus).
+    // Reveal a file or folder on demand. Root/mode changes reload the tree
+    // asynchronously, so callers re-run as nodes/expanded settle: "pending" means
+    // ancestors are still loading and the caller should retry on the next settle.
+    const applyRevealTarget = useCallback(
+      (file: string): "pending" | "done" => {
+        if (!rootPath || !isUnder(file, rootPath)) return "pending";
+        if (tree.nodes[rootPath]?.status !== "loaded") return "pending";
+        let loading = false;
+        for (const dir of ancestorsToExpand(rootPath, file)) {
+          if (!tree.expanded.has(dir)) {
+            tree.expand(dir);
+            loading = true;
+          } else if (tree.nodes[dir]?.status !== "loaded") {
+            loading = true;
+          }
+        }
+        if (loading) return "pending";
+        // When the reveal target is itself a folder, expand it so its contents are
+        // visible, not just its row. The parent ancestor is now loaded, so isDirAt
+        // is reliable here; files report false and are left untouched.
+        if (isDirAt(file) === true && !tree.expanded.has(file)) {
+          tree.expand(file);
+        }
+        // Ancestors are settled: the request is handled regardless of whether the
+        // target is representable. A hidden file (showHidden off) or a file under a
+        // hidden folder never enters entryIndexByPath, so only select when present.
+        if (entryIndexByPath.has(file)) {
+          setSelectedPath(file);
+          requestAnimationFrame(() =>
+            scrollEntryIntoView(file, { topRatio: 0.2 }),
+          );
+        }
+        return "done";
+      },
+      [
+        rootPath,
+        tree.nodes,
+        tree.expanded,
+        tree.expand,
+        entryIndexByPath,
+        isDirAt,
+        scrollEntryIntoView,
+      ],
+    );
+
+    // Focus on Explorer: reveal a file or folder requested by the app (without
+    // stealing focus).
     const revealConsumedRef = useRef<number | null>(null);
     useEffect(() => {
       if (!revealRequest) return;
       if (revealConsumedRef.current === revealRequest.nonce) return;
-      const file = revealRequest.path;
-      if (!rootPath || !isUnder(file, rootPath)) return;
-      if (tree.nodes[rootPath]?.status !== "loaded") return;
-      let pending = false;
-      for (const dir of ancestorsToExpand(rootPath, file)) {
-        if (!tree.expanded.has(dir)) {
-          tree.expand(dir);
-          pending = true;
-        } else if (tree.nodes[dir]?.status !== "loaded") {
-          pending = true;
-        }
-      }
-      if (pending) return;
-      // When the reveal target is itself a folder, expand it so its contents are
-      // visible, not just its row. The parent ancestor is now loaded, so isDirAt
-      // is reliable here; files report false and are left untouched.
-      if (isDirAt(file) === true && !tree.expanded.has(file)) {
-        tree.expand(file);
-      }
-      // Ancestors are expanded and settled: the request is handled regardless of
-      // whether the target is representable. A hidden file (showHidden off) or a
-      // file under a hidden folder never enters entryIndexByPath; consuming here
-      // avoids re-expanding the ancestors on every later collapse/expand.
+      if (applyRevealTarget(revealRequest.path) === "pending") return;
       revealConsumedRef.current = revealRequest.nonce;
-      if (!entryIndexByPath.has(file)) return;
-      setSelectedPath(file);
-      requestAnimationFrame(() => scrollEntryIntoView(file, { topRatio: 0.2 }));
-    }, [
-      revealRequest,
-      rootPath,
-      tree.nodes,
-      tree.expanded,
-      tree.expand,
-      entryIndexByPath,
-      isDirAt,
-      scrollEntryIntoView,
-    ]);
+    }, [revealRequest, applyRevealTarget]);
+
+    // Reveal a search result in the tree (from the search context menu).
+    const searchRevealConsumedRef = useRef<number | null>(null);
+    useEffect(() => {
+      if (!searchReveal) return;
+      if (searchRevealConsumedRef.current === searchReveal.nonce) return;
+      if (applyRevealTarget(searchReveal.path) === "pending") return;
+      searchRevealConsumedRef.current = searchReveal.nonce;
+    }, [searchReveal, applyRevealTarget]);
 
     // A create-at-root pending is a virtualized row near the top; if the list is
     // scrolled away its InlineInput never mounts (and never autofocuses). Bring
@@ -1167,6 +1195,9 @@ export const FileExplorer = memo(
               onRequestClose={closeSearch}
               onActiveChange={setIsSearchActive}
               onRevealInTerminal={onRevealInTerminal}
+              onRevealInExplorer={revealInExplorer}
+              onSetAsRoot={onSetAsRoot}
+              onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
             />
 
             {!isSearchActive ? (
