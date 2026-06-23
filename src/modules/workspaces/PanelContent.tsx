@@ -8,6 +8,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useRef } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
 import {
+  setEditorAutoSave,
   setEditorAutocompletion,
   setEditorBracketMatching,
   setEditorCloseBrackets,
@@ -39,10 +40,11 @@ const GLOBAL_TOGGLE_SETTERS: Record<
   EditorGlobalToggleKey,
   (value: boolean) => Promise<void>
 > = {
+  autoSave: setEditorAutoSave,
+  scrollPastEnd: setEditorScrollPastEnd,
   bracketMatching: setEditorBracketMatching,
   closeBrackets: setEditorCloseBrackets,
   autocompletion: setEditorAutocompletion,
-  scrollPastEnd: setEditorScrollPastEnd,
 };
 
 type CommitFileDiffOpenInput = {
@@ -99,6 +101,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
+  const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const bracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
@@ -106,10 +109,11 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
 
   const globalToggles = {
     value: {
+      autoSave,
+      scrollPastEnd,
       bracketMatching,
       closeBrackets,
       autocompletion,
-      scrollPastEnd,
     },
     onToggle: (key: EditorGlobalToggleKey, value: boolean) =>
       void GLOBAL_TOGGLE_SETTERS[key](value),

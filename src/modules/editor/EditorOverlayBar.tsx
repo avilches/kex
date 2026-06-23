@@ -19,18 +19,21 @@ import {
 type MarkdownViewMode = "rendered" | "raw";
 
 export type EditorGlobalToggleKey =
+  | "autoSave"
+  | "scrollPastEnd"
   | "bracketMatching"
   | "closeBrackets"
-  | "autocompletion"
-  | "scrollPastEnd";
+  | "autocompletion";
 
 export type EditorGlobalToggles = Record<EditorGlobalToggleKey, boolean>;
 
+// Order mirrors the Settings window Editor group.
 const GLOBAL_TOGGLE_LABELS: [EditorGlobalToggleKey, string][] = [
+  ["autoSave", "Auto save"],
+  ["scrollPastEnd", "Scroll past end"],
   ["bracketMatching", "Bracket matching"],
   ["closeBrackets", "Auto close brackets"],
   ["autocompletion", "Autocompletion"],
-  ["scrollPastEnd", "Scroll past end"],
 ];
 
 type Props = {

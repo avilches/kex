@@ -207,39 +207,42 @@ export function GeneralSection() {
         <SettingRow title="Autocompletion" description="Show completion suggestions while typing.">
           <Switch checked={editorAutocompletion} onCheckedChange={(v) => void setEditorAutocompletion(v)} />
         </SettingRow>
-        <SettingRow title="Cursor blinking" description="Blink the editor cursor.">
-          <Switch checked={editorCursorBlink} onCheckedChange={(v) => void setEditorCursorBlink(v)} />
-        </SettingRow>
-        {editorCursorBlink && (
-          <SliderRow
-            title="Cursor blink rate"
-            description="Blink period of the editor caret. Lower is faster."
-            value={editorCursorBlinkRate}
-            min={EDITOR_BLINK_RATE_MIN}
-            max={EDITOR_BLINK_RATE_MAX}
-            step={EDITOR_BLINK_RATE_STEP}
-            defaultValue={EDITOR_BLINK_RATE_DEFAULT}
-            format={(v) => `${v} ms`}
-            onChange={(v) => void setEditorCursorBlinkRate(v)}
-          />
-        )}
-        <SettingRow title="Cursor style" description="Editor caret shape.">
-          <Select value={editorCursorStyle} onValueChange={(v) => void setEditorCursorStyle(v as CursorStyle)}>
-            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CURSOR_STYLES.map((style) => (
-                <SelectItem
-                  key={style}
-                  value={style}
-                  className="text-[12px] [&>span:last-child]:w-full"
-                >
-                  <span className="capitalize">{style}</span>
-                  <CursorGlyph kind={style} />
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingRow>
+        <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
+          <Label>Cursor</Label>
+          <SettingRow title="Cursor blinking" description="Blink the editor cursor.">
+            <Switch checked={editorCursorBlink} onCheckedChange={(v) => void setEditorCursorBlink(v)} />
+          </SettingRow>
+          {editorCursorBlink && (
+            <SliderRow
+              title="Cursor blink rate"
+              description="Blink period of the editor caret. Lower is faster."
+              value={editorCursorBlinkRate}
+              min={EDITOR_BLINK_RATE_MIN}
+              max={EDITOR_BLINK_RATE_MAX}
+              step={EDITOR_BLINK_RATE_STEP}
+              defaultValue={EDITOR_BLINK_RATE_DEFAULT}
+              format={(v) => `${v} ms`}
+              onChange={(v) => void setEditorCursorBlinkRate(v)}
+            />
+          )}
+          <SettingRow title="Cursor style" description="Editor caret shape.">
+            <Select value={editorCursorStyle} onValueChange={(v) => void setEditorCursorStyle(v as CursorStyle)}>
+              <SelectTrigger size="sm" className="h-8 w-28 text-[12px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CURSOR_STYLES.map((style) => (
+                  <SelectItem
+                    key={style}
+                    value={style}
+                    className="text-[12px] [&>span:last-child]:w-full"
+                  >
+                    <span className="capitalize">{style}</span>
+                    <CursorGlyph kind={style} />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingRow>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
