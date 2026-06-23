@@ -69,6 +69,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
+import { SliderRow } from "../components/SliderRow";
 
 const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIcon }[] = [
   { id: "system", label: "System", icon: ComputerIcon },
@@ -586,55 +587,6 @@ function FontFamilyInput({
 const formatPx = (v: number) => `${v} px`;
 const formatSignedPx = (v: number) => `${v > 0 ? "+" : ""}${v} px`;
 const formatRatio = (v: number) => v.toFixed(1);
-
-function SliderRow({
-  title,
-  description,
-  value,
-  min,
-  max,
-  step,
-  defaultValue,
-  format,
-  onChange,
-}: {
-  title: string;
-  description: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  defaultValue: number;
-  format: (v: number) => string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <SettingRow title={title} description={description}>
-      <div className="flex items-center gap-2">
-        <Slider
-          value={[value]}
-          min={min}
-          max={max}
-          step={step}
-          onValueChange={(v) => onChange(v[0] ?? defaultValue)}
-          className="w-32"
-        />
-        <span className="w-12 shrink-0 text-right tabular-nums text-[11px] text-muted-foreground">
-          {format(value)}
-        </span>
-        <button
-          type="button"
-          title="Reset to default"
-          disabled={value === defaultValue}
-          onClick={() => onChange(defaultValue)}
-          className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
-        >
-          <HugeiconsIcon icon={Refresh01Icon} size={11} />
-        </button>
-      </div>
-    </SettingRow>
-  );
-}
 
 type GitPreviewEntry =
   | { name: string; label: string; color: { vscode: string; jetbrains: string }; kind?: "normal" }
