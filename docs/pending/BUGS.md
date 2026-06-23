@@ -2,10 +2,10 @@
 
 Cada bug es un fichero autocontenido y accionable por un agente en `docs/pending/bugs/`. Un agente puede ejecutar cualquiera de forma aislada: cada fichero incluye contexto del proyecto, ubicación `archivo:línea`, problema, impacto, fix concreto, criterios de aceptación, comandos de verificación y el test a añadir si toca un subsistema core.
 
-Total: 29 bugs. 6 high, 12 medium, 11 low. Los marcados con asterisco se verificaron a mano.
+Total: 28 bugs. 5 high, 12 medium, 11 low. Los marcados con asterisco se verificaron a mano.
 
 > Auditoria 2026-06-23: eliminados por estar ya corregidos en el codigo: BUG-20 (pty_open autoriza post-spawn), BUG-27 (countDiffLines es fallback valido), BUG-30 (errores fs/autosave ya con toast), BUG-34 (cd quoting ya usa comillas dobles). Ver `AUDIT-2026-06-23.md`.
-> Arreglados despues de la auditoria: BUG-28 (parser descarta entradas con path vacio en status truncado).
+> Arreglados despues de la auditoria: BUG-28 (parser descarta entradas con path vacio en status truncado), BUG-05 (guardia de diff grande tambien por numero de lineas).
 
 ## High
 
@@ -14,7 +14,6 @@ Total: 29 bugs. 6 high, 12 medium, 11 low. Los marcados con asterisco se verific
 | BUG-02 | El diff no normaliza CRLF: fichero entero como cambiado | [bugs/BUG-02-diff-no-normaliza-crlf.md](bugs/BUG-02-diff-no-normaliza-crlf.md) |
 | BUG-03 | Timer de autosave perdido al desmontar: pérdida de datos | [bugs/BUG-03-autosave-timer-perdido-al-desmontar.md](bugs/BUG-03-autosave-timer-perdido-al-desmontar.md) |
 | BUG-04 | El editor del diff se reconstruye en cada cambio/tema | [bugs/BUG-04-diff-editor-reconstruido-por-cambio.md](bugs/BUG-04-diff-editor-reconstruido-por-cambio.md) |
-| BUG-05 | Diffs grandes sin guardia por líneas (solo bytes) | [bugs/BUG-05-diffs-grandes-umbral-solo-bytes.md](bugs/BUG-05-diffs-grandes-umbral-solo-bytes.md) |
 | BUG-06 | Rename staged: pathspec incompleto en `diff_content` | [bugs/BUG-06-diff-rename-staged-pathspec-incompleto.md](bugs/BUG-06-diff-rename-staged-pathspec-incompleto.md) |
 | BUG-07 | `split_name_status_numstat` heurística TAB frágil | [bugs/BUG-07-split-name-status-numstat-heuristica-tab.md](bugs/BUG-07-split-name-status-numstat-heuristica-tab.md) |
 

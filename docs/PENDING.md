@@ -11,7 +11,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-02](pending/bugs/BUG-02-diff-no-normaliza-crlf.md) — Diff no normaliza CRLF
 - [BUG-03](pending/bugs/BUG-03-autosave-timer-perdido-al-desmontar.md) — Autosave: timer perdido al desmontar
 - [BUG-04](pending/bugs/BUG-04-diff-editor-reconstruido-por-cambio.md) — Diff editor reconstruido por cambio de dep
-- [BUG-05](pending/bugs/BUG-05-diffs-grandes-umbral-solo-bytes.md) — Diffs grandes: umbral solo en bytes
 - [BUG-06](pending/bugs/BUG-06-diff-rename-staged-pathspec-incompleto.md) — Diff rename staged: pathspec incompleto
 - [BUG-07](pending/bugs/BUG-07-split-name-status-numstat-heuristica-tab.md) — Split name-status/numstat: heuristica por tab
 - [BUG-08](pending/bugs/BUG-08-fuga-procesos-background-shellstate.md) — Fuga de procesos background en ShellState
@@ -39,6 +38,9 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [F8](pending/features/F8-explorer-navegacion-teclado.md) — Navegacion del explorer por teclado
 - [F9](pending/features/F9-explorer-operaciones-fichero.md) — Operaciones de fichero en el explorer (duplicar, copiar/pegar, cortar, borrar) + limpieza del menu
 - [F10](pending/features/F10-confirm-quit-proceso-vivo.md) — Confirmar salida de la app con un proceso de terminal vivo (upstream d782f7d, aplazado en sync 2026-06-22)
+- [F11](pending/features/F11-launcher-ide-externo.md) — URGENTE: boton para abrir el proyecto en un IDE/editor/terminal externo (estilo Supacode/Emdash/Nimbalyst)
+- [F12](pending/features/F12-boton-run-proyecto-workspace.md) — URGENTE: boton Run para ejecutar el proyecto del workspace (run configs por workspace)
+- [F13](pending/features/F13-workspace-mostrar-prs-repo.md) — Workspace: mostrar PRs del repo (lista de PRs via gh CLI / GitHub API)
 
 ## Mejoras (`docs/pending/improvements/`)
 

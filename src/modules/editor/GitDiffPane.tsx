@@ -15,6 +15,7 @@ import {
   workingDiffKey,
   commitDiffKey,
 } from "./lib/diffCache";
+import { isDiffTooLarge } from "./lib/diffSize";
 import { resolveLanguage, resolveLanguageSync } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 
@@ -41,8 +42,6 @@ type Props = {
   wordWrap: boolean;
   onToggleWordWrap: () => void;
 };
-
-const LARGE_FILE_THRESHOLD = 256 * 1024;
 
 const SHARED_EXT = buildSharedExtensions();
 const READONLY_EXT = [
@@ -199,9 +198,10 @@ export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordW
   const isBinary = loaded?.isBinary ?? false;
   const fallbackPatch = loaded?.fallbackPatch ?? "";
 
-  const isTooLarge =
-    originalContent.length > LARGE_FILE_THRESHOLD ||
-    modifiedContent.length > LARGE_FILE_THRESHOLD;
+  const isTooLarge = useMemo(
+    () => isDiffTooLarge(originalContent, modifiedContent),
+    [originalContent, modifiedContent],
+  );
   const useFallback = isBinary || isTooLarge;
 
   const initialLang = useMemo(() => resolveLanguageSync(path), [path]);
