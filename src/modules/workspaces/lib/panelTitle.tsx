@@ -53,5 +53,5 @@ export function panelIcon(panel: Panel, _workspaceId?: string): ReactNode {
   if (panel.kind === "editor" || panel.kind === "markdown") {
     return <img src={fileIconUrl(basename(panel.path))} alt="" className="size-3.5 shrink-0" />;
   }
-  return <HugeiconsIcon icon={PANEL_ICONS[panel.kind]} size={14} strokeWidth={1.5} />;
+  return <HugeiconsIcon icon={PANEL_ICONS[panel.kind]} size={13} strokeWidth={2} />;
 }
