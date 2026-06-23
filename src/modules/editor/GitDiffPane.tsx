@@ -6,7 +6,6 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import { WrapToggleButton } from "./WrapToggleButton";
 import { buildSharedExtensions, languageCompartment, wrapCompartment } from "./lib/extensions";
 import {
@@ -39,6 +38,8 @@ type Props = {
   source: WorkingSource | CommitSource;
   chipLabel?: string;
   active: boolean;
+  wordWrap: boolean;
+  onToggleWordWrap: () => void;
 };
 
 const LARGE_FILE_THRESHOLD = 256 * 1024;
@@ -126,14 +127,14 @@ function loadStateFromCache(
   };
 }
 
-export function GitDiffPane({ source, chipLabel, active }: Props) {
+export function GitDiffPane({ source, chipLabel, active, wordWrap, onToggleWordWrap }: Props) {
   const cmRef = useRef<ReactCodeMirrorRef>(null);
+  const wordWrapRef = useRef(wordWrap);
+  wordWrapRef.current = wordWrap;
   const themeExt = useEditorThemeExt();
   const [state, setState] = useState<LoadState>(() =>
     active ? loadStateFromCache(source) : { kind: "idle" },
   );
-  const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
-
   const key = cacheKey(source);
   const originalPath = source.originalPath;
   // source is created inline in PanelContent and gets a new object identity on every parent render.
@@ -208,11 +209,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     () => [
       ...SHARED_EXT,
       languageCompartment.of(initialLang ?? []),
-      wrapCompartment.of(
-        usePreferencesStore.getState().editorWordWrap
-          ? EditorView.lineWrapping
-          : [],
-      ),
+      wrapCompartment.of(wordWrapRef.current ? EditorView.lineWrapping : []),
       ...READONLY_EXT,
       unifiedMergeView({
         original: originalContent,
@@ -232,10 +229,10 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     if (!view) return;
     view.dispatch({
       effects: wrapCompartment.reconfigure(
-        editorWordWrap ? EditorView.lineWrapping : [],
+        wordWrap ? EditorView.lineWrapping : [],
       ),
     });
-  }, [editorWordWrap]);
+  }, [wordWrap]);
 
   // Resolve and apply syntax highlighting asynchronously when the language pack
   // isn't cached yet. This must wait until the editor is actually mounted
@@ -303,7 +300,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
               </span>
             </>
           ) : null}
-          <WrapToggleButton />
+          <WrapToggleButton value={wordWrap} onToggle={onToggleWordWrap} />
         </div>
       </div>
 

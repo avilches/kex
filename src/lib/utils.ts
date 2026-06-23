@@ -8,3 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 export function isMarkdownPath(path: string): boolean {
   return /\.(md|markdown|mdx)$/i.test(path)
 }
+
+export function shouldWrapByDefault(path: string): boolean {
+  return /\.(md|markdown|mdx|txt|text)$/i.test(path)
+}

@@ -3,12 +3,12 @@ import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type Panel =
   | { id: string; kind: "terminal"; cwd?: string; title?: string; blocks?: boolean;
       locked?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; autofocus?: boolean }
-  | { id: string; kind: "editor"; path: string; title?: string; dirty: boolean; preview: boolean; locked?: boolean; autofocus?: boolean }
+  | { id: string; kind: "editor"; path: string; title?: string; dirty: boolean; preview: boolean; locked?: boolean; autofocus?: boolean; wordWrapOverride?: boolean }
   | { id: string; kind: "browser";         url: string;   title?: string; floating?: boolean }
   | { id: string; kind: "markdown";        path: string;  title?: string }
-  | { id: string; kind: "git-diff";        path: string;  repoRoot: string; mode: "-" | "+"; originalPath: string | null; title?: string; locked?: boolean; autofocus?: boolean }
+  | { id: string; kind: "git-diff";        path: string;  repoRoot: string; mode: "-" | "+"; originalPath: string | null; title?: string; locked?: boolean; autofocus?: boolean; wordWrapOverride?: boolean }
   | { id: string; kind: "git-history";     repoRoot: string; title?: string }
-  | { id: string; kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null; title?: string };
+  | { id: string; kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null; title?: string; wordWrapOverride?: boolean };
 
 // Panels whose tab can drive the sidebar via the autofocus flag (terminal cwd,
 // or the file path for editor / git-diff). Other kinds never carry autofocus.
