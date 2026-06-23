@@ -224,3 +224,17 @@ Continuacion de la tanda de ajustes de terminal (cursor style, inactive style, c
 2. **Confirmar pegado multilinea (paste protection)**: avisar antes de pegar texto que contiene saltos de linea, para evitar ejecutar comandos sin querer. Encaja con la politica de "validar en cada boundary" y reusa el patron del dialogo de "warn on close". Interceptar el paste (handler de xterm / clipboard) y mostrar confirmacion cuando el texto pegado tenga `\n`.
 
 3. **Copy on select / paste con boton derecho**: comportamiento estilo terminal clasico (copiar automaticamente al seleccionar, pegar con click derecho). Dos toggles independientes. xterm da `onSelectionChange` para copy-on-select; el paste con boton derecho se cablea en el handler de contextmenu del host del slot.
+
+---
+
+## Terminal: clic en enlaces a ficheros generados por un agente
+
+Estado: idea anotada (2026-06-23), por investigar.
+
+Cuando Claude Code (u otro agente) imprime en el terminal una ruta a un fichero de texto (por ejemplo un markdown de superpowers como `docs/superpowers/plans/2026-06-23-foo.md`), probar que pasa al hacer clic sobre ese enlace:
+
+- Verificar si xterm lo detecta como enlace y si el clic lo abre.
+- Comprobar si abre el fichero en un panel `editor`/`markdown` de Kex o si lo delega al SO (que podria abrir otra app).
+- Decidir el comportamiento deseado: un clic (o Cmd+clic) sobre una ruta de fichero del repo deberia abrirla dentro de Kex en el editor o en el visor markdown, no salir a una app externa.
+
+Si no funciona hoy, anotar el coste de cablear un link handler (xterm `registerLinkProvider` / web-links addon) que reconozca rutas de fichero y las abra via el flujo de apertura de paneles existente.
