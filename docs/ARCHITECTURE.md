@@ -379,7 +379,7 @@ src/
 └── modules/
     ├── terminal/                  — xterm.js stack, PTY bridge, OSC parsing (7/133/0/2), blocks, oscTitleStore
     │   └── block/                 — Block overlay, shell input, mode machine, history
-    ├── editor/                    — CodeMirror 6 stack, diffs, vim
+    ├── editor/                    — CodeMirror 6 stack, diffs, vim. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. Global editor settings (indent size, indent with tabs, scroll past end, highlight active line, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences and are applied via CodeMirror compartments so they update live without rebuilding editor state.
     ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)
     │   ├── components/            — NotificationBell
     │   ├── lib/                   — route, notify, agentIcon, agentSessionRestore
@@ -409,7 +409,7 @@ src/
 
 All panel kinds follow the same never-unmount rule. Panels live inside panes; panes are nodes of a binary split tree inside a workspace. The workspace sidebar (left, 52px) lists workspaces; the right panel holds Explorer, Source Control, and Git History.
 
-Markdown files open in their rendered view (`kind: "markdown"`) by default; a floating `Rendered | Edit` toggle (`EditorOverlayBar`) flips a single panel in place between `markdown` and `editor` via `setPanelView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty). `EditorOverlayBar` also hosts `WrapToggleButton`, which controls the global `editorWordWrap` preference shared by code editors, markdown editors, and the git diff pane.
+Markdown files open in their rendered view (`kind: "markdown"`) by default; a floating `Rendered | Edit` toggle (`EditorOverlayBar`) flips a single panel in place between `markdown` and `editor` via `setPanelView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty). `EditorOverlayBar` also hosts a `[...]` dropdown that surfaces the per-extension view settings (wrap, line numbers, whitespace, fold gutter) for the currently open file extension; the header label reads "Applies to .<ext> files" and changes persist to `editorViewByExt` in the preferences store. Word wrap is now a per-extension setting, not a global per-panel override.
 
 A `browser` panel carries an optional `floating` flag. When set, the panel is shown in a native `WebviewUrl::External` window (managed Rust-side by `FloatBrowserState`) and its in-pane slot renders a placeholder with an editable address bar instead of the iframe. See `docs/FORK.md` (Floating browser windows) for the full lifecycle.
 
