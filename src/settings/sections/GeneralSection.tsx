@@ -14,17 +14,29 @@ import {
 } from "@/components/ui/tooltip";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  EDITOR_INDENT_SIZES,
   TERMINAL_SCROLLBACK_PRESETS,
   setAgentNotifications,
   setAutofocusNewTabs,
   setAutostart,
   setEditorAutoSave,
+  setEditorAutocompletion,
+  setEditorBracketMatching,
+  setEditorCloseBrackets,
+  setEditorCursorBlink,
+  setEditorCursorStyle,
+  setEditorHighlightActiveLine,
+  setEditorIndentSize,
+  setEditorIndentWithTabs,
   setEditorPreviewOnClick,
+  setEditorScrollPastEnd,
   setTerminalCursorBlink,
+  setTerminalCursorStyle,
   setTerminalScrollback,
   setTerminalWebglEnabled,
   setVimMode,
   setWarnOnCloseTabWithRunningProcess,
+  type CursorStyle,
 } from "@/modules/settings/store";
 import { invoke } from "@tauri-apps/api/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
@@ -49,6 +61,16 @@ export function GeneralSection() {
     (s) => s.warnOnCloseTabWithRunningProcess,
   );
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
+  const editorIndentSize = usePreferencesStore((s) => s.editorIndentSize);
+  const editorIndentWithTabs = usePreferencesStore((s) => s.editorIndentWithTabs);
+  const editorScrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
+  const editorHighlightActiveLine = usePreferencesStore((s) => s.editorHighlightActiveLine);
+  const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
+  const editorCloseBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
+  const editorAutocompletion = usePreferencesStore((s) => s.editorAutocompletion);
+  const editorCursorBlink = usePreferencesStore((s) => s.editorCursorBlink);
+  const editorCursorStyle = usePreferencesStore((s) => s.editorCursorStyle);
+  const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
   const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
 
@@ -134,6 +156,47 @@ export function GeneralSection() {
             onCheckedChange={(v) => void setEditorAutoSave(v)}
           />
         </SettingRow>
+        <SettingRow title="Indentation size" description="Spaces per indent level (also the tab width).">
+          <Select value={String(editorIndentSize)} onValueChange={(v) => void setEditorIndentSize(Number(v))}>
+            <SelectTrigger size="sm" className="h-8 w-24 text-[12px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {EDITOR_INDENT_SIZES.map((n) => (
+                <SelectItem key={n} value={String(n)} className="text-[12px]">{n}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+        <SettingRow title="Indent with tabs" description="Insert tab characters instead of spaces.">
+          <Switch checked={editorIndentWithTabs} onCheckedChange={(v) => void setEditorIndentWithTabs(v)} />
+        </SettingRow>
+        <SettingRow title="Scroll past end" description="Allow scrolling beyond the last line.">
+          <Switch checked={editorScrollPastEnd} onCheckedChange={(v) => void setEditorScrollPastEnd(v)} />
+        </SettingRow>
+        <SettingRow title="Highlight active line" description="Highlight the line the cursor is on.">
+          <Switch checked={editorHighlightActiveLine} onCheckedChange={(v) => void setEditorHighlightActiveLine(v)} />
+        </SettingRow>
+        <SettingRow title="Bracket matching" description="Highlight the bracket matching the one at the cursor.">
+          <Switch checked={editorBracketMatching} onCheckedChange={(v) => void setEditorBracketMatching(v)} />
+        </SettingRow>
+        <SettingRow title="Auto close brackets" description="Insert the closing bracket/quote automatically.">
+          <Switch checked={editorCloseBrackets} onCheckedChange={(v) => void setEditorCloseBrackets(v)} />
+        </SettingRow>
+        <SettingRow title="Autocompletion" description="Show completion suggestions while typing.">
+          <Switch checked={editorAutocompletion} onCheckedChange={(v) => void setEditorAutocompletion(v)} />
+        </SettingRow>
+        <SettingRow title="Cursor blinking" description="Blink the editor cursor.">
+          <Switch checked={editorCursorBlink} onCheckedChange={(v) => void setEditorCursorBlink(v)} />
+        </SettingRow>
+        <SettingRow title="Cursor style" description="Editor caret shape.">
+          <Select value={editorCursorStyle} onValueChange={(v) => void setEditorCursorStyle(v as CursorStyle)}>
+            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bar" className="text-[12px]">Bar</SelectItem>
+              <SelectItem value="block" className="text-[12px]">Block</SelectItem>
+              <SelectItem value="underline" className="text-[12px]">Underline</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -194,6 +257,16 @@ export function GeneralSection() {
             checked={terminalCursorBlink}
             onCheckedChange={(v) => void setTerminalCursorBlink(v)}
           />
+        </SettingRow>
+        <SettingRow title="Cursor style" description="Terminal caret shape.">
+          <Select value={terminalCursorStyle} onValueChange={(v) => void setTerminalCursorStyle(v as CursorStyle)}>
+            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bar" className="text-[12px]">Bar</SelectItem>
+              <SelectItem value="block" className="text-[12px]">Block</SelectItem>
+              <SelectItem value="underline" className="text-[12px]">Underline</SelectItem>
+            </SelectContent>
+          </Select>
         </SettingRow>
         <SettingRow
           title="Warn when closing a tab with a running process"
