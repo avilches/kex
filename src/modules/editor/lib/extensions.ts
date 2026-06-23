@@ -118,6 +118,20 @@ export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
       ".cm-cursor, .cm-dropCursor": {
         borderLeftColor: "var(--foreground)",
       },
+      // bracketMatching only recolors the glyph by default, which syntax
+      // highlighting overrides; a background makes the match actually visible.
+      ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": {
+        backgroundColor:
+          "color-mix(in srgb, var(--foreground) 22%, transparent)",
+        outline:
+          "1px solid color-mix(in srgb, var(--foreground) 40%, transparent)",
+        borderRadius: "2px",
+      },
+      ".cm-nonmatchingBracket, &.cm-focused .cm-nonmatchingBracket": {
+        backgroundColor:
+          "color-mix(in srgb, var(--destructive, #f43f5e) 30%, transparent)",
+        borderRadius: "2px",
+      },
       ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection":
         {
           backgroundColor:
