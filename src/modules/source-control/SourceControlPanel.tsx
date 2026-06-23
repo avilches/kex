@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { pathBasename } from "@/lib/pathUtils";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
@@ -44,18 +45,19 @@ import {
   Add01Icon,
   Alert02Icon,
   ArrowDown01Icon,
+  ArrowDown02Icon,
   ArrowRight01Icon,
-  ArrowUp01Icon,
+  ArrowUp02Icon,
   CheckmarkCircle01Icon,
   Copy01Icon,
   Download01Icon,
   File01Icon,
   FileDiffIcon,
   FolderCloudIcon,
-  FolderGitTwoIcon,
   FolderOpenIcon,
   FolderTreeIcon,
   GitBranchIcon,
+  GitCommitIcon,
   Link01Icon,
   ListViewIcon,
   MinusSignIcon,
@@ -570,48 +572,75 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   return (
     <TooltipProvider delayDuration={800} skipDelayDuration={300}>
       <aside className="flex h-full min-w-0 flex-col bg-sidebar [contain:layout_style]">
-        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 pb-2.5 pt-3">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-none text-foreground transition-colors hover:bg-foreground/10">
-              <HugeiconsIcon
-                icon={FolderGitTwoIcon}
-                size={12}
-                strokeWidth={1.9}
-                className="shrink-0 text-muted-foreground"
-              />
-              <span className="max-w-[140px] truncate">{repoLabel}</span>
-            </div>
-            {scm.status && (scm.status.ahead > 0 || scm.status.behind > 0) ? (
-              <div className="flex shrink-0 items-center gap-0.5 text-[10px] font-semibold tabular-nums leading-none text-muted-foreground">
-                {scm.status.ahead > 0 ? (
-                  <span className="inline-flex items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5">
-                    <HugeiconsIcon
-                      icon={ArrowUp01Icon}
-                      size={9}
-                      strokeWidth={2.2}
-                    />
-                    {scm.status.ahead}
-                  </span>
-                ) : null}
-                {scm.status.behind > 0 ? (
-                  <span className="inline-flex items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5">
-                    <HugeiconsIcon
-                      icon={ArrowDown01Icon}
-                      size={9}
-                      strokeWidth={2.2}
-                    />
-                    {scm.status.behind}
-                  </span>
-                ) : null}
+        <header className="flex shrink-0 items-start justify-between gap-1 border-b border-border/60 px-1.5 py-1">
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex h-6 min-w-0 items-center gap-1.5">
+              <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-0.5 text-[11.5px] font-medium leading-none text-foreground">
+                <HugeiconsIcon
+                  icon={GitBranchIcon}
+                  size={12}
+                  strokeWidth={1.9}
+                  className="shrink-0 text-muted-foreground"
+                />
+                <span className="max-w-[140px] truncate">{repoLabel}</span>
               </div>
-            ) : null}
-            {scm.status?.isDetached ? (
-              <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                detached
-              </span>
+              {scm.status && (scm.status.ahead > 0 || scm.status.behind > 0) ? (
+                <div className="flex shrink-0 items-center gap-1 text-[10px] font-semibold tabular-nums leading-none">
+                  {scm.status.ahead > 0 ? (
+                    <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+                      <HugeiconsIcon
+                        icon={ArrowUp02Icon}
+                        size={11}
+                        strokeWidth={2}
+                      />
+                      {scm.status.ahead}
+                    </span>
+                  ) : null}
+                  {scm.status.behind > 0 ? (
+                    <span className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400">
+                      <HugeiconsIcon
+                        icon={ArrowDown02Icon}
+                        size={11}
+                        strokeWidth={2}
+                      />
+                      {scm.status.behind}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {scm.status?.isDetached ? (
+                <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  detached
+                </span>
+              ) : null}
+            </div>
+            {scm.repo ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex w-fit min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground">
+                    {scm.repo.isWorktree ? (
+                      <HugeiconsIcon
+                        icon={Link01Icon}
+                        size={12}
+                        strokeWidth={1.9}
+                        className="shrink-0"
+                      />
+                    ) : null}
+                    <span className="truncate">
+                      {pathBasename(scm.repo.repoRoot)}
+                    </span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  className={cn(SOURCE_CONTROL_TOOLTIP_CLASS, "text-[10.5px]")}
+                >
+                  {scm.repo.repoRoot}
+                </TooltipContent>
+              </Tooltip>
             ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex h-6 shrink-0 items-center gap-0.5">
             <IconActionButton
               label={
                 scmViewMode === "tree" ? "Show as list" : "Group by directory"
@@ -686,30 +715,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
               )}
             </IconActionButton>
+            {onOpenGitGraph ? (
+              <IconActionButton
+                label="Log"
+                onClick={() => onOpenGitGraph()}
+                side="bottom"
+              >
+                <HugeiconsIcon
+                  icon={GitCommitIcon}
+                  size={14}
+                  strokeWidth={1.85}
+                />
+              </IconActionButton>
+            ) : null}
           </div>
         </header>
-
-        {onOpenGitGraph ? (
-          <button
-            type="button"
-            onClick={() => onOpenGitGraph()}
-            className="group flex shrink-0 items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
-          >
-            <HugeiconsIcon
-              icon={GitBranchIcon}
-              size={13}
-              strokeWidth={1.85}
-              className="shrink-0"
-            />
-            <span className="flex-1 text-[12px] font-medium">Commit Graph</span>
-            <HugeiconsIcon
-              icon={ArrowRight01Icon}
-              size={12}
-              strokeWidth={2}
-              className="shrink-0 opacity-50 transition-transform group-hover:translate-x-0.5"
-            />
-          </button>
-        ) : null}
 
         {scm.panelState === "loading" ? (
           <PanelCenter title="Loading repository" />

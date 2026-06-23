@@ -140,6 +140,39 @@ describe("resolveSidebarTarget", () => {
     expect(t.mode).toBe("pinned");
   });
 
+  it("re-roots to a git repo nested strictly under the pinned root", () => {
+    const t = resolveSidebarTarget({
+      folder: "/proj/wt/src/file.ts",
+      workspaceRoot: "/proj",
+      gitRoot: "/proj/wt",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "filesystem", fsRoot: "/proj/wt" });
+  });
+
+  it("stays pinned when the nearest git root is the pinned root itself", () => {
+    const t = resolveSidebarTarget({
+      folder: "/proj/src/file.ts",
+      workspaceRoot: "/proj",
+      gitRoot: "/proj",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "pinned", fsRoot: null });
+  });
+
+  it("normalizes backslashes comparing a nested git root with the pinned root", () => {
+    const t = resolveSidebarTarget({
+      folder: "C:\\proj\\wt\\file.ts",
+      workspaceRoot: "C:\\proj",
+      gitRoot: "C:\\proj\\wt",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "filesystem", fsRoot: "C:/proj/wt" });
+  });
+
   it("uses the git root as filesystem root when outside the workspace root", () => {
     const t = resolveSidebarTarget({
       folder: "/x/repo/src/inner",

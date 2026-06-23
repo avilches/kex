@@ -6,12 +6,13 @@ import {
 import { listenFsChanged } from "@/modules/explorer/lib/watch";
 import { useWorkspaceEnvStore, workspaceScopeKey } from "@/modules/workspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { canReuseResolvedRepo } from "./repoReuse";
 
 const AUTO_FETCH_THROTTLE_MS = 5 * 60_000;
 const AUTO_FETCH_LRU_LIMIT = 16;
 const FOCUS_REFRESH_MIN_INTERVAL_MS = 1500;
-// Skip the context-change refetch when the data is this fresh and the new path
-// is still inside the loaded repo (cd-within-repo produces identical status).
+// Skip the context-change refetch when the data is this fresh and the context
+// path is unchanged (a re-fired effect, not a navigation to a different folder).
 const SC_STATUS_TTL_MS = 2000;
 
 export type SourceControlRefreshMode = "auto" | "always" | "never";
@@ -169,6 +170,9 @@ export function useSourceControl(
   const autoFetchByRepoRef = useRef(new Map<string, number>());
   const enabledRef = useRef(enabled);
   const lastRefreshAtRef = useRef(0);
+  // The context path the current repo was resolved from. Reuse is keyed on this
+  // exact path, never on a prefix, so a nested repo/worktree re-resolves.
+  const resolvedContextRef = useRef<string | null>(null);
 
   useEffect(() => {
     stateRef.current = state;
@@ -183,6 +187,7 @@ export function useSourceControl(
     inflightRef.current = null;
     inflightModeRef.current = "never";
     autoFetchByRepoRef.current.clear();
+    resolvedContextRef.current = null;
     setState({
       repo: null,
       status: null,
@@ -212,6 +217,7 @@ export function useSourceControl(
       const requestId = ++requestIdRef.current;
 
       if (!contextPath) {
+        resolvedContextRef.current = null;
         setState({
           repo: null,
           status: null,
@@ -226,8 +232,7 @@ export function useSourceControl(
 
       const activeRoot = stateRef.current.repo?.repoRoot ?? null;
       const reusableRoot =
-        activeRoot &&
-        (contextPath === activeRoot || contextPath.startsWith(`${activeRoot}/`))
+        activeRoot && canReuseResolvedRepo(contextPath, resolvedContextRef.current)
           ? activeRoot
           : undefined;
 
@@ -248,6 +253,7 @@ export function useSourceControl(
                 branch: status.branch,
                 upstream: status.upstream,
                 isDetached: status.isDetached,
+                isWorktree: repo?.isWorktree ?? false,
               };
             }
           } catch {
@@ -319,6 +325,7 @@ export function useSourceControl(
           }
         }
 
+        resolvedContextRef.current = contextPath;
         setState((current) => ({
           ...current,
           repo,
@@ -330,6 +337,7 @@ export function useSourceControl(
         }));
       } catch (error) {
         if (requestId !== requestIdRef.current) return;
+        resolvedContextRef.current = null;
         setState((current) => ({
           ...current,
           repo: null,
@@ -430,13 +438,12 @@ export function useSourceControl(
     }
     setState((current) => ({ ...current, lastRemoteError: null }));
     const run = () => {
-      const root = stateRef.current.repo?.repoRoot;
-      const sameRepo =
-        !!root &&
-        !!contextPath &&
-        (contextPath === root || contextPath.startsWith(`${root}/`));
+      const sameContext = canReuseResolvedRepo(
+        contextPath,
+        resolvedContextRef.current,
+      );
       const fresh = Date.now() - lastRefreshAtRef.current < SC_STATUS_TTL_MS;
-      if (fresh && sameRepo && stateRef.current.hasRepo) return;
+      if (fresh && sameContext && stateRef.current.hasRepo) return;
       void refresh({ remote: "never" });
     };
     const idle =

@@ -26,6 +26,22 @@ fn normalize_git_path(path: &str) -> String {
     path.replace('\\', "/")
 }
 
+/// Normalizes a path that may point to a file into the directory to use as a git
+/// cwd: the parent directory when `path` is a file, otherwise `path` unchanged.
+/// Lets repo resolution accept an open file (e.g. an editor tab) and find the
+/// repo that owns it. The parent is sliced from the input string to preserve its
+/// separator/path form (native or WSL).
+pub fn dir_path_for(path: &str, workspace: &WorkspaceEnv) -> String {
+    if !resolve_path(path, workspace).is_file() {
+        return path.to_string();
+    }
+    match path.rfind(['/', '\\']) {
+        Some(0) => "/".to_string(),
+        Some(idx) => path[..idx].to_string(),
+        None => path.to_string(),
+    }
+}
+
 pub fn canonical_dir(
     registry: &WorkspaceRegistry,
     path: &str,

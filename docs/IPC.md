@@ -69,8 +69,8 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 
 | Command | Description |
 |---|---|
-| `git_resolve_repo` | Find the git repo root for a given path |
-| `git_panel_snapshot` | Fast status snapshot for the source control panel |
+| `git_resolve_repo` | Find the nearest git repo root for a given path (accepts a file path, resolving from its parent dir) |
+| `git_panel_snapshot` | Fast status snapshot for the source control panel (accepts a file path, resolving from its parent dir) |
 | `git_status` | Full porcelain status |
 | `git_diff` | Diff of staged or unstaged changes |
 | `git_diff_content` | Full diff content for a specific file |

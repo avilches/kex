@@ -290,6 +290,10 @@ Plain code editor panels render `EditorOverlayBar` without the view toggle. The 
 
 The global kill switch in `globals.css` hides every native scrollbar (chunky Chromium bars on Linux/Windows, a flashing WKWebView overlay on macOS). Thin, theme-colored scrollbars are now opted back in where they help: the editor and git diff (`.cm-scroller`), the markdown preview, the file explorer, the source control panel, and the git history (side panel and tab). They use the standard `scrollbar-width: thin` / `scrollbar-color` exposed as a reusable `.thin-scrollbar` utility; this matters because the kill switch's `scrollbar-width: none` overrides any `::-webkit-scrollbar` styling in WKWebView, so the standard property is the only reliable way to bring the bar back. The terminal recolors xterm's own overlay slider instead. Bars are thin and stay visible while content overflows (not auto-hide), colored from the theme `--foreground`. The editor's right padding was moved to `.cm-content` so the bar sits flush against the panel edge.
 
+### Nested repos and worktrees in the git views
+
+Anchoring (autofocus / `F4`) on a file that lives in a git repo nested inside the pinned workspace root now re-roots the Explorer to that nested repo, so Source Control and Git History follow the nearest repo of the focused file instead of the parent (`resolveSidebarTarget`, tested). Repo resolution (`git_resolve_repo` / `git_panel_snapshot`) accepts a file path (resolving from its parent directory) so editor tabs anchor too, and the Source Control summary keys repo reuse on the exact context path (`canReuseResolvedRepo`, tested) so a nested repo is never absorbed into its parent. When the resolved repo is a linked worktree, the Source Control header shows a `worktree` badge (link icon) next to the branch, with the worktree path in its tooltip; `GitRepoInfo` carries an `isWorktree` flag for this.
+
 ---
 
 ## Roadmap (planned, not yet built)
