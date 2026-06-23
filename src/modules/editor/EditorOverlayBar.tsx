@@ -15,6 +15,8 @@ import {
   EDITOR_INDENT_MIN,
   type EditorViewSettings,
 } from "./lib/editorViewSettings";
+import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 type MarkdownViewMode = "rendered" | "raw";
 
@@ -55,6 +57,8 @@ type Props = {
 };
 
 export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const toggleLabel = view ? getShortcutLabel("editor.markdown.toggleView", userShortcuts) : null;
   const showToggles = view?.mode !== "rendered" && !!viewToggles;
   const v = viewToggles?.value;
   const set = (patch: Partial<EditorViewSettings>) => {
@@ -165,8 +169,8 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
             view.renderedDisabled && view.mode === "raw"
               ? view.renderedHint
               : view.mode === "raw"
-                ? "Preview"
-                : "Edit"
+                ? toggleLabel ? `Preview (${toggleLabel})` : "Preview"
+                : toggleLabel ? `Edit (${toggleLabel})` : "Edit"
           }
           className={cn(
             "flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground",
