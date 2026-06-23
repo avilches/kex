@@ -32,6 +32,15 @@ Nunca hardcodear un atajo de teclado (comparar `e.key === "F2"`, `e.metaKey && e
 
 Al anadir una accion con atajo: nueva entrada en `SHORTCUTS` (con `id`, `label`, `group`, `defaultBindings`), su `ShortcutId` en el union type, y conectar el handler. Asi aparece automaticamente en la seccion de Settings y queda reasignable.
 
+### Settings del editor: donde vive cada ajuste
+
+Al anadir un ajuste al editor hay que ubicarlo segun su alcance:
+
+- **Ajuste por extension de archivo** (vive en `editorViewByExt`, resuelto con `resolveEditorView`): SIEMPRE va en el menu contextual del editor (el dropdown `[...]` de `EditorOverlayBar`), en su seccion "por extension". No va en la ventana de Settings (esa es global).
+- **Ajuste global del editor** (preferencia top-level del store): va en DOS sitios: en su grupo "Global" del menu contextual `[...]` y tambien en la ventana de Settings (`GeneralSection`).
+
+Asi el usuario puede tocar lo visual rapido desde el editor y la configuracion global queda accesible tanto en contexto como en la pantalla de ajustes.
+
 ### Estado mutable externo en React
 
 Nunca usar `setInterval + setTick` para releer estado mutable externo (arrays a nivel de modulo, pools, caches). El state setter queda stale tras el primer render cycle y no causa re-renders. Usar `useSyncExternalStore(subscribe, getSnapshot)`. `getSnapshot` debe devolver la MISMA referencia si nada cambio (cache obligatorio), de lo contrario React lanza "infinite loop" error. Patron correcto: snapshot cacheado en el modulo, funcion `notify*()` que lo recalcula y notifica, llamar `notify*()` en todos los puntos donde el estado cambia.
