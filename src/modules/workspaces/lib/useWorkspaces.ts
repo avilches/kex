@@ -67,6 +67,55 @@ export function applyFsRoot(
   );
 }
 
+export function applyClosePanel(
+  workspaces: Workspace[],
+  workspaceId: string,
+  panelId: string,
+): Workspace[] {
+  return workspaces.map((w): Workspace => {
+    if (w.id !== workspaceId) return w;
+    const result = findPanelPane(w.paneTree, panelId);
+    if (!result) return w;
+    const { pane } = result;
+    const remaining = pane.panels.filter((p) => p.id !== panelId);
+    if (remaining.length === 0) {
+      const newTree = removePaneFromTree(w.paneTree, pane.id);
+      if (!newTree) {
+        return {
+          ...w,
+          paneTree: updatePane(w.paneTree, pane.id, (p) => ({
+            ...p,
+            panels: [],
+            activePanelId: null,
+          })),
+        };
+      }
+      const sibling = siblingPane(w.paneTree, pane.id);
+      return {
+        ...w,
+        paneTree: newTree,
+        activePaneId:
+          w.activePaneId === pane.id
+            ? (sibling?.id ?? firstPaneId(newTree))
+            : w.activePaneId,
+      };
+    }
+    const idx = pane.panels.findIndex((p) => p.id === panelId);
+    const newActiveId =
+      pane.activePanelId === panelId
+        ? ((remaining[idx] ?? remaining[idx - 1])?.id ?? null)
+        : pane.activePanelId;
+    return {
+      ...w,
+      paneTree: updatePane(w.paneTree, pane.id, (p) => ({
+        ...p,
+        panels: remaining,
+        activePanelId: newActiveId,
+      })),
+    };
+  });
+}
+
 function newPaneNode(cwd?: string): PaneNode {
   const panelId = newPanelId();
   return {
@@ -329,57 +378,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, []);
 
   const closePanel = useCallback((workspaceId: string, panelId: string) => {
-    let workspaceRemoved = false;
-
-    setWorkspaces((prev) => {
-      const updated = prev.flatMap((w): Workspace[] => {
-        if (w.id !== workspaceId) return [w];
-        const result = findPanelPane(w.paneTree, panelId);
-        if (!result) return [w];
-        const { pane } = result;
-        const remaining = pane.panels.filter((p) => p.id !== panelId);
-        if (remaining.length === 0) {
-          // Last panel in pane — close the pane
-          const newTree = removePaneFromTree(w.paneTree, pane.id);
-          if (!newTree) return []; // Last pane — remove workspace
-          const sibling = siblingPane(w.paneTree, pane.id);
-          return [{
-            ...w,
-            paneTree: newTree,
-            activePaneId: w.activePaneId === pane.id
-              ? (sibling?.id ?? firstPaneId(newTree))
-              : w.activePaneId,
-          }];
-        }
-        // Prefer the tab to the right; if none, the one to the left
-        const idx = pane.panels.findIndex((p) => p.id === panelId);
-        const newActiveId =
-          pane.activePanelId === panelId
-            ? ((remaining[idx] ?? remaining[idx - 1])?.id ?? null)
-            : pane.activePanelId;
-        return [{
-          ...w,
-          paneTree: updatePane(w.paneTree, pane.id, (p) => ({
-            ...p,
-            panels: remaining,
-            activePanelId: newActiveId,
-          })),
-        }];
-      });
-      // If the last workspace was just removed, allow the array to go empty —
-      // the useEffect above detects workspaces.length === 0 and closes the window.
-      workspaceRemoved = updated.length < prev.length && !updated.find((w) => w.id === workspaceId);
-      return updated;
-    });
-
-    setActiveWorkspaceId((prevId) => {
-      if (!workspaceRemoved || prevId !== workspaceId) return prevId;
-      const remaining = workspacesRef.current.filter((w) => w.id !== workspaceId);
-      const prevWsId = previousWorkspaceIdRef.current;
-      if (prevWsId && prevWsId !== workspaceId && remaining.some((w) => w.id === prevWsId)) return prevWsId;
-      const closedIdx = workspacesRef.current.findIndex((w) => w.id === workspaceId);
-      return (remaining[closedIdx] ?? remaining[closedIdx - 1])?.id ?? prevId;
-    });
+    setWorkspaces((prev) => applyClosePanel(prev, workspaceId, panelId));
   }, []);
 
   const replacePanel = useCallback((workspaceId: string, paneId: string, oldPanelId: string, newPanel: Panel) => {
