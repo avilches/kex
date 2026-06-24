@@ -31,6 +31,8 @@ export const autocompletionCompartment = new Compartment();
 export const scrollPastEndCompartment = new Compartment();
 export const cursorBlinkCompartment = new Compartment();
 export const cursorStyleCompartment = new Compartment();
+export const spellCheckCompartment = new Compartment();
+export const columnRulerCompartment = new Compartment();
 
 export function indentExt(size: number, withTabs: boolean): Extension {
   const unit = withTabs ? "\t" : " ".repeat(size);
@@ -39,6 +41,19 @@ export function indentExt(size: number, withTabs: boolean): Extension {
 
 export function lineNumbersExt(on: boolean): Extension {
   return on ? [lineNumbers(), highlightActiveLineGutter()] : [];
+}
+
+export function spellCheckExt(on: boolean): Extension {
+  return EditorView.contentAttributes.of({ spellcheck: on ? "true" : "false" });
+}
+
+export function columnRulerExt(col: number): Extension {
+  if (col <= 0) return [];
+  return EditorView.theme({
+    ".cm-line": {
+      backgroundImage: `linear-gradient(90deg, transparent calc(${col}ch), color-mix(in srgb, var(--muted-foreground) 30%, transparent) calc(${col}ch), color-mix(in srgb, var(--muted-foreground) 30%, transparent) calc(${col}ch + 1px), transparent calc(${col}ch + 1px))`,
+    },
+  });
 }
 
 export type SharedExtConfig = {
@@ -68,6 +83,8 @@ export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
     scrollPastEndCompartment.of(cfg.scrollPastEnd ? scrollPastEnd() : []),
     cursorBlinkCompartment.of(cursorBlinkExt(cfg.cursorBlink, cfg.cursorBlinkRate)),
     cursorStyleCompartment.of(cursorStyleExt(cfg.cursorStyle)),
+    spellCheckCompartment.of(spellCheckExt(cfg.view.spellCheck)),
+    columnRulerCompartment.of(columnRulerExt(cfg.view.columnRuler)),
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
         backgroundColor: "transparent !important",

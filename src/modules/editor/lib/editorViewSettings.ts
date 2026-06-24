@@ -5,6 +5,8 @@ export type EditorViewSettings = {
   foldGutter: boolean;
   indentSize: number;
   indentWithTabs: boolean;
+  columnRuler: number; // 0 = disabled
+  spellCheck: boolean;
 };
 
 export type EditorViewMap = Record<string, Partial<EditorViewSettings>>;
@@ -24,6 +26,8 @@ export const PROSE_DEFAULTS: EditorViewSettings = {
   foldGutter: false,
   indentSize: 4,
   indentWithTabs: false,
+  columnRuler: 0,
+  spellCheck: true,
 };
 
 export const CODE_DEFAULTS: EditorViewSettings = {
@@ -33,6 +37,8 @@ export const CODE_DEFAULTS: EditorViewSettings = {
   foldGutter: true,
   indentSize: 4,
   indentWithTabs: false,
+  columnRuler: 0,
+  spellCheck: false,
 };
 
 export function extOf(path: string): string {

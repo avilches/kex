@@ -33,6 +33,8 @@ import {
   bracketMatchingCompartment,
   buildSharedExtensions,
   closeBracketsCompartment,
+  columnRulerCompartment,
+  columnRulerExt,
   cursorBlinkCompartment,
   cursorStyleCompartment,
   foldGutterCompartment,
@@ -42,6 +44,8 @@ import {
   lineNumbersCompartment,
   lineNumbersExt,
   scrollPastEndCompartment,
+  spellCheckCompartment,
+  spellCheckExt,
   whitespaceCompartment,
   wrapCompartment,
 } from "./lib/extensions";
@@ -249,6 +253,18 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       if (!v) return;
       v.dispatch({ effects: cursorStyleCompartment.reconfigure(cursorStyleExt(cursorStylePref)) });
     }, [cursorStylePref]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: spellCheckCompartment.reconfigure(spellCheckExt(view.spellCheck)) });
+    }, [view.spellCheck]);
+
+    useEffect(() => {
+      const v = cmRef.current?.view;
+      if (!v) return;
+      v.dispatch({ effects: columnRulerCompartment.reconfigure(columnRulerExt(view.columnRuler)) });
+    }, [view.columnRuler]);
 
     useEffect(() => {
       const ext = path.split(".").pop()?.toLowerCase() ?? null;

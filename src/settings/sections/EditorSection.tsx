@@ -295,6 +295,8 @@ function settingsSummary(s: EditorViewSettings): string {
   if (s.foldGutter) parts.push("Fold");
   if (s.indentWithTabs) parts.push("Tabs");
   if (s.indentSize !== 4) parts.push(`Indent ${s.indentSize}`);
+  if (s.columnRuler > 0) parts.push(`Col ${s.columnRuler}`);
+  if (s.spellCheck) parts.push("Spell check");
   return parts.join(" · ");
 }
 
@@ -507,6 +509,37 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
               />
             </div>
           </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-[12px]">Column ruler</span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-[12px] text-muted-foreground">
+                {effective.columnRuler === 0 ? "off" : "col"}
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={500}
+                value={effective.columnRuler}
+                onFocus={(e) => e.currentTarget.select()}
+                onKeyDown={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10);
+                  if (Number.isNaN(n)) return;
+                  void patchEditorViewEntry(entryKey, {
+                    columnRuler: Math.min(500, Math.max(0, n)),
+                  });
+                }}
+                className="h-7 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
+              />
+            </div>
+          </div>
+          <ExtToggle
+            label="Spell check"
+            checked={effective.spellCheck}
+            onChange={(v) =>
+              void patchEditorViewEntry(entryKey, { spellCheck: v })
+            }
+          />
         </div>
       )}
     </div>
