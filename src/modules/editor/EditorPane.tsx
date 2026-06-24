@@ -82,6 +82,8 @@ type Props = {
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onContentChange?: (content: string) => void;
+  /** Called once when the initial file content is loaded from disk. */
+  onReady?: (initialContent: string) => void;
 };
 
 function formatBytes(n: number): string {
@@ -91,7 +93,7 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onContentChange }, ref) {
+  function EditorPane({ path, onDirtyChange, onSaved, onContentChange, onReady }, ref) {
     const { doc, onChange, save, reload } = useDocument({
       path,
       onDirtyChange,
@@ -100,12 +102,23 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     reloadRef.current = reload;
     const onContentChangeRef = useRef(onContentChange);
     onContentChangeRef.current = onContentChange;
+    const onReadyRef = useRef(onReady);
+    onReadyRef.current = onReady;
+    const onReadyFiredRef = useRef(false);
     const cmRef = useRef<ReactCodeMirrorRef>(null);
 
     const handleChange = useCallback((value: string) => {
       onChange(value);
       onContentChangeRef.current?.(value);
     }, [onChange]);
+
+    // Fire onReady once when the file content first loads from disk.
+    useEffect(() => {
+      if (doc.status === "ready" && !onReadyFiredRef.current) {
+        onReadyFiredRef.current = true;
+        onReadyRef.current?.(doc.content);
+      }
+    }, [doc]);
     const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
     const scrollPastEndPref = usePreferencesStore((s) => s.editorScrollPastEnd);
     const highlightActiveLinePref = usePreferencesStore((s) => s.editorHighlightActiveLine);
