@@ -350,7 +350,8 @@ export function useSourceControlPanel(
 
 
   const allClean = stagedEntries.length === 0 && unstagedEntries.length === 0;
-  const canPush = !!status?.upstream && status.behind === 0;
+  const canPush =
+    !!status?.upstream && status.behind === 0 && status.ahead > 0;
   const pushHint = useMemo(() => {
     if (!status) return null;
     if (!status.upstream) {
