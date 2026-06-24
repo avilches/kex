@@ -294,14 +294,13 @@ function extLabel(key: string): string {
 }
 
 function settingsSummary(s: EditorViewSettings): string {
-  const parts: string[] = [
-    `Wrap ${s.wrap ? "on" : "off"}`,
-    `Line# ${s.lineNumbers ? "on" : "off"}`,
-    `WS ${s.whitespace ? "on" : "off"}`,
-    `Fold ${s.foldGutter ? "on" : "off"}`,
-    `Tabs ${s.indentWithTabs ? "on" : "off"}`,
-    `Indent ${s.indentSize}`,
-  ];
+  const parts: string[] = [];
+  if (s.wrap) parts.push("Wrap");
+  if (s.lineNumbers) parts.push("Line#");
+  if (s.whitespace) parts.push("Whitespace");
+  if (s.foldGutter) parts.push("Fold");
+  if (s.indentWithTabs) parts.push("Tabs");
+  if (s.indentSize !== 4) parts.push(`Indent ${s.indentSize}`);
   return parts.join(" · ");
 }
 
