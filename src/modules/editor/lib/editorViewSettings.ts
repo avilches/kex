@@ -17,9 +17,9 @@ export function clampIndentSize(n: number): number {
   return Math.min(EDITOR_INDENT_MAX, Math.max(EDITOR_INDENT_MIN, Math.round(n)));
 }
 
-const PROSE_EXTS = new Set(["md", "markdown", "mdx", "txt", "text"]);
+export const PROSE_EXTS = new Set(["md", "markdown", "mdx", "txt", "text"]);
 
-const PROSE_DEFAULTS: EditorViewSettings = {
+export const PROSE_DEFAULTS: EditorViewSettings = {
   wrap: true,
   lineNumbers: false,
   whitespace: false,
@@ -28,7 +28,7 @@ const PROSE_DEFAULTS: EditorViewSettings = {
   indentWithTabs: false,
 };
 
-const CODE_DEFAULTS: EditorViewSettings = {
+export const CODE_DEFAULTS: EditorViewSettings = {
   wrap: false,
   lineNumbers: true,
   whitespace: false,
@@ -48,10 +48,35 @@ export function defaultsForExt(ext: string): EditorViewSettings {
   return PROSE_EXTS.has(ext) ? { ...PROSE_DEFAULTS } : { ...CODE_DEFAULTS };
 }
 
+export function normalizeExtKey(exts: string[]): string {
+  return exts
+    .map((e) => e.toLowerCase().trim())
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
+export function findKeyForExt(ext: string, map: EditorViewMap): string | null {
+  let bestKey: string | null = null;
+  let bestCount = Number.POSITIVE_INFINITY;
+  for (const key of Object.keys(map)) {
+    if (key === "*") continue;
+    const parts = key.split(",");
+    if (parts.includes(ext) && parts.length < bestCount) {
+      bestKey = key;
+      bestCount = parts.length;
+    }
+  }
+  return bestKey;
+}
+
 export function resolveEditorView(
   path: string,
   map: EditorViewMap,
 ): EditorViewSettings {
   const ext = extOf(path);
-  return { ...defaultsForExt(ext), ...(map[ext] ?? {}) };
+  const bestKey = findKeyForExt(ext, map);
+  const base = defaultsForExt(ext);
+  const overlay = bestKey != null ? (map[bestKey] ?? {}) : (map["*"] ?? {});
+  return { ...base, ...overlay };
 }

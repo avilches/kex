@@ -7,12 +7,29 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Refresh01Icon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  Refresh01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { defaultMonoFontFamily } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  CODE_DEFAULTS,
+  clampIndentSize,
+  EDITOR_INDENT_MAX,
+  EDITOR_INDENT_MIN,
+  type EditorViewMap,
+  type EditorViewSettings,
+  normalizeExtKey,
+  PROSE_DEFAULTS,
+  PROSE_EXTS,
+} from "@/modules/editor/lib/editorViewSettings";
 import {
   type CursorStyle,
   CURSOR_STYLES,
@@ -32,6 +49,9 @@ import {
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_MIN,
   LINE_HEIGHT_STEP,
+  deleteEditorViewEntry,
+  patchEditorViewEntry,
+  resetEditorViewEntry,
   setEditorAutoSave,
   setEditorAutocompletion,
   setEditorBracketMatching,
@@ -44,6 +64,7 @@ import {
   setEditorLetterSpacing,
   setEditorLineHeight,
   setEditorScrollPastEnd,
+  upsertEditorViewEntry,
 } from "@/modules/settings/store";
 import { CursorGlyph } from "../components/CursorGlyph";
 import { FieldLabel } from "../components/FieldLabel";
@@ -172,6 +193,8 @@ export function EditorSection() {
         </SettingRow>
       </div>
 
+      <FileTypesSection />
+
       <div className="flex flex-col gap-2">
         <FieldLabel>Cursor</FieldLabel>
         <SettingRow title="Cursor style" description="Editor caret shape.">
@@ -240,6 +263,264 @@ export function EditorSection() {
           </div>
         </SettingRow>
       </div>
+    </div>
+  );
+}
+
+function sortedEntries(map: EditorViewMap): [string, Partial<EditorViewSettings>][] {
+  return Object.entries(map).sort(([a], [b]) => {
+    if (a === "*") return 1;
+    if (b === "*") return -1;
+    const ac = a.split(",").length;
+    const bc = b.split(",").length;
+    if (ac !== bc) return ac - bc;
+    return a.localeCompare(b);
+  });
+}
+
+function effectiveSettings(
+  key: string,
+  partial: Partial<EditorViewSettings>,
+): EditorViewSettings {
+  const allProse =
+    key !== "*" && key.split(",").every((e) => PROSE_EXTS.has(e));
+  return { ...(allProse ? PROSE_DEFAULTS : CODE_DEFAULTS), ...partial };
+}
+
+function extLabel(key: string): string {
+  if (key === "*") return "Default (*)";
+  return key
+    .split(",")
+    .map((e) => `.${e}`)
+    .join(", ");
+}
+
+function settingsSummary(s: EditorViewSettings): string {
+  const parts: string[] = [
+    `Wrap ${s.wrap ? "on" : "off"}`,
+    `Line# ${s.lineNumbers ? "on" : "off"}`,
+    `WS ${s.whitespace ? "on" : "off"}`,
+    `Fold ${s.foldGutter ? "on" : "off"}`,
+    `Tabs ${s.indentWithTabs ? "on" : "off"}`,
+    `Indent ${s.indentSize}`,
+  ];
+  return parts.join(" · ");
+}
+
+function FileTypesSection() {
+  const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [addInput, setAddInput] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+  const addInputRef = useRef<HTMLInputElement>(null);
+
+  const entries = sortedEntries(editorViewByExt);
+
+  function handleAdd() {
+    const raw = addInput.trim();
+    if (!raw) return;
+    const tokens = raw
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    if (tokens.length === 0) return;
+    if (tokens.some((t) => t === "*") && tokens.length > 1) {
+      setAddError('Cannot mix "*" with other extensions.');
+      return;
+    }
+    setAddError(null);
+    const newKey = normalizeExtKey(tokens);
+    void upsertEditorViewEntry(tokens, {});
+    setAddInput("");
+    setExpandedKey(newKey);
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <FieldLabel>File types</FieldLabel>
+      <div className="flex items-center gap-2">
+        <input
+          ref={addInputRef}
+          type="text"
+          value={addInput}
+          onChange={(e) => {
+            setAddInput(e.target.value);
+            setAddError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleAdd();
+          }}
+          placeholder="ts, tsx, go ..."
+          className="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-[12px] outline-none placeholder:text-muted-foreground/50 focus:border-ring"
+        />
+        <button
+          type="button"
+          title="Add file type"
+          onClick={handleAdd}
+          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <HugeiconsIcon icon={Add01Icon} size={13} />
+        </button>
+      </div>
+      {addError && (
+        <span className="text-[11px] text-destructive">{addError}</span>
+      )}
+      <div className="flex flex-col gap-1">
+        {entries.map(([key, partial]) => (
+          <ExtensionRow
+            key={key}
+            entryKey={key}
+            partial={partial}
+            expanded={expandedKey === key}
+            onToggle={() =>
+              setExpandedKey((prev) => (prev === key ? null : key))
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type ExtensionRowProps = {
+  entryKey: string;
+  partial: Partial<EditorViewSettings>;
+  expanded: boolean;
+  onToggle: () => void;
+};
+
+function ExtensionRow({
+  entryKey,
+  partial,
+  expanded,
+  onToggle,
+}: ExtensionRowProps) {
+  const effective = effectiveSettings(entryKey, partial);
+  const isCatchAll = entryKey === "*";
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-card/60">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex size-[18px] shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <HugeiconsIcon
+            icon={expanded ? ArrowDown01Icon : ArrowRight01Icon}
+            size={11}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-baseline gap-3 text-left"
+        >
+          <span className="shrink-0 text-[12.5px] font-medium font-mono">
+            {extLabel(entryKey)}
+          </span>
+          {!expanded && (
+            <span className="truncate text-[11px] text-muted-foreground">
+              {settingsSummary(effective)}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          title="Reset to defaults"
+          onClick={() => void resetEditorViewEntry(entryKey)}
+          className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <HugeiconsIcon icon={Refresh01Icon} size={11} />
+        </button>
+        {!isCatchAll && (
+          <button
+            type="button"
+            title="Remove"
+            onClick={() => void deleteEditorViewEntry(entryKey)}
+            className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={11} />
+          </button>
+        )}
+      </div>
+      {expanded && (
+        <div className="flex flex-col gap-1.5 border-t border-border/40 px-4 py-3">
+          <ExtToggle
+            label="Word wrap"
+            checked={effective.wrap}
+            onChange={(v) => void patchEditorViewEntry(entryKey, { wrap: v })}
+          />
+          <ExtToggle
+            label="Line numbers"
+            checked={effective.lineNumbers}
+            onChange={(v) =>
+              void patchEditorViewEntry(entryKey, { lineNumbers: v })
+            }
+          />
+          <ExtToggle
+            label="Show whitespace"
+            checked={effective.whitespace}
+            onChange={(v) =>
+              void patchEditorViewEntry(entryKey, { whitespace: v })
+            }
+          />
+          <ExtToggle
+            label="Fold gutter"
+            checked={effective.foldGutter}
+            onChange={(v) =>
+              void patchEditorViewEntry(entryKey, { foldGutter: v })
+            }
+          />
+          <div className="flex items-center justify-between gap-4">
+            <ExtToggle
+              label="Indent with tabs"
+              checked={effective.indentWithTabs}
+              onChange={(v) =>
+                void patchEditorViewEntry(entryKey, { indentWithTabs: v })
+              }
+            />
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-[12px] text-muted-foreground">
+                Indent size
+              </span>
+              <input
+                type="number"
+                min={EDITOR_INDENT_MIN}
+                max={EDITOR_INDENT_MAX}
+                value={effective.indentSize}
+                onFocus={(e) => e.currentTarget.select()}
+                onKeyDown={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10);
+                  if (Number.isNaN(n)) return;
+                  void patchEditorViewEntry(entryKey, {
+                    indentSize: clampIndentSize(n),
+                  });
+                }}
+                className="h-7 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExtToggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[12px]">{label}</span>
+      <Switch checked={checked} onCheckedChange={onChange} />
     </div>
   );
 }

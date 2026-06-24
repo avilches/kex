@@ -1,5 +1,13 @@
 import type { KeyBinding, ShortcutId } from "@/modules/shortcuts/shortcuts";
-import type { EditorViewMap, EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
+import {
+  type EditorViewMap,
+  type EditorViewSettings,
+  CODE_DEFAULTS,
+  findKeyForExt,
+  normalizeExtKey,
+  PROSE_DEFAULTS,
+  PROSE_EXTS,
+} from "@/modules/editor/lib/editorViewSettings";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 
@@ -355,6 +363,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: false,
 };
 
+const SEEDED_EDITOR_VIEW_MAP: EditorViewMap = {
+  "md,markdown,mdx,text,txt": { ...PROSE_DEFAULTS },
+  "*": { ...CODE_DEFAULTS },
+};
+
 // Keybindings live in their own file so reassigning a shortcut never rewrites
 // the (much larger) general settings, and vice versa.
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -507,9 +520,12 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.editorPreviewOnClick,
     editorViewByExt: (() => {
       const v = get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT);
-      return v && typeof v === "object" && !Array.isArray(v)
-        ? v
-        : DEFAULT_PREFERENCES.editorViewByExt;
+      const parsed =
+        v && typeof v === "object" && !Array.isArray(v)
+          ? v
+          : DEFAULT_PREFERENCES.editorViewByExt;
+      if (Object.keys(parsed).length === 0) return SEEDED_EDITOR_VIEW_MAP;
+      return parsed;
     })(),
     editorScrollPastEnd:
       get<boolean>(KEY_EDITOR_SCROLL_PAST_END) ??
@@ -564,6 +580,14 @@ export async function loadPreferences(): Promise<Preferences> {
   if (!map.has(KEY_WORKSPACE_PANE_LIMIT)) configDefaults.push([KEY_WORKSPACE_PANE_LIMIT, DEFAULT_PREFERENCES.workspacePaneLimit]);
   if (!map.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
   if (!map.has(KEY_KEEP_FOLDER_LAYOUT)) configDefaults.push([KEY_KEEP_FOLDER_LAYOUT, DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot]);
+  const storedExtMap = map.get(KEY_EDITOR_VIEW_BY_EXT);
+  const storedExtMapIsEmpty =
+    !storedExtMap ||
+    typeof storedExtMap !== "object" ||
+    Object.keys(storedExtMap as object).length === 0;
+  if (storedExtMapIsEmpty) {
+    configDefaults.push([KEY_EDITOR_VIEW_BY_EXT, SEEDED_EDITOR_VIEW_MAP]);
+  }
   if (configDefaults.length > 0) {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
   }
@@ -810,10 +834,86 @@ export async function setEditorViewForExt(
 ): Promise<void> {
   const current =
     (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
-  const next = { ...current, [ext]: value };
+  const existingKey = findKeyForExt(ext, current);
+  const next = { ...current, [existingKey ?? ext]: value };
   await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
 }
 
+export async function upsertEditorViewEntry(
+  rawExts: string[],
+  value: Partial<EditorViewSettings>,
+): Promise<void> {
+  const current =
+    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+  const newKey = normalizeExtKey(rawExts);
+  if (newKey === "") return;
+
+  if (current[newKey] !== undefined) {
+    const next = { ...current, [newKey]: value };
+    await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+    return;
+  }
+
+  const newExts = newKey.split(",");
+  let inheritedValue: Partial<EditorViewSettings> = current["*"] ?? {};
+  let firstSourceFound = false;
+  const next: EditorViewMap = {};
+
+  for (const [key, settings] of Object.entries(current)) {
+    if (key === "*") {
+      next[key] = settings;
+      continue;
+    }
+    const keyExts = key.split(",");
+    const overlap = keyExts.filter((e) => newExts.includes(e));
+    if (overlap.length === 0) {
+      next[key] = settings;
+      continue;
+    }
+    if (!firstSourceFound) {
+      inheritedValue = settings;
+      firstSourceFound = true;
+    }
+    const remaining = keyExts.filter((e) => !newExts.includes(e));
+    if (remaining.length === 0) continue;
+    const remainingKey = normalizeExtKey(remaining);
+    next[remainingKey] = settings;
+  }
+
+  next[newKey] = firstSourceFound ? inheritedValue : value;
+  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+}
+
+export async function patchEditorViewEntry(
+  key: string,
+  patch: Partial<EditorViewSettings>,
+): Promise<void> {
+  const current =
+    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+  if (current[key] === undefined) return;
+  const next = { ...current, [key]: { ...current[key], ...patch } };
+  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+}
+
+export async function deleteEditorViewEntry(key: string): Promise<void> {
+  if (key === "*") return;
+  const current =
+    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+  const next = { ...current };
+  delete next[key];
+  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+}
+
+export async function resetEditorViewEntry(key: string): Promise<void> {
+  const current =
+    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+  const isProse =
+    key !== "*" &&
+    key.split(",").every((e) => PROSE_EXTS.has(e));
+  const defaults = isProse ? { ...PROSE_DEFAULTS } : { ...CODE_DEFAULTS };
+  const next = { ...current, [key]: defaults };
+  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+}
 
 export async function setEditorScrollPastEnd(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_SCROLL_PAST_END, value);
