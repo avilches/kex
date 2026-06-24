@@ -46,6 +46,11 @@ impl PtyState {
 }
 
 #[tauri::command]
+pub fn pty_list_shells() -> Vec<shell_init::ShellInfo> {
+    shell_init::list_shells()
+}
+
+#[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn pty_open(
     app: tauri::AppHandle,
@@ -58,6 +63,7 @@ pub async fn pty_open(
     workspace: Option<WorkspaceEnv>,
     blocks: Option<bool>,
     panel_id: Option<String>,
+    shell: Option<String>,
     on_data: Channel<Response>,
     on_exit: Channel<i32>,
 ) -> Result<u32, String> {
@@ -70,7 +76,7 @@ pub async fn pty_open(
     let (cwd, canonical_cwd) = spawn_cwd_or_home(cwd, &workspace);
     let id = state.next_id.fetch_add(1, Ordering::Relaxed);
     let session = tauri::async_runtime::spawn_blocking(move || {
-        session::spawn(id, app, cols, rows, cwd, workspace, blocks, panel_id, on_data, on_exit)
+        session::spawn(id, app, cols, rows, cwd, workspace, blocks, panel_id, shell, on_data, on_exit)
             .map(|(s, _)| s)
     })
     .await

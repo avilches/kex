@@ -123,6 +123,7 @@ pub fn spawn(
     workspace: WorkspaceEnv,
     blocks: bool,
     panel_id: Option<String>,
+    shell: Option<String>,
     on_data: Channel<Response>,
     on_exit: Channel<i32>,
 ) -> Result<(Arc<Session>, PtySize), String> {
@@ -145,7 +146,7 @@ pub fn spawn(
     #[cfg(not(unix))]
     let ipc_path_opt: Option<&str> = None;
 
-    let cmd = shell_init::build_command(id, cwd, workspace, blocks, panel_id.clone(), ipc_path_opt)?;
+    let cmd = shell_init::build_command(id, cwd, workspace, blocks, panel_id.clone(), ipc_path_opt, shell)?;
 
     #[cfg(unix)]
     let ipc_guard = super::ipc::spawn_listener(

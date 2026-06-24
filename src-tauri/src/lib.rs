@@ -670,6 +670,7 @@ pub fn run() {
         .manage(float_browser::FloatBrowserState::new())
         .invoke_handler(tauri::generate_handler![
             pty::pty_open,
+            pty::pty_list_shells,
             pty::pty_write,
             pty::pty_resize,
             pty::pty_close,

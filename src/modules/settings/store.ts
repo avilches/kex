@@ -137,6 +137,7 @@ export type Preferences = {
   warnOnCloseTabWithRunningProcess: boolean;
   warnOnCloseWorkspace: boolean;
   terminalFontFamily: string;
+  terminalShell: string;
   terminalFontWeight: string;
   terminalLetterSpacing: number;
   terminalFontSize: number;
@@ -192,6 +193,7 @@ const KEY_EDITOR_CURSOR_STYLE = "editorCursorStyle";
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
 const KEY_WARN_ON_CLOSE_WORKSPACE = "warnOnCloseWorkspace";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
+const KEY_TERMINAL_SHELL = "terminalShell";
 const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
@@ -331,6 +333,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   warnOnCloseTabWithRunningProcess: true,
   warnOnCloseWorkspace: true,
   terminalFontFamily: "",
+  terminalShell: "",
   terminalFontWeight: "normal",
   terminalLetterSpacing: LETTER_SPACING_DEFAULT,
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
@@ -470,6 +473,8 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalFontFamily:
       get<string>(KEY_TERMINAL_FONT_FAMILY) ??
       DEFAULT_PREFERENCES.terminalFontFamily,
+    terminalShell:
+      get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
     terminalFontWeight: coerceFontWeight(
       get<string>(KEY_TERMINAL_FONT_WEIGHT) ??
         DEFAULT_PREFERENCES.terminalFontWeight,
@@ -734,6 +739,10 @@ export async function setTerminalFontFamily(value: string): Promise<void> {
   await writePref(KEY_TERMINAL_FONT_FAMILY, value.trim());
 }
 
+export async function setTerminalShell(value: string): Promise<void> {
+  await writePref(KEY_TERMINAL_SHELL, value);
+}
+
 const TERMINAL_FONT_WEIGHT_VALUES = new Set(["normal", "500", "600", "bold"]);
 
 export function coerceFontWeight(value: string): string {
@@ -988,6 +997,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",
   [KEY_WARN_ON_CLOSE_WORKSPACE]: "warnOnCloseWorkspace",
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
+  [KEY_TERMINAL_SHELL]: "terminalShell",
   [KEY_TERMINAL_FONT_WEIGHT]: "terminalFontWeight",
   [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
   [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",

@@ -460,6 +460,7 @@ async function openPtyForSession(
     cwd,
     s.blocks,
     leafId,
+    usePreferencesStore.getState().terminalShell || undefined,
   );
 }
 

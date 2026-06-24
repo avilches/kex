@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import {
   Select,
   SelectContent,
@@ -49,9 +50,11 @@ import {
   setTerminalLineHeight,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
+  setTerminalShell,
   setTerminalWebglEnabled,
   setWarnOnCloseTabWithRunningProcess,
 } from "@/modules/settings/store";
+import { useEffect, useState } from "react";
 import { CursorGlyph } from "../components/CursorGlyph";
 import { FieldLabel } from "../components/FieldLabel";
 import { FontFamilyInput } from "../components/FontFamilyInput";
@@ -70,6 +73,9 @@ const TERMINAL_FONT_WEIGHTS = [
   { value: "600", label: "Semi-Bold" },
   { value: "bold", label: "Bold" },
 ] as const;
+
+type ShellInfo = { name: string; path: string; integrated: boolean };
+const SHELL_AUTO = "auto";
 
 export function TerminalSection() {
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
@@ -95,6 +101,14 @@ export function TerminalSection() {
   const warnOnCloseRunning = usePreferencesStore(
     (s) => s.warnOnCloseTabWithRunningProcess,
   );
+  const terminalShell = usePreferencesStore((s) => s.terminalShell);
+  const [shells, setShells] = useState<ShellInfo[]>([]);
+
+  useEffect(() => {
+    void invoke<ShellInfo[]>("pty_list_shells")
+      .then(setShells)
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -144,6 +158,31 @@ export function TerminalSection() {
               {TERMINAL_FONT_WEIGHTS.map((w) => (
                 <SelectItem key={w.value} value={w.value} className="text-[12px]">
                   {w.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+        <SettingRow
+          title="Default shell"
+          description={
+            shells.find((s) => s.path === terminalShell)?.integrated === false
+              ? "Command blocks and directory tracking are unavailable for this shell."
+              : "Shell for new terminal tabs. Existing tabs keep their shell."
+          }
+        >
+          <Select
+            value={terminalShell || SHELL_AUTO}
+            onValueChange={(v) => void setTerminalShell(v === SHELL_AUTO ? "" : v)}
+          >
+            <SelectTrigger size="sm" className="h-8 w-40 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SHELL_AUTO} className="text-[12px]">Auto</SelectItem>
+              {shells.map((s) => (
+                <SelectItem key={s.path} value={s.path} className="text-[12px]">
+                  {s.name}
                 </SelectItem>
               ))}
             </SelectContent>
