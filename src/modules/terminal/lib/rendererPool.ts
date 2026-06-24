@@ -852,6 +852,7 @@ export function applyFontWeight(weight: string): void {
   for (const slot of slots) {
     if (slot.term.options.fontWeight === weight) continue;
     slot.term.options.fontWeight = weight as FontWeight;
+    slot.fitAddon.fit();
   }
 }
 

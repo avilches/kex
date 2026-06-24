@@ -137,7 +137,7 @@ export function TerminalSection() {
             value={terminalFontWeight}
             onValueChange={(v) => void setTerminalFontWeight(v)}
           >
-            <SelectTrigger value={terminalFontWeight} className="h-8 w-28 text-[12px]">
+            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
