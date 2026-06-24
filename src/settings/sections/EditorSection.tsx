@@ -52,6 +52,7 @@ import {
   deleteEditorViewEntry,
   patchEditorViewEntry,
   resetEditorViewEntry,
+  SEEDED_KEYS,
   setEditorAutoSave,
   setEditorAutocompletion,
   setEditorBracketMatching,
@@ -267,8 +268,14 @@ export function EditorSection() {
   );
 }
 
+const SEEDED_DEFAULTS: EditorViewMap = {
+  "md,markdown,mdx,text,txt": { ...PROSE_DEFAULTS },
+  "*": { ...CODE_DEFAULTS },
+};
+
 function sortedEntries(map: EditorViewMap): [string, Partial<EditorViewSettings>][] {
-  return Object.entries(map).sort(([a], [b]) => {
+  const merged: EditorViewMap = { ...SEEDED_DEFAULTS, ...map };
+  return Object.entries(merged).sort(([a], [b]) => {
     if (a === "*") return 1;
     if (b === "*") return -1;
     const ac = a.split(",").length;
@@ -396,7 +403,7 @@ function ExtensionRow({
   onToggle,
 }: ExtensionRowProps) {
   const effective = effectiveSettings(entryKey, partial);
-  const isCatchAll = entryKey === "*";
+  const isCatchAll = SEEDED_KEYS.has(entryKey);
 
   return (
     <div className="rounded-lg border border-border/60 bg-card/60">

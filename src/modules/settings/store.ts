@@ -368,6 +368,8 @@ const SEEDED_EDITOR_VIEW_MAP: EditorViewMap = {
   "*": { ...CODE_DEFAULTS },
 };
 
+export const SEEDED_KEYS = new Set(["*", "md,markdown,mdx,text,txt"]);
+
 // Keybindings live in their own file so reassigning a shortcut never rewrites
 // the (much larger) general settings, and vice versa.
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -896,7 +898,7 @@ export async function patchEditorViewEntry(
 }
 
 export async function deleteEditorViewEntry(key: string): Promise<void> {
-  if (key === "*") return;
+  if (SEEDED_KEYS.has(key)) return;
   const current =
     (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
   const next = { ...current };
