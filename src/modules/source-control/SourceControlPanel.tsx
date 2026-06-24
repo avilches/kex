@@ -785,7 +785,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       className="h-7 flex-1 text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
                       disabled={!canCommit}
                       onClick={() => {
-                        if (pushOnCommit && scm.canPush) {
+                        if (pushOnCommit) {
                           void scm.commitAndPush();
                         } else {
                           void scm.commit();
@@ -796,7 +796,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                         ? "Committing…"
                         : scm.actionBusy === "push"
                           ? "Pushing…"
-                          : pushOnCommit && scm.canPush
+                          : pushOnCommit
                             ? "Commit & Push"
                             : "Commit"}
                     </Button>
