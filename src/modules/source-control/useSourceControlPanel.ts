@@ -699,6 +699,7 @@ export function useSourceControlPanel(
     try {
       const result = await native.gitCommit(repo.repoRoot, commitMessage);
       setCommitMessage("");
+      flushCommitMessage();
       invalidateRepoDiffs(repo.repoRoot);
       await summary.refresh({ remote: "never" });
       setLocalActionBusy(null);
@@ -714,7 +715,7 @@ export function useSourceControlPanel(
       setActionError(normalizeError(error));
       setLocalActionBusy(null);
     }
-  }, [commitMessage, repo, summary]);
+  }, [commitMessage, repo, summary, setCommitMessage, flushCommitMessage]);
 
   const pendingDiscardView = useMemo<PendingDiscard | null>(() => {
     if (!pendingDiscard) return null;
