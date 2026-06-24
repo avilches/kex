@@ -59,9 +59,12 @@ import {
   GitBranchIcon,
   GitForkIcon,
   Link01Icon,
+  ListViewIcon,
   MinusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
+  UnfoldLessIcon,
+  UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -83,6 +86,7 @@ import {
 } from "./useSourceControlPanel";
 import {
   buildScmTree,
+  collectDirKeys,
   flattenScmTree,
   type ScmDirNode,
 } from "./scmTree";
@@ -265,6 +269,36 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     ? "Wait for the current Git action to finish."
     : pushHint;
   const stagedCount = scm.stagedEntries.length;
+  const unstagedCount = scm.unstagedEntries.length;
+  const changesSummary =
+    stagedCount === 0 && unstagedCount === 0
+      ? "No changes"
+      : [
+          unstagedCount > 0 ? `${unstagedCount} changed` : null,
+          stagedCount > 0 ? `${stagedCount} staged` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+  const allTreeDirKeys = useMemo(
+    () =>
+      scmViewMode === "tree"
+        ? [
+            ...collectDirKeys(buildScmTree(scm.stagedEntries), "staged/"),
+            ...collectDirKeys(buildScmTree(scm.unstagedEntries), "changes/"),
+          ]
+        : [],
+    [scmViewMode, scm.stagedEntries, scm.unstagedEntries],
+  );
+  const allFoldersCollapsed =
+    allTreeDirKeys.length > 0 &&
+    allTreeDirKeys.every((key) => treeCollapsed.has(key));
+  const toggleCollapseAll = useCallback(() => {
+    setTreeCollapsed(
+      allFoldersCollapsed ? new Set<string>() : new Set(allTreeDirKeys),
+    );
+  }, [allFoldersCollapsed, allTreeDirKeys]);
+
   const pushStatusLabel = upstreamBadgeLabel(scm.status?.upstream);
   const hasUpstream = !!scm.status?.upstream;
   const isDiverged =
@@ -599,7 +633,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   return (
     <TooltipProvider delayDuration={800} skipDelayDuration={300}>
       <aside className="flex h-full min-w-0 flex-col bg-sidebar [contain:layout_style]">
-        <header className="flex shrink-0 items-start justify-between gap-1 border-b border-border/60 px-1.5 py-1">
+        <header className="flex shrink-0 items-start gap-1 border-b border-border/60 px-1.5 py-1">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex h-6 min-w-0 items-center gap-1.5">
               <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-tight text-foreground">
@@ -616,6 +650,61 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   detached
                 </span>
               ) : null}
+              <div className="flex shrink-0 items-center gap-0.5">
+                <RemoteActionButton
+                  label={fetchLabel}
+                  disabled={!canFetch}
+                  onClick={handleFetch}
+                >
+                  {fetchBusy ? (
+                    <Spinner className="size-3" />
+                  ) : (
+                    <HugeiconsIcon icon={ArrowDownToDotIcon} size={13} strokeWidth={1.85} />
+                  )}
+                </RemoteActionButton>
+                <RemoteActionButton
+                  label={pullLabel}
+                  disabled={!canPull}
+                  onClick={handlePull}
+                >
+                  {pullBusy ? (
+                    <Spinner className="size-3" />
+                  ) : (
+                    <span className={cn(
+                      "inline-flex items-center gap-1",
+                      (scm.status?.behind ?? 0) > 0 && "text-blue-600 dark:text-blue-400",
+                    )}>
+                      <HugeiconsIcon icon={ArrowDown02Icon} size={13} strokeWidth={1.9} />
+                      {(scm.status?.behind ?? 0) > 0 && (
+                        <span className="text-[10px] font-semibold tabular-nums">
+                          {scm.status?.behind}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </RemoteActionButton>
+                <RemoteActionButton
+                  label={pushLabel}
+                  disabled={!scm.canPush || !!scm.actionBusy}
+                  onClick={() => void scm.push()}
+                >
+                  {pushBusy ? (
+                    <Spinner className="size-3" />
+                  ) : (
+                    <span className={cn(
+                      "inline-flex items-center gap-1",
+                      (scm.status?.ahead ?? 0) > 0 && "text-emerald-600 dark:text-emerald-400",
+                    )}>
+                      <HugeiconsIcon icon={ArrowUp02Icon} size={13} strokeWidth={1.9} />
+                      {(scm.status?.ahead ?? 0) > 0 && (
+                        <span className="text-[10px] font-semibold tabular-nums">
+                          {scm.status?.ahead}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </RemoteActionButton>
+              </div>
             </div>
             {scm.repo ? (
               <span
@@ -635,61 +724,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </span>
               </span>
             ) : null}
-          </div>
-          <div className="flex h-6 shrink-0 items-center gap-0.5">
-            <RemoteActionButton
-              label={fetchLabel}
-              disabled={!canFetch}
-              onClick={handleFetch}
-            >
-              {fetchBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <HugeiconsIcon icon={ArrowDownToDotIcon} size={13} strokeWidth={1.85} />
-              )}
-            </RemoteActionButton>
-            <RemoteActionButton
-              label={pullLabel}
-              disabled={!canPull}
-              onClick={handlePull}
-            >
-              {pullBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <span className={cn(
-                  "inline-flex items-center gap-1",
-                  (scm.status?.behind ?? 0) > 0 && "text-blue-600 dark:text-blue-400",
-                )}>
-                  <HugeiconsIcon icon={ArrowDown02Icon} size={13} strokeWidth={1.9} />
-                  {(scm.status?.behind ?? 0) > 0 && (
-                    <span className="text-[10px] font-semibold tabular-nums">
-                      {scm.status?.behind}
-                    </span>
-                  )}
-                </span>
-              )}
-            </RemoteActionButton>
-            <RemoteActionButton
-              label={pushLabel}
-              disabled={!scm.canPush || !!scm.actionBusy}
-              onClick={() => void scm.push()}
-            >
-              {pushBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <span className={cn(
-                  "inline-flex items-center gap-1",
-                  (scm.status?.ahead ?? 0) > 0 && "text-emerald-600 dark:text-emerald-400",
-                )}>
-                  <HugeiconsIcon icon={ArrowUp02Icon} size={13} strokeWidth={1.9} />
-                  {(scm.status?.ahead ?? 0) > 0 && (
-                    <span className="text-[10px] font-semibold tabular-nums">
-                      {scm.status?.ahead}
-                    </span>
-                  )}
-                </span>
-              )}
-            </RemoteActionButton>
           </div>
         </header>
 
@@ -821,6 +855,62 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex h-7 shrink-0 items-center justify-between gap-2 border-b border-border/40 px-2">
+                <span className="min-w-0 truncate text-[10.5px] font-medium text-muted-foreground">
+                  {changesSummary}
+                </span>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {scmViewMode === "tree" ? (
+                    <IconActionButton
+                      label={
+                        allFoldersCollapsed ? "Expand all" : "Collapse all"
+                      }
+                      disabled={allTreeDirKeys.length === 0}
+                      onClick={toggleCollapseAll}
+                    >
+                      <HugeiconsIcon
+                        icon={
+                          allFoldersCollapsed ? UnfoldMoreIcon : UnfoldLessIcon
+                        }
+                        size={14}
+                        strokeWidth={1.85}
+                      />
+                    </IconActionButton>
+                  ) : null}
+                  <IconActionButton
+                    label={
+                      scmViewMode === "tree" ? "View as list" : "View as tree"
+                    }
+                    onClick={() =>
+                      void setScmViewMode(
+                        scmViewMode === "tree" ? "list" : "tree",
+                      )
+                    }
+                  >
+                    <HugeiconsIcon
+                      icon={scmViewMode === "tree" ? ListViewIcon : FolderTreeIcon}
+                      size={14}
+                      strokeWidth={1.85}
+                    />
+                  </IconActionButton>
+                  <IconActionButton
+                    label="Refresh source control"
+                    disabled={isRefreshing || !!scm.actionBusy}
+                    onClick={handleRefresh}
+                  >
+                    {isRefreshing ? (
+                      <Spinner className="size-3.5" />
+                    ) : (
+                      <HugeiconsIcon
+                        icon={Refresh01Icon}
+                        size={14}
+                        strokeWidth={1.9}
+                        className={cn(refreshAnimating && "animate-spin")}
+                      />
+                    )}
+                  </IconActionButton>
+                </div>
+              </div>
               {scm.allClean ? (
                 <CleanTreeHint repoLabel={repoLabel} />
               ) : (
@@ -893,37 +983,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   </div>
                 </div>
               )}
-              <div className="flex h-7 shrink-0 items-center gap-0.5 border-t border-border/40 px-1">
-                <IconActionButton
-                  label={scmViewMode === "tree" ? "View as list" : "View as tree"}
-                  onClick={() =>
-                    void setScmViewMode(scmViewMode === "tree" ? "list" : "tree")
-                  }
-                >
-                  <HugeiconsIcon
-                    icon={FolderTreeIcon}
-                    size={14}
-                    strokeWidth={1.85}
-                    className={cn(scmViewMode === "tree" && "text-foreground")}
-                  />
-                </IconActionButton>
-                <IconActionButton
-                  label="Refresh source control"
-                  disabled={isRefreshing || !!scm.actionBusy}
-                  onClick={handleRefresh}
-                >
-                  {isRefreshing ? (
-                    <Spinner className="size-3.5" />
-                  ) : (
-                    <HugeiconsIcon
-                      icon={Refresh01Icon}
-                      size={14}
-                      strokeWidth={1.9}
-                      className={cn(refreshAnimating && "animate-spin")}
-                    />
-                  )}
-                </IconActionButton>
-              </div>
             </div>
           </>
         ) : null}

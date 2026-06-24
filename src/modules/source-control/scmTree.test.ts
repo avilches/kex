@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SourceControlEntry } from "./useSourceControlPanel";
 import {
   buildScmTree,
+  collectDirKeys,
   flattenScmTree,
   type ScmDirNode,
   type ScmTreeNode,
@@ -119,5 +120,25 @@ describe("flattenScmTree", () => {
     const collapsedRows = flattenScmTree(tree, new Set(["staged/src/a"]), "staged/");
     expect(collapsedRows).toHaveLength(1);
     expect(collapsedRows[0].type).toBe("dir");
+  });
+});
+
+describe("collectDirKeys", () => {
+  it("returns every nested directory key, prefixed", () => {
+    const tree = buildScmTree([
+      entry("src/a/x.ts"),
+      entry("src/b/y.ts"),
+      entry("README.md"),
+    ]);
+    expect(collectDirKeys(tree, "changes/").sort()).toEqual([
+      "changes/src",
+      "changes/src/a",
+      "changes/src/b",
+    ]);
+  });
+
+  it("returns an empty list when there are no directories", () => {
+    const tree = buildScmTree([entry("README.md"), entry("LICENSE")]);
+    expect(collectDirKeys(tree, "changes/")).toEqual([]);
   });
 });

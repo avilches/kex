@@ -105,6 +105,22 @@ export function buildScmTree(entries: SourceControlEntry[]): ScmTreeNode[] {
   return buildChildren(root, "");
 }
 
+// All directory collapse keys in the tree, regardless of current collapsed
+// state. Used to collapse / expand every folder at once.
+export function collectDirKeys(
+  nodes: ScmTreeNode[],
+  keyPrefix = "",
+): string[] {
+  const keys: string[] = [];
+  for (const node of nodes) {
+    if (node.type === "dir") {
+      keys.push(`${keyPrefix}${node.fullPath}`);
+      keys.push(...collectDirKeys(node.children, keyPrefix));
+    }
+  }
+  return keys;
+}
+
 export function flattenScmTree(
   nodes: ScmTreeNode[],
   collapsed: ReadonlySet<string>,
