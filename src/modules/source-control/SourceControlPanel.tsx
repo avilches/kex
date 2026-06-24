@@ -761,23 +761,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               </div>
 
               <div className="flex w-full items-center gap-2">
-                <label
-                  title={
-                    scm.canPush
-                      ? "Push to remote after committing"
-                      : pushDisabledReason
-                  }
-                  className="flex h-7 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Checkbox
-                    checked={pushOnCommit}
-                    onCheckedChange={(value) =>
-                      onPushOnCommitChange(value === true)
-                    }
-                    aria-label="Push after commit"
-                  />
-                  Push
-                </label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -805,6 +788,23 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                     {commitHint}
                   </TooltipContent>
                 </Tooltip>
+                <label
+                  title={
+                    scm.canPush
+                      ? "Push to remote after committing"
+                      : pushDisabledReason
+                  }
+                  className="flex h-7 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <Checkbox
+                    checked={pushOnCommit}
+                    onCheckedChange={(value) =>
+                      onPushOnCommitChange(value === true)
+                    }
+                    aria-label="Push after commit"
+                  />
+                  Push
+                </label>
               </div>
 
               <CommitFeedback feedback={footerFeedback} />
