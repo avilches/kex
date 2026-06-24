@@ -47,7 +47,7 @@ export function resolveEditorView(
   map: EditorViewMap,
 ): EditorViewSettings {
   const ext = extOf(path);
-  const base = { ...CODE_DEFAULTS, ...(map["*"] ?? {}) };
   const entry = map[ext];
-  return entry ? { ...base, ...entry } : base;
+  if (entry) return { ...CODE_DEFAULTS, ...entry };
+  return { ...CODE_DEFAULTS, ...(map["*"] ?? {}) };
 }

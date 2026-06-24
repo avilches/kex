@@ -44,13 +44,13 @@ describe("resolveEditorView", () => {
     };
     expect(resolveEditorView("a.ts", map).indentSize).toBe(2);
   });
-  it("merges * base with specific entry, entry wins conflicts", () => {
+  it("specific entry does not inherit * overrides (entry is self-contained)", () => {
     const map: EditorViewMap = {
       ts: { lineNumbers: false },
       "*": { indentSize: 2 },
     };
     const resolved = resolveEditorView("a.ts", map);
-    expect(resolved.indentSize).toBe(2);
+    expect(resolved.indentSize).toBe(CODE_DEFAULTS.indentSize);
     expect(resolved.lineNumbers).toBe(false);
   });
   it("base defaults are still applied for fields not in the overlay", () => {

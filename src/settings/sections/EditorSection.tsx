@@ -278,14 +278,8 @@ function sortedEntries(map: EditorViewMap): [string, Partial<EditorViewSettings>
   });
 }
 
-function effectiveSettings(
-  entryKey: string,
-  partial: Partial<EditorViewSettings>,
-  map: EditorViewMap,
-): EditorViewSettings {
-  const starBase: EditorViewSettings = { ...CODE_DEFAULTS, ...(map["*"] ?? {}) };
-  if (entryKey === "*") return starBase;
-  return { ...starBase, ...partial };
+function effectiveSettings(partial: Partial<EditorViewSettings>): EditorViewSettings {
+  return { ...CODE_DEFAULTS, ...partial };
 }
 
 function extLabel(key: string): string {
@@ -295,7 +289,7 @@ function extLabel(key: string): string {
 
 function settingsSummary(s: EditorViewSettings): string {
   const parts: string[] = [];
-  if (s.wrap) parts.push("Wrap");
+  if (s.wrap) parts.push("Word wrap");
   if (s.lineNumbers) parts.push("Line#");
   if (s.whitespace) parts.push("Whitespace");
   if (s.foldGutter) parts.push("Fold");
@@ -389,7 +383,6 @@ function FileTypesSection() {
             onToggle={() =>
               setExpandedKey((prev) => (prev === key ? null : key))
             }
-            map={editorViewByExt}
           />
         ))}
       </div>
@@ -402,17 +395,10 @@ type ExtensionRowProps = {
   partial: Partial<EditorViewSettings>;
   expanded: boolean;
   onToggle: () => void;
-  map: EditorViewMap;
 };
 
-function ExtensionRow({
-  entryKey,
-  partial,
-  expanded,
-  onToggle,
-  map,
-}: ExtensionRowProps) {
-  const effective = effectiveSettings(entryKey, partial, map);
+function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowProps) {
+  const effective = effectiveSettings(partial);
   const isCatchAll = entryKey === "*";
 
   return (

@@ -856,9 +856,12 @@ export async function setEditorViewForExt(
 export async function addEditorViewEntries(exts: string[]): Promise<void> {
   const current =
     (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+  const starBase: EditorViewSettings = { ...CODE_DEFAULTS, ...(current["*"] ?? {}) };
   const next = { ...current };
   for (const ext of exts) {
-    if (ext && ext !== "*" && next[ext] === undefined) next[ext] = {};
+    if (ext && ext !== "*" && next[ext] === undefined) {
+      next[ext] = { ...starBase };
+    }
   }
   await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
 }
