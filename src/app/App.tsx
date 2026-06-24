@@ -61,6 +61,7 @@ import {
 import {
   clearFocusedTerminal,
   disposeSession,
+  leafHasForegroundProcess,
   navigateFocusedBlocks,
   type TerminalPaneHandle,
   useTerminalFileDrop,
@@ -71,6 +72,7 @@ import { UpdaterDialog } from "@/modules/updater";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
 import {
   allPanes,
+  collectRunningTerminals,
   findPane,
   findPaneInDirection,
   panelTitle,
@@ -100,7 +102,10 @@ import {
 } from "@/modules/workspaces/lib/workspaceState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
-import { clearRunningCommandEntry } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import {
+  clearRunningCommandEntry,
+  getRunningCommandsSnapshot,
+} from "@/modules/workspaces/lib/terminalEphemeralStore";
 import {
   resolveExplorerRoot,
   resolveSidebarTarget,
@@ -415,16 +420,32 @@ export default function App() {
   const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState<
     { id: string; isLast: boolean } | null
   >(null);
+  const [pendingWorkspaceProcesses, setPendingWorkspaceProcesses] = useState<
+    { id: string; processes: { panelId: string; label: string }[] } | null
+  >(null);
 
-  const requestCloseWorkspace = useCallback((wsId: string) => {
-    if (usePreferencesStore.getState().warnOnCloseWorkspace) {
+  const requestCloseWorkspace = useCallback(async (wsId: string) => {
+    const prefs = usePreferencesStore.getState();
+    const ws = workspacesRef.current.find((w) => w.id === wsId);
+    if (prefs.warnOnCloseTabWithRunningProcess && ws) {
+      const processes = await collectRunningTerminals(
+        ws,
+        leafHasForegroundProcess,
+        (id) => getRunningCommandsSnapshot().get(id),
+      );
+      if (processes.length > 0) {
+        setPendingWorkspaceProcesses({ id: wsId, processes });
+        return;
+      }
+    }
+    if (prefs.warnOnCloseWorkspace) {
       setPendingCloseWorkspace({
         id: wsId,
         isLast: workspacesRef.current.length === 1,
       });
-    } else {
-      void handleCloseWorkspaceRef.current(wsId);
+      return;
     }
+    void handleCloseWorkspaceRef.current(wsId);
   }, []);
 
   const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
@@ -1535,7 +1556,7 @@ export default function App() {
     if (!activeWorkspace) return;
     if (!activePanelId) {
       // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
-      requestCloseWorkspace(activeWorkspace.id);
+      void requestCloseWorkspace(activeWorkspace.id);
       return;
     }
     if (
@@ -2066,7 +2087,7 @@ export default function App() {
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(home ?? undefined)}
               onReorder={reorderWorkspaces}
-              onClose={(wsId) => requestCloseWorkspace(wsId)}
+              onClose={(wsId) => void requestCloseWorkspace(wsId)}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
@@ -2270,6 +2291,14 @@ export default function App() {
               const id = pendingCloseWorkspace?.id;
               setPendingCloseWorkspace(null);
               if (dontAskAgain) void setWarnOnCloseWorkspace(false);
+              if (id) void handleCloseWorkspaceRef.current(id);
+            }}
+            pendingWorkspaceProcesses={pendingWorkspaceProcesses}
+            onCancelWorkspaceProcesses={() => setPendingWorkspaceProcesses(null)}
+            onConfirmWorkspaceProcesses={(dontAskAgain) => {
+              const id = pendingWorkspaceProcesses?.id;
+              setPendingWorkspaceProcesses(null);
+              if (dontAskAgain) void setWarnOnCloseTabWithRunningProcess(false);
               if (id) void handleCloseWorkspaceRef.current(id);
             }}
           />
