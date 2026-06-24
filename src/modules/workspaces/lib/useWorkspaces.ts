@@ -67,6 +67,16 @@ export function applyFsRoot(
   );
 }
 
+export function applyPushOnCommit(
+  workspaces: Workspace[],
+  workspaceId: string,
+  enabled: boolean,
+): Workspace[] {
+  return workspaces.map((w) =>
+    w.id === workspaceId ? { ...w, pushOnCommit: enabled } : w,
+  );
+}
+
 export function applyClosePanel(
   workspaces: Workspace[],
   workspaceId: string,
@@ -484,6 +494,13 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyFsRoot(prev, workspaceId, path));
   }, []);
 
+  const setPushOnCommit = useCallback(
+    (workspaceId: string, enabled: boolean) => {
+      setWorkspaces((prev) => applyPushOnCommit(prev, workspaceId, enabled));
+    },
+    [],
+  );
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -536,6 +553,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setExplorerRootMode,
     setPinnedRoot,
     setFsRoot,
+    setPushOnCommit,
     setTerminalRunningCommand,
     setPanelView,
     findPanelGlobal,

@@ -61,6 +61,8 @@ export type RightPanelProps = {
   onExplorerSearchClose?: () => void;
   // SourceControlPanel props
   sourceControl: SourceControlSummary;
+  pushOnCommit: boolean;
+  onPushOnCommitChange: (enabled: boolean) => void;
   onOpenDiff: (input: {
     path: string;
     repoRoot: string;
@@ -159,6 +161,8 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
             <SourceControlPanel
               open={activeTab === "git"}
               sourceControl={props.sourceControl}
+              pushOnCommit={props.pushOnCommit}
+              onPushOnCommitChange={props.onPushOnCommitChange}
               onOpenDiff={props.onOpenDiff}
               onOpenFile={props.onOpenFile}
             />

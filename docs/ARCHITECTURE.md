@@ -154,7 +154,7 @@ The shared cascade (`resolveSidebarTarget`, tested): given the panel's reference
 
 **Git status and staging.** The source control panel shows modified, staged, untracked, and conflicted files. You can stage / unstage individual files or hunks. The diff view uses the CodeMirror merge extension.
 
-**Commit.** Type a commit message and commit with `Cmd+Enter` / `Ctrl+Enter`. No separate terminal command needed.
+**Commit.** Type a commit message and commit with `Cmd+Enter` / `Ctrl+Enter`. No separate terminal command needed. A **Push** checkbox next to the Commit button, when checked, pushes to the remote right after a successful commit (the button label switches to "Commit & Push"). The checkbox state is persisted per workspace in `workspaces/<id>.json` (the `pushOnCommit` field).
 
 **Push.** Push to the remote with upstream awareness — Kex tells you if you are ahead, behind, or diverged before you push.
 

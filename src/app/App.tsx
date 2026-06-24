@@ -172,6 +172,7 @@ export default function App() {
     setExplorerRootMode,
     setPinnedRoot,
     setFsRoot,
+    setPushOnCommit,
     setTerminalRunningCommand,
     setPanelView,
     findPanelGlobal,
@@ -499,6 +500,15 @@ export default function App() {
     !isFilesystemRoot(explorerRoot);
 
   const fsRootPath = fsFolderRoot ?? home;
+
+  const pushOnCommit = activeWorkspace?.pushOnCommit ?? false;
+
+  const handlePushOnCommitChange = useCallback(
+    (enabled: boolean) => {
+      if (activeWorkspace) setPushOnCommit(activeWorkspace.id, enabled);
+    },
+    [activeWorkspace, setPushOnCommit],
+  );
 
   const handleChangeRootMode = useCallback(
     (mode: ExplorerRootMode) => {
@@ -2142,6 +2152,8 @@ export default function App() {
                         onAddToGitignore={handleAddToGitignore}
                         onExplorerSearchClose={onExplorerSearchClose}
                         sourceControl={sourceControl}
+                        pushOnCommit={pushOnCommit}
+                        onPushOnCommitChange={handlePushOnCommitChange}
                         onOpenDiff={openGitDiffInPanel}
                         onOpenGitGraph={openGitGraphFromContext}
                         repoRoot={rightPanelRepoRoot}
@@ -2223,6 +2235,8 @@ export default function App() {
                         onAddToGitignore={handleAddToGitignore}
                         onExplorerSearchClose={onExplorerSearchClose}
                         sourceControl={sourceControl}
+                        pushOnCommit={pushOnCommit}
+                        onPushOnCommitChange={handlePushOnCommitChange}
                         onOpenDiff={openGitDiffInPanel}
                         onOpenGitGraph={openGitGraphFromContext}
                         repoRoot={rightPanelRepoRoot}

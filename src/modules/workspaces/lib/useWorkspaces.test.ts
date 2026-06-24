@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Panel, SplitNode, Workspace } from "./types";
-import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyPinnedRoot, collectRunningTerminals } from "./useWorkspaces";
+import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyPinnedRoot, applyPushOnCommit, collectRunningTerminals } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -47,6 +47,19 @@ describe("applyFsRoot", () => {
   it("keeps the root slash for the filesystem root", () => {
     const out = applyFsRoot([ws()], "w1", "/");
     expect(out[0].fsRoot).toBe("/");
+  });
+});
+
+describe("applyPushOnCommit", () => {
+  it("sets the flag on the matching workspace only", () => {
+    const out = applyPushOnCommit([ws(), ws({ id: "w2" })], "w1", true);
+    expect(out[0].pushOnCommit).toBe(true);
+    expect(out[1].pushOnCommit).toBeUndefined();
+  });
+
+  it("clears the flag when disabled", () => {
+    const out = applyPushOnCommit([ws({ pushOnCommit: true })], "w1", false);
+    expect(out[0].pushOnCommit).toBe(false);
   });
 });
 

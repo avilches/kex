@@ -52,4 +52,5 @@ export type Workspace = {
   explorerRootMode?: ExplorerRootMode;
   pinnedRoot?: string;
   fsRoot?: string;
+  pushOnCommit?: boolean;
 };

@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -89,6 +90,8 @@ import {
 type Props = {
   open: boolean;
   sourceControl: SourceControlSummary;
+  pushOnCommit: boolean;
+  onPushOnCommitChange: (enabled: boolean) => void;
   onOpenDiff: (input: {
     path: string;
     repoRoot: string;
@@ -164,6 +167,8 @@ function statusTextClass(code: string): string {
 export const SourceControlPanel = memo(function SourceControlPanel({
   open,
   sourceControl,
+  pushOnCommit,
+  onPushOnCommitChange,
   onOpenDiff,
   onOpenFile,
 }: Props) {
@@ -755,46 +760,49 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </span>
               </div>
 
-              <div className="grid w-full grid-cols-2 gap-1.5">
+              <div className="flex w-full items-center gap-2">
+                <label
+                  title={
+                    scm.canPush
+                      ? "Push to remote after committing"
+                      : pushDisabledReason
+                  }
+                  className="flex h-7 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <Checkbox
+                    checked={pushOnCommit}
+                    onCheckedChange={(value) =>
+                      onPushOnCommitChange(value === true)
+                    }
+                    aria-label="Push after commit"
+                  />
+                  Push
+                </label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       size="xs"
-                      className="h-7 text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
+                      className="h-7 flex-1 text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
                       disabled={!canCommit}
-                      onClick={() => void scm.commit()}
+                      onClick={() => {
+                        if (pushOnCommit && scm.canPush) {
+                          void scm.commitAndPush();
+                        } else {
+                          void scm.commit();
+                        }
+                      }}
                     >
-                      {scm.actionBusy === "commit" ? "Committing…" : "Commit"}
+                      {scm.actionBusy === "commit"
+                        ? "Committing…"
+                        : scm.actionBusy === "push"
+                          ? "Pushing…"
+                          : pushOnCommit && scm.canPush
+                            ? "Commit & Push"
+                            : "Commit"}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    className="text-[10.5px]"
-                  >
+                  <TooltipContent side="bottom" className="text-[10.5px]">
                     {commitHint}
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="xs"
-                      variant="secondary"
-                      className="h-7 text-[11.5px] font-medium disabled:cursor-not-allowed"
-                      disabled={!canCommit || !scm.canPush || !!scm.actionBusy}
-                      onClick={() => void scm.commitAndPush()}
-                    >
-                      {scm.actionBusy === "commit" || scm.actionBusy === "push"
-                        ? "Working…"
-                        : "Commit and Push"}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    className="max-w-64 text-[10.5px]"
-                  >
-                    {!canCommit
-                      ? (commitDisabledReason ?? commitHint)
-                      : pushDisabledReason}
                   </TooltipContent>
                 </Tooltip>
               </div>
