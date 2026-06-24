@@ -3,10 +3,7 @@ import {
   type EditorViewMap,
   type EditorViewSettings,
   CODE_DEFAULTS,
-  findKeyForExt,
-  normalizeExtKey,
   PROSE_DEFAULTS,
-  PROSE_EXTS,
 } from "@/modules/editor/lib/editorViewSettings";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
@@ -363,12 +360,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: false,
 };
 
-const SEEDED_EDITOR_VIEW_MAP: EditorViewMap = {
-  "md,markdown,mdx,text,txt": { ...PROSE_DEFAULTS },
-  "*": { ...CODE_DEFAULTS },
-};
+const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
 
-export const SEEDED_KEYS = new Set(["*", "md,markdown,mdx,text,txt"]);
+function buildColdStartMap(): EditorViewMap {
+  const m: EditorViewMap = { "*": { ...CODE_DEFAULTS } };
+  for (const e of PROSE_SEED_EXTS) m[e] = { ...PROSE_DEFAULTS };
+  return m;
+}
 
 // Keybindings live in their own file so reassigning a shortcut never rewrites
 // the (much larger) general settings, and vice versa.
@@ -522,12 +520,13 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.editorPreviewOnClick,
     editorViewByExt: (() => {
       const v = get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT);
-      const parsed =
+      const raw =
         v && typeof v === "object" && !Array.isArray(v)
-          ? v
-          : DEFAULT_PREFERENCES.editorViewByExt;
-      if (Object.keys(parsed).length === 0) return SEEDED_EDITOR_VIEW_MAP;
-      return parsed;
+          ? (v as EditorViewMap)
+          : {};
+      if (Object.keys(raw).length === 0) return buildColdStartMap();
+      if (!raw["*"]) return { ...raw, "*": { ...CODE_DEFAULTS } };
+      return raw;
     })(),
     editorScrollPastEnd:
       get<boolean>(KEY_EDITOR_SCROLL_PAST_END) ??
@@ -583,12 +582,13 @@ export async function loadPreferences(): Promise<Preferences> {
   if (!map.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
   if (!map.has(KEY_KEEP_FOLDER_LAYOUT)) configDefaults.push([KEY_KEEP_FOLDER_LAYOUT, DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot]);
   const storedExtMap = map.get(KEY_EDITOR_VIEW_BY_EXT);
-  const storedExtMapIsEmpty =
-    !storedExtMap ||
-    typeof storedExtMap !== "object" ||
-    Object.keys(storedExtMap as object).length === 0;
-  if (storedExtMapIsEmpty) {
-    configDefaults.push([KEY_EDITOR_VIEW_BY_EXT, SEEDED_EDITOR_VIEW_MAP]);
+  const storedExtKeys =
+    storedExtMap && typeof storedExtMap === "object" && !Array.isArray(storedExtMap)
+      ? Object.keys(storedExtMap as object)
+      : [];
+  const needsExtPersist = storedExtKeys.length === 0 || !storedExtKeys.includes("*");
+  if (needsExtPersist) {
+    configDefaults.push([KEY_EDITOR_VIEW_BY_EXT, result.editorViewByExt]);
   }
   if (configDefaults.length > 0) {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
@@ -836,53 +836,16 @@ export async function setEditorViewForExt(
 ): Promise<void> {
   const current =
     (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
-  const existingKey = findKeyForExt(ext, current);
-  const next = { ...current, [existingKey ?? ext]: value };
-  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+  await writePref(KEY_EDITOR_VIEW_BY_EXT, { ...current, [ext]: value });
 }
 
-export async function upsertEditorViewEntry(
-  rawExts: string[],
-  value: Partial<EditorViewSettings>,
-): Promise<void> {
+export async function addEditorViewEntries(exts: string[]): Promise<void> {
   const current =
     (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
-  const newKey = normalizeExtKey(rawExts);
-  if (newKey === "") return;
-
-  if (current[newKey] !== undefined) {
-    const next = { ...current, [newKey]: value };
-    await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
-    return;
+  const next = { ...current };
+  for (const ext of exts) {
+    if (ext && ext !== "*" && next[ext] === undefined) next[ext] = {};
   }
-
-  const newExts = newKey.split(",");
-  let inheritedValue: Partial<EditorViewSettings> = current["*"] ?? {};
-  let firstSourceFound = false;
-  const next: EditorViewMap = {};
-
-  for (const [key, settings] of Object.entries(current)) {
-    if (key === "*") {
-      next[key] = settings;
-      continue;
-    }
-    const keyExts = key.split(",");
-    const overlap = keyExts.filter((e) => newExts.includes(e));
-    if (overlap.length === 0) {
-      next[key] = settings;
-      continue;
-    }
-    if (!firstSourceFound) {
-      inheritedValue = settings;
-      firstSourceFound = true;
-    }
-    const remaining = keyExts.filter((e) => !newExts.includes(e));
-    if (remaining.length === 0) continue;
-    const remainingKey = normalizeExtKey(remaining);
-    next[remainingKey] = settings;
-  }
-
-  next[newKey] = firstSourceFound ? inheritedValue : value;
   await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
 }
 
@@ -898,7 +861,7 @@ export async function patchEditorViewEntry(
 }
 
 export async function deleteEditorViewEntry(key: string): Promise<void> {
-  if (SEEDED_KEYS.has(key)) return;
+  if (key === "*") return;
   const current =
     (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
   const next = { ...current };
@@ -906,15 +869,10 @@ export async function deleteEditorViewEntry(key: string): Promise<void> {
   await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
 }
 
-export async function resetEditorViewEntry(key: string): Promise<void> {
+export async function resetEditorViewEntry(): Promise<void> {
   const current =
     (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
-  const isProse =
-    key !== "*" &&
-    key.split(",").every((e) => PROSE_EXTS.has(e));
-  const defaults = isProse ? { ...PROSE_DEFAULTS } : { ...CODE_DEFAULTS };
-  const next = { ...current, [key]: defaults };
-  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+  await writePref(KEY_EDITOR_VIEW_BY_EXT, { ...current, "*": { ...CODE_DEFAULTS } });
 }
 
 export async function setEditorScrollPastEnd(value: boolean): Promise<void> {

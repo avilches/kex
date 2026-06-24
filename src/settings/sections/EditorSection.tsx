@@ -26,9 +26,6 @@ import {
   EDITOR_INDENT_MIN,
   type EditorViewMap,
   type EditorViewSettings,
-  normalizeExtKey,
-  PROSE_DEFAULTS,
-  PROSE_EXTS,
 } from "@/modules/editor/lib/editorViewSettings";
 import {
   type CursorStyle,
@@ -49,10 +46,10 @@ import {
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_MIN,
   LINE_HEIGHT_STEP,
+  addEditorViewEntries,
   deleteEditorViewEntry,
   patchEditorViewEntry,
   resetEditorViewEntry,
-  SEEDED_KEYS,
   setEditorAutoSave,
   setEditorAutocompletion,
   setEditorBracketMatching,
@@ -65,7 +62,6 @@ import {
   setEditorLetterSpacing,
   setEditorLineHeight,
   setEditorScrollPastEnd,
-  upsertEditorViewEntry,
 } from "@/modules/settings/store";
 import { CursorGlyph } from "../components/CursorGlyph";
 import { FieldLabel } from "../components/FieldLabel";
@@ -268,38 +264,33 @@ export function EditorSection() {
   );
 }
 
-const SEEDED_DEFAULTS: EditorViewMap = {
-  "md,markdown,mdx,text,txt": { ...PROSE_DEFAULTS },
-  "*": { ...CODE_DEFAULTS },
-};
+const EXT_VALID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
+
+function isValidExt(e: string): boolean {
+  return EXT_VALID_RE.test(e);
+}
 
 function sortedEntries(map: EditorViewMap): [string, Partial<EditorViewSettings>][] {
-  const merged: EditorViewMap = { ...SEEDED_DEFAULTS, ...map };
-  return Object.entries(merged).sort(([a], [b]) => {
+  return Object.entries(map).sort(([a], [b]) => {
     if (a === "*") return 1;
     if (b === "*") return -1;
-    const ac = a.split(",").length;
-    const bc = b.split(",").length;
-    if (ac !== bc) return ac - bc;
     return a.localeCompare(b);
   });
 }
 
 function effectiveSettings(
-  key: string,
+  entryKey: string,
   partial: Partial<EditorViewSettings>,
+  map: EditorViewMap,
 ): EditorViewSettings {
-  const allProse =
-    key !== "*" && key.split(",").every((e) => PROSE_EXTS.has(e));
-  return { ...(allProse ? PROSE_DEFAULTS : CODE_DEFAULTS), ...partial };
+  const starBase: EditorViewSettings = { ...CODE_DEFAULTS, ...(map["*"] ?? {}) };
+  if (entryKey === "*") return starBase;
+  return { ...starBase, ...partial };
 }
 
 function extLabel(key: string): string {
-  if (key === "*") return "Default (*)";
-  return key
-    .split(",")
-    .map((e) => `.${e}`)
-    .join(", ");
+  if (key === "*") return "Rest of the files";
+  return `.${key}`;
 }
 
 function settingsSummary(s: EditorViewSettings): string {
@@ -317,29 +308,44 @@ function settingsSummary(s: EditorViewSettings): string {
 function FileTypesSection() {
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [addInput, setAddInput] = useState("");
+  const [filterText, setFilterText] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
-  const addInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const entries = sortedEntries(editorViewByExt);
+  const allEntries = sortedEntries(editorViewByExt);
+  const filter = filterText.trim().toLowerCase();
+  const filteredEntries = filter === ""
+    ? allEntries
+    : allEntries.filter(([key]) => key === "*" || key.startsWith(filter));
 
-  function handleAdd() {
-    const raw = addInput.trim();
+  function handleCommit() {
+    const raw = filterText.trim().toLowerCase();
     if (!raw) return;
-    const tokens = raw
-      .split(",")
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean);
+
+    const tokens = raw.split(",").map((t) => t.trim()).filter(Boolean);
     if (tokens.length === 0) return;
-    if (tokens.some((t) => t === "*") && tokens.length > 1) {
-      setAddError('Cannot mix "*" with other extensions.');
+
+    const invalid = tokens.filter((t) => !isValidExt(t));
+    if (invalid.length > 0) {
+      setAddError(`Invalid: ${invalid.map((t) => `"${t}"`).join(", ")}. Use letters, digits, - or .`);
       return;
     }
+
     setAddError(null);
-    const newKey = normalizeExtKey(tokens);
-    void upsertEditorViewEntry(tokens, {});
-    setAddInput("");
-    setExpandedKey(newKey);
+
+    // If a single token matches an existing entry exactly, just expand it.
+    if (tokens.length === 1 && editorViewByExt[tokens[0]] !== undefined) {
+      setExpandedKey(tokens[0]);
+      setFilterText("");
+      return;
+    }
+
+    const newExts = tokens.filter((t) => editorViewByExt[t] === undefined);
+    if (newExts.length > 0) {
+      void addEditorViewEntries(newExts);
+      setExpandedKey(newExts[0] ?? null);
+    }
+    setFilterText("");
   }
 
   return (
@@ -347,33 +353,35 @@ function FileTypesSection() {
       <FieldLabel>File types</FieldLabel>
       <div className="flex items-center gap-2">
         <input
-          ref={addInputRef}
+          ref={inputRef}
           type="text"
-          value={addInput}
+          value={filterText}
           onChange={(e) => {
-            setAddInput(e.target.value);
+            setFilterText(e.target.value);
             setAddError(null);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleAdd();
+            if (e.key === "Enter") handleCommit();
           }}
-          placeholder="ts, tsx, go ..."
+          placeholder="Filter or add: ts, tsx, go ..."
           className="h-8 flex-1 rounded-md border border-border bg-transparent px-2.5 text-[12px] outline-none placeholder:text-muted-foreground/50 focus:border-ring"
         />
-        <button
-          type="button"
-          title="Add file type"
-          onClick={handleAdd}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <HugeiconsIcon icon={Add01Icon} size={13} />
-        </button>
+        {filterText.trim() && (
+          <button
+            type="button"
+            title="Add file type"
+            onClick={handleCommit}
+            className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <HugeiconsIcon icon={Add01Icon} size={13} />
+          </button>
+        )}
       </div>
       {addError && (
         <span className="text-[11px] text-destructive">{addError}</span>
       )}
       <div className="flex flex-col gap-1">
-        {entries.map(([key, partial]) => (
+        {filteredEntries.map(([key, partial]) => (
           <ExtensionRow
             key={key}
             entryKey={key}
@@ -382,6 +390,7 @@ function FileTypesSection() {
             onToggle={() =>
               setExpandedKey((prev) => (prev === key ? null : key))
             }
+            map={editorViewByExt}
           />
         ))}
       </div>
@@ -394,6 +403,7 @@ type ExtensionRowProps = {
   partial: Partial<EditorViewSettings>;
   expanded: boolean;
   onToggle: () => void;
+  map: EditorViewMap;
 };
 
 function ExtensionRow({
@@ -401,9 +411,10 @@ function ExtensionRow({
   partial,
   expanded,
   onToggle,
+  map,
 }: ExtensionRowProps) {
-  const effective = effectiveSettings(entryKey, partial);
-  const isCatchAll = SEEDED_KEYS.has(entryKey);
+  const effective = effectiveSettings(entryKey, partial, map);
+  const isCatchAll = entryKey === "*";
 
   return (
     <div className="rounded-lg border border-border/60 bg-card/60">
@@ -432,14 +443,16 @@ function ExtensionRow({
             </span>
           )}
         </button>
-        <button
-          type="button"
-          title="Reset to defaults"
-          onClick={() => void resetEditorViewEntry(entryKey)}
-          className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <HugeiconsIcon icon={Refresh01Icon} size={11} />
-        </button>
+        {isCatchAll && (
+          <button
+            type="button"
+            title="Reset to defaults"
+            onClick={() => void resetEditorViewEntry()}
+            className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <HugeiconsIcon icon={Refresh01Icon} size={11} />
+          </button>
+        )}
         {!isCatchAll && (
           <button
             type="button"
