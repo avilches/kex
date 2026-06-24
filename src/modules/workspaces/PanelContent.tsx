@@ -84,7 +84,7 @@ export type PanelCallbacks = {
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
   // Panel data update (used by tab bar lock/restore toggles)
   onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
-  // File rename (editor/markdown tabs — renames the file on disk)
+  // File rename (editor/markdown tabs - renames the file on disk)
   onRenameFile?: (panelId: string, newName: string) => void;
   // Reveal an editor/markdown/git file in the explorer tree
   onFocusOnExplorer?: (filePath: string) => void;
@@ -112,7 +112,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
 
-  // Live content state for preview panes — updated via debounced onContentChange
+  // Live content state for preview panes - updated via debounced onContentChange
   const [liveContent, setLiveContent] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevPreviewModeRef = useRef(false);
@@ -120,6 +120,12 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const handleContentChange = useCallback((content: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => setLiveContent(content), 300);
+  }, []);
+
+  // Seed liveContent immediately when EditorPane first loads the file from disk
+  // (onContentChange only fires on user edits, not on initial load).
+  const handleReady = useCallback((initialContent: string) => {
+    setLiveContent(initialContent);
   }, []);
 
   // Cleanup debounce timer on unmount
@@ -279,6 +285,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                 }}
                 path={panel.path}
                 onContentChange={handleContentChange}
+                onReady={handleReady}
               />
             </div>
             <div className="absolute inset-0" style={{ zIndex: 5 }}>
