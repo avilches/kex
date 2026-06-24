@@ -1,11 +1,11 @@
-import { isMarkdownPath } from "@/lib/utils";
+import { isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
 import { EditorOverlayBar, type EditorGlobalToggleKey } from "@/modules/editor";
 import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 import type { SearchAddon } from "@xterm/addon-search";
-import { type ComponentType, lazy, Suspense, useRef } from "react";
+import { type ComponentType, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
 import {
   setEditorAutoSave,
@@ -28,6 +28,9 @@ const GitDiffPane = lazy(() =>
 );
 const MarkdownPreviewPane = lazy(() =>
   import("@/modules/markdown/MarkdownPreviewPane").then((m) => ({ default: m.MarkdownPreviewPane as ComponentType<any> })),
+);
+const HtmlPreviewPane = lazy(() =>
+  import("@/modules/html-preview/HtmlPreviewPane").then((m) => ({ default: m.HtmlPreviewPane as ComponentType<any> })),
 );
 const BrowserPane = lazy(() =>
   import("@/modules/browser/BrowserPane").then((m) => ({ default: m.BrowserPane as ComponentType<any> })),
@@ -67,6 +70,8 @@ export type PanelCallbacks = {
   onEditorDirtyChange?: (panelId: string, dirty: boolean) => void;
   onEditorClose?: (panelId: string) => void;
   registerEditorHandle?: (panelId: string, handle: EditorPaneHandle | null) => void;
+  // Preview callbacks
+  onTogglePreview?: (panelId: string) => void;
   // Markdown callbacks
   onSetMarkdownView?: (panelId: string, mode: "rendered" | "raw") => void;
   // Browser callbacks
@@ -107,6 +112,38 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
 
+  // Live content state for preview panes — updated via debounced onContentChange
+  const [liveContent, setLiveContent] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevPreviewModeRef = useRef(false);
+
+  const handleContentChange = useCallback((content: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setLiveContent(content), 300);
+  }, []);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  // Derive previewMode: true for editor panels with previewMode flag, always true for kind:"markdown"
+  const previewMode =
+    panel.kind === "editor"
+      ? (panel.previewMode ?? false)
+      : panel.kind === "markdown";
+
+  // Seed liveContent from editor buffer when preview mode first activates
+  useEffect(() => {
+    if (previewMode && !prevPreviewModeRef.current) {
+      const content = editorRef.current?.getContent();
+      if (content != null) setLiveContent(content);
+    }
+    prevPreviewModeRef.current = previewMode;
+  }, [previewMode]);
+
   const globalToggles = {
     value: {
       autoSave,
@@ -142,41 +179,63 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       );
 
     case "editor": {
+      const ismd = isMarkdownPath(panel.path);
+      const ishtml = isHtmlPath(panel.path);
+      const showPreviewToggle = ismd || ishtml;
+
       const viewToggles = {
         ext: extOf(panel.path),
         value: resolveEditorView(panel.path, editorViewByExt),
         onChange: (next: EditorViewSettings) =>
           void setEditorViewForExt(extOf(panel.path), next),
       };
+
       return (
         <Suspense fallback={null}>
           <div className="relative h-full w-full">
-            {isMarkdownPath(panel.path) ? (
-              <EditorOverlayBar
-                viewToggles={viewToggles}
-                globalToggles={globalToggles}
-                view={{
-                  mode: "raw",
-                  onChange: (mode) => callbacks.onSetMarkdownView?.(panel.id, mode),
-                  renderedDisabled: panel.dirty,
-                  renderedHint: "Save to preview",
-                }}
-              />
-            ) : (
-              <EditorOverlayBar
-                viewToggles={viewToggles}
-                globalToggles={globalToggles}
-              />
-            )}
-            <EditorPane
-              ref={(h: EditorPaneHandle | null) => {
-                (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
-                callbacks.registerEditorHandle?.(panel.id, h);
-              }}
-              path={panel.path}
-              onDirtyChange={(dirty: boolean) => callbacks.onEditorDirtyChange?.(panel.id, dirty)}
-              onClose={() => callbacks.onEditorClose?.(panel.id)}
+            <EditorOverlayBar
+              view={
+                showPreviewToggle
+                  ? {
+                      mode: previewMode ? "rendered" : "raw",
+                      onChange: () => callbacks.onTogglePreview?.(panel.id),
+                      isHtml: ishtml,
+                    }
+                  : undefined
+              }
+              viewToggles={!previewMode ? viewToggles : undefined}
+              globalToggles={!previewMode ? globalToggles : undefined}
             />
+            <div
+              className={
+                previewMode
+                  ? "absolute inset-0 invisible pointer-events-none"
+                  : "h-full w-full"
+              }
+            >
+              <EditorPane
+                ref={(h: EditorPaneHandle | null) => {
+                  (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
+                  callbacks.registerEditorHandle?.(panel.id, h);
+                }}
+                path={panel.path}
+                onDirtyChange={(dirty: boolean) =>
+                  callbacks.onEditorDirtyChange?.(panel.id, dirty)
+                }
+                onClose={() => callbacks.onEditorClose?.(panel.id)}
+                onContentChange={handleContentChange}
+              />
+            </div>
+            {previewMode && ismd && (
+              <div className="absolute inset-0" style={{ zIndex: 5 }}>
+                <MarkdownPreviewPane content={liveContent} />
+              </div>
+            )}
+            {previewMode && ishtml && (
+              <div className="absolute inset-0" style={{ zIndex: 5 }}>
+                <HtmlPreviewPane content={liveContent} path={panel.path} />
+              </div>
+            )}
           </div>
         </Suspense>
       );
@@ -205,11 +264,27 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
     case "markdown":
       return (
         <Suspense fallback={null}>
-          <MarkdownPreviewPane
-            path={panel.path}
-            visible={visible}
-            onSetView={(mode: "rendered" | "raw") => callbacks.onSetMarkdownView?.(panel.id, mode)}
-          />
+          <div className="relative h-full w-full">
+            <EditorOverlayBar
+              view={{
+                mode: "rendered",
+                onChange: (mode: "rendered" | "raw") =>
+                  callbacks.onSetMarkdownView?.(panel.id, mode),
+              }}
+            />
+            <div className="absolute inset-0 invisible pointer-events-none">
+              <EditorPane
+                ref={(h: EditorPaneHandle | null) => {
+                  (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
+                }}
+                path={panel.path}
+                onContentChange={handleContentChange}
+              />
+            </div>
+            <div className="absolute inset-0" style={{ zIndex: 5 }}>
+              <MarkdownPreviewPane content={liveContent} />
+            </div>
+          </div>
         </Suspense>
       );
 
