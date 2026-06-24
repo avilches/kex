@@ -116,6 +116,27 @@ export function applyClosePanel(
   });
 }
 
+export async function collectRunningTerminals(
+  ws: Workspace,
+  getForegroundProcess: (panelId: string) => Promise<string | null>,
+  getCommand: (panelId: string) => string | undefined,
+): Promise<{ panelId: string; label: string }[]> {
+  const terminals = allPanes(ws.paneTree)
+    .flatMap((p) => p.panels)
+    .filter((panel): panel is Extract<Panel, { kind: "terminal" }> => panel.kind === "terminal");
+  const checked = await Promise.all(
+    terminals.map(async (panel) => {
+      const processName = await getForegroundProcess(panel.id);
+      if (processName === null) return null;
+      const label = getCommand(panel.id) ?? (processName || panel.title || "shell");
+      return { panelId: panel.id, label };
+    }),
+  );
+  return checked.filter(
+    (x): x is { panelId: string; label: string } => x !== null,
+  );
+}
+
 function newPaneNode(cwd?: string): PaneNode {
   const panelId = newPanelId();
   return {

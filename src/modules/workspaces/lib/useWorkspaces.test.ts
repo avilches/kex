@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Panel, SplitNode, Workspace } from "./types";
-import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyPinnedRoot } from "./useWorkspaces";
+import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyPinnedRoot, collectRunningTerminals } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -95,5 +95,56 @@ describe("applyClosePanel", () => {
     const pane = out[0].paneTree as Extract<SplitNode, { kind: "pane" }>;
     expect(pane.panels.map((p) => p.id)).toEqual(["t1", "t3"]);
     expect(pane.activePanelId).toBe("t3");
+  });
+});
+
+describe("collectRunningTerminals", () => {
+  const term = (id: string, title?: string): Panel => ({ id, kind: "terminal", title });
+  const wsWith = (panels: Panel[]): Workspace =>
+    ws({
+      paneTree: { kind: "pane", id: "p1", panels, activePanelId: panels[0]?.id ?? null },
+      activePaneId: "p1",
+    });
+
+  it("returns only terminals with a foreground process, preserving pane order", async () => {
+    const w = wsWith([term("t1"), term("t2"), term("t3")]);
+    const running = new Set(["t1", "t3"]);
+    const out = await collectRunningTerminals(
+      w,
+      async (id) => (running.has(id) ? "node" : null),
+      () => undefined,
+    );
+    expect(out.map((r) => r.panelId)).toEqual(["t1", "t3"]);
+  });
+
+  it("labels with command, then process name, then title, then 'shell'", async () => {
+    const w = wsWith([term("t1"), term("t2", "Build"), term("t3"), term("t4")]);
+    const commands = new Map([["t1", "pnpm dev"]]);
+    const procNames = new Map([
+      ["t1", "node"],
+      ["t2", ""],
+      ["t3", "vim"],
+      ["t4", ""],
+    ]);
+    const out = await collectRunningTerminals(
+      w,
+      async (id) => procNames.get(id) ?? null,
+      (id) => commands.get(id),
+    );
+    expect(out).toEqual([
+      { panelId: "t1", label: "pnpm dev" },
+      { panelId: "t2", label: "Build" },
+      { panelId: "t3", label: "vim" },
+      { panelId: "t4", label: "shell" },
+    ]);
+  });
+
+  it("ignores non-terminal panels and returns empty when nothing runs", async () => {
+    const w = wsWith([
+      { id: "e1", kind: "editor", path: "/a", dirty: false, preview: false },
+      term("t1"),
+    ]);
+    const out = await collectRunningTerminals(w, async () => null, () => undefined);
+    expect(out).toEqual([]);
   });
 });
