@@ -479,6 +479,13 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, [updatePanelData]);
 
+  const togglePreviewMode = useCallback((workspaceId: string, panelId: string) => {
+    updatePanelData(workspaceId, panelId, (p) => {
+      if (p.kind !== "editor") return p;
+      return { ...p, previewMode: !(p.previewMode ?? false) };
+    });
+  }, [updatePanelData]);
+
   const setWorkspaceCwd = useCallback((workspaceId: string, cwd: string) => {
     const normalized = cwd.length > 1 ? cwd.replace(/\/$/, "") : cwd;
     setWorkspaces((prev) =>
@@ -563,6 +570,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceGitConfig,
     setTerminalRunningCommand,
     setPanelView,
+    togglePreviewMode,
     findPanelGlobal,
     findPaneGlobal,
     resetWorkspaces,
