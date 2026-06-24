@@ -55,6 +55,7 @@ type SourceControlPanelState = {
   actionError: string | null;
   remoteError: string | null;
   actionMessage: string | null;
+  dismissFeedback: () => void;
   stagedEntries: SourceControlEntry[];
   unstagedEntries: SourceControlEntry[];
   allClean: boolean;
@@ -320,6 +321,17 @@ export function useSourceControlPanel(
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [selectionTransition, setSelectionTransition] =
     useState<SelectionTransition>("none");
+
+  // Footer feedback is an ephemeral toast. Its source state (actionError,
+  // actionMessage, remoteError) outlives the toast and even the panel mount, so
+  // it must be cleared once the toast has been shown or the panel stops showing
+  // it, otherwise it re-fires every time CommitFeedback remounts (tab switch or
+  // right-panel collapse).
+  const dismissFeedback = useCallback(() => {
+    setActionError(null);
+    setActionMessage(null);
+    summary.clearRemoteError();
+  }, [summary.clearRemoteError]);
   const [pendingDiscard, setPendingDiscard] = useState<
     | { scope: "single"; entry: SourceControlEntry }
     | { scope: "all"; entries: SourceControlEntry[] }
@@ -409,7 +421,7 @@ export function useSourceControlPanel(
     if (!isOpen) {
       setPanelState("closed");
       setSelectionTransition("none");
-      setActionMessage(null);
+      dismissFeedback();
       return;
     }
     if (summary.isLoading && !summary.hasRepo && !summary.status) {
@@ -478,6 +490,7 @@ export function useSourceControlPanel(
     summary.localError,
     summary.repo,
     summary.status,
+    dismissFeedback,
   ]);
 
   const selectEntry = useCallback(
@@ -747,6 +760,7 @@ export function useSourceControlPanel(
     actionError,
     remoteError: summary.lastRemoteError,
     actionMessage,
+    dismissFeedback,
     stagedEntries,
     unstagedEntries,
     allClean,

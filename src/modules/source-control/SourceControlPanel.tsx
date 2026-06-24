@@ -851,7 +851,10 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </label>
               </div>
 
-              <CommitFeedback feedback={footerFeedback} />
+              <CommitFeedback
+                feedback={footerFeedback}
+                onDismiss={scm.dismissFeedback}
+              />
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col">
@@ -1610,11 +1613,15 @@ function IconActionButton({
 
 function CommitFeedback({
   feedback,
+  onDismiss,
 }: {
   feedback: { tone: "error" | "success"; message: string } | null;
+  onDismiss: () => void;
 }) {
   const [visibleFeedback, setVisibleFeedback] = useState(feedback);
   const [isVisible, setIsVisible] = useState(false);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   useEffect(() => {
     if (!feedback) {
@@ -1630,6 +1637,9 @@ function CommitFeedback({
           ? null
           : current,
       );
+      // Consume the source state so the toast never re-fires when the panel or
+      // tab is shown again after it has run its course.
+      onDismissRef.current();
     }, 3900);
     return () => {
       window.clearTimeout(hideTimer);

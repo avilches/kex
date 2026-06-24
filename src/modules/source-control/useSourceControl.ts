@@ -49,6 +49,7 @@ export type SourceControlSummary = {
   runRemoteAction: (
     mode?: SourceControlRemoteActionMode,
   ) => Promise<SourceControlRemoteActionResult>;
+  clearRemoteError: () => void;
 };
 
 export type SourceControlRemoteIndicator = {
@@ -422,6 +423,14 @@ export function useSourceControl(
     [refresh],
   );
 
+  const clearRemoteError = useCallback(() => {
+    setState((current) =>
+      current.lastRemoteError === null
+        ? current
+        : { ...current, lastRemoteError: null },
+    );
+  }, []);
+
   useEffect(() => {
     if (!enabled) {
       requestIdRef.current++;
@@ -526,7 +535,8 @@ export function useSourceControl(
       applyStatus,
       refresh,
       runRemoteAction,
+      clearRemoteError,
     }),
-    [state, applyStatus, refresh, runRemoteAction],
+    [state, applyStatus, refresh, runRemoteAction, clearRemoteError],
   );
 }
