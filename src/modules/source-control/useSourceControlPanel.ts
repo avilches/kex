@@ -18,6 +18,7 @@ type DiffMode = "+" | "-";
 type SelectionTransition = "none" | "moved-group" | "reset";
 
 const RECONCILE_DEBOUNCE_MS = 180;
+const COMMIT_PERSIST_DEBOUNCE_MS = 400;
 
 export type DiffSelection = {
   path: string;
@@ -246,6 +247,12 @@ function optimisticDiscard(
   return { ...status, changedFiles: next };
 }
 
+type CommitDraftParams = {
+  workspaceId: string | null;
+  savedCommitMessage: string;
+  onPersist: (workspaceId: string, message: string) => void;
+};
+
 export function useSourceControlPanel(
   isOpen: boolean,
   summary: SourceControlSummary,
@@ -258,12 +265,56 @@ export function useSourceControlPanel(
         title?: string;
       }) => void)
     | null,
+  commitDraft: CommitDraftParams,
 ): SourceControlPanelState {
   const [panelState, setPanelState] = useState<PanelState>("closed");
   const [repo, setRepo] = useState<GitRepoInfo | null>(null);
   const [status, setStatus] = useState<GitStatusSnapshot | null>(null);
   const [selected, setSelected] = useState<DiffSelection | null>(null);
-  const [commitMessage, setCommitMessage] = useState("");
+  const [commitMessage, setCommitMessageState] = useState(
+    commitDraft.savedCommitMessage,
+  );
+  const commitDraftRef = useRef(commitMessage);
+  const commitWorkspaceIdRef = useRef(commitDraft.workspaceId);
+  const persistCommitRef = useRef(commitDraft.onPersist);
+  persistCommitRef.current = commitDraft.onPersist;
+  const commitPersistTimerRef = useRef(0);
+
+  const flushCommitMessage = useCallback(() => {
+    if (commitPersistTimerRef.current) {
+      window.clearTimeout(commitPersistTimerRef.current);
+      commitPersistTimerRef.current = 0;
+    }
+    const workspaceId = commitWorkspaceIdRef.current;
+    if (workspaceId) persistCommitRef.current(workspaceId, commitDraftRef.current);
+  }, []);
+
+  const setCommitMessage = useCallback((value: string) => {
+    commitDraftRef.current = value;
+    setCommitMessageState(value);
+    if (commitPersistTimerRef.current) {
+      window.clearTimeout(commitPersistTimerRef.current);
+    }
+    commitPersistTimerRef.current = window.setTimeout(() => {
+      commitPersistTimerRef.current = 0;
+      const workspaceId = commitWorkspaceIdRef.current;
+      if (workspaceId)
+        persistCommitRef.current(workspaceId, commitDraftRef.current);
+    }, COMMIT_PERSIST_DEBOUNCE_MS);
+  }, []);
+
+  // On workspace switch, flush the previous draft and load the new workspace's
+  // saved message. Same-workspace saved-message changes (echoed back from our
+  // own persist) are ignored so they never clobber the live draft.
+  useEffect(() => {
+    if (commitWorkspaceIdRef.current === commitDraft.workspaceId) return;
+    flushCommitMessage();
+    commitWorkspaceIdRef.current = commitDraft.workspaceId;
+    commitDraftRef.current = commitDraft.savedCommitMessage;
+    setCommitMessageState(commitDraft.savedCommitMessage);
+  }, [commitDraft.workspaceId, commitDraft.savedCommitMessage, flushCommitMessage]);
+
+  useEffect(() => () => flushCommitMessage(), [flushCommitMessage]);
   const [localActionBusy, setLocalActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -611,6 +662,7 @@ export function useSourceControlPanel(
     try {
       const result = await native.gitCommit(repo.repoRoot, commitMessage);
       setCommitMessage("");
+      flushCommitMessage();
       setActionMessage(
         `Committed ${result.commitSha.slice(0, 7)} ${result.summary}`,
       );
@@ -621,7 +673,7 @@ export function useSourceControlPanel(
     } finally {
       setLocalActionBusy(null);
     }
-  }, [commitMessage, repo, summary]);
+  }, [commitMessage, repo, summary, setCommitMessage, flushCommitMessage]);
 
   const push = useCallback(async () => {
     if (!repo) return;

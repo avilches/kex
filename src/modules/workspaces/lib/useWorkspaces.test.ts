@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Panel, SplitNode, Workspace } from "./types";
-import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyPinnedRoot, applyPushOnCommit, collectRunningTerminals } from "./useWorkspaces";
+import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, collectRunningTerminals } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -50,16 +50,22 @@ describe("applyFsRoot", () => {
   });
 });
 
-describe("applyPushOnCommit", () => {
-  it("sets the flag on the matching workspace only", () => {
-    const out = applyPushOnCommit([ws(), ws({ id: "w2" })], "w1", true);
-    expect(out[0].pushOnCommit).toBe(true);
-    expect(out[1].pushOnCommit).toBeUndefined();
+describe("applyGitConfig", () => {
+  it("seeds defaults and patches the matching workspace only", () => {
+    const out = applyGitConfig([ws(), ws({ id: "w2" })], "w1", {
+      pushOnCommit: true,
+    });
+    expect(out[0].git).toEqual({ commitMessage: "", pushOnCommit: true });
+    expect(out[1].git).toBeUndefined();
   });
 
-  it("clears the flag when disabled", () => {
-    const out = applyPushOnCommit([ws({ pushOnCommit: true })], "w1", false);
-    expect(out[0].pushOnCommit).toBe(false);
+  it("merges a partial patch over the existing config", () => {
+    const out = applyGitConfig(
+      [ws({ git: { commitMessage: "wip", pushOnCommit: true } })],
+      "w1",
+      { commitMessage: "done" },
+    );
+    expect(out[0].git).toEqual({ commitMessage: "done", pushOnCommit: true });
   });
 });
 

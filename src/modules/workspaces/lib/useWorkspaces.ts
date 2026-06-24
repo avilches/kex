@@ -19,7 +19,7 @@ import {
   updateDivider,
   updatePane,
 } from "./splitNode";
-import { type Panel, type PaneNode, type Workspace, isAutofocusPanel } from "./types";
+import { type Panel, type PaneNode, type Workspace, type WorkspaceGitConfig, isAutofocusPanel } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newPanelId } from "@/lib/ids";
 
@@ -67,13 +67,20 @@ export function applyFsRoot(
   );
 }
 
-export function applyPushOnCommit(
+const DEFAULT_GIT_CONFIG: WorkspaceGitConfig = {
+  commitMessage: "",
+  pushOnCommit: false,
+};
+
+export function applyGitConfig(
   workspaces: Workspace[],
   workspaceId: string,
-  enabled: boolean,
+  patch: Partial<WorkspaceGitConfig>,
 ): Workspace[] {
   return workspaces.map((w) =>
-    w.id === workspaceId ? { ...w, pushOnCommit: enabled } : w,
+    w.id === workspaceId
+      ? { ...w, git: { ...(w.git ?? DEFAULT_GIT_CONFIG), ...patch } }
+      : w,
   );
 }
 
@@ -494,9 +501,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyFsRoot(prev, workspaceId, path));
   }, []);
 
-  const setPushOnCommit = useCallback(
-    (workspaceId: string, enabled: boolean) => {
-      setWorkspaces((prev) => applyPushOnCommit(prev, workspaceId, enabled));
+  const setWorkspaceGitConfig = useCallback(
+    (workspaceId: string, patch: Partial<WorkspaceGitConfig>) => {
+      setWorkspaces((prev) => applyGitConfig(prev, workspaceId, patch));
     },
     [],
   );
@@ -553,7 +560,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setExplorerRootMode,
     setPinnedRoot,
     setFsRoot,
-    setPushOnCommit,
+    setWorkspaceGitConfig,
     setTerminalRunningCommand,
     setPanelView,
     findPanelGlobal,

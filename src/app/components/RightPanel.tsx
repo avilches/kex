@@ -63,6 +63,9 @@ export type RightPanelProps = {
   sourceControl: SourceControlSummary;
   pushOnCommit: boolean;
   onPushOnCommitChange: (enabled: boolean) => void;
+  gitWorkspaceId: string | null;
+  savedCommitMessage: string;
+  onCommitMessagePersist: (workspaceId: string, message: string) => void;
   onOpenDiff: (input: {
     path: string;
     repoRoot: string;
@@ -163,6 +166,9 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               sourceControl={props.sourceControl}
               pushOnCommit={props.pushOnCommit}
               onPushOnCommitChange={props.onPushOnCommitChange}
+              gitWorkspaceId={props.gitWorkspaceId}
+              savedCommitMessage={props.savedCommitMessage}
+              onCommitMessagePersist={props.onCommitMessagePersist}
               onOpenDiff={props.onOpenDiff}
               onOpenFile={props.onOpenFile}
             />

@@ -172,7 +172,7 @@ export default function App() {
     setExplorerRootMode,
     setPinnedRoot,
     setFsRoot,
-    setPushOnCommit,
+    setWorkspaceGitConfig,
     setTerminalRunningCommand,
     setPanelView,
     findPanelGlobal,
@@ -501,13 +501,22 @@ export default function App() {
 
   const fsRootPath = fsFolderRoot ?? home;
 
-  const pushOnCommit = activeWorkspace?.pushOnCommit ?? false;
+  const pushOnCommit = activeWorkspace?.git?.pushOnCommit ?? false;
+  const savedCommitMessage = activeWorkspace?.git?.commitMessage ?? "";
 
   const handlePushOnCommitChange = useCallback(
     (enabled: boolean) => {
-      if (activeWorkspace) setPushOnCommit(activeWorkspace.id, enabled);
+      if (activeWorkspace)
+        setWorkspaceGitConfig(activeWorkspace.id, { pushOnCommit: enabled });
     },
-    [activeWorkspace, setPushOnCommit],
+    [activeWorkspace, setWorkspaceGitConfig],
+  );
+
+  const handleCommitMessagePersist = useCallback(
+    (workspaceId: string, message: string) => {
+      setWorkspaceGitConfig(workspaceId, { commitMessage: message });
+    },
+    [setWorkspaceGitConfig],
   );
 
   const handleChangeRootMode = useCallback(
@@ -2154,6 +2163,9 @@ export default function App() {
                         sourceControl={sourceControl}
                         pushOnCommit={pushOnCommit}
                         onPushOnCommitChange={handlePushOnCommitChange}
+                        gitWorkspaceId={activeWorkspaceId}
+                        savedCommitMessage={savedCommitMessage}
+                        onCommitMessagePersist={handleCommitMessagePersist}
                         onOpenDiff={openGitDiffInPanel}
                         onOpenGitGraph={openGitGraphFromContext}
                         repoRoot={rightPanelRepoRoot}
@@ -2237,6 +2249,9 @@ export default function App() {
                         sourceControl={sourceControl}
                         pushOnCommit={pushOnCommit}
                         onPushOnCommitChange={handlePushOnCommitChange}
+                        gitWorkspaceId={activeWorkspaceId}
+                        savedCommitMessage={savedCommitMessage}
+                        onCommitMessagePersist={handleCommitMessagePersist}
                         onOpenDiff={openGitDiffInPanel}
                         onOpenGitGraph={openGitGraphFromContext}
                         repoRoot={rightPanelRepoRoot}

@@ -43,6 +43,11 @@ export type SplitNode =
       dividerPosition: number;
     };
 
+export type WorkspaceGitConfig = {
+  commitMessage: string;
+  pushOnCommit: boolean;
+};
+
 export type Workspace = {
   id: string;
   title: string;
@@ -52,5 +57,5 @@ export type Workspace = {
   explorerRootMode?: ExplorerRootMode;
   pinnedRoot?: string;
   fsRoot?: string;
-  pushOnCommit?: boolean;
+  git?: WorkspaceGitConfig;
 };

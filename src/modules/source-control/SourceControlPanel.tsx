@@ -92,6 +92,9 @@ type Props = {
   sourceControl: SourceControlSummary;
   pushOnCommit: boolean;
   onPushOnCommitChange: (enabled: boolean) => void;
+  gitWorkspaceId: string | null;
+  savedCommitMessage: string;
+  onCommitMessagePersist: (workspaceId: string, message: string) => void;
   onOpenDiff: (input: {
     path: string;
     repoRoot: string;
@@ -169,10 +172,17 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   sourceControl,
   pushOnCommit,
   onPushOnCommitChange,
+  gitWorkspaceId,
+  savedCommitMessage,
+  onCommitMessagePersist,
   onOpenDiff,
   onOpenFile,
 }: Props) {
-  const scm = useSourceControlPanel(open, sourceControl, onOpenDiff);
+  const scm = useSourceControlPanel(open, sourceControl, onOpenDiff, {
+    workspaceId: gitWorkspaceId,
+    savedCommitMessage,
+    onPersist: onCommitMessagePersist,
+  });
   const refreshAnimationRef = useRef<number | null>(null);
   const [refreshAnimating, setRefreshAnimating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
