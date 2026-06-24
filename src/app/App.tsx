@@ -1656,6 +1656,9 @@ export default function App() {
       },
       "tab.newBlock": () => openNewBlock(),
       "workspace.new": () => addWorkspace(home ?? undefined),
+      "workspace.close": () => {
+        if (activeWorkspace) void requestCloseWorkspace(activeWorkspace.id);
+      },
       "tab.newBrowser": () => openBrowserInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActivePanel,
@@ -1827,6 +1830,7 @@ export default function App() {
       cycleWorkspace,
       activatePanel,
       handleCloseActivePanel,
+      requestCloseWorkspace,
       focusSidebar,
       openNewTerminal,
       openNewBlock,

@@ -45,6 +45,7 @@ export type ShortcutId =
   | "notifications.toggle"
   | "window.new"
   | "workspace.new"
+  | "workspace.close"
   | "workspace.prev"
   | "workspace.next"
   | "view.zoomIn"
@@ -95,6 +96,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "New Workspace",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "n" }],
+  },
+  {
+    id: "workspace.close",
+    label: "Close Workspace",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "w" }],
   },
   {
     id: "workspace.prev",
