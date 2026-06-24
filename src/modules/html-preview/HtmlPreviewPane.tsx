@@ -22,7 +22,7 @@ export function HtmlPreviewPane({ content, path }: Props) {
   const contentWithBase = injectBase(content, baseUrl);
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-background">
+    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-white">
       <iframe
         srcDoc={contentWithBase}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
