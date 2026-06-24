@@ -24,9 +24,11 @@ guards de cierre por-tab (`useTabCloseGuards`), asi que hoy matar procesos al ce
 un workspace no avisa de nada.
 
 Utilidades existentes reutilizables:
-- `leafHasForegroundProcess(panelId)` (`@/modules/terminal`): mismo criterio que el
-  guard de cierre de un tab individual.
-- `getRunningCommandsSnapshot()` (`terminalEphemeralStore`): `Map<panelId, command>`.
+- `leafHasForegroundProcess(panelId): Promise<string | null>` (`@/modules/terminal`):
+  mismo criterio que el guard de cierre de un tab individual. Es **asincrona** (IPC
+  `pty_has_foreground_process`); devuelve el nombre del proceso en foreground o `null`.
+- `getRunningCommandsSnapshot()` (`terminalEphemeralStore`): `ReadonlyMap<panelId, command>`
+  sincrono, con el comando en curso por terminal.
 - `allPanes(paneTree)` (`splitNode`): lista de panes del workspace.
 - Preferencia `warnOnCloseTabWithRunningProcess` con su setter
   `setWarnOnCloseTabWithRunningProcess`.
@@ -61,13 +63,21 @@ Decisiones cerradas:
 
 ## Diseno
 
-### Cascada en `requestCloseWorkspace(wsId)`
+### Cascada en `requestCloseWorkspace(wsId)` (ahora async)
+
+`requestCloseWorkspace` pasa a ser `async` (la deteccion de procesos es asincrona). Los
+dos call sites (X del sidebar, Cmd+W) la invocan como fire-and-forget (`void`), no usan
+el retorno.
 
 ```
 prefs = usePreferencesStore.getState()
 ws    = workspacesRef.current.find(w => w.id === wsId)
 1. si prefs.warnOnCloseTabWithRunningProcess y ws:
-     running = collectRunningTerminals(ws, leafHasForegroundProcess, id => getRunningCommandsSnapshot().get(id))
+     running = await collectRunningTerminals(
+       ws,
+       leafHasForegroundProcess,
+       id => getRunningCommandsSnapshot().get(id),
+     )
      si running.length > 0:
         setPendingWorkspaceProcesses({ id: wsId, processes: running })
         return
@@ -80,22 +90,25 @@ ws    = workspacesRef.current.find(w => w.id === wsId)
 Cmd+W solo cierra workspaces vacios (sin tabs -> sin procesos), asi que la rama 1
 solo se activa de hecho via la X del sidebar. Ambos comparten este embudo.
 
-### Functional core: `collectRunningTerminals` (puro, testeable)
+### Functional core: `collectRunningTerminals` (puro, testeable, async)
 
 Nueva funcion pura exportada (junto a los `apply*` en `useWorkspaces.ts`):
 
 ```
 collectRunningTerminals(
   ws: Workspace,
-  isRunning: (panelId: string) => boolean,
+  getForegroundProcess: (panelId: string) => Promise<string | null>,
   getCommand: (panelId: string) => string | undefined,
-): { panelId: string; label: string }[]
+): Promise<{ panelId: string; label: string }[]>
 ```
 
-Recorre `allPanes(ws.paneTree)`, filtra `panel.kind === "terminal"`, incluye los que
-`isRunning(panel.id)` es true, con `label = getCommand(panel.id) ?? panel.title ?? "shell"`.
-Inyectar `isRunning`/`getCommand` permite testear sin estado mutable; en App se llama
-con `leafHasForegroundProcess` y el getter del snapshot.
+Recorre `allPanes(ws.paneTree)`, filtra `panel.kind === "terminal"`, consulta cada uno
+con `getForegroundProcess` en paralelo (`Promise.all`), incluye los que devuelven un
+nombre no nulo, con `label = getCommand(panel.id) ?? processName ?? panel.title ?? "shell"`.
+Preserva el orden de los panes. Inyectar `getForegroundProcess`/`getCommand` permite
+testear sin estado mutable ni IPC; en App se llama con `leafHasForegroundProcess` y el
+getter del snapshot. Coste: N llamadas IPC en paralelo, solo cuando A esta on y se cierra
+un workspace.
 
 ### Modal de procesos (en `CloseDialogs.tsx`)
 
