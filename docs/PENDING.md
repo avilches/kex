@@ -23,7 +23,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-38](pending/bugs/BUG-38-busqueda-cmdF-incompleta.md) - Cmd+F: no busca en markdown/git-diff (terminal y editor resueltos)
 - [BUG-39](pending/bugs/BUG-39-file-search-ux-poco-clara.md) - Busqueda de ficheros: UX poco clara (no es bug de codigo; los atajos funcionan, falta descubribilidad: tratar como mejora de UI)
 - [BUG-40](pending/bugs/BUG-40-stage-unstage-all-incompleto.md) — Stage all / unstage all no procesa todos los ficheros (la logica de pathspecs parece correcta; el sintoma cuelga probablemente de BUG-06, renames sin original_rel. Reproducir antes de fix)
-- [BUG-42](pending/bugs/BUG-42-borrar-fichero-con-editor-abierto.md) — Borrar un fichero con el editor abierto (sin verificar)
+- [BUG-42](pending/bugs/BUG-42-borrar-fichero-con-editor-abierto.md) — Borrar un fichero con el editor abierto: el editor muestra un error rojo generico (string crudo de IPC, sin distinguir ENOENT ni ofrecer accion) y la vista de diff no reacciona (contenido obsoleto). Definir mejor UX
 - [BUG-43](pending/bugs/BUG-43-restore-claude-code-con-worktree.md) — Restore de Claude Code cuando ha creado un worktree (sin verificar)
 
 ## Features (`docs/pending/features/`)
@@ -54,7 +54,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 
 ## Contexto adicional (`docs/pending/`)
 
-- [MODAL_MESSAGES.md](pending/MODAL_MESSAGES.md) — Mensajes de modales destructivos (discard por caso + feedback de resultado)
+- [MODAL_MESSAGES.md](pending/MODAL_MESSAGES.md) — Modales destructivos de git: textos de discard por caso (el modal generico "miente" diciendo "can't be undone" hasta cuando no hay perdida), feedback de resultado, e iconos de los botones de accion (que comuniquen reversible como unstage vs destructivo como discard)
 - [BUGS.md](pending/BUGS.md) — Resumen ejecutivo de todos los bugs
 - [DOCS.md](pending/DOCS.md) — Notas de documentacion pendiente
 - [README.md](pending/README.md) — Descripcion general del contenido de pending

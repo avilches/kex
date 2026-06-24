@@ -1,8 +1,9 @@
 # Mensajes de modales destructivos (source-control y otros)
 
 Mejora de UX: afinar los textos de los modales destructivos (empezando por **discard changes** en
-source-control) y dar feedback de resultado tras la accion. No programado todavia: quedan decisiones de
-alcance y tono por cerrar antes de implementar.
+source-control), dar feedback de resultado tras la accion, y revisar los **iconos de los botones de accion**
+para que comuniquen si una accion es reversible o destructiva (ver seccion "Iconos de los botones de accion").
+No programado todavia: quedan decisiones de alcance y tono por cerrar antes de implementar.
 
 ## Decisiones (tres ejes separados)
 
@@ -46,6 +47,32 @@ alcance y tono por cerrar antes de implementar.
   (`SourceControlPanel.tsx:770-796`), close dialogs (`CloseDialogs.tsx`: fichero sucio / terminal con proceso
   / fichero borrado externamente, ya bien afinados), reset all shortcuts (`ShortcutsSection.tsx:156-174`),
   delete custom theme (sin confirm).
+
+## Iconos de los botones de accion (stage / unstage / discard)
+
+Problema de UX senalado: el boton "-" no significa lo mismo en cada grupo y eso confunde. Quitar del stage
+(unstage) NO pierde nada (solo mueve la entrada de "Staged" a "Changes"); en cambio el boton de "Changes"
+ejecuta un discard, que en untracked borra del disco. El usuario debe poder distinguir de un vistazo la
+accion reversible de la destructiva.
+
+Estado actual del codigo (`SourceControlPanel.tsx`):
+
+- **Staged -> Unstage** (reversible): `MinusSignIcon` (`-`). Aparece en el header "Unstage all" (`:1164`),
+  en carpeta "Unstage folder" (`:1286`) y en la fila "Unstage ${path}" (`:1429`).
+- **Changes -> Discard** (destructivo): `RemoveSquareIcon`. Header/"Discard all", carpeta "Discard folder
+  changes" (`:1295`) y fila "Discard ${path}" (`:1446`).
+- **Changes -> Stage** (reversible): `PlusSignIcon` (`+`).
+
+O sea, ya hay dos iconos distintos (MinusSign vs RemoveSquare), pero la diferencia es sutil y no lee como
+"reversible vs irreversible". Cosas a revisar cuando se programe:
+
+- Elegir iconos que comuniquen mejor el riesgo: el discard destructivo podria usar un icono de papelera o de
+  peligro en lugar de un cuadrado; el unstage reversible podria ser una flecha de "devolver"/"bajar" en vez
+  de un simple `-`, para no colisionar conceptualmente con "quitar".
+- Mantener consistencia entre los tres niveles (header / carpeta / fila) y con los iconos del explorer.
+- Posible color/tinte distinto para la accion destructiva (hover en tono destructivo) sin recargar la fila.
+- Decidir junto con los textos del modal (esta misma nota): icono + titulo + boton deben contar la misma
+  historia por caso (M / D / untracked / discard all).
 
 ## Strings propuestas (base, sujetas a retoque de tono)
 
