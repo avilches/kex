@@ -46,10 +46,7 @@ import {
   Add01Icon,
   Alert02Icon,
   ArrowDown01Icon,
-  ArrowDown02Icon,
-  ArrowDownToDotIcon,
   ArrowRight01Icon,
-  ArrowUp02Icon,
   CheckmarkCircle01Icon,
   CopySlashIcon,
   File01Icon,
@@ -63,6 +60,9 @@ import {
   MinusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
+  SquareArrowDown02Icon,
+  SquareArrowDown03Icon,
+  SquareArrowUp02Icon,
   UnfoldLessIcon,
   UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
@@ -643,7 +643,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   strokeWidth={1.9}
                   className="shrink-0 text-muted-foreground"
                 />
-                <span className="max-w-[140px] truncate">{repoLabel}</span>
+                <span className="truncate">{repoLabel}</span>
               </div>
               {scm.status?.isDetached ? (
                 <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -659,7 +659,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   {fetchBusy ? (
                     <Spinner className="size-3" />
                   ) : (
-                    <HugeiconsIcon icon={ArrowDownToDotIcon} size={13} strokeWidth={1.85} />
+                    <HugeiconsIcon icon={SquareArrowDown03Icon} size={17} strokeWidth={1.85} />
                   )}
                 </RemoteActionButton>
                 <RemoteActionButton
@@ -674,7 +674,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       "inline-flex items-center gap-1",
                       (scm.status?.behind ?? 0) > 0 && "text-blue-600 dark:text-blue-400",
                     )}>
-                      <HugeiconsIcon icon={ArrowDown02Icon} size={13} strokeWidth={1.9} />
+                      <HugeiconsIcon icon={SquareArrowDown02Icon} size={17} strokeWidth={1.9} />
                       {(scm.status?.behind ?? 0) > 0 && (
                         <span className="text-[10px] font-semibold tabular-nums">
                           {scm.status?.behind}
@@ -695,7 +695,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       "inline-flex items-center gap-1",
                       (scm.status?.ahead ?? 0) > 0 && "text-emerald-600 dark:text-emerald-400",
                     )}>
-                      <HugeiconsIcon icon={ArrowUp02Icon} size={13} strokeWidth={1.9} />
+                      <HugeiconsIcon icon={SquareArrowUp02Icon} size={17} strokeWidth={1.9} />
                       {(scm.status?.ahead ?? 0) > 0 && (
                         <span className="text-[10px] font-semibold tabular-nums">
                           {scm.status?.ahead}
@@ -709,7 +709,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             {scm.repo ? (
               <span
                 title={scm.repo.repoRoot}
-                className="inline-flex w-fit min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
+                className="inline-flex max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
               >
                 {scm.repo.isWorktree ? (
                   <HugeiconsIcon
@@ -1571,7 +1571,7 @@ function RemoteActionButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex h-6 items-center gap-1 rounded-md px-1.5 text-muted-foreground transition-colors",
+        "flex h-6 min-w-6 items-center justify-center gap-1 rounded-md px-1.5 text-muted-foreground transition-colors",
         disabled
           ? "cursor-default opacity-40"
           : "hover:bg-accent hover:text-foreground",
