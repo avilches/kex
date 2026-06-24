@@ -294,7 +294,7 @@ function settingsSummary(s: EditorViewSettings): string {
   if (s.whitespace) parts.push("Whitespace");
   if (s.foldGutter) parts.push("Fold");
   if (s.indentWithTabs) parts.push("Tabs");
-  if (s.indentSize !== 4) parts.push(`Indent ${s.indentSize}`);
+  parts.push(`Indent ${s.indentSize}`);
   if (s.columnRuler > 0) parts.push(`Col ${s.columnRuler}`);
   if (s.spellCheck) parts.push("Spell check");
   return parts.join(" · ");
