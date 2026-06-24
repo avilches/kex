@@ -12,7 +12,7 @@ import { newPanelId } from "@/lib/ids";
 import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
 import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
-import { isMarkdownPath } from "@/lib/utils";
+import { isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -175,6 +175,7 @@ export default function App() {
     setWorkspaceGitConfig,
     setTerminalRunningCommand,
     setPanelView,
+    togglePreviewMode,
     findPanelGlobal,
     resetWorkspaces,
   } = useWorkspaces(initialOpts);
@@ -1156,6 +1157,10 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) setPanelView(found.workspace.id, panelId, mode);
       },
+      onTogglePreview: (panelId) => {
+        const found = findPanelGlobal(panelId);
+        if (found) togglePreviewMode(found.workspace.id, panelId);
+      },
       registerEditorHandle: (panelId, h) => {
         if (h) {
           editorHandles.current.set(panelId, h);
@@ -1219,6 +1224,7 @@ export default function App() {
       setWorkspaceCwd,
       setTerminalRunningCommand,
       setPanelView,
+      togglePreviewMode,
       updatePanelData,
       activeWorkspace,
       openPanel,
@@ -1708,15 +1714,22 @@ export default function App() {
       },
       "editor.markdown.toggleView": () => {
         if (!activePanel || !activePanelId || !activeWorkspaceId) return;
-        if (activePanel.kind === "markdown") {
+        if (activePanel.kind === "editor" && isMarkdownPath(activePanel.path)) {
+          togglePreviewMode(activeWorkspaceId, activePanelId);
+        } else if (activePanel.kind === "markdown") {
           setPanelView(activeWorkspaceId, activePanelId, "raw");
-        } else if (
-          activePanel.kind === "editor" &&
-          isMarkdownPath(activePanel.path) &&
-          !activePanel.dirty
-        ) {
-          setPanelView(activeWorkspaceId, activePanelId, "rendered");
         }
+      },
+      "editor.html.toggleView": () => {
+        if (!activePanel || !activePanelId || !activeWorkspaceId) return;
+        if (activePanel.kind === "editor" && isHtmlPath(activePanel.path)) {
+          togglePreviewMode(activeWorkspaceId, activePanelId);
+        }
+      },
+      "editor.save": () => {
+        if (!activePanelId) return;
+        const handle = editorHandles.current.get(activePanelId);
+        if (handle) void handle.save();
       },
       "tab.next": () => {
         if (!activeWorkspace || !activePane) return;
@@ -1868,6 +1881,7 @@ export default function App() {
       toggleRightPanel,
       showRightPanelTab,
       showExplorerWithMode,
+      togglePreviewMode,
     ],
   );
 
@@ -1881,6 +1895,15 @@ export default function App() {
           activePanel?.kind === "markdown" ||
           (activePanel?.kind === "editor" && isMarkdownPath(activePanel.path))
         );
+      }
+      if (id === "editor.html.toggleView") {
+        return !(
+          activePanel?.kind === "editor" &&
+          isHtmlPath(activePanel.path)
+        );
+      }
+      if (id === "editor.save") {
+        return activePanel?.kind !== "editor";
       }
       if (id === "terminal.clear") {
         const target =
