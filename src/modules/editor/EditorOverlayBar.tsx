@@ -44,6 +44,7 @@ type Props = {
     onChange: (mode: MarkdownViewMode) => void;
     renderedDisabled?: boolean;
     renderedHint?: string;
+    isHtml?: boolean;
   };
   viewToggles?: {
     ext: string;
@@ -58,7 +59,8 @@ type Props = {
 
 export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const toggleLabel = view ? getShortcutLabel("editor.markdown.toggleView", userShortcuts) : null;
+  const shortcutId = view?.isHtml ? "editor.html.toggleView" : "editor.markdown.toggleView";
+  const toggleLabel = view ? getShortcutLabel(shortcutId, userShortcuts) : null;
   const showToggles = view?.mode !== "rendered" && !!viewToggles;
   const v = viewToggles?.value;
   const set = (patch: Partial<EditorViewSettings>) => {
