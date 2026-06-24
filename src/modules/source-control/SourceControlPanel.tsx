@@ -709,7 +709,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             {scm.repo ? (
               <span
                 title={scm.repo.repoRoot}
-                className="inline-flex max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
+                className="inline-flex w-fit max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
               >
                 {scm.repo.isWorktree ? (
                   <HugeiconsIcon
