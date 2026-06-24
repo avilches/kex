@@ -524,9 +524,20 @@ export async function loadPreferences(): Promise<Preferences> {
         v && typeof v === "object" && !Array.isArray(v)
           ? (v as EditorViewMap)
           : {};
-      if (Object.keys(raw).length === 0) return buildColdStartMap();
-      if (!raw["*"]) return { ...raw, "*": { ...CODE_DEFAULTS } };
-      return raw;
+      // Split any comma-separated keys written manually in the JSON.
+      const normalized: EditorViewMap = {};
+      for (const [key, value] of Object.entries(raw)) {
+        if (!key.includes(",")) {
+          normalized[key] = value;
+        } else {
+          for (const ext of key.split(",").map((e) => e.trim()).filter(Boolean)) {
+            if (normalized[ext] === undefined) normalized[ext] = value;
+          }
+        }
+      }
+      if (Object.keys(normalized).length === 0) return buildColdStartMap();
+      if (!normalized["*"]) return { ...normalized, "*": { ...CODE_DEFAULTS } };
+      return normalized;
     })(),
     editorScrollPastEnd:
       get<boolean>(KEY_EDITOR_SCROLL_PAST_END) ??
@@ -586,7 +597,10 @@ export async function loadPreferences(): Promise<Preferences> {
     storedExtMap && typeof storedExtMap === "object" && !Array.isArray(storedExtMap)
       ? Object.keys(storedExtMap as object)
       : [];
-  const needsExtPersist = storedExtKeys.length === 0 || !storedExtKeys.includes("*");
+  const needsExtPersist =
+    storedExtKeys.length === 0 ||
+    !storedExtKeys.includes("*") ||
+    storedExtKeys.some((k) => k.includes(","));
   if (needsExtPersist) {
     configDefaults.push([KEY_EDITOR_VIEW_BY_EXT, result.editorViewByExt]);
   }

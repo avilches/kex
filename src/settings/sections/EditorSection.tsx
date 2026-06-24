@@ -190,8 +190,6 @@ export function EditorSection() {
         </SettingRow>
       </div>
 
-      <FileTypesSection />
-
       <div className="flex flex-col gap-2">
         <FieldLabel>Cursor</FieldLabel>
         <SettingRow title="Cursor style" description="Editor caret shape.">
@@ -260,6 +258,8 @@ export function EditorSection() {
           </div>
         </SettingRow>
       </div>
+
+      <FileTypesSection />
     </div>
   );
 }
