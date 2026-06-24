@@ -238,3 +238,10 @@ Cuando Claude Code (u otro agente) imprime en el terminal una ruta a un fichero 
 - Decidir el comportamiento deseado: un clic (o Cmd+clic) sobre una ruta de fichero del repo deberia abrirla dentro de Kex en el editor o en el visor markdown, no salir a una app externa.
 
 Si no funciona hoy, anotar el coste de cablear un link handler (xterm `registerLinkProvider` / web-links addon) que reconozca rutas de fichero y las abra via el flujo de apertura de paneles existente.
+
+---
+
+## Editor preview
+
+- Split view (editor + preview side by side): the overlay architecture keeps the editor mounted,
+  so this is a layout-only change - replace the hidden/shown divs with a flex-row split.

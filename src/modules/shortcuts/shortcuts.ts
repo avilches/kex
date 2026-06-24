@@ -56,6 +56,8 @@ export type ShortcutId =
   | "editor.undo"
   | "editor.redo"
   | "editor.markdown.toggleView"
+  | "editor.save"
+  | "editor.html.toggleView"
   | "path.copy"
   | "notifications.jumpToLast";
 
@@ -415,6 +417,18 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "editor.markdown.toggleView",
     label: "Toggle Markdown Preview",
+    group: "Editor",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "v" }],
+  },
+  {
+    id: "editor.save",
+    label: "Save file",
+    group: "Editor",
+    defaultBindings: [{ [MOD_PROP]: true, key: "s" }],
+  },
+  {
+    id: "editor.html.toggleView",
+    label: "Toggle HTML preview",
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "v" }],
   },

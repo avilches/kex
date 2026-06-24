@@ -5,6 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function isHtmlPath(path: string): boolean {
+  return /\.(html|htm)$/i.test(path)
+}
+
 export function isMarkdownPath(path: string): boolean {
   return /\.(md|markdown|mdx)$/i.test(path)
 }
