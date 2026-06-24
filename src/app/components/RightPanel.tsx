@@ -13,6 +13,8 @@ import { setRightPanelActiveTab } from "@/modules/settings/store";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SourceControlSummary } from "@/modules/source-control";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
+import { GitCommitIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 
 export type RightPanelTab = "explorer" | "git" | "history";
@@ -158,21 +160,34 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               open={activeTab === "git"}
               sourceControl={props.sourceControl}
               onOpenDiff={props.onOpenDiff}
-              onOpenGitGraph={props.onOpenGitGraph}
               onOpenFile={props.onOpenFile}
             />
           </div>
           <div
             className={cn(
-              "absolute inset-0 overflow-auto",
+              "absolute inset-0 flex flex-col overflow-hidden",
               activeTab !== "history" && "invisible pointer-events-none",
             )}
           >
-            <GitHistoryPane
-              repoRoot={props.repoRoot}
-              onOpenCommitFile={props.onOpenCommitFile}
-              onSearchHandle={props.onSearchHandle}
-            />
+            {props.onOpenGitGraph ? (
+              <div className="flex h-8 shrink-0 items-center justify-end border-b border-border/60 px-1.5">
+                <button
+                  type="button"
+                  title="Open in panel"
+                  onClick={props.onOpenGitGraph}
+                  className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <HugeiconsIcon icon={GitCommitIcon} size={14} strokeWidth={1.85} />
+                </button>
+              </div>
+            ) : null}
+            <div className="min-h-0 flex-1 overflow-auto">
+              <GitHistoryPane
+                repoRoot={props.repoRoot}
+                onOpenCommitFile={props.onOpenCommitFile}
+                onSearchHandle={props.onSearchHandle}
+              />
+            </div>
           </div>
         </div>
       </div>

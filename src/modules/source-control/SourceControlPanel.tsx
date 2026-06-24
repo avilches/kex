@@ -46,21 +46,18 @@ import {
   Alert02Icon,
   ArrowDown01Icon,
   ArrowDown02Icon,
+  ArrowDownToDotIcon,
   ArrowRight01Icon,
   ArrowUp02Icon,
   CheckmarkCircle01Icon,
   CopySlashIcon,
-  Download01Icon,
   File01Icon,
   FileDiffIcon,
-  FolderCloudIcon,
   FolderOpenIcon,
   FolderTreeIcon,
   GitBranchIcon,
-  GitCommitIcon,
   GitForkIcon,
   Link01Icon,
-  ListViewIcon,
   MinusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
@@ -92,7 +89,6 @@ import {
 type Props = {
   open: boolean;
   sourceControl: SourceControlSummary;
-  onOpenGitGraph?: () => void;
   onOpenDiff: (input: {
     path: string;
     repoRoot: string;
@@ -168,7 +164,6 @@ function statusTextClass(code: string): string {
 export const SourceControlPanel = memo(function SourceControlPanel({
   open,
   sourceControl,
-  onOpenGitGraph,
   onOpenDiff,
   onOpenFile,
 }: Props) {
@@ -566,6 +561,25 @@ export const SourceControlPanel = memo(function SourceControlPanel({
 
   const fetchBusy = sourceControl.busyAction === "fetch";
   const pullBusy = sourceControl.busyAction === "pull";
+  const pushBusy = sourceControl.busyAction === "push";
+
+  const fetchLabel = fetchBusy
+    ? "Fetching…"
+    : !hasUpstream
+      ? "No upstream configured"
+      : "Fetch from remote";
+
+  const pullLabel = pullBusy
+    ? "Pulling…"
+    : isDiverged
+      ? "Branch diverged — resolve in terminal"
+      : !hasUpstream
+        ? "No upstream configured"
+        : (scm.status?.behind ?? 0) === 0
+          ? "Already up to date"
+          : `Pull ${scm.status?.behind ?? 0} commits (fast-forward)`;
+
+  const pushLabel = pushBusy ? "Pushing…" : pushDisabledReason;
 
   return (
     <TooltipProvider delayDuration={800} skipDelayDuration={300}>
@@ -582,30 +596,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
                 <span className="max-w-[140px] truncate">{repoLabel}</span>
               </div>
-              {scm.status && (scm.status.ahead > 0 || scm.status.behind > 0) ? (
-                <div className="flex shrink-0 items-center gap-1 text-[10px] font-semibold tabular-nums leading-none">
-                  {scm.status.ahead > 0 ? (
-                    <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
-                      <HugeiconsIcon
-                        icon={ArrowUp02Icon}
-                        size={11}
-                        strokeWidth={2}
-                      />
-                      {scm.status.ahead}
-                    </span>
-                  ) : null}
-                  {scm.status.behind > 0 ? (
-                    <span className="inline-flex items-center gap-0.5 text-blue-600 dark:text-blue-400">
-                      <HugeiconsIcon
-                        icon={ArrowDown02Icon}
-                        size={11}
-                        strokeWidth={2}
-                      />
-                      {scm.status.behind}
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
               {scm.status?.isDetached ? (
                 <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   detached
@@ -613,114 +603,78 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               ) : null}
             </div>
             {scm.repo ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex w-fit min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground">
-                    {scm.repo.isWorktree ? (
-                      <HugeiconsIcon
-                        icon={GitForkIcon}
-                        size={12}
-                        strokeWidth={1.9}
-                        className="shrink-0"
-                      />
-                    ) : null}
-                    <span className="truncate">
-                      {pathBasename(scm.repo.repoRoot)}
-                    </span>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent
-                  side="bottom"
-                  className="text-[10.5px]"
-                >
-                  {scm.repo.repoRoot}
-                </TooltipContent>
-              </Tooltip>
+              <span
+                title={scm.repo.repoRoot}
+                className="inline-flex w-fit min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
+              >
+                {scm.repo.isWorktree ? (
+                  <HugeiconsIcon
+                    icon={GitForkIcon}
+                    size={12}
+                    strokeWidth={1.9}
+                    className="shrink-0"
+                  />
+                ) : null}
+                <span className="truncate">
+                  {pathBasename(scm.repo.repoRoot)}
+                </span>
+              </span>
             ) : null}
           </div>
           <div className="flex h-6 shrink-0 items-center gap-0.5">
-            <IconActionButton
-              label={
-                scmViewMode === "tree" ? "Show as list" : "Group by directory"
-              }
-              onClick={() =>
-                void setScmViewMode(scmViewMode === "tree" ? "list" : "tree")
-              }
-            >
-              <HugeiconsIcon
-                icon={scmViewMode === "tree" ? ListViewIcon : FolderTreeIcon}
-                size={14}
-                strokeWidth={1.85}
-              />
-            </IconActionButton>
-            <IconActionButton
-              label={fetchBusy ? "Fetching…" : "Fetch from remote"}
+            <RemoteActionButton
+              label={fetchLabel}
               disabled={!canFetch}
               onClick={handleFetch}
             >
               {fetchBusy ? (
                 <Spinner className="size-3" />
               ) : (
-                <HugeiconsIcon
-                  icon={FolderCloudIcon}
-                  size={14}
-                  strokeWidth={1.85}
-                />
+                <HugeiconsIcon icon={ArrowDownToDotIcon} size={13} strokeWidth={1.85} />
               )}
-            </IconActionButton>
-            <IconActionButton
-              label={
-                pullBusy
-                  ? "Pulling…"
-                  : isDiverged
-                    ? "Branch diverged — resolve in terminal"
-                    : !hasUpstream
-                      ? "No upstream configured"
-                      : (scm.status?.behind ?? 0) === 0
-                        ? "Already up to date"
-                        : `Pull ${scm.status?.behind ?? 0} commits (fast-forward)`
-              }
+            </RemoteActionButton>
+            <RemoteActionButton
+              label={pullLabel}
               disabled={!canPull}
               onClick={handlePull}
             >
               {pullBusy ? (
                 <Spinner className="size-3" />
               ) : (
-                <HugeiconsIcon
-                  icon={Download01Icon}
-                  size={14}
-                  strokeWidth={1.9}
-                />
+                <span className={cn(
+                  "inline-flex items-center gap-1",
+                  (scm.status?.behind ?? 0) > 0 && "text-blue-600 dark:text-blue-400",
+                )}>
+                  <HugeiconsIcon icon={ArrowDown02Icon} size={13} strokeWidth={1.9} />
+                  {(scm.status?.behind ?? 0) > 0 && (
+                    <span className="text-[10px] font-semibold tabular-nums">
+                      {scm.status?.behind}
+                    </span>
+                  )}
+                </span>
               )}
-            </IconActionButton>
-            <IconActionButton
-              label="Refresh source control"
-              disabled={isRefreshing || !!scm.actionBusy}
-              onClick={handleRefresh}
+            </RemoteActionButton>
+            <RemoteActionButton
+              label={pushLabel}
+              disabled={!scm.canPush || !!scm.actionBusy}
+              onClick={() => void scm.push()}
             >
-              {isRefreshing ? (
-                <Spinner className="size-3.5" />
+              {pushBusy ? (
+                <Spinner className="size-3" />
               ) : (
-                <HugeiconsIcon
-                  icon={Refresh01Icon}
-                  size={14}
-                  strokeWidth={1.9}
-                  className={cn(refreshAnimating && "animate-spin")}
-                />
+                <span className={cn(
+                  "inline-flex items-center gap-1",
+                  (scm.status?.ahead ?? 0) > 0 && "text-emerald-600 dark:text-emerald-400",
+                )}>
+                  <HugeiconsIcon icon={ArrowUp02Icon} size={13} strokeWidth={1.9} />
+                  {(scm.status?.ahead ?? 0) > 0 && (
+                    <span className="text-[10px] font-semibold tabular-nums">
+                      {scm.status?.ahead}
+                    </span>
+                  )}
+                </span>
               )}
-            </IconActionButton>
-            {onOpenGitGraph ? (
-              <IconActionButton
-                label="Log"
-                onClick={() => onOpenGitGraph()}
-              >
-                <HugeiconsIcon
-                  icon={GitCommitIcon}
-                  size={14}
-                  strokeWidth={1.85}
-                />
-              </IconActionButton>
-            ) : null}
+            </RemoteActionButton>
           </div>
         </header>
 
@@ -826,17 +780,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       size="xs"
                       variant="secondary"
                       className="h-7 text-[11.5px] font-medium disabled:cursor-not-allowed"
-                      disabled={!scm.canPush || !!scm.actionBusy}
-                      onClick={() => void scm.push()}
+                      disabled={!canCommit || !scm.canPush || !!scm.actionBusy}
+                      onClick={() => void scm.commitAndPush()}
                     >
-                      {scm.actionBusy === "push" ? "Pushing…" : "Push"}
+                      {scm.actionBusy === "commit" || scm.actionBusy === "push"
+                        ? "Working…"
+                        : "Commit and Push"}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
                     side="bottom"
                     className="max-w-64 text-[10.5px]"
                   >
-                    {pushDisabledReason}
+                    {!canCommit
+                      ? (commitDisabledReason ?? commitHint)
+                      : pushDisabledReason}
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -844,78 +802,111 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               <CommitFeedback feedback={footerFeedback} />
             </div>
 
-            {scm.allClean ? (
-              <CleanTreeHint repoLabel={repoLabel} />
-            ) : (
-              <div
-                ref={containerRef}
-                tabIndex={0}
-                role="listbox"
-                aria-label="Changed files"
-                aria-activedescendant={
-                  focusedRowKey ? `scm-row-${focusedRowKey}` : undefined
-                }
-                onKeyDown={handlePanelKeyDown}
-                className="relative min-h-0 flex-1 outline-none focus-visible:ring-1 focus-visible:ring-primary/30"
-              >
+            <div className="flex min-h-0 flex-1 flex-col">
+              {scm.allClean ? (
+                <CleanTreeHint repoLabel={repoLabel} />
+              ) : (
                 <div
-                  ref={scrollRef}
-                  className="thin-scrollbar h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]"
+                  ref={containerRef}
+                  tabIndex={0}
+                  role="listbox"
+                  aria-label="Changed files"
+                  aria-activedescendant={
+                    focusedRowKey ? `scm-row-${focusedRowKey}` : undefined
+                  }
+                  onKeyDown={handlePanelKeyDown}
+                  className="relative min-h-0 flex-1 outline-none focus-visible:ring-1 focus-visible:ring-primary/30"
                 >
                   <div
-                    style={{
-                      height: virtualizer.getTotalSize(),
-                      position: "relative",
-                      width: "100%",
-                    }}
+                    ref={scrollRef}
+                    className="thin-scrollbar h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]"
                   >
-                    {virtualizer.getVirtualItems().map((virtualRow) => {
-                      const row = rows[virtualRow.index];
-                      if (!row) return null;
-                      return (
-                        <div
-                          key={virtualRow.key}
-                          style={{
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                            width: "100%",
-                            height: virtualRow.size,
-                            transform: `translateY(${virtualRow.start}px)`,
-                          }}
-                        >
-                          <RowRenderer
-                            row={row}
-                            focused={focusedRowKey === row.key}
-                            selected={scm.selected}
-                            actionBusy={scm.actionBusy}
-                            repoRoot={scm.repo?.repoRoot ?? null}
-                            stagedCollapsed={stagedCollapsed}
-                            changesCollapsed={changesCollapsed}
-                            treeCollapsed={treeCollapsed}
-                            onFocusRow={setFocusedRowKey}
-                            onToggleStagedCollapsed={() => setStagedCollapsed((v) => !v)}
-                            onToggleChangesCollapsed={() => setChangesCollapsed((v) => !v)}
-                            onToggleTreeDir={toggleTreeDir}
-                            onStageFolder={handleStageFolder}
-                            onUnstageFolder={handleUnstageFolder}
-                            onDiscardFolder={handleDiscardFolder}
-                            onSelectEntry={scm.selectEntry}
-                            onStageEntry={scm.stageEntry}
-                            onUnstageEntry={scm.unstageEntry}
-                            onDiscardEntry={scm.requestDiscardEntry}
-                            onStageAll={scm.stageAllEntries}
-                            onUnstageAll={scm.unstageAllEntries}
-                            onDiscardAll={scm.requestDiscardAll}
-                            onOpenFile={onOpenFile}
-                          />
-                        </div>
-                      );
-                    })}
+                    <div
+                      style={{
+                        height: virtualizer.getTotalSize(),
+                        position: "relative",
+                        width: "100%",
+                      }}
+                    >
+                      {virtualizer.getVirtualItems().map((virtualRow) => {
+                        const row = rows[virtualRow.index];
+                        if (!row) return null;
+                        return (
+                          <div
+                            key={virtualRow.key}
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              width: "100%",
+                              height: virtualRow.size,
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                          >
+                            <RowRenderer
+                              row={row}
+                              focused={focusedRowKey === row.key}
+                              selected={scm.selected}
+                              actionBusy={scm.actionBusy}
+                              repoRoot={scm.repo?.repoRoot ?? null}
+                              stagedCollapsed={stagedCollapsed}
+                              changesCollapsed={changesCollapsed}
+                              treeCollapsed={treeCollapsed}
+                              onFocusRow={setFocusedRowKey}
+                              onToggleStagedCollapsed={() => setStagedCollapsed((v) => !v)}
+                              onToggleChangesCollapsed={() => setChangesCollapsed((v) => !v)}
+                              onToggleTreeDir={toggleTreeDir}
+                              onStageFolder={handleStageFolder}
+                              onUnstageFolder={handleUnstageFolder}
+                              onDiscardFolder={handleDiscardFolder}
+                              onSelectEntry={scm.selectEntry}
+                              onStageEntry={scm.stageEntry}
+                              onUnstageEntry={scm.unstageEntry}
+                              onDiscardEntry={scm.requestDiscardEntry}
+                              onStageAll={scm.stageAllEntries}
+                              onUnstageAll={scm.unstageAllEntries}
+                              onDiscardAll={scm.requestDiscardAll}
+                              onOpenFile={onOpenFile}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
+              )}
+              <div className="flex h-7 shrink-0 items-center gap-0.5 border-t border-border/40 px-1">
+                <IconActionButton
+                  label={scmViewMode === "tree" ? "View as list" : "View as tree"}
+                  onClick={() =>
+                    void setScmViewMode(scmViewMode === "tree" ? "list" : "tree")
+                  }
+                >
+                  <HugeiconsIcon
+                    icon={FolderTreeIcon}
+                    size={14}
+                    strokeWidth={1.85}
+                    className={cn(scmViewMode === "tree" && "text-foreground")}
+                  />
+                </IconActionButton>
+                <IconActionButton
+                  label="Refresh source control"
+                  disabled={isRefreshing || !!scm.actionBusy}
+                  onClick={handleRefresh}
+                >
+                  {isRefreshing ? (
+                    <Spinner className="size-3.5" />
+                  ) : (
+                    <HugeiconsIcon
+                      icon={Refresh01Icon}
+                      size={14}
+                      strokeWidth={1.9}
+                      className={cn(refreshAnimating && "animate-spin")}
+                    />
+                  )}
+                </IconActionButton>
               </div>
-            )}
+            </div>
           </>
         ) : null}
       </aside>
@@ -1483,6 +1474,44 @@ const EntryRow = memo(function EntryRow({
     </ContextMenu>
   );
 });
+
+function RemoteActionButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">
+          <button
+            type="button"
+            aria-label={label}
+            disabled={disabled}
+            onClick={onClick}
+            className={cn(
+              "flex h-6 items-center gap-1 rounded-md px-1.5 text-muted-foreground transition-colors",
+              disabled
+                ? "cursor-default opacity-40"
+                : "hover:bg-accent hover:text-foreground",
+            )}
+          >
+            {children}
+          </button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-56 text-[10.5px]">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 function IconActionButton({
   label,

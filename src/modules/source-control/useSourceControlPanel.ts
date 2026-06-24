@@ -77,6 +77,7 @@ type SourceControlPanelState = {
   requestDiscardEntries: (entries: SourceControlEntry[]) => void;
   commit: () => Promise<void>;
   push: () => Promise<void>;
+  commitAndPush: () => Promise<void>;
 };
 
 function normalizeError(error: unknown): string {
@@ -638,6 +639,31 @@ export function useSourceControlPanel(
     }
   }, [repo, status?.upstream, summary]);
 
+  const commitAndPush = useCallback(async () => {
+    if (!repo || summary.busyAction) return;
+    setLocalActionBusy("commit");
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      const result = await native.gitCommit(repo.repoRoot, commitMessage);
+      setCommitMessage("");
+      invalidateRepoDiffs(repo.repoRoot);
+      await summary.refresh({ remote: "never" });
+      setLocalActionBusy(null);
+      const pushResult = await summary.runRemoteAction("push");
+      if (pushResult.ok) {
+        setActionMessage(
+          `Committed ${result.commitSha.slice(0, 7)} ${result.summary} and pushed`,
+        );
+      } else if (pushResult.error) {
+        setActionError(pushResult.error);
+      }
+    } catch (error) {
+      setActionError(normalizeError(error));
+      setLocalActionBusy(null);
+    }
+  }, [commitMessage, repo, summary]);
+
   const pendingDiscardView = useMemo<PendingDiscard | null>(() => {
     if (!pendingDiscard) return null;
     if (pendingDiscard.scope === "single") {
@@ -690,5 +716,6 @@ export function useSourceControlPanel(
     requestDiscardEntries,
     commit,
     push,
+    commitAndPush,
   };
 }
