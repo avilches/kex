@@ -7,12 +7,11 @@ import {
   SearchQuery,
   setSearchQuery,
 } from "@codemirror/search";
-import { type Extension } from "@codemirror/state";
+import type { Extension } from "@codemirror/state";
 import {
   EditorView,
   highlightActiveLine,
   highlightWhitespace,
-  keymap,
   scrollPastEnd,
 } from "@codemirror/view";
 import { autocompletion, closeBrackets } from "@codemirror/autocomplete";
@@ -82,6 +81,7 @@ type Props = {
   path: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
+  onContentChange?: (content: string) => void;
 };
 
 function formatBytes(n: number): string {
@@ -91,14 +91,21 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved }, ref) {
+  function EditorPane({ path, onDirtyChange, onSaved, onContentChange }, ref) {
     const { doc, onChange, save, reload } = useDocument({
       path,
       onDirtyChange,
     });
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
+    const onContentChangeRef = useRef(onContentChange);
+    onContentChangeRef.current = onContentChange;
     const cmRef = useRef<ReactCodeMirrorRef>(null);
+
+    const handleChange = useCallback((value: string) => {
+      onChange(value);
+      onContentChangeRef.current?.(value);
+    }, [onChange]);
     const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
     const scrollPastEndPref = usePreferencesStore((s) => s.editorScrollPastEnd);
     const highlightActiveLinePref = usePreferencesStore((s) => s.editorHighlightActiveLine);
@@ -164,19 +171,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           }),
           languageCompartment.of([]),
           wrapCompartment.of(v0.wrap ? EditorView.lineWrapping : []),
-          keymap.of([
-            {
-              key: "Mod-s",
-              preventDefault: true,
-              run: () => {
-                void (async () => {
-                  await saveRef.current();
-                  onSavedRef.current?.();
-                })();
-                return true;
-              },
-            },
-          ]),
         ];
       },
       [],
@@ -446,7 +440,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         <CodeMirror
           ref={cmRef}
           value={doc.content}
-          onChange={onChange}
+          onChange={handleChange}
           theme={themeExt}
           extensions={extensions}
           height="100%"
