@@ -30,6 +30,7 @@ import {
   applyCursorWidth,
   applyFontFamily,
   applyFontSize,
+  applyFontWeight,
   applyLetterSpacing,
   applyLineHeight,
   applyTheme as applyPoolTheme,
@@ -822,6 +823,11 @@ export function useTerminalSession({
   useEffect(() => {
     applyLetterSpacing(letterSpacing);
   }, [letterSpacing]);
+
+  const fontWeight = usePreferencesStore((p) => p.terminalFontWeight);
+  useEffect(() => {
+    applyFontWeight(fontWeight);
+  }, [fontWeight]);
 
   const lineHeight = usePreferencesStore((p) => p.terminalLineHeight);
   useEffect(() => {

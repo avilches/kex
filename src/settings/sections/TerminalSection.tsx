@@ -44,6 +44,7 @@ import {
   setTerminalCursorWidth,
   setTerminalFontFamily,
   setTerminalFontSize,
+  setTerminalFontWeight,
   setTerminalLetterSpacing,
   setTerminalLineHeight,
   setTerminalScrollSensitivity,
@@ -63,9 +64,17 @@ import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 import { SliderRow } from "../components/SliderRow";
 
+const TERMINAL_FONT_WEIGHTS = [
+  { value: "normal", label: "Normal" },
+  { value: "500", label: "Medium" },
+  { value: "600", label: "Semi-Bold" },
+  { value: "bold", label: "Bold" },
+] as const;
+
 export function TerminalSection() {
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
+  const terminalFontWeight = usePreferencesStore((s) => s.terminalFontWeight);
   const terminalLetterSpacing = usePreferencesStore(
     (s) => s.terminalLetterSpacing,
   );
@@ -120,6 +129,26 @@ export function TerminalSection() {
           format={formatSignedPx}
           onChange={(v) => void setTerminalLetterSpacing(v)}
         />
+        <SettingRow
+          title="Font weight"
+          description="Thickness of terminal characters"
+        >
+          <Select
+            value={terminalFontWeight}
+            onValueChange={(v) => void setTerminalFontWeight(v)}
+          >
+            <SelectTrigger value={terminalFontWeight} className="h-8 w-28 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TERMINAL_FONT_WEIGHTS.map((w) => (
+                <SelectItem key={w.value} value={w.value} className="text-[12px]">
+                  {w.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
         <SliderRow
           title="Line height"
           description="Vertical space per row, as a multiple of the font size."

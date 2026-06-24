@@ -11,7 +11,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
-import { Terminal } from "@xterm/xterm";
+import { type FontWeight, Terminal } from "@xterm/xterm";
 import { shouldCursorBlink } from "./cursorBlink";
 import {
   terminalDeleteSequence,
@@ -174,6 +174,7 @@ function termOptions() {
   const prefs = usePreferencesStore.getState();
   return {
     fontFamily: resolveMonoFontFamily(prefs.terminalFontFamily),
+    fontWeight: prefs.terminalFontWeight as FontWeight,
     letterSpacing: prefs.terminalLetterSpacing,
     fontSize: renderFontSize(prefs.terminalFontSize, prefs.zoomLevel),
     lineHeight: prefs.terminalLineHeight,
@@ -844,6 +845,13 @@ export function applyLetterSpacing(spacing: number): void {
     if (slot.term.options.letterSpacing === spacing) continue;
     slot.term.options.letterSpacing = spacing;
     slot.fitAddon.fit();
+  }
+}
+
+export function applyFontWeight(weight: string): void {
+  for (const slot of slots) {
+    if (slot.term.options.fontWeight === weight) continue;
+    slot.term.options.fontWeight = weight as FontWeight;
   }
 }
 
