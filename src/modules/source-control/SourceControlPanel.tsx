@@ -1495,29 +1495,21 @@ function RemoteActionButton({
   children: ReactNode;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="inline-flex">
-          <button
-            type="button"
-            aria-label={label}
-            disabled={disabled}
-            onClick={onClick}
-            className={cn(
-              "flex h-6 items-center gap-1 rounded-md px-1.5 text-muted-foreground transition-colors",
-              disabled
-                ? "cursor-default opacity-40"
-                : "hover:bg-accent hover:text-foreground",
-            )}
-          >
-            {children}
-          </button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-56 text-[10.5px]">
-        {label}
-      </TooltipContent>
-    </Tooltip>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "flex h-6 items-center gap-1 rounded-md px-1.5 text-muted-foreground transition-colors",
+        disabled
+          ? "cursor-default opacity-40"
+          : "hover:bg-accent hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
