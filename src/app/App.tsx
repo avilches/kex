@@ -176,7 +176,8 @@ export default function App() {
     setWorkspaceGitConfig,
     setTerminalRunningCommand,
     setPanelView,
-    togglePreviewMode,
+    toggleOverlayPreview,
+    toggleSplitPreview,
     findPanelGlobal,
     resetWorkspaces,
   } = useWorkspaces(initialOpts);
@@ -1158,9 +1159,13 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) setPanelView(found.workspace.id, panelId, mode);
       },
-      onTogglePreview: (panelId) => {
+      onToggleOverlayPreview: (panelId) => {
         const found = findPanelGlobal(panelId);
-        if (found) togglePreviewMode(found.workspace.id, panelId);
+        if (found) toggleOverlayPreview(found.workspace.id, panelId);
+      },
+      onToggleSplitPreview: (panelId) => {
+        const found = findPanelGlobal(panelId);
+        if (found) toggleSplitPreview(found.workspace.id, panelId);
       },
       registerEditorHandle: (panelId, h) => {
         if (h) {
@@ -1225,7 +1230,8 @@ export default function App() {
       setWorkspaceCwd,
       setTerminalRunningCommand,
       setPanelView,
-      togglePreviewMode,
+      toggleOverlayPreview,
+      toggleSplitPreview,
       updatePanelData,
       activeWorkspace,
       openPanel,
@@ -1738,7 +1744,7 @@ export default function App() {
       "editor.markdown.toggleView": () => {
         if (!activePanel || !activePanelId || !activeWorkspaceId) return;
         if (activePanel.kind === "editor" && isMarkdownPath(activePanel.path)) {
-          togglePreviewMode(activeWorkspaceId, activePanelId);
+          toggleOverlayPreview(activeWorkspaceId, activePanelId);
         } else if (activePanel.kind === "markdown") {
           setPanelView(activeWorkspaceId, activePanelId, "raw");
         }
@@ -1746,7 +1752,16 @@ export default function App() {
       "editor.html.toggleView": () => {
         if (!activePanel || !activePanelId || !activeWorkspaceId) return;
         if (activePanel.kind === "editor" && isHtmlPath(activePanel.path)) {
-          togglePreviewMode(activeWorkspaceId, activePanelId);
+          toggleOverlayPreview(activeWorkspaceId, activePanelId);
+        }
+      },
+      "editor.preview.toggleSplit": () => {
+        if (!activePanel || !activePanelId || !activeWorkspaceId) return;
+        if (
+          activePanel.kind === "editor" &&
+          (isMarkdownPath(activePanel.path) || isHtmlPath(activePanel.path))
+        ) {
+          toggleSplitPreview(activeWorkspaceId, activePanelId);
         }
       },
       "editor.save": () => {
@@ -1915,7 +1930,8 @@ export default function App() {
       showRightPanelTab,
       showExplorerWithMode,
       rotateExplorerRoot,
-      togglePreviewMode,
+      toggleOverlayPreview,
+      toggleSplitPreview,
     ],
   );
 
@@ -1934,6 +1950,12 @@ export default function App() {
         return !(
           activePanel?.kind === "editor" &&
           isHtmlPath(activePanel.path)
+        );
+      }
+      if (id === "editor.preview.toggleSplit") {
+        return !(
+          activePanel?.kind === "editor" &&
+          (isMarkdownPath(activePanel.path) || isHtmlPath(activePanel.path))
         );
       }
       if (id === "editor.save") {

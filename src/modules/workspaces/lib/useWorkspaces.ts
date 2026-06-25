@@ -530,10 +530,17 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, [updatePanelData]);
 
-  const togglePreviewMode = useCallback((workspaceId: string, panelId: string) => {
+  const toggleOverlayPreview = useCallback((workspaceId: string, panelId: string) => {
     updatePanelData(workspaceId, panelId, (p) => {
       if (p.kind !== "editor") return p;
-      return { ...p, previewMode: !(p.previewMode ?? false) };
+      return { ...p, previewMode: p.previewMode === "overlay" ? undefined : "overlay" };
+    });
+  }, [updatePanelData]);
+
+  const toggleSplitPreview = useCallback((workspaceId: string, panelId: string) => {
+    updatePanelData(workspaceId, panelId, (p) => {
+      if (p.kind !== "editor") return p;
+      return { ...p, previewMode: p.previewMode === "split" ? undefined : "split" };
     });
   }, [updatePanelData]);
 
@@ -622,7 +629,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceGitConfig,
     setTerminalRunningCommand,
     setPanelView,
-    togglePreviewMode,
+    toggleOverlayPreview,
+    toggleSplitPreview,
     findPanelGlobal,
     findPaneGlobal,
     resetWorkspaces,

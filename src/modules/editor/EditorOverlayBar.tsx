@@ -20,7 +20,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { DocumentCodeIcon, EyeIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import { DocumentCodeIcon, EyeIcon, LayoutTwoColumnIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   clampIndentSize,
@@ -32,8 +32,6 @@ import { LANGUAGES } from "./lib/languageDefinitions";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useState } from "react";
-
-type MarkdownViewMode = "rendered" | "raw";
 
 export type EditorGlobalToggleKey =
   | "autoSave"
@@ -55,10 +53,9 @@ const GLOBAL_TOGGLE_LABELS: [EditorGlobalToggleKey, string][] = [
 
 type Props = {
   view?: {
-    mode: MarkdownViewMode;
-    onChange: (mode: MarkdownViewMode) => void;
-    renderedDisabled?: boolean;
-    renderedHint?: string;
+    mode: "raw" | "overlay" | "split";
+    onToggleOverlay: () => void;
+    onToggleSplit?: () => void;
     isHtml?: boolean;
   };
   viewToggles?: {
@@ -79,7 +76,8 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLan
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutId = view?.isHtml ? "editor.html.toggleView" : "editor.markdown.toggleView";
   const toggleLabel = view ? getShortcutLabel(shortcutId, userShortcuts) : null;
-  const showToggles = view?.mode !== "rendered" && !!viewToggles;
+  const showToggles = view?.mode === "raw" && !!viewToggles;
+  const onToggleSplit = view?.onToggleSplit;
   const v = viewToggles?.value;
   const set = (patch: Partial<EditorViewSettings>) => {
     if (!viewToggles || !v) return;
@@ -92,7 +90,7 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLan
   const [langOpen, setLangOpen] = useState(false);
   const selectableLanguages = LANGUAGES.filter((l) => l.userSelectable !== false);
   return (
-    <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-md border border-border/60 bg-card/85 p-0.5 text-[11px] shadow-sm backdrop-blur">
+    <div className="pointer-events-auto absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-md border border-border/60 bg-card/85 p-0.5 text-[11px] shadow-sm backdrop-blur">
       {onLanguageChange && (
         <Popover open={langOpen} onOpenChange={setLangOpen}>
           <PopoverTrigger asChild>
@@ -232,24 +230,37 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLan
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {view && showToggles && v && <div className="h-4 w-px bg-border/60" />}
+      {showToggles && v && <div className="h-4 w-px bg-border/60" />}
+      {view && onToggleSplit && (
+        <button
+          type="button"
+          onClick={onToggleSplit}
+          title={view.mode === "split" ? "Close split" : "Split view"}
+          className={cn(
+            "flex size-[22px] items-center justify-center rounded transition-colors",
+            view.mode === "split"
+              ? "text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <HugeiconsIcon icon={LayoutTwoColumnIcon} size={13} strokeWidth={2} />
+        </button>
+      )}
+      {view && onToggleSplit && <div className="h-4 w-px bg-border/60" />}
       {view && (
         <button
           type="button"
-          onClick={() => view.onChange(view.mode === "raw" ? "rendered" : "raw")}
-          disabled={view.renderedDisabled && view.mode === "raw"}
+          onClick={view.onToggleOverlay}
           title={
-            view.renderedDisabled && view.mode === "raw"
-              ? view.renderedHint
-              : view.mode === "raw"
-                ? toggleLabel ? `Preview (${toggleLabel})` : "Preview"
-                : toggleLabel ? `Edit (${toggleLabel})` : "Edit"
+            view.mode === "raw"
+              ? toggleLabel ? `Preview (${toggleLabel})` : "Preview"
+              : toggleLabel ? `Edit (${toggleLabel})` : "Edit"
           }
           className={cn(
-            "flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground",
-            view.renderedDisabled &&
-              view.mode === "raw" &&
-              "cursor-not-allowed opacity-40 hover:text-muted-foreground",
+            "flex size-[22px] items-center justify-center rounded transition-colors",
+            view.mode === "overlay"
+              ? "text-foreground"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           <HugeiconsIcon
