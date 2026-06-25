@@ -4,6 +4,7 @@ mod da_filter;
 mod ipc;
 #[cfg(windows)]
 mod job;
+mod metrics;
 mod session;
 pub(crate) mod shell_init;
 
@@ -18,6 +19,9 @@ use tauri::ipc::{Channel, Response};
 
 use crate::modules::workspace::{spawn_cwd_or_home, WorkspaceEnv, WorkspaceRegistry};
 use session::Session;
+
+pub use metrics::ProcessMonitor;
+use metrics::{aggregate_tree, ProcStat};
 
 pub struct PtyState {
     sessions: RwLock<HashMap<u32, Arc<Session>>>,
