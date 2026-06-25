@@ -327,6 +327,10 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               view={{
                 mode: "overlay",
                 onToggleOverlay: () => callbacks.onSetMarkdownView?.(panel.id, "raw"),
+                onToggleSplit: () => callbacks.onUpdatePanel?.(panel.id, (p) => {
+                  if (p.kind !== "markdown") return p;
+                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split" };
+                }),
               }}
             />
             <div className="absolute inset-0 invisible pointer-events-none">
