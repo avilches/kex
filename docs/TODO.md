@@ -309,6 +309,29 @@ Que el usuario pueda predecir, sin pensar, que pasa al hacer click o doble click
 
 ---
 
+## Terminal: configurar el cwd de las nuevas terminales (workspace root vs tab enfocado)
+
+Estado: idea anotada (2026-06-24).
+
+Permitir elegir, via preferencia, donde abre su cwd una terminal nueva: en el **workspace root** (`Workspace.cwd`) o en el **cwd del tab/panel enfocado** (heredar del terminal activo). Hoy el comportamiento esta hardcodeado a "heredar del tab enfocado, con fallback al workspace root".
+
+### Comportamiento actual
+
+`App.tsx:670` (`openNewTerminal`) crea el panel con `cwd: activeCwdRef.current ?? ws.cwd`:
+
+1. `activeCwdRef.current`: cwd del panel activo visible, pero **solo si es un terminal** (`App.tsx:213-216`; si el panel activo es editor/git-history, es `null`).
+2. fallback a `ws.cwd`: el workspace root (`Workspace.cwd`, `types.ts:54`).
+
+En Rust, `spawn_cwd_or_home()` (`workspace.rs:178-189`) valida y cae a `$HOME` si el cwd es invalido o falta. Los mismos call sites de `openPanel` con `cwd` cubren tambien split-right (`App.tsx:921`) y split-down (`App.tsx:948`) y el nuevo bloque (`App.tsx:686`), que tendrian que respetar la misma preferencia.
+
+### Que falta
+
+- Nueva preferencia (p. ej. `newTerminalCwd: "focused" | "workspaceRoot"`, default `"focused"` para conservar el comportamiento actual). Plumbing en `src/modules/settings/store.ts` (campo en `Preferences` + default + parse + setter + `PREF_KEY_MAP`).
+- Leer la preferencia en `App.tsx` y elegir entre `activeCwdRef.current ?? ws.cwd` (modo `focused`) y `ws.cwd` directo (modo `workspaceRoot`), aplicandolo a todos los call sites de creacion de terminal.
+- UI: es un ajuste global del editor/terminal, asi que va en `TerminalSection` de Settings (y, segun la regla de CLAUDE.md, no es un ajuste por extension). Valorar si tiene sentido tambien por-workspace mas adelante.
+
+---
+
 ## Asignar hotkeys a tabs en workspaces
 
 Estado: idea anotada (2026-06-24); la navegacion por indice ya esta hecha, queda el binding por-tab.
