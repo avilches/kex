@@ -7,6 +7,7 @@ import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/Termin
 import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
+import { resolveDisplayName } from "@/modules/editor/lib/languageResolver";
 import {
   setEditorAutoSave,
   setEditorAutocompletion,
@@ -112,7 +113,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
 
-  const [currentLanguageName, setCurrentLanguageName] = useState<string>("");
+  const [currentLanguageName, setCurrentLanguageName] = useState<string>(() =>
+    panel.kind === "editor" ? resolveDisplayName(panel.path) : "",
+  );
 
   // Live content state for preview panes - updated via debounced onContentChange
   const [liveContent, setLiveContent] = useState("");

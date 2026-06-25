@@ -114,6 +114,32 @@ export function TerminalSection() {
     <div className="flex flex-col gap-6">
       <SectionHeader title="Terminal" />
 
+      <SettingRow
+        title="Default shell"
+        description={
+          shells.find((s) => s.path === terminalShell)?.integrated === false
+            ? "Command blocks and directory tracking are unavailable for this shell."
+            : "Shell for new terminal tabs. Existing tabs keep their shell."
+        }
+      >
+        <Select
+          value={terminalShell || SHELL_AUTO}
+          onValueChange={(v) => void setTerminalShell(v === SHELL_AUTO ? "" : v)}
+        >
+          <SelectTrigger size="sm" className="h-8 w-40 text-[12px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={SHELL_AUTO} className="text-[12px]">Auto</SelectItem>
+            {shells.map((s) => (
+              <SelectItem key={s.path} value={s.path} className="text-[12px]">
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingRow>
+
       <div className="flex flex-col gap-2">
         <FieldLabel>Font</FieldLabel>
         <FontFamilyInput
@@ -131,17 +157,6 @@ export function TerminalSection() {
           defaultValue={TERMINAL_FONT_SIZE_DEFAULT}
           format={formatPx}
           onChange={(v) => void setTerminalFontSize(v)}
-        />
-        <SliderRow
-          title="Letter spacing"
-          description="Extra horizontal space between characters."
-          value={terminalLetterSpacing}
-          min={LETTER_SPACING_MIN}
-          max={LETTER_SPACING_MAX}
-          step={LETTER_SPACING_STEP}
-          defaultValue={LETTER_SPACING_DEFAULT}
-          format={formatSignedPx}
-          onChange={(v) => void setTerminalLetterSpacing(v)}
         />
         <SettingRow
           title="Font weight"
@@ -163,31 +178,17 @@ export function TerminalSection() {
             </SelectContent>
           </Select>
         </SettingRow>
-        <SettingRow
-          title="Default shell"
-          description={
-            shells.find((s) => s.path === terminalShell)?.integrated === false
-              ? "Command blocks and directory tracking are unavailable for this shell."
-              : "Shell for new terminal tabs. Existing tabs keep their shell."
-          }
-        >
-          <Select
-            value={terminalShell || SHELL_AUTO}
-            onValueChange={(v) => void setTerminalShell(v === SHELL_AUTO ? "" : v)}
-          >
-            <SelectTrigger size="sm" className="h-8 w-40 text-[12px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={SHELL_AUTO} className="text-[12px]">Auto</SelectItem>
-              {shells.map((s) => (
-                <SelectItem key={s.path} value={s.path} className="text-[12px]">
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingRow>
+        <SliderRow
+          title="Letter spacing"
+          description="Extra horizontal space between characters."
+          value={terminalLetterSpacing}
+          min={LETTER_SPACING_MIN}
+          max={LETTER_SPACING_MAX}
+          step={LETTER_SPACING_STEP}
+          defaultValue={LETTER_SPACING_DEFAULT}
+          format={formatSignedPx}
+          onChange={(v) => void setTerminalLetterSpacing(v)}
+        />
         <SliderRow
           title="Line height"
           description="Vertical space per row, as a multiple of the font size."
