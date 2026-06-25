@@ -383,7 +383,18 @@ src/
 ├── settings/                      — Second window (SettingsApp.tsx + sections)
 ├── styles/                        — globals.css, fonts.css, tokens, terminalTheme
 └── modules/
-    ├── terminal/                  — xterm.js stack, PTY bridge, OSC parsing (7/133/0/2), blocks, oscTitleStore
+    ├── terminal/                  — xterm.js stack, PTY bridge, OSC parsing (7/133/0/2), blocks, oscTitleStore.
+    │   │                            `TerminalPathBar` renders as the first row of every terminal panel (h-6, mirrors
+    │   │                            `EditorPathBar`): cwd on the left, and `pid / process / CPU% / RAM` on the right.
+    │   │                            `process` is the OSC-133 foreground command when one is running, or the shell name
+    │   │                            at rest. Metrics come from the ephemeral `terminalMetricsStore`
+    │   │                            (`useSyncExternalStore`, never persisted, outside the workspaces tree). A single
+    │   │                            `useTerminalMetricsSampler` hook polls `pty_metrics` every 5 s
+    │   │                            (`TERMINAL_METRICS_INTERVAL_MS`) for the visible terminals of the active workspace
+    │   │                            only (at most one per pane); it skips polling when the document is hidden.
+    │   │                            CPU% is normalized 0..=100 across logical cores. The Rust side uses a persistent
+    │   │                            `sysinfo::System` (`ProcessMonitor` in managed state) so the CPU value is a real
+    │   │                            delta between samples, not an instantaneous reading.
     │   └── block/                 — Block overlay, shell input, mode machine, history
     ├── editor/                    — CodeMirror 6 stack, diffs. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter, indent size 1-12, indent with tabs) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. The per-extension settings are surfaced only in the editor overlay `[...]` menu. Global editor settings (scroll past end, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + blink rate + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences applied via CodeMirror compartments so they update live without rebuilding editor state; the global toggles appear in both the `[...]` menu and the Settings window. A few preferences are JSON-only (no UI; edit `settings-general.json`): `editorHighlightActiveLine`, `editorAutoSaveDelay`, `workspacePaneLimit`, `paneSplitLimit`, `keepFolderLayoutOnChangeExplorerRoot`.
     ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)

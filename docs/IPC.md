@@ -19,6 +19,7 @@ State: `PtyState = RwLock<HashMap<id, Session>>`
 | `pty_close_all` | Close all PTYs (used on app exit) |
 | `pty_has_foreground_process` | Whether a process other than the shell itself is in the foreground |
 | `pty_shell_name` | Detected shell name for the PTY session |
+| `pty_metrics(pty_ids)` | Sample CPU% and resident memory of each terminal's shell process tree (shell PID + all descendants). Returns `{ pty_id, pid, cpu_percent, mem_bytes, shell_name }[]`. CPU is normalized 0..=100 (per-core sum divided by logical CPU count) via a persistent `sysinfo::System` kept in `ProcessMonitor` managed state, so the value is a real delta between calls, not an instantaneous snapshot. Sessions with an unknown shell PID or no active session are skipped. `shell_name` is the shell process name, used when no foreground command is running. |
 
 Shell integration scripts (`scripts/`) are injected at spawn time. Platform detection happens in `pty/shell_init.rs` with `#[cfg(unix)]` / `#[cfg(windows)]` split.
 
