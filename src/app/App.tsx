@@ -83,6 +83,7 @@ import {
 } from "@/modules/workspaces";
 import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
+import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import type { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
@@ -495,6 +496,11 @@ export default function App() {
         home,
       }),
     [activeRootMode, workspaceRootPath, fsFolderRoot, home],
+  );
+
+  const editorChrome = useMemo(
+    () => ({ explorerRoot, home }),
+    [explorerRoot, home],
   );
 
   const canNavigateUp =
@@ -2259,6 +2265,7 @@ export default function App() {
                 <ResizablePanel id="center" minSize="30%">
                   <div className="flex h-full min-h-0 flex-col">
                     <div className="relative min-h-0 flex-1">
+                      <EditorChromeProvider value={editorChrome}>
                       <WorkspaceView
                         workspaces={workspaces}
                         activeWorkspaceId={activeWorkspaceId}
@@ -2282,6 +2289,7 @@ export default function App() {
                         onNavigateFloatBrowserPanel={onNavigateFloatBrowserPanel}
                         welcomeActions={welcomeActions}
                       />
+                      </EditorChromeProvider>
                     </div>
 
                     <WorkspaceInputBar

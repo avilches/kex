@@ -1,7 +1,8 @@
 import { cn, isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
-import { EditorOverlayBar, type EditorGlobalToggleKey } from "@/modules/editor";
+import { EditorPathBar, type EditorGlobalToggleKey } from "@/modules/editor";
+import { useEditorChrome } from "./EditorChromeContext";
 import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -107,6 +108,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
+  const { explorerRoot, home } = useEditorChrome();
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
   const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const bracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
@@ -209,91 +211,84 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
 
       return (
         <Suspense fallback={null}>
-          <div className="relative h-full w-full">
-            {/*
-              EditorOverlayBar is positioned in a pointer-events-none wrapper sized
-              to the editor area. In split mode this constrains it to the left half
-              so it does not float over the preview. pointer-events-auto on the bar
-              itself makes buttons clickable despite the wrapper.
-            */}
-            <div
-              className={cn(
-                "pointer-events-none absolute inset-y-0 left-0 z-20",
-                effectivePreviewMode === "split" ? "right-1/2" : "right-0",
-              )}
-            >
-              <EditorOverlayBar
-                view={showPreviewToggle ? {
-                  mode: effectivePreviewMode ?? "raw",
-                  onToggleOverlay: () => callbacks.onToggleOverlayPreview?.(panel.id),
-                  onToggleSplit: () => callbacks.onToggleSplitPreview?.(panel.id),
-                  isHtml: ishtml,
-                } : undefined}
-                viewToggles={effectivePreviewMode == null ? viewToggles : undefined}
-                globalToggles={effectivePreviewMode == null ? globalToggles : undefined}
-                overrideLanguage={panel.overrideLanguage}
-                currentLanguageName={currentLanguageName}
-                onLanguageChange={(lang) => {
-                  const willShowPreview = lang
-                    ? isMarkdownPath(`x.${lang}`) || isHtmlPath(`x.${lang}`)
-                    : isMarkdownPath(panel.path) || isHtmlPath(panel.path);
-                  callbacks.onUpdatePanel?.(panel.id, (p) => {
-                    if (p.kind !== "editor") return p;
-                    return {
-                      ...p,
-                      overrideLanguage: lang,
-                      previewMode: willShowPreview ? p.previewMode : undefined,
-                    };
-                  });
-                }}
-              />
-            </div>
+          <div className="flex h-full w-full flex-col">
+            <EditorPathBar
+              path={panel.path}
+              explorerRoot={explorerRoot}
+              home={home}
+              onReveal={() => callbacks.onFocusOnExplorer?.(panel.path)}
+              view={showPreviewToggle ? {
+                mode: effectivePreviewMode ?? "raw",
+                onToggleOverlay: () => callbacks.onToggleOverlayPreview?.(panel.id),
+                onToggleSplit: () => callbacks.onToggleSplitPreview?.(panel.id),
+                isHtml: ishtml,
+              } : undefined}
+              viewToggles={effectivePreviewMode == null ? viewToggles : undefined}
+              globalToggles={effectivePreviewMode == null ? globalToggles : undefined}
+              overrideLanguage={panel.overrideLanguage}
+              currentLanguageName={currentLanguageName}
+              onLanguageChange={(lang) => {
+                const willShowPreview = lang
+                  ? isMarkdownPath(`x.${lang}`) || isHtmlPath(`x.${lang}`)
+                  : isMarkdownPath(panel.path) || isHtmlPath(panel.path);
+                callbacks.onUpdatePanel?.(panel.id, (p) => {
+                  if (p.kind !== "editor") return p;
+                  return {
+                    ...p,
+                    overrideLanguage: lang,
+                    previewMode: willShowPreview ? p.previewMode : undefined,
+                  };
+                });
+              }}
+            />
 
-            {/* Editor: always mounted. CSS width/visibility changes per mode. */}
-            <div
-              className={cn(
-                "absolute inset-y-0 left-0",
-                effectivePreviewMode === "overlay"
-                  ? "invisible pointer-events-none right-0"
-                  : effectivePreviewMode === "split"
-                    ? "right-1/2"
-                    : "right-0",
-              )}
-            >
-              <EditorPane
-                ref={(h: EditorPaneHandle | null) => {
-                  (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
-                  callbacks.registerEditorHandle?.(panel.id, h);
-                }}
-                path={panel.path}
-                onDirtyChange={(dirty: boolean) =>
-                  callbacks.onEditorDirtyChange?.(panel.id, dirty)
-                }
-                onClose={() => callbacks.onEditorClose?.(panel.id)}
-                onContentChange={handleContentChange}
-                overrideLanguage={panel.overrideLanguage}
-                onLanguageResolved={setCurrentLanguageName}
-              />
-            </div>
-
-            {/* 1px divider in split mode */}
-            {effectivePreviewMode === "split" && (
-              <div className="absolute inset-y-0 left-1/2 z-20 w-px -translate-x-px bg-border" />
-            )}
-
-            {/* Preview: visible in overlay (full) and split (right half) */}
-            {(effectivePreviewMode === "overlay" || effectivePreviewMode === "split") && (
+            <div className="relative min-h-0 flex-1">
+              {/* Editor: always mounted. CSS width/visibility changes per mode. */}
               <div
                 className={cn(
-                  "absolute inset-y-0 z-10",
-                  effectivePreviewMode === "split" ? "right-0" : "inset-0",
+                  "absolute inset-y-0 left-0",
+                  effectivePreviewMode === "overlay"
+                    ? "invisible pointer-events-none right-0"
+                    : effectivePreviewMode === "split"
+                      ? "right-1/2"
+                      : "right-0",
                 )}
-                style={effectivePreviewMode === "split" ? { left: "calc(50% + 1px)" } : undefined}
               >
-                {ismd && <MarkdownPreviewPane content={liveContent} />}
-                {ishtml && <HtmlPreviewPane content={liveContent} path={panel.path} />}
+                <EditorPane
+                  ref={(h: EditorPaneHandle | null) => {
+                    (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
+                    callbacks.registerEditorHandle?.(panel.id, h);
+                  }}
+                  path={panel.path}
+                  onDirtyChange={(dirty: boolean) =>
+                    callbacks.onEditorDirtyChange?.(panel.id, dirty)
+                  }
+                  onClose={() => callbacks.onEditorClose?.(panel.id)}
+                  onContentChange={handleContentChange}
+                  overrideLanguage={panel.overrideLanguage}
+                  onLanguageResolved={setCurrentLanguageName}
+                />
               </div>
-            )}
+
+              {/* 1px divider in split mode */}
+              {effectivePreviewMode === "split" && (
+                <div className="absolute inset-y-0 left-1/2 z-20 w-px -translate-x-px bg-border" />
+              )}
+
+              {/* Preview: visible in overlay (full) and split (right half) */}
+              {(effectivePreviewMode === "overlay" || effectivePreviewMode === "split") && (
+                <div
+                  className={cn(
+                    "absolute inset-y-0 z-10",
+                    effectivePreviewMode === "split" ? "right-0" : "inset-0",
+                  )}
+                  style={effectivePreviewMode === "split" ? { left: "calc(50% + 1px)" } : undefined}
+                >
+                  {ismd && <MarkdownPreviewPane content={liveContent} />}
+                  {ishtml && <HtmlPreviewPane content={liveContent} path={panel.path} />}
+                </div>
+              )}
+            </div>
           </div>
         </Suspense>
       );
@@ -322,8 +317,12 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
     case "markdown":
       return (
         <Suspense fallback={null}>
-          <div className="relative h-full w-full">
-            <EditorOverlayBar
+          <div className="flex h-full w-full flex-col">
+            <EditorPathBar
+              path={panel.path}
+              explorerRoot={explorerRoot}
+              home={home}
+              onReveal={() => callbacks.onFocusOnExplorer?.(panel.path)}
               view={{
                 mode: "overlay",
                 onToggleOverlay: () => callbacks.onSetMarkdownView?.(panel.id, "raw"),
@@ -333,18 +332,20 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                 }),
               }}
             />
-            <div className="absolute inset-0 invisible pointer-events-none">
-              <EditorPane
-                ref={(h: EditorPaneHandle | null) => {
-                  (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
-                }}
-                path={panel.path}
-                onContentChange={handleContentChange}
-                onReady={handleReady}
-              />
-            </div>
-            <div className="absolute inset-0" style={{ zIndex: 5 }}>
-              <MarkdownPreviewPane content={liveContent} />
+            <div className="relative min-h-0 flex-1">
+              <div className="absolute inset-0 invisible pointer-events-none">
+                <EditorPane
+                  ref={(h: EditorPaneHandle | null) => {
+                    (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
+                  }}
+                  path={panel.path}
+                  onContentChange={handleContentChange}
+                  onReady={handleReady}
+                />
+              </div>
+              <div className="absolute inset-0" style={{ zIndex: 5 }}>
+                <MarkdownPreviewPane content={liveContent} />
+              </div>
             </div>
           </div>
         </Suspense>
