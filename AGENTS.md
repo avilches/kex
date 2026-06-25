@@ -118,8 +118,6 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **header/** — top bar + inline search (`SearchInline` adapts to terminal vs editor via `SearchTarget`).
   `WindowControls` rendered when `USE_CUSTOM_WINDOW_CONTROLS` is true (Linux + Windows; macOS uses native traffic
   lights).
-- **statusbar/** — bottom bar, `CwdBreadcrumb` (handles Unix paths, Windows drive letters, and home `~` segments via
-  `pathUtils.segmentsFromCwd`).
 - **shortcuts/** — keymap registry (`shortcuts.ts`) + `useGlobalShortcuts`. Handlers live in `App.tsx` and are passed in
   by id (`tab.new`, …). `metaKey || ctrlKey` for cross-platform Cmd/Ctrl.
 - **settings/** — settings store (`store.ts` via `tauri-plugin-store`), preferences hook, settings window opener.

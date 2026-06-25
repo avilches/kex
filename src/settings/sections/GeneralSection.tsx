@@ -78,17 +78,15 @@ export function GeneralSection() {
 
       <div className="flex flex-col gap-2">
         <SettingRow
-          title="Enable autofocus in new tabs"
-          description={
+          title={
             <>
-              Tabs with autofocus{" "}
+              Enable autofocus in new tabs{"  "}
               <span className="inline-flex translate-y-[2px] text-primary">
-                <HugeiconsIcon icon={CrosshairIcon} size={12} strokeWidth={2} />
-              </span>{" "}
-              refresh the sidebar when selected. You can toggle autofocus per
-              tab from its context menu.
+                <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
+              </span>
             </>
           }
+          description="Tabs with autofocus refresh the sidebar when selected. You can toggle autofocus per tab from its context menu."
         >
           <Switch
             checked={autofocusNewTabs}
