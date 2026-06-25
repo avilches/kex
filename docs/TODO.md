@@ -245,3 +245,64 @@ Si no funciona hoy, anotar el coste de cablear un link handler (xterm `registerL
 
 - Split view (editor + preview side by side): the overlay architecture keeps the editor mounted,
   so this is a layout-only change - replace the hidden/shown divs with a flex-row split.
+
+---
+
+## CLI `kex`: API de control externa via socket (estilo cmux)
+
+Estado: idea anotada (2026-06-24), por disenar.
+
+Crear un comando CLI `kex` que se comunique con la aplicacion en ejecucion a traves de un socket, para consultar e interactuar con su estado desde scripts o agentes externos. Inspiracion directa: la API de cmux ([docs](https://cmux.com/es/docs/api)).
+
+### Que deberia ofrecer
+
+Mismas operaciones expuestas por dos vias (CLI y socket directo), como hace cmux:
+
+- **Consultar**: listar workspaces, panes/superficies, paneles (con su `kind`, cwd, fichero, url), la ventana/foco actual, y "identify" del contexto desde el que se invoca (que panel/pty soy).
+- **Enviar input**: mandar texto o pulsaciones de tecla (enter, tab, escape) a un terminal enfocado o a una superficie concreta.
+- **Recibir datos**: leer output/estado de un panel (p. ej. ultimas lineas, cwd, estado del agente).
+- **Acciones de layout**: abrir paneles, crear splits direccionales (left/right/up/down), enfocar una superficie, crear/seleccionar/cerrar workspaces.
+- **Notificaciones / metadata de sidebar**: crear alertas, indicadores de estado o progreso (encaja con el modulo `agents` y la `NotificationBell` ya existentes).
+- **Utilidad**: `ping` para disponibilidad y consulta de capacidades del socket.
+
+### Protocolo (boceto)
+
+- Socket Unix en `/tmp/kex.sock` (ruta configurable via env, p. ej. `KEX_SOCKET_PATH`); en Windows, named pipe.
+- Mensajes JSON terminados en salto de linea, estructura JSON-RPC: `{"id":"req-1","method":"workspace.list","params":{}}`. La CLI traduce subcomandos (`kex list-workspaces --json`) a estas peticiones.
+
+### Base tecnica ya disponible (no reinventar)
+
+- Ya existe un socket Unix por-panel en `src-tauri/src/modules/pty/ipc.rs` (`UnixListener`, env `KEX_IPC`), pero hoy es **unidireccional** (hook -> Kex) y **solo** para eventos `SessionStart`/`SessionEnd` de Claude Code. Esta API es algo distinto: un socket de control **global** y **bidireccional** de proposito general. Se puede reusar el patron de listener pero hace falta un socket de app (no por-panel) y un dispatcher de metodos sobre el estado de workspaces.
+- El estado de Workspace/Pane/Panel vive en `useWorkspaces` (frontend); habria que decidir como expone el backend ese estado (espejo en Rust, o el socket reenvia a la webview via eventos Tauri y espera respuesta).
+
+### Seguridad
+
+Control de acceso obligatorio, como cmux: modo desactivado por defecto o restringido. Tres niveles posibles: off / solo procesos `kex` / cualquier proceso local. Validar y autorizar en el boundary del socket (liston de seguridad de `AGENTS.md`: validar en cada boundary IPC/fs/red). Cuidado especial con "enviar input a un terminal" desde un proceso externo: es una superficie de ejecucion de comandos.
+
+### Por que es valioso
+
+Habilita automatizacion, scripting y orquestacion por agentes (abrir un workspace, lanzar comandos en paneles concretos, leer resultados) sin tocar la UI. Es la base de integraciones tipo "un agente conduce Kex".
+
+---
+
+## Definir click / doble-click de forma consistente (explorer, git changes, busquedas)
+
+Estado: idea anotada (2026-06-24), por disenar.
+
+El comportamiento de un click y un doble click sobre una fila de fichero es distinto y confuso segun donde estes. Solo el explorer tiene un modelo claro y configurable; los demas sitios reusan el mismo flag con otra semantica o lo ignoran.
+
+### Estado actual observado
+
+- **Explorer** (`TreeRow.tsx:222,251`): respeta la preferencia `editorPreviewOnClick` (configurable, default true). Single click -> abre en **preview** (tab efimero, se reemplaza al abrir otro); doble click -> abre **permanente** (pin). Modelo claro.
+- **Git changes / source control** (`SourceControlPanel.tsx:1380-1390`): reusa el flag `previewOnClick`, pero la vista de diff no tiene concepto preview-vs-permanente. El flag solo decide si el diff se abre con single o con doble click. Misma preferencia, semantica distinta.
+- **Busquedas** (`ExplorerSearch.tsx:231,313`): ignora el flag. Single click **siempre** abre (`onOpenFile` sin distincion de pin), no hay doble click ni modo preview. Tercera semantica.
+
+### Que decidir
+
+- Un modelo mental unico para toda la app: que significa single click y que significa doble click en cualquier lista de ficheros (explorer, git changes, busqueda de ficheros, busqueda de contenido, git-history).
+- Si el concepto preview/permanente aplica al panel de diff y al de busqueda, o si esos abren siempre permanente (y entonces el flag no deberia influir ahi, o deberia influir de forma documentada y coherente).
+- Reflejar la decision en la preferencia: hoy `editorPreviewOnClick` solo cubre bien el editor. Quiza renombrar/ampliar su alcance o documentar explicitamente que sitios afecta.
+
+### Objetivo
+
+Que el usuario pueda predecir, sin pensar, que pasa al hacer click o doble click en cualquier fila de fichero, y que la preferencia de preview tenga un efecto coherente (o claramente acotado) en todos los sitios.
