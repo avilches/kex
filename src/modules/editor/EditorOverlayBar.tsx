@@ -77,7 +77,7 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLan
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutId = view?.isHtml ? "editor.html.toggleView" : "editor.markdown.toggleView";
   const toggleLabel = view ? getShortcutLabel(shortcutId, userShortcuts) : null;
-  const showToggles = view?.mode === "raw" && !!viewToggles;
+  const showToggles = (view == null || view.mode === "raw") && !!viewToggles;
   const onToggleSplit = view?.onToggleSplit;
   const v = viewToggles?.value;
   const set = (patch: Partial<EditorViewSettings>) => {
