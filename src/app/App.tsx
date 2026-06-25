@@ -65,6 +65,7 @@ import {
   navigateFocusedBlocks,
   type TerminalPaneHandle,
   useTerminalFileDrop,
+  useTerminalMetricsSampler,
   writeToSession,
 } from "@/modules/terminal";
 import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
@@ -203,6 +204,9 @@ export default function App() {
   const activePane = activeWorkspace
     ? findPane(activeWorkspace.paneTree, activeWorkspace.activePaneId)
     : null;
+
+  useTerminalMetricsSampler(activeWorkspace?.paneTree ?? null);
+
   const activePanelId = activePane?.activePanelId ?? null;
   const activePanel = activePanelId
     ? (activePane?.panels.find((p) => p.id === activePanelId) ?? null)
