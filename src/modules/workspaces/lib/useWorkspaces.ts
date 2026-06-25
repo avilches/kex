@@ -461,7 +461,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const target = findReopenTarget(workspacesRef.current, activeWorkspaceId, entry);
     if (!target) return;
     closedPanelsRef.current = rest;
-    const newPanel: Panel = { ...entry.panel, id: newPanelId() };
+    const newPanel: Panel = (() => {
+      const base = { ...entry.panel, id: newPanelId() };
+      if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
+      if (base.kind === "terminal" || base.kind === "git-diff") return { ...base, locked: false };
+      return base;
+    })();
     openPanel(target.workspaceId, target.paneId, newPanel);
   }, [openPanel, activeWorkspaceId]);
 
