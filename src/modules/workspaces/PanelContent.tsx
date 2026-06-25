@@ -112,6 +112,8 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
 
+  const [currentLanguageName, setCurrentLanguageName] = useState<string>("");
+
   // Live content state for preview panes - updated via debounced onContentChange
   const [liveContent, setLiveContent] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -211,6 +213,14 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               }
               viewToggles={!previewMode ? viewToggles : undefined}
               globalToggles={!previewMode ? globalToggles : undefined}
+              overrideLanguage={panel.overrideLanguage}
+              currentLanguageName={currentLanguageName}
+              onLanguageChange={(lang) =>
+                callbacks.onUpdatePanel?.(panel.id, (p) => ({
+                  ...p,
+                  overrideLanguage: lang,
+                }))
+              }
             />
             <div
               className={
@@ -230,6 +240,8 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                 }
                 onClose={() => callbacks.onEditorClose?.(panel.id)}
                 onContentChange={handleContentChange}
+                overrideLanguage={panel.overrideLanguage}
+                onLanguageResolved={setCurrentLanguageName}
               />
             </div>
             {previewMode && ismd && (

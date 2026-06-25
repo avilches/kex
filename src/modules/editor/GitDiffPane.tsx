@@ -235,7 +235,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
         cursorBlinkRate: s.editorCursorBlinkRate,
         cursorStyle: s.editorCursorStyle,
       }),
-      languageCompartment.of(initialLang ?? []),
+      languageCompartment.of(initialLang?.ext ?? []),
       wrapCompartment.of(v0.wrap ? EditorView.lineWrapping : []),
       ...READONLY_EXT,
       unifiedMergeView({ original: originalContent, mergeControls: false, highlightChanges: true, gutter: true, syntaxHighlightDeletions: true, collapseUnchanged: { margin: 3, minSize: 6 } }),
@@ -270,12 +270,12 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     if (useFallback || initialLang) return;
     if (state.kind !== "loaded") return;
     let cancelled = false;
-    resolveLanguage(path).then((ext) => {
+    resolveLanguage(path).then((res) => {
       if (cancelled) return;
       const view = cmRef.current?.view;
       if (!view) return;
       view.dispatch({
-        effects: languageCompartment.reconfigure(ext ?? []),
+        effects: languageCompartment.reconfigure(res?.ext ?? []),
       });
     });
     return () => {

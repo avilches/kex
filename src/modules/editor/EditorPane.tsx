@@ -7,7 +7,6 @@ import {
   SearchQuery,
   setSearchQuery,
 } from "@codemirror/search";
-import type { Extension } from "@codemirror/state";
 import {
   EditorView,
   highlightActiveLine,
@@ -49,7 +48,7 @@ import {
   wrapCompartment,
 } from "./lib/extensions";
 import { resolveEditorView } from "./lib/editorViewSettings";
-import { resolveLanguage } from "./lib/languageResolver";
+import { resolveLanguage, type LanguageResult } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 import { useDocument } from "./lib/useDocument";
 import { cursorBlinkExt, cursorStyleExt } from "./lib/cursorExtensions";
@@ -84,6 +83,8 @@ type Props = {
   onContentChange?: (content: string) => void;
   /** Called once when the initial file content is loaded from disk. */
   onReady?: (initialContent: string) => void;
+  overrideLanguage?: string | null;
+  onLanguageResolved?: (name: string) => void;
 };
 
 function formatBytes(n: number): string {
@@ -93,7 +94,7 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onContentChange, onReady }, ref) {
+  function EditorPane({ path, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved }, ref) {
     const { doc, onChange, save, reload } = useDocument({
       path,
       onDirtyChange,
@@ -278,28 +279,21 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       languageRef.current = ext;
       if (doc.status !== "ready") return;
       let cancelled = false;
-      const resolve = async (): Promise<Extension> => {
-        if (path.toLowerCase().endsWith(".kex-theme")) {
-          const [{ json }, { colorSwatches }] = await Promise.all([
-            import("@codemirror/lang-json"),
-            import("./lib/colorSwatches"),
-          ]);
-          return [json(), colorSwatches()];
-        }
-        return (await resolveLanguage(path)) ?? [];
+      const resolve = async (): Promise<LanguageResult> => {
+        const resolvePath = overrideLanguage ? `dummy.${overrideLanguage}` : path;
+        return (await resolveLanguage(resolvePath)) ?? { ext: [], name: "", id: "" };
       };
-      void resolve().then((extension) => {
+      void resolve().then((result) => {
         if (cancelled) return;
-        const v = cmRef.current?.view;
-        if (!v) return;
-        v.dispatch({
-          effects: languageCompartment.reconfigure(extension),
-        });
+        const view = cmRef.current?.view;
+        if (!view) return;
+        view.dispatch({ effects: languageCompartment.reconfigure(result.ext) });
+        onLanguageResolved?.(result.name);
       });
       return () => {
         cancelled = true;
       };
-    }, [path, doc.status]);
+    }, [path, doc.status, overrideLanguage]);
 
     useImperativeHandle(
       ref,

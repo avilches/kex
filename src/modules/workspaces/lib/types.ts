@@ -3,7 +3,7 @@ import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type Panel =
   | { id: string; kind: "terminal"; cwd?: string; title?: string; blocks?: boolean;
       locked?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; autofocus?: boolean }
-  | { id: string; kind: "editor"; path: string; title?: string; dirty: boolean; preview: boolean; previewMode?: boolean; locked?: boolean; autofocus?: boolean }
+  | { id: string; kind: "editor"; path: string; title?: string; dirty: boolean; preview: boolean; previewMode?: boolean; locked?: boolean; autofocus?: boolean; overrideLanguage?: string | null }
   | { id: string; kind: "browser";         url: string;   title?: string; floating?: boolean }
   | { id: string; kind: "markdown";        path: string;  title?: string }
   | { id: string; kind: "git-diff";        path: string;  repoRoot: string; mode: "-" | "+"; originalPath: string | null; title?: string; locked?: boolean; autofocus?: boolean }

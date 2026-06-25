@@ -7,6 +7,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { DocumentCodeIcon, EyeIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -15,8 +28,10 @@ import {
   EDITOR_INDENT_MIN,
   type EditorViewSettings,
 } from "./lib/editorViewSettings";
+import { LANGUAGES } from "./lib/languageDefinitions";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useState } from "react";
 
 type MarkdownViewMode = "rendered" | "raw";
 
@@ -55,9 +70,12 @@ type Props = {
     value: EditorGlobalToggles;
     onToggle: (key: EditorGlobalToggleKey, value: boolean) => void;
   };
+  overrideLanguage?: string | null;
+  currentLanguageName?: string;
+  onLanguageChange?: (lang: string | null) => void;
 };
 
-export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
+export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLanguage, currentLanguageName, onLanguageChange }: Props) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutId = view?.isHtml ? "editor.html.toggleView" : "editor.markdown.toggleView";
   const toggleLabel = view ? getShortcutLabel(shortcutId, userShortcuts) : null;
@@ -71,8 +89,61 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles }: Props) {
   // Radix closes the menu on every item select; keep it open so several
   // toggles can be flipped in one pass.
   const keepOpen = (e: Event) => e.preventDefault();
+  const [langOpen, setLangOpen] = useState(false);
+  const selectableLanguages = LANGUAGES.filter((l) => l.userSelectable !== false);
   return (
     <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-md border border-border/60 bg-card/85 p-0.5 text-[11px] shadow-sm backdrop-blur">
+      {onLanguageChange && (
+        <Popover open={langOpen} onOpenChange={setLangOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="h-6 rounded px-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
+              title="Change language mode"
+            >
+              {overrideLanguage
+                ? (selectableLanguages.find((l) =>
+                    l.extensions[0] === overrideLanguage ||
+                    l.extensions.includes(overrideLanguage)
+                  )?.name ?? overrideLanguage)
+                : (currentLanguageName || "Auto")}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0" align="end">
+            <Command>
+              <CommandInput placeholder="Search language..." className="h-8 text-[12px]" />
+              <CommandList>
+                <CommandEmpty>No language found.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value="auto"
+                    onSelect={() => {
+                      onLanguageChange(null);
+                      setLangOpen(false);
+                    }}
+                    className="text-[12px]"
+                  >
+                    Auto
+                  </CommandItem>
+                  {selectableLanguages.map((lang) => (
+                    <CommandItem
+                      key={lang.extensions[0]}
+                      value={lang.name}
+                      onSelect={() => {
+                        onLanguageChange(lang.extensions[0]);
+                        setLangOpen(false);
+                      }}
+                      className="text-[12px]"
+                    >
+                      {lang.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      )}
       {showToggles && v && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
