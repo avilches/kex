@@ -130,9 +130,10 @@ const ROOT_MODES: {
   { id: "pinned", label: "Workspace Root", icon: PinIcon },
 ];
 
+// Both modes surface Cmd+E, the key that cycles the explorer root between them.
 const MODE_SHORTCUT: Record<string, ShortcutId> = {
-  filesystem: "explorer.viewFilesystem",
-  pinned: "explorer.viewPinned",
+  filesystem: "sidebar.showExplorer",
+  pinned: "sidebar.showExplorer",
 };
 
 type RootModeContext = {

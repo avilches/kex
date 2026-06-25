@@ -49,6 +49,7 @@ export type ShortcutId =
   | "workspace.close"
   | "workspace.prev"
   | "workspace.next"
+  | "workspace.selectByIndex"
   | "view.zoomIn"
   | "view.zoomOut"
   | "view.zoomReset"
@@ -119,6 +120,15 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowDown" }],
   },
   {
+    id: "workspace.selectByIndex",
+    label: "Jump to Workspace 1–9",
+    group: "General",
+    // Wildcard digit: Cmd+1..9 jump to that workspace. The "1" is just the
+    // representative binding; matchBinding treats any 1-9 as a hit (see the
+    // workspace.selectByIndex special case). Cmd+0 is left to Reset Zoom.
+    defaultBindings: [{ meta: true, key: "1" }],
+  },
+  {
     id: "commandPalette.open",
     label: "Open Command Palette",
     group: "General",
@@ -144,7 +154,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "sidebar.showExplorer",
-    label: "Show Explorer",
+    label: "Explorer (cycle root)",
     group: "Sidebar",
     defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
   },
@@ -164,13 +174,15 @@ export const SHORTCUTS: Shortcut[] = [
     id: "explorer.viewFilesystem",
     label: "Explorer: File System",
     group: "Sidebar",
-    defaultBindings: [{ ctrl: true, key: "1" }],
+    // No default binding: Ctrl+1/Ctrl+2 are now tab.selectByIndex. Cycle the
+    // explorer root with Cmd+E (sidebar.showExplorer); these stay reassignable.
+    defaultBindings: [],
   },
   {
     id: "explorer.viewPinned",
     label: "Explorer: Workspace Root",
     group: "Sidebar",
-    defaultBindings: [{ ctrl: true, key: "2" }],
+    defaultBindings: [],
   },
   {
     id: "explorer.toggleHidden",
@@ -362,9 +374,11 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "tab.selectByIndex",
-    label: "Jump to Tab 1–9",
+    label: "Jump to Tab 1–9 (0 = last)",
     group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
+    // Wildcard digit: Ctrl+1..9 select that tab in the active pane, Ctrl+0
+    // selects the last one. The "1" is just the representative binding.
+    defaultBindings: [{ ctrl: true, key: "1" }],
   },
   {
     id: "search.focus",
@@ -488,11 +502,14 @@ export function matchBinding(
     : e.key.toLowerCase();
   const bindingKey = binding.key.toLowerCase();
 
-  // Special case for Jump to Tab 1-9: only match if both the event key and
-  // the binding key are digits 1-9 and they match exactly.
-  if (id === "tab.selectByIndex") {
-    if (!/^[1-9]$/.test(e.key) || !/^[1-9]$/.test(binding.key)) return false;
-    if (eventKey !== bindingKey) return false;
+  // Special case for the index shortcuts: the binding key is just a
+  // representative digit; ANY digit in range counts as a hit (the handler
+  // reads e.key for the actual index). Workspaces use 1-9 (0 stays Reset Zoom);
+  // tabs use 0-9 (0 = last tab).
+  if (id === "workspace.selectByIndex") {
+    if (!/^[1-9]$/.test(e.key) || !/^[0-9]$/.test(binding.key)) return false;
+  } else if (id === "tab.selectByIndex") {
+    if (!/^[0-9]$/.test(e.key) || !/^[0-9]$/.test(binding.key)) return false;
   } else if (eventKey !== bindingKey) {
     return false;
   }

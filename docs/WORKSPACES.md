@@ -182,7 +182,7 @@ reapIdleSlot()        ← fires after SLOT_REAP_GRACE_MS if still idle
 disposeSlot()         ← term.dispose(), host.remove(), splice from slots[]
 ```
 
-The grace periods exist so that quick panel switches (e.g., Cmd+1 / Cmd+2 / Cmd+1 in rapid
+The grace periods exist so that quick panel switches (e.g., Ctrl+1 / Ctrl+2 / Ctrl+1 in rapid
 succession) reuse the same warm slot without destroying and recreating it.
 
 `IDLE_SLOTS_KEEP_WARM = 1`: at most one idle slot keeps its xterm instance alive after the reap

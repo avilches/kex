@@ -135,10 +135,12 @@ describe("matchBinding", () => {
     expect(matchBinding(event as KeyboardEvent, binding, "tab.selectByIndex")).toBe(true);
   });
 
-  test("matchBinding for tab.selectByIndex does not match different digit", () => {
+  test("matchBinding for tab.selectByIndex matches any digit (wildcard)", () => {
+    // The binding digit is just representative; any 0-9 with the same modifiers
+    // is a hit, the handler reads e.key for the actual index.
     const binding: KeyBinding = { meta: true, key: "5" };
     const event = createMockKeyboardEvent("3", { meta: true });
-    expect(matchBinding(event as KeyboardEvent, binding, "tab.selectByIndex")).toBe(false);
+    expect(matchBinding(event as KeyboardEvent, binding, "tab.selectByIndex")).toBe(true);
   });
 
   test("matchBinding for tab.selectByIndex does not match non-digit", () => {
@@ -222,43 +224,70 @@ test("bare Delete keydown matches file.delete", () => {
   expect(matchesShortcut(ev, "file.delete")).toBe(true);
 });
 
-describe("tab.selectByIndex binding uniqueness", () => {
-  // explorer.viewFilesystem/Pinned intentionally use Ctrl+1-2 on all platforms.
-  // On macOS, tab.selectByIndex uses Cmd (meta) so there is no conflict.
-  // On Linux/Windows both use Ctrl -- the user can reassign via Settings.
-  // These are the only known exceptions.
-  const DIGIT_EXCEPTIONS = new Set<ShortcutId>([
-    "explorer.viewFilesystem",
-    "explorer.viewPinned",
-  ]);
+function digitEvent(
+  key: string,
+  mods: { meta?: boolean; ctrl?: boolean },
+): KeyboardEvent {
+  return {
+    key,
+    code: `Digit${key}`,
+    ctrlKey: !!mods.ctrl,
+    metaKey: !!mods.meta,
+    shiftKey: false,
+    altKey: false,
+    repeat: false,
+  } as unknown as KeyboardEvent;
+}
 
-  test("only tab.selectByIndex and known explorer.view* bind to Cmd/Ctrl+1-9", () => {
-    const tabSelectByIndex = SHORTCUTS.find(
-      (s) => s.id === "tab.selectByIndex"
-    );
-    expect(tabSelectByIndex).toBeDefined();
+describe("index shortcut digit families", () => {
+  // workspace.selectByIndex (Cmd/meta + 1-9) and tab.selectByIndex (Ctrl + 0-9)
+  // own the digit space via wildcard matching. On macOS this is conflict-free
+  // (Cmd vs Ctrl are distinct). On Windows/Linux MOD_PROP is Ctrl, so Ctrl+0
+  // (last tab) overlaps view.zoomReset; tab wins by registration order and
+  // Reset Zoom stays reassignable. That single overlap is the one known
+  // exception, excluded below.
+  const KNOWN_DIGIT_OVERLAP = new Set<ShortcutId>(["view.zoomReset"]);
 
-    const digitPattern = /^[1-9]$/;
-    const otherShortcuts = SHORTCUTS.filter(
-      (s) => s.id !== "tab.selectByIndex" && !DIGIT_EXCEPTIONS.has(s.id)
-    );
-
-    for (const other of otherShortcuts) {
-      for (const binding of other.defaultBindings) {
-        const isDigitKey = digitPattern.test(binding.key);
-        const isCmdOrCtrl = binding.meta || binding.ctrl;
-        const sameModifiers =
-          binding.meta === tabSelectByIndex!.defaultBindings[0].meta &&
-          binding.ctrl === tabSelectByIndex!.defaultBindings[0].ctrl &&
-          binding.shift === tabSelectByIndex!.defaultBindings[0].shift &&
-          binding.alt === tabSelectByIndex!.defaultBindings[0].alt;
-
-        if (isDigitKey && isCmdOrCtrl && sameModifiers) {
+  test("no unexpected shortcut collides with the index digit families", () => {
+    const digit = /^[0-9]$/;
+    for (const s of SHORTCUTS) {
+      if (
+        s.id === "workspace.selectByIndex" ||
+        s.id === "tab.selectByIndex" ||
+        KNOWN_DIGIT_OVERLAP.has(s.id)
+      )
+        continue;
+      for (const b of s.defaultBindings) {
+        if (!digit.test(b.key)) continue;
+        const wsFamily =
+          !!b.meta && !b.ctrl && !b.alt && !b.shift && /^[1-9]$/.test(b.key);
+        const tabFamily = !!b.ctrl && !b.meta && !b.alt && !b.shift;
+        if (wsFamily)
           expect.fail(
-            `${other.id} binds to Cmd/Ctrl+${binding.key}, which conflicts with tab.selectByIndex`
+            `${s.id} binds Cmd+${b.key}, conflicts with workspace.selectByIndex`,
           );
-        }
+        if (tabFamily)
+          expect.fail(
+            `${s.id} binds Ctrl+${b.key}, conflicts with tab.selectByIndex`,
+          );
       }
     }
+  });
+
+  test("Cmd+1..9 select a workspace, Cmd+0 does not (left for Reset Zoom)", () => {
+    expect(matchesShortcut(digitEvent("1", { meta: true }), "workspace.selectByIndex")).toBe(true);
+    expect(matchesShortcut(digitEvent("9", { meta: true }), "workspace.selectByIndex")).toBe(true);
+    expect(matchesShortcut(digitEvent("0", { meta: true }), "workspace.selectByIndex")).toBe(false);
+  });
+
+  test("Ctrl+0..9 select a tab (0 = last)", () => {
+    expect(matchesShortcut(digitEvent("1", { ctrl: true }), "tab.selectByIndex")).toBe(true);
+    expect(matchesShortcut(digitEvent("9", { ctrl: true }), "tab.selectByIndex")).toBe(true);
+    expect(matchesShortcut(digitEvent("0", { ctrl: true }), "tab.selectByIndex")).toBe(true);
+  });
+
+  test("digit families do not cross modifiers", () => {
+    expect(matchesShortcut(digitEvent("1", { meta: true }), "tab.selectByIndex")).toBe(false);
+    expect(matchesShortcut(digitEvent("1", { ctrl: true }), "workspace.selectByIndex")).toBe(false);
   });
 });

@@ -311,22 +311,18 @@ Que el usuario pueda predecir, sin pensar, que pasa al hacer click o doble click
 
 ## Asignar hotkeys a tabs en workspaces
 
-Estado: idea anotada (2026-06-24), por disenar.
+Estado: idea anotada (2026-06-24); la navegacion por indice ya esta hecha, queda el binding por-tab.
 
-Poder asignar atajos de teclado para saltar directamente a un tab (panel) concreto, mas alla de la navegacion por posicion que ya existe.
+### Ya implementado (2026-06-24)
 
-### Estado actual
+- `workspace.selectByIndex` (Cmd+1..9): salta al workspace N. Cmd+0 sigue siendo Reset Zoom.
+- `tab.selectByIndex` (Ctrl+1..9, Ctrl+0 = ultimo): salta al tab N del pane activo. Antes estaba roto (cambiaba de workspace) y solo respondia a Cmd+1; ahora usa matching comodin de digito (`shortcuts.ts` matchBinding) y handler real en `App.tsx`.
+- Cmd+E rota el root del explorer (File System <-> Workspace Root), liberando Ctrl+1/Ctrl+2.
 
-- `tab.selectByIndex` ("Jump to Tab 1-9", Cmd+1..9): salta al tab N **por posicion** dentro del pane activo (`shortcuts.ts:357`, handler en `App.tsx:1750`). El binding sigue a la posicion, no al tab: si reordenas, Cmd+1 va a otro tab.
-- `tab.next` / `tab.prev`: ciclar tabs.
-- `workspace.prev` / `workspace.next`: ciclar workspaces (no hay salto a workspace por indice).
+### Que falta (lo que de verdad pedia la idea)
 
-### Que falta / a decidir
+- **Hotkey pegado a un tab concreto**: que el usuario asigne un atajo a un tab determinado y lo siga aunque cambie de posicion o de pane (binding por-tab persistido, no por-indice). Decidir donde se asigna (menu contextual del tab, o un modo "asignar atajo") y como se persiste en el modelo `Panel`/`Workspace`. Debe vivir en el registry unico (`shortcuts.ts`) sin chocar con las familias de digito de `tab.selectByIndex` / `workspace.selectByIndex`.
 
-- **Hotkey pegado a un tab concreto**: que el usuario asigne un atajo a un tab determinado y lo siga aunque cambie de posicion o de pane (binding por-tab persistido, no por-indice). Decidir donde se asigna (menu contextual del tab, o un modo "asignar atajo") y como se persiste en el modelo `Panel`/`Workspace`.
-- **Salto a workspace por indice**: hoy solo hay prev/next; valorar `workspace.selectByIndex` (p. ej. Cmd+Alt+1..9) analogo al de tabs.
-- Encaja con el registry unico de shortcuts (`shortcuts.ts` + `matchesShortcut`); cuidar que los bindings por-tab no choquen con `tab.selectByIndex` ni con los atajos globales reasignables.
+### Nota cross-platform
 
-### Objetivo
-
-Navegacion directa y memorizable a tabs/workspaces frecuentes, sin depender de su posicion actual.
+En Windows/Linux `MOD_PROP` es Ctrl, asi que Ctrl+0 (ultimo tab) se solapa con `view.zoomReset`; el tab gana por orden de registro y Reset Zoom queda reasignable. En macOS no hay conflicto (Cmd vs Ctrl son distintos).

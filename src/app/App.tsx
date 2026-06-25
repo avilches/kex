@@ -1413,6 +1413,25 @@ export default function App() {
     [handleChangeRootMode],
   );
 
+  // Cmd+E: bring up the explorer, then on each press cycle its root between File
+  // System and Workspace Root. With no pinned root the cycle stays on File
+  // System (idempotent). It never closes the sidebar (use sidebar.toggle).
+  const rotateExplorerRoot = useCallback(() => {
+    const state = usePreferencesStore.getState();
+    const inExplorer =
+      state.rightPanelOpen && state.rightPanelActiveTab === "explorer";
+    if (!inExplorer) {
+      showRightPanelTab("explorer");
+      return;
+    }
+    const mode = activeWorkspace?.explorerRootMode ?? "filesystem";
+    if (mode === "filesystem") {
+      if (activeWorkspace?.pinnedRoot) handleChangeRootMode("pinned");
+    } else {
+      handleChangeRootMode("filesystem");
+    }
+  }, [activeWorkspace, handleChangeRootMode, showRightPanelTab]);
+
   const { sourceControl, toggleSourceControl, openGitGraphFromContext } =
     useSourceControlContext({
       explorerRoot,
@@ -1752,9 +1771,13 @@ export default function App() {
         activatePanel(activeWorkspace.id, prev.id);
       },
       "tab.selectByIndex": (e) => {
-        const idx = parseInt(e.key, 10) - 1;
-        if (idx >= 0 && idx < workspaces.length)
-          setActiveWorkspaceId(workspaces[idx].id);
+        if (!activeWorkspace || !activePane) return;
+        const panels = activePane.panels;
+        if (panels.length === 0) return;
+        const digit = parseInt(e.key, 10);
+        const idx = digit === 0 ? panels.length - 1 : digit - 1;
+        if (idx >= 0 && idx < panels.length)
+          activatePanel(activeWorkspace.id, panels[idx].id);
       },
       "pane.splitRight": doSplitRight,
       "pane.splitDown": doSplitDown,
@@ -1763,7 +1786,7 @@ export default function App() {
       "pane.focusLeft": () => focusPaneInDirection("left"),
       "pane.focusRight": () => focusPaneInDirection("right"),
       "sidebar.toggle": toggleRightPanel,
-      "sidebar.showExplorer": () => showRightPanelTab("explorer"),
+      "sidebar.showExplorer": rotateExplorerRoot,
       "sidebar.showGit": () => showRightPanelTab("git"),
       "sidebar.showHistory": () => showRightPanelTab("history"),
       "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
@@ -1782,6 +1805,11 @@ export default function App() {
       "window.new": () => void native.openMainWindow(),
       "workspace.prev": () => cycleWorkspace(-1),
       "workspace.next": () => cycleWorkspace(1),
+      "workspace.selectByIndex": (e) => {
+        const idx = parseInt(e.key, 10) - 1;
+        if (idx >= 0 && idx < workspaces.length)
+          setActiveWorkspaceId(workspaces[idx].id);
+      },
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
       "view.zoomReset": zoomReset,
@@ -1886,6 +1914,7 @@ export default function App() {
       toggleRightPanel,
       showRightPanelTab,
       showExplorerWithMode,
+      rotateExplorerRoot,
       togglePreviewMode,
     ],
   );

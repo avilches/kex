@@ -45,7 +45,6 @@ Total: 27 bugs. 5 high, 11 medium, 11 low. Los marcados con asterisco se verific
 | BUG-26 | Effect del diff depende de `source` inestable | [bugs/BUG-26-diff-effect-source-dep-recreated.md](bugs/BUG-26-diff-effect-source-dep-recreated.md) |
 | BUG-29 | Split de paths por `"/"` (cross-platform) | [bugs/BUG-29-path-split-forward-slash-only.md](bugs/BUG-29-path-split-forward-slash-only.md) |
 | BUG-31 | Preview de tema obsoleto tras cerrar la paleta | [bugs/BUG-31-theme-preview-stale-after-close.md](bugs/BUG-31-theme-preview-stale-after-close.md) |
-| BUG-32 | `tab.selectByIndex` salta el guard de key | [bugs/BUG-32-selectbyindex-matcher-skips-key-guard.md](bugs/BUG-32-selectbyindex-matcher-skips-key-guard.md) |
 | BUG-33 | `segmentsFromCwd` case-sensitive en Windows | [bugs/BUG-33-segmentsfromcwd-case-sensitive-home-windows.md](bugs/BUG-33-segmentsfromcwd-case-sensitive-home-windows.md) |
 | BUG-35 | `usePresence` re-entrancy latente | [bugs/BUG-35-usepresence-mounted-in-deps-reentrancy.md](bugs/BUG-35-usepresence-mounted-in-deps-reentrancy.md) |
 
