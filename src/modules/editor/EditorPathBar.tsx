@@ -144,7 +144,7 @@ export function EditorPathBar({
   const [langOpen, setLangOpen] = useState(false);
   const selectableLanguages = LANGUAGES.filter((l) => l.userSelectable !== false);
   return (
-    <div className="flex h-7 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-card/40 px-2 text-[11px]">
+    <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
       <PathDisplay path={path} explorerRoot={explorerRoot} home={home} onReveal={onReveal} />
       <div className="ml-auto flex shrink-0 items-center gap-1">
         {onLanguageChange && (

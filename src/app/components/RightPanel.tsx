@@ -108,12 +108,15 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               type="button"
               onClick={() => void setRightPanelActiveTab(tab.id)}
               className={cn(
-                "h-full px-3 text-[11px] font-medium transition-colors",
+                "relative h-full px-3 text-[11px] font-medium transition-colors",
                 activeTab === tab.id
                   ? "bg-card text-foreground"
                   : "bg-muted/35 text-muted-foreground hover:bg-card hover:text-foreground",
               )}
             >
+              {activeTab === tab.id && (
+                <div className="absolute inset-x-0 top-0 h-[1.5px] bg-tab-focus-indicator" />
+              )}
               {tab.label}
             </button>
           ))}

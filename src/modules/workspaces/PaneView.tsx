@@ -246,30 +246,38 @@ export const PaneView = memo(function PaneView({
       onMouseDownCapture={handleFocus}
       onFocus={handleFocus}
     >
-      <PaneTabBar
-        panels={pane.panels}
-        activePanelId={pane.activePanelId}
-        paneFocused={focused}
-        workspaceId={workspaceId}
-        isWorkspaceActive={isWorkspaceActive}
-        onActivate={handleActivate}
-        onClose={handleClose}
-        onNewTerminal={handleNewTerminal}
-        onCloseOtherPanels={handleCloseOtherPanels}
-        onCloseAllPanels={handleCloseAllPanels}
-        onSplitTerminalRight={handleSplitTerminalRight}
-        onSplitTerminalDown={handleSplitTerminalDown}
-        onNewBrowser={handleNewBrowser}
-        onSplitBrowserRight={handleSplitBrowserRight}
-        onSplitBrowserDown={handleSplitBrowserDown}
-        onDetachAgent={handleDetachAgent}
-        onRenamePanel={callbacks.onRenamePanel}
-        onUpdatePanel={callbacks.onUpdatePanel}
-        onRenameFile={callbacks.onRenameFile}
-        onFocusOnExplorer={callbacks.onFocusOnExplorer}
-        gitStatus={gitStatus}
-        gitColorScheme={gitColorScheme}
-      />
+      <div className="relative shrink-0">
+        <PaneTabBar
+          panels={pane.panels}
+          activePanelId={pane.activePanelId}
+          paneFocused={focused}
+          workspaceId={workspaceId}
+          isWorkspaceActive={isWorkspaceActive}
+          onActivate={handleActivate}
+          onClose={handleClose}
+          onNewTerminal={handleNewTerminal}
+          onCloseOtherPanels={handleCloseOtherPanels}
+          onCloseAllPanels={handleCloseAllPanels}
+          onSplitTerminalRight={handleSplitTerminalRight}
+          onSplitTerminalDown={handleSplitTerminalDown}
+          onNewBrowser={handleNewBrowser}
+          onSplitBrowserRight={handleSplitBrowserRight}
+          onSplitBrowserDown={handleSplitBrowserDown}
+          onDetachAgent={handleDetachAgent}
+          onRenamePanel={callbacks.onRenamePanel}
+          onUpdatePanel={callbacks.onUpdatePanel}
+          onRenameFile={callbacks.onRenameFile}
+          onFocusOnExplorer={callbacks.onFocusOnExplorer}
+          gitStatus={gitStatus}
+          gitColorScheme={gitColorScheme}
+        />
+        {dimOpacity > 0 && (
+          <div
+            className="pointer-events-none absolute inset-0 bg-black"
+            style={{ opacity: dimOpacity }}
+          />
+        )}
+      </div>
       <div className="relative min-h-0 flex-1">
         {pane.panels.map((panel) => (
           <div

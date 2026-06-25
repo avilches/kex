@@ -1007,7 +1007,7 @@ export const FileExplorer = memo(
         tabIndex={0}
         onKeyDown={handleKeyDown}
       >
-        <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-1.5">
+        <div className="flex h-8 shrink-0 items-center gap-1 px-1.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

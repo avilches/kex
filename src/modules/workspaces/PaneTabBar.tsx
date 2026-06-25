@@ -789,7 +789,7 @@ function DraggableTab({
               "self-stretch border-r border-border/30",
               active
                 ? "bg-background text-foreground"
-                : "border-b border-border/60 bg-muted/35 text-muted-foreground hover:bg-muted/55 hover:text-foreground",
+                : "border-b border-border/40 bg-muted/35 text-muted-foreground hover:bg-muted/55 hover:text-foreground",
             ]
           : [
               "h-5 rounded",
@@ -1252,7 +1252,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     <div
       ref={scrollContainerRef}
       className={cn(
-        "flex h-7 shrink-0 items-center overflow-x-auto bg-card/60 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex h-8 shrink-0 items-center overflow-x-auto bg-card/60 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         tabBarStyle === "connected"
           ? "gap-0 border-t border-border/60"
           : "gap-0.5 border-b border-border/60 px-1",
@@ -1330,14 +1330,21 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           gitColorScheme={gitColorScheme}
         />
       ))}
-      <button
-        type="button"
-        onClick={onNewTerminal}
-        className="ml-1 shrink-0 px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        title="New terminal in this pane"
+      <div
+        className={cn(
+          "flex flex-1 items-center self-stretch",
+          tabBarStyle === "connected" && "border-b border-border/40",
+        )}
       >
-        +
-      </button>
+        <button
+          type="button"
+          onClick={onNewTerminal}
+          className="ml-1 shrink-0 px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          title="New terminal in this pane"
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }
