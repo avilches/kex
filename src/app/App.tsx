@@ -165,6 +165,7 @@ export default function App() {
     openPanel,
     activatePanel,
     closePanel,
+    reopenClosed,
     updatePanelData,
     replacePanel,
     setTerminalPanelCwd,
@@ -1681,6 +1682,9 @@ export default function App() {
       "tab.newBrowser": () => openBrowserInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActivePanel,
+      "tab.reopenClosed": () => {
+        if (activeWorkspace) reopenClosed();
+      },
       "tab.rename": () => {
         const active = document.activeElement;
         const tag = active?.tagName;
@@ -1849,6 +1853,7 @@ export default function App() {
       cycleWorkspace,
       activatePanel,
       handleCloseActivePanel,
+      reopenClosed,
       requestCloseWorkspace,
       focusSidebar,
       openNewTerminal,

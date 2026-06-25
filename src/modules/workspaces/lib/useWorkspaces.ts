@@ -220,6 +220,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
 
   const previousWorkspaceIdRef = useRef<string | null>(null);
+  const closedPanelsRef = useRef<ClosedEntry[]>([]);
 
   // When all workspaces are gone, flush state and destroy the window.
   // Uses claimClose() to avoid racing with the onCloseRequested handler in main.tsx
@@ -440,8 +441,29 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, []);
 
   const closePanel = useCallback((workspaceId: string, panelId: string) => {
+    const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    if (ws) {
+      const found = findPanelPane(ws.paneTree, panelId);
+      if (found) {
+        closedPanelsRef.current = captureClosedEntry(closedPanelsRef.current, {
+          panel: found.panel,
+          paneId: found.pane.id,
+          workspaceId,
+        });
+      }
+    }
     setWorkspaces((prev) => applyClosePanel(prev, workspaceId, panelId));
   }, []);
+
+  const reopenClosed = useCallback(() => {
+    const [entry, ...rest] = closedPanelsRef.current;
+    if (!entry) return;
+    const target = findReopenTarget(workspacesRef.current, activeWorkspaceId, entry);
+    if (!target) return;
+    closedPanelsRef.current = rest;
+    const newPanel: Panel = { ...entry.panel, id: newPanelId() };
+    openPanel(target.workspaceId, target.paneId, newPanel);
+  }, [openPanel, activeWorkspaceId]);
 
   const replacePanel = useCallback((workspaceId: string, paneId: string, oldPanelId: string, newPanel: Panel) => {
     setWorkspaces((prev) =>
@@ -577,6 +599,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     openPanel,
     activatePanel,
     closePanel,
+    reopenClosed,
     updatePanelData,
     replacePanel,
     setTerminalPanelCwd,
