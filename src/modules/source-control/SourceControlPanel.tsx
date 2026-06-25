@@ -999,13 +999,33 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle>
               {scm.pendingDiscard?.scope === "all"
-                ? `This will discard ${scm.pendingDiscard.label} and cannot be undone.`
-                : scm.pendingDiscard
-                  ? `Discard changes in "${scm.pendingDiscard.label}"? This cannot be undone.`
-                  : null}
+                ? "Discard all changes?"
+                : scm.pendingDiscard?.untracked
+                  ? "Delete untracked file?"
+                  : "Discard changes?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {scm.pendingDiscard?.scope === "all" ? (
+                scm.pendingDiscard.untrackedCount > 0 ? (
+                  <>
+                    All {scm.pendingDiscard.count} unstaged changes will be
+                    discarded, including{" "}
+                    {scm.pendingDiscard.untrackedCount === 1
+                      ? "1 untracked file"
+                      : `${scm.pendingDiscard.untrackedCount} untracked files`}{" "}
+                    that will be permanently deleted from disk. This can&apos;t
+                    be undone.
+                  </>
+                ) : (
+                  `All ${scm.pendingDiscard.count} unstaged changes will be discarded. This can't be undone.`
+                )
+              ) : scm.pendingDiscard?.untracked ? (
+                `"${basename(scm.pendingDiscard.label)}" is not tracked by git. It will be removed from disk. This can't be undone.`
+              ) : scm.pendingDiscard ? (
+                `Your edits to "${basename(scm.pendingDiscard.label)}" will be lost. This can't be undone.`
+              ) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1013,7 +1033,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction onClick={() => void scm.confirmPendingDiscard()}>
-              Discard
+              {scm.pendingDiscard?.scope === "all"
+                ? "Discard all"
+                : scm.pendingDiscard?.untracked
+                  ? "Delete"
+                  : "Discard"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -38,11 +38,9 @@ export type SourceControlEntry = {
 };
 
 
-export type PendingDiscard = {
-  scope: "single" | "all";
-  count: number;
-  label: string;
-};
+export type PendingDiscard =
+  | { scope: "single"; count: 1; label: string; untracked: boolean }
+  | { scope: "all"; count: number; label: string; untrackedCount: number };
 
 type SourceControlPanelState = {
   panelState: PanelState;
@@ -571,12 +569,35 @@ export function useSourceControlPanel(
     [repo, runMutation],
   );
 
+  const executeDiscard = useCallback(
+    async (list: SourceControlEntry[], key: string) => {
+      if (!repo) return;
+      const entries: GitDiscardEntry[] = list.map((entry) => ({
+        path: entry.path,
+        untracked: entry.untracked,
+      }));
+      const paths = new Set(list.map((entry) => entry.path));
+      await runMutation(
+        key,
+        (s) => optimisticDiscard(s, paths),
+        () => native.gitDiscard(repo.repoRoot, entries),
+        [...paths],
+      );
+    },
+    [repo, runMutation],
+  );
+
   const requestDiscardEntry = useCallback(
     (entry: SourceControlEntry) => {
       if (!repo || summary.busyAction) return;
+      // D = tracked deleted file; git restore brings it back with no data loss
+      if (entry.statusCode === "D") {
+        void executeDiscard([entry], `discard:${entry.path}`);
+        return;
+      }
       setPendingDiscard({ scope: "single", entry });
     },
-    [repo, summary.busyAction],
+    [repo, summary.busyAction, executeDiscard],
   );
 
   const requestDiscardAll = useCallback(() => {
@@ -589,26 +610,18 @@ export function useSourceControlPanel(
   }, []);
 
   const confirmPendingDiscard = useCallback(async () => {
-    if (!repo || !pendingDiscard) return;
+    if (!pendingDiscard) return;
     const list =
       pendingDiscard.scope === "single"
         ? [pendingDiscard.entry]
         : pendingDiscard.entries;
-    setPendingDiscard(null);
-    const entries: GitDiscardEntry[] = list.map((entry) => ({
-      path: entry.path,
-      untracked: entry.untracked,
-    }));
-    const paths = new Set(list.map((entry) => entry.path));
-    await runMutation(
+    const key =
       pendingDiscard.scope === "single"
         ? `discard:${list[0].path}`
-        : "discard:all",
-      (s) => optimisticDiscard(s, paths),
-      () => native.gitDiscard(repo.repoRoot, entries),
-      [...paths],
-    );
-  }, [pendingDiscard, repo, runMutation]);
+        : "discard:all";
+    setPendingDiscard(null);
+    await executeDiscard(list, key);
+  }, [pendingDiscard, executeDiscard]);
 
   const stageAllEntries = useCallback(async () => {
     if (!repo || unstagedEntries.length === 0) return;
@@ -738,14 +751,17 @@ export function useSourceControlPanel(
         scope: "single",
         count: 1,
         label: pendingDiscard.entry.path,
+        untracked: pendingDiscard.entry.untracked,
       };
     }
+    const untrackedCount = pendingDiscard.entries.filter((e) => e.untracked).length;
     return {
       scope: "all",
       count: pendingDiscard.entries.length,
       label: `${pendingDiscard.entries.length} unstaged ${
         pendingDiscard.entries.length === 1 ? "file" : "files"
       }`,
+      untrackedCount,
     };
   }, [pendingDiscard]);
 
