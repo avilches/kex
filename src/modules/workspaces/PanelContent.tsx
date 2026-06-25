@@ -147,6 +147,26 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       void GLOBAL_TOGGLE_SETTERS[key](value),
   };
 
+  // Derive effectivePreviewMode above the switch so hooks can use it unconditionally.
+  // Coerces legacy boolean true (old saved workspace state) to "overlay".
+  const rawPM = panel.kind === "editor"
+    ? (panel.previewMode as "overlay" | "split" | boolean | undefined)
+    : panel.kind === "markdown"
+      ? "overlay"
+      : undefined;
+  const effectivePreviewMode: "overlay" | "split" | undefined =
+    rawPM === true ? "overlay" : !rawPM ? undefined : (rawPM as "overlay" | "split");
+
+  const prevEffectivePreviewModeRef = useRef<"overlay" | "split" | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevEffectivePreviewModeRef.current;
+    if (effectivePreviewMode != null && prev == null) {
+      const content = editorRef.current?.getContent();
+      if (content != null) setLiveContent(content);
+    }
+    prevEffectivePreviewModeRef.current = effectivePreviewMode;
+  }, [effectivePreviewMode]);
+
   switch (panel.kind) {
     case "terminal":
       return (
@@ -170,12 +190,6 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       );
 
     case "editor": {
-      // Resolve previewMode to a string union, handling legacy boolean `true` from
-      // old saved workspace state (previewMode was boolean before this feature).
-      const rawPM = panel.previewMode as "overlay" | "split" | boolean | undefined;
-      const effectivePreviewMode: "overlay" | "split" | undefined =
-        rawPM === true ? "overlay" : !rawPM ? undefined : (rawPM as "overlay" | "split");
-
       const ismd = isMarkdownPath(panel.path);
       const ishtml = isHtmlPath(panel.path);
       const showPreviewToggle = ismd || ishtml;
@@ -186,17 +200,6 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
         onChange: (next: EditorViewSettings) =>
           void setEditorViewForExt(extOf(panel.path), next),
       };
-
-      // Seed liveContent from editor buffer when preview mode first activates
-      const prevEffectivePreviewModeRef = useRef<"overlay" | "split" | undefined>(undefined);
-      useEffect(() => {
-        const prev = prevEffectivePreviewModeRef.current;
-        if (effectivePreviewMode != null && prev == null) {
-          const content = editorRef.current?.getContent();
-          if (content != null) setLiveContent(content);
-        }
-        prevEffectivePreviewModeRef.current = effectivePreviewMode;
-      }, [effectivePreviewMode]);
 
       return (
         <Suspense fallback={null}>
