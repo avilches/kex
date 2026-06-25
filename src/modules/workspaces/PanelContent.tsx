@@ -190,8 +190,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       );
 
     case "editor": {
-      const ismd = isMarkdownPath(panel.path);
-      const ishtml = isHtmlPath(panel.path);
+      const overrideLang = panel.overrideLanguage ?? null;
+      const ismd = overrideLang ? isMarkdownPath(`x.${overrideLang}`) : isMarkdownPath(panel.path);
+      const ishtml = overrideLang ? isHtmlPath(`x.${overrideLang}`) : isHtmlPath(panel.path);
       const showPreviewToggle = ismd || ishtml;
 
       const viewToggles = {
@@ -218,12 +219,16 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               globalToggles={!previewMode ? globalToggles : undefined}
               overrideLanguage={panel.overrideLanguage}
               currentLanguageName={currentLanguageName}
-              onLanguageChange={(lang) =>
+              onLanguageChange={(lang) => {
+                const willShowPreview = lang
+                  ? isMarkdownPath(`x.${lang}`) || isHtmlPath(`x.${lang}`)
+                  : isMarkdownPath(panel.path) || isHtmlPath(panel.path);
                 callbacks.onUpdatePanel?.(panel.id, (p) => ({
                   ...p,
                   overrideLanguage: lang,
-                }))
-              }
+                  ...(!willShowPreview && { previewMode: false }),
+                }));
+              }}
             />
             <div
               className={
