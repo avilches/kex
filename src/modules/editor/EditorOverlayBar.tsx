@@ -92,7 +92,7 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLan
   const selectableLanguages = LANGUAGES.filter((l) => l.userSelectable !== false);
   return (
     <div className={cn(
-      "pointer-events-auto absolute top-3 z-10 inline-flex items-center gap-1 rounded-md border border-border/60 bg-card/85 p-0.5 text-[11px] shadow-sm backdrop-blur",
+      "pointer-events-auto absolute top-3 z-20 inline-flex items-center gap-1 rounded-md border border-border/60 bg-card/85 p-0.5 text-[11px] shadow-sm backdrop-blur",
       inSplitMode ? "right-[calc(50%+0.75rem)]" : "right-3",
     )}>
       {onLanguageChange && (
