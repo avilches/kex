@@ -370,3 +370,15 @@ These phases are designed but not fully implemented:
 - Dependabot: bump de actions/checkout v6 -> v7 en los 3 workflows del fork (ci, release, signpath-test; el upstream tocaba ademas update-nix-sources.yml, ausente aqui). Resto re-derivado nativamente con pnpm update + cargo update (dentro de rangos semver), no cherry-pick; coincide con los grupos no-AI de los dependabot (codemirror lint/merge/view, hugeicons, radix, tauri/api, biome 2.5.0, tailwind, vitest, knip, shadcn, etc.).
 - Quality suite: pnpm check-types OK, biome lint sin issues, 437 tests JS (425 base + 6 resolveEditorTheme + 6 OSC 52), cargo clippy limpio, 263 tests Rust (260 base + 3 spawn_cwd_or_home).
 - Changes skipped (removed surface): sin cambios nuevos respecto al rango anterior; el unico commit nuevo del rango (8043cfa) se aplico.
+
+#### 2026-06-24
+
+- Upstream HEAD: d77476e762b8ade438c643061723b9f494213600
+- Commits revisados: 8043cfa106f7de9ee182b3dbd051e35cd2f1b273..d77476e762b8ade438c643061723b9f494213600 (10 commits reales, 0 merges)
+- Outcome: work plan creado en docs/upstream-2026-06-24.md y ejecutado
+- Changes applied (Bucket B): fix(breadcrumb) scroll horizontal (6963d82, cherry-pick limpio); fix(window) allow-destroy permission ya presente en el fork (414ee17, no action)
+- Changes applied (Bucket C): font weight terminal (9fc0425, merge manual); shell selector (a770307, merge manual); language override por panel con selector UI en EditorOverlayBar (d77476e, merge manual + reimplementacion UI)
+- Changes skipped (removed surface): Nix sources (564e145); version bump v0.8.2 (63099f5); npm dep bumps (db63229); AI autocomplete endpoints (a8b9481 -- superficie eliminada); quit-on-last-tab (7a812ca -- modelo de tabs eliminado en Phase 2)
+- Bonus (no upstream): HTML preview para archivos .html con injectBase para paths relativos; markdown live preview refactor (seeding de liveContent via onContentChange); undo-close-tab design spec (F5); editor.save shortcut global; toggle HTML preview shortcut.
+- New features rejected: ninguna
+- Quality suite: biome lint sin issues, pnpm check-types OK, 517 tests JS (49 archivos; +6 resolveDisplayName, +1 git-bash OSC 7, +3 coerceFontWeight), cargo clippy limpio, 273 tests Rust (+6 shell_init unix/windows).
