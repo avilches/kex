@@ -48,10 +48,14 @@ export function TerminalPathBar({ panelId, cwd, explorerRoot, home, onReveal }: 
             {process}
           </span>
         )}
-        <span className="text-border/60">&middot;</span>
-        <span>{metrics ? formatCpu(metrics.cpuPercent) : "-"}</span>
-        <span className="text-border/60">&middot;</span>
-        <span>{metrics ? formatMem(metrics.memBytes) : "-"}</span>
+        {metrics && (
+          <>
+            <span className="text-border/60">&middot;</span>
+            <span>{formatCpu(metrics.cpuPercent)}</span>
+            <span className="text-border/60">&middot;</span>
+            <span>{formatMem(metrics.memBytes)}</span>
+          </>
+        )}
       </div>
     </div>
   );
