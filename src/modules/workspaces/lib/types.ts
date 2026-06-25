@@ -59,3 +59,9 @@ export type Workspace = {
   fsRoot?: string;
   git?: WorkspaceGitConfig;
 };
+
+export type ClosedEntry = {
+  panel: Panel;
+  paneId: string;
+  workspaceId: string;
+};

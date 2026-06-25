@@ -19,9 +19,33 @@ import {
   updateDivider,
   updatePane,
 } from "./splitNode";
-import { type Panel, type PaneNode, type Workspace, type WorkspaceGitConfig, isAutofocusPanel } from "./types";
+import { type ClosedEntry, type Panel, type PaneNode, type Workspace, type WorkspaceGitConfig, isAutofocusPanel } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newPanelId } from "@/lib/ids";
+
+export function captureClosedEntry(
+  entries: ClosedEntry[],
+  entry: ClosedEntry,
+  cap = 10,
+): ClosedEntry[] {
+  return [entry, ...entries].slice(0, cap);
+}
+
+export function findReopenTarget(
+  workspaces: Workspace[],
+  activeWorkspaceId: string,
+  entry: ClosedEntry,
+): { workspaceId: string; paneId: string } | null {
+  const targetWs =
+    workspaces.find((w) => w.id === entry.workspaceId) ??
+    workspaces.find((w) => w.id === activeWorkspaceId);
+  if (!targetWs) return null;
+  const pane = findPane(targetWs.paneTree, entry.paneId);
+  return {
+    workspaceId: targetWs.id,
+    paneId: pane ? entry.paneId : targetWs.activePaneId,
+  };
+}
 
 // New autofocus-capable tabs inherit the "autofocus in new tabs" preference,
 // unless they already carry an explicit flag. Restored tabs never pass through
