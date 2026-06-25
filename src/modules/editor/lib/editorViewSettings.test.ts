@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampColumnRuler,
   CODE_DEFAULTS,
+  EDITOR_COLUMN_RULER_MAX,
+  EDITOR_COLUMN_RULER_MIN,
   extOf,
   resolveEditorView,
   type EditorViewMap,
@@ -58,5 +61,32 @@ describe("resolveEditorView", () => {
     const resolved = resolveEditorView("a.ts", map);
     expect(resolved.lineNumbers).toBe(CODE_DEFAULTS.lineNumbers);
     expect(resolved.indentSize).toBe(2);
+  });
+  it("clamps a tiny stored columnRuler up to the minimum (avoids gutter-overlap look)", () => {
+    const map: EditorViewMap = { "*": { columnRuler: 1 } };
+    expect(resolveEditorView("a.ts", map).columnRuler).toBe(EDITOR_COLUMN_RULER_MIN);
+  });
+  it("keeps columnRuler 0 (off) untouched", () => {
+    const map: EditorViewMap = { "*": { columnRuler: 0 } };
+    expect(resolveEditorView("a.ts", map).columnRuler).toBe(0);
+  });
+});
+
+describe("clampColumnRuler", () => {
+  it("treats 0 and negatives as off", () => {
+    expect(clampColumnRuler(0)).toBe(0);
+    expect(clampColumnRuler(-5)).toBe(0);
+  });
+  it("raises sub-minimum positive columns to the minimum", () => {
+    expect(clampColumnRuler(1)).toBe(EDITOR_COLUMN_RULER_MIN);
+    expect(clampColumnRuler(3)).toBe(EDITOR_COLUMN_RULER_MIN);
+  });
+  it("keeps in-range columns and caps at the maximum", () => {
+    expect(clampColumnRuler(80)).toBe(80);
+    expect(clampColumnRuler(9999)).toBe(EDITOR_COLUMN_RULER_MAX);
+  });
+  it("rounds and rejects non-finite values", () => {
+    expect(clampColumnRuler(80.6)).toBe(81);
+    expect(clampColumnRuler(Number.NaN)).toBe(0);
   });
 });

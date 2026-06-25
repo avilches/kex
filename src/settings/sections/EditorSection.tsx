@@ -21,7 +21,9 @@ import { useEffect, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   CODE_DEFAULTS,
+  clampColumnRuler,
   clampIndentSize,
+  EDITOR_COLUMN_RULER_MAX,
   EDITOR_INDENT_MAX,
   EDITOR_INDENT_MIN,
   type EditorViewMap,
@@ -518,7 +520,7 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
               <input
                 type="number"
                 min={0}
-                max={500}
+                max={EDITOR_COLUMN_RULER_MAX}
                 value={effective.columnRuler}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={(e) => e.stopPropagation()}
@@ -526,7 +528,7 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
                   const n = Number.parseInt(e.target.value, 10);
                   if (Number.isNaN(n)) return;
                   void patchEditorViewEntry(entryKey, {
-                    columnRuler: Math.min(500, Math.max(0, n)),
+                    columnRuler: clampColumnRuler(n),
                   });
                 }}
                 className="h-7 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"

@@ -13,7 +13,7 @@ import {
   lineNumbers,
   scrollPastEnd,
 } from "@codemirror/view";
-import type { EditorViewSettings } from "./editorViewSettings";
+import { clampColumnRuler, type EditorViewSettings } from "./editorViewSettings";
 import { cursorBlinkExt, cursorStyleExt } from "./cursorExtensions";
 
 // Compartments allow runtime reconfiguration without rebuilding state.
@@ -48,10 +48,11 @@ export function spellCheckExt(on: boolean): Extension {
 }
 
 export function columnRulerExt(col: number): Extension {
-  if (col <= 0) return [];
+  const c = clampColumnRuler(col);
+  if (c <= 0) return [];
   return EditorView.theme({
     ".cm-line": {
-      backgroundImage: `linear-gradient(90deg, transparent calc(${col}ch), color-mix(in srgb, var(--muted-foreground) 30%, transparent) calc(${col}ch), color-mix(in srgb, var(--muted-foreground) 30%, transparent) calc(${col}ch + 1px), transparent calc(${col}ch + 1px))`,
+      backgroundImage: `linear-gradient(90deg, transparent calc(${c}ch), color-mix(in srgb, var(--muted-foreground) 30%, transparent) calc(${c}ch), color-mix(in srgb, var(--muted-foreground) 30%, transparent) calc(${c}ch + 1px), transparent calc(${c}ch + 1px))`,
     },
   });
 }

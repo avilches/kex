@@ -23,7 +23,9 @@ import {
 import { DocumentCodeIcon, EyeIcon, LayoutTwoColumnIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
+  clampColumnRuler,
   clampIndentSize,
+  EDITOR_COLUMN_RULER_MAX,
   EDITOR_INDENT_MAX,
   EDITOR_INDENT_MIN,
   type EditorViewSettings,
@@ -263,6 +265,35 @@ export function EditorPathBar({
                   className="h-6 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
                 />
               </div>
+              <div className="flex items-center justify-between gap-2 px-2.5 py-1">
+                <span className="text-[12px]">Column ruler</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">
+                    {v.columnRuler === 0 ? "off" : "col"}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={EDITOR_COLUMN_RULER_MAX}
+                    value={v.columnRuler}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      const n = Number.parseInt(e.target.value, 10);
+                      if (Number.isNaN(n)) return;
+                      set({ columnRuler: clampColumnRuler(n) });
+                    }}
+                    className="h-6 w-14 rounded border border-border bg-transparent px-1.5 text-right text-[12px] tabular-nums outline-none focus:border-ring"
+                  />
+                </div>
+              </div>
+              <DropdownMenuCheckboxItem
+                checked={v.spellCheck}
+                onSelect={keepOpen}
+                onCheckedChange={(c) => set({ spellCheck: !!c })}
+              >
+                Spell check
+              </DropdownMenuCheckboxItem>
               {globalToggles && (
                 <>
                   <DropdownMenuSeparator />
