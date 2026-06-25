@@ -99,7 +99,7 @@ function PathDisplay({
       onClick={onReveal}
       title={path}
       disabled={!onReveal}
-      className="flex min-w-0 items-center gap-1 text-left text-[11px]"
+      className="flex min-w-0 items-center gap-1 overflow-hidden text-left text-[11px]"
     >
       {dirs.length > 0 && (
         // direction: rtl truncates from the left so the filename stays visible;
@@ -110,7 +110,7 @@ function PathDisplay({
           </span>
         </span>
       )}
-      <span className={cn("shrink-0 text-foreground", onReveal && "hover:underline")}>
+      <span className={cn("min-w-0 truncate text-foreground", onReveal && "hover:underline")}>
         {name}
       </span>
     </button>
