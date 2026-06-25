@@ -31,7 +31,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [F1](pending/features/F1-diff-side-by-side.md) — Diff side-by-side
 - [F2](pending/features/F2-stage-unstage-por-hunk.md) — Stage/unstage por hunk
 - [F3](pending/features/F3-navegacion-hunks.md) — Navegacion entre hunks
-- [F5](pending/features/F5-reabrir-tab-cerrado.md) — Reabrir tab cerrado
 - [F6](pending/features/F6-scrollback-persistente.md) — Scrollback persistente
 - [F7](pending/features/F7-tab-bar-style-en-settings.md) — Exponer el estilo de tab bar en Settings
 - [F10](pending/features/F10-confirm-quit-proceso-vivo.md) — Confirmar salida de la app con un proceso de terminal vivo (upstream d782f7d, aplazado en sync 2026-06-22)

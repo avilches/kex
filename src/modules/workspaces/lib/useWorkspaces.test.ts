@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Panel, SplitNode, Workspace } from "./types";
-import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, collectRunningTerminals } from "./useWorkspaces";
+import type { ClosedEntry, Panel, SplitNode, Workspace } from "./types";
+import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, captureClosedEntry, collectRunningTerminals, findReopenTarget } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -165,5 +165,88 @@ describe("collectRunningTerminals", () => {
     ]);
     const out = await collectRunningTerminals(w, async () => null, () => undefined);
     expect(out).toEqual([]);
+  });
+});
+
+describe("captureClosedEntry", () => {
+  const entry = (id: string): ClosedEntry => ({
+    panel: { id, kind: "terminal" },
+    paneId: "p1",
+    workspaceId: "w1",
+  });
+
+  it("prepends the new entry (LIFO order)", () => {
+    const out = captureClosedEntry([entry("t1")], entry("t2"));
+    expect(out.map((e) => e.panel.id)).toEqual(["t2", "t1"]);
+  });
+
+  it("enforces the cap by dropping the oldest entry", () => {
+    const initial = Array.from({ length: 10 }, (_, i) => entry(`t${i}`));
+    const out = captureClosedEntry(initial, entry("t10"));
+    expect(out).toHaveLength(10);
+    expect(out[0].panel.id).toBe("t10");
+    expect(out[9].panel.id).toBe("t8");
+  });
+
+  it("starts from empty correctly", () => {
+    const out = captureClosedEntry([], entry("t1"));
+    expect(out).toEqual([entry("t1")]);
+  });
+});
+
+describe("findReopenTarget", () => {
+  const makeWs = (id: string, paneId: string): Workspace => ({
+    id,
+    title: "W",
+    paneTree: { kind: "pane", id: paneId, panels: [], activePanelId: null },
+    activePaneId: paneId,
+  });
+
+  it("returns the original workspace and pane when both exist", () => {
+    const workspaces = [makeWs("w1", "p1")];
+    const entry: ClosedEntry = {
+      panel: { id: "t1", kind: "terminal" },
+      paneId: "p1",
+      workspaceId: "w1",
+    };
+    expect(findReopenTarget(workspaces, "w1", entry)).toEqual({
+      workspaceId: "w1",
+      paneId: "p1",
+    });
+  });
+
+  it("falls back to active pane when the original pane no longer exists", () => {
+    const workspaces = [makeWs("w1", "p2")]; // p1 was destroyed, now p2 is active
+    const entry: ClosedEntry = {
+      panel: { id: "t1", kind: "terminal" },
+      paneId: "p1",
+      workspaceId: "w1",
+    };
+    expect(findReopenTarget(workspaces, "w1", entry)).toEqual({
+      workspaceId: "w1",
+      paneId: "p2",
+    });
+  });
+
+  it("falls back to the active workspace when the original workspace was closed", () => {
+    const workspaces = [makeWs("w2", "p3")]; // w1 is gone
+    const entry: ClosedEntry = {
+      panel: { id: "t1", kind: "terminal" },
+      paneId: "p1",
+      workspaceId: "w1",
+    };
+    expect(findReopenTarget(workspaces, "w2", entry)).toEqual({
+      workspaceId: "w2",
+      paneId: "p3",
+    });
+  });
+
+  it("returns null when no workspaces exist", () => {
+    const entry: ClosedEntry = {
+      panel: { id: "t1", kind: "terminal" },
+      paneId: "p1",
+      workspaceId: "w1",
+    };
+    expect(findReopenTarget([], "w1", entry)).toBeNull();
   });
 });
