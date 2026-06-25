@@ -16,7 +16,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { type JSX, useEffect, useState } from "react";
+import { type JSX, useEffect, useRef, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
@@ -44,18 +44,32 @@ const SECTIONS: {
 
 const VALID_TABS: SettingsTab[] = SECTIONS.map((s) => s.id);
 
+function parseTabParam(raw: string | null): { tab: SettingsTab; ext?: string } {
+  if (!raw) return { tab: "general" };
+  const [tabId, ext] = raw.split(":");
+  const tab = (VALID_TABS as string[]).includes(tabId) ? (tabId as SettingsTab) : "general";
+  return { tab, ext: ext || undefined };
+}
+
 function readInitialTab(): SettingsTab {
   if (typeof window === "undefined") return "general";
   const url = new URL(window.location.href);
-  const t = url.searchParams.get("tab");
-  if (t && (VALID_TABS as string[]).includes(t)) return t as SettingsTab;
-  return "general";
+  return parseTabParam(url.searchParams.get("tab")).tab;
+}
+
+function readInitialFileTypesExt(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const url = new URL(window.location.href);
+  return parseTabParam(url.searchParams.get("tab")).ext;
 }
 
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsTab>(readInitialTab);
+  const [fileTypesExt, setFileTypesExt] = useState<string | undefined>(readInitialFileTypesExt);
   const init = usePreferencesStore((s) => s.init);
   const ActiveSection = SECTIONS.find((s) => s.id === active)?.component;
+  // Track whether fileTypesExt has been consumed by EditorSection so we don't re-apply on re-render.
+  const fileTypesExtConsumed = useRef(false);
 
   useEffect(() => {
     void init();
@@ -76,9 +90,12 @@ export function SettingsApp() {
   }, []);
 
   useEffect(() => {
-    const apply = (detail: string) => {
-      if ((VALID_TABS as string[]).includes(detail)) {
-        setActive(detail as SettingsTab);
+    const apply = (raw: string) => {
+      const { tab, ext } = parseTabParam(raw);
+      setActive(tab);
+      if (ext) {
+        fileTypesExtConsumed.current = false;
+        setFileTypesExt(ext);
       }
     };
     const unlistenPromise = getCurrentWebviewWindow().listen<string>(
@@ -148,7 +165,17 @@ export function SettingsApp() {
         <ScrollArea type="auto" className="min-h-0 flex-1">
           <div className="px-8 pt-2 pb-7">
             <div className="mx-auto w-full max-w-160">
-              {ActiveSection && <ActiveSection />}
+              {ActiveSection && active === "editor" ? (
+                <EditorSection
+                  fileTypesExt={fileTypesExtConsumed.current ? undefined : fileTypesExt}
+                  onFileTypesExtConsumed={() => {
+                    fileTypesExtConsumed.current = true;
+                    setFileTypesExt(undefined);
+                  }}
+                />
+              ) : (
+                ActiveSection && <ActiveSection />
+              )}
             </div>
           </div>
         </ScrollArea>

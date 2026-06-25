@@ -3,6 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -69,6 +70,7 @@ type Props = {
     ext: string;
     value: EditorViewSettings;
     onChange: (next: EditorViewSettings) => void;
+    onViewInSettings?: () => void;
   };
   globalToggles?: {
     value: EditorGlobalToggles;
@@ -294,6 +296,17 @@ export function EditorPathBar({
               >
                 Spell check
               </DropdownMenuCheckboxItem>
+              {viewToggles.onViewInSettings && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-[12px] text-muted-foreground"
+                    onSelect={() => viewToggles.onViewInSettings?.()}
+                  >
+                    View in Settings
+                  </DropdownMenuItem>
+                </>
+              )}
               {globalToggles && (
                 <>
                   <DropdownMenuSeparator />

@@ -77,7 +77,13 @@ import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 import { SliderRow } from "../components/SliderRow";
 
-export function EditorSection() {
+export function EditorSection({
+  fileTypesExt,
+  onFileTypesExtConsumed,
+}: {
+  fileTypesExt?: string;
+  onFileTypesExtConsumed?: () => void;
+} = {}) {
   const editorFontFamily = usePreferencesStore((s) => s.editorFontFamily);
   const editorFontSize = usePreferencesStore((s) => s.editorFontSize);
   const editorLetterSpacing = usePreferencesStore((s) => s.editorLetterSpacing);
@@ -261,7 +267,7 @@ export function EditorSection() {
         </SettingRow>
       </div>
 
-      <FileTypesSection />
+      <FileTypesSection focusExt={fileTypesExt} onFocusConsumed={onFileTypesExtConsumed} />
     </div>
   );
 }
@@ -302,12 +308,31 @@ function settingsSummary(s: EditorViewSettings): string {
   return parts.join(" · ");
 }
 
-function FileTypesSection() {
+function FileTypesSection({
+  focusExt,
+  onFocusConsumed,
+}: {
+  focusExt?: string;
+  onFocusConsumed?: () => void;
+}) {
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [filterText, setFilterText] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!focusExt) return;
+    if (editorViewByExt[focusExt] !== undefined) {
+      setExpandedKey(focusExt);
+    }
+    setTimeout(() => {
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    onFocusConsumed?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusExt]);
 
   const allEntries = sortedEntries(editorViewByExt);
   const filter = filterText.trim().toLowerCase();
@@ -346,7 +371,7 @@ function FileTypesSection() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={sectionRef} className="flex flex-col gap-2">
       <FieldLabel>File types</FieldLabel>
       <div className="flex items-center gap-2">
         <input
