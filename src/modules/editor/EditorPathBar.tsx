@@ -33,6 +33,7 @@ import {
 } from "./lib/editorViewSettings";
 import { editorPathDisplay } from "./lib/editorPathDisplay";
 import { LANGUAGES } from "./lib/languageDefinitions";
+import { resolveDisplayName } from "./lib/languageResolver";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useState } from "react";
@@ -190,7 +191,7 @@ export function EditorPathBar({
                       }}
                       className="rounded-menu-item text-[12px]"
                     >
-                      Auto
+                      {resolveDisplayName(path)}
                     </CommandItem>
                     {selectableLanguages.map((lang) => (
                       <CommandItem
@@ -217,7 +218,7 @@ export function EditorPathBar({
               <button
                 type="button"
                 title="View options"
-                className="order-last flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                className="order-last flex size-[22px] items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground"
               >
                 <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
               </button>
@@ -300,13 +301,6 @@ export function EditorPathBar({
                   />
                 </div>
               </div>
-              <DropdownMenuCheckboxItem
-                checked={v.spellCheck}
-                onSelect={keepOpen}
-                onCheckedChange={(c) => set({ spellCheck: !!c })}
-              >
-                Spell check
-              </DropdownMenuCheckboxItem>
               {viewToggles.onViewInSettings && (
                 <>
                   <DropdownMenuSeparator />

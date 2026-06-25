@@ -59,7 +59,6 @@ function settingsSummary(s: EditorViewSettings): string {
   if (s.indentWithTabs) parts.push("Tabs");
   parts.push(`Indent ${s.indentSize}`);
   if (s.columnRuler > 0) parts.push(`Col ${s.columnRuler}`);
-  if (s.spellCheck) parts.push("Spell check");
   return parts.join(" · ");
 }
 
@@ -328,13 +327,6 @@ function ExtensionRow({ entryKey, partial, expanded, onToggle }: ExtensionRowPro
               />
             </div>
           </div>
-          <ExtToggle
-            label="Spell check"
-            checked={effective.spellCheck}
-            onChange={(v) =>
-              void patchEditorViewEntry(entryKey, { spellCheck: v })
-            }
-          />
         </div>
       )}
     </div>
