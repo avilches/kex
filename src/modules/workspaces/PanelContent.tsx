@@ -109,7 +109,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
-  const { explorerRoot, home } = useEditorChrome();
+  const { workspaceRoot, home } = useEditorChrome();
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
   const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const bracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
@@ -217,9 +217,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
           <div className="flex h-full w-full flex-col">
             <EditorPathBar
               path={panel.path}
-              explorerRoot={explorerRoot}
+              workspaceRoot={workspaceRoot}
               home={home}
-              onReveal={() => callbacks.onFocusOnExplorer?.(panel.path)}
+              onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
               view={showPreviewToggle ? {
                 mode: effectivePreviewMode ?? "raw",
                 onToggleOverlay: () => callbacks.onToggleOverlayPreview?.(panel.id),
@@ -323,9 +323,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
           <div className="flex h-full w-full flex-col">
             <EditorPathBar
               path={panel.path}
-              explorerRoot={explorerRoot}
+              workspaceRoot={workspaceRoot}
               home={home}
-              onReveal={() => callbacks.onFocusOnExplorer?.(panel.path)}
+              onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
               view={{
                 mode: "overlay",
                 onToggleOverlay: () => callbacks.onSetMarkdownView?.(panel.id, "raw"),

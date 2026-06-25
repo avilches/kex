@@ -9,7 +9,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
 import { newPanelId } from "@/lib/ids";
-import { quoteShellArg } from "@/lib/shellQuote";
 import { useZoom } from "@/lib/useZoom";
 import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
 import { isMarkdownPath, isHtmlPath } from "@/lib/utils";
@@ -50,7 +49,6 @@ import {
   type ShortcutId,
 } from "@/modules/shortcuts";
 import { useSourceControlContext } from "@/modules/source-control";
-import { StatusBar } from "@/modules/statusbar";
 import { DuplicateProgressBar, DuplicateQuitModal } from "@/modules/explorer";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import {
@@ -455,7 +453,7 @@ export default function App() {
 
   const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
   const setWorkspaceEnv = useWorkspaceEnvStore((s) => s.setEnv);
-  const { home, launchCwd, launchCwdResolved, switchWorkspace } =
+  const { home, launchCwd, launchCwdResolved } =
     useWorkspaceSwitcher({
       workspacesRef,
       workspaceEnv,
@@ -499,8 +497,8 @@ export default function App() {
   );
 
   const editorChrome = useMemo(
-    () => ({ explorerRoot, home }),
-    [explorerRoot, home],
+    () => ({ explorerRoot, workspaceRoot: workspaceRootPath, home }),
+    [explorerRoot, workspaceRootPath, home],
   );
 
   const canNavigateUp =
@@ -1363,21 +1361,6 @@ export default function App() {
 
   // ── Source control ────────────────────────────────────────────────────────
 
-  const activeFilePath = (() => {
-    if (activePanel?.kind === "editor")
-      return (activePanel as { path: string }).path;
-    if (activePanel?.kind === "git-diff") {
-      const p = activePanel as { path: string; repoRoot: string };
-      if (/^([A-Za-z]:|\/|\\)/.test(p.path)) return p.path;
-      return `${p.repoRoot.replace(/[\\/]+$/, "")}/${p.path.replace(/^[\\/]+/, "")}`;
-    }
-    if (activePanel?.kind === "git-commit-file") {
-      const p = activePanel as { path: string; repoRoot: string };
-      return `${p.repoRoot.replace(/[\\/]+$/, "")}/${p.path.replace(/^[\\/]+/, "")}`;
-    }
-    return null;
-  })();
-
   const explorerActiveFilePath =
     activePanel?.kind === "editor" || activePanel?.kind === "markdown"
       ? (activePanel as { path: string }).path
@@ -1504,17 +1487,6 @@ export default function App() {
   );
 
   // ── Terminal helpers ──────────────────────────────────────────────────────
-
-  const sendCd = useCallback(
-    (path: string) => {
-      if (activePanelId === null) return;
-      const term = terminalHandles.current.get(activePanelId);
-      if (!term) return;
-      term.write(`cd ${quoteShellArg(path)}\r`);
-      term.focus();
-    },
-    [activePanelId],
-  );
 
   const openFolderInTerminal = useCallback(
     (path: string) => {
@@ -2351,17 +2323,6 @@ export default function App() {
               </ResizablePanelGroup>
             </WorkspaceDndProvider>
           </div>
-
-          {!zenMode && (
-            <StatusBar
-              cwd={activeCwd}
-              filePath={activeFilePath}
-              home={home}
-              onCd={sendCd}
-              onWorkspaceChange={switchWorkspace}
-              privateActive={false}
-            />
-          )}
 
           <DuplicateProgressBar />
           <DuplicateQuitModal />

@@ -62,7 +62,7 @@ Kex uses a strict **two-process model**. The Rust process owns all OS access. Th
 │  git-history/   — Commit graph, per-file diffs              │
 │  theme/         — CSS variable engine, presets              │
 │  agents/        — Terminal agent notifications              │
-│  + tabs, header, statusbar, sidebar, settings, preview…     │
+│  + tabs, header, sidebar, settings, preview…                │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -88,7 +88,6 @@ So the dialog that actually lists processes is gated on the process preference a
 **Native PTY via `portable-pty`.** Not a wrapper around `script` or `expect`. Kex spawns a real pseudo-terminal, so TUI apps (vim, htop, tmux, lazygit, etc.) work correctly, including mouse input and true color.
 
 **Shell integration.** Kex injects init scripts at shell startup that emit OSC 7 (current working directory) and OSC 133 sequences (prompt boundaries, command start, command end, exit code). This enables:
-- The CWD breadcrumb in the status bar to update as you `cd` through directories.
 - The file explorer to follow the active terminal's working directory.
 - The optional **block terminal** mode (a panel with `blocks: true`): command output is grouped into blocks with per-block chrome (cwd, time, duration, exit badge on failure) and a hover toolbar (`Run again`, copy command/output, find in block). The shell's prompt is suppressed and input is driven by a host-rendered `ShellInput`. `Cmd+Up`/`Cmd+Down` navigate between command blocks.
 
@@ -102,7 +101,7 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **True color and 256-color.** The xterm.js WebGL renderer supports the full color space. The terminal color palette is driven by the active app theme, not hardcoded.
 
-**WSL as a first-class workspace (Windows only).** Each tab can be set to run inside a specific WSL distro via the workspace switcher in the status bar. The file explorer, git operations, and AI tools all operate inside that distro's filesystem — it is not a wrapped subprocess.
+**WSL as a first-class workspace (Windows only).** Each tab can be set to run inside a specific WSL distro. The file explorer, git operations, and AI tools all operate inside that distro's filesystem — it is not a wrapped subprocess.
 
 ### 3.2 Code editor
 
@@ -256,7 +255,7 @@ Closing a tab from the UI (the explicit close button) also kills the immediate c
 
 ### 4.5 OSC trust model
 
-Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command boundaries), and OSC 0/2 (window/icon title). The cwd from OSC 7 updates the status bar breadcrumb and the explorer root. OSC 0/2 title is written to `oscTitleStore` (in-memory, not persisted) and shown in the pane tab. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd or tab title. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
+Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command boundaries), and OSC 0/2 (window/icon title). The cwd from OSC 7 updates the explorer root. OSC 0/2 title is written to `oscTitleStore` (in-memory, not persisted) and shown in the pane tab. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd or tab title. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
 
 **Tab title priority** (highest to lowest, evaluated in `PaneTabBar`):
 
@@ -394,7 +393,6 @@ src/
     ├── source-control/            — Git stage/commit/push panel. Supports a List/Tree view toggle (persisted as `scmViewMode` in settings); Tree mode keeps the Staged Changes / Changes roots and renders each as a directory tree with compacted single-child chains (explorer-style icons and spacing), built by the pure `scmTree.ts`.
     ├── git-history/               — Commit graph, per-file diffs
     ├── header/                    — Top bar, inline search
-    ├── statusbar/                 — CWD breadcrumb, workspace env selector
     ├── workspaces/                — Workspace/Pane/Panel model; useWorkspaces (source of truth),
     │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/PanelContent,
     │                                WorkspaceDndProvider (DndContext + file/tab drag handlers)
@@ -415,7 +413,7 @@ src/
 
 All panel kinds follow the same never-unmount rule. Panels live inside panes; panes are nodes of a binary split tree inside a workspace. The workspace sidebar (left, 52px) lists workspaces; the right panel holds Explorer, Source Control, and Git History.
 
-Every editor (and `markdown`) panel renders a thin top bar (`EditorPathBar`) as the first row of its layout: the open file's path relative to the active workspace `explorerRoot` on the left (falling back to an absolute `~`-collapsed path when the file is outside the root; the relative-path helper is `editorPathDisplay`, fed `explorerRoot`/`home` via `EditorChromeContext`), and the editor controls on the right. Clicking the filename reveals it in the explorer; segments are not navigable (the status bar already provides a navigable breadcrumb). Markdown files open in their rendered view (`kind: "markdown"`) by default; a `Rendered | Edit` toggle in that bar flips a single panel in place between `markdown` and `editor` via `setPanelView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty). The bar also hosts a `[...]` dropdown that surfaces the per-extension view settings (wrap, line numbers, whitespace, fold gutter) for the currently open file extension; the header label reads "Applies to .<ext> files" and changes persist to `editorViewByExt` in the preferences store. Word wrap is a per-extension setting, not a global per-panel override.
+Every editor (and `markdown`) panel renders a thin top bar (`EditorPathBar`) as the first row of its layout: the open file's full path as a navigable breadcrumb on the left, and the editor controls on the right. The breadcrumb (`EditorPathBreadcrumb`, modeled by the pure `buildEditorPathBreadcrumb`) renders every directory segment as a clickable button that reveals that folder in the explorer; the filename is the non-clickable leaf. Each segment is tagged relative to the workspace root (`workspaceRoot`/`home` reach the bar via `EditorChromeContext`): the root segment carries a pin icon, its ancestors are dimmed, and descendants render normally; marking is suppressed when there is no pinned root or the file lives outside it. The full path is always shown (no segment collapsing) and the breadcrumb scrolls horizontally when it overflows, while the right-side controls stay fixed. Markdown files open in their rendered view (`kind: "markdown"`) by default; a `Rendered | Edit` toggle in that bar flips a single panel in place between `markdown` and `editor` via `setPanelView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty). The bar also hosts a `[...]` dropdown that surfaces the per-extension view settings (wrap, line numbers, whitespace, fold gutter) for the currently open file extension; the header label reads "Applies to .<ext> files" and changes persist to `editorViewByExt` in the preferences store. Word wrap is a per-extension setting, not a global per-panel override.
 
 A `browser` panel carries an optional `floating` flag. When set, the panel is shown in a native `WebviewUrl::External` window (managed Rust-side by `FloatBrowserState`) and its in-pane slot renders a placeholder with an editable address bar instead of the iframe. See `docs/FORK.md` (Floating browser windows) for the full lifecycle.
 

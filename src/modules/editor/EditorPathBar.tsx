@@ -31,7 +31,7 @@ import {
   EDITOR_INDENT_MIN,
   type EditorViewSettings,
 } from "./lib/editorViewSettings";
-import { editorPathDisplay } from "./lib/editorPathDisplay";
+import { EditorPathBreadcrumb } from "./EditorPathBreadcrumb";
 import { LANGUAGES } from "./lib/languageDefinitions";
 import { resolveDisplayName } from "./lib/languageResolver";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
@@ -58,9 +58,9 @@ const GLOBAL_TOGGLE_LABELS: [EditorGlobalToggleKey, string][] = [
 
 type Props = {
   path: string;
-  explorerRoot: string | null;
+  workspaceRoot: string | null;
   home: string | null;
-  onReveal?: () => void;
+  onRevealPath: (path: string) => void;
   view?: {
     mode: "raw" | "overlay" | "split";
     onToggleOverlay: () => void;
@@ -82,47 +82,11 @@ type Props = {
   onLanguageChange?: (lang: string | null) => void;
 };
 
-function PathDisplay({
-  path,
-  explorerRoot,
-  home,
-  onReveal,
-}: {
-  path: string;
-  explorerRoot: string | null;
-  home: string | null;
-  onReveal?: () => void;
-}) {
-  const { dirs, name } = editorPathDisplay(path, explorerRoot, home);
-  return (
-    <button
-      type="button"
-      onClick={onReveal}
-      title={path}
-      disabled={!onReveal}
-      className="flex min-w-0 items-center gap-1 overflow-hidden text-left text-[11px]"
-    >
-      {dirs.length > 0 && (
-        // direction: rtl truncates from the left so the filename stays visible;
-        // the inner span keeps the text in natural reading order.
-        <span className="min-w-0 truncate text-muted-foreground" style={{ direction: "rtl" }}>
-          <span style={{ direction: "ltr", unicodeBidi: "isolate" }}>
-            {dirs.join(" / ")} /
-          </span>
-        </span>
-      )}
-      <span className={cn("min-w-0 truncate text-foreground", onReveal && "hover:underline")}>
-        {name}
-      </span>
-    </button>
-  );
-}
-
 export function EditorPathBar({
   path,
-  explorerRoot,
+  workspaceRoot,
   home,
-  onReveal,
+  onRevealPath,
   view,
   viewToggles,
   globalToggles,
@@ -203,7 +167,12 @@ export function EditorPathBar({
   })();
   return (
     <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
-      <PathDisplay path={path} explorerRoot={explorerRoot} home={home} onReveal={onReveal} />
+      <EditorPathBreadcrumb
+        path={path}
+        workspaceRoot={workspaceRoot}
+        home={home}
+        onRevealPath={onRevealPath}
+      />
       <div className="ml-auto flex shrink-0 items-center gap-1">
         {onLanguageChange && (
           <Popover open={langOpen} onOpenChange={setLangOpen}>
