@@ -216,40 +216,38 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               so it does not float over the preview. pointer-events-auto on the bar
               itself makes buttons clickable despite the wrapper.
             */}
-            {showPreviewToggle && (
-              <div
-                className={cn(
-                  "pointer-events-none absolute inset-y-0 left-0 z-20",
-                  effectivePreviewMode === "split" ? "right-1/2" : "right-0",
-                )}
-              >
-                <EditorOverlayBar
-                  view={{
-                    mode: effectivePreviewMode ?? "raw",
-                    onToggleOverlay: () => callbacks.onToggleOverlayPreview?.(panel.id),
-                    onToggleSplit: () => callbacks.onToggleSplitPreview?.(panel.id),
-                    isHtml: ishtml,
-                  }}
-                  viewToggles={effectivePreviewMode == null ? viewToggles : undefined}
-                  globalToggles={effectivePreviewMode == null ? globalToggles : undefined}
-                  overrideLanguage={panel.overrideLanguage}
-                  currentLanguageName={currentLanguageName}
-                  onLanguageChange={(lang) => {
-                    const willShowPreview = lang
-                      ? isMarkdownPath(`x.${lang}`) || isHtmlPath(`x.${lang}`)
-                      : isMarkdownPath(panel.path) || isHtmlPath(panel.path);
-                    callbacks.onUpdatePanel?.(panel.id, (p) => {
-                      if (p.kind !== "editor") return p;
-                      return {
-                        ...p,
-                        overrideLanguage: lang,
-                        previewMode: willShowPreview ? p.previewMode : undefined,
-                      };
-                    });
-                  }}
-                />
-              </div>
-            )}
+            <div
+              className={cn(
+                "pointer-events-none absolute inset-y-0 left-0 z-20",
+                effectivePreviewMode === "split" ? "right-1/2" : "right-0",
+              )}
+            >
+              <EditorOverlayBar
+                view={showPreviewToggle ? {
+                  mode: effectivePreviewMode ?? "raw",
+                  onToggleOverlay: () => callbacks.onToggleOverlayPreview?.(panel.id),
+                  onToggleSplit: () => callbacks.onToggleSplitPreview?.(panel.id),
+                  isHtml: ishtml,
+                } : undefined}
+                viewToggles={effectivePreviewMode == null ? viewToggles : undefined}
+                globalToggles={effectivePreviewMode == null ? globalToggles : undefined}
+                overrideLanguage={panel.overrideLanguage}
+                currentLanguageName={currentLanguageName}
+                onLanguageChange={(lang) => {
+                  const willShowPreview = lang
+                    ? isMarkdownPath(`x.${lang}`) || isHtmlPath(`x.${lang}`)
+                    : isMarkdownPath(panel.path) || isHtmlPath(panel.path);
+                  callbacks.onUpdatePanel?.(panel.id, (p) => {
+                    if (p.kind !== "editor") return p;
+                    return {
+                      ...p,
+                      overrideLanguage: lang,
+                      previewMode: willShowPreview ? p.previewMode : undefined,
+                    };
+                  });
+                }}
+              />
+            </div>
 
             {/* Editor: always mounted. CSS width/visibility changes per mode. */}
             <div
