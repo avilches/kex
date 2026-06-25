@@ -306,3 +306,27 @@ El comportamiento de un click y un doble click sobre una fila de fichero es dist
 ### Objetivo
 
 Que el usuario pueda predecir, sin pensar, que pasa al hacer click o doble click en cualquier fila de fichero, y que la preferencia de preview tenga un efecto coherente (o claramente acotado) en todos los sitios.
+
+---
+
+## Asignar hotkeys a tabs en workspaces
+
+Estado: idea anotada (2026-06-24), por disenar.
+
+Poder asignar atajos de teclado para saltar directamente a un tab (panel) concreto, mas alla de la navegacion por posicion que ya existe.
+
+### Estado actual
+
+- `tab.selectByIndex` ("Jump to Tab 1-9", Cmd+1..9): salta al tab N **por posicion** dentro del pane activo (`shortcuts.ts:357`, handler en `App.tsx:1750`). El binding sigue a la posicion, no al tab: si reordenas, Cmd+1 va a otro tab.
+- `tab.next` / `tab.prev`: ciclar tabs.
+- `workspace.prev` / `workspace.next`: ciclar workspaces (no hay salto a workspace por indice).
+
+### Que falta / a decidir
+
+- **Hotkey pegado a un tab concreto**: que el usuario asigne un atajo a un tab determinado y lo siga aunque cambie de posicion o de pane (binding por-tab persistido, no por-indice). Decidir donde se asigna (menu contextual del tab, o un modo "asignar atajo") y como se persiste en el modelo `Panel`/`Workspace`.
+- **Salto a workspace por indice**: hoy solo hay prev/next; valorar `workspace.selectByIndex` (p. ej. Cmd+Alt+1..9) analogo al de tabs.
+- Encaja con el registry unico de shortcuts (`shortcuts.ts` + `matchesShortcut`); cuidar que los bindings por-tab no choquen con `tab.selectByIndex` ni con los atajos globales reasignables.
+
+### Objetivo
+
+Navegacion directa y memorizable a tabs/workspaces frecuentes, sin depender de su posicion actual.
