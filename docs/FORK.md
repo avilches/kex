@@ -278,12 +278,16 @@ scrolling to it without stealing focus from the editor. The context menu also ga
 
 ### Word wrap floating bar
 
-The word wrap setting for editors was moved from the Settings window to a floating action bar (`EditorOverlayBar`) rendered over the editor panel. `EditorOverlayBar` replaces `MarkdownViewToggle` (removed) and hosts two controls:
+The word wrap setting for editors was moved from the Settings window to the editor controls bar (then `EditorOverlayBar`, since reshaped into `EditorPathBar`, see "Editor path bar" below). It replaced `MarkdownViewToggle` (removed) and hosts two controls:
 
 - `WrapToggleButton` toggles word wrap for the current panel. Word wrap defaults by file type: prose (`.md`, `.markdown`, `.mdx`, `.txt`, `.text`, via `shouldWrapByDefault`) opens wrapped, code and everything else unwrapped. The toggle sets a per-panel `wordWrapOverride` (persisted with the workspace), so the effective wrap is `override ?? type default`. This replaced the old global `editorWordWrap` preference (removed). The same override and toggle apply to editor panels and to the git diff / commit-file panes, which share the button.
 - The `Rendered | Edit` view toggle (markdown panels only, label changed from `Rendered | Raw`). The underlying value `"raw"` is unchanged; only the visible label differs.
 
-Plain code editor panels render `EditorOverlayBar` without the view toggle. The wrap button shows in code and markdown edit (raw) panels, but is hidden in the markdown Rendered preview, where word wrap has nothing to act on.
+Plain code editor panels render the bar without the view toggle. The wrap button shows in code and markdown edit (raw) panels, but is hidden in the markdown Rendered preview, where word wrap has nothing to act on.
+
+### Editor path bar
+
+The editor controls bar (`EditorOverlayBar`) was reshaped into `EditorPathBar`: a thin top bar that is the first row of every editor and markdown panel instead of a chip floating over the content. It adds the open file's path on the left (relative to the active workspace `explorerRoot`, falling back to an absolute `~`-collapsed path when the file is outside the root) and keeps the existing controls (language selector, `[...]` view options, split, preview) on the right. The filename reveals the file in the explorer on click; the path is not navigable, since the bottom status bar already provides a navigable breadcrumb. `explorerRoot`/`home` reach the bar through `EditorChromeContext` (a small provider around `WorkspaceView`) rather than prop drilling through the render tree; the relative-path computation lives in the pure `editorPathDisplay` helper.
 
 ### Thin scrollbars
 
