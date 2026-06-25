@@ -115,7 +115,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   // Live content state for preview panes - updated via debounced onContentChange
   const [liveContent, setLiveContent] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevPreviewModeRef = useRef(false);
+  const prevPreviewModeRef = useRef<string | boolean>(false);
 
   const handleContentChange = useCallback((content: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
