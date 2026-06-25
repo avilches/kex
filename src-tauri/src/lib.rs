@@ -650,6 +650,7 @@ pub fn run() {
             Ok(())
         })
         .manage(pty::PtyState::default())
+        .manage(pty::ProcessMonitor::default())
         .manage(shell::ShellState::default())
         .manage(fs::watch::FsWatchState::default())
         .manage(history::HistoryState::default())
@@ -676,6 +677,7 @@ pub fn run() {
             pty::pty_close,
             pty::pty_close_all,
             pty::pty_has_foreground_process,
+            pty::pty_metrics,
             pty::pty_shell_name,
             fs::tree::list_subdirs,
             fs::tree::fs_read_dir,

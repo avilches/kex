@@ -15,6 +15,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 
 use portable_pty::PtySize;
+use serde::Serialize;
 use tauri::ipc::{Channel, Response};
 
 use crate::modules::workspace::{spawn_cwd_or_home, WorkspaceEnv, WorkspaceRegistry};
@@ -244,6 +245,69 @@ pub fn pty_has_foreground_process(state: tauri::State<PtyState>, id: u32) -> Res
         return Ok(None);
     }
     Ok(shell_foreground_process_name(shell_pid))
+}
+
+#[derive(Serialize)]
+pub struct PtyMetrics {
+    pub pty_id: u32,
+    pub pid: u32,
+    pub cpu_percent: f32,
+    pub mem_bytes: u64,
+    pub shell_name: String,
+}
+
+// Sample CPU% (normalized 0..=100) and RAM for each given pty's shell process
+// tree. Refreshes the shared System once per call so CPU% is a real delta.
+#[tauri::command]
+pub fn pty_metrics(
+    state: tauri::State<PtyState>,
+    monitor: tauri::State<ProcessMonitor>,
+    pty_ids: Vec<u32>,
+) -> Vec<PtyMetrics> {
+    use sysinfo::{Pid, ProcessesToUpdate};
+
+    let mut sys = monitor.0.lock().unwrap();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+    let num_cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+
+    let mut procs: HashMap<u32, ProcStat> = HashMap::new();
+    for (pid, proc_) in sys.processes() {
+        procs.insert(
+            pid.as_u32(),
+            ProcStat {
+                parent: proc_.parent().map(|p| p.as_u32()).unwrap_or(0),
+                cpu: proc_.cpu_usage(),
+                mem: proc_.memory(),
+            },
+        );
+    }
+
+    let sessions = state.sessions.read().unwrap();
+    let mut out = Vec::new();
+    for pty_id in pty_ids {
+        let Some(session) = sessions.get(&pty_id) else {
+            continue;
+        };
+        let shell_pid = session.shell_pid;
+        if shell_pid == 0 {
+            continue;
+        }
+        let (cpu_percent, mem_bytes) = aggregate_tree(&procs, shell_pid, num_cpus);
+        let shell_name = sys
+            .process(Pid::from_u32(shell_pid))
+            .map(|p| p.name().to_string_lossy().into_owned())
+            .unwrap_or_default();
+        out.push(PtyMetrics {
+            pty_id,
+            pid: shell_pid,
+            cpu_percent,
+            mem_bytes,
+            shell_name,
+        });
+    }
+    out
 }
 
 // Returns the name of the first foreground child of the shell, or None if no child exists.
