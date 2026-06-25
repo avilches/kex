@@ -183,7 +183,6 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
           <TerminalPathBar
             panelId={panel.id}
             cwd={panel.cwd ?? ""}
-            explorerRoot={explorerRoot}
             home={home}
             onReveal={panel.cwd ? () => callbacks.onFocusOnExplorer?.(panel.cwd as string) : undefined}
           />

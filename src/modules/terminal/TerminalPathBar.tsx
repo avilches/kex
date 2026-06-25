@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
-import { editorPathDisplay } from "@/modules/editor/lib/editorPathDisplay";
+import { segmentsFromCwd } from "@/lib/pathUtils";
 import {
   getRunningCommandsSnapshot,
   subscribeToRunningCommands,
@@ -11,17 +11,18 @@ import { formatCpu, formatMem } from "./lib/metricsFormat";
 type Props = {
   panelId: string;
   cwd: string;
-  explorerRoot: string | null;
   home: string | null;
   onReveal?: () => void;
 };
 
-export function TerminalPathBar({ panelId, cwd, explorerRoot, home, onReveal }: Props) {
+export function TerminalPathBar({ panelId, cwd, home, onReveal }: Props) {
   const metrics = useMetrics(panelId);
   const running =
     useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(panelId) ??
     null;
-  const { dirs, name } = cwd ? editorPathDisplay(cwd, explorerRoot, home) : { dirs: [], name: "" };
+  const segments = cwd ? segmentsFromCwd(cwd, home) : [];
+  const dirs = segments.slice(0, -1).map((s) => s.label);
+  const name = segments.length > 0 ? segments[segments.length - 1].label : "";
   const process = running ?? metrics?.shellName ?? null;
   return (
     <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
