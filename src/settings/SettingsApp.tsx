@@ -8,6 +8,7 @@ import {
   Cancel01Icon,
   ColorsIcon,
   ComputerTerminal01Icon,
+  File02Icon,
   InformationCircleIcon,
   KeyboardIcon,
   PaintBoardIcon,
@@ -22,6 +23,7 @@ import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateS
 import { AboutSection } from "./sections/AboutSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
+import { FileTypesSection } from "./sections/FileTypesSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { TerminalSection } from "./sections/TerminalSection";
@@ -35,6 +37,7 @@ const SECTIONS: {
 }[] = [
   { id: "general", label: "General", icon: Settings01Icon, component: GeneralSection },
   { id: "editor", label: "Editor", icon: SourceCodeIcon, component: EditorSection },
+  { id: "filetypes", label: "File Types", icon: File02Icon, component: FileTypesSection },
   { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon, component: TerminalSection },
   { id: "appearance", label: "Appearance", icon: PaintBoardIcon, component: AppearanceSection },
   { id: "themes", label: "Themes", icon: ColorsIcon, component: ThemesSection },
@@ -165,10 +168,10 @@ export function SettingsApp() {
         <ScrollArea type="auto" className="min-h-0 flex-1">
           <div className="px-8 pt-2 pb-7">
             <div className="mx-auto w-full max-w-160">
-              {ActiveSection && active === "editor" ? (
-                <EditorSection
-                  fileTypesExt={fileTypesExtConsumed.current ? undefined : fileTypesExt}
-                  onFileTypesExtConsumed={() => {
+              {active === "filetypes" ? (
+                <FileTypesSection
+                  focusExt={fileTypesExtConsumed.current ? undefined : fileTypesExt}
+                  onFocusConsumed={() => {
                     fileTypesExtConsumed.current = true;
                     setFileTypesExt(undefined);
                   }}

@@ -18,7 +18,7 @@ import {
   setEditorViewForExt,
 } from "@/modules/settings/store";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { openEditorFileTypesSettings } from "@/modules/settings/openSettingsWindow";
+import { openFileTypesSettings } from "@/modules/settings/openSettingsWindow";
 import type { Panel } from "./lib/types";
 
 // TerminalPane is intentionally eager (terminal-first app).
@@ -209,7 +209,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
         value: resolveEditorView(panel.path, editorViewByExt),
         onChange: (next: EditorViewSettings) =>
           void setEditorViewForExt(ext, next),
-        onViewInSettings: () => void openEditorFileTypesSettings(ext || undefined),
+        onViewInSettings: () => void openFileTypesSettings(ext || undefined),
       };
 
       return (

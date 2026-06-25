@@ -17,11 +17,11 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { DocumentCodeIcon, EyeIcon, LayoutTwoColumnIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import { Command as CommandPrimitive } from "cmdk";
+import { DocumentCodeIcon, EyeIcon, LayoutTwoColumnIcon, MoreHorizontalIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   clampColumnRuler,
@@ -166,8 +166,19 @@ export function EditorPathBar({
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-0" align="end">
-              <Command>
-                <CommandInput placeholder="Search language..." className="h-8 text-[12px]" />
+              <Command className="rounded-menu">
+                <div className="relative px-2 py-1.5">
+                  <HugeiconsIcon
+                    icon={Search01Icon}
+                    size={13}
+                    strokeWidth={2}
+                    className="absolute top-1/2 left-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <CommandPrimitive.Input
+                    placeholder="Search language…"
+                    className="h-7 w-full min-w-0 rounded-3xl border border-transparent bg-input/50 pr-3 pl-6.5 text-xs outline-none transition-[color,box-shadow,background-color] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                  />
+                </div>
                 <CommandList>
                   <CommandEmpty>No language found.</CommandEmpty>
                   <CommandGroup>
@@ -177,7 +188,7 @@ export function EditorPathBar({
                         onLanguageChange(null);
                         setLangOpen(false);
                       }}
-                      className="text-[12px]"
+                      className="rounded-menu-item text-[12px]"
                     >
                       Auto
                     </CommandItem>
@@ -189,7 +200,7 @@ export function EditorPathBar({
                           onLanguageChange(lang.extensions[0]);
                           setLangOpen(false);
                         }}
-                        className="text-[12px]"
+                        className="rounded-menu-item text-[12px]"
                       >
                         {lang.name}
                       </CommandItem>
@@ -206,7 +217,7 @@ export function EditorPathBar({
               <button
                 type="button"
                 title="View options"
-                className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                className="order-last flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
               >
                 <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
               </button>
@@ -303,7 +314,7 @@ export function EditorPathBar({
                     className="text-[12px] text-muted-foreground"
                     onSelect={() => viewToggles.onViewInSettings?.()}
                   >
-                    View in Settings
+                    {viewToggles.ext ? `View ${viewToggles.ext} Settings` : "View file type Settings"}
                   </DropdownMenuItem>
                 </>
               )}
