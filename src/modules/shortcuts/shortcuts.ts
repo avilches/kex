@@ -12,6 +12,7 @@ export type ShortcutId =
   | "tab.newBrowser"
   | "tab.newEditor"
   | "tab.close"
+  | "tab.reopenClosed"
   | "tab.rename"
   | "tab.lock"
   | "tab.focusOnExplorer"
@@ -227,7 +228,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "tab.newBlock",
     label: "New Blocks Terminal",
     group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
+    defaultBindings: [{ [MOD_PROP]: true, key: "b" }],
   },
   {
     id: "tab.newBrowser",
@@ -247,6 +248,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Close Tab or Pane",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "w" }],
+  },
+  {
+    id: "tab.reopenClosed",
+    label: "Reopen Closed Tab",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
   },
   {
     id: "tab.rename",
