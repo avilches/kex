@@ -21,7 +21,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Command as CommandPrimitive } from "cmdk";
-import { DocumentCodeIcon, EyeIcon, LayoutTwoColumnIcon, MoreHorizontalIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import { DocumentCodeIcon, EyeIcon, LayoutTwoColumnIcon, MoreHorizontalIcon, Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   clampColumnRuler,
@@ -146,6 +146,61 @@ export function EditorPathBar({
   const keepOpen = (e: Event) => e.preventDefault();
   const [langOpen, setLangOpen] = useState(false);
   const selectableLanguages = LANGUAGES.filter((l) => l.userSelectable !== false);
+
+  // Language picker entries. The active one (override, or the by-extension auto
+  // language when none) is pinned first with a check; the auto-detected language
+  // carries an "(auto)" suffix and otherwise keeps its natural list position.
+  const autoName = resolveDisplayName(path);
+  const autoLang = selectableLanguages.find((l) => l.name === autoName);
+  const overrideLang = overrideLanguage
+    ? selectableLanguages.find(
+        (l) =>
+          l.extensions[0] === overrideLanguage ||
+          l.extensions.includes(overrideLanguage),
+      )
+    : undefined;
+  const activeId = overrideLanguage
+    ? (overrideLang?.extensions[0] ?? overrideLanguage)
+    : "auto";
+  const langEntries = (() => {
+    const base = selectableLanguages.map((l) =>
+      l === autoLang
+        ? {
+            id: "auto",
+            label: l.name,
+            searchValue: `auto ${l.name}`,
+            isAuto: true,
+            active: activeId === "auto",
+            select: () => onLanguageChange?.(null),
+          }
+        : {
+            id: l.extensions[0],
+            label: l.name,
+            searchValue: l.name,
+            isAuto: false,
+            active: activeId === l.extensions[0],
+            select: () => onLanguageChange?.(l.extensions[0]),
+          },
+    );
+    if (!autoLang) {
+      base.unshift({
+        id: "auto",
+        label: autoName,
+        searchValue: `auto ${autoName}`,
+        isAuto: true,
+        active: activeId === "auto",
+        select: () => onLanguageChange?.(null),
+      });
+    }
+    const active = base.find((e) => e.id === activeId);
+    const auto = base.find((e) => e.id === "auto");
+    const rest = base.filter((e) => e.id !== activeId && e.id !== "auto");
+    const ordered = [];
+    if (auto) ordered.push(auto);
+    if (active && active.id !== "auto") ordered.push(active);
+    ordered.push(...rest);
+    return ordered;
+  })();
   return (
     <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
       <PathDisplay path={path} explorerRoot={explorerRoot} home={home} onReveal={onReveal} />
@@ -183,27 +238,30 @@ export function EditorPathBar({
                 <CommandList>
                   <CommandEmpty>No language found.</CommandEmpty>
                   <CommandGroup>
-                    <CommandItem
-                      value="auto"
-                      onSelect={() => {
-                        onLanguageChange(null);
-                        setLangOpen(false);
-                      }}
-                      className="rounded-menu-item text-[12px]"
-                    >
-                      {resolveDisplayName(path)}
-                    </CommandItem>
-                    {selectableLanguages.map((lang) => (
+                    {langEntries.map((e) => (
                       <CommandItem
-                        key={lang.extensions[0]}
-                        value={lang.name}
+                        key={e.id}
+                        value={e.searchValue}
                         onSelect={() => {
-                          onLanguageChange(lang.extensions[0]);
+                          e.select();
                           setLangOpen(false);
                         }}
                         className="rounded-menu-item text-[12px]"
                       >
-                        {lang.name}
+                        <span>
+                          {e.label}
+                          {e.isAuto && (
+                            <span className="text-muted-foreground"> (auto)</span>
+                          )}
+                        </span>
+                        {e.active && (
+                          <HugeiconsIcon
+                            icon={Tick02Icon}
+                            size={13}
+                            strokeWidth={2}
+                            className="ml-auto shrink-0 text-primary"
+                          />
+                        )}
                       </CommandItem>
                     ))}
                   </CommandGroup>
