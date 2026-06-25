@@ -70,9 +70,10 @@ type Props = {
   overrideLanguage?: string | null;
   currentLanguageName?: string;
   onLanguageChange?: (lang: string | null) => void;
+  inSplitMode?: boolean;
 };
 
-export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLanguage, currentLanguageName, onLanguageChange }: Props) {
+export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLanguage, currentLanguageName, onLanguageChange, inSplitMode }: Props) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutId = view?.isHtml ? "editor.html.toggleView" : "editor.markdown.toggleView";
   const toggleLabel = view ? getShortcutLabel(shortcutId, userShortcuts) : null;
@@ -90,7 +91,10 @@ export function EditorOverlayBar({ view, viewToggles, globalToggles, overrideLan
   const [langOpen, setLangOpen] = useState(false);
   const selectableLanguages = LANGUAGES.filter((l) => l.userSelectable !== false);
   return (
-    <div className="pointer-events-auto absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-md border border-border/60 bg-card/85 p-0.5 text-[11px] shadow-sm backdrop-blur">
+    <div className={cn(
+      "pointer-events-auto absolute top-3 z-10 inline-flex items-center gap-1 rounded-md border border-border/60 bg-card/85 p-0.5 text-[11px] shadow-sm backdrop-blur",
+      inSplitMode ? "right-[calc(50%+0.75rem)]" : "right-3",
+    )}>
       {onLanguageChange && (
         <Popover open={langOpen} onOpenChange={setLangOpen}>
           <PopoverTrigger asChild>
