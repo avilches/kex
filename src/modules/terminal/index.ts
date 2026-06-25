@@ -1,4 +1,5 @@
 export { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
+export { TerminalPathBar } from "./TerminalPathBar";
 export {
   clearFocusedTerminal,
   disposeSession,

@@ -108,6 +108,7 @@ import {
   clearRunningCommandEntry,
   getRunningCommandsSnapshot,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { clearMetricsEntry } from "@/modules/workspaces/lib/terminalMetricsStore";
 import {
   resolveExplorerRoot,
   resolveSidebarTarget,
@@ -370,6 +371,7 @@ export default function App() {
         searchAddons.current.delete(id);
         terminalHandles.current.delete(id);
         clearRunningCommandEntry(id);
+        clearMetricsEntry(id);
       }
     }
     livePanelIdsRef.current = live;
@@ -405,6 +407,7 @@ export default function App() {
     for (const id of livePanelIdsRef.current) {
       disposeSession(id);
       clearRunningCommandEntry(id);
+      clearMetricsEntry(id);
     }
     searchAddons.current.clear();
     terminalHandles.current.clear();

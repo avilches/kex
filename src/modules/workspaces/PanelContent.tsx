@@ -5,6 +5,7 @@ import { EditorPathBar, type EditorGlobalToggleKey } from "@/modules/editor";
 import { useEditorChrome } from "./EditorChromeContext";
 import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
+import { TerminalPathBar } from "@/modules/terminal";
 import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
@@ -178,23 +179,34 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   switch (panel.kind) {
     case "terminal":
       return (
-        <TerminalPane
-          ref={(h) => {
-            (terminalRef as React.MutableRefObject<TerminalPaneHandle | null>).current = h;
-            callbacks.registerTerminalHandle?.(panel.id, h);
-          }}
-          panelId={panel.id}
-          visible={visible}
-          focused={focused}
-          initialCwd={panel.cwd}
-          blocks={panel.blocks}
-          restoreOnRestart={panel.restoreOnRestart}
-          persistentCommand={panel.persistentCommand}
-          onSearchReady={callbacks.onSearchReady}
-          onExit={callbacks.onExit}
-          onCwd={callbacks.onCwd}
-          onRunningCommand={callbacks.onRunningCommand}
-        />
+        <div className="flex h-full w-full flex-col">
+          <TerminalPathBar
+            panelId={panel.id}
+            cwd={panel.cwd ?? ""}
+            explorerRoot={explorerRoot}
+            home={home}
+            onReveal={panel.cwd ? () => callbacks.onFocusOnExplorer?.(panel.cwd as string) : undefined}
+          />
+          <div className="relative min-h-0 flex-1">
+            <TerminalPane
+              ref={(h) => {
+                (terminalRef as React.MutableRefObject<TerminalPaneHandle | null>).current = h;
+                callbacks.registerTerminalHandle?.(panel.id, h);
+              }}
+              panelId={panel.id}
+              visible={visible}
+              focused={focused}
+              initialCwd={panel.cwd}
+              blocks={panel.blocks}
+              restoreOnRestart={panel.restoreOnRestart}
+              persistentCommand={panel.persistentCommand}
+              onSearchReady={callbacks.onSearchReady}
+              onExit={callbacks.onExit}
+              onCwd={callbacks.onCwd}
+              onRunningCommand={callbacks.onRunningCommand}
+            />
+          </div>
+        </div>
       );
 
     case "editor": {
