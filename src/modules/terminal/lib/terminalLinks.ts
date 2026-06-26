@@ -28,11 +28,6 @@ function parseFileUri(uri: string): string {
   return path;
 }
 
-const CLAUDE_PATTERNS = [
-  /(?:Write|Read|Edit|Update|MultiEdit)\(([^)\n]+)\)/g,
-  /Wrote \d+ lines? to ([^\n]+)/g,
-];
-
 const PATH_PATTERNS: RegExp[] = [
   // Absolute: /path/to/file.ext
   /(\/[^\s:'"<>()\[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
@@ -118,18 +113,6 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
             dispatchFileLink(rawPath, cwd, lineNum, col);
           },
         });
-      }
-
-      for (const pattern of CLAUDE_PATTERNS) {
-        pattern.lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = pattern.exec(lineText)) !== null) {
-          const untrimmed = match[1];
-          const rawPath = untrimmed.trimEnd();
-          const offset = match.index + match[0].indexOf(untrimmed);
-          if (DEBUG_LINKS) console.log(`[links] claude match: "${rawPath}"`);
-          promises.push(addLink(rawPath, offset, offset + rawPath.length));
-        }
       }
 
       for (const pattern of PATH_PATTERNS) {
