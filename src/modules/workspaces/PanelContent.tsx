@@ -190,7 +190,13 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
             panelId={panel.id}
             cwd={panel.cwd ?? ""}
             home={home}
-            onReveal={panel.cwd ? () => callbacks.onFocusOnExplorer?.(panel.cwd as string) : undefined}
+            workspaceRoot={workspaceRoot}
+            gitRootPath={gitRootPath}
+            onReveal={(p) => callbacks.onFocusOnExplorer?.(p)}
+            onSetAsRoot={callbacks.onSetAsRoot}
+            onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
+            onRevealInTerminal={callbacks.onRevealInTerminal}
+            onAddToGitignore={callbacks.onAddToGitignore}
           />
           <div className="relative min-h-0 flex-1">
             <TerminalPane

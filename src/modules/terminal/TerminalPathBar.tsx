@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
-import { segmentsFromCwd } from "@/lib/pathUtils";
+import { buildCwdBreadcrumb } from "@/modules/workspaces/pathbar/cwdBreadcrumb";
+import { PathBreadcrumb } from "@/modules/workspaces/pathbar/PathBreadcrumb";
+import { DirSegmentContextMenu } from "@/modules/workspaces/pathbar/DirSegmentContextMenu";
 import {
   getRunningCommandsSnapshot,
   subscribeToRunningCommands,
@@ -12,36 +14,52 @@ type Props = {
   panelId: string;
   cwd: string;
   home: string | null;
-  onReveal?: () => void;
+  workspaceRoot: string | null;
+  gitRootPath: string | null;
+  onReveal?: (path: string) => void;
+  onSetAsRoot?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
+  onRevealInTerminal?: (path: string) => void;
+  onAddToGitignore?: (path: string, isDir: boolean) => void;
 };
 
-export function TerminalPathBar({ panelId, cwd, home, onReveal }: Props) {
+export function TerminalPathBar({
+  panelId,
+  cwd,
+  home,
+  workspaceRoot,
+  gitRootPath,
+  onReveal,
+  onSetAsRoot,
+  onNewWorkspaceFromFolder,
+  onRevealInTerminal,
+  onAddToGitignore,
+}: Props) {
   const metrics = useMetrics(panelId);
   const running =
     useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(panelId) ??
     null;
-  const segments = cwd ? segmentsFromCwd(cwd, home) : [];
-  const dirs = segments.slice(0, -1).map((s) => s.label);
-  const name = segments.length > 0 ? segments[segments.length - 1].label : "";
+  const { segments } = buildCwdBreadcrumb(cwd, workspaceRoot, home);
   const process = running ?? metrics?.shellName ?? null;
   return (
     <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
-      <button
-        type="button"
-        onClick={onReveal}
-        title={cwd}
-        disabled={!onReveal}
-        className="flex min-w-0 items-center gap-1 overflow-hidden text-left text-[11px]"
-      >
-        {dirs.length > 0 && (
-          <span className="min-w-0 truncate text-muted-foreground" style={{ direction: "rtl" }}>
-            <span style={{ direction: "ltr", unicodeBidi: "isolate" }}>{dirs.join(" / ")} /</span>
-          </span>
+      <PathBreadcrumb
+        segments={segments}
+        onRevealPath={(p) => onReveal?.(p)}
+        renderSegment={(seg, trigger) => (
+          <DirSegmentContextMenu
+            path={seg.fullPath}
+            rootPath={workspaceRoot ?? seg.fullPath}
+            gitRootPath={gitRootPath}
+            onSetAsRoot={onSetAsRoot}
+            onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
+            onRevealInTerminal={onRevealInTerminal}
+            onAddToGitignore={onAddToGitignore}
+          >
+            {trigger}
+          </DirSegmentContextMenu>
         )}
-        <span className={cn("min-w-0 truncate text-foreground", onReveal && "hover:underline")}>
-          {name}
-        </span>
-      </button>
+      />
       <div className="ml-auto flex shrink-0 items-center gap-2 font-mono text-muted-foreground">
         {metrics && (
           <span title="Process ID">{metrics.pid}</span>
