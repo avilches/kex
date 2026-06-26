@@ -13,6 +13,7 @@ import type { WelcomeActions } from "./EmptyPaneWelcome";
 type Props = {
   workspaces: Workspace[];
   activeWorkspaceId: string;
+  expandedPaneId?: string | null;
   onActivatePanel: (workspaceId: string, panelId: string) => void;
   onClosePanel: (workspaceId: string, panelId: string) => void;
   onCloseManyPanels: (workspaceId: string, panelIds: string[]) => void;
@@ -37,6 +38,7 @@ type Props = {
 export function WorkspaceView({
   workspaces,
   activeWorkspaceId,
+  expandedPaneId,
   ...rest
 }: Props) {
   const { draggingItem } = useWorkspaceDnd();
@@ -71,6 +73,7 @@ export function WorkspaceView({
             workspaceCwd={ws.cwd}
             activePaneId={ws.activePaneId}
             isWorkspaceActive={ws.id === activeWorkspaceId}
+            expandedPaneId={expandedPaneId}
             onActivatePanel={rest.onActivatePanel}
             onClosePanel={rest.onClosePanel}
             onCloseManyPanels={rest.onCloseManyPanels}
