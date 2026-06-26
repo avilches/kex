@@ -22,6 +22,7 @@ import {
 // eager startup bundle (see eager-budget.test.ts). It loads only when a block
 // terminal is actually opened.
 const ShellInput = lazy(() => import("./block/ShellInput"));
+import { ScratchpadBar } from "./ScratchpadBar";
 
 export type TerminalPaneHandle = {
   write: (data: string) => void;
@@ -156,12 +157,16 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
               />
             </Suspense>
           </div>
+          {session.scratchpadOpen && <ScratchpadBar leafId={panelId} />}
         </div>
       );
     }
 
     return (
-      <div ref={containerRef} className="zoom-exempt h-full w-full" style={hideStyle} />
+      <div className="zoom-exempt flex h-full w-full flex-col" style={hideStyle}>
+        <div ref={containerRef} className="min-h-0 flex-1" />
+        {session.scratchpadOpen && <ScratchpadBar leafId={panelId} />}
+      </div>
     );
   },
 );
