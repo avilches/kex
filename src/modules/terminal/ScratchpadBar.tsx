@@ -78,15 +78,19 @@ export function ScratchpadBar({ leafId }: Props) {
         onBlur={() => setLeafScratchpadFocused(leafId, false)}
       />
       <div className="flex shrink-0 items-center gap-2">
-        <label className="flex cursor-pointer items-center gap-1.5 select-none">
+        <div className="flex items-center gap-1.5">
           <Switch
+            id="scratchpad-enter-sends"
             checked={enterSends}
             onCheckedChange={(v) => void setTerminalScratchpadEnterSends(v)}
           />
-          <span className="text-[11px] text-muted-foreground">
+          <label
+            htmlFor="scratchpad-enter-sends"
+            className="cursor-pointer text-[11px] text-muted-foreground select-none"
+          >
             {enterSends ? "Enter=Send" : "Shift+Enter=Send"}
-          </span>
-        </label>
+          </label>
+        </div>
         <button
           type="button"
           onClick={send}
