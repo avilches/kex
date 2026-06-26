@@ -195,6 +195,7 @@ export default function App() {
   } = useFloatBrowser({ updatePanelData, findPanelGlobal });
 
   const activeCwdRef = useRef<string | null>(null);
+  const contextCwdRef = useRef<string | null>(null);
 
   // ── Active panel derivation ───────────────────────────────────────────────
 
@@ -213,13 +214,13 @@ export default function App() {
     ? ((activePanel as { cwd?: string }).cwd ?? null)
     : null;
   activeCwdRef.current = activeCwd;
+  const contextCwdFilePath = activePanel ? panelFilePath(activePanel) : null;
   const contextCwd =
     activePanel?.kind === "terminal"
       ? (activePanel.cwd ?? null)
-      : activePanel && "path" in activePanel
-        ? (activePanel.path.split(/[\\/]/).slice(0, -1).join("/") || null)
+      : contextCwdFilePath
+        ? (contextCwdFilePath.split(/[\\/]/).slice(0, -1).join("/") || null)
         : null;
-  const contextCwdRef = useRef<string | null>(null);
   contextCwdRef.current = contextCwd;
 
   // ── Handle maps ───────────────────────────────────────────────────────────
@@ -697,7 +698,7 @@ export default function App() {
       const cwd =
         terminalNewFolderMode === "workspace"
           ? activeWorkspace.cwd
-          : (contextCwd ?? activeWorkspace.cwd);
+          : (contextCwdRef.current ?? activeWorkspace.cwd);
       openPanel(
         activeWorkspace.id,
         targetPaneId ?? activeWorkspace.activePaneId,
@@ -709,7 +710,7 @@ export default function App() {
         },
       );
     },
-    [activeWorkspace, contextCwd, openPanel],
+    [activeWorkspace, openPanel],
   );
 
   // ── Window title ──────────────────────────────────────────────────────────
