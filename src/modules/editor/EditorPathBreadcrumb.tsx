@@ -8,7 +8,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { FolderPinIcon, Home03Icon } from "@hugeicons/core-free-icons";
+import { Home03Icon, PinIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import {
@@ -68,9 +68,9 @@ export function EditorPathBreadcrumb({
                         />
                       ) : s.relation === "root" ? (
                         <HugeiconsIcon
-                          icon={FolderPinIcon}
-                          className="size-3"
-                          strokeWidth={1.75}
+                          icon={PinIcon}
+                          className="size-3 text-primary"
+                          strokeWidth={2}
                         />
                       ) : null}
                       {s.isHome ? "Home" : s.label}
