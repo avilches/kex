@@ -52,7 +52,9 @@ export function TerminalPathBar({ panelId, cwd, home, onReveal }: Props) {
         {metrics && (
           <>
             <span className="text-border/60">&middot;</span>
-            <span>{formatCpu(metrics.cpuPercent)}</span>
+            <span className={cn(metrics.cpuPercent < 0.05 && "text-muted-foreground/50")}>
+              {formatCpu(metrics.cpuPercent)}
+            </span>
             <span className="text-border/60">&middot;</span>
             <span>{formatMem(metrics.memBytes)}</span>
           </>
