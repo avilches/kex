@@ -12,6 +12,7 @@ import { SerializeAddon } from "@xterm/addon-serialize";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { type FontWeight, Terminal } from "@xterm/xterm";
+import { registerTerminalLinks } from "@/modules/terminal/lib/terminalLinks";
 import { shouldCursorBlink } from "./cursorBlink";
 import {
   terminalDeleteSequence,
@@ -236,6 +237,9 @@ function createSlot(): Slot {
     lastH: 0,
     lastUsedAt: 0,
   };
+
+  const termLinksDisposer = registerTerminalLinks(term, () => slot.currentLeafId);
+  slot.oscDisposers.push(termLinksDisposer);
 
   term.attachCustomKeyEventHandler((event) => {
     // During IME composition the browser is assembling a multi-keystroke

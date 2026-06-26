@@ -66,6 +66,7 @@ import {
   useTerminalMetricsSampler,
   writeToSession,
 } from "@/modules/terminal";
+import { configureTerminalLinkBridge } from "@/modules/terminal/lib/terminalLinkBridge";
 import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import { useWorkspaceEnvStore } from "@/modules/workspace";
@@ -236,6 +237,10 @@ export default function App() {
   const [gitHistoryHandle, setGitHistoryHandle] =
     useState<GitHistorySearchHandle | null>(null);
   const pendingGotoLine = useRef<Map<string, number>>(new Map());
+  const fileLinkHandlerRef = useRef<(path: string, cwd: string | null, line?: number, col?: number) => void>(
+    () => {},
+  );
+  const cwdResolverRef = useRef<(leafId: string) => string | null>(() => null);
 
   const { zoomIn, zoomOut, zoomReset } = useZoom();
   useEditorFont();
@@ -850,6 +855,35 @@ export default function App() {
     },
     [activeWorkspace, openPanel],
   );
+
+  fileLinkHandlerRef.current = (path, cwd, line, _col) => {
+    let absPath = path;
+    if (path.startsWith("~/")) {
+      absPath = home ? `${home}/${path.slice(2)}` : path;
+    } else if (!path.startsWith("/") && cwd) {
+      absPath = `${cwd}/${path}`;
+    }
+    const id = openFileInPanel(absPath, true);
+    if (id == null) return;
+    if (line == null) return;
+    const h = editorHandles.current.get(id);
+    if (h) h.gotoLine(line);
+    else pendingGotoLine.current.set(id, line);
+  };
+
+  cwdResolverRef.current = (leafId) => {
+    const found = findPanelGlobal(leafId);
+    if (!found) return null;
+    const p = found.panel;
+    return p.kind === "terminal" ? (p.cwd ?? null) : null;
+  };
+
+  useEffect(() => {
+    configureTerminalLinkBridge({
+      onFileLink: (path, cwd, line, col) => fileLinkHandlerRef.current(path, cwd, line, col),
+      resolveLeafCwd: (leafId) => cwdResolverRef.current(leafId),
+    });
+  }, []);
 
   // ── Float browser callbacks ───────────────────────────────────────────────
 
