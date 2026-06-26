@@ -86,6 +86,7 @@ import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
+import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import type { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -813,6 +814,7 @@ export default function App() {
             );
           }
           activatePanel(activeWorkspace.id, existing.id);
+          flashTab(existing.id);
           return existing.id;
         }
       }

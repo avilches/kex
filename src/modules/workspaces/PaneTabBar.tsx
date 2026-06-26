@@ -5,10 +5,11 @@ import { panelIcon, panelTitle } from "./lib/panelTitle";
 import { type Panel, isAutofocusPanel, isLockablePanel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
+import { subscribeTabFlash, getTabFlashSnapshot } from "./lib/tabFlashStore";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -175,6 +176,17 @@ function DraggableTab({
     lockFlashSnap.panelId === panel.id ? lockFlashSnap.seq : 0;
   const lockFlashRef = useFlash<HTMLButtonElement>(lockFlashToken);
 
+  const tabFlashSnap = useSyncExternalStore(subscribeTabFlash, getTabFlashSnapshot);
+  const tabFlashToken = tabFlashSnap.panelId === panel.id ? tabFlashSnap.seq : 0;
+  const tabFlashRef = useFlash<HTMLDivElement>(tabFlashToken);
+  const setMergedRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+      tabFlashRef.current = node;
+    },
+    [setNodeRef, tabFlashRef],
+  );
+
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
   }, [isRenaming]);
@@ -208,7 +220,7 @@ function DraggableTab({
 
   const tabDiv = (
     <div
-      ref={setNodeRef}
+      ref={setMergedRef}
       {...attributes}
       data-panel-id={panel.id}
       title={nativeTooltip}
