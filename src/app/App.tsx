@@ -1954,10 +1954,13 @@ export default function App() {
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
       "view.zoomReset": zoomReset,
-      "view.zenMode": () =>
+      "view.zenMode": () => {
+        if (!activeWorkspace) return;
+        if (allPanes(activeWorkspace.paneTree).length <= 1) return;
         setZenPaneId((prev) =>
-          prev !== null ? null : (activeWorkspace?.activePaneId ?? null),
-        ),
+          prev !== null ? null : activeWorkspace.activePaneId,
+        );
+      },
       "editor.undo": () => {
         if (activePanelId) editorHandles.current.get(activePanelId)?.undo();
       },
