@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import { type Panel, isAutofocusPanel, isLockablePanel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import type React from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
@@ -19,421 +20,14 @@ import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { useTabRenameStore } from "./lib/tabRenameStore";
-import { useFileRenameStore } from "./lib/fileRenameStore";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import type { AgentSession } from "@/modules/agents/lib/types";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, Copy01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
-import { pathBasename, pathDirname } from "@/lib/pathUtils";
-import { panelFilePath } from "./lib/panelPath";
-import { native } from "@/lib/native";
+import { Alert02Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
-
-function HoverTable({ children }: { children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5 text-[12px]">
-      {children}
-    </div>
-  );
-}
-
-function HoverRow({
-  label,
-  value,
-  copy,
-  action,
-  valueClassName,
-  valueSuffix,
-}: {
-  label: string;
-  value: string;
-  copy?: string;
-  action?: { icon: ReactNode; label: string; onClick: () => void };
-  valueClassName?: string;
-  valueSuffix?: ReactNode;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  return (
-    <>
-      <span className="whitespace-nowrap text-muted-foreground">{label}</span>
-      <span className="group/row flex min-w-0 items-start gap-1">
-        <span className={cn("min-w-0 break-words", valueClassName ?? "text-foreground")}>
-          {value}
-          {valueSuffix}
-        </span>
-        {copy !== undefined && (
-          <button
-            type="button"
-            title={`Copy ${label.toLowerCase()}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              void navigator.clipboard
-                .writeText(copy)
-                .then(() => setCopied(true))
-                .catch(() => {});
-            }}
-            className="flex size-[20px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/row:opacity-100 hover:text-foreground"
-          >
-            <HugeiconsIcon
-              icon={copied ? Tick02Icon : Copy01Icon}
-              size={14}
-              strokeWidth={1.9}
-            />
-          </button>
-        )}
-        {action && (
-          <button
-            type="button"
-            title={action.label}
-            onClick={(e) => {
-              e.stopPropagation();
-              action.onClick();
-            }}
-            className="flex size-[20px] shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition group-hover/row:opacity-100 hover:text-foreground"
-          >
-            {action.icon}
-          </button>
-        )}
-      </span>
-    </>
-  );
-}
-
-function FilePathLines({
-  absPath,
-  repoRoot,
-  repoRel,
-  onRename,
-  isRenaming,
-  fileRenameRef,
-  onRenameCommit,
-  onRenameCancel,
-  children,
-}: {
-  absPath: string;
-  repoRoot: string | null;
-  repoRel: string | null;
-  onRename?: () => void;
-  isRenaming?: boolean;
-  fileRenameRef?: React.Ref<HTMLInputElement>;
-  onRenameCommit?: () => void;
-  onRenameCancel?: () => void;
-  children?: ReactNode;
-}) {
-  const filename = pathBasename(absPath);
-  return (
-    <HoverTable>
-      {isRenaming ? (
-        <>
-          <span className="whitespace-nowrap text-muted-foreground">Rename file</span>
-          <input
-            ref={fileRenameRef}
-            autoFocus
-            defaultValue={filename}
-            onFocus={(e) => e.currentTarget.select()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); onRenameCommit?.(); }
-              if (e.key === "Escape") { e.preventDefault(); onRenameCancel?.(); }
-            }}
-            onBlur={() => onRenameCancel?.()}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="min-w-0 rounded border border-input bg-transparent px-1.5 py-0.5 text-[12px] font-medium text-foreground outline-none focus:border-ring"
-          />
-        </>
-      ) : (
-        <HoverRow
-          label="File name"
-          value={filename}
-          copy={filename}
-          valueClassName="font-medium text-foreground"
-          action={
-            onRename
-              ? {
-                  icon: <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={1.9} />,
-                  label: "Rename file",
-                  onClick: onRename,
-                }
-              : undefined
-          }
-        />
-      )}
-      {repoRoot && <HoverRow label="Repo root" value={repoRoot} copy={repoRoot} />}
-      {repoRel && <HoverRow label="Relative to repo" value={repoRel} copy={repoRel} />}
-      <HoverRow label="Absolute path" value={absPath} copy={absPath} />
-      {children}
-    </HoverTable>
-  );
-}
-
-function useGitRepoRoot(dir: string | undefined): string | null {
-  const [root, setRoot] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!dir) {
-      setRoot(null);
-      return;
-    }
-    let cancelled = false;
-    setRoot(null);
-    native
-      .gitResolveRepo(dir)
-      .then((info) => {
-        if (cancelled || !info) return;
-        setRoot(info.repoRoot.replace(/\\/g, "/").replace(/\/$/, ""));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [dir]);
-
-  return root;
-}
-
-function EditorHoverContent({
-  absPath,
-  onRename,
-  isRenaming,
-  fileRenameRef,
-  onRenameCommit,
-  onRenameCancel,
-}: {
-  absPath: string;
-  onRename?: () => void;
-  isRenaming?: boolean;
-  fileRenameRef?: React.Ref<HTMLInputElement>;
-  onRenameCommit?: () => void;
-  onRenameCancel?: () => void;
-}) {
-  const root = useGitRepoRoot(pathDirname(absPath));
-  const abs = absPath.replace(/\\/g, "/");
-  const repoRel =
-    root && abs !== root && abs.startsWith(`${root}/`)
-      ? abs.slice(root.length + 1)
-      : null;
-
-  return (
-    <div className="space-y-1.5 text-[12px]">
-      <FilePathLines
-        absPath={absPath}
-        repoRoot={root}
-        repoRel={repoRel}
-        onRename={onRename}
-        isRenaming={isRenaming}
-        fileRenameRef={fileRenameRef}
-        onRenameCommit={onRenameCommit}
-        onRenameCancel={onRenameCancel}
-      />
-    </div>
-  );
-}
-
-function GitFileHoverContent({
-  repoRoot,
-  path,
-  originalPath,
-  sha,
-}: {
-  repoRoot: string;
-  path: string;
-  originalPath: string | null;
-  sha?: string;
-}) {
-  const root = repoRoot.replace(/\\/g, "/").replace(/\/$/, "");
-  const absPath = `${root}/${path}`;
-  return (
-    <FilePathLines absPath={absPath} repoRoot={root} repoRel={path}>
-      {originalPath && originalPath !== path && (
-        <HoverRow label="Renamed" value={originalPath} copy={originalPath} />
-      )}
-      {sha && (
-        <HoverRow
-          label="Commit"
-          value={sha.slice(0, 8)}
-          copy={sha}
-          valueClassName="font-mono text-foreground"
-        />
-      )}
-    </FilePathLines>
-  );
-}
-
-function formatElapsed(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${s % 60}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
-}
-
-function AgentHoverCardContent({
-  agentSession,
-  cwd,
-  tabTitle,
-  panelRestoreOnRestart,
-  onUpdatePanel,
-}: {
-  agentSession: AgentSession;
-  cwd: string | undefined;
-  tabTitle: string;
-  panelRestoreOnRestart: boolean;
-  onUpdatePanel: (updater: (p: Panel) => Panel) => void;
-}) {
-  const elapsed = formatElapsed(Date.now() - agentSession.startedAt);
-  const sessionId = agentSession.meta?.sessionId;
-  const directory = cwd ?? agentSession.meta?.cwdLaunch;
-  const repoRoot = useGitRepoRoot(directory);
-  const transcriptPath = agentSession.meta?.transcriptPath;
-  const [transcriptExists, setTranscriptExists] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!transcriptPath) {
-      setTranscriptExists(null);
-      return;
-    }
-    let cancelled = false;
-    setTranscriptExists(null);
-    native
-      .fsStat(transcriptPath)
-      .then(() => { if (!cancelled) setTranscriptExists(true); })
-      .catch(() => { if (!cancelled) setTranscriptExists(false); });
-    return () => { cancelled = true; };
-  }, [transcriptPath]);
-
-  return (
-    <div className="space-y-1.5 text-[12px]">
-      <div className="flex items-center gap-1.5">
-        <span className="font-medium text-foreground">{tabTitle}</span>
-        {agentSession.status === "working" ? (
-          <span className="size-[7px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
-        ) : agentSession.status === "waiting" ? (
-          <span className="inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
-        ) : null}
-      </div>
-      <HoverTable>
-        {directory && <HoverRow label="Path" value={directory} copy={directory} />}
-        {repoRoot && <HoverRow label="Repo root" value={repoRoot} copy={repoRoot} />}
-        {sessionId && (
-          <HoverRow label="Session" value={sessionId} copy={sessionId} valueClassName="font-mono text-foreground" />
-        )}
-        {transcriptPath && (
-          <HoverRow
-            label="Transcript"
-            value={transcriptPath}
-            copy={transcriptPath}
-            valueClassName="font-mono text-foreground"
-            valueSuffix={
-              transcriptExists === false ? (
-                <span className="ml-1.5 font-sans text-muted-foreground">not created yet</span>
-              ) : undefined
-            }
-          />
-        )}
-        <HoverRow label="Started" value={`${elapsed} ago`} />
-      </HoverTable>
-      {agentSession.restoreError && (
-        <div className="break-words text-destructive">
-          {agentSession.restoreErrorReason ?? "unknown error"}
-        </div>
-      )}
-      <div className="mt-1.5 border-t border-border/40 pt-1.5">
-        <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
-          <input
-            type="checkbox"
-            className="size-3 accent-primary"
-            checked={panelRestoreOnRestart}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              onUpdatePanel((p) => ({ ...p, restoreOnRestart: checked }));
-            }}
-          />
-          <span className="text-muted-foreground">Run on start</span>
-        </label>
-      </div>
-    </div>
-  );
-}
-
-function TerminalHoverCardContent({
-  customTitle,
-  cwd,
-  runningCommand,
-  panelRestoreOnRestart,
-  panelPersistentCommand,
-  onUpdatePanel,
-  onInputFocusChange,
-}: {
-  customTitle: string | undefined;
-  cwd: string | undefined;
-  runningCommand: string | null;
-  panelRestoreOnRestart: boolean;
-  panelPersistentCommand: string | undefined;
-  onUpdatePanel: (updater: (p: Panel) => Panel) => void;
-  onInputFocusChange?: (focused: boolean) => void;
-}) {
-  const repoRoot = useGitRepoRoot(cwd);
-  return (
-    <div className="space-y-1.5 text-[12px]">
-      {customTitle && (
-        <div className="font-medium text-foreground">{customTitle}</div>
-      )}
-      <HoverTable>
-        {cwd && <HoverRow label="Path" value={cwd} copy={cwd} />}
-        {repoRoot && <HoverRow label="Repo root" value={repoRoot} copy={repoRoot} />}
-        {runningCommand && (
-          <HoverRow label="Running" value={runningCommand} valueClassName="font-mono text-foreground" />
-        )}
-      </HoverTable>
-      <div className="mt-1.5 space-y-1 border-t border-border/40 pt-1.5">
-        <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
-          <input
-            type="checkbox"
-            className="size-3 accent-primary"
-            checked={panelRestoreOnRestart}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              onUpdatePanel((p) => ({
-                ...p,
-                restoreOnRestart: checked,
-                // Preserve the typed command when unchecking so re-checking
-                // restores it; on check, preload the running command if empty.
-                persistentCommand: checked
-                  ? (panelPersistentCommand ?? runningCommand ?? undefined)
-                  : panelPersistentCommand,
-              }));
-            }}
-          />
-          <span className="text-muted-foreground">Run on start</span>
-        </label>
-        {panelRestoreOnRestart && (
-          <input
-            type="text"
-            placeholder="command to run (e.g. lazygit)"
-            defaultValue={panelPersistentCommand ?? ""}
-            onFocus={() => onInputFocusChange?.(true)}
-            onBlur={(e) => {
-              const v = e.target.value.trim();
-              onUpdatePanel((p) => ({ ...p, persistentCommand: v || undefined }));
-              onInputFocusChange?.(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              e.stopPropagation();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="h-6 w-full rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-primary"
-          />
-        )}
-      </div>
-    </div>
-  );
-}
+import { panelFilePath } from "./lib/panelPath";
 
 type Props = {
   panels: Panel[];
@@ -483,11 +77,7 @@ function DraggableTab({
   shortcutLabels,
   onRenamePanel,
   onUpdatePanel,
-  onRenameFile,
   onFocusOnExplorer,
-  onHoverChange,
-  onSnapIntoView,
-  closeHoverToken,
   gitStatusMap,
   gitStatus,
   gitColorScheme,
@@ -514,11 +104,7 @@ function DraggableTab({
   shortcutLabels: Record<string, string | null>;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
   onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
-  onRenameFile?: (panelId: string, newName: string) => void;
   onFocusOnExplorer?: (filePath: string) => void;
-  onHoverChange?: (panelId: string, open: boolean) => void;
-  onSnapIntoView?: (panelId: string) => void;
-  closeHoverToken: number;
   gitStatusMap?: Map<string, GitStatusCode> | null;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
@@ -583,8 +169,6 @@ function DraggableTab({
   const startRename = useTabRenameStore((s) => s.startRename);
   const inputRef = useRef<HTMLInputElement>(null);
   const handledRef = useRef(false);
-  const [hoverOpen, setHoverOpen] = useState(false);
-  const [isFileRenaming, setIsFileRenaming] = useState(false);
   const lockFlashSnap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
   const [lockFlashActive, setLockFlashActive] = useState(false);
   const lockFlashSeqRef = useRef(0);
@@ -599,70 +183,10 @@ function DraggableTab({
     const t3 = setTimeout(() => setLockFlashActive(false), 340);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [lockFlashSnap, panel.id]);
-  const fileRenameInputRef = useRef<HTMLInputElement>(null);
-  // Keep the hover card open while the pointer is still over the tab. Clicking a
-  // tab moves focus into the terminal, which blurs the dnd-kit-focusable trigger
-  // and would otherwise dismiss the card mid-hover.
-  const pointerInsideRef = useRef(false);
-  const contextMenuOpenRef = useRef(false);
-  // Keep the hover open while the run-on-start command input is focused, so it
-  // is not dismissed mid-typing by a pointer leave.
-  const hoverInputFocusedRef = useRef(false);
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
   }, [isRenaming]);
-
-  // When the run-on-start popup closes with an empty command, drop the toggle:
-  // "run on start" with nothing to run is meaningless. Reset to undefined (not
-  // false) so a future agent in this terminal still resumes (it reads `!== false`).
-  const wasHoverOpenRef = useRef(false);
-  const runOnStartCleanup = () => {
-    if (
-      panel.kind === "terminal" &&
-      !hasAgent &&
-      panel.restoreOnRestart &&
-      !panel.persistentCommand?.trim()
-    ) {
-      onUpdatePanel?.(panel.id, (p) => ({
-        ...p,
-        restoreOnRestart: undefined,
-        persistentCommand: undefined,
-      }));
-    }
-  };
-  const runOnStartCleanupRef = useRef(runOnStartCleanup);
-  runOnStartCleanupRef.current = runOnStartCleanup;
-  useEffect(() => {
-    if (wasHoverOpenRef.current && !hoverOpen) runOnStartCleanupRef.current();
-    wasHoverOpenRef.current = hoverOpen;
-  }, [hoverOpen]);
-
-  useEffect(() => {
-    if (!anyRenaming || isFileRenaming) return;
-    setHoverOpen(false);
-    onHoverChange?.(panel.id, false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anyRenaming]);
-
-  // Force-close the hover when the tab bar is scrolled (bumped by the parent).
-  useEffect(() => {
-    if (closeHoverToken === 0) return;
-    setHoverOpen(false);
-    onHoverChange?.(panel.id, false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closeHoverToken]);
-
-  // Open hover + start inline file rename when triggered via F2 shortcut
-  const triggerPanelId = useFileRenameStore((s) => s.triggerPanelId);
-  useEffect(() => {
-    if (triggerPanelId !== panel.id) return;
-    useFileRenameStore.getState().clearTrigger();
-    if (panel.kind !== "editor" && panel.kind !== "markdown") return;
-    setHoverOpen(true);
-    setIsFileRenaming(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerPanelId]);
 
   function handleSave() {
     if (handledRef.current) return;
@@ -678,95 +202,17 @@ function DraggableTab({
     clearRename();
   }
 
-  function handleRenameFromHover() {
-    setIsFileRenaming(true);
-  }
-
-  function commitFileRename() {
-    const value = fileRenameInputRef.current?.value.trim() ?? "";
-    const currentName = "path" in panel ? pathBasename((panel as { path: string }).path) : "";
-    setIsFileRenaming(false);
-    setHoverOpen(false);
-    onHoverChange?.(panel.id, false);
-    if (value && value !== currentName) {
-      onRenameFile?.(panel.id, value);
+  const nativeTooltip = (() => {
+    const cwd = panel.kind === "terminal" ? panel.cwd : undefined;
+    const parts: string[] = [];
+    if (cwd) parts.push(cwd);
+    if (agentSession) {
+      const model = agentSession.agent;
+      const sessionId = agentSession.meta?.sessionId;
+      const agentPart = [model, sessionId].filter(Boolean).join(" ");
+      if (agentPart) parts.push(agentPart);
     }
-  }
-
-  function cancelFileRename() {
-    setIsFileRenaming(false);
-    if (!pointerInsideRef.current) {
-      setHoverOpen(false);
-      onHoverChange?.(panel.id, false);
-    }
-  }
-
-  const hoverBody: ReactNode = (() => {
-    switch (panel.kind) {
-      case "terminal":
-        if (isRestoreError) return null;
-        return hasAgent
-          ? <AgentHoverCardContent
-              agentSession={agentSession!}
-              cwd={panel.cwd}
-              tabTitle={agentTitle}
-              panelRestoreOnRestart={panel.restoreOnRestart !== false}
-              onUpdatePanel={(updater) => onUpdatePanel?.(panel.id, updater)}
-            />
-          : <TerminalHoverCardContent
-              customTitle={panel.title}
-              cwd={panel.cwd}
-              runningCommand={runningCommand}
-              panelRestoreOnRestart={panel.restoreOnRestart ?? false}
-              panelPersistentCommand={panel.persistentCommand}
-              onUpdatePanel={(updater) => onUpdatePanel?.(panel.id, updater)}
-              onInputFocusChange={(focused) => {
-                hoverInputFocusedRef.current = focused;
-                if (!focused && !pointerInsideRef.current) {
-                  setHoverOpen(false);
-                  onHoverChange?.(panel.id, false);
-                }
-              }}
-            />;
-      case "editor":
-        return (
-          <EditorHoverContent
-            absPath={panel.path}
-            onRename={isFileRenaming ? undefined : handleRenameFromHover}
-            isRenaming={isFileRenaming}
-            fileRenameRef={fileRenameInputRef}
-            onRenameCommit={commitFileRename}
-            onRenameCancel={cancelFileRename}
-          />
-        );
-      case "markdown":
-        return (
-          <EditorHoverContent
-            absPath={panel.path}
-            onRename={isFileRenaming ? undefined : handleRenameFromHover}
-            isRenaming={isFileRenaming}
-            fileRenameRef={fileRenameInputRef}
-            onRenameCommit={commitFileRename}
-            onRenameCancel={cancelFileRename}
-          />
-        );
-      case "git-diff":
-        return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} />;
-      case "git-commit-file":
-        return <GitFileHoverContent repoRoot={panel.repoRoot} path={panel.path} originalPath={panel.originalPath} sha={panel.sha} />;
-      case "git-history":
-        return (
-          <HoverTable>
-            <HoverRow label="Repo root" value={panel.repoRoot} copy={panel.repoRoot} />
-          </HoverTable>
-        );
-      case "browser":
-        return panel.url
-          ? <HoverTable><HoverRow label="URL" value={panel.url} copy={panel.url} /></HoverTable>
-          : null;
-      default:
-        return null;
-    }
+    return parts.join(" - ") || undefined;
   })();
 
   const tabDiv = (
@@ -774,12 +220,11 @@ function DraggableTab({
       ref={setNodeRef}
       {...attributes}
       data-panel-id={panel.id}
-      onPointerEnter={() => { pointerInsideRef.current = true; }}
-      onPointerLeave={() => { pointerInsideRef.current = false; }}
+      title={nativeTooltip}
       onClick={() => onActivate(panel.id)}
       onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
       onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
-      onContextMenu={(e) => { if (anyRenaming || isFileRenaming) e.preventDefault(); }}
+      onContextMenu={(e) => { if (anyRenaming) e.preventDefault(); }}
       {...wrappedListeners}
       className={cn(
         "group relative flex max-w-[320px] shrink-0 select-none touch-none items-center gap-1 px-1.5 text-[11px] transition-colors",
@@ -894,35 +339,14 @@ function DraggableTab({
   );
 
   return (
-    <HoverCard
-      open={hoverOpen}
-      openDelay={700}
-      closeDelay={100}
-      onOpenChange={(o) => {
-        if (o && (anyRenaming || contextMenuOpenRef.current)) return;
-        if (!o && (pointerInsideRef.current || isFileRenaming || hoverInputFocusedRef.current)) return;
-        setHoverOpen(o);
-        onHoverChange?.(panel.id, o);
-        if (o) onSnapIntoView?.(panel.id);
-      }}
-    >
     <Popover
       open={isRenaming}
       onOpenChange={(open) => { if (!open) handleSave(); }}
     >
-      <ContextMenu onOpenChange={(o) => {
-          contextMenuOpenRef.current = o;
-          if (o) {
-            setHoverOpen(false);
-            onHoverChange?.(panel.id, false);
-            onSnapIntoView?.(panel.id);
-          }
-        }}>
+      <ContextMenu>
         <ContextMenuTrigger asChild>
           <PopoverAnchor asChild>
-            <HoverCardTrigger asChild>
-              {tabDiv}
-            </HoverCardTrigger>
+            {tabDiv}
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
@@ -1094,23 +518,10 @@ function DraggableTab({
         />
       </PopoverContent>
     </Popover>
-    {hoverBody && (
-      <HoverCardContent
-        side="bottom"
-        align="start"
-        sideOffset={0}
-        className="z-40 w-fit min-w-44 max-w-96 select-text rounded-xl p-2.5"
-        onPointerEnter={() => { pointerInsideRef.current = true; }}
-        onPointerLeave={() => { pointerInsideRef.current = false; }}
-      >
-        {hoverBody}
-      </HoverCardContent>
-    )}
-    </HoverCard>
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onRenameFile, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
+export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -1132,8 +543,6 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   const userScrolledRef = useRef(false);
   const mouseLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mouseInsideRef = useRef(true);
-  const hoverOpenPanelsRef = useRef(new Set<string>());
-  const [hoverCloseToken, setHoverCloseToken] = useState(0);
   const renamingPanelId = useTabRenameStore((s) => s.renamingPanelId);
   const isRenamingRef = useRef(false);
   useEffect(() => {
@@ -1175,12 +584,6 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (isRenamingRef.current) return;
-      // A hover card open over a tab must not block scrolling. Close any open
-      // hovers and let the wheel through.
-      if (hoverOpenPanelsRef.current.size > 0) {
-        hoverOpenPanelsRef.current.clear();
-        setHoverCloseToken((t) => t + 1);
-      }
       const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       container.scrollLeft += delta;
       userScrolledRef.current = true;
@@ -1317,14 +720,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
           shortcutLabels={shortcutLabels}
           onRenamePanel={onRenamePanel}
           onUpdatePanel={onUpdatePanel}
-          onRenameFile={onRenameFile}
           onFocusOnExplorer={onFocusOnExplorer}
-          onHoverChange={(panelId, open) => {
-            if (open) hoverOpenPanelsRef.current.add(panelId);
-            else hoverOpenPanelsRef.current.delete(panelId);
-          }}
-          onSnapIntoView={(panelId) => scrollPanelIntoView(panelId, 'smooth')}
-          closeHoverToken={hoverCloseToken}
           gitStatusMap={gitStatusMap}
           gitStatus={gitStatus}
           gitColorScheme={gitColorScheme}
