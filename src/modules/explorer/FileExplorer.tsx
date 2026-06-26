@@ -642,6 +642,12 @@ export const FileExplorer = memo(
         if (!active) return "pending";
         if (!rootPath || !isUnder(file, rootPath)) return "pending";
         if (tree.nodes[rootPath]?.status !== "loaded") return "pending";
+        // The focused folder became the explorer root (a re-root): the root has
+        // no tree entry to select, so flash the root row instead.
+        if (isUnder(rootPath, file)) {
+          setFlash((f) => ({ path: rootPath, token: f.token + 1 }));
+          return "done";
+        }
         let loading = false;
         for (const dir of ancestorsToExpand(rootPath, file)) {
           if (!tree.expanded.has(dir)) {
@@ -662,10 +668,16 @@ export const FileExplorer = memo(
         // target is representable. A hidden file (showHidden off) or a file under a
         // hidden folder never enters entryIndexByPath, so only select when present.
         if (entryIndexByPath.has(file)) {
+          // Skip the flash when the target is already selected: opening a file
+          // from the sidebar selects it on click, and the autofocus tab would
+          // otherwise re-reveal that same file in a circular flash.
+          const alreadySelected = selectedPath === file;
           setSelectedPath(file);
           requestAnimationFrame(() => {
             scrollEntryIntoView(file, { topRatio: 0.2 });
-            setFlash((f) => ({ path: file, token: f.token + 1 }));
+            if (!alreadySelected) {
+              setFlash((f) => ({ path: file, token: f.token + 1 }));
+            }
           });
         }
         return "done";
@@ -679,6 +691,7 @@ export const FileExplorer = memo(
         entryIndexByPath,
         isDirAt,
         scrollEntryIntoView,
+        selectedPath,
       ],
     );
 
@@ -962,6 +975,7 @@ export const FileExplorer = memo(
             <FsRootRow
               path={row.path}
               isWorkspaceRoot={rootMode === "pinned"}
+              flashToken={flash.path === row.path ? flash.token : 0}
               onSetAsRoot={onSetAsRoot}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
               onRevealInTerminal={onRevealInTerminal}

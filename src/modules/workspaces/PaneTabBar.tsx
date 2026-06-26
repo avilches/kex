@@ -1,15 +1,14 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import { useFlash } from "@/lib/useFlash";
+import { FlashOverlay } from "@/components/FlashOverlay";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import { type Panel, isAutofocusPanel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
-import { subscribeTabFlash, getTabFlashSnapshot } from "./lib/tabFlashStore";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -174,18 +173,6 @@ function DraggableTab({
   const lockFlashSnap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
   const lockFlashToken =
     lockFlashSnap.panelId === panel.id ? lockFlashSnap.seq : 0;
-  const lockFlashRef = useFlash<HTMLButtonElement>(lockFlashToken);
-
-  const tabFlashSnap = useSyncExternalStore(subscribeTabFlash, getTabFlashSnapshot);
-  const tabFlashToken = tabFlashSnap.panelId === panel.id ? tabFlashSnap.seq : 0;
-  const tabFlashRef = useFlash<HTMLDivElement>(tabFlashToken);
-  const setMergedRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      setNodeRef(node);
-      tabFlashRef.current = node;
-    },
-    [setNodeRef, tabFlashRef],
-  );
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
@@ -220,7 +207,7 @@ function DraggableTab({
 
   const tabDiv = (
     <div
-      ref={setMergedRef}
+      ref={setNodeRef}
       {...attributes}
       data-panel-id={panel.id}
       title={nativeTooltip}
@@ -308,9 +295,8 @@ function DraggableTab({
       )}
       {isLocked ? (
         <button
-          ref={lockFlashRef}
           type="button"
-          className="ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded text-foreground transition-colors hover:bg-muted"
+          className="relative ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded text-foreground transition-colors hover:bg-muted"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -318,6 +304,7 @@ function DraggableTab({
           }}
           title="Unlock tab"
         >
+          <FlashOverlay token={lockFlashToken} />
           <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
         </button>
       ) : (

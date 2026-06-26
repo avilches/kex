@@ -14,6 +14,8 @@ import { useTheme } from "@/modules/theme";
 import { detachAgentSession } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { useWorkspaceDndInsert } from "./WorkspaceDndProvider";
+import { useTabFlash } from "./lib/tabFlashStore";
+import { FlashOverlay } from "@/components/FlashOverlay";
 
 type Props = {
   pane: PaneNode;
@@ -144,6 +146,14 @@ function PaneDropOverlay({ paneId, tooNarrow, tooShort }: {
   );
 }
 
+// Subscribes to the tab-flash store in isolation so the memoized PaneView is not
+// re-rendered on every flash. Outlines the whole pane (border only) when the
+// flashed panel is the one this pane is showing.
+function PaneFlashBorder({ panelId }: { panelId: string | null }) {
+  const token = useTabFlash(panelId ?? "");
+  return <FlashOverlay token={token} variant="ring" className="z-50" />;
+}
+
 export const PaneView = memo(function PaneView({
   pane,
   workspaceId,
@@ -246,6 +256,7 @@ export const PaneView = memo(function PaneView({
       onMouseDownCapture={handleFocus}
       onFocus={handleFocus}
     >
+      <PaneFlashBorder panelId={pane.activePanelId} />
       <div className="relative shrink-0">
         <PaneTabBar
           panels={pane.panels}

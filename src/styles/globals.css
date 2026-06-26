@@ -431,18 +431,33 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
   animation: terax-tab-in var(--dur-base) var(--ease-premium);
 }
 
-/* Attention flash: two quick pulses of the primary color over the element's own
- * background. Shared by the explorer reveal (focused file/folder) and the locked
- * tab's lock icon (Cmd+W on a locked tab). Re-triggered per event via `useFlash`,
- * which removes and re-adds the class with a reflow so the animation replays. */
+/* Attention flash: two quick pulses of the primary color. Rendered by the
+ * FlashOverlay component (a `key`-remounted overlay span) and shared by the
+ * explorer reveal (focused file/folder), the locked tab's lock icon (Cmd+W on a
+ * locked tab) and the tab itself. The overlay sits over the parent background
+ * but its 55% peak keeps the text/icon underneath legible. */
 @keyframes terax-flash {
-  25%,
-  75% {
-    background-color: var(--primary);
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: var(--flash-peak, 0.55);
   }
 }
-.terax-flash {
-  animation: terax-flash 620ms var(--ease-soft);
+/* A single pulse (~340ms). The fill variant tints the parent (kept at 55% so the
+ * text stays legible); the ring variant outlines the parent border instead. */
+.terax-flash-overlay {
+  opacity: 0;
+  animation: terax-flash 340ms var(--ease-soft);
+}
+.terax-flash-fill {
+  background-color: var(--primary);
+}
+/* Ring keeps full peak: the ring-primary/60 utility already sets the alpha, so
+ * at the pulse peak it matches the center drop indicator exactly. */
+.terax-flash-ring {
+  --flash-peak: 1;
 }
 
 /* Text shimmer loop (replaces motion background-position animation). Driven by
@@ -487,7 +502,7 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
     animation: none;
     background-position: 0% center;
   }
-  .terax-flash {
-    animation: none;
-  }
+  /* The attention flash is kept under reduced-motion on purpose: it is a
+   * functional cue (revealed file, locked tab) and animates opacity only, with
+   * no spatial movement, so it does not trigger motion sensitivity. */
 }

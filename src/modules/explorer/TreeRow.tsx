@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/context-menu";
 import { pathDirname } from "@/lib/pathUtils";
 import { KEY_SEP } from "@/lib/platform";
-import { useFlash } from "@/lib/useFlash";
+import { FlashOverlay } from "@/components/FlashOverlay";
 import { cn } from "@/lib/utils";
 import { isCopying } from "@/modules/explorer/lib/duplicateStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -197,15 +197,13 @@ function EntryRowImpl(props: EntryRowProps) {
   });
   const isFileDropTarget = isFileDropValid && isFileOver;
 
-  const flashRef = useFlash<HTMLButtonElement>(flashToken);
   const setRefs = useCallback(
     (node: HTMLButtonElement | null) => {
-      flashRef.current = node;
       setDragRef(node);
       setDropRef(node);
       setFileDropRef(node);
     },
-    [flashRef, setDragRef, setDropRef, setFileDropRef],
+    [setDragRef, setDropRef, setFileDropRef],
   );
 
   // Spring open a collapsed folder after hovering over it during a drag.
@@ -258,7 +256,7 @@ function EntryRowImpl(props: EntryRowProps) {
               else onOpenFile(path, true);
             }}
             className={cn(
-              "group flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] transition-colors hover:bg-accent/70",
+              "group relative flex h-6 w-full min-w-0 items-center gap-2 rounded-sm px-1.5 text-left text-[13px] transition-colors hover:bg-accent/70",
               isSelected
                 ? "bg-accent text-foreground"
                 : gitignored
@@ -273,6 +271,7 @@ function EntryRowImpl(props: EntryRowProps) {
             {...listeners}
             {...attributes}
           >
+            <FlashOverlay token={flashToken} />
             <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
               {isDir ? (
                 <HugeiconsIcon
@@ -522,6 +521,7 @@ const LRM = "\u200e";
 export type FsRootRowProps = {
   path: string;
   isWorkspaceRoot: boolean;
+  flashToken: number;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -534,6 +534,7 @@ export type FsRootRowProps = {
 export function FsRootRow({
   path,
   isWorkspaceRoot,
+  flashToken,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
   onRevealInTerminal,
@@ -557,12 +558,13 @@ export function FsRootRow({
           {...listeners}
           {...attributes}
           className={cn(
-            "flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
+            "relative flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]",
             isDragging && "opacity-50",
           )}
           style={{ paddingLeft: 6 }}
           title={path}
         >
+          <FlashOverlay token={flashToken} />
           <img
             src={folderIconUrl("", true)}
             alt=""
