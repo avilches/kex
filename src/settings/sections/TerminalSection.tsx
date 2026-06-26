@@ -18,6 +18,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   type CursorInactiveStyle,
   type CursorStyle,
+  type TerminalNewFolderMode,
   CURSOR_INACTIVE_STYLES,
   CURSOR_STYLES,
   CURSOR_WIDTH_MAX,
@@ -48,6 +49,7 @@ import {
   setTerminalFontWeight,
   setTerminalLetterSpacing,
   setTerminalLineHeight,
+  setTerminalNewFolderMode,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalShell,
@@ -102,6 +104,9 @@ export function TerminalSection() {
     (s) => s.warnOnCloseTabWithRunningProcess,
   );
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
+  const terminalNewFolderMode = usePreferencesStore(
+    (s) => s.terminalNewFolderMode,
+  );
   const [shells, setShells] = useState<ShellInfo[]>([]);
 
   useEffect(() => {
@@ -136,6 +141,33 @@ export function TerminalSection() {
                 {s.name}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+      </SettingRow>
+
+      <SettingRow
+        title="Open new terminals in"
+        description="Where new terminal tabs and splits open."
+      >
+        <Select
+          value={terminalNewFolderMode}
+          onValueChange={(v) =>
+            void setTerminalNewFolderMode(v as TerminalNewFolderMode)
+          }
+        >
+          <SelectTrigger size="sm" className="h-8 w-52 text-[12px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="context" className="text-[12px]">
+              Current folder
+              <span className="block text-[10px] text-muted-foreground leading-tight">
+                based on the terminal cwd or the path in the editor
+              </span>
+            </SelectItem>
+            <SelectItem value="workspace" className="text-[12px]">
+              Workspace folder
+            </SelectItem>
           </SelectContent>
         </Select>
       </SettingRow>
