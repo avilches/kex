@@ -41,6 +41,7 @@ const PATH_PATTERNS: RegExp[] = [
 ];
 
 export function registerTerminalLinks(term: Terminal, getLeafId: () => string | null): () => void {
+  if (DEBUG_LINKS) console.log("[links] registerTerminalLinks called");
   term.options.linkHandler = {
     allowNonHttpProtocols: true,
     activate(_event, uri) {
@@ -65,6 +66,7 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
         return;
       }
       const lineText = bufferLine.translateToString(true);
+      if (DEBUG_LINKS && lineText.trim()) console.log(`[links] provideLinks line ${bufferLineNumber}: ${JSON.stringify(lineText)}`);
       const links: ILink[] = [];
       const seen = new Set<string>();
       const promises: Promise<void>[] = [];
