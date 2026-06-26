@@ -116,6 +116,7 @@ import {
   type ExplorerRootMode,
 } from "@/modules/workspaces/lib/explorerRoot";
 import type { RevealRequest } from "@/modules/explorer";
+import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { panelFilePath } from "@/modules/workspaces/lib/panelPath";
 import { isAutofocusPanel, isLockablePanel } from "@/modules/workspaces/lib/types";
 
@@ -597,7 +598,7 @@ export default function App() {
   );
 
   const focusSidebar = useCallback(
-    (folder: string, opts: { fromShortcut: boolean }) => {
+    (folder: string, opts: { fromShortcut: boolean; pendingAction?: RevealAction }) => {
       const ws = activeWorkspace;
       if (!ws) return;
       void native
@@ -616,10 +617,10 @@ export default function App() {
           if (target.mode === "filesystem" && target.fsRoot) {
             setFsRoot(ws.id, target.fsRoot);
           }
-          setRevealRequest((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1 }));
+          setRevealRequest((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1, pendingAction: opts.pendingAction }));
         });
 
-      if (opts.fromShortcut) {
+      if (opts.fromShortcut || opts.pendingAction) {
         const state = usePreferencesStore.getState();
         if (!state.rightPanelOpen) void setRightPanelOpen(true);
         if (state.rightPanelActiveTab === "history") {
@@ -1292,7 +1293,7 @@ export default function App() {
       onRenameFile: (panelId, newName) => {
         void handleRenameFileFromTab(panelId, newName);
       },
-      onFocusOnExplorer: (filePath) => focusSidebar(filePath, { fromShortcut: true }),
+      onFocusOnExplorer: (filePath, pendingAction) => focusSidebar(filePath, { fromShortcut: true, pendingAction }),
     }),
     [
       activePanelId,

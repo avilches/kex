@@ -21,6 +21,7 @@ import {
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { openFileTypesSettings } from "@/modules/settings/openSettingsWindow";
 import type { Panel } from "./lib/types";
+import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 
 // TerminalPane is intentionally eager (terminal-first app).
 // All other heavy panel types are lazy-loaded to keep the startup bundle lean.
@@ -92,7 +93,7 @@ export type PanelCallbacks = {
   // File rename (editor/markdown tabs - renames the file on disk)
   onRenameFile?: (panelId: string, newName: string) => void;
   // Reveal an editor/markdown/git file in the explorer tree
-  onFocusOnExplorer?: (filePath: string) => void;
+  onFocusOnExplorer?: (filePath: string, pendingAction?: RevealAction) => void;
 };
 
 type Props = {
