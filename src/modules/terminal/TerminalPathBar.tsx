@@ -8,7 +8,23 @@ import {
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { useMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
+import type { AgentSession } from "@/modules/agents/lib/types";
+import { ReloadIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
+import { agentChip } from "./lib/agentChip";
+
+function AgentChipIndicator({ session }: { session: AgentSession }) {
+  const chip = agentChip(session.status);
+  const model = session.meta?.model ?? session.agent;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={cn("size-2 rounded-full", chip.dotClass)} title={chip.title} />
+      <span>{model}</span>
+    </span>
+  );
+}
 
 type Props = {
   panelId: string;
@@ -16,6 +32,9 @@ type Props = {
   home: string | null;
   workspaceRoot: string | null;
   gitRootPath: string | null;
+  restoreOnRestart?: boolean;
+  persistentCommand?: string;
+  onOpenMenu?: () => void;
   onReveal?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
@@ -29,6 +48,9 @@ export function TerminalPathBar({
   home,
   workspaceRoot,
   gitRootPath,
+  restoreOnRestart,
+  persistentCommand,
+  onOpenMenu,
   onReveal,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
@@ -39,6 +61,7 @@ export function TerminalPathBar({
   const running =
     useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(panelId) ??
     null;
+  const agentSession = useAgentStore((s) => s.sessions[panelId] ?? null);
   const { segments } = buildCwdBreadcrumb(cwd, workspaceRoot, home);
   const process = running ?? metrics?.shellName ?? null;
   return (
@@ -79,6 +102,17 @@ export function TerminalPathBar({
             <span>{formatMem(metrics.memBytes)}</span>
           </>
         )}
+        {restoreOnRestart !== false && persistentCommand && (
+          <button
+            type="button"
+            title={persistentCommand}
+            onClick={() => onOpenMenu?.()}
+            className="flex items-center justify-center text-muted-foreground"
+          >
+            <HugeiconsIcon icon={ReloadIcon} size={11} strokeWidth={1.75} />
+          </button>
+        )}
+        {agentSession && <AgentChipIndicator session={agentSession} />}
       </div>
     </div>
   );
