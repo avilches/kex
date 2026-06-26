@@ -168,6 +168,7 @@ export type Preferences = {
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
   keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
+  scratchpadEnterSends: boolean;
 };
 
 const STORE_PATH = "settings-general.json";
@@ -224,6 +225,7 @@ const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
+const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 13;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -364,6 +366,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
   keepFolderLayoutOnChangeExplorerRoot: false,
+  scratchpadEnterSends: true,
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -597,6 +600,9 @@ export async function loadPreferences(): Promise<Preferences> {
     keepFolderLayoutOnChangeExplorerRoot:
       get<boolean>(KEY_KEEP_FOLDER_LAYOUT) ??
       DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot,
+    scratchpadEnterSends:
+      get<boolean>(KEY_SCRATCHPAD_ENTER_SENDS) ??
+      DEFAULT_PREFERENCES.scratchpadEnterSends,
   };
 
   // Persist any config keys that weren't present so they're discoverable in the JSON.
@@ -848,6 +854,10 @@ export async function setTerminalScrollSensitivity(
 
 export async function setLastWslDistro(value: string | null): Promise<void> {
   await writePref(KEY_LAST_WSL_DISTRO, value);
+}
+
+export async function setTerminalScratchpadEnterSends(value: boolean): Promise<void> {
+  await writePref(KEY_SCRATCHPAD_ENTER_SENDS, value);
 }
 
 export async function setZoomLevel(value: number): Promise<void> {
