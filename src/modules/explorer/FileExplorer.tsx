@@ -109,7 +109,6 @@ type Props = {
   gitRootPath: string | null;
   workspaceRootPath: string | null;
   workspaceRootExists: boolean;
-  activeFilePath?: string | null;
   revealRequest?: RevealRequest | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
@@ -343,7 +342,6 @@ export const FileExplorer = memo(
       gitRootPath,
       workspaceRootPath,
       workspaceRootExists,
-      activeFilePath,
       revealRequest,
       onOpenFile,
       onPathRenamed,
@@ -564,20 +562,6 @@ export const FileExplorer = memo(
       },
       [entryIndexByPath, virtualizer],
     );
-
-    const lastSyncedActivePathRef = useRef<string | null>(null);
-    useEffect(() => {
-      if (
-        !activeFilePath ||
-        activeFilePath === lastSyncedActivePathRef.current
-      ) {
-        return;
-      }
-      if (!entryIndexByPath.has(activeFilePath)) return;
-      lastSyncedActivePathRef.current = activeFilePath;
-      setSelectedPath(activeFilePath);
-      requestAnimationFrame(() => scrollEntryIntoView(activeFilePath));
-    }, [activeFilePath, entryIndexByPath, scrollEntryIntoView]);
 
     // A pending rename/create/duplicate must not outlive its inline input being
     // interactable: while one is active, renameInProgress blocks every click in

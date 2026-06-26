@@ -50,7 +50,6 @@ export type RightPanelProps = {
   gitRootPath: string | null;
   workspaceRootPath: string | null;
   workspaceRootExists: boolean;
-  activeFilePath?: string | null;
   revealRequest?: RevealRequest | null;
   onOpenFile: (path: string, pin?: boolean) => void;
   onPathRenamed?: (from: string, to: string) => void;
@@ -146,7 +145,6 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               gitRootPath={props.gitRootPath}
               workspaceRootPath={props.workspaceRootPath}
               workspaceRootExists={props.workspaceRootExists}
-              activeFilePath={props.activeFilePath}
               revealRequest={props.revealRequest}
               onOpenFile={props.onOpenFile}
               onPathRenamed={props.onPathRenamed}

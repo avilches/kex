@@ -1348,11 +1348,6 @@ export default function App() {
 
   // ── Source control ────────────────────────────────────────────────────────
 
-  const explorerActiveFilePath =
-    activePanel?.kind === "editor" || activePanel?.kind === "markdown"
-      ? (activePanel as { path: string }).path
-      : null;
-
   const toggleRightPanel = useCallback(() => {
     void setRightPanelOpen(!usePreferencesStore.getState().rightPanelOpen);
   }, []);
@@ -2366,7 +2361,6 @@ export default function App() {
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
-                        activeFilePath={explorerActiveFilePath ?? null}
                         revealRequest={revealRequest}
                         onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                         onPathRenamed={handlePathRenamed}
@@ -2455,7 +2449,6 @@ export default function App() {
                         gitRootPath={gitRoot}
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
-                        activeFilePath={explorerActiveFilePath ?? null}
                         revealRequest={revealRequest}
                         onOpenFile={(path, pin) => openFileInPanel(path, pin)}
                         onPathRenamed={handlePathRenamed}
