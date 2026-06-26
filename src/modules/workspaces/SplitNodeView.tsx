@@ -4,6 +4,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { memo, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { PaneView } from "./PaneView";
 import type { PanelCallbacks } from "./PanelContent";
 import type { SplitNode } from "./lib/types";
@@ -17,6 +18,7 @@ type Props = {
   workspaceCwd?: string;
   activePaneId: string;
   isWorkspaceActive: boolean;
+  expandedPaneId?: string | null;
   onActivatePanel: (workspaceId: string, panelId: string) => void;
   onClosePanel: (workspaceId: string, panelId: string) => void;
   onCloseManyPanels: (workspaceId: string, panelIds: string[]) => void;
@@ -42,7 +44,7 @@ type Props = {
   welcomeActions?: WelcomeActions;
 };
 
-export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, ...rest }: Props) {
+export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, expandedPaneId, ...rest }: Props) {
   const splitId = node.kind === "split" ? node.id : null;
 
   const handleLayoutChanged = useCallback(
@@ -58,32 +60,42 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, .
   );
 
   if (node.kind === "pane") {
+    const isExpanded = expandedPaneId === node.id;
+    const isHidden = expandedPaneId != null && !isExpanded;
     return (
-      <PaneView
-        pane={node}
-        workspaceId={rest.workspaceId}
-        workspaceCwd={rest.workspaceCwd}
-        focused={node.id === activePaneId}
-        isWorkspaceActive={rest.isWorkspaceActive}
-        onActivatePanel={rest.onActivatePanel}
-        onClosePanel={rest.onClosePanel}
-        onCloseManyPanels={rest.onCloseManyPanels}
-        onFocusPane={rest.onFocusPane}
-        onNewTerminal={rest.onNewTerminal}
-        onSplitTerminalRight={rest.onSplitTerminalRight}
-        onSplitTerminalDown={rest.onSplitTerminalDown}
-        onNewBrowser={rest.onNewBrowser}
-        onSplitBrowserRight={rest.onSplitBrowserRight}
-        onSplitBrowserDown={rest.onSplitBrowserDown}
-        callbacks={rest.callbacks}
-        gitStatus={rest.gitStatus}
-        gitColorScheme={rest.gitColorScheme}
-        onFloatBrowserPanel={rest.onFloatBrowserPanel}
-        onDockBrowserPanel={rest.onDockBrowserPanel}
-        onFocusFloatBrowserPanel={rest.onFocusFloatBrowserPanel}
-      onNavigateFloatBrowserPanel={rest.onNavigateFloatBrowserPanel}
-        welcomeActions={rest.welcomeActions}
-      />
+      <div
+        className={cn(
+          "h-full w-full",
+          isExpanded && "absolute inset-0 z-10",
+          isHidden && "invisible pointer-events-none",
+        )}
+      >
+        <PaneView
+          pane={node}
+          workspaceId={rest.workspaceId}
+          workspaceCwd={rest.workspaceCwd}
+          focused={node.id === activePaneId}
+          isWorkspaceActive={rest.isWorkspaceActive}
+          onActivatePanel={rest.onActivatePanel}
+          onClosePanel={rest.onClosePanel}
+          onCloseManyPanels={rest.onCloseManyPanels}
+          onFocusPane={rest.onFocusPane}
+          onNewTerminal={rest.onNewTerminal}
+          onSplitTerminalRight={rest.onSplitTerminalRight}
+          onSplitTerminalDown={rest.onSplitTerminalDown}
+          onNewBrowser={rest.onNewBrowser}
+          onSplitBrowserRight={rest.onSplitBrowserRight}
+          onSplitBrowserDown={rest.onSplitBrowserDown}
+          callbacks={rest.callbacks}
+          gitStatus={rest.gitStatus}
+          gitColorScheme={rest.gitColorScheme}
+          onFloatBrowserPanel={rest.onFloatBrowserPanel}
+          onDockBrowserPanel={rest.onDockBrowserPanel}
+          onFocusFloatBrowserPanel={rest.onFocusFloatBrowserPanel}
+          onNavigateFloatBrowserPanel={rest.onNavigateFloatBrowserPanel}
+          welcomeActions={rest.welcomeActions}
+        />
+      </div>
     );
   }
 
@@ -98,7 +110,7 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, .
         defaultSize={`${node.dividerPosition * 100}%`}
         minSize="10%"
       >
-        <SplitNodeView node={node.first} activePaneId={activePaneId} {...rest} />
+        <SplitNodeView node={node.first} activePaneId={activePaneId} expandedPaneId={expandedPaneId} {...rest} />
       </ResizablePanel>
       <ResizableHandle withHandle />
       <ResizablePanel
@@ -109,6 +121,7 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, .
         <SplitNodeView
           node={node.second}
           activePaneId={activePaneId}
+          expandedPaneId={expandedPaneId}
           {...rest}
         />
       </ResizablePanel>
