@@ -58,6 +58,7 @@ import {
 } from "@/modules/explorer/lib/gitignore";
 import {
   clearFocusedTerminal,
+  cycleScratchpad,
   disposeSession,
   leafHasForegroundProcess,
   navigateFocusedBlocks,
@@ -1796,6 +1797,11 @@ export default function App() {
       "explorer.search": handleExplorerSearch,
       "terminal.clear": () => {
         clearFocusedTerminal();
+      },
+      "terminal.scratchpad": () => {
+        if (activePanelId && activePanel?.kind === "terminal") {
+          cycleScratchpad(activePanelId);
+        }
       },
       "blocks.prev": () => navigateFocusedBlocks(-1),
       "blocks.next": () => navigateFocusedBlocks(1),
