@@ -32,6 +32,7 @@ export type ShortcutId =
   | "pane.focusLeft"
   | "pane.focusRight"
   | "terminal.clear"
+  | "terminal.scratchpad"
   | "blocks.prev"
   | "blocks.next"
   | "search.focus"
@@ -346,6 +347,12 @@ export const SHORTCUTS: Shortcut[] = [
     // macOS — on other platforms Ctrl+K is readline's kill-line, so we leave it
     // unbound and let users assign their own in settings.
     defaultBindings: IS_MAC ? [{ meta: true, key: "k" }] : [],
+  },
+  {
+    id: "terminal.scratchpad",
+    label: "Toggle Scratchpad Bar",
+    group: "Terminal",
+    defaultBindings: IS_MAC ? [{ meta: true, key: "u" }] : [],
   },
   {
     id: "blocks.prev",
