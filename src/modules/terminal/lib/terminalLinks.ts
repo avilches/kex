@@ -8,18 +8,20 @@ const DEBUG_LINKS = true;
 const pathExistsCache = new Map<string, boolean>();
 
 async function pathExists(absPath: string): Promise<boolean> {
-  if (pathExistsCache.has(absPath)) return pathExistsCache.get(absPath)!;
+  const cached = pathExistsCache.get(absPath);
+  if (cached !== undefined) return cached;
   try {
     await invoke("fs_stat", { path: absPath });
     pathExistsCache.set(absPath, true);
     return true;
   } catch {
-    pathExistsCache.set(absPath, false);
+    // Don't cache failures: the file may not exist yet (e.g. being generated)
+    // and caching false would prevent detecting it on the next hover.
     return false;
   }
 }
 
-function parseFileUri(uri: string): string {
+export function parseFileUri(uri: string): string {
   let path = uri.slice("file://".length);
   const slashIdx = path.indexOf("/");
   if (slashIdx > 0) path = path.slice(slashIdx);
