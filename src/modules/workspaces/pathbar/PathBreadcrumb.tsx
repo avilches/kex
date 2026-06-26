@@ -16,7 +16,8 @@ import type { PathSegment, PathSegmentRelation } from "./cwdBreadcrumb";
 type PathBreadcrumbProps = {
   segments: PathSegment[];
   onRevealPath: (path: string) => void;
-  renderSegment?: (seg: PathSegment, badge: React.ReactNode) => React.ReactNode;
+  // Second arg is the full trigger (BreadcrumbLink > button > Badge); wrap it, don't replace it.
+  renderSegment?: (seg: PathSegment, trigger: React.ReactNode) => React.ReactNode;
   trailing?: React.ReactNode;
 };
 
@@ -61,18 +62,21 @@ export function PathBreadcrumb({
                 {s.isHome ? "Home" : s.label}
               </Badge>
             );
+            const trigger = (
+              <BreadcrumbLink asChild>
+                <button
+                  type="button"
+                  onClick={() => onRevealPath(s.fullPath)}
+                  title={s.fullPath}
+                >
+                  {badge}
+                </button>
+              </BreadcrumbLink>
+            );
             return (
               <Fragment key={s.fullPath}>
                 <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <button
-                      type="button"
-                      onClick={() => onRevealPath(s.fullPath)}
-                      title={s.fullPath}
-                    >
-                      {renderSegment ? renderSegment(s, badge) : badge}
-                    </button>
-                  </BreadcrumbLink>
+                  {renderSegment?.(s, trigger) ?? trigger}
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="[&>svg]:size-3" />
               </Fragment>
