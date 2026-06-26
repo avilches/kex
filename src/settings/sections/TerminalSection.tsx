@@ -50,6 +50,7 @@ import {
   setTerminalLetterSpacing,
   setTerminalLineHeight,
   setTerminalNewFolderMode,
+  setTerminalScratchpadEnterSends,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalShell,
@@ -102,6 +103,9 @@ export function TerminalSection() {
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
   const warnOnCloseRunning = usePreferencesStore(
     (s) => s.warnOnCloseTabWithRunningProcess,
+  );
+  const scratchpadEnterSends = usePreferencesStore(
+    (s) => s.scratchpadEnterSends,
   );
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
   const terminalNewFolderMode = usePreferencesStore(
@@ -310,6 +314,15 @@ export function TerminalSection() {
           <Switch
             checked={warnOnCloseRunning}
             onCheckedChange={(v) => void setWarnOnCloseTabWithRunningProcess(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Scratchpad: Enter sends"
+          description="When the scratchpad bar is open, Enter sends the text to the terminal. Shift+Enter inserts a newline. Uncheck to swap."
+        >
+          <Switch
+            checked={scratchpadEnterSends}
+            onCheckedChange={(v) => void setTerminalScratchpadEnterSends(v)}
           />
         </SettingRow>
       </div>

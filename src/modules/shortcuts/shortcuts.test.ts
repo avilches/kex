@@ -239,6 +239,14 @@ function digitEvent(
   } as unknown as KeyboardEvent;
 }
 
+describe("terminal.scratchpad shortcut", () => {
+  it("is registered in SHORTCUTS", () => {
+    const sc = SHORTCUTS.find((s) => s.id === "terminal.scratchpad");
+    expect(sc).toBeDefined();
+    expect(sc?.group).toBe("Terminal");
+  });
+});
+
 describe("index shortcut digit families", () => {
   // workspace.selectByIndex (Cmd/meta + 1-9) and tab.selectByIndex (Ctrl + 0-9)
   // own the digit space via wildcard matching. On macOS this is conflict-free

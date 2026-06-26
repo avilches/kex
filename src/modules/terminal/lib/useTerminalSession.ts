@@ -102,6 +102,11 @@ type Session = {
   // at the most recent release. Read once on the next bind to trigger a
   // SIGWINCH-driven repaint instead of replaying dormant bytes.
   altScreenAtRelease: boolean;
+  scratchpadOpen: boolean;
+  scratchpadFocused: boolean;
+  scratchpadFocus: (() => void) | null;
+  scratchpadDraft: string;
+  scratchpadListeners: Set<() => void>;
 };
 
 const sessions = new Map<string, Session>();
@@ -236,6 +241,61 @@ export function getLeafDraft(leafId: string): string {
 export function setLeafDraft(leafId: string, text: string): void {
   const s = sessions.get(leafId);
   if (s) s.inputDraft = text;
+}
+
+function notifyScratchpad(leafId: string): void {
+  const s = sessions.get(leafId);
+  if (!s) return;
+  for (const l of s.scratchpadListeners) l();
+}
+
+export function cycleScratchpad(leafId: string): void {
+  const s = sessions.get(leafId);
+  if (!s || s.shellExited) return;
+  if (!s.scratchpadOpen) {
+    s.scratchpadOpen = true;
+    notifyScratchpad(leafId);
+    // Focus callback registered after the component mounts; try next tick.
+    setTimeout(() => s.scratchpadFocus?.(), 0);
+  } else if (s.scratchpadFocused) {
+    focusSlot(leafId);
+  } else {
+    s.scratchpadFocus?.();
+  }
+}
+
+export function closeScratchpad(leafId: string): void {
+  const s = sessions.get(leafId);
+  if (!s) return;
+  if (!s.scratchpadOpen) return;
+  s.scratchpadOpen = false;
+  notifyScratchpad(leafId);
+  focusSlot(leafId);
+}
+
+export function setLeafScratchpadFocus(
+  leafId: string,
+  fn: (() => void) | null,
+): void {
+  const s = sessions.get(leafId);
+  if (s) s.scratchpadFocus = fn;
+}
+
+export function setLeafScratchpadFocused(
+  leafId: string,
+  focused: boolean,
+): void {
+  const s = sessions.get(leafId);
+  if (s) s.scratchpadFocused = focused;
+}
+
+export function getLeafScratchpadDraft(leafId: string): string {
+  return sessions.get(leafId)?.scratchpadDraft ?? "";
+}
+
+export function setLeafScratchpadDraft(leafId: string, text: string): void {
+  const s = sessions.get(leafId);
+  if (s) s.scratchpadDraft = text;
 }
 
 /**
@@ -412,6 +472,11 @@ function ensureSession(
     inputActive: false,
     everSubmitted: false,
     altScreenAtRelease: false,
+    scratchpadOpen: false,
+    scratchpadFocused: false,
+    scratchpadFocus: null,
+    scratchpadDraft: "",
+    scratchpadListeners: new Set(),
   };
   sessions.set(leafId, session);
 
@@ -809,6 +874,19 @@ export function useTerminalSession({
     };
   }, [leafId, blocks]);
 
+  const [scratchpadOpen, setScratchpadOpen] = useState<boolean>(
+    () => sessions.get(leafId)?.scratchpadOpen ?? false,
+  );
+  useEffect(() => {
+    const s = ensureSession(leafId, initialCwdRef.current, blocks);
+    setScratchpadOpen(s.scratchpadOpen);
+    const cb = () => setScratchpadOpen(sessions.get(leafId)?.scratchpadOpen ?? false);
+    s.scratchpadListeners.add(cb);
+    return () => {
+      s.scratchpadListeners.delete(cb);
+    };
+  }, [leafId, blocks]);
+
   const fontSize = usePreferencesStore((p) => p.terminalFontSize);
   const zoomLevel = usePreferencesStore((p) => p.zoomLevel);
   useEffect(() => {
@@ -1007,6 +1085,7 @@ export function useTerminalSession({
       searchBlock,
       revealMatch,
       clearSearch,
+      scratchpadOpen,
     }),
     [
       write,
@@ -1022,6 +1101,7 @@ export function useTerminalSession({
       searchBlock,
       revealMatch,
       clearSearch,
+      scratchpadOpen,
     ],
   );
 }

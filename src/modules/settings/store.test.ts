@@ -119,3 +119,9 @@ describe("editorViewByExt default", () => {
     expect(DEFAULT_PREFERENCES.editorViewByExt).toEqual({});
   });
 });
+
+describe("DEFAULT_PREFERENCES", () => {
+  it("scratchpadEnterSends defaults to true", () => {
+    expect(DEFAULT_PREFERENCES.scratchpadEnterSends).toBe(true);
+  });
+});

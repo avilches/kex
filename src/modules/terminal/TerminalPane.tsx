@@ -17,6 +17,7 @@ import {
   submitToLeaf,
   useTerminalSession,
 } from "./lib/useTerminalSession";
+import { ScratchpadBar } from "./ScratchpadBar";
 
 // Lazy: ShellInput pulls the CodeMirror stack, which must stay out of the
 // eager startup bundle (see eager-budget.test.ts). It loads only when a block
@@ -156,12 +157,16 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
               />
             </Suspense>
           </div>
+          {session.scratchpadOpen && <ScratchpadBar leafId={panelId} />}
         </div>
       );
     }
 
     return (
-      <div ref={containerRef} className="zoom-exempt h-full w-full" style={hideStyle} />
+      <div className="zoom-exempt flex h-full w-full flex-col" style={hideStyle}>
+        <div ref={containerRef} className="min-h-0 flex-1" />
+        {session.scratchpadOpen && <ScratchpadBar leafId={panelId} />}
+      </div>
     );
   },
 );
