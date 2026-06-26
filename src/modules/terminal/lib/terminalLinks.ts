@@ -40,12 +40,20 @@ const PATH_PATTERNS: RegExp[] = [
 ];
 
 export function registerTerminalLinks(term: Terminal, getLeafId: () => string | null): () => void {
+  // Consume OSC 8 file:// hyperlinks before xterm's built-in OscLinkProvider can
+  // turn them into clickable links. A real file:// OSC link (emitted e.g. by Claude
+  // Code) opens Finder on click regardless of our linkHandler. By suppressing the
+  // built-in link, the path text stays plain and is detected by our regex provider
+  // below, which opens it in the editor. http(s) OSC links are left untouched.
+  const oscDisposable = term.parser.registerOscHandler(8, (data) => {
+    const sep = data.indexOf(";");
+    const uri = sep >= 0 ? data.slice(sep + 1) : "";
+    return uri.startsWith("file://");
+  });
+
   term.options.linkHandler = {
     allowNonHttpProtocols: true,
     activate(event, uri) {
-      // preventDefault stops the mouseup from triggering WKWebKit's native
-      // file:// URL handling, which would open Finder independently of our handler.
-      // The actual file:// navigation is blocked at the Rust level via on_navigation.
       event.preventDefault();
       if (uri.startsWith("file://")) {
         dispatchFileLink(parseFileUri(uri), null);
@@ -127,5 +135,6 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
   return () => {
     term.options.linkHandler = undefined;
     providerDisposable.dispose();
+    oscDisposable.dispose();
   };
 }
