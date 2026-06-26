@@ -41,7 +41,12 @@ const PATH_PATTERNS: RegExp[] = [
 ];
 
 export function registerTerminalLinks(term: Terminal, getLeafId: () => string | null): () => void {
-  if (DEBUG_LINKS) console.log("[links] registerTerminalLinks called");
+  if (DEBUG_LINKS) {
+    console.log("[links] registerTerminalLinks called, term.element:", term.element?.tagName ?? "null");
+    term.element?.addEventListener("mousemove", () => {
+      console.log("[links] mousemove reaches term.element");
+    }, { once: true });
+  }
   term.options.linkHandler = {
     allowNonHttpProtocols: true,
     activate(_event, uri) {
