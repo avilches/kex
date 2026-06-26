@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
-import { Home01Icon, PinIcon } from "@hugeicons/core-free-icons";
+import { Folder01Icon, Home01Icon, PinIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Select,
@@ -190,7 +190,12 @@ export function TerminalSection() {
             </SelectItem>
             <SelectItem value="context" className="text-[12px]">
               <span className="flex items-center gap-2">
-                <span className="size-[13px]" />
+                <HugeiconsIcon
+                  icon={Folder01Icon}
+                  size={13}
+                  strokeWidth={2}
+                  className="text-muted-foreground"
+                />
                 Last folder from terminal or editor
               </span>
             </SelectItem>
