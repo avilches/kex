@@ -1,5 +1,5 @@
 import { BreadcrumbItem, BreadcrumbPage } from "@/components/ui/breadcrumb";
-import { pathDirname } from "@/lib/pathUtils";
+import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { PathBreadcrumb } from "@/modules/workspaces/pathbar/PathBreadcrumb";
 import { DirSegmentContextMenu } from "@/modules/workspaces/pathbar/DirSegmentContextMenu";
 import { FileLeafContextMenu } from "@/modules/workspaces/pathbar/FileLeafContextMenu";
@@ -39,9 +39,13 @@ export function EditorPathBreadcrumb({
     home,
   );
 
+  const fileIcon = fileIconUrl(fileName);
   const leafNode = (
     <BreadcrumbItem>
-      <BreadcrumbPage className="whitespace-nowrap text-foreground">
+      <BreadcrumbPage className="flex items-center gap-1 whitespace-nowrap text-foreground">
+        {fileIcon ? (
+          <img src={fileIcon} alt="" className="size-4 shrink-0" />
+        ) : null}
         {fileName}
       </BreadcrumbPage>
     </BreadcrumbItem>
@@ -54,7 +58,7 @@ export function EditorPathBreadcrumb({
       renderSegment={(seg, trigger) => (
         <DirSegmentContextMenu
           path={seg.fullPath}
-          rootPath={workspaceRoot ?? seg.fullPath}
+          workspaceRoot={workspaceRoot}
           gitRootPath={gitRootPath ?? null}
           onSetAsRoot={onSetAsRoot}
           onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
@@ -68,7 +72,7 @@ export function EditorPathBreadcrumb({
         onFocusOnExplorer ? (
           <FileLeafContextMenu
             path={path}
-            rootPath={workspaceRoot ?? pathDirname(path)}
+            workspaceRoot={workspaceRoot}
             gitRootPath={gitRootPath ?? null}
             onFocusOnExplorer={onFocusOnExplorer}
             onAddToGitignore={onAddToGitignore}
