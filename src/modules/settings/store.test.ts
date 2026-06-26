@@ -12,6 +12,7 @@ import {
   parseCursorInactiveStyle,
   parseCursorStyle,
   parseScmViewMode,
+  parseTerminalNewFolderMode,
   DEFAULT_PREFERENCES,
 } from "./store";
 
@@ -95,6 +96,21 @@ describe("scmViewMode", () => {
     expect(parseScmViewMode(undefined)).toBe("tree");
     expect(parseScmViewMode(null)).toBe("tree");
     expect(parseScmViewMode(42)).toBe("tree");
+  });
+});
+
+describe("terminalNewFolderMode", () => {
+  it("defaults to context", () => {
+    expect(DEFAULT_PREFERENCES.terminalNewFolderMode).toBe("context");
+  });
+
+  it("parses only the exact 'workspace' string as workspace", () => {
+    expect(parseTerminalNewFolderMode("workspace")).toBe("workspace");
+    expect(parseTerminalNewFolderMode("context")).toBe("context");
+    expect(parseTerminalNewFolderMode("WORKSPACE")).toBe("context");
+    expect(parseTerminalNewFolderMode(undefined)).toBe("context");
+    expect(parseTerminalNewFolderMode(null)).toBe("context");
+    expect(parseTerminalNewFolderMode(42)).toBe("context");
   });
 });
 

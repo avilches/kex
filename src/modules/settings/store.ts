@@ -16,6 +16,8 @@ export type GitColorScheme = "vscode" | "jetbrains";
 
 export type ScmViewMode = "list" | "tree";
 
+export type TerminalNewFolderMode = "workspace" | "context";
+
 export type CursorStyle = "bar" | "block" | "underline";
 
 export type CursorInactiveStyle =
@@ -147,6 +149,7 @@ export type Preferences = {
   terminalCursorInactiveStyle: CursorInactiveStyle;
   terminalCursorWidth: number;
   terminalScrollSensitivity: number;
+  terminalNewFolderMode: TerminalNewFolderMode;
   lastWslDistro: string | null;
   zoomLevel: number;
   agentNotifications: boolean;
@@ -224,6 +227,7 @@ const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
+const KEY_TERMINAL_NEW_FOLDER_MODE = "terminalNewFolderMode";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 13;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -343,6 +347,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalCursorInactiveStyle: CURSOR_INACTIVE_STYLE_DEFAULT,
   terminalCursorWidth: CURSOR_WIDTH_DEFAULT,
   terminalScrollSensitivity: SCROLL_SENSITIVITY_DEFAULT,
+  terminalNewFolderMode: "context",
   lastWslDistro: null,
   zoomLevel: 1.0,
   agentNotifications: true,
@@ -387,6 +392,10 @@ const PREFS_CHANGED_EVENT = "kex://prefs-changed";
 
 export function parseScmViewMode(value: unknown): ScmViewMode {
   return value === "list" ? "list" : "tree";
+}
+
+export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMode {
+  return value === "workspace" ? "workspace" : "context";
 }
 
 async function writePref<T>(key: string, value: T): Promise<void> {
@@ -511,6 +520,9 @@ export async function loadPreferences(): Promise<Preferences> {
       SCROLL_SENSITIVITY_MAX,
       SCROLL_SENSITIVITY_STEP,
       SCROLL_SENSITIVITY_DEFAULT,
+    ),
+    terminalNewFolderMode: parseTerminalNewFolderMode(
+      get<string>(KEY_TERMINAL_NEW_FOLDER_MODE),
     ),
     lastWslDistro:
       get<string | null>(KEY_LAST_WSL_DISTRO) ??
@@ -733,6 +745,12 @@ export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promi
 
 export async function setWarnOnCloseWorkspace(value: boolean): Promise<void> {
   await writePref(KEY_WARN_ON_CLOSE_WORKSPACE, value);
+}
+
+export async function setTerminalNewFolderMode(
+  value: TerminalNewFolderMode,
+): Promise<void> {
+  await writePref(KEY_TERMINAL_NEW_FOLDER_MODE, value);
 }
 
 export async function setTerminalFontFamily(value: string): Promise<void> {
@@ -1025,6 +1043,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_RIGHT_PANEL_ACTIVE_TAB]: "rightPanelActiveTab",
   [KEY_PANEL_SIDE]: "panelSide",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
+  [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
 };
 
 /** Subscribe to changes from any window (settings → main). */
