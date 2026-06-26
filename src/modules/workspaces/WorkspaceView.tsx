@@ -73,7 +73,7 @@ export function WorkspaceView({
             workspaceCwd={ws.cwd}
             activePaneId={ws.activePaneId}
             isWorkspaceActive={ws.id === activeWorkspaceId}
-            expandedPaneId={expandedPaneId}
+            expandedPaneId={ws.id === activeWorkspaceId ? expandedPaneId : null}
             onActivatePanel={rest.onActivatePanel}
             onClosePanel={rest.onClosePanel}
             onCloseManyPanels={rest.onCloseManyPanels}

@@ -90,7 +90,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { IS_MAC } from "@/lib/platform";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
 import { RightPanel, type RightPanelHandle } from "./components/RightPanel";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
@@ -1660,7 +1660,7 @@ export default function App() {
 
   const [zenPaneId, setZenPaneId] = useState<string | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setZenPaneId(null);
   }, [activeWorkspaceId]);
 
