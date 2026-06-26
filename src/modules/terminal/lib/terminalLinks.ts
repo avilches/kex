@@ -46,6 +46,11 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
     term.element?.addEventListener("mousemove", () => {
       console.log("[links] mousemove reaches term.element");
     }, { once: true });
+    const screen = term.element?.querySelector(".xterm-screen");
+    console.log("[links] .xterm-screen:", screen?.tagName ?? "not found");
+    screen?.addEventListener("mousemove", () => {
+      console.log("[links] mousemove reaches .xterm-screen");
+    }, { once: true });
   }
   term.options.linkHandler = {
     allowNonHttpProtocols: true,
