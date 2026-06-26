@@ -60,7 +60,16 @@ type Props = {
   path: string;
   workspaceRoot: string | null;
   home: string | null;
+  gitRootPath?: string | null;
   onRevealPath: (path: string) => void;
+  onFocusOnExplorer?: (
+    path: string,
+    action?: "rename" | "duplicate" | "delete",
+  ) => void;
+  onSetAsRoot?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
+  onRevealInTerminal?: (path: string) => void;
+  onAddToGitignore?: (path: string, isDir: boolean) => void;
   view?: {
     mode: "raw" | "overlay" | "split";
     onToggleOverlay: () => void;
@@ -86,7 +95,13 @@ export function EditorPathBar({
   path,
   workspaceRoot,
   home,
+  gitRootPath,
   onRevealPath,
+  onFocusOnExplorer,
+  onSetAsRoot,
+  onNewWorkspaceFromFolder,
+  onRevealInTerminal,
+  onAddToGitignore,
   view,
   viewToggles,
   globalToggles,
@@ -171,7 +186,13 @@ export function EditorPathBar({
         path={path}
         workspaceRoot={workspaceRoot}
         home={home}
+        gitRootPath={gitRootPath}
         onRevealPath={onRevealPath}
+        onFocusOnExplorer={onFocusOnExplorer}
+        onSetAsRoot={onSetAsRoot}
+        onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
+        onRevealInTerminal={onRevealInTerminal}
+        onAddToGitignore={onAddToGitignore}
       />
       <div className="ml-auto flex shrink-0 items-center gap-1">
         {onLanguageChange && (

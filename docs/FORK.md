@@ -142,9 +142,9 @@ previous workspaces or pane layout.
   `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspace-state.json` (`explorerRootMode`,
   `pinnedRoot`).
 - **Per-terminal autofocus (sidebar-driving terminal)** -- replaces the removed "Follow Terminal" / "Follow Git Root"
-  modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab hover card)
-  drives both the Explorer root and the Source Control / Git History repo when it gains focus or its cwd changes while
-  focused. F4 (`tab.focusOnExplorer`) does the same anchoring unconditionally regardless of autofocus, and
+  modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab right-click
+  context menu) drives both the Explorer root and the Source Control / Git History repo when it gains focus or its cwd
+  changes while focused. F4 (`tab.focusOnExplorer`) does the same anchoring unconditionally regardless of autofocus, and
   additionally opens the right panel if closed and switches away from Git History. Both F4 and autofocus use the same
   cascade: folder under workspace root -> Workspace Root mode; else under a git repo -> File System rooted at that git
   root; else File System at the common ancestor / dirname. The git repo for Source Control / Git History is resolved
@@ -290,6 +290,24 @@ Plain code editor panels render the bar without the view toggle. The wrap button
 The editor controls bar (`EditorOverlayBar`) was reshaped into `EditorPathBar`: a thin top bar that is the first row of every editor and markdown panel instead of a chip floating over the content. It shows the open file's full path as a navigable breadcrumb on the left and keeps the existing controls (language selector, `[...]` view options, split, preview) on the right. The breadcrumb (`EditorPathBreadcrumb`, modeled by the pure `buildEditorPathBreadcrumb`) renders every directory segment as a clickable button that reveals that folder in the explorer, with the filename as the non-clickable leaf. Segments are tagged relative to the pinned workspace root: the root carries a pin icon, its ancestors are dimmed, descendants render normally, and marking is suppressed when there is no pinned root or the file is outside it. The full path is always shown (no collapsing) and scrolls horizontally on overflow while the controls stay fixed. `workspaceRoot`/`home` reach the bar through `EditorChromeContext` (a small provider around `WorkspaceView`) rather than prop drilling through the render tree.
 
 This breadcrumb replaced the bottom status bar (`StatusBar`, with its `CwdBreadcrumb` and `WorkspaceEnvSelector`), which was removed entirely. The terminal cwd breadcrumb is gone; the editor breadcrumb now reflects the open file's path instead. Note: the Windows-only WSL `WorkspaceEnvSelector` had no other UI host, so switching workspace environment currently has no dedicated control.
+
+### Path bar context menus and tab HoverCard removal
+
+The terminal path bar cwd is now a navigable breadcrumb (`PathBreadcrumb` / `buildCwdBreadcrumb` in
+`modules/workspaces/pathbar/`) shared with the editor bar. Each directory segment has a right-click context menu
+(`DirSegmentContextMenu` / `dirSegmentMenuItems`): Set as Workspace Root, New Workspace from Folder, Open in
+Terminal, Reveal in Finder, Copy Relative/Absolute Path, Add to .gitignore.
+
+The editor path bar file-name leaf has a right-click context menu (`FileLeafContextMenu` / `fileLeafMenuItems`):
+Reveal in Finder, Rename, Duplicate, Copy Absolute/Relative Path, Add to .gitignore, Delete. Mutations route
+through `RevealRequest.pendingAction` so the explorer performs the action immediately after revealing the file in
+the tree (nonce-guarded, fires once).
+
+The terminal path bar `[...]` DropdownMenu (`TerminalPathBarMenu`) surfaces session metadata that was previously in
+the floating tab HoverCard: run-on-start checkbox, persistent command input, and for agent sessions: session id
+(copy), transcript (Reveal in Finder), started elapsed, restore error. The floating tab HoverCard has been removed
+entirely; tabs use a native `title` tooltip (cwd, agent model/sessionId). None of this surface exists in upstream
+Terax.
 
 ### Terminal info bar
 

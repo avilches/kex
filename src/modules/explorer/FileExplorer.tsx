@@ -83,8 +83,9 @@ import {
   isUnder,
   type ExplorerRootMode,
 } from "@/modules/workspaces/lib/explorerRoot";
+import { dispatchRevealAction, type RevealAction } from "./lib/pendingAction";
 
-export type RevealRequest = { path: string; nonce: number };
+export type RevealRequest = { path: string; nonce: number; pendingAction?: RevealAction };
 
 export type FileExplorerHandle = {
   focus: () => void;
@@ -693,7 +694,19 @@ export const FileExplorer = memo(
       if (revealConsumedRef.current === revealRequest.nonce) return;
       if (applyRevealTarget(revealRequest.path) === "pending") return;
       revealConsumedRef.current = revealRequest.nonce;
-    }, [revealRequest, applyRevealTarget]);
+      if (revealRequest.pendingAction && entryIndexByPath.has(revealRequest.path)) {
+        dispatchRevealAction(
+          revealRequest.pendingAction,
+          revealRequest.path,
+          isDirAt(revealRequest.path) === true,
+          {
+            beginRename: rowActions.beginRename,
+            beginDuplicate: rowActions.beginDuplicate,
+            requestDelete: rowActions.requestDelete,
+          },
+        );
+      }
+    }, [revealRequest, applyRevealTarget, entryIndexByPath, isDirAt, rowActions]);
 
     // Reveal a search result in the tree (from the search context menu).
     const searchRevealConsumedRef = useRef<number | null>(null);

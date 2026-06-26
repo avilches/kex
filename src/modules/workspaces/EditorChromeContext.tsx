@@ -6,12 +6,15 @@ export type EditorChrome = {
   /** Pinned workspace root, used to mark the root segment in the path bar. */
   workspaceRoot: string | null;
   home: string | null;
+  /** Git repo root resolved from explorerRoot; null when outside a repo. */
+  gitRootPath: string | null;
 };
 
 const EditorChromeContext = createContext<EditorChrome>({
   explorerRoot: null,
   workspaceRoot: null,
   home: null,
+  gitRootPath: null,
 });
 
 export const EditorChromeProvider = EditorChromeContext.Provider;

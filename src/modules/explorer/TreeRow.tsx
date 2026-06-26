@@ -342,12 +342,10 @@ function EntryRowImpl(props: EntryRowProps) {
             Open File
           </ContextMenuItem>
         )}
-        {onRevealInTerminal && (
+        {onRevealInTerminal && isDir && (
           <ContextMenuItem
             className={COMPACT_ITEM}
-            onSelect={() =>
-              onRevealInTerminal(isDir ? path : pathDirname(path) || rootPath)
-            }
+            onSelect={() => onRevealInTerminal(path)}
           >
             <HugeiconsIcon
               icon={ComputerTerminal01Icon}

@@ -1,93 +1,84 @@
-import { Fragment } from "react";
-import { Badge } from "@/components/ui/badge";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Home03Icon, PinIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { cn } from "@/lib/utils";
-import {
-  buildEditorPathBreadcrumb,
-  type EditorSegmentRelation,
-} from "./lib/editorPathBreadcrumb";
+import { BreadcrumbItem, BreadcrumbPage } from "@/components/ui/breadcrumb";
+import { pathDirname } from "@/lib/pathUtils";
+import { PathBreadcrumb } from "@/modules/workspaces/pathbar/PathBreadcrumb";
+import { DirSegmentContextMenu } from "@/modules/workspaces/pathbar/DirSegmentContextMenu";
+import { FileLeafContextMenu } from "@/modules/workspaces/pathbar/FileLeafContextMenu";
+import { buildEditorPathBreadcrumb } from "./lib/editorPathBreadcrumb";
 
 type Props = {
   path: string;
   workspaceRoot: string | null;
   home: string | null;
+  gitRootPath?: string | null;
   onRevealPath: (path: string) => void;
-};
-
-const RELATION_CLASS: Record<EditorSegmentRelation, string> = {
-  "above-root": "text-muted-foreground/60 hover:text-foreground",
-  root: "text-foreground",
-  "inside-root": "text-muted-foreground hover:text-foreground",
+  onFocusOnExplorer?: (
+    path: string,
+    action?: "rename" | "duplicate" | "delete",
+  ) => void;
+  onSetAsRoot?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
+  onRevealInTerminal?: (path: string) => void;
+  onAddToGitignore?: (path: string, isDir: boolean) => void;
 };
 
 export function EditorPathBreadcrumb({
   path,
   workspaceRoot,
   home,
+  gitRootPath,
   onRevealPath,
+  onFocusOnExplorer,
+  onSetAsRoot,
+  onNewWorkspaceFromFolder,
+  onRevealInTerminal,
+  onAddToGitignore,
 }: Props) {
   const { segments, fileName } = buildEditorPathBreadcrumb(
     path,
     workspaceRoot,
     home,
   );
+
+  const leafNode = (
+    <BreadcrumbItem>
+      <BreadcrumbPage className="whitespace-nowrap text-foreground">
+        {fileName}
+      </BreadcrumbPage>
+    </BreadcrumbItem>
+  );
+
   return (
-    <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <Breadcrumb>
-        <BreadcrumbList className="flex-nowrap gap-1 text-[11px] sm:gap-1">
-          {segments.map((s) => (
-            <Fragment key={s.fullPath}>
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <button
-                    type="button"
-                    onClick={() => onRevealPath(s.fullPath)}
-                    title={s.fullPath}
-                  >
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "gap-1 whitespace-nowrap",
-                        RELATION_CLASS[s.relation],
-                      )}
-                    >
-                      {s.isHome ? (
-                        <HugeiconsIcon
-                          icon={Home03Icon}
-                          className="size-3"
-                          strokeWidth={1.75}
-                        />
-                      ) : s.relation === "root" ? (
-                        <HugeiconsIcon
-                          icon={PinIcon}
-                          className="size-3 text-primary"
-                          strokeWidth={2}
-                        />
-                      ) : null}
-                      {s.isHome ? "Home" : s.label}
-                    </Badge>
-                  </button>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="[&>svg]:size-3" />
-            </Fragment>
-          ))}
-          <BreadcrumbItem>
-            <BreadcrumbPage className="whitespace-nowrap text-foreground">
-              {fileName}
-            </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-    </div>
+    <PathBreadcrumb
+      segments={segments}
+      onRevealPath={onRevealPath}
+      renderSegment={(seg, trigger) => (
+        <DirSegmentContextMenu
+          path={seg.fullPath}
+          rootPath={workspaceRoot ?? seg.fullPath}
+          gitRootPath={gitRootPath ?? null}
+          onSetAsRoot={onSetAsRoot}
+          onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
+          onRevealInTerminal={onRevealInTerminal}
+          onAddToGitignore={onAddToGitignore}
+        >
+          {trigger}
+        </DirSegmentContextMenu>
+      )}
+      trailing={
+        onFocusOnExplorer ? (
+          <FileLeafContextMenu
+            path={path}
+            rootPath={workspaceRoot ?? pathDirname(path)}
+            gitRootPath={gitRootPath ?? null}
+            onFocusOnExplorer={onFocusOnExplorer}
+            onAddToGitignore={onAddToGitignore}
+          >
+            {leafNode}
+          </FileLeafContextMenu>
+        ) : (
+          leafNode
+        )
+      }
+    />
   );
 }
