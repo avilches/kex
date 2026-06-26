@@ -11,7 +11,7 @@ import { useMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import type { Panel } from "@/modules/workspaces/lib/types";
-import { ReloadIcon } from "@hugeicons/core-free-icons";
+import { ComputerTerminal01Icon, ReloadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
 import { agentChip } from "./lib/agentChip";
@@ -68,31 +68,46 @@ export function TerminalPathBar({
   const process = running ?? metrics?.shellName ?? null;
   return (
     <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
-      <PathBreadcrumb
-        segments={segments}
-        onRevealPath={(p) => onReveal?.(p)}
-        renderSegment={(seg, trigger) => (
-          <DirSegmentContextMenu
-            path={seg.fullPath}
-            rootPath={workspaceRoot ?? seg.fullPath}
-            gitRootPath={gitRootPath}
-            onSetAsRoot={onSetAsRoot}
-            onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
-            onRevealInTerminal={onRevealInTerminal}
-            onAddToGitignore={onAddToGitignore}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <PathBreadcrumb
+          grow={false}
+          segments={segments}
+          onRevealPath={(p) => onReveal?.(p)}
+          renderSegment={(seg, trigger) => (
+            <DirSegmentContextMenu
+              path={seg.fullPath}
+              rootPath={workspaceRoot ?? seg.fullPath}
+              gitRootPath={gitRootPath}
+              onSetAsRoot={onSetAsRoot}
+              onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
+              onRevealInTerminal={onRevealInTerminal}
+              onAddToGitignore={onAddToGitignore}
+            >
+              {trigger}
+            </DirSegmentContextMenu>
+          )}
+        />
+        {process && (
+          <span
+            title={process}
+            className={cn(
+              "flex min-w-0 shrink items-center gap-1 font-mono text-muted-foreground",
+              running && "text-foreground",
+            )}
           >
-            {trigger}
-          </DirSegmentContextMenu>
+            <HugeiconsIcon
+              icon={ComputerTerminal01Icon}
+              size={12}
+              strokeWidth={1.75}
+              className="shrink-0"
+            />
+            <span className="truncate">{process}</span>
+          </span>
         )}
-      />
-      <div className="ml-auto flex shrink-0 items-center gap-2 font-mono text-muted-foreground">
+      </div>
+      <div className="flex shrink-0 items-center gap-2 font-mono text-muted-foreground">
         {metrics && (
           <span title="Process ID">{metrics.pid}</span>
-        )}
-        {process && (
-          <span className={cn("max-w-[200px] truncate", running && "text-foreground")}>
-            {process}
-          </span>
         )}
         {metrics && (
           <>

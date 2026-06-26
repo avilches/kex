@@ -19,6 +19,8 @@ type PathBreadcrumbProps = {
   // Second arg is the full trigger (BreadcrumbLink > button > Badge); wrap it, don't replace it.
   renderSegment?: (seg: PathSegment, trigger: React.ReactNode) => React.ReactNode;
   trailing?: React.ReactNode;
+  // When false, the breadcrumb only takes its content width (so siblings can sit right after it).
+  grow?: boolean;
 };
 
 const RELATION_CLASS: Record<PathSegmentRelation, string> = {
@@ -32,9 +34,15 @@ export function PathBreadcrumb({
   onRevealPath,
   renderSegment,
   trailing,
+  grow = true,
 }: PathBreadcrumbProps) {
   return (
-    <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div
+      className={cn(
+        "min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        grow && "flex-1",
+      )}
+    >
       <Breadcrumb>
         <BreadcrumbList className="flex-nowrap gap-1 text-[11px] sm:gap-1">
           {segments.map((s) => {
