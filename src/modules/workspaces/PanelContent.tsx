@@ -238,6 +238,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               home={home}
               gitRootPath={gitRootPath}
               onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
+              onFocusOnExplorer={callbacks.onFocusOnExplorer}
               onSetAsRoot={callbacks.onSetAsRoot}
               onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
               onRevealInTerminal={callbacks.onRevealInTerminal}
@@ -349,6 +350,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               home={home}
               gitRootPath={gitRootPath}
               onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
+              onFocusOnExplorer={callbacks.onFocusOnExplorer}
               onSetAsRoot={callbacks.onSetAsRoot}
               onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
               onRevealInTerminal={callbacks.onRevealInTerminal}

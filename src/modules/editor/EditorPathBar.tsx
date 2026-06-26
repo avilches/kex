@@ -62,6 +62,10 @@ type Props = {
   home: string | null;
   gitRootPath?: string | null;
   onRevealPath: (path: string) => void;
+  onFocusOnExplorer?: (
+    path: string,
+    action?: "rename" | "duplicate" | "delete",
+  ) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -93,6 +97,7 @@ export function EditorPathBar({
   home,
   gitRootPath,
   onRevealPath,
+  onFocusOnExplorer,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
   onRevealInTerminal,
@@ -183,6 +188,7 @@ export function EditorPathBar({
         home={home}
         gitRootPath={gitRootPath}
         onRevealPath={onRevealPath}
+        onFocusOnExplorer={onFocusOnExplorer}
         onSetAsRoot={onSetAsRoot}
         onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
         onRevealInTerminal={onRevealInTerminal}

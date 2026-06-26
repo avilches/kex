@@ -1,6 +1,8 @@
 import { BreadcrumbItem, BreadcrumbPage } from "@/components/ui/breadcrumb";
+import { pathDirname } from "@/lib/pathUtils";
 import { PathBreadcrumb } from "@/modules/workspaces/pathbar/PathBreadcrumb";
 import { DirSegmentContextMenu } from "@/modules/workspaces/pathbar/DirSegmentContextMenu";
+import { FileLeafContextMenu } from "@/modules/workspaces/pathbar/FileLeafContextMenu";
 import { buildEditorPathBreadcrumb } from "./lib/editorPathBreadcrumb";
 
 type Props = {
@@ -9,6 +11,10 @@ type Props = {
   home: string | null;
   gitRootPath?: string | null;
   onRevealPath: (path: string) => void;
+  onFocusOnExplorer?: (
+    path: string,
+    action?: "rename" | "duplicate" | "delete",
+  ) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -21,6 +27,7 @@ export function EditorPathBreadcrumb({
   home,
   gitRootPath,
   onRevealPath,
+  onFocusOnExplorer,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
   onRevealInTerminal,
@@ -31,6 +38,15 @@ export function EditorPathBreadcrumb({
     workspaceRoot,
     home,
   );
+
+  const leafNode = (
+    <BreadcrumbItem>
+      <BreadcrumbPage className="whitespace-nowrap text-foreground">
+        {fileName}
+      </BreadcrumbPage>
+    </BreadcrumbItem>
+  );
+
   return (
     <PathBreadcrumb
       segments={segments}
@@ -49,11 +65,19 @@ export function EditorPathBreadcrumb({
         </DirSegmentContextMenu>
       )}
       trailing={
-        <BreadcrumbItem>
-          <BreadcrumbPage className="whitespace-nowrap text-foreground">
-            {fileName}
-          </BreadcrumbPage>
-        </BreadcrumbItem>
+        onFocusOnExplorer ? (
+          <FileLeafContextMenu
+            path={path}
+            rootPath={workspaceRoot ?? pathDirname(path)}
+            gitRootPath={gitRootPath ?? null}
+            onFocusOnExplorer={onFocusOnExplorer}
+            onAddToGitignore={onAddToGitignore}
+          >
+            {leafNode}
+          </FileLeafContextMenu>
+        ) : (
+          leafNode
+        )
       }
     />
   );
