@@ -2,6 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ILink, ILinkProvider, Terminal } from "@xterm/xterm";
 import { dispatchFileLink, getLeafCwd } from "@/modules/terminal/lib/terminalLinkBridge";
 
+// Set to true to log link detection to the browser console (DevTools)
+const DEBUG_LINKS = true;
+
 const pathExistsCache = new Map<string, boolean>();
 
 async function pathExists(absPath: string): Promise<boolean> {
@@ -30,10 +33,16 @@ const CLAUDE_PATTERNS = [
   /Wrote \d+ lines? to ([^\n]+)/g,
 ];
 
-const PATH_PATTERNS = [
+const PATH_PATTERNS: RegExp[] = [
+  // Absolute: /path/to/file.ext
   /(\/[^\s:'"<>()\[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
+  // Home-relative: ~/path/to/file.ext
   /(~\/[^\s:'"<>()\[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
+  // Explicit relative: ./file.ext or ../file.ext
   /((?:\.\/|\.\.\/)[^\s:'"<>()\[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
+  // Bare relative (docs/file.md) or standalone filename (HANDOFF-foo.md).
+  // Lookbehind prevents matching inside absolute paths (char before must not be / \w .)
+  /(?<![/\w.])([a-zA-Z0-9_][a-zA-Z0-9_.\-/]*\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
 ];
 
 export function registerTerminalLinks(term: Terminal, getLeafId: () => string | null): () => void {
@@ -41,8 +50,11 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
     allowNonHttpProtocols: true,
     activate(_event, uri) {
       if (uri.startsWith("file://")) {
-        dispatchFileLink(parseFileUri(uri), null);
+        const path = parseFileUri(uri);
+        if (DEBUG_LINKS) console.log(`[links] OSC8 file click: "${path}"`);
+        dispatchFileLink(path, null);
       } else {
+        if (DEBUG_LINKS) console.log(`[links] OSC8 url click: "${uri}"`);
         import("@tauri-apps/plugin-opener").then(({ openUrl }) =>
           openUrl(uri).catch(console.error),
         );
@@ -80,11 +92,19 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
         } else if (rawPath.startsWith("~/")) {
           absPath = rawPath;
         } else {
-          if (!cwd) return;
+          if (!cwd) {
+            if (DEBUG_LINKS) console.log(`[links] skip "${rawPath}" — no cwd`);
+            return;
+          }
           absPath = `${cwd}/${rawPath}`;
         }
 
-        if (!(await pathExists(absPath))) return;
+        if (DEBUG_LINKS) console.log(`[links] stat "${absPath}"`);
+        if (!(await pathExists(absPath))) {
+          if (DEBUG_LINKS) console.log(`[links] ✗ "${absPath}"`);
+          return;
+        }
+        if (DEBUG_LINKS) console.log(`[links] ✓ "${rawPath}"`);
 
         links.push({
           range: {
@@ -107,6 +127,7 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
           const untrimmed = match[1];
           const rawPath = untrimmed.trimEnd();
           const offset = match.index + match[0].indexOf(untrimmed);
+          if (DEBUG_LINKS) console.log(`[links] claude match: "${rawPath}"`);
           promises.push(addLink(rawPath, offset, offset + rawPath.length));
         }
       }
@@ -118,6 +139,7 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
           const rawPath = match[1];
           const lineNum = match[2] ? parseInt(match[2].slice(1), 10) : undefined;
           const col = match[3] ? parseInt(match[3].slice(1), 10) : undefined;
+          if (DEBUG_LINKS) console.log(`[links] path match: "${rawPath}"`);
           promises.push(addLink(rawPath, match.index, match.index + match[0].length, lineNum, col));
         }
       }
