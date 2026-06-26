@@ -213,6 +213,14 @@ export default function App() {
     ? ((activePanel as { cwd?: string }).cwd ?? null)
     : null;
   activeCwdRef.current = activeCwd;
+  const contextCwd =
+    activePanel?.kind === "terminal"
+      ? (activePanel.cwd ?? null)
+      : activePanel && "path" in activePanel
+        ? (activePanel.path.split(/[\\/]/).slice(0, -1).join("/") || null)
+        : null;
+  const contextCwdRef = useRef<string | null>(null);
+  contextCwdRef.current = contextCwd;
 
   // ── Handle maps ───────────────────────────────────────────────────────────
 
@@ -668,10 +676,15 @@ export default function App() {
             (w) => w.id === activeWorkspaceIdRef.current,
           );
       if (!ws) return;
+      const { terminalNewFolderMode } = usePreferencesStore.getState();
+      const cwd =
+        terminalNewFolderMode === "workspace"
+          ? ws.cwd
+          : (contextCwdRef.current ?? ws.cwd);
       openPanel(ws.id, targetPaneId ?? ws.activePaneId, {
         id: newPanelId(),
         kind: "terminal",
-        cwd: activeCwdRef.current ?? ws.cwd,
+        cwd,
       });
     },
     [openPanel],
@@ -680,6 +693,11 @@ export default function App() {
   const openNewBlock = useCallback(
     (targetPaneId?: string) => {
       if (!activeWorkspace) return;
+      const { terminalNewFolderMode } = usePreferencesStore.getState();
+      const cwd =
+        terminalNewFolderMode === "workspace"
+          ? activeWorkspace.cwd
+          : (contextCwd ?? activeWorkspace.cwd);
       openPanel(
         activeWorkspace.id,
         targetPaneId ?? activeWorkspace.activePaneId,
@@ -687,11 +705,11 @@ export default function App() {
           id: newPanelId(),
           kind: "terminal",
           blocks: true,
-          cwd: activeCwd ?? activeWorkspace.cwd,
+          cwd,
         },
       );
     },
-    [activeWorkspace, activeCwd, openPanel],
+    [activeWorkspace, contextCwd, openPanel],
   );
 
   // ── Window title ──────────────────────────────────────────────────────────
@@ -919,10 +937,14 @@ export default function App() {
         return;
       }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
+      const { terminalNewFolderMode } = usePreferencesStore.getState();
       openPanel(wsId, newPaneId, {
         id: newPanelId(),
         kind: "terminal",
-        cwd: activeCwdRef.current ?? ws.cwd,
+        cwd:
+          terminalNewFolderMode === "workspace"
+            ? ws.cwd
+            : (contextCwdRef.current ?? ws.cwd),
       });
     },
     [splitPane, openPanel],
@@ -946,10 +968,14 @@ export default function App() {
         return;
       }
       const newPaneId = splitPane(wsId, paneId, "vertical");
+      const { terminalNewFolderMode } = usePreferencesStore.getState();
       openPanel(wsId, newPaneId, {
         id: newPanelId(),
         kind: "terminal",
-        cwd: activeCwdRef.current ?? ws.cwd,
+        cwd:
+          terminalNewFolderMode === "workspace"
+            ? ws.cwd
+            : (contextCwdRef.current ?? ws.cwd),
       });
     },
     [splitPane, openPanel],
