@@ -2,7 +2,7 @@ import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { useFlash } from "@/lib/useFlash";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
-import { type Panel, isAutofocusPanel, isLockablePanel } from "./lib/types";
+import { type Panel, isAutofocusPanel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -123,8 +123,8 @@ function DraggableTab({
   const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
   const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${panel.id}:after`, disabled: !isWorkspaceActive });
   const active = panel.id === activePanelId;
-  const isLockable = isLockablePanel(panel);
-  const isLocked = isLockablePanel(panel) && (panel.locked ?? false);
+  // Every panel can be locked, no exception.
+  const isLocked = panel.locked ?? false;
   const focusFilePath = panelFilePath(panel);
   const focusTarget =
     focusFilePath ?? (panel.kind === "terminal" ? (panel.cwd ?? null) : null);
@@ -410,20 +410,18 @@ function DraggableTab({
                 <ContextMenuSeparator />
               </>
             )}
-            {isLockable && (
-              <ContextMenuItem
-                onSelect={() => onUpdatePanel?.(panel.id, (p) => {
-                  const newLocked = !isLocked;
-                  return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
-                })}
-              >
-                <HugeiconsIcon icon={isLocked ? SquareUnlock02Icon : LockKeyIcon} size={14} strokeWidth={2} />
-                {isLocked ? "Unlock Tab" : "Lock Tab"}
-                {shortcutLabels["tab.lock"] && (
-                  <ContextMenuShortcut>{shortcutLabels["tab.lock"]}</ContextMenuShortcut>
-                )}
-              </ContextMenuItem>
-            )}
+            <ContextMenuItem
+              onSelect={() => onUpdatePanel?.(panel.id, (p) => {
+                const newLocked = !isLocked;
+                return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
+              })}
+            >
+              <HugeiconsIcon icon={isLocked ? SquareUnlock02Icon : LockKeyIcon} size={14} strokeWidth={2} />
+              {isLocked ? "Unlock Tab" : "Lock Tab"}
+              {shortcutLabels["tab.lock"] && (
+                <ContextMenuShortcut>{shortcutLabels["tab.lock"]}</ContextMenuShortcut>
+              )}
+            </ContextMenuItem>
             <ContextMenuItem disabled={isLocked} onSelect={() => onClose(panel.id)}>
               <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
               Close Tab

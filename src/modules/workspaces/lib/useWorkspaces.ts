@@ -520,11 +520,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const setPanelView = useCallback((workspaceId: string, panelId: string, mode: "rendered" | "raw") => {
     updatePanelData(workspaceId, panelId, (p) => {
       if (mode === "raw" && p.kind === "markdown" && isMarkdownPath(p.path)) {
-        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false };
+        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, locked: p.locked, autofocus: p.autofocus };
       }
       if (mode === "rendered" && p.kind === "editor" && isMarkdownPath(p.path)) {
         if (p.dirty) return p;
-        return { id: p.id, kind: "markdown", path: p.path, title: p.title };
+        return { id: p.id, kind: "markdown", path: p.path, title: p.title, locked: p.locked, autofocus: p.autofocus };
       }
       return p;
     });

@@ -1,29 +1,31 @@
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 
+// Common to every panel. `locked` (prevent close) applies to all kinds with no
+// exception. `autofocus` lives here too so any new path-bearing kind opts in
+// automatically; it is only *effective* where isAutofocusPanel is true.
+type PanelCommon = {
+  id: string;
+  title?: string;
+  locked?: boolean;
+  autofocus?: boolean;
+};
+
 export type Panel =
-  | { id: string; kind: "terminal"; cwd?: string; title?: string; blocks?: boolean;
-      locked?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; autofocus?: boolean }
-  | { id: string; kind: "editor"; path: string; title?: string; dirty: boolean; preview: boolean; previewMode?: "overlay" | "split"; locked?: boolean; autofocus?: boolean; overrideLanguage?: string | null }
-  | { id: string; kind: "browser";         url: string;   title?: string; floating?: boolean }
-  | { id: string; kind: "markdown";        path: string;  title?: string }
-  | { id: string; kind: "git-diff";        path: string;  repoRoot: string; mode: "-" | "+"; originalPath: string | null; title?: string; locked?: boolean; autofocus?: boolean }
-  | { id: string; kind: "git-history";     repoRoot: string; title?: string }
-  | { id: string; kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null; title?: string };
+  | (PanelCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string })
+  | (PanelCommon & { kind: "editor"; path: string; dirty: boolean; preview: boolean; previewMode?: "overlay" | "split"; overrideLanguage?: string | null })
+  | (PanelCommon & { kind: "browser"; url: string; floating?: boolean })
+  | (PanelCommon & { kind: "markdown"; path: string })
+  | (PanelCommon & { kind: "git-diff"; path: string; repoRoot: string; mode: "-" | "+"; originalPath: string | null })
+  | (PanelCommon & { kind: "git-history"; repoRoot: string })
+  | (PanelCommon & { kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null });
 
-// Panels whose tab can drive the sidebar via the autofocus flag (terminal cwd,
-// or the file path for editor / git-diff). Other kinds never carry autofocus.
-export type AutofocusPanel = Extract<
-  Panel,
-  { kind: "terminal" | "editor" | "git-diff" }
->;
-
-export function isAutofocusPanel(p: Panel): p is AutofocusPanel {
-  return p.kind === "terminal" || p.kind === "editor" || p.kind === "git-diff";
+// A panel can drive the sidebar (autofocus) when it resolves to a filesystem
+// location: the terminal cwd, or any kind that carries a `path` (with a file or
+// not). New path-bearing kinds get autofocus automatically, no list to update.
+// Only browser (web URL) and git-history (no single file) lack it.
+export function isAutofocusPanel(p: Panel): boolean {
+  return p.kind === "terminal" || "path" in p;
 }
-
-// Lock (prevent close) applies to the same panel kinds that can drive the
-// sidebar: terminal, editor and git-diff.
-export const isLockablePanel = isAutofocusPanel;
 
 export type PaneNode = {
   kind: "pane";

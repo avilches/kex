@@ -121,7 +121,7 @@ import type { RevealRequest } from "@/modules/explorer";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { panelFilePath } from "@/modules/workspaces/lib/panelPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
-import { isAutofocusPanel, isLockablePanel } from "@/modules/workspaces/lib/types";
+import { isAutofocusPanel } from "@/modules/workspaces/lib/types";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -1979,12 +1979,10 @@ export default function App() {
         );
       },
       "tab.lock": () => {
-        if (!activePanelId || !activePanel || !isLockablePanel(activePanel))
-          return;
+        if (!activePanelId || !activePanel) return;
         const found = findPanelGlobal(activePanelId);
         if (found)
           updatePanelData(found.workspace.id, activePanelId, (p) => {
-            if (!isLockablePanel(p)) return p;
             const newLocked = !p.locked;
             if (p.kind === "editor") {
               return {

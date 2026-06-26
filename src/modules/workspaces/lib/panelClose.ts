@@ -1,4 +1,4 @@
-import { type Panel, isLockablePanel } from "./types";
+import type { Panel } from "./types";
 
 /**
  * Whether a bulk action (Close All Tabs / Close Other Tabs) may close this panel.
@@ -6,5 +6,5 @@ import { type Panel, isLockablePanel } from "./types";
  * them first (or close them individually after unlocking).
  */
 export function isBulkClosable(panel: Panel): boolean {
-  return !(isLockablePanel(panel) && (panel.locked ?? false));
+  return !(panel.locked ?? false);
 }

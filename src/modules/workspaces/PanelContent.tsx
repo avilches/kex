@@ -373,7 +373,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                 onToggleOverlay: () => callbacks.onSetMarkdownView?.(panel.id, "raw"),
                 onToggleSplit: () => callbacks.onUpdatePanel?.(panel.id, (p) => {
                   if (p.kind !== "markdown") return p;
-                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split" };
+                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus };
                 }),
               }}
             />
