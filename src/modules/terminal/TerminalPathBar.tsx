@@ -76,7 +76,7 @@ export function TerminalPathBar({
           renderSegment={(seg, trigger) => (
             <DirSegmentContextMenu
               path={seg.fullPath}
-              rootPath={workspaceRoot ?? seg.fullPath}
+              workspaceRoot={workspaceRoot}
               gitRootPath={gitRootPath}
               onSetAsRoot={onSetAsRoot}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}

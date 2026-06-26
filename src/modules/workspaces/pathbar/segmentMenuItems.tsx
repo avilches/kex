@@ -25,9 +25,61 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+function isInsideRoot(path: string, workspaceRoot: string | null): boolean {
+  return (
+    workspaceRoot != null &&
+    (path === workspaceRoot || path.startsWith(`${workspaceRoot}/`))
+  );
+}
+
+const SUBPATH_CLASS = "max-w-[240px] truncate text-[10px] text-muted-foreground";
+
+// Copy Relative Path: disabled (greyed) when the path is above the workspace
+// root or there is no root, since a relative path is meaningless there.
+function copyRelativeItem(path: string, workspaceRoot: string | null) {
+  const inRoot = isInsideRoot(path, workspaceRoot);
+  const relText = inRoot ? relativePath(workspaceRoot as string, path) : null;
+  return (
+    <ContextMenuItem
+      className={COMPACT_ITEM}
+      disabled={!inRoot}
+      onSelect={() => {
+        if (relText != null) void copyToClipboard(relText);
+      }}
+    >
+      <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
+      <span className="flex min-w-0 flex-col">
+        <span>Copy Relative Path</span>
+        {relText != null && (
+          <span className={SUBPATH_CLASS} title={relText}>
+            {relText}
+          </span>
+        )}
+      </span>
+    </ContextMenuItem>
+  );
+}
+
+function copyAbsoluteItem(path: string) {
+  return (
+    <ContextMenuItem
+      className={COMPACT_ITEM}
+      onSelect={() => void copyToClipboard(path)}
+    >
+      <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
+      <span className="flex min-w-0 flex-col">
+        <span>Copy Absolute Path</span>
+        <span className={SUBPATH_CLASS} title={path}>
+          {path}
+        </span>
+      </span>
+    </ContextMenuItem>
+  );
+}
+
 export type DirSegmentMenuDeps = {
   path: string;
-  rootPath: string;
+  workspaceRoot: string | null;
   gitRootPath: string | null;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
@@ -38,7 +90,7 @@ export type DirSegmentMenuDeps = {
 export function dirSegmentMenuItems(deps: DirSegmentMenuDeps): React.ReactNode {
   const {
     path,
-    rootPath,
+    workspaceRoot,
     gitRootPath,
     onSetAsRoot,
     onNewWorkspaceFromFolder,
@@ -96,20 +148,8 @@ export function dirSegmentMenuItems(deps: DirSegmentMenuDeps): React.ReactNode {
         {REVEAL_LABEL}
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem
-        className={COMPACT_ITEM}
-        onSelect={() => void copyToClipboard(relativePath(rootPath, path))}
-      >
-        <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-        Copy Relative Path
-      </ContextMenuItem>
-      <ContextMenuItem
-        className={COMPACT_ITEM}
-        onSelect={() => void copyToClipboard(path)}
-      >
-        <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-        Copy Absolute Path
-      </ContextMenuItem>
+      {copyRelativeItem(path, workspaceRoot)}
+      {copyAbsoluteItem(path)}
       {gitignoreEntry && (
         <>
           <ContextMenuSeparator />
@@ -128,7 +168,7 @@ export function dirSegmentMenuItems(deps: DirSegmentMenuDeps): React.ReactNode {
 
 export type FileLeafMenuDeps = {
   path: string;
-  rootPath: string;
+  workspaceRoot: string | null;
   gitRootPath: string | null;
   onFocusOnExplorer: (
     path: string,
@@ -138,8 +178,13 @@ export type FileLeafMenuDeps = {
 };
 
 export function fileLeafMenuItems(deps: FileLeafMenuDeps): React.ReactNode {
-  const { path, rootPath, gitRootPath, onFocusOnExplorer, onAddToGitignore } =
-    deps;
+  const {
+    path,
+    workspaceRoot,
+    gitRootPath,
+    onFocusOnExplorer,
+    onAddToGitignore,
+  } = deps;
 
   const gitignoreEntry =
     gitRootPath && onAddToGitignore
@@ -171,20 +216,8 @@ export function fileLeafMenuItems(deps: FileLeafMenuDeps): React.ReactNode {
         Duplicate
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem
-        className={COMPACT_ITEM}
-        onSelect={() => void copyToClipboard(path)}
-      >
-        <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-        Copy Absolute Path
-      </ContextMenuItem>
-      <ContextMenuItem
-        className={COMPACT_ITEM}
-        onSelect={() => void copyToClipboard(relativePath(rootPath, path))}
-      >
-        <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-        Copy Relative Path
-      </ContextMenuItem>
+      {copyAbsoluteItem(path)}
+      {copyRelativeItem(path, workspaceRoot)}
       {gitignoreEntry && (
         <>
           <ContextMenuSeparator />
