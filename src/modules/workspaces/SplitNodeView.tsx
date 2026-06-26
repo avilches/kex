@@ -65,9 +65,9 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, e
     return (
       <div
         className={cn(
-          "h-full w-full",
-          isExpanded && "absolute inset-0 z-10",
-          isHidden && "invisible pointer-events-none",
+          "h-full w-full transition-opacity duration-150",
+          isExpanded && "absolute inset-0 z-10 animate-in fade-in-0 zoom-in-95",
+          isHidden && "opacity-0 pointer-events-none",
         )}
       >
         <PaneView

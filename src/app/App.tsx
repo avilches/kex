@@ -511,6 +511,11 @@ export default function App() {
   const workspaceRootPath = activeWorkspace?.pinnedRoot ?? null;
   const fsFolderRoot = activeWorkspace?.fsRoot ?? null;
 
+  // Git repo the workspace root belongs to, or null when the workspace root is a
+  // plain container folder. resolveSidebarTarget uses it to decide whether a git
+  // repo nested under the workspace should re-root the explorer (see focusSidebar).
+  const [workspaceGitRoot, setWorkspaceGitRoot] = useState<string | null>(null);
+
   const explorerRoot = useMemo<string | null>(
     () =>
       resolveExplorerRoot({
@@ -613,6 +618,7 @@ export default function App() {
           const target = resolveSidebarTarget({
             folder,
             workspaceRoot: workspaceRootPath,
+            workspaceGitRoot,
             gitRoot: resolvedGitRoot,
             currentFsRoot: fsFolderRoot,
             home,
@@ -627,7 +633,7 @@ export default function App() {
       if (opts.fromShortcut || opts.pendingAction) {
         const state = usePreferencesStore.getState();
         if (!state.rightPanelOpen) void setRightPanelOpen(true);
-        if (state.rightPanelActiveTab === "history") {
+        if (state.rightPanelActiveTab !== "explorer") {
           void setRightPanelActiveTab("explorer");
         }
       }
@@ -635,6 +641,7 @@ export default function App() {
     [
       activeWorkspace,
       workspaceRootPath,
+      workspaceGitRoot,
       fsFolderRoot,
       home,
       setExplorerRootMode,
@@ -680,6 +687,26 @@ export default function App() {
       })
       .catch(() => {
         if (!cancelled) setWorkspaceRootExists(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceRootPath]);
+
+  // Resolve the workspace root's own repo once per root, not on every focus.
+  useEffect(() => {
+    if (!workspaceRootPath) {
+      setWorkspaceGitRoot(null);
+      return;
+    }
+    let cancelled = false;
+    void native
+      .gitResolveRepo(workspaceRootPath)
+      .then((info) => {
+        if (!cancelled) setWorkspaceGitRoot(info?.repoRoot ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setWorkspaceGitRoot(null);
       });
     return () => {
       cancelled = true;
@@ -890,12 +917,21 @@ export default function App() {
     } else if (!path.startsWith("/") && cwd) {
       absPath = `${cwd}/${path}`;
     }
-    const id = openFileInPanel(absPath, true);
-    if (id == null) return;
-    if (line == null) return;
-    const h = editorHandles.current.get(id);
-    if (h) h.gotoLine(line);
-    else pendingGotoLine.current.set(id, line);
+    void invoke<{ kind: "file" | "dir" | "symlink" }>("fs_stat", { path: absPath })
+      .then((stat) => {
+        if (stat.kind === "dir") {
+          focusSidebar(absPath, { fromShortcut: true });
+          return;
+        }
+        const id = openFileInPanel(absPath, true);
+        if (id == null || line == null) return;
+        const h = editorHandles.current.get(id);
+        if (h) h.gotoLine(line);
+        else pendingGotoLine.current.set(id, line);
+      })
+      .catch(() => {
+        openFileInPanel(absPath, true);
+      });
   };
 
   cwdResolverRef.current = (leafId) => {
@@ -987,6 +1023,7 @@ export default function App() {
         return;
       }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
+      setZenPaneId(null);
       const { terminalNewFolderMode } = usePreferencesStore.getState();
       openPanel(wsId, newPaneId, {
         id: newPanelId(),
@@ -1020,6 +1057,7 @@ export default function App() {
         return;
       }
       const newPaneId = splitPane(wsId, paneId, "vertical");
+      setZenPaneId(null);
       const { terminalNewFolderMode } = usePreferencesStore.getState();
       openPanel(wsId, newPaneId, {
         id: newPanelId(),
@@ -1065,6 +1103,7 @@ export default function App() {
         return;
       }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
+      setZenPaneId(null);
       const panelId = newPanelId();
       openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
       setTimeout(
@@ -1093,6 +1132,7 @@ export default function App() {
         return;
       }
       const newPaneId = splitPane(wsId, paneId, "vertical");
+      setZenPaneId(null);
       const panelId = newPanelId();
       openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
       setTimeout(
@@ -1678,6 +1718,12 @@ export default function App() {
     setZenPaneId(null);
   }, [activeWorkspaceId]);
 
+  useEffect(() => {
+    if (zenPaneId !== null && activeWorkspace?.activePaneId !== zenPaneId) {
+      setZenPaneId(null);
+    }
+  }, [activeWorkspace?.activePaneId, zenPaneId]);
+
   const handleCloseActivePanel = useCallback(() => {
     if (!activeWorkspace) return;
     if (!activePanelId) {
@@ -2246,17 +2292,15 @@ export default function App() {
     <ThemeProvider>
       <TooltipProvider>
         <div className="zoom-content relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
-          {zenPaneId === null && (
-            <Header
-              onToggleSidebar={toggleRightPanel}
-              panelSide={panelSide}
-              onOpenCommandPalette={() => openCommandPalette("commands")}
-              onActivateAgent={onActivateAgent}
-              onOpenSettings={() => void openSettingsWindow()}
-              searchTarget={searchTarget}
-              searchRef={searchInlineRef}
-            />
-          )}
+          <Header
+            onToggleSidebar={toggleRightPanel}
+            panelSide={panelSide}
+            onOpenCommandPalette={() => openCommandPalette("commands")}
+            onActivateAgent={onActivateAgent}
+            onOpenSettings={() => void openSettingsWindow()}
+            searchTarget={searchTarget}
+            searchRef={searchInlineRef}
+          />
 
           {/* 3-column layout */}
           <div className="flex min-h-0 flex-1">
