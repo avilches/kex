@@ -43,7 +43,9 @@ export function TerminalPathBar({ panelId, cwd, home, onReveal }: Props) {
         </span>
       </button>
       <div className="ml-auto flex shrink-0 items-center gap-2 font-mono text-muted-foreground">
-        {metrics && <span>{metrics.pid}</span>}
+        {metrics && (
+          <span title="Process ID">{metrics.pid}</span>
+        )}
         {process && (
           <span className={cn("max-w-[200px] truncate", running && "text-foreground")}>
             {process}
