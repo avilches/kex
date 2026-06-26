@@ -679,10 +679,10 @@ export const FileExplorer = memo(
         // hidden folder never enters entryIndexByPath, so only select when present.
         if (entryIndexByPath.has(file)) {
           setSelectedPath(file);
-          setFlash((f) => ({ path: file, token: f.token + 1 }));
-          requestAnimationFrame(() =>
-            scrollEntryIntoView(file, { topRatio: 0.2 }),
-          );
+          requestAnimationFrame(() => {
+            scrollEntryIntoView(file, { topRatio: 0.2 });
+            setFlash((f) => ({ path: file, token: f.token + 1 }));
+          });
         }
         return "done";
       },
