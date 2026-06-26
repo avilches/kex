@@ -1658,7 +1658,11 @@ export default function App() {
 
   // ── Shortcuts ─────────────────────────────────────────────────────────────
 
-  const [zenMode, setZenMode] = useState(false);
+  const [zenPaneId, setZenPaneId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setZenPaneId(null);
+  }, [activeWorkspaceId]);
 
   const handleCloseActivePanel = useCallback(() => {
     if (!activeWorkspace) return;
@@ -1890,7 +1894,10 @@ export default function App() {
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
       "view.zoomReset": zoomReset,
-      "view.zenMode": () => setZenMode((v) => !v),
+      "view.zenMode": () =>
+        setZenPaneId((prev) =>
+          prev !== null ? null : (activeWorkspace?.activePaneId ?? null),
+        ),
       "editor.undo": () => {
         if (activePanelId) editorHandles.current.get(activePanelId)?.undo();
       },
@@ -2225,7 +2232,7 @@ export default function App() {
     <ThemeProvider>
       <TooltipProvider>
         <div className="zoom-content relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
-          {!zenMode && (
+          {zenPaneId === null && (
             <Header
               onToggleSidebar={toggleRightPanel}
               panelSide={panelSide}
@@ -2325,6 +2332,7 @@ export default function App() {
                       <WorkspaceView
                         workspaces={workspaces}
                         activeWorkspaceId={activeWorkspaceId}
+                        expandedPaneId={zenPaneId}
                         onActivatePanel={onActivatePanelStable}
                         onClosePanel={onClosePanelStable}
                         onCloseManyPanels={onCloseManyPanelsStable}
