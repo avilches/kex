@@ -180,7 +180,10 @@ fn create_app_window(
             .inner_size(width, height)
             .min_inner_size(640.0, 480.0)
             .resizable(true)
-            .visible(false);
+            .visible(false)
+            // Block file:// navigation so WKWebKit doesn't open Finder when the
+            // user clicks an OSC 8 link whose URI starts with file://.
+            .on_navigation(|url| url.scheme() != "file");
 
     #[cfg(target_os = "macos")]
     let builder = builder
@@ -292,7 +295,8 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         .inner_size(780.0, 720.0)
         .resizable(false)
         .visible(false)
-        .always_on_top(true);
+        .always_on_top(true)
+        .on_navigation(|url| url.scheme() != "file");
 
     // On non-macOS, set the active main window as parent so settings
     // minimizes with it.

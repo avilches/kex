@@ -2,9 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ILink, ILinkProvider, Terminal } from "@xterm/xterm";
 import { dispatchFileLink, getLeafCwd } from "@/modules/terminal/lib/terminalLinkBridge";
 
-// Set to true to log link detection to the browser console (DevTools)
-const DEBUG_LINKS = true;
-
 const pathExistsCache = new Map<string, boolean>();
 
 async function pathExists(absPath: string): Promise<boolean> {
@@ -32,37 +29,27 @@ export function parseFileUri(uri: string): string {
 
 const PATH_PATTERNS: RegExp[] = [
   // Absolute: /path/to/file.ext
-  /(\/[^\s:'"<>()\[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
+  /(\/[^\s:'"<>()[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
   // Home-relative: ~/path/to/file.ext
-  /(~\/[^\s:'"<>()\[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
+  /(~\/[^\s:'"<>()[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
   // Explicit relative: ./file.ext or ../file.ext
-  /((?:\.\/|\.\.\/)[^\s:'"<>()\[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
+  /((?:\.\/|\.\.\/)[^\s:'"<>()[\]{}\\]+\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
   // Bare relative (docs/file.md) or standalone filename (HANDOFF-foo.md).
   // Lookbehind prevents matching inside absolute paths (char before must not be / \w .)
   /(?<![/\w.])([a-zA-Z0-9_][a-zA-Z0-9_.\-/]*\.[a-zA-Z]{1,10})(:\d+)?(:\d+)?/g,
 ];
 
 export function registerTerminalLinks(term: Terminal, getLeafId: () => string | null): () => void {
-  if (DEBUG_LINKS) {
-    console.log("[links] registerTerminalLinks called, term.element:", term.element?.tagName ?? "null");
-    term.element?.addEventListener("mousemove", () => {
-      console.log("[links] mousemove reaches term.element");
-    }, { once: true });
-    const screen = term.element?.querySelector(".xterm-screen");
-    console.log("[links] .xterm-screen:", screen?.tagName ?? "not found");
-    screen?.addEventListener("mousemove", () => {
-      console.log("[links] mousemove reaches .xterm-screen");
-    }, { once: true });
-  }
   term.options.linkHandler = {
     allowNonHttpProtocols: true,
-    activate(_event, uri) {
+    activate(event, uri) {
+      // preventDefault stops the mouseup from triggering WKWebKit's native
+      // file:// URL handling, which would open Finder independently of our handler.
+      // The actual file:// navigation is blocked at the Rust level via on_navigation.
+      event.preventDefault();
       if (uri.startsWith("file://")) {
-        const path = parseFileUri(uri);
-        if (DEBUG_LINKS) console.log(`[links] OSC8 file click: "${path}"`);
-        dispatchFileLink(path, null);
+        dispatchFileLink(parseFileUri(uri), null);
       } else {
-        if (DEBUG_LINKS) console.log(`[links] OSC8 url click: "${uri}"`);
         import("@tauri-apps/plugin-opener").then(({ openUrl }) =>
           openUrl(uri).catch(console.error),
         );
@@ -78,7 +65,6 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
         return;
       }
       const lineText = bufferLine.translateToString(true);
-      if (DEBUG_LINKS && lineText.trim()) console.log(`[links] provideLinks line ${bufferLineNumber}: ${JSON.stringify(lineText)}`);
       const links: ILink[] = [];
       const seen = new Set<string>();
       const promises: Promise<void>[] = [];
@@ -101,19 +87,11 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
         } else if (rawPath.startsWith("~/")) {
           absPath = rawPath;
         } else {
-          if (!cwd) {
-            if (DEBUG_LINKS) console.log(`[links] skip "${rawPath}" — no cwd`);
-            return;
-          }
+          if (!cwd) return;
           absPath = `${cwd}/${rawPath}`;
         }
 
-        if (DEBUG_LINKS) console.log(`[links] stat "${absPath}"`);
-        if (!(await pathExists(absPath))) {
-          if (DEBUG_LINKS) console.log(`[links] ✗ "${absPath}"`);
-          return;
-        }
-        if (DEBUG_LINKS) console.log(`[links] ✓ "${rawPath}"`);
+        if (!(await pathExists(absPath))) return;
 
         links.push({
           range: {
@@ -131,12 +109,11 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
 
       for (const pattern of PATH_PATTERNS) {
         pattern.lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = pattern.exec(lineText)) !== null) {
+        // biome-ignore lint/suspicious/noAssignInExpressions: standard regex loop pattern
+        for (let match: RegExpExecArray | null; (match = pattern.exec(lineText)) !== null;) {
           const rawPath = match[1];
           const lineNum = match[2] ? parseInt(match[2].slice(1), 10) : undefined;
           const col = match[3] ? parseInt(match[3].slice(1), 10) : undefined;
-          if (DEBUG_LINKS) console.log(`[links] path match: "${rawPath}"`);
           promises.push(addLink(rawPath, match.index, match.index + match[0].length, lineNum, col));
         }
       }
