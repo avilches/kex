@@ -164,7 +164,12 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
         }
       : undefined,
     watch: {
-      ignored: ["**/src-tauri/**"],
+      ignored: [
+        "**/src-tauri/**",
+        "**/.claude/**",
+        "**/docs/**",
+        "**/.superpowers/**",
+      ],
     },
   },
 }));
