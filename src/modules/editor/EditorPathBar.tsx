@@ -58,6 +58,7 @@ const GLOBAL_TOGGLE_LABELS: [EditorGlobalToggleKey, string][] = [
 
 type Props = {
   path: string;
+  panelId?: string;
   workspaceRoot: string | null;
   home: string | null;
   gitRootPath?: string | null;
@@ -66,6 +67,7 @@ type Props = {
     path: string,
     action?: "rename" | "duplicate" | "delete",
   ) => void;
+  onRenameFile?: (panelId: string, newName: string) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -93,11 +95,13 @@ type Props = {
 
 export function EditorPathBar({
   path,
+  panelId,
   workspaceRoot,
   home,
   gitRootPath,
   onRevealPath,
   onFocusOnExplorer,
+  onRenameFile,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
   onRevealInTerminal,
@@ -184,11 +188,13 @@ export function EditorPathBar({
     <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
       <EditorPathBreadcrumb
         path={path}
+        panelId={panelId}
         workspaceRoot={workspaceRoot}
         home={home}
         gitRootPath={gitRootPath}
         onRevealPath={onRevealPath}
         onFocusOnExplorer={onFocusOnExplorer}
+        onRenameFile={onRenameFile}
         onSetAsRoot={onSetAsRoot}
         onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
         onRevealInTerminal={onRevealInTerminal}

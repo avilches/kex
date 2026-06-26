@@ -174,6 +174,8 @@ export type FileLeafMenuDeps = {
     path: string,
     action?: "rename" | "duplicate" | "delete",
   ) => void;
+  // When set, Rename edits the name inline here instead of focusing the explorer.
+  onRename?: () => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
 };
 
@@ -183,6 +185,7 @@ export function fileLeafMenuItems(deps: FileLeafMenuDeps): React.ReactNode {
     workspaceRoot,
     gitRootPath,
     onFocusOnExplorer,
+    onRename,
     onAddToGitignore,
   } = deps;
 
@@ -203,7 +206,9 @@ export function fileLeafMenuItems(deps: FileLeafMenuDeps): React.ReactNode {
       <ContextMenuSeparator />
       <ContextMenuItem
         className={COMPACT_ITEM}
-        onSelect={() => onFocusOnExplorer(path, "rename")}
+        onSelect={() =>
+          onRename ? onRename() : onFocusOnExplorer(path, "rename")
+        }
       >
         <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
         Rename

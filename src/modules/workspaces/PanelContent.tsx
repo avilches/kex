@@ -243,11 +243,13 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
           <div className="flex h-full w-full flex-col">
             <EditorPathBar
               path={panel.path}
+              panelId={panel.id}
               workspaceRoot={workspaceRoot}
               home={home}
               gitRootPath={gitRootPath}
               onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
               onFocusOnExplorer={callbacks.onFocusOnExplorer}
+              onRenameFile={callbacks.onRenameFile}
               onSetAsRoot={callbacks.onSetAsRoot}
               onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
               onRevealInTerminal={callbacks.onRevealInTerminal}
@@ -355,11 +357,13 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
           <div className="flex h-full w-full flex-col">
             <EditorPathBar
               path={panel.path}
+              panelId={panel.id}
               workspaceRoot={workspaceRoot}
               home={home}
               gitRootPath={gitRootPath}
               onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
               onFocusOnExplorer={callbacks.onFocusOnExplorer}
+              onRenameFile={callbacks.onRenameFile}
               onSetAsRoot={callbacks.onSetAsRoot}
               onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
               onRevealInTerminal={callbacks.onRevealInTerminal}
