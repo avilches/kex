@@ -214,6 +214,26 @@ The 200ms delay lets the shell finish its init sequence before the command is in
 
 ---
 
+## Terminal path bar UI
+
+Session metadata that was previously accessible from the floating tab HoverCard (which has been removed) is now
+surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side of `TerminalPathBar`:
+
+- **Run on start** checkbox: toggles `restoreOnRestart` on the panel. When enabled (and a `persistentCommand` is set), a
+  reload icon appears inline in the path bar as a visual indicator. For agent sessions the checkbox defaults to checked
+  and enabling it captures the current running command as the `persistentCommand` if none is already set.
+- **Persistent command input**: the command that will be run when the terminal restarts. Editable inline in the menu.
+- **Session id** (agent sessions only): shown read-only; click to copy.
+- **Transcript** (agent sessions only): Reveal in Finder. Existence is checked lazily on menu open via `fsStat` so
+  there is no up-front IPC cost.
+- **Started elapsed**: how long ago the session started.
+- **Restore error**: shown when `restoreError` is set on the session (e.g. the resume command failed or the cwd was
+  deleted). The tab title turns red and a `⚠` icon appears; the menu surfaces the error reason for diagnosis.
+
+Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an agent is active) -- no HoverCard.
+
+---
+
 ## agentStore extensions
 
 `AgentSession` has two restore-specific fields:

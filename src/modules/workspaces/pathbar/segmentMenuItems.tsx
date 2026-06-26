@@ -1,3 +1,4 @@
+// These are curated subsets of the full explorer context menu; TreeRow.tsx (src/modules/explorer/TreeRow.tsx) is the canonical reference for the complete item order.
 import {
   ContextMenuItem,
   ContextMenuSeparator,
