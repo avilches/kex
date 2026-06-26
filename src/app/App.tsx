@@ -1771,6 +1771,10 @@ export default function App() {
 
   function focusPaneInDirection(dir: "up" | "down" | "left" | "right") {
     if (!activeWorkspace) return;
+    if (zenPaneId !== null) {
+      setZenPaneId(null);
+      return;
+    }
     const paneIds = new Set(
       allPanes(activeWorkspace.paneTree).map((p) => p.id),
     );
