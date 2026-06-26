@@ -207,7 +207,7 @@ function DraggableTab({
     const parts: string[] = [];
     if (cwd) parts.push(cwd);
     if (agentSession) {
-      const model = agentSession.agent;
+      const model = agentSession.meta?.model ?? agentSession.agent;
       const sessionId = agentSession.meta?.sessionId;
       const agentPart = [model, sessionId].filter(Boolean).join(" ");
       if (agentPart) parts.push(agentPart);

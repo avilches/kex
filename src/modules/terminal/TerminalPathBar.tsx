@@ -105,13 +105,12 @@ export function TerminalPathBar({
           </>
         )}
         {restoreOnRestart !== false && persistentCommand && (
-          <button
-            type="button"
+          <span
             title={persistentCommand}
-            className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+            className="flex size-[22px] items-center justify-center text-muted-foreground"
           >
             <HugeiconsIcon icon={ReloadIcon} size={11} strokeWidth={1.75} />
-          </button>
+          </span>
         )}
         {agentSession && <AgentChipIndicator session={agentSession} />}
         <TerminalPathBarMenu
