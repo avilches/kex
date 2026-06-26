@@ -1178,141 +1178,6 @@ export default function App() {
     [findPanelGlobal, handlePathRenamed],
   );
 
-  const panelCallbacks = useMemo<PanelCallbacks>(
-    () => ({
-      onSearchReady: (panelId, addon) => {
-        searchAddons.current.set(panelId, addon);
-        if (panelId === activePanelId) setActiveSearchAddon(addon);
-      },
-      onExit: (panelId, _code) => {
-        const found = findPanelGlobal(panelId);
-        if (found) closePanel(found.workspace.id, panelId);
-      },
-      onCwd: (panelId, cwd) => {
-        const found = findPanelGlobal(panelId);
-        if (found) {
-          setTerminalPanelCwd(found.workspace.id, panelId, cwd);
-          const isFocused =
-            found.workspace.activePaneId === found.pane.id &&
-            found.pane.activePanelId === panelId;
-          if (isFocused) {
-            setWorkspaceCwd(found.workspace.id, cwd);
-            if (
-              found.workspace.id === activeWorkspace?.id &&
-              found.panel.kind === "terminal" &&
-              found.panel.autofocus
-            ) {
-              focusSidebar(cwd, { fromShortcut: false });
-            }
-          }
-        }
-      },
-      onRunningCommand: (panelId, cmd) => {
-        const found = findPanelGlobal(panelId);
-        if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
-      },
-      registerTerminalHandle: (panelId, h) => {
-        if (h) terminalHandles.current.set(panelId, h);
-        else terminalHandles.current.delete(panelId);
-      },
-      onEditorDirtyChange: (panelId, dirty) => {
-        const found = findPanelGlobal(panelId);
-        if (found)
-          updatePanelData(found.workspace.id, panelId, (p) =>
-            p.kind === "editor"
-              ? { ...p, dirty, ...(dirty ? { preview: false } : {}) }
-              : p,
-          );
-      },
-      onEditorClose: (panelId) => {
-        const found = findPanelGlobal(panelId);
-        if (found) closePanel(found.workspace.id, panelId);
-      },
-      onSetMarkdownView: (panelId, mode) => {
-        const found = findPanelGlobal(panelId);
-        if (found) setPanelView(found.workspace.id, panelId, mode);
-      },
-      onToggleOverlayPreview: (panelId) => {
-        const found = findPanelGlobal(panelId);
-        if (found) toggleOverlayPreview(found.workspace.id, panelId);
-      },
-      onToggleSplitPreview: (panelId) => {
-        const found = findPanelGlobal(panelId);
-        if (found) toggleSplitPreview(found.workspace.id, panelId);
-      },
-      registerEditorHandle: (panelId, h) => {
-        if (h) {
-          editorHandles.current.set(panelId, h);
-          const line = pendingGotoLine.current.get(panelId);
-          if (line != null) {
-            pendingGotoLine.current.delete(panelId);
-            h.gotoLine(line);
-          }
-        } else {
-          editorHandles.current.delete(panelId);
-        }
-        if (panelId === activePanelId) setActiveEditorHandle(h);
-      },
-      onBrowserUrlChange: (panelId, url) => {
-        const found = findPanelGlobal(panelId);
-        if (found)
-          updatePanelData(found.workspace.id, panelId, (p) =>
-            p.kind === "browser" ? { ...p, url } : p,
-          );
-      },
-      registerBrowserHandle: (panelId, h) => {
-        if (h) browserHandles.current.set(panelId, h);
-        else browserHandles.current.delete(panelId);
-      },
-      onOpenCommitFile: (input) => {
-        if (!activeWorkspace) return;
-        openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-          id: newPanelId(),
-          kind: "git-commit-file",
-          repoRoot: input.repoRoot,
-          sha: input.sha,
-          path: input.path,
-          originalPath: input.originalPath,
-        });
-      },
-      onGitHistorySearchHandle: (_panelId, handle) => {
-        setGitHistoryHandle(handle);
-      },
-      onRenamePanel: (panelId, title) => {
-        const found = findPanelGlobal(panelId);
-        if (found)
-          updatePanelData(found.workspace.id, panelId, (p) => ({
-            ...p,
-            title,
-          }));
-      },
-      onUpdatePanel: (panelId, updater) => {
-        const found = findPanelGlobal(panelId);
-        if (found) updatePanelData(found.workspace.id, panelId, updater);
-      },
-      onRenameFile: (panelId, newName) => {
-        void handleRenameFileFromTab(panelId, newName);
-      },
-      onFocusOnExplorer: (filePath, pendingAction) => focusSidebar(filePath, { fromShortcut: true, pendingAction }),
-    }),
-    [
-      activePanelId,
-      findPanelGlobal,
-      closePanel,
-      setTerminalPanelCwd,
-      setWorkspaceCwd,
-      setTerminalRunningCommand,
-      setPanelView,
-      toggleOverlayPreview,
-      toggleSplitPreview,
-      updatePanelData,
-      activeWorkspace,
-      openPanel,
-      handleRenameFileFromTab,
-      focusSidebar,
-    ],
-  );
-
   // ── Close guards ──────────────────────────────────────────────────────────
 
   const savePanel = useCallback(async (panelId: string) => {
@@ -1510,6 +1375,11 @@ export default function App() {
   // same repo Source Control resolves from explorerRoot (single source of truth).
   const gitRoot = sourceControl.repo?.repoRoot ?? null;
 
+  const editorChromeWithGit = useMemo(
+    () => ({ ...editorChrome, gitRootPath: gitRoot }),
+    [editorChrome, gitRoot],
+  );
+
   const handleAddToGitignore = useCallback(
     async (path: string, isDir: boolean) => {
       if (!gitRoot) return;
@@ -1586,6 +1456,149 @@ export default function App() {
       }, 80);
     },
     [addWorkspace, setPinnedRoot],
+  );
+
+  const panelCallbacks = useMemo<PanelCallbacks>(
+    () => ({
+      onSearchReady: (panelId, addon) => {
+        searchAddons.current.set(panelId, addon);
+        if (panelId === activePanelId) setActiveSearchAddon(addon);
+      },
+      onExit: (panelId, _code) => {
+        const found = findPanelGlobal(panelId);
+        if (found) closePanel(found.workspace.id, panelId);
+      },
+      onCwd: (panelId, cwd) => {
+        const found = findPanelGlobal(panelId);
+        if (found) {
+          setTerminalPanelCwd(found.workspace.id, panelId, cwd);
+          const isFocused =
+            found.workspace.activePaneId === found.pane.id &&
+            found.pane.activePanelId === panelId;
+          if (isFocused) {
+            setWorkspaceCwd(found.workspace.id, cwd);
+            if (
+              found.workspace.id === activeWorkspace?.id &&
+              found.panel.kind === "terminal" &&
+              found.panel.autofocus
+            ) {
+              focusSidebar(cwd, { fromShortcut: false });
+            }
+          }
+        }
+      },
+      onRunningCommand: (panelId, cmd) => {
+        const found = findPanelGlobal(panelId);
+        if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
+      },
+      registerTerminalHandle: (panelId, h) => {
+        if (h) terminalHandles.current.set(panelId, h);
+        else terminalHandles.current.delete(panelId);
+      },
+      onEditorDirtyChange: (panelId, dirty) => {
+        const found = findPanelGlobal(panelId);
+        if (found)
+          updatePanelData(found.workspace.id, panelId, (p) =>
+            p.kind === "editor"
+              ? { ...p, dirty, ...(dirty ? { preview: false } : {}) }
+              : p,
+          );
+      },
+      onEditorClose: (panelId) => {
+        const found = findPanelGlobal(panelId);
+        if (found) closePanel(found.workspace.id, panelId);
+      },
+      onSetMarkdownView: (panelId, mode) => {
+        const found = findPanelGlobal(panelId);
+        if (found) setPanelView(found.workspace.id, panelId, mode);
+      },
+      onToggleOverlayPreview: (panelId) => {
+        const found = findPanelGlobal(panelId);
+        if (found) toggleOverlayPreview(found.workspace.id, panelId);
+      },
+      onToggleSplitPreview: (panelId) => {
+        const found = findPanelGlobal(panelId);
+        if (found) toggleSplitPreview(found.workspace.id, panelId);
+      },
+      registerEditorHandle: (panelId, h) => {
+        if (h) {
+          editorHandles.current.set(panelId, h);
+          const line = pendingGotoLine.current.get(panelId);
+          if (line != null) {
+            pendingGotoLine.current.delete(panelId);
+            h.gotoLine(line);
+          }
+        } else {
+          editorHandles.current.delete(panelId);
+        }
+        if (panelId === activePanelId) setActiveEditorHandle(h);
+      },
+      onBrowserUrlChange: (panelId, url) => {
+        const found = findPanelGlobal(panelId);
+        if (found)
+          updatePanelData(found.workspace.id, panelId, (p) =>
+            p.kind === "browser" ? { ...p, url } : p,
+          );
+      },
+      registerBrowserHandle: (panelId, h) => {
+        if (h) browserHandles.current.set(panelId, h);
+        else browserHandles.current.delete(panelId);
+      },
+      onOpenCommitFile: (input) => {
+        if (!activeWorkspace) return;
+        openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+          id: newPanelId(),
+          kind: "git-commit-file",
+          repoRoot: input.repoRoot,
+          sha: input.sha,
+          path: input.path,
+          originalPath: input.originalPath,
+        });
+      },
+      onGitHistorySearchHandle: (_panelId, handle) => {
+        setGitHistoryHandle(handle);
+      },
+      onRenamePanel: (panelId, title) => {
+        const found = findPanelGlobal(panelId);
+        if (found)
+          updatePanelData(found.workspace.id, panelId, (p) => ({
+            ...p,
+            title,
+          }));
+      },
+      onUpdatePanel: (panelId, updater) => {
+        const found = findPanelGlobal(panelId);
+        if (found) updatePanelData(found.workspace.id, panelId, updater);
+      },
+      onRenameFile: (panelId, newName) => {
+        void handleRenameFileFromTab(panelId, newName);
+      },
+      onFocusOnExplorer: (filePath, pendingAction) => focusSidebar(filePath, { fromShortcut: true, pendingAction }),
+      onSetAsRoot: handleSetAsRoot,
+      onNewWorkspaceFromFolder: newWorkspaceFromFolder,
+      onRevealInTerminal: openFolderInTerminal,
+      onAddToGitignore: handleAddToGitignore,
+    }),
+    [
+      activePanelId,
+      findPanelGlobal,
+      closePanel,
+      setTerminalPanelCwd,
+      setWorkspaceCwd,
+      setTerminalRunningCommand,
+      setPanelView,
+      toggleOverlayPreview,
+      toggleSplitPreview,
+      updatePanelData,
+      activeWorkspace,
+      openPanel,
+      handleRenameFileFromTab,
+      focusSidebar,
+      handleSetAsRoot,
+      newWorkspaceFromFolder,
+      openFolderInTerminal,
+      handleAddToGitignore,
+    ],
   );
 
   const openContentHit = useCallback(
@@ -2306,7 +2319,7 @@ export default function App() {
                 <ResizablePanel id="center" minSize="30%">
                   <div className="flex h-full min-h-0 flex-col">
                     <div className="relative min-h-0 flex-1">
-                      <EditorChromeProvider value={editorChrome}>
+                      <EditorChromeProvider value={editorChromeWithGit}>
                       <WorkspaceView
                         workspaces={workspaces}
                         activeWorkspaceId={activeWorkspaceId}

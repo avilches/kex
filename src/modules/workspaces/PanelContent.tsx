@@ -94,6 +94,11 @@ export type PanelCallbacks = {
   onRenameFile?: (panelId: string, newName: string) => void;
   // Reveal an editor/markdown/git file in the explorer tree
   onFocusOnExplorer?: (filePath: string, pendingAction?: RevealAction) => void;
+  // Dir-segment context menu actions (editor/markdown path bar)
+  onSetAsRoot?: (path: string) => void;
+  onNewWorkspaceFromFolder?: (path: string) => void;
+  onRevealInTerminal?: (path: string) => void;
+  onAddToGitignore?: (path: string, isDir: boolean) => void;
 };
 
 type Props = {
@@ -111,7 +116,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
-  const { workspaceRoot, home } = useEditorChrome();
+  const { workspaceRoot, home, gitRootPath } = useEditorChrome();
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
   const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const bracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
@@ -231,7 +236,12 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               path={panel.path}
               workspaceRoot={workspaceRoot}
               home={home}
+              gitRootPath={gitRootPath}
               onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
+              onSetAsRoot={callbacks.onSetAsRoot}
+              onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
+              onRevealInTerminal={callbacks.onRevealInTerminal}
+              onAddToGitignore={callbacks.onAddToGitignore}
               view={showPreviewToggle ? {
                 mode: effectivePreviewMode ?? "raw",
                 onToggleOverlay: () => callbacks.onToggleOverlayPreview?.(panel.id),
@@ -337,7 +347,12 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               path={panel.path}
               workspaceRoot={workspaceRoot}
               home={home}
+              gitRootPath={gitRootPath}
               onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
+              onSetAsRoot={callbacks.onSetAsRoot}
+              onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
+              onRevealInTerminal={callbacks.onRevealInTerminal}
+              onAddToGitignore={callbacks.onAddToGitignore}
               view={{
                 mode: "overlay",
                 onToggleOverlay: () => callbacks.onSetMarkdownView?.(panel.id, "raw"),
