@@ -390,6 +390,12 @@ export const FileExplorer = memo(
     );
     const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
+    // Drives the attention flash on the just-revealed row. The token bumps on
+    // every reveal so revealing the same path again replays the animation.
+    const [flash, setFlash] = useState<{ path: string; token: number }>({
+      path: "",
+      token: 0,
+    });
     const [pendingDelete, setPendingDelete] = useState<{
       path: string;
       isDir: boolean;
@@ -646,6 +652,10 @@ export const FileExplorer = memo(
     // ancestors are still loading and the caller should retry on the next settle.
     const applyRevealTarget = useCallback(
       (file: string): "pending" | "done" => {
+        // Hold the reveal until the explorer is the visible tab: selecting and
+        // scrolling while hidden lands off-screen, so the highlight would only
+        // show after a second request. Re-runs once `active` flips true.
+        if (!active) return "pending";
         if (!rootPath || !isUnder(file, rootPath)) return "pending";
         if (tree.nodes[rootPath]?.status !== "loaded") return "pending";
         let loading = false;
@@ -669,6 +679,7 @@ export const FileExplorer = memo(
         // hidden folder never enters entryIndexByPath, so only select when present.
         if (entryIndexByPath.has(file)) {
           setSelectedPath(file);
+          setFlash((f) => ({ path: file, token: f.token + 1 }));
           requestAnimationFrame(() =>
             scrollEntryIntoView(file, { topRatio: 0.2 }),
           );
@@ -676,6 +687,7 @@ export const FileExplorer = memo(
         return "done";
       },
       [
+        active,
         rootPath,
         tree.nodes,
         tree.expanded,
@@ -939,6 +951,7 @@ export const FileExplorer = memo(
               actions={rowActions}
               renameInProgress={renameInProgress}
               isSelected={selectedPath === row.path}
+              flashToken={flash.path === row.path ? flash.token : 0}
               isRenaming={row.kind === "rename"}
               isExternalDropTarget={externalTargetDir === row.path}
               gitStatusCode={row.gitStatusCode}

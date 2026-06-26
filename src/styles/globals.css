@@ -431,6 +431,20 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
   animation: terax-tab-in var(--dur-base) var(--ease-premium);
 }
 
+/* Attention flash: two quick pulses of the primary color over the element's own
+ * background. Shared by the explorer reveal (focused file/folder) and the locked
+ * tab's lock icon (Cmd+W on a locked tab). Re-triggered per event via `useFlash`,
+ * which removes and re-adds the class with a reflow so the animation replays. */
+@keyframes terax-flash {
+  25%,
+  75% {
+    background-color: var(--primary);
+  }
+}
+.terax-flash {
+  animation: terax-flash 620ms var(--ease-soft);
+}
+
 /* Text shimmer loop (replaces motion background-position animation). Driven by
  * --shimmer-duration / --shimmer-spread set inline per instance. */
 @keyframes terax-shimmer {
@@ -472,5 +486,8 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
   .terax-shimmer {
     animation: none;
     background-position: 0% center;
+  }
+  .terax-flash {
+    animation: none;
   }
 }

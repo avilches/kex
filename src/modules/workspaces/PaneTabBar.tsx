@@ -1,5 +1,6 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
+import { useFlash } from "@/lib/useFlash";
 import { panelIcon, panelTitle } from "./lib/panelTitle";
 import { type Panel, isAutofocusPanel, isLockablePanel } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -170,19 +171,9 @@ function DraggableTab({
   const inputRef = useRef<HTMLInputElement>(null);
   const handledRef = useRef(false);
   const lockFlashSnap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
-  const [lockFlashActive, setLockFlashActive] = useState(false);
-  const lockFlashSeqRef = useRef(0);
-
-  useEffect(() => {
-    if (lockFlashSnap.panelId !== panel.id) return;
-    if (lockFlashSnap.seq === lockFlashSeqRef.current) return;
-    lockFlashSeqRef.current = lockFlashSnap.seq;
-    setLockFlashActive(true);
-    const t1 = setTimeout(() => setLockFlashActive(false), 120);
-    const t2 = setTimeout(() => setLockFlashActive(true), 220);
-    const t3 = setTimeout(() => setLockFlashActive(false), 340);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [lockFlashSnap, panel.id]);
+  const lockFlashToken =
+    lockFlashSnap.panelId === panel.id ? lockFlashSnap.seq : 0;
+  const lockFlashRef = useFlash<HTMLButtonElement>(lockFlashToken);
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
@@ -305,13 +296,9 @@ function DraggableTab({
       )}
       {isLocked ? (
         <button
+          ref={lockFlashRef}
           type="button"
-          className={cn(
-            "ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded hover:bg-muted",
-            lockFlashActive
-              ? "scale-125 text-amber-400 transition-[color,transform] duration-300"
-              : "text-foreground transition-colors",
-          )}
+          className="ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded text-foreground transition-colors hover:bg-muted"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();

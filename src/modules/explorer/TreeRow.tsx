@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/context-menu";
 import { pathDirname } from "@/lib/pathUtils";
 import { KEY_SEP } from "@/lib/platform";
+import { useFlash } from "@/lib/useFlash";
 import { cn } from "@/lib/utils";
 import { isCopying } from "@/modules/explorer/lib/duplicateStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -97,6 +98,7 @@ export type EntryRowProps = {
   actions: RowActions;
   renameInProgress: boolean;
   isSelected: boolean;
+  flashToken: number;
   isRenaming: boolean;
   isExternalDropTarget?: boolean;
   gitStatusCode?: GitStatusCode | null;
@@ -126,6 +128,7 @@ function EntryRowImpl(props: EntryRowProps) {
     actions,
     renameInProgress,
     isSelected,
+    flashToken,
     isRenaming,
     isExternalDropTarget = false,
     gitStatusCode,
@@ -194,13 +197,15 @@ function EntryRowImpl(props: EntryRowProps) {
   });
   const isFileDropTarget = isFileDropValid && isFileOver;
 
+  const flashRef = useFlash<HTMLButtonElement>(flashToken);
   const setRefs = useCallback(
     (node: HTMLButtonElement | null) => {
+      flashRef.current = node;
       setDragRef(node);
       setDropRef(node);
       setFileDropRef(node);
     },
-    [setDragRef, setDropRef, setFileDropRef],
+    [flashRef, setDragRef, setDropRef, setFileDropRef],
   );
 
   // Spring open a collapsed folder after hovering over it during a drag.
