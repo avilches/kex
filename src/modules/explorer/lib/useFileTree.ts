@@ -556,11 +556,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       }
       const to = joinPath(parent, trimmed);
       try {
-        try {
-          await invoke("git_mv", { from: renaming, to, workspace: currentWorkspaceEnv() });
-        } catch {
-          await invoke("fs_rename", { from: renaming, to, workspace: currentWorkspaceEnv() });
-        }
+        await native.renameFile(renaming, to);
         options?.onPathRenamed?.(renaming, to);
         await fetchChildren(parent);
       } catch (e) {
@@ -621,11 +617,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         return;
       }
       try {
-        try {
-          await invoke("git_mv", { from, to, workspace: currentWorkspaceEnv() });
-        } catch {
-          await invoke("fs_rename", { from, to, workspace: currentWorkspaceEnv() });
-        }
+        await native.renameFile(from, to);
         options?.onPathRenamed?.(from, to);
         await Promise.all([fetchChildren(dirname(from)), fetchChildren(toDir)]);
       } catch (e) {
