@@ -16,7 +16,7 @@ export type GitColorScheme = "vscode" | "jetbrains";
 
 export type ScmViewMode = "list" | "tree";
 
-export type TerminalNewFolderMode = "workspace" | "context";
+export type TerminalNewFolderMode = "home" | "workspace" | "context";
 
 export type CursorStyle = "bar" | "block" | "underline";
 
@@ -398,7 +398,9 @@ export function parseScmViewMode(value: unknown): ScmViewMode {
 }
 
 export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMode {
-  return value === "workspace" ? "workspace" : "context";
+  if (value === "home") return "home";
+  if (value === "workspace") return "workspace";
+  return "context";
 }
 
 async function writePref<T>(key: string, value: T): Promise<void> {

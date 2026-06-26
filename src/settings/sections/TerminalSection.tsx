@@ -1,4 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import { homeDir } from "@tauri-apps/api/path";
+import { Folder01Icon, Home01Icon, PinIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Select,
   SelectContent,
@@ -112,10 +115,14 @@ export function TerminalSection() {
     (s) => s.terminalNewFolderMode,
   );
   const [shells, setShells] = useState<ShellInfo[]>([]);
+  const [home, setHome] = useState<string>("");
 
   useEffect(() => {
     void invoke<ShellInfo[]>("pty_list_shells")
       .then(setShells)
+      .catch(() => {});
+    void homeDir()
+      .then((h) => setHome(h.replace(/\\/g, "/").replace(/\/$/, "")))
       .catch(() => {});
   }, []);
 
@@ -159,18 +166,42 @@ export function TerminalSection() {
             void setTerminalNewFolderMode(v as TerminalNewFolderMode)
           }
         >
-          <SelectTrigger size="sm" className="h-8 w-52 text-[12px]">
+          <SelectTrigger size="sm" className="h-8 w-60 text-[12px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="context" className="text-[12px]">
-              Current folder
-              <span className="block text-[10px] text-muted-foreground leading-tight">
-                based on the terminal cwd or the path in the editor
+            <SelectItem value="home" className="text-[12px]">
+              <span className="flex items-center gap-2">
+                <HugeiconsIcon
+                  icon={Home01Icon}
+                  size={13}
+                  strokeWidth={2}
+                  className="text-muted-foreground"
+                />
+                {home || "Home"}
               </span>
             </SelectItem>
             <SelectItem value="workspace" className="text-[12px]">
-              Workspace folder
+              <span className="flex items-center gap-2">
+                <HugeiconsIcon
+                  icon={PinIcon}
+                  size={13}
+                  strokeWidth={2}
+                  className="text-muted-foreground"
+                />
+                Workspace root folder
+              </span>
+            </SelectItem>
+            <SelectItem value="context" className="text-[12px]">
+              <span className="flex items-center gap-2">
+                <HugeiconsIcon
+                  icon={Folder01Icon}
+                  size={13}
+                  strokeWidth={2}
+                  className="text-muted-foreground"
+                />
+                Last folder from terminal or editor
+              </span>
             </SelectItem>
           </SelectContent>
         </Select>

@@ -118,6 +118,7 @@ import {
 } from "@/modules/workspaces/lib/explorerRoot";
 import type { RevealRequest } from "@/modules/explorer";
 import { panelFilePath } from "@/modules/workspaces/lib/panelPath";
+import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import { isAutofocusPanel, isLockablePanel } from "@/modules/workspaces/lib/types";
 
 function basename(path: string): string {
@@ -200,6 +201,7 @@ export default function App() {
 
   const activeCwdRef = useRef<string | null>(null);
   const contextCwdRef = useRef<string | null>(null);
+  const homeRef = useRef<string | null>(null);
 
   // ── Active panel derivation ───────────────────────────────────────────────
 
@@ -486,6 +488,7 @@ export default function App() {
       },
       clearWorkspaceState,
     });
+  homeRef.current = home;
 
   // When Cmd+Shift+F is pressed while the panel is closed, the panel opens
   // asynchronously (Tauri IPC). This effect fires once both conditions are met
@@ -691,14 +694,15 @@ export default function App() {
           );
       if (!ws) return;
       const { terminalNewFolderMode } = usePreferencesStore.getState();
-      const cwd =
-        terminalNewFolderMode === "workspace"
-          ? ws.cwd
-          : (contextCwdRef.current ?? ws.cwd);
       openPanel(ws.id, targetPaneId ?? ws.activePaneId, {
         id: newPanelId(),
         kind: "terminal",
-        cwd,
+        cwd: resolveNewTerminalCwd({
+          mode: terminalNewFolderMode,
+          home: homeRef.current,
+          lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
+          workspaceRoot: ws.pinnedRoot ?? ws.fsRoot ?? null,
+        }),
       });
     },
     [openPanel],
@@ -708,10 +712,6 @@ export default function App() {
     (targetPaneId?: string) => {
       if (!activeWorkspace) return;
       const { terminalNewFolderMode } = usePreferencesStore.getState();
-      const cwd =
-        terminalNewFolderMode === "workspace"
-          ? activeWorkspace.cwd
-          : (contextCwdRef.current ?? activeWorkspace.cwd);
       openPanel(
         activeWorkspace.id,
         targetPaneId ?? activeWorkspace.activePaneId,
@@ -719,7 +719,13 @@ export default function App() {
           id: newPanelId(),
           kind: "terminal",
           blocks: true,
-          cwd,
+          cwd: resolveNewTerminalCwd({
+            mode: terminalNewFolderMode,
+            home: homeRef.current,
+            lastFolder: contextCwdRef.current ?? activeWorkspace.cwd ?? null,
+            workspaceRoot:
+              activeWorkspace.pinnedRoot ?? activeWorkspace.fsRoot ?? null,
+          }),
         },
       );
     },
@@ -984,10 +990,12 @@ export default function App() {
       openPanel(wsId, newPaneId, {
         id: newPanelId(),
         kind: "terminal",
-        cwd:
-          terminalNewFolderMode === "workspace"
-            ? ws.cwd
-            : (contextCwdRef.current ?? ws.cwd),
+        cwd: resolveNewTerminalCwd({
+          mode: terminalNewFolderMode,
+          home: homeRef.current,
+          lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
+          workspaceRoot: ws.pinnedRoot ?? ws.fsRoot ?? null,
+        }),
       });
     },
     [splitPane, openPanel],
@@ -1015,10 +1023,12 @@ export default function App() {
       openPanel(wsId, newPaneId, {
         id: newPanelId(),
         kind: "terminal",
-        cwd:
-          terminalNewFolderMode === "workspace"
-            ? ws.cwd
-            : (contextCwdRef.current ?? ws.cwd),
+        cwd: resolveNewTerminalCwd({
+          mode: terminalNewFolderMode,
+          home: homeRef.current,
+          lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
+          workspaceRoot: ws.pinnedRoot ?? ws.fsRoot ?? null,
+        }),
       });
     },
     [splitPane, openPanel],

@@ -104,7 +104,8 @@ describe("terminalNewFolderMode", () => {
     expect(DEFAULT_PREFERENCES.terminalNewFolderMode).toBe("context");
   });
 
-  it("parses only the exact 'workspace' string as workspace", () => {
+  it("parses all three valid modes and falls back to context", () => {
+    expect(parseTerminalNewFolderMode("home")).toBe("home");
     expect(parseTerminalNewFolderMode("workspace")).toBe("workspace");
     expect(parseTerminalNewFolderMode("context")).toBe("context");
     expect(parseTerminalNewFolderMode("WORKSPACE")).toBe("context");
