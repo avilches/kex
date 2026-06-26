@@ -10,10 +10,12 @@ import {
 import { useMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { AgentSession } from "@/modules/agents/lib/types";
+import type { Panel } from "@/modules/workspaces/lib/types";
 import { ReloadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
 import { agentChip } from "./lib/agentChip";
+import { TerminalPathBarMenu } from "./TerminalPathBarMenu";
 
 function AgentChipIndicator({ session }: { session: AgentSession }) {
   const chip = agentChip(session.status);
@@ -34,7 +36,7 @@ type Props = {
   gitRootPath: string | null;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
-  onOpenMenu?: () => void;
+  onUpdatePanel?: (updater: (p: Panel) => Panel) => void;
   onReveal?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
@@ -50,7 +52,7 @@ export function TerminalPathBar({
   gitRootPath,
   restoreOnRestart,
   persistentCommand,
-  onOpenMenu,
+  onUpdatePanel,
   onReveal,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
@@ -106,13 +108,19 @@ export function TerminalPathBar({
           <button
             type="button"
             title={persistentCommand}
-            onClick={() => onOpenMenu?.()}
-            className="flex items-center justify-center text-muted-foreground"
+            className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
           >
             <HugeiconsIcon icon={ReloadIcon} size={11} strokeWidth={1.75} />
           </button>
         )}
         {agentSession && <AgentChipIndicator session={agentSession} />}
+        <TerminalPathBarMenu
+          restoreOnRestart={restoreOnRestart}
+          persistentCommand={persistentCommand}
+          onUpdatePanel={onUpdatePanel ?? (() => {})}
+          agentSession={agentSession}
+          runningCommand={running}
+        />
       </div>
     </div>
   );

@@ -194,6 +194,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
             gitRootPath={gitRootPath}
             restoreOnRestart={panel.restoreOnRestart}
             persistentCommand={panel.persistentCommand}
+            onUpdatePanel={(updater) => callbacks.onUpdatePanel?.(panel.id, updater)}
             onReveal={(p) => callbacks.onFocusOnExplorer?.(p)}
             onSetAsRoot={callbacks.onSetAsRoot}
             onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
