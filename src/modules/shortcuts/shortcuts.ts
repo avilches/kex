@@ -434,9 +434,9 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "view.zenMode",
-    label: "Toggle Zen Mode",
+    label: "Toggle Full Pane",
     group: "View",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "z" }],
+    defaultBindings: [{ key: "F5" }],
   },
   // Editor entries are display-only: CodeMirror's historyKeymap binds these
   // keys natively. We register them here so the shortcuts dialog can surface

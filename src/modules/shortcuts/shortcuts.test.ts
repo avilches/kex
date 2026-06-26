@@ -299,3 +299,27 @@ describe("index shortcut digit families", () => {
     expect(matchesShortcut(digitEvent("1", { ctrl: true }), "workspace.selectByIndex")).toBe(false);
   });
 });
+
+test("view.zenMode default binding is F5 (no modifiers)", () => {
+  const e = {
+    key: "F5",
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    repeat: false,
+  } as unknown as KeyboardEvent;
+  expect(matchesShortcut(e, "view.zenMode")).toBe(true);
+});
+
+test("view.zenMode old Cmd+Shift+Z binding no longer matches", () => {
+  const e = {
+    key: "z",
+    ctrlKey: MOD_PROP === "ctrl",
+    metaKey: MOD_PROP === "meta",
+    shiftKey: true,
+    altKey: false,
+    repeat: false,
+  } as unknown as KeyboardEvent;
+  expect(matchesShortcut(e, "view.zenMode")).toBe(false);
+});
