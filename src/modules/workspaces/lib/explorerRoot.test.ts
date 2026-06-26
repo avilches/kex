@@ -122,6 +122,7 @@ describe("resolveSidebarTarget", () => {
     const t = resolveSidebarTarget({
       folder: "/a/b/c/d",
       workspaceRoot: "/a/b",
+      workspaceGitRoot: "/a/b",
       gitRoot: "/a/b",
       currentFsRoot: null,
       home,
@@ -133,6 +134,7 @@ describe("resolveSidebarTarget", () => {
     const t = resolveSidebarTarget({
       folder: "/a/b",
       workspaceRoot: "/a/b",
+      workspaceGitRoot: null,
       gitRoot: null,
       currentFsRoot: null,
       home,
@@ -140,10 +142,11 @@ describe("resolveSidebarTarget", () => {
     expect(t.mode).toBe("pinned");
   });
 
-  it("re-roots to a git repo nested strictly under the pinned root", () => {
+  it("re-roots to a git repo nested under a workspace root that is itself a repo", () => {
     const t = resolveSidebarTarget({
       folder: "/proj/wt/src/file.ts",
       workspaceRoot: "/proj",
+      workspaceGitRoot: "/proj",
       gitRoot: "/proj/wt",
       currentFsRoot: null,
       home,
@@ -151,10 +154,35 @@ describe("resolveSidebarTarget", () => {
     expect(t).toEqual({ mode: "filesystem", fsRoot: "/proj/wt" });
   });
 
+  it("stays pinned in a non-repo container workspace holding a nested repo", () => {
+    const t = resolveSidebarTarget({
+      folder: "/Work/terax-ai/src/App.tsx",
+      workspaceRoot: "/Work",
+      workspaceGitRoot: null,
+      gitRoot: "/Work/terax-ai",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "pinned", fsRoot: null });
+  });
+
+  it("stays pinned when the focused file shares the workspace root's own repo", () => {
+    const t = resolveSidebarTarget({
+      folder: "/repo/sub/x/file.ts",
+      workspaceRoot: "/repo/sub",
+      workspaceGitRoot: "/repo",
+      gitRoot: "/repo",
+      currentFsRoot: null,
+      home,
+    });
+    expect(t).toEqual({ mode: "pinned", fsRoot: null });
+  });
+
   it("stays pinned when the nearest git root is the pinned root itself", () => {
     const t = resolveSidebarTarget({
       folder: "/proj/src/file.ts",
       workspaceRoot: "/proj",
+      workspaceGitRoot: "/proj",
       gitRoot: "/proj",
       currentFsRoot: null,
       home,
@@ -162,10 +190,11 @@ describe("resolveSidebarTarget", () => {
     expect(t).toEqual({ mode: "pinned", fsRoot: null });
   });
 
-  it("normalizes backslashes comparing a nested git root with the pinned root", () => {
+  it("normalizes backslashes comparing a nested git root with the workspace repo", () => {
     const t = resolveSidebarTarget({
       folder: "C:\\proj\\wt\\file.ts",
       workspaceRoot: "C:\\proj",
+      workspaceGitRoot: "C:\\proj",
       gitRoot: "C:\\proj\\wt",
       currentFsRoot: null,
       home,
@@ -177,6 +206,7 @@ describe("resolveSidebarTarget", () => {
     const t = resolveSidebarTarget({
       folder: "/x/repo/src/inner",
       workspaceRoot: "/a/b",
+      workspaceGitRoot: null,
       gitRoot: "/x/repo",
       currentFsRoot: null,
       home,
@@ -188,6 +218,7 @@ describe("resolveSidebarTarget", () => {
     const t = resolveSidebarTarget({
       folder: "/x/y/z",
       workspaceRoot: null,
+      workspaceGitRoot: null,
       gitRoot: null,
       currentFsRoot: "/x/other",
       home,
@@ -199,6 +230,7 @@ describe("resolveSidebarTarget", () => {
     const t = resolveSidebarTarget({
       folder: "/x/y/z",
       workspaceRoot: null,
+      workspaceGitRoot: null,
       gitRoot: null,
       currentFsRoot: null,
       home: null,

@@ -75,6 +75,7 @@ export function ancestorsToExpand(root: string, file: string): string[] {
 export function resolveSidebarTarget(input: {
   folder: string;
   workspaceRoot: string | null;
+  workspaceGitRoot: string | null;
   gitRoot: string | null;
   currentFsRoot: string | null;
   home: string | null;
@@ -82,12 +83,19 @@ export function resolveSidebarTarget(input: {
   const folder = normalizeSep(input.folder);
   const pinned = input.workspaceRoot ? normalizeSep(input.workspaceRoot) : null;
   const gitRoot = input.gitRoot ? normalizeSep(input.gitRoot) : null;
-  // A git repo nested strictly inside the pinned root re-roots the explorer to it
-  // so the explorer, source control and history all reflect the nested repo.
+  const pinnedGitRoot = input.workspaceGitRoot
+    ? normalizeSep(input.workspaceGitRoot)
+    : null;
+  // A git repo nested strictly inside the workspace root re-roots the explorer to
+  // it (so explorer, source control and history all reflect the nested repo), but
+  // only when the workspace root itself belongs to a repo. That anchors a worktree
+  // under a project repo to the worktree, while a non-repo container workspace
+  // stays put: focusing a file in one of its projects never drops the wider view.
   if (
     pinned &&
+    pinnedGitRoot &&
     gitRoot &&
-    gitRoot !== pinned &&
+    gitRoot !== pinnedGitRoot &&
     isUnder(gitRoot, pinned) &&
     isUnder(folder, gitRoot)
   ) {
