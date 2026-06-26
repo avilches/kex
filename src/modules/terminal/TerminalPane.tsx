@@ -17,12 +17,12 @@ import {
   submitToLeaf,
   useTerminalSession,
 } from "./lib/useTerminalSession";
+import { ScratchpadBar } from "./ScratchpadBar";
 
 // Lazy: ShellInput pulls the CodeMirror stack, which must stay out of the
 // eager startup bundle (see eager-budget.test.ts). It loads only when a block
 // terminal is actually opened.
 const ShellInput = lazy(() => import("./block/ShellInput"));
-import { ScratchpadBar } from "./ScratchpadBar";
 
 export type TerminalPaneHandle = {
   write: (data: string) => void;

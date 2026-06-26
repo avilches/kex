@@ -25,6 +25,7 @@ export function ScratchpadBar({ leafId }: Props) {
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
+    el.focus(); // focus on mount -- bar just became visible
     setLeafScratchpadFocus(leafId, () => el.focus());
     return () => setLeafScratchpadFocus(leafId, null);
   }, [leafId]);
@@ -69,7 +70,7 @@ export function ScratchpadBar({ leafId }: Props) {
         value={text}
         rows={1}
         placeholder="Scratchpad -- type here, send to terminal"
-        className="min-h-[28px] w-0 flex-1 resize-none overflow-hidden rounded bg-transparent font-mono text-sm leading-[1.4] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+        className="min-h-[28px] w-0 flex-1 resize-none overflow-y-auto rounded bg-transparent font-mono text-sm leading-[1.4] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
         style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
@@ -89,7 +90,8 @@ export function ScratchpadBar({ leafId }: Props) {
         <button
           type="button"
           onClick={send}
-          className="flex h-[22px] items-center justify-center rounded px-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          disabled={!text.trim()}
+          className="flex h-[22px] items-center justify-center rounded px-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
         >
           Send
         </button>
