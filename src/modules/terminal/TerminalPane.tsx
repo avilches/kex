@@ -128,7 +128,9 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
               className="absolute inset-0 z-0"
               onMouseDown={(e) => {
                 downYRef.current = e.clientY;
-                setLeafScratchpadActive(panelId, false);
+                // Only switch sides on a click inside an already-focused tab; a
+                // click that re-activates the tab should restore the prior side.
+                if (focused) setLeafScratchpadActive(panelId, false);
               }}
               onMouseUp={(e) => {
                 const moved =
@@ -180,7 +182,10 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
             "min-h-0 flex-1 transition-opacity",
             session.scratchpadFocused && "opacity-50",
           )}
-          onMouseDownCapture={() => setLeafScratchpadActive(panelId, false)}
+          onMouseDownCapture={() => {
+            // See blocks branch: only switch sides inside an already-focused tab.
+            if (focused) setLeafScratchpadActive(panelId, false);
+          }}
         />
         {session.scratchpadOpen && (
           <ScratchpadBar leafId={panelId} paneFocused={focused} />
