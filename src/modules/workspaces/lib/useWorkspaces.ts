@@ -108,10 +108,20 @@ export function applyGitConfig(
   );
 }
 
+// Per-pane most-recently-used activation history (panelIds, most recent first).
+// In memory only, never persisted. Bounds defensively; the live list is already
+// capped by the number of open tabs in the pane (see paneActivationHistoryRef).
+export const MRU_HISTORY_LIMIT = 50;
+
+export function pushMru(history: string[], panelId: string, limit = MRU_HISTORY_LIMIT): string[] {
+  return [panelId, ...history.filter((id) => id !== panelId)].slice(0, limit);
+}
+
 export function applyClosePanel(
   workspaces: Workspace[],
   workspaceId: string,
   panelId: string,
+  history?: string[],
 ): Workspace[] {
   return workspaces.map((w): Workspace => {
     if (w.id !== workspaceId) return w;
@@ -142,9 +152,11 @@ export function applyClosePanel(
       };
     }
     const idx = pane.panels.findIndex((p) => p.id === panelId);
+    const remainingIds = new Set(remaining.map((p) => p.id));
+    const mruTarget = history?.find((id) => id !== panelId && remainingIds.has(id)) ?? null;
     const newActiveId =
       pane.activePanelId === panelId
-        ? ((remaining[idx] ?? remaining[idx - 1])?.id ?? null)
+        ? (mruTarget ?? (remaining[idx] ?? remaining[idx - 1])?.id ?? null)
         : pane.activePanelId;
     return {
       ...w,
@@ -221,6 +233,34 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const previousWorkspaceIdRef = useRef<string | null>(null);
   const closedPanelsRef = useRef<ClosedEntry[]>([]);
+
+  // paneId -> MRU activation history (panelIds, most recent first). Drives which
+  // tab gets focus when the active one closes. In memory only, never persisted.
+  const paneActivationHistoryRef = useRef<Map<string, string[]>>(new Map());
+  const recordActivation = useCallback((paneId: string, panelId: string) => {
+    const map = paneActivationHistoryRef.current;
+    map.set(paneId, pushMru(map.get(paneId) ?? [], panelId));
+  }, []);
+
+  // Reconcile the history against live panes/panels: drop dead panes and panels
+  // (closed, moved between panes, collapsed splits). Keeps the map bounded and
+  // ensures a stale id is never selected as the next active tab.
+  useEffect(() => {
+    const map = paneActivationHistoryRef.current;
+    const live = new Map<string, Set<string>>();
+    for (const w of workspaces) {
+      for (const pane of allPanes(w.paneTree)) {
+        live.set(pane.id, new Set(pane.panels.map((p) => p.id)));
+      }
+    }
+    for (const paneId of [...map.keys()]) {
+      const ids = live.get(paneId);
+      if (!ids) { map.delete(paneId); continue; }
+      const pruned = (map.get(paneId) ?? []).filter((id) => ids.has(id));
+      if (pruned.length === 0) map.delete(paneId);
+      else map.set(paneId, pruned);
+    }
+  }, [workspaces]);
 
   // When all workspaces are gone, flush state and destroy the window.
   // Uses claimClose() to avoid racing with the onCloseRequested handler in main.tsx
@@ -404,6 +444,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const openPanel = useCallback((workspaceId: string, paneId: string, panel: Panel, insertionIndex?: number) => {
     const newPanel = withNewTabAutofocus(panel);
+    recordActivation(paneId, newPanel.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -420,9 +461,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         };
       }),
     );
-  }, []);
+  }, [recordActivation]);
 
   const activatePanel = useCallback((workspaceId: string, panelId: string) => {
+    const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    const pane = ws ? findPanelPane(ws.paneTree, panelId)?.pane : undefined;
+    if (pane) recordActivation(pane.id, panelId);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -438,13 +482,15 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         };
       }),
     );
-  }, []);
+  }, [recordActivation]);
 
   const closePanel = useCallback((workspaceId: string, panelId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    let history: string[] | undefined;
     if (ws) {
       const found = findPanelPane(ws.paneTree, panelId);
       if (found) {
+        history = paneActivationHistoryRef.current.get(found.pane.id);
         closedPanelsRef.current = captureClosedEntry(closedPanelsRef.current, {
           panel: found.panel,
           paneId: found.pane.id,
@@ -452,7 +498,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         });
       }
     }
-    setWorkspaces((prev) => applyClosePanel(prev, workspaceId, panelId));
+    setWorkspaces((prev) => applyClosePanel(prev, workspaceId, panelId, history));
   }, []);
 
   const reopenClosed = useCallback(() => {
@@ -471,6 +517,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, [openPanel, activeWorkspaceId]);
 
   const replacePanel = useCallback((workspaceId: string, paneId: string, oldPanelId: string, newPanel: Panel) => {
+    recordActivation(paneId, newPanel.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -486,7 +533,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         };
       }),
     );
-  }, []);
+  }, [recordActivation]);
 
   const updatePanelData = useCallback((workspaceId: string, panelId: string, updater: (p: Panel) => Panel) => {
     setWorkspaces((prev) =>

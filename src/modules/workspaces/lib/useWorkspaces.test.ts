@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Panel, SplitNode, Workspace } from "./types";
-import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, captureClosedEntry, collectRunningTerminals, findReopenTarget } from "./useWorkspaces";
+import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -114,6 +114,68 @@ describe("applyClosePanel", () => {
     const pane = out[0].paneTree as Extract<SplitNode, { kind: "pane" }>;
     expect(pane.panels.map((p) => p.id)).toEqual(["t1", "t3"]);
     expect(pane.activePanelId).toBe("t3");
+  });
+
+  const threeTabPane = (active: string): Workspace =>
+    ws({
+      paneTree: { kind: "pane", id: "p1", panels: [term("t1"), term("t2"), term("t3")], activePanelId: active },
+      activePaneId: "p1",
+    });
+  const activeId = (out: Workspace[]) =>
+    (out[0].paneTree as Extract<SplitNode, { kind: "pane" }>).activePanelId;
+
+  it("returns to the MRU tab instead of the neighbour when the active tab closes", () => {
+    // Activation order t1, t2, t3 means history is most-recent-first [t3, t2, t1].
+    const out = applyClosePanel([threeTabPane("t3")], "w1", "t3", ["t3", "t2", "t1"]);
+    expect(activeId(out)).toBe("t2");
+  });
+
+  it("skips MRU entries whose tabs no longer exist", () => {
+    // t2 was closed earlier but lingers in history; it must be skipped for t1.
+    const out = applyClosePanel([threeTabPane("t3")], "w1", "t3", ["t3", "t2", "t1"].filter((id) => id !== "t2"));
+    expect(activeId(out)).toBe("t1");
+  });
+
+  it("falls back to the neighbour when the history is empty", () => {
+    const out = applyClosePanel([threeTabPane("t2")], "w1", "t2", []);
+    expect(activeId(out)).toBe("t3");
+  });
+
+  it("follows the MRU chain across repeated closes (C -> B -> A)", () => {
+    // History most-recent-first after opening t1, t2, t3 in order.
+    let history = ["t3", "t2", "t1"];
+    let out = applyClosePanel([threeTabPane("t3")], "w1", "t3", history);
+    expect(activeId(out)).toBe("t2");
+    history = history.filter((id) => id !== "t3");
+    const twoLeft = ws({
+      paneTree: { kind: "pane", id: "p1", panels: [term("t1"), term("t2")], activePanelId: "t2" },
+      activePaneId: "p1",
+    });
+    out = applyClosePanel([twoLeft], "w1", "t2", history);
+    expect(activeId(out)).toBe("t1");
+  });
+
+  it("does not change the active tab when a non-active tab closes, even with history", () => {
+    const out = applyClosePanel([threeTabPane("t2")], "w1", "t3", ["t3", "t2", "t1"]);
+    expect(activeId(out)).toBe("t2");
+  });
+});
+
+describe("pushMru", () => {
+  it("prepends a new id, most recent first", () => {
+    expect(pushMru(["b", "a"], "c")).toEqual(["c", "b", "a"]);
+  });
+
+  it("moves an existing id to the front without duplicating", () => {
+    expect(pushMru(["c", "b", "a"], "a")).toEqual(["a", "c", "b"]);
+  });
+
+  it("caps the history at the limit, dropping the oldest", () => {
+    const full = Array.from({ length: MRU_HISTORY_LIMIT }, (_, i) => `t${i}`);
+    const out = pushMru(full, "new");
+    expect(out).toHaveLength(MRU_HISTORY_LIMIT);
+    expect(out[0]).toBe("new");
+    expect(out).not.toContain(`t${MRU_HISTORY_LIMIT - 1}`);
   });
 });
 
