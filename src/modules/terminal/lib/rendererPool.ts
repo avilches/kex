@@ -30,6 +30,9 @@ export type SlotAdapter = {
   evictLeaf(leafId: string): void;
   isLeafFocused(leafId: string): boolean;
   isLeafBlocks(leafId: string): boolean;
+  // Focus the leaf's active side: the scratchpad if it is open and the active
+  // side, otherwise the terminal slot.
+  focusLeaf(leafId: string): void;
 };
 
 export type LeafBridge = {
@@ -473,7 +476,8 @@ function scheduleUnhide(slot: Slot, stale: boolean): void {
       }
       const leafId = slot.currentLeafId;
       if (leafId !== null && adapter?.isLeafFocused(leafId)) {
-        slot.term.focus();
+        // Honor the scratchpad as the active side; never blindly focus the grid.
+        adapter.focusLeaf(leafId);
       }
     });
   });

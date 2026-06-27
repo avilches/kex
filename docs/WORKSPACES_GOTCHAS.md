@@ -261,3 +261,46 @@ verificar que el permiso correspondiente (`core:window:allow-*`) este en `capabi
 | `src/main.tsx` | `setTimeout(retryMissingWebgl, 350)` tras `showWindow`; `onCloseRequested` usa `await destroy()` con reset de flushing en error |
 | `src/modules/workspaces/lib/useWorkspaces.ts` | `useEffect` cierre por workspaces vacios + navegacion adyacente en closeWorkspace/closePanel |
 | `src-tauri/capabilities/default.json` | `core:window:allow-destroy` agregado |
+
+---
+
+## Bug 7: el scratchpad no recibe el foco (nuevos terminales y restore) (RESUELTO)
+
+### Sintoma
+
+Con la preferencia "scratchpad en terminales nuevos" activa, la barra del scratchpad aparecia pero
+el cursor se quedaba en el terminal. Al cambiar entre tabs del **mismo pane** (uno oculto), el
+scratchpad "cogia y perdia" el foco. Al reiniciar, los tabs con scratchpad abierto se robaban el
+foco entre si y se activaba un tab distinto al que estaba activo al cerrar. En split (dos panes
+visibles) si funcionaba, lo que despisto el diagnostico.
+
+### Causa raiz
+
+Tres focos compitiendo, ninguno consciente de que el scratchpad podia ser el "lado activo":
+
+1. `ScratchpadBar` hacia `el.focus()` en su `useEffect` de montaje **incondicionalmente**. En el
+   restore, cada tab con scratchpad abierto (incluso ocultos) montaba su barra y robaba el foco,
+   activando otro tab.
+2. `scheduleUnhide` (`rendererPool.ts`), al hacer visible un slot, ejecutaba `slot.term.focus()`
+   tras un doble `requestAnimationFrame` si el leaf estaba enfocado. Eso pisaba el foco del
+   scratchpad justo despues de que lo tomara (de ahi "lo coge y lo pierde"). En split no se dispara
+   porque no hay ciclo de ocultar/mostrar.
+3. El efecto de foco re-tomaba el foco en cada ejecucion mientras el pane estaba enfocado, y su
+   `setTimeout` diferido podia dispararse despues de que el pane perdiera el foco.
+
+El sintoma fue dificil de aislar porque el tag de debug inicial (estado en el titulo del tab) estaba
+roto: `subscribeLeafScratchpad` devolvia un no-op cuando la sesion aun no existia al suscribirse, asi
+que mostraba `---` siempre y sugeria (en falso) que el scratchpad no se abria.
+
+### Fix
+
+- `SlotAdapter.focusLeaf(leafId)` centraliza el foco: enfoca el scratchpad si esta abierto y es el
+  lado activo (`scratchpadActive`), si no el slot del terminal. `scheduleUnhide` y el efecto de foco
+  lo usan en vez de `slot.term.focus()` / `focusSlot` a ciegas.
+- `ScratchpadBar` ya no hace `el.focus()` al montar; solo registra el callback de foco. El foco lo
+  decide la sesion (`focusLeaf`, transicion a focused, ciclo `Cmd+U`).
+- El efecto de foco solo actua en la transicion no-focused -> focused y su `setTimeout` aborta si el
+  leaf ya no es el visible/enfocado.
+
+`scratchpadActive` ("focused" persistido) es una **preferencia de lado**, no el foco global: "si este
+pane gana el foco, ponlo en el scratchpad". Solo el tab activo toma el foco.

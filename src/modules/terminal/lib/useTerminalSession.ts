@@ -115,7 +115,6 @@ type Session = {
   scratchpadFocus: (() => void) | null;
   scratchpadInsert: ((text: string) => void) | null;
   scratchpadDraft: string;
-  scratchpadListeners: Set<() => void>;
 };
 
 const sessions = new Map<string, Session>();
@@ -123,6 +122,11 @@ const sessions = new Map<string, Session>();
 // Block-overlay viewport listeners, keyed by leafId at module scope so the
 // overlay (a child) can subscribe before the parent effect creates the session.
 const blockViewportListeners = new Map<string, Set<() => void>>();
+
+// Scratchpad state listeners keyed by leafId at module scope, so subscribers
+// (the tab tag, the pane) can subscribe before the session exists and still get
+// notified once it is created and on every open/active/focused change.
+const scratchpadListeners = new Map<string, Set<() => void>>();
 
 const readyLeaves = new Set<string>();
 const readyWaiters = new Map<
@@ -253,9 +257,23 @@ export function setLeafDraft(leafId: string, text: string): void {
 }
 
 function notifyScratchpad(leafId: string): void {
-  const s = sessions.get(leafId);
-  if (!s) return;
-  for (const l of s.scratchpadListeners) l();
+  const set = scratchpadListeners.get(leafId);
+  if (set) for (const l of set) l();
+}
+
+function subscribeLeafScratchpad(
+  leafId: string,
+  cb: () => void,
+): () => void {
+  let set = scratchpadListeners.get(leafId);
+  if (!set) {
+    set = new Set();
+    scratchpadListeners.set(leafId, set);
+  }
+  set.add(cb);
+  return () => {
+    set.delete(cb);
+  };
 }
 
 // Persist the open/active pair (hidden | visible | focused) for restore.
@@ -485,6 +503,12 @@ configureRendererPool({
   isLeafBlocks(leafId) {
     return sessions.get(leafId)?.blocks ?? false;
   },
+  focusLeaf(leafId) {
+    const s = sessions.get(leafId);
+    if (!s) return;
+    if (s.scratchpadOpen && s.scratchpadActive) s.scratchpadFocus?.();
+    else focusSlot(leafId);
+  },
 });
 
 function ensureSession(
@@ -534,7 +558,6 @@ function ensureSession(
     scratchpadFocus: null,
     scratchpadInsert: null,
     scratchpadDraft: "",
-    scratchpadListeners: new Set(),
   };
   sessions.set(leafId, session);
 
@@ -986,10 +1009,7 @@ export function useTerminalSession({
       setScratchpadOpen(cur?.scratchpadOpen ?? false);
       setScratchpadFocusedState(cur?.scratchpadFocused ?? false);
     };
-    s.scratchpadListeners.add(cb);
-    return () => {
-      s.scratchpadListeners.delete(cb);
-    };
+    return subscribeLeafScratchpad(leafId, cb);
   }, [leafId, blocks]);
 
   const fontSize = usePreferencesStore((p) => p.terminalFontSize);

@@ -112,7 +112,9 @@ export function ScratchpadBar({ leafId, paneFocused }: Props) {
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.focus(); // focus on mount -- bar just became visible
+    // Register the focus callback; do NOT focus on mount. Focus is driven by
+    // the session (focusLeaf / focus-gain / cycle) so an open scratchpad on a
+    // non-active tab (e.g. on restore) never steals focus.
     setLeafScratchpadFocus(leafId, () => el.focus());
     return () => setLeafScratchpadFocus(leafId, null);
   }, [leafId]);
