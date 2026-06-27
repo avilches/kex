@@ -1,10 +1,21 @@
 import { useDroppable } from "@dnd-kit/core";
-import { Switch } from "@/components/ui/switch";
+import { Settings01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Kbd, ShortcutKeys } from "@/components/Kbd";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setTerminalScratchpadEnterSends } from "@/modules/settings/store";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 import {
   closeScratchpad,
@@ -17,10 +28,35 @@ import {
 } from "./lib/useTerminalSession";
 
 const MAX_TEXTAREA_HEIGHT = 160; // px, ~6 lines
+const ROTATE_MS = 30_000;
+
+// Key glyphs, not letters: shift (mayuscula) and return.
+const SHIFT_GLYPH = "⇧";
+const RETURN_GLYPH = "⏎";
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = "auto";
   el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+}
+
+function placeholderMessages(
+  enterSends: boolean,
+  switchLabel: string | null,
+  hasAgent: boolean,
+): string[] {
+  return [
+    enterSends
+      ? "Press Enter to send, Shift+Enter for a new line"
+      : "Press Shift+Enter to send, Enter for a new line",
+    switchLabel
+      ? `Esc closes, ${switchLabel} opens the scratchpad again`
+      : "Esc closes the scratchpad",
+    switchLabel
+      ? `${switchLabel} switches between terminal and scratchpad`
+      : "Toggle the scratchpad from the terminal",
+    hasAgent ? "Enter your prompt" : "Enter your command",
+    "Drag files onto the scratchpad",
+  ];
 }
 
 type Props = {
@@ -32,8 +68,17 @@ export function ScratchpadBar({ leafId }: Props) {
   const [text, setText] = useState(() => getLeafScratchpadDraft(leafId));
   const enterSends = usePreferencesStore((s) => s.scratchpadEnterSends);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const hasAgent = useAgentStore((s) => Boolean(s.sessions[leafId]));
   const { setNodeRef, isOver } = useDroppable({
     id: `${SCRATCHPAD_DROP_PREFIX}${leafId}`,
+  });
+
+  // Rotate the placeholder by wall-clock bucket so every open bar shows the same
+  // hint, advancing on the 30s boundary rather than from mount time.
+  const [, tick] = useReducer((c: number) => c + 1, 0);
+  useEffect(() => {
+    const t = setTimeout(tick, ROTATE_MS - (Date.now() % ROTATE_MS) + 50);
+    return () => clearTimeout(t);
   });
 
   const insertAtCursor = useCallback(
@@ -109,17 +154,9 @@ export function ScratchpadBar({ leafId }: Props) {
     }
   }
 
-  const switchKey = getShortcutLabel("terminal.scratchpad", userShortcuts);
-  const sendHint = enterSends
-    ? "Enter to send, Shift+Enter for newline"
-    : "Shift+Enter to send, Enter for newline";
-  const placeholder = [
-    sendHint,
-    "Esc to close",
-    switchKey ? `${switchKey} to switch` : null,
-  ]
-    .filter(Boolean)
-    .join("  ·  ");
+  const switchLabel = getShortcutLabel("terminal.scratchpad", userShortcuts);
+  const messages = placeholderMessages(enterSends, switchLabel, hasAgent);
+  const placeholder = messages[Math.floor(Date.now() / ROTATE_MS) % messages.length];
 
   return (
     <div
@@ -141,28 +178,42 @@ export function ScratchpadBar({ leafId }: Props) {
         onFocus={() => setLeafScratchpadFocused(leafId, true)}
         onBlur={() => setLeafScratchpadFocused(leafId, false)}
       />
-      <div className="flex shrink-0 items-center gap-2">
-        <div className="flex items-center gap-1.5">
-          <Switch
-            id="scratchpad-enter-sends"
-            checked={enterSends}
-            onCheckedChange={(v) => void setTerminalScratchpadEnterSends(v)}
-          />
-          <label
-            htmlFor="scratchpad-enter-sends"
-            className="cursor-pointer text-[11px] text-muted-foreground select-none"
-          >
-            {enterSends ? "Enter=Send" : "Shift+Enter=Send"}
-          </label>
-        </div>
-        <button
-          type="button"
-          onClick={send}
-          disabled={!text.trim()}
-          className="flex h-[22px] items-center justify-center rounded bg-primary px-2.5 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-default disabled:opacity-40"
-        >
-          Send
-        </button>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <span className="flex items-center gap-1" title="Toggle scratchpad">
+          <ShortcutKeys id="terminal.scratchpad" />
+        </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              title="Scratchpad settings"
+              className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-0">
+            <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+              Send
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={enterSends ? "enter" : "shift-enter"}
+              onValueChange={(v) =>
+                void setTerminalScratchpadEnterSends(v === "enter")
+              }
+            >
+              <DropdownMenuRadioItem value="enter">
+                <Kbd>{RETURN_GLYPH}</Kbd>
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="shift-enter">
+                <span className="flex items-center gap-1">
+                  <Kbd>{SHIFT_GLYPH}</Kbd>
+                  <Kbd>{RETURN_GLYPH}</Kbd>
+                </span>
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

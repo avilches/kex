@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
@@ -347,15 +348,6 @@ export function TerminalSection() {
             onCheckedChange={(v) => void setWarnOnCloseTabWithRunningProcess(v)}
           />
         </SettingRow>
-        <SettingRow
-          title="Scratchpad: Enter sends"
-          description="When the scratchpad bar is open, Enter sends the text to the terminal. Shift+Enter inserts a newline. Uncheck to swap."
-        >
-          <Switch
-            checked={scratchpadEnterSends}
-            onCheckedChange={(v) => void setTerminalScratchpadEnterSends(v)}
-          />
-        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -456,6 +448,41 @@ export function TerminalSection() {
             checked={terminalCursorBlink}
             onCheckedChange={(v) => void setTerminalCursorBlink(v)}
           />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <FieldLabel>Scratchpad</FieldLabel>
+        <SettingRow
+          title="Press to send"
+          description="Which keypress sends the scratchpad text to the terminal. The other inserts a new line."
+        >
+          <RadioGroup
+            className="flex-row gap-4"
+            value={scratchpadEnterSends ? "enter" : "shift-enter"}
+            onValueChange={(v) =>
+              void setTerminalScratchpadEnterSends(v === "enter")
+            }
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="enter" id="scratchpad-send-enter" />
+              <label
+                htmlFor="scratchpad-send-enter"
+                className="cursor-pointer text-[12px]"
+              >
+                Enter
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="shift-enter" id="scratchpad-send-shift" />
+              <label
+                htmlFor="scratchpad-send-shift"
+                className="cursor-pointer text-[12px]"
+              >
+                Shift+Enter
+              </label>
+            </div>
+          </RadioGroup>
         </SettingRow>
       </div>
     </div>
