@@ -636,11 +636,16 @@ pub fn run() {
                     // Route the action to the current window only, so it never fans
                     // out across every open window. emit_to targets a single label;
                     // plain emit (even on a window) would broadcast to all webviews.
+                    // Filter by existence: focused_window may be stale after the last
+                    // window was destroyed in windowless mode.
                     let mgr = app.state::<window_state::WindowStateManager>();
-                    if let Some(label) = mgr.get_focused_window() {
+                    let live_label = mgr
+                        .get_focused_window()
+                        .filter(|l| app.get_webview_window(l.as_str()).is_some());
+                    if let Some(label) = live_label {
                         let _ = app.emit_to(label.as_str(), "kex:menu", id.to_string());
                     } else if matches!(id, "new_workspace" | "new_terminal" | "new_browser") {
-                        // Windowless mode: no focused window. Create one — the new window
+                        // Windowless mode: no live window. Create one — the new window
                         // initialises with a default workspace and terminal on its own.
                         let app2 = app.clone();
                         tauri::async_runtime::spawn(async move {
