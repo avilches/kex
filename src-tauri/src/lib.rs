@@ -17,6 +17,9 @@ pub(crate) struct QuitGuard {
     pub(crate) confirmed: AtomicBool,
     /// Set while we are waiting for an in-progress duplication to finish before quitting.
     pub(crate) pending: AtomicBool,
+    /// Set by the frontend before it voluntarily destroys the last window (last workspace
+    /// removed). Signals ExitRequested to stay alive without windows rather than quitting.
+    pub(crate) windowless_mode: AtomicBool,
 }
 
 /// Called by the frontend once it has flushed editors and workspace state in
@@ -33,6 +36,16 @@ fn confirm_quit(app: tauri::AppHandle) {
 fn cancel_quit(app: tauri::AppHandle) {
     app.state::<QuitGuard>().pending.store(false, Ordering::SeqCst);
     let _ = app.emit("kex:duplicate-quit-dismissed", ());
+}
+
+/// Called by the frontend just before it destroys the last window because the
+/// last workspace was removed. Signals the subsequent ExitRequested event to
+/// keep the app alive (macOS-style: stay in the Dock without any windows).
+#[tauri::command]
+fn enter_windowless_mode(app: tauri::AppHandle) {
+    app.state::<QuitGuard>()
+        .windowless_mode
+        .store(true, Ordering::SeqCst);
 }
 
 /// Single decision point for an app-quit request, shared by every quit path:
@@ -55,7 +68,16 @@ fn signal_quit_request(app: &tauri::AppHandle) {
     app.state::<QuitGuard>()
         .confirmed
         .store(true, Ordering::SeqCst);
-    let _ = app.emit("kex:before-quit", ());
+    let has_main = app
+        .webview_windows()
+        .keys()
+        .any(|l| l.starts_with("w-"));
+    if has_main {
+        let _ = app.emit("kex:before-quit", ());
+    } else {
+        // No windows to flush — exit immediately.
+        app.exit(0);
+    }
 }
 
 /// macOS-only: handles to menu items whose labels track app state.
@@ -738,6 +760,7 @@ pub fn run() {
             get_launch_dir,
             confirm_quit,
             cancel_quit,
+            enter_windowless_mode,
             sync_menu,
             open_settings_window,
             open_main_window,
@@ -774,11 +797,18 @@ pub fn run() {
                 if guard.confirmed.load(Ordering::SeqCst) {
                     return;
                 }
+                // The frontend voluntarily closed the last window (last workspace
+                // removed). Stay alive in the background — macOS-style no-window mode.
+                if guard.windowless_mode.swap(false, Ordering::SeqCst) {
+                    api.prevent_exit();
+                    return;
+                }
                 let has_main = app_handle
                     .webview_windows()
                     .keys()
                     .any(|l| l.starts_with("w-"));
                 if !has_main {
+                    // No windows and no explicit quit: nothing to do, exit normally.
                     return;
                 }
                 // Defer this pass; signal_quit_request decides between the modal

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { isMarkdownPath } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
@@ -267,7 +268,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // when the user closes the last workspace and clicks X simultaneously.
   useEffect(() => {
     if (workspaces.length === 0 && claimClose()) {
-      void flushWorkspaceState().finally(() => void getCurrentWindow().destroy());
+      void flushWorkspaceState().finally(async () => {
+        // Signal Rust to stay alive after the window closes (macOS-style windowless mode).
+        await invoke("enter_windowless_mode").catch(() => {});
+        void getCurrentWindow().destroy();
+      });
     }
   }, [workspaces]);
 

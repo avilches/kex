@@ -154,7 +154,7 @@ export function CloseDialogs({
             <AlertDialogTitle>Close this workspace?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingCloseWorkspace?.isLast
-                ? "This is the last workspace. Closing it will quit the app."
+                ? "This is the last workspace. Closing it will close all windows."
                 : "The workspace and all of its tabs will be closed."}
             </AlertDialogDescription>
           </AlertDialogHeader>
