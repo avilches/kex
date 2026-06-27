@@ -119,7 +119,9 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           <div
             className={cn(
               "relative min-h-0 flex-1 transition-opacity",
-              session.scratchpadFocused && "opacity-50",
+              session.scratchpadOpen &&
+                session.scratchpadFocused &&
+                "opacity-50",
             )}
           >
             {/* biome-ignore lint/a11y/noStaticElementInteractions: terminal surface; pointer selects command blocks */}

@@ -277,6 +277,7 @@ export function closeScratchpad(leafId: string): void {
   if (!s.scratchpadOpen) return;
   s.scratchpadOpen = false;
   s.scratchpadActive = false;
+  s.scratchpadFocused = false;
   notifyScratchpad(leafId);
   focusSlot(leafId);
 }
