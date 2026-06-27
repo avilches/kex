@@ -126,8 +126,13 @@ previous workspaces or pane layout.
   focus. Distinguishes "active in its pane" from "has global focus" when multiple panes are visible.
 - **`workspace.new` shortcut (`Cmd+N`)** — creates a new workspace directly from the keyboard or command palette. In the
   original, the equivalent was `Cmd+T` for a new tab.
-- **Adjacent tab activation on close** — closing a panel activates the panel to its right (if any), then to its left.
-  More natural than the original behavior of always activating the last panel.
+- **MRU focus on tab close** — closing the active tab of a pane returns focus to the most-recently-used surviving tab,
+  not the positional neighbour, so closing a chain of tabs walks back through the order you used them. Each pane keeps an
+  in-memory MRU list of tab ids (`paneActivationHistoryRef` in `useWorkspaces`, never persisted, cap 50) updated on every
+  activation; `applyClosePanel` consumes it and falls back to the adjacent tab (right, then left) when the history is
+  empty. A reconciliation effect prunes dead panes/tabs so a stale id is never selected. Independent from reopen-closed
+  (undo). Upstream always activated the last panel; the fork previously activated the positional neighbour. See
+  `docs/WORKSPACES.md` for the full lifecycle.
 - **Workspaces without tabs** — closing the last tab no longer closes the workspace. Instead, the sole pane of the workspace becomes empty and renders a welcome screen with quick actions (new terminal, open file). A workspace is closed only by an explicit action (the close shortcut or the sidebar close button). The close action runs a two-stage cascade: if `warnOnCloseTabWithRunningProcess` is on and the workspace has terminals with live foreground processes, a dialog lists the affected terminals and offers to disable future warnings; otherwise, if `warnOnCloseWorkspace` is on, a plain confirmation dialog is shown; otherwise the workspace closes directly. Closing the last workspace quits the app. Not present in upstream Terax.
 - **Directional pane focus shortcuts** — `Cmd+Ctrl+Arrow` (Mac) / `Ctrl+Alt+Arrow` (non-Mac) moves focus to the
   geometrically adjacent pane in the given direction. Uses `findPaneInDirection` (spatial scoring on DOM rects: closest

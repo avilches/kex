@@ -29,10 +29,29 @@ its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`).
 
 A pane may have an empty `panels` array with `activePanelId: null`. This state is valid only for
 the sole pane of a workspace (when the workspace has no split). When the last tab is closed in a
-split pane, `applyClosePanel` (the pure entry point for tab close in `splitNode.ts`) collapses the
-empty half and promotes the sibling - only the root pane of a single-pane workspace is left empty,
-where it renders a welcome screen. This invariant is locked by a unit test in
+split pane, `applyClosePanel` (the pure entry point for tab close in `useWorkspaces.ts`) collapses
+the empty half and promotes the sibling - only the root pane of a single-pane workspace is left
+empty, where it renders a welcome screen. This invariant is locked by a unit test in
 `workspaceState.test.ts`: `sanitizeWorkspace` must round-trip an empty pane without dropping it.
+
+**Focus on close (per-pane MRU).** When the *active* tab of a pane with more than one tab closes,
+focus returns to the most-recently-used surviving tab, not the positional neighbour. Each pane
+keeps an MRU list of `panelId`s (most recent first) in `paneActivationHistoryRef`, an in-memory ref
+in `useWorkspaces` that is never persisted (capped at `MRU_HISTORY_LIMIT = 50`, though the live list
+is already bounded by the pane's open-tab count). `recordActivation` pushes onto it from the three
+points that move the active tab to a real panel: `activatePanel`, `openPanel`, `replacePanel`.
+`closePanel` reads the closing pane's history and passes it to `applyClosePanel`, which picks the
+first history id that still exists in the remaining tabs, falling back to the positional neighbour
+(`remaining[idx] ?? remaining[idx - 1]`) when the history is empty. The `history` argument is
+optional, so the pure function keeps its legacy neighbour behaviour when called without it.
+
+A single reconciliation effect (`useEffect` on `workspaces`) prunes the map against live
+panes/panels: it drops dead panes and dead `panelId`s, so a stale id is never selected and the map
+stays bounded. This covers every removal path (close, drag between panes, split collapse, workspace
+close) without per-callback cleanup; cross-pane moves need no special handling because a moved tab's
+id no longer appears in its old pane's remaining tabs. This is independent from reopen-closed (undo,
+`closedPanelsRef`): that stores dead `Panel` snapshots to resurrect; this orders live tabs to choose
+focus. The selection logic is locked by unit tests in `useWorkspaces.test.ts`.
 
 `editor` and `markdown` panels also carry an optional `explorerRoot`: the folder the explorer and
 git context jump to while that tab is active. It is captured when the file is opened
