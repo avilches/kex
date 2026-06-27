@@ -936,7 +936,12 @@ export function useTerminalSession({
         onRunningCommand: (cmd) => cbRef.current.onRunningCommand?.(cmd),
         onScratchpadState: (st) => cbRef.current.onScratchpadState?.(st),
       });
-      if (s.visibleNow && s.focusedNow && !s.blocks) focusSlot(leafId);
+      if (s.visibleNow && s.focusedNow && !s.blocks) {
+        // Honor the scratchpad as the active side on first ready (new terminal
+        // opened with it, or a restored tab that was focused there).
+        if (s.scratchpadOpen && s.scratchpadActive) s.scratchpadFocus?.();
+        else focusSlot(leafId);
+      }
     });
     return () => {
       cancelled = true;
