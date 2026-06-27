@@ -14,6 +14,7 @@ import {
   parseScmViewMode,
   parseTerminalNewFolderMode,
   DEFAULT_PREFERENCES,
+  PREF_KEY_MAP,
 } from "./store";
 
 describe("clampToStep", () => {
@@ -124,5 +125,14 @@ describe("editorViewByExt default", () => {
 describe("DEFAULT_PREFERENCES", () => {
   it("scratchpadEnterSends defaults to true", () => {
     expect(DEFAULT_PREFERENCES.scratchpadEnterSends).toBe(true);
+  });
+});
+
+describe("PREF_KEY_MAP", () => {
+  // A preference with a UI setter that is missing here never propagates to live
+  // windows: onPreferencesChange looks the store key up in this map and drops
+  // anything unmapped. Regression guard for the scratchpad Enter=Send toggle.
+  it("maps scratchpadEnterSends so its toggle reaches subscribers", () => {
+    expect(PREF_KEY_MAP.scratchpadEnterSends).toBe("scratchpadEnterSends");
   });
 });

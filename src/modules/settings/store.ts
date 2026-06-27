@@ -1005,8 +1005,10 @@ export async function setTabBarStyle(value: TabBarStyle): Promise<void> {
 
 export type PrefKey = keyof Preferences;
 
-// Defined once; maps store keys to Preferences property names.
-const PREF_KEY_MAP: Record<string, PrefKey> = {
+// Defined once; maps store keys to Preferences property names. Any preference
+// written through writePref must appear here, or onPreferencesChange drops the
+// update and live windows never see the new value.
+export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_THEME]: "theme",
   [KEY_THEME_ID]: "themeId",
   [KEY_EDITOR_THEME]: "editorTheme",
@@ -1056,6 +1058,7 @@ const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_PANEL_SIDE]: "panelSide",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
+  [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
 };
 
 /** Subscribe to changes from any window (settings → main). */
