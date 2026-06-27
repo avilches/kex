@@ -1,7 +1,7 @@
+import { Kbd, ShortcutKeys } from "@/components/Kbd";
+import type { ShortcutId } from "@/modules/shortcuts";
 import { cn } from "@/lib/utils";
-import { getShortcutLabel, type ShortcutId } from "@/modules/shortcuts";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   blockWatermarkState,
   type WatermarkState,
@@ -70,30 +70,9 @@ function Hint(props: { label: string; keys?: string; shortcut?: ShortcutId }) {
         {props.shortcut ? (
           <ShortcutKeys id={props.shortcut} />
         ) : (
-          <Key>{props.keys}</Key>
+          <Kbd>{props.keys}</Kbd>
         )}
       </span>
     </>
-  );
-}
-
-function ShortcutKeys({ id }: { id: ShortcutId }) {
-  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const label = getShortcutLabel(id, userShortcuts) ?? "";
-  const tokens = label ? label.split(" ") : [];
-  return (
-    <>
-      {tokens.map((t, i) => (
-        <Key key={`${t}-${i}`}>{t}</Key>
-      ))}
-    </>
-  );
-}
-
-function Key({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-md border border-border/60 bg-muted/50 px-1.5 font-sans text-[11px] font-medium text-foreground/80 shadow-xs">
-      {children}
-    </kbd>
   );
 }
