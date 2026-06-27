@@ -244,7 +244,7 @@ export const SHORTCUTS: Shortcut[] = [
     id: "tab.newBlock",
     label: "New Blocks Terminal",
     group: "Tabs",
-    defaultBindings: [{ [MOD_PROP]: true, key: "b" }],
+    defaultBindings: [],
   },
   {
     id: "tab.newBrowser",
@@ -358,14 +358,14 @@ export const SHORTCUTS: Shortcut[] = [
     id: "blocks.prev",
     label: "Previous Command Block",
     group: "Terminal",
-    defaultBindings: [{ [MOD_PROP]: true, key: "ArrowUp" }],
+    defaultBindings: [],
     allowRepeat: true,
   },
   {
     id: "blocks.next",
     label: "Next Command Block",
     group: "Terminal",
-    defaultBindings: [{ [MOD_PROP]: true, key: "ArrowDown" }],
+    defaultBindings: [],
     allowRepeat: true,
   },
   {

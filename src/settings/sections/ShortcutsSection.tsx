@@ -50,8 +50,9 @@ export function ShortcutsSection() {
   };
 
   const filteredShortcuts = useMemo(() => {
-    // Filter out internal/non-overridable shortcuts like tab.selectByIndex.
-    const base = SHORTCUTS.filter((s) => s.id !== "tab.selectByIndex");
+    // Filter out internal/non-overridable shortcuts and blocks (JSON-only).
+    const HIDDEN_IDS = new Set(["tab.selectByIndex", "tab.newBlock", "blocks.prev", "blocks.next"]);
+    const base = SHORTCUTS.filter((s) => !HIDDEN_IDS.has(s.id));
     if (!search) return base;
     const lower = search.toLowerCase();
     return base.filter(

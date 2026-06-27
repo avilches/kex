@@ -2,8 +2,8 @@ import type { SearchTarget } from "@/modules/header";
 import { allPaneIds } from "@/modules/workspaces";
 import type { SplitNode } from "@/modules/workspaces";
 import {
+  ArrowReloadHorizontalIcon,
   Cancel01Icon,
-  DashboardSquare01Icon,
   FileEditIcon,
   FileSearchIcon,
   Globe02Icon,
@@ -11,11 +11,13 @@ import {
   LayoutTwoColumnIcon,
   LayoutTwoRowIcon,
   PaintBoardIcon,
+  Refresh01Icon,
   Search01Icon,
   Settings01Icon,
   SidebarLeftIcon,
   SourceCodeIcon,
   TerminalIcon,
+  UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
 import type { PaletteItem } from "./types";
 
@@ -39,7 +41,6 @@ export type CommandPaletteActionContext = {
   home: string | null;
   openNewTab: () => void;
   openNewWorkspace: () => void;
-  openNewBlock: () => void;
   openNewEditor: () => void;
   openNewBrowser: () => void;
   openGitGraph: () => void;
@@ -52,6 +53,11 @@ export type CommandPaletteActionContext = {
   toggleSidebar: () => void;
   openSettings: () => void;
   openKeyboardShortcuts: () => void;
+  reopenClosedTab: () => void;
+  openNewWindow: () => void;
+  clearTerminal: () => void;
+  toggleZenMode: () => void;
+  hasActiveTerminal: boolean;
 };
 
 const noop = () => {};
@@ -114,13 +120,42 @@ export function createCommandItems(
       run: ctx.openNewWorkspace,
     },
     {
-      id: "tab.newBlock",
-      title: "New block terminal",
+      id: "window.new",
+      title: "New window",
+      group: "General",
+      keywords: ["window", "new", "open"],
+      icon: TerminalIcon,
+      shortcutId: "window.new",
+      run: ctx.openNewWindow,
+    },
+    {
+      id: "tab.reopenClosed",
+      title: "Reopen closed tab",
       group: "Tabs",
-      keywords: ["blocks", "warp", "command blocks", "terminal"],
-      icon: DashboardSquare01Icon,
-      shortcutId: "tab.newBlock",
-      run: ctx.openNewBlock,
+      keywords: ["reopen", "undo close", "restore tab"],
+      icon: ArrowReloadHorizontalIcon,
+      shortcutId: "tab.reopenClosed",
+      run: ctx.reopenClosedTab,
+    },
+    {
+      id: "terminal.clear",
+      title: "Clear terminal",
+      group: "Tabs",
+      keywords: ["clear", "clean", "reset", "terminal"],
+      icon: Refresh01Icon,
+      shortcutId: "terminal.clear",
+      disabledReason: ctx.hasActiveTerminal ? undefined : "No active terminal",
+      run: ctx.clearTerminal,
+    },
+    {
+      id: "view.zenMode",
+      title: "Toggle full pane",
+      group: "View",
+      keywords: ["zen", "fullscreen", "focus", "expand", "pane"],
+      icon: UnfoldMoreIcon,
+      shortcutId: "view.zenMode",
+      disabledReason: activePaneCount > 1 ? undefined : "Single pane",
+      run: ctx.toggleZenMode,
     },
     {
       id: "tab.newEditor",

@@ -2296,7 +2296,6 @@ export default function App() {
               openNewTerminal();
             },
             openNewWorkspace: () => addWorkspace(home ?? undefined),
-            openNewBlock: () => openNewBlock(),
             openNewEditor: () => setNewEditorOpen(true),
             openNewBrowser: () => openBrowserInPanel(""),
             openGitGraph: openGitGraphFromContext,
@@ -2309,6 +2308,15 @@ export default function App() {
             toggleSidebar: toggleRightPanel,
             openSettings: () => void openSettingsWindow(),
             openKeyboardShortcuts: () => void openSettingsWindow("shortcuts"),
+            reopenClosedTab: () => { if (activeWorkspace) reopenClosed(); },
+            openNewWindow: () => void native.openMainWindow(),
+            clearTerminal: clearFocusedTerminal,
+            toggleZenMode: () => {
+              if (!activeWorkspace) return;
+              if (allPanes(activeWorkspace.paneTree).length <= 1) return;
+              setZenPaneId((prev) => prev !== null ? null : activeWorkspace.activePaneId);
+            },
+            hasActiveTerminal: activePanel?.kind === "terminal",
           })
         : [],
     [
@@ -2321,7 +2329,6 @@ export default function App() {
       home,
       addWorkspace,
       openNewTerminal,
-      openNewBlock,
       openBrowserInPanel,
       openGitGraphFromContext,
       toggleSourceControl,
@@ -2329,6 +2336,10 @@ export default function App() {
       doSplitRight,
       doSplitDown,
       toggleRightPanel,
+      reopenClosed,
+      clearFocusedTerminal,
+      setZenPaneId,
+      activePanel,
     ],
   );
 
