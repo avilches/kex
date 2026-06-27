@@ -348,6 +348,8 @@ export function WorkspaceDndProvider({
 
   return (
     <DndContext
+      // Fixed layout: dnd auto-scroll would shift the whole viewport when a drag reaches the window edge.
+      autoScroll={false}
       sensors={sensors}
       collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
