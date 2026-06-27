@@ -83,7 +83,7 @@ fn signal_quit_request(app: &tauri::AppHandle) {
 /// macOS-only: handles to menu items whose labels track app state.
 #[cfg(target_os = "macos")]
 struct DynMenuItems {
-    autosave: tauri::menu::MenuItem<tauri::Wry>,
+    autosave: tauri::menu::CheckMenuItem<tauri::Wry>,
     sidebar: tauri::menu::CheckMenuItem<tauri::Wry>,
     explorer: tauri::menu::CheckMenuItem<tauri::Wry>,
     git: tauri::menu::CheckMenuItem<tauri::Wry>,
@@ -117,11 +117,7 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
         let handles = app.state::<MenuHandles>();
         let guard = handles.0.lock().expect("MenuHandles mutex poisoned");
         let Some(items) = guard.as_ref() else { return };
-        let _ = items.autosave.set_text(if state.autosave {
-            "Disable Autosave"
-        } else {
-            "Enable Autosave"
-        });
+        let _ = items.autosave.set_checked(state.autosave);
         let _ = items.sidebar.set_checked(state.sidebar_open);
         let on = |tab: &str| state.sidebar_open && state.active_tab == tab;
         let _ = items.explorer.set_checked(on("explorer"));
@@ -477,6 +473,7 @@ pub fn run() {
                     CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, PredefinedMenuItem,
                     SubmenuBuilder,
                 };
+                use tauri_plugin_store::StoreExt;
 
                 // Kex (app menu)
                 let about = PredefinedMenuItem::about(app, None, None)?;
@@ -507,8 +504,9 @@ pub fn run() {
                 let new_browser = MenuItemBuilder::with_id("new_browser", "New Browser Tab")
                     .accelerator("Cmd+Shift+O")
                     .build(app)?;
-                let autosave =
-                    MenuItemBuilder::with_id("toggle_autosave", "Enable Autosave").build(app)?;
+                let autosave = CheckMenuItemBuilder::with_id("toggle_autosave", "Autosave")
+                    .checked(false)
+                    .build(app)?;
                 let close_tab = MenuItemBuilder::with_id("close_tab", "Close Tab")
                     .accelerator("Cmd+W")
                     .build(app)?;
@@ -644,13 +642,34 @@ pub fn run() {
                         .filter(|l| app.get_webview_window(l.as_str()).is_some());
                     if let Some(label) = live_label {
                         let _ = app.emit_to(label.as_str(), "kex:menu", id.to_string());
-                    } else if matches!(id, "new_workspace" | "new_terminal" | "new_browser") {
-                        // Windowless mode: no live window. Create one — the new window
-                        // initialises with a default workspace and terminal on its own.
-                        let app2 = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let _ = create_new_window(&app2);
-                        });
+                    } else {
+                        // Windowless mode: no live window to route the event to.
+                        match id {
+                            "new_workspace" | "new_terminal" | "new_browser" => {
+                                let app2 = app.clone();
+                                tauri::async_runtime::spawn(async move {
+                                    let _ = create_new_window(&app2);
+                                });
+                            }
+                            "toggle_autosave" => {
+                                if let Ok(store) = app.store("settings-general.json") {
+                                    let current = store
+                                        .get("editorAutoSave")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false);
+                                    let new_val = !current;
+                                    store.set("editorAutoSave", new_val);
+                                    let _ = store.save();
+                                    let handles = app.state::<MenuHandles>();
+                                    let guard =
+                                        handles.0.lock().expect("MenuHandles mutex poisoned");
+                                    if let Some(items) = guard.as_ref() {
+                                        let _ = items.autosave.set_checked(new_val);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 });
             }
