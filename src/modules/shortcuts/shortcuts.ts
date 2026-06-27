@@ -175,7 +175,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "explorer.viewFilesystem",
-    label: "Explorer: File System",
+    label: "File System",
     group: "Explorer",
     // No default binding: Ctrl+1/Ctrl+2 are now tab.selectByIndex. Cycle the
     // explorer root with Cmd+E (sidebar.showExplorer); these stay reassignable.
@@ -183,13 +183,13 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "explorer.viewPinned",
-    label: "Explorer: Workspace Root",
+    label: "Workspace Root",
     group: "Explorer",
     defaultBindings: [],
   },
   {
     id: "explorer.toggleHidden",
-    label: "Explorer: Toggle Hidden Files",
+    label: "Toggle Hidden Files",
     group: "Explorer",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "." }],
   },
