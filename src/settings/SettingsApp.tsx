@@ -36,9 +36,9 @@ const SECTIONS: {
   component: () => JSX.Element;
 }[] = [
   { id: "general", label: "General", icon: Settings01Icon, component: GeneralSection },
+  { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon, component: TerminalSection },
   { id: "editor", label: "Editor", icon: SourceCodeIcon, component: EditorSection },
   { id: "filetypes", label: "File Types", icon: File02Icon, component: FileTypesSection },
-  { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon, component: TerminalSection },
   { id: "appearance", label: "Appearance", icon: PaintBoardIcon, component: AppearanceSection },
   { id: "themes", label: "Themes", icon: ColorsIcon, component: ThemesSection },
   { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },

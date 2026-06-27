@@ -76,7 +76,9 @@ import {
   collectRunningTerminals,
   findPane,
   findPaneInDirection,
+  findPanelPane,
   panelTitle,
+  siblingPane,
   type PanelCallbacks,
   type Rect,
   useWorkspaces,
@@ -251,7 +253,7 @@ export default function App() {
   const [gitHistoryHandle, setGitHistoryHandle] =
     useState<GitHistorySearchHandle | null>(null);
   const pendingGotoLine = useRef<Map<string, number>>(new Map());
-  const fileLinkHandlerRef = useRef<(path: string, cwd: string | null, line?: number, col?: number) => void>(
+  const fileLinkHandlerRef = useRef<(path: string, cwd: string | null, line?: number, col?: number, sourcePanelId?: string) => void>(
     () => {},
   );
   const cwdResolverRef = useRef<(leafId: string) => string | null>(() => null);
@@ -863,6 +865,44 @@ export default function App() {
     [activeWorkspace, activatePanel, openPanel, replacePanel],
   );
 
+  const openFileInRightSplit = useCallback(
+    (path: string, sourcePanelId?: string) => {
+      if (!activeWorkspace) return undefined;
+      const markdown = isMarkdownPath(path);
+      for (const pane of allPanes(activeWorkspace.paneTree)) {
+        const existing = pane.panels.find(
+          (p) =>
+            (p.kind === "editor" || p.kind === "markdown") &&
+            (p as { path: string }).path === path,
+        );
+        if (existing) {
+          activatePanel(activeWorkspace.id, existing.id);
+          flashTab(existing.id);
+          return existing.id;
+        }
+      }
+      const panelId = newPanelId();
+      const panel = markdown
+        ? ({ id: panelId, kind: "markdown" as const, path } as const)
+        : ({ id: panelId, kind: "editor" as const, path, dirty: false, preview: false } as const);
+      const sourcePaneId = sourcePanelId
+        ? findPanelPane(activeWorkspace.paneTree, sourcePanelId)?.pane.id
+        : undefined;
+      if (sourcePaneId) {
+        const sibling = siblingPane(activeWorkspace.paneTree, sourcePaneId);
+        if (sibling) {
+          openPanel(activeWorkspace.id, sibling.id, panel);
+        } else {
+          splitPaneAndOpenPanel(activeWorkspace.id, sourcePaneId, "right", panel);
+        }
+      } else {
+        openPanel(activeWorkspace.id, activeWorkspace.activePaneId, panel);
+      }
+      return panelId;
+    },
+    [activeWorkspace, activatePanel, openPanel, splitPaneAndOpenPanel],
+  );
+
   const openGitDiffInPanel = useCallback(
     (params: {
       repoRoot: string;
@@ -912,7 +952,7 @@ export default function App() {
     [activeWorkspace, openPanel],
   );
 
-  fileLinkHandlerRef.current = (path, cwd, line, _col) => {
+  fileLinkHandlerRef.current = (path, cwd, line, _col, sourcePanelId) => {
     let absPath = path;
     if (path.startsWith("~/")) {
       absPath = home ? `${home}/${path.slice(2)}` : path;
@@ -925,14 +965,14 @@ export default function App() {
           focusSidebar(absPath, { fromShortcut: true });
           return;
         }
-        const id = openFileInPanel(absPath, true);
+        const id = openFileInRightSplit(absPath, sourcePanelId);
         if (id == null || line == null) return;
         const h = editorHandles.current.get(id);
         if (h) h.gotoLine(line);
         else pendingGotoLine.current.set(id, line);
       })
       .catch(() => {
-        openFileInPanel(absPath, true);
+        openFileInRightSplit(absPath, sourcePanelId);
       });
   };
 
@@ -945,7 +985,7 @@ export default function App() {
 
   useEffect(() => {
     configureTerminalLinkBridge({
-      onFileLink: (path, cwd, line, col) => fileLinkHandlerRef.current(path, cwd, line, col),
+      onFileLink: (path, cwd, line, col, sourcePanelId) => fileLinkHandlerRef.current(path, cwd, line, col, sourcePanelId),
       resolveLeafCwd: (leafId) => cwdResolverRef.current(leafId),
     });
   }, []);

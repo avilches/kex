@@ -56,7 +56,7 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
     activate(event, uri) {
       event.preventDefault();
       if (uri.startsWith("file://")) {
-        dispatchFileLink(parseFileUri(uri), null);
+        dispatchFileLink(parseFileUri(uri), null, undefined, undefined, getLeafId() ?? undefined);
       } else {
         import("@tauri-apps/plugin-opener").then(({ openUrl }) =>
           openUrl(uri).catch(console.error),
@@ -110,7 +110,7 @@ export function registerTerminalLinks(term: Terminal, getLeafId: () => string | 
           decorations: { pointerCursor: true, underline: true },
           activate(event) {
             if (!event.metaKey && !event.ctrlKey) return;
-            dispatchFileLink(rawPath, cwd, lineNum, col);
+            dispatchFileLink(rawPath, cwd, lineNum, col, getLeafId() ?? undefined);
           },
         });
       }
