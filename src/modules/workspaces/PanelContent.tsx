@@ -220,7 +220,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               persistentCommand={panel.persistentCommand}
               initialScratchpad={
                 panel.scratchpad ??
-                (scratchpadInNewTerminals ? "visible" : "hidden")
+                (scratchpadInNewTerminals ? "focused" : "hidden")
               }
               onSearchReady={callbacks.onSearchReady}
               onExit={callbacks.onExit}

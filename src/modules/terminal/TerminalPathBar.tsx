@@ -129,6 +129,7 @@ export function TerminalPathBar({
         )}
         {agentSession && <AgentChipIndicator session={agentSession} />}
         <TerminalPathBarMenu
+          leafId={panelId}
           restoreOnRestart={restoreOnRestart}
           persistentCommand={persistentCommand}
           onUpdatePanel={onUpdatePanel ?? (() => {})}

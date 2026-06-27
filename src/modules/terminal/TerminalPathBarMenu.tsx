@@ -10,8 +10,11 @@ import { Copy01Icon, FolderOpenIcon, MoreHorizontalIcon } from "@hugeicons/core-
 import { HugeiconsIcon } from "@hugeicons/react";
 import { native } from "@/lib/native";
 import { copyToClipboard, revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import type { Panel } from "@/modules/workspaces/lib/types";
+import { leafScratchpadOpen, toggleScratchpad } from "./lib/useTerminalSession";
 
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -23,6 +26,7 @@ function formatElapsed(ms: number): string {
 }
 
 type Props = {
+  leafId: string;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
   onUpdatePanel: (updater: (p: Panel) => Panel) => void;
@@ -31,6 +35,7 @@ type Props = {
 };
 
 export function TerminalPathBarMenu({
+  leafId,
   restoreOnRestart,
   persistentCommand,
   onUpdatePanel,
@@ -38,6 +43,13 @@ export function TerminalPathBarMenu({
   runningCommand,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [scratchpadOn, setScratchpadOn] = useState(false);
+  const scratchpadKey = usePreferencesStore((s) =>
+    getShortcutLabel("terminal.scratchpad", s.shortcuts),
+  );
+  useEffect(() => {
+    if (open) setScratchpadOn(leafScratchpadOpen(leafId));
+  }, [open, leafId]);
   const [transcriptExists, setTranscriptExists] = useState<boolean | null>(null);
   const transcriptPath = agentSession?.meta?.transcriptPath;
 
@@ -72,6 +84,26 @@ export function TerminalPathBarMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 text-[12px]">
+        <div className="px-2 py-1.5">
+          <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+            <input
+              type="checkbox"
+              className="size-3 accent-primary"
+              checked={scratchpadOn}
+              onChange={() => {
+                toggleScratchpad(leafId);
+                setScratchpadOn((v) => !v);
+              }}
+            />
+            <span>Scratchpad</span>
+            {scratchpadKey && (
+              <span className="ml-auto text-[11px] text-muted-foreground">
+                {scratchpadKey}
+              </span>
+            )}
+          </label>
+        </div>
+        <DropdownMenuSeparator />
         <div className="space-y-1 px-2 py-1.5">
           <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
             <input
