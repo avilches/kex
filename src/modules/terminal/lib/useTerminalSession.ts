@@ -1052,18 +1052,28 @@ export function useTerminalSession({
     applyScrollSensitivity(scrollSensitivity);
   }, [scrollSensitivity]);
 
+  const wasFocusedRef = useRef(false);
   useEffect(() => {
     const s = sessions.get(leafId);
     if (!s) return;
     s.visibleNow = visible;
     s.focusedNow = focused;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (visible) {
       if (s.container && !s.hasSlot) bindLeafToSlot(leafId, s);
       else if (s.hasSlot) refreshLeafSlot(leafId);
       setSlotFocused(leafId, focused);
-      if (focused && !blocks) {
+      // Only seize focus on the transition to focused-and-visible. Re-running
+      // for other reasons (theme, fonts, sibling visibility) must not yank focus
+      // back from wherever the user just moved it (e.g. another tab).
+      const gained = visible && focused && !wasFocusedRef.current;
+      if (gained && !blocks) {
         if (s.scratchpadOpen && s.scratchpadActive) {
-          setTimeout(() => sessions.get(leafId)?.scratchpadFocus?.(), 0);
+          timer = setTimeout(() => {
+            // Bail if focus already left this leaf before the tick ran.
+            const cur = sessions.get(leafId);
+            if (cur?.focusedNow && cur.visibleNow) cur.scratchpadFocus?.();
+          }, 0);
         } else {
           focusSlot(leafId);
         }
@@ -1072,6 +1082,10 @@ export function useTerminalSession({
       if (s.blocks || isLeafAltScreen(leafId)) parkLeafSlot(leafId);
       else unbindLeafFromSlot(leafId, s);
     }
+    wasFocusedRef.current = visible && focused;
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [leafId, visible, focused, blocks]);
 
   const write = useCallback(
