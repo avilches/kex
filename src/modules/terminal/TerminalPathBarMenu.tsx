@@ -1,12 +1,20 @@
 import { useState, useEffect } from "react";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Copy01Icon, FolderOpenIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import {
+  Copy01Icon,
+  FolderOpenIcon,
+  MoreHorizontalIcon,
+  NoteEditIcon,
+  PlayIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { native } from "@/lib/native";
 import { copyToClipboard, revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
@@ -84,46 +92,39 @@ export function TerminalPathBarMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 text-[12px]">
-        <div className="px-2 py-1.5">
-          <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
-            <input
-              type="checkbox"
-              className="size-3 accent-primary"
-              checked={scratchpadOn}
-              onChange={() => {
-                toggleScratchpad(leafId);
-                setScratchpadOn((v) => !v);
-              }}
-            />
-            <span>Scratchpad</span>
-            {scratchpadKey && (
-              <span className="ml-auto text-[11px] text-muted-foreground">
-                {scratchpadKey}
-              </span>
-            )}
-          </label>
-        </div>
+        <DropdownMenuCheckboxItem
+          checked={scratchpadOn}
+          onSelect={(e) => e.preventDefault()}
+          onCheckedChange={() => {
+            toggleScratchpad(leafId);
+            setScratchpadOn((v) => !v);
+          }}
+        >
+          <HugeiconsIcon icon={NoteEditIcon} className="size-3.5" strokeWidth={2} />
+          <span>Scratchpad</span>
+          {scratchpadKey && (
+            <DropdownMenuShortcut>{scratchpadKey}</DropdownMenuShortcut>
+          )}
+        </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
-        <div className="space-y-1 px-2 py-1.5">
-          <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
-            <input
-              type="checkbox"
-              className="size-3 accent-primary"
-              checked={checked}
-              onChange={(e) => {
-                const next = e.target.checked;
-                onUpdatePanel((p) => ({
-                  ...p,
-                  restoreOnRestart: next,
-                  persistentCommand: next
-                    ? (persistentCommand ?? runningCommand ?? undefined)
-                    : persistentCommand,
-                }));
-              }}
-            />
-            <span>Run on start</span>
-          </label>
-          {checked && (
+        <DropdownMenuCheckboxItem
+          checked={checked}
+          onSelect={(e) => e.preventDefault()}
+          onCheckedChange={(next) => {
+            onUpdatePanel((p) => ({
+              ...p,
+              restoreOnRestart: next,
+              persistentCommand: next
+                ? (persistentCommand ?? runningCommand ?? undefined)
+                : persistentCommand,
+            }));
+          }}
+        >
+          <HugeiconsIcon icon={PlayIcon} className="size-3.5" strokeWidth={2} />
+          <span>Run on start</span>
+        </DropdownMenuCheckboxItem>
+        {checked && (
+          <div className="px-2 py-1">
             <input
               type="text"
               placeholder="command to run (e.g. lazygit)"
@@ -139,8 +140,8 @@ export function TerminalPathBarMenu({
               onPointerDown={(e) => e.stopPropagation()}
               className="h-6 w-full rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-primary"
             />
-          )}
-        </div>
+          </div>
+        )}
         {agentSession && (
           <>
             <DropdownMenuSeparator />
