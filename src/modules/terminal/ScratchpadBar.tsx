@@ -1,7 +1,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Kbd, ShortcutKeys } from "@/components/Kbd";
+import { Kbd } from "@/components/Kbd";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ENTER_KEY, SHIFT_KEY } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -29,10 +30,6 @@ import {
 
 const MAX_TEXTAREA_HEIGHT = 160; // px, ~6 lines
 const ROTATE_MS = 30_000;
-
-// Key glyphs, not letters: shift (mayuscula) and return.
-const SHIFT_GLYPH = "⇧";
-const RETURN_GLYPH = "⏎";
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = "auto";
@@ -66,6 +63,7 @@ type Props = {
 export function ScratchpadBar({ leafId }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => getLeafScratchpadDraft(leafId));
+  const [focused, setFocused] = useState(false);
   const enterSends = usePreferencesStore((s) => s.scratchpadEnterSends);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const hasAgent = useAgentStore((s) => Boolean(s.sessions[leafId]));
@@ -162,7 +160,8 @@ export function ScratchpadBar({ leafId }: Props) {
     <div
       ref={setNodeRef}
       className={cn(
-        "flex shrink-0 items-end gap-2 border-t border-border/40 px-3 py-2 transition-colors",
+        "flex shrink-0 items-end gap-2 border-t px-3 py-2 transition-colors",
+        focused ? "border-primary/50" : "border-border/40",
         isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
       )}
     >
@@ -175,13 +174,21 @@ export function ScratchpadBar({ leafId }: Props) {
         style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => setLeafScratchpadFocused(leafId, true)}
-        onBlur={() => setLeafScratchpadFocused(leafId, false)}
+        onFocus={() => {
+          setFocused(true);
+          setLeafScratchpadFocused(leafId, true);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          setLeafScratchpadFocused(leafId, false);
+        }}
       />
-      <div className="flex shrink-0 items-center gap-1.5">
-        <span className="flex items-center gap-1" title="Toggle scratchpad">
-          <ShortcutKeys id="terminal.scratchpad" />
-        </span>
+      <div className="flex shrink-0 items-center gap-1.5 self-center">
+        {!text && switchLabel && (
+          <span className="pointer-events-none shrink-0 select-none whitespace-nowrap text-[10px] text-muted-foreground/40">
+            {switchLabel} switch
+          </span>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -192,7 +199,7 @@ export function ScratchpadBar({ leafId }: Props) {
               <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-0">
+          <DropdownMenuContent align="end" side="top" sideOffset={6}>
             <DropdownMenuLabel className="text-[11px] text-muted-foreground">
               Send
             </DropdownMenuLabel>
@@ -203,12 +210,12 @@ export function ScratchpadBar({ leafId }: Props) {
               }
             >
               <DropdownMenuRadioItem value="enter">
-                <Kbd>{RETURN_GLYPH}</Kbd>
+                <Kbd>{ENTER_KEY}</Kbd>
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="shift-enter">
                 <span className="flex items-center gap-1">
-                  <Kbd>{SHIFT_GLYPH}</Kbd>
-                  <Kbd>{RETURN_GLYPH}</Kbd>
+                  <Kbd>{SHIFT_KEY}</Kbd>
+                  <Kbd>{ENTER_KEY}</Kbd>
                 </span>
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
