@@ -68,6 +68,7 @@ export type ShortcutId =
 export type ShortcutGroup =
   | "General"
   | "Sidebar"
+  | "Explorer"
   | "Tabs"
   | "Panes"
   | "Terminal"
@@ -175,7 +176,7 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "explorer.viewFilesystem",
     label: "Explorer: File System",
-    group: "Sidebar",
+    group: "Explorer",
     // No default binding: Ctrl+1/Ctrl+2 are now tab.selectByIndex. Cycle the
     // explorer root with Cmd+E (sidebar.showExplorer); these stay reassignable.
     defaultBindings: [],
@@ -183,55 +184,55 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "explorer.viewPinned",
     label: "Explorer: Workspace Root",
-    group: "Sidebar",
+    group: "Explorer",
     defaultBindings: [],
   },
   {
     id: "explorer.toggleHidden",
     label: "Explorer: Toggle Hidden Files",
-    group: "Sidebar",
+    group: "Explorer",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "." }],
   },
   {
     id: "explorer.search",
     label: "Search Files",
-    group: "Sidebar",
+    group: "Explorer",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
   },
   {
     id: "path.copy",
     label: "Copy Path",
-    group: "General",
+    group: "Explorer",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "c" }],
   },
   {
     id: "file.copy",
     label: "Copy File",
-    group: "General",
+    group: "Explorer",
     defaultBindings: [{ [MOD_PROP]: true, key: "c" }],
   },
   {
     id: "file.cut",
     label: "Cut File",
-    group: "General",
+    group: "Explorer",
     defaultBindings: [{ [MOD_PROP]: true, key: "x" }],
   },
   {
     id: "file.paste",
     label: "Paste File",
-    group: "General",
+    group: "Explorer",
     defaultBindings: [{ [MOD_PROP]: true, key: "v" }],
   },
   {
     id: "file.delete",
     label: "Delete File",
-    group: "General",
+    group: "Explorer",
     defaultBindings: [{ key: "Delete" }],
   },
   {
     id: "file.rename",
     label: "Rename File",
-    group: "General",
+    group: "Explorer",
     defaultBindings: [{ key: "F2" }],
   },
   {
@@ -484,6 +485,7 @@ export const SHORTCUTS: Shortcut[] = [
 export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   "General",
   "Sidebar",
+  "Explorer",
   "Tabs",
   "Panes",
   "Terminal",
