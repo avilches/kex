@@ -287,7 +287,7 @@ function DraggableTab({
       )}
       {isAutofocusPanel(panel) && panel.autofocus && (
         <span
-          className="ml-0.5 shrink-0 text-primary"
+          className="ml-0.5 shrink-0 text-muted-foreground"
           title="Autofocus: this tab drives the sidebar"
         >
           <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
