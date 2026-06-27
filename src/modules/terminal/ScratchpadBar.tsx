@@ -31,7 +31,7 @@ import {
 } from "./lib/useTerminalSession";
 
 const MAX_TEXTAREA_HEIGHT = 160; // px, ~6 lines
-const ROTATE_MS = 30_000;
+const ROTATE_MS = 5_000;
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = "auto";
@@ -45,14 +45,14 @@ function placeholderMessages(
 ): string[] {
   return [
     enterSends
-      ? "Press Enter to send, Shift+Enter for a new line"
-      : "Press Shift+Enter to send, Enter for a new line",
+      ? "Enter sends. Shift+Enter new line"
+      : "Shift+Enter sends. Enter new line",
     switchLabel
-      ? `Esc closes, ${switchLabel} opens the scratchpad again`
+      ? `Esc closes. ${switchLabel} opens the scratchpad again`
       : "Esc closes the scratchpad",
     switchLabel
-      ? `${switchLabel} switches between terminal and scratchpad`
-      : "Toggle the scratchpad from the terminal",
+      ? `${switchLabel} toggles scratchpad`
+      : "Define a shortcut to toggle the scratchpad in settings",
     hasAgent ? "Enter your prompt" : "Enter your command",
     "Drag files onto the scratchpad",
   ];
