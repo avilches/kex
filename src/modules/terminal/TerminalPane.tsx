@@ -15,6 +15,7 @@ import {
   focusLeafInput,
   interruptLeaf,
   leafCwd,
+  setLeafScratchpadActive,
   submitToLeaf,
   useTerminalSession,
 } from "./lib/useTerminalSession";
@@ -127,6 +128,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
               className="absolute inset-0 z-0"
               onMouseDown={(e) => {
                 downYRef.current = e.clientY;
+                setLeafScratchpadActive(panelId, false);
               }}
               onMouseUp={(e) => {
                 const moved =
@@ -178,6 +180,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
             "min-h-0 flex-1 transition-opacity",
             session.scratchpadFocused && "opacity-50",
           )}
+          onMouseDownCapture={() => setLeafScratchpadActive(panelId, false)}
         />
         {session.scratchpadOpen && (
           <ScratchpadBar leafId={panelId} paneFocused={focused} />

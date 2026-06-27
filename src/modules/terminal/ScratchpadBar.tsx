@@ -22,6 +22,7 @@ import { SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 import {
   closeScratchpad,
   getLeafScratchpadDraft,
+  setLeafScratchpadActive,
   setLeafScratchpadDraft,
   setLeafScratchpadFocus,
   setLeafScratchpadFocused,
@@ -189,6 +190,7 @@ export function ScratchpadBar({ leafId, paneFocused }: Props) {
         onFocus={() => {
           setFocused(true);
           setLeafScratchpadFocused(leafId, true);
+          setLeafScratchpadActive(leafId, true);
         }}
         onBlur={() => {
           setFocused(false);
@@ -201,46 +203,56 @@ export function ScratchpadBar({ leafId, paneFocused }: Props) {
             {hint}
           </span>
         )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              title="Scratchpad settings"
-              className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" sideOffset={6}>
-            <DropdownMenuLabel className="text-[11px] text-muted-foreground">
-              Send
-            </DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={enterSends ? "enter" : "shift-enter"}
-              onValueChange={(v) =>
-                void setTerminalScratchpadEnterSends(v === "enter")
-              }
-            >
-              <DropdownMenuRadioItem value="enter">
-                Enter sends{" "}
-                <span className="text-[10.5px] text-muted-foreground">
-                  Like Terminal
-                </span>
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="shift-enter">
-                Enter new line{" "}
-                <span className="text-[10.5px] text-muted-foreground">
-                  Like text field
-                </span>
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void openSettingsWindow("terminal")}>
-              <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
-              Terminal settings
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {paneFocused && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                title="Scratchpad settings"
+                className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" sideOffset={6}>
+              <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                Send
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={enterSends ? "enter" : "shift-enter"}
+                onValueChange={(v) =>
+                  void setTerminalScratchpadEnterSends(v === "enter")
+                }
+              >
+                <DropdownMenuRadioItem
+                  value="enter"
+                  className="flex-col items-start gap-0"
+                >
+                  Enter sends
+                  <span className="text-[10.5px] text-muted-foreground">
+                    Like Terminal
+                  </span>
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem
+                  value="shift-enter"
+                  className="flex-col items-start gap-0"
+                >
+                  Enter new line
+                  <span className="text-[10.5px] text-muted-foreground">
+                    Like text field
+                  </span>
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => void openSettingsWindow("terminal")}
+              >
+                <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
+                Terminal settings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );

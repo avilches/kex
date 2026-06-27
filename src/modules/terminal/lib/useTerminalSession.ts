@@ -104,6 +104,9 @@ type Session = {
   altScreenAtRelease: boolean;
   scratchpadOpen: boolean;
   scratchpadFocused: boolean;
+  // Which side the leaf was last working on: true = scratchpad, false = terminal.
+  // Survives tab blur so re-focusing the tab restores that side.
+  scratchpadActive: boolean;
   scratchpadFocus: (() => void) | null;
   scratchpadInsert: ((text: string) => void) | null;
   scratchpadDraft: string;
@@ -255,12 +258,15 @@ export function cycleScratchpad(leafId: string): void {
   if (!s || s.shellExited) return;
   if (!s.scratchpadOpen) {
     s.scratchpadOpen = true;
+    s.scratchpadActive = true;
     notifyScratchpad(leafId);
     // Focus callback registered after the component mounts; try next tick.
     setTimeout(() => s.scratchpadFocus?.(), 0);
   } else if (s.scratchpadFocused) {
+    s.scratchpadActive = false;
     focusSlot(leafId);
   } else {
+    s.scratchpadActive = true;
     s.scratchpadFocus?.();
   }
 }
@@ -270,8 +276,14 @@ export function closeScratchpad(leafId: string): void {
   if (!s) return;
   if (!s.scratchpadOpen) return;
   s.scratchpadOpen = false;
+  s.scratchpadActive = false;
   notifyScratchpad(leafId);
   focusSlot(leafId);
+}
+
+export function setLeafScratchpadActive(leafId: string, active: boolean): void {
+  const s = sessions.get(leafId);
+  if (s) s.scratchpadActive = active;
 }
 
 export function setLeafScratchpadFocus(
@@ -489,6 +501,7 @@ function ensureSession(
     altScreenAtRelease: false,
     scratchpadOpen: false,
     scratchpadFocused: false,
+    scratchpadActive: false,
     scratchpadFocus: null,
     scratchpadInsert: null,
     scratchpadDraft: "",
@@ -985,7 +998,13 @@ export function useTerminalSession({
       if (s.container && !s.hasSlot) bindLeafToSlot(leafId, s);
       else if (s.hasSlot) refreshLeafSlot(leafId);
       setSlotFocused(leafId, focused);
-      if (focused && !blocks) focusSlot(leafId);
+      if (focused && !blocks) {
+        if (s.scratchpadOpen && s.scratchpadActive) {
+          setTimeout(() => sessions.get(leafId)?.scratchpadFocus?.(), 0);
+        } else {
+          focusSlot(leafId);
+        }
+      }
     } else if (s.hasSlot) {
       if (s.blocks || isLeafAltScreen(leafId)) parkLeafSlot(leafId);
       else unbindLeafFromSlot(leafId, s);
