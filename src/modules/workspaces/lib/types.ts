@@ -10,8 +10,16 @@ type PanelCommon = {
   autofocus?: boolean;
 };
 
+// Persisted visibility of a terminal's scratchpad bar, restored on startup.
+export type ScratchpadState = "hidden" | "visible" | "focused";
+
+export function scratchpadStateOf(open: boolean, active: boolean): ScratchpadState {
+  if (!open) return "hidden";
+  return active ? "focused" : "visible";
+}
+
 export type Panel =
-  | (PanelCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string })
+  | (PanelCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; scratchpad?: ScratchpadState })
   | (PanelCommon & { kind: "editor"; path: string; dirty: boolean; preview: boolean; previewMode?: "overlay" | "split"; overrideLanguage?: string | null })
   | (PanelCommon & { kind: "browser"; url: string; floating?: boolean })
   | (PanelCommon & { kind: "markdown"; path: string })

@@ -56,6 +56,7 @@ import {
   setTerminalLineHeight,
   setTerminalNewFolderMode,
   setTerminalScratchpadEnterSends,
+  setTerminalScratchpadInNewTerminals,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalShell,
@@ -111,6 +112,9 @@ export function TerminalSection() {
   );
   const scratchpadEnterSends = usePreferencesStore(
     (s) => s.scratchpadEnterSends,
+  );
+  const scratchpadInNewTerminals = usePreferencesStore(
+    (s) => s.scratchpadInNewTerminals,
   );
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
   const terminalNewFolderMode = usePreferencesStore(
@@ -211,6 +215,17 @@ export function TerminalSection() {
 
       <div className="flex flex-col gap-2">
         <FieldLabel>Scratchpad</FieldLabel>
+        <SettingRow
+          title="Enable scratchpad in new terminals"
+          description="New terminals open with the scratchpad bar visible. A small input under the terminal to compose and send text without typing in the shell."
+        >
+          <Switch
+            checked={scratchpadInNewTerminals}
+            onCheckedChange={(v) =>
+              void setTerminalScratchpadInNewTerminals(v)
+            }
+          />
+        </SettingRow>
         <SettingRow
           title={
             scratchpadEnterSends

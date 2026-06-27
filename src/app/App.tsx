@@ -1539,6 +1539,13 @@ export default function App() {
         const found = findPanelGlobal(panelId);
         if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
       },
+      onScratchpadState: (panelId, state) => {
+        const found = findPanelGlobal(panelId);
+        if (found)
+          updatePanelData(found.workspace.id, panelId, (p) =>
+            p.kind === "terminal" ? { ...p, scratchpad: state } : p,
+          );
+      },
       registerTerminalHandle: (panelId, h) => {
         if (h) terminalHandles.current.set(panelId, h);
         else terminalHandles.current.delete(panelId);

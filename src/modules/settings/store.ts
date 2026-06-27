@@ -172,6 +172,7 @@ export type Preferences = {
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
   keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
+  scratchpadInNewTerminals: boolean;
 };
 
 const STORE_PATH = "settings-general.json";
@@ -230,6 +231,7 @@ const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_TERMINAL_NEW_FOLDER_MODE = "terminalNewFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
+const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 13;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -372,6 +374,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   paneSplitLimit: { width: 250, height: 250 },
   keepFolderLayoutOnChangeExplorerRoot: false,
   scratchpadEnterSends: true,
+  scratchpadInNewTerminals: true,
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -617,6 +620,9 @@ export async function loadPreferences(): Promise<Preferences> {
     scratchpadEnterSends:
       get<boolean>(KEY_SCRATCHPAD_ENTER_SENDS) ??
       DEFAULT_PREFERENCES.scratchpadEnterSends,
+    scratchpadInNewTerminals:
+      get<boolean>(KEY_SCRATCHPAD_IN_NEW_TERMINALS) ??
+      DEFAULT_PREFERENCES.scratchpadInNewTerminals,
   };
 
   // Persist any config keys that weren't present so they're discoverable in the JSON.
@@ -880,6 +886,10 @@ export async function setTerminalScratchpadEnterSends(value: boolean): Promise<v
   await writePref(KEY_SCRATCHPAD_ENTER_SENDS, value);
 }
 
+export async function setTerminalScratchpadInNewTerminals(value: boolean): Promise<void> {
+  await writePref(KEY_SCRATCHPAD_IN_NEW_TERMINALS, value);
+}
+
 export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
@@ -1059,6 +1069,7 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
+  [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
 };
 
 /** Subscribe to changes from any window (settings → main). */

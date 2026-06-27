@@ -99,6 +99,8 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **Link detection.** URLs in terminal output are clickable and open in the system browser.
 
+**Scratchpad bar.** A per-terminal input bar (`terminal.scratchpad`, default `Cmd+U`) to compose multi-line text and send it to the shell without typing at the prompt. It supports drag-and-drop of explorer paths (inserted as `@`-prefixed references) and an Enter / Shift+Enter send-mode preference (`scratchpadEnterSends`). Its visibility is one of three states (`hidden | visible | focused`) persisted per terminal panel (`Panel.scratchpad`) and restored on launch; new terminals open it by default when `scratchpadInNewTerminals` is on. The bar can also be toggled from the tab context menu.
+
 **True color and 256-color.** The xterm.js WebGL renderer supports the full color space. The terminal color palette is driven by the active app theme, not hardcoded.
 
 **WSL as a first-class workspace (Windows only).** Each tab can be set to run inside a specific WSL distro. The file explorer, git operations, and AI tools all operate inside that distro's filesystem — it is not a wrapped subprocess.

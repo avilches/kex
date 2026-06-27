@@ -25,7 +25,11 @@ Workspace           — a named environment (local or WSL distro)
 
 A `Panel` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
-its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`).
+its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`). A `terminal` panel also persists
+`scratchpad` (`hidden | visible | focused`): the runtime open/active state of its scratchpad bar
+(`scratchpadStateOf`), synced from the session via `onScratchpadState` and replayed on restore as
+`initialScratchpad`. When unset (a fresh terminal) the `scratchpadInNewTerminals` preference decides
+the initial visibility.
 
 A pane may have an empty `panels` array with `activePanelId: null`. This state is valid only for
 the sole pane of a workspace (when the workspace has no split). When the last tab is closed in a

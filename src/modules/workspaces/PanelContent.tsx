@@ -20,7 +20,7 @@ import {
 } from "@/modules/settings/store";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { openFileTypesSettings } from "@/modules/settings/openSettingsWindow";
-import type { Panel } from "./lib/types";
+import type { Panel, ScratchpadState } from "./lib/types";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 
 // TerminalPane is intentionally eager (terminal-first app).
@@ -70,6 +70,7 @@ export type PanelCallbacks = {
   onExit?: (panelId: string, code: number) => void;
   onCwd?: (panelId: string, cwd: string) => void;
   onRunningCommand?: (panelId: string, cmd: string | null) => void;
+  onScratchpadState?: (panelId: string, state: ScratchpadState) => void;
   registerTerminalHandle?: (panelId: string, handle: TerminalPaneHandle | null) => void;
   // Editor callbacks
   onEditorDirtyChange?: (panelId: string, dirty: boolean) => void;
@@ -123,6 +124,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
+  const scratchpadInNewTerminals = usePreferencesStore(
+    (s) => s.scratchpadInNewTerminals,
+  );
 
   const [currentLanguageName, setCurrentLanguageName] = useState<string>(() =>
     panel.kind === "editor" ? resolveDisplayName(panel.path) : "",
@@ -214,10 +218,15 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               blocks={panel.blocks}
               restoreOnRestart={panel.restoreOnRestart}
               persistentCommand={panel.persistentCommand}
+              initialScratchpad={
+                panel.scratchpad ??
+                (scratchpadInNewTerminals ? "visible" : "hidden")
+              }
               onSearchReady={callbacks.onSearchReady}
               onExit={callbacks.onExit}
               onCwd={callbacks.onCwd}
               onRunningCommand={callbacks.onRunningCommand}
+              onScratchpadState={callbacks.onScratchpadState}
             />
           </div>
         </div>

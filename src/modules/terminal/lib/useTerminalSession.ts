@@ -3,6 +3,10 @@ import { consumeRestorePlan, restorePlansReady } from "@/modules/agents/lib/agen
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  type ScratchpadState,
+  scratchpadStateOf,
+} from "@/modules/workspaces/lib/types";
 import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DormantRing } from "./dormantRing";
@@ -56,6 +60,7 @@ type Callbacks = {
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
   onRunningCommand?: (cmd: string | null) => void;
+  onScratchpadState?: (state: ScratchpadState) => void;
 };
 
 type Session = {
@@ -253,6 +258,15 @@ function notifyScratchpad(leafId: string): void {
   for (const l of s.scratchpadListeners) l();
 }
 
+// Persist the open/active pair (hidden | visible | focused) for restore.
+function notifyScratchpadState(leafId: string): void {
+  const s = sessions.get(leafId);
+  if (!s) return;
+  s.callbacks.onScratchpadState?.(
+    scratchpadStateOf(s.scratchpadOpen, s.scratchpadActive),
+  );
+}
+
 export function cycleScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s || s.shellExited) return;
@@ -269,6 +283,7 @@ export function cycleScratchpad(leafId: string): void {
     s.scratchpadActive = true;
     s.scratchpadFocus?.();
   }
+  notifyScratchpadState(leafId);
 }
 
 export function closeScratchpad(leafId: string): void {
@@ -279,12 +294,24 @@ export function closeScratchpad(leafId: string): void {
   s.scratchpadActive = false;
   s.scratchpadFocused = false;
   notifyScratchpad(leafId);
+  notifyScratchpadState(leafId);
   focusSlot(leafId);
 }
 
 export function setLeafScratchpadActive(leafId: string, active: boolean): void {
   const s = sessions.get(leafId);
-  if (s) s.scratchpadActive = active;
+  if (!s || s.scratchpadActive === active) return;
+  s.scratchpadActive = active;
+  notifyScratchpadState(leafId);
+}
+
+export function leafScratchpadOpen(leafId: string): boolean {
+  return sessions.get(leafId)?.scratchpadOpen ?? false;
+}
+
+export function toggleScratchpad(leafId: string): void {
+  if (leafScratchpadOpen(leafId)) closeScratchpad(leafId);
+  else cycleScratchpad(leafId);
 }
 
 export function setLeafScratchpadFocus(
@@ -464,6 +491,7 @@ function ensureSession(
   leafId: string,
   initialCwd?: string,
   blocks = false,
+  initialScratchpad?: ScratchpadState,
 ): Session {
   const existing = sessions.get(leafId);
   if (existing) return existing;
@@ -500,9 +528,9 @@ function ensureSession(
     inputActive: false,
     everSubmitted: false,
     altScreenAtRelease: false,
-    scratchpadOpen: false,
+    scratchpadOpen: initialScratchpad ? initialScratchpad !== "hidden" : false,
     scratchpadFocused: false,
-    scratchpadActive: false,
+    scratchpadActive: initialScratchpad === "focused",
     scratchpadFocus: null,
     scratchpadInsert: null,
     scratchpadDraft: "",
@@ -836,10 +864,12 @@ type Options = {
   blocks?: boolean;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
+  initialScratchpad?: ScratchpadState;
   onSearchReady?: (addon: SearchAddon) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
   onRunningCommand?: (cmd: string | null) => void;
+  onScratchpadState?: (state: ScratchpadState) => void;
 };
 
 export function useTerminalSession({
@@ -851,13 +881,27 @@ export function useTerminalSession({
   blocks = false,
   restoreOnRestart,
   persistentCommand,
+  initialScratchpad,
   onSearchReady,
   onExit,
   onCwd,
   onRunningCommand,
+  onScratchpadState,
 }: Options) {
-  const cbRef = useRef({ onSearchReady, onExit, onCwd, onRunningCommand });
-  cbRef.current = { onSearchReady, onExit, onCwd, onRunningCommand };
+  const cbRef = useRef({
+    onSearchReady,
+    onExit,
+    onCwd,
+    onRunningCommand,
+    onScratchpadState,
+  });
+  cbRef.current = {
+    onSearchReady,
+    onExit,
+    onCwd,
+    onRunningCommand,
+    onScratchpadState,
+  };
 
   // initialCwd seeds the first PTY spawn only. It must NOT be an effect dep:
   // OSC 7 updates the leaf cwd on every `cd`, and re-running the bind effect
@@ -868,10 +912,17 @@ export function useTerminalSession({
   // it in refs and off the effect deps just like initialCwd.
   const runOnStartRef = useRef({ restoreOnRestart, persistentCommand });
   runOnStartRef.current = { restoreOnRestart, persistentCommand };
+  // Seeds the initial scratchpad visibility on session creation only (restore).
+  const initialScratchpadRef = useRef(initialScratchpad);
 
   useEffect(() => {
     let cancelled = false;
-    const s = ensureSession(leafId, initialCwdRef.current, blocks);
+    const s = ensureSession(
+      leafId,
+      initialCwdRef.current,
+      blocks,
+      initialScratchpadRef.current,
+    );
     s.restoreOnRestart = runOnStartRef.current.restoreOnRestart;
     s.persistentCommand = runOnStartRef.current.persistentCommand;
     s.ready.then(() => {
@@ -883,6 +934,7 @@ export function useTerminalSession({
         onExit: (c) => cbRef.current.onExit?.(c),
         onCwd: (c) => cbRef.current.onCwd?.(c),
         onRunningCommand: (cmd) => cbRef.current.onRunningCommand?.(cmd),
+        onScratchpadState: (st) => cbRef.current.onScratchpadState?.(st),
       });
       if (s.visibleNow && s.focusedNow && !s.blocks) focusSlot(leafId);
     });
@@ -895,7 +947,12 @@ export function useTerminalSession({
   const [blockMode, setBlockMode] = useState<BlockMode>("prompt");
   useEffect(() => {
     if (!blocks) return;
-    const s = ensureSession(leafId, initialCwdRef.current, blocks);
+    const s = ensureSession(
+      leafId,
+      initialCwdRef.current,
+      blocks,
+      initialScratchpadRef.current,
+    );
     setBlockMode(s.blockMode);
     const cb = () => setBlockMode(sessions.get(leafId)?.blockMode ?? "prompt");
     s.blockListeners.add(cb);
@@ -911,7 +968,12 @@ export function useTerminalSession({
     () => sessions.get(leafId)?.scratchpadFocused ?? false,
   );
   useEffect(() => {
-    const s = ensureSession(leafId, initialCwdRef.current, blocks);
+    const s = ensureSession(
+      leafId,
+      initialCwdRef.current,
+      blocks,
+      initialScratchpadRef.current,
+    );
     setScratchpadOpen(s.scratchpadOpen);
     setScratchpadFocusedState(s.scratchpadFocused);
     const cb = () => {

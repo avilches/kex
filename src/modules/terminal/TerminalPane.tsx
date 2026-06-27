@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/modules/theme";
+import type { ScratchpadState } from "@/modules/workspaces/lib/types";
 import type { SearchAddon } from "@xterm/addon-search";
 import {
   forwardRef,
@@ -46,10 +47,13 @@ type Props = {
   /** "Run on start": resume the agent or run the saved command on first spawn. */
   restoreOnRestart?: boolean;
   persistentCommand?: string;
+  /** Persisted scratchpad visibility, seeded on first mount. */
+  initialScratchpad?: ScratchpadState;
   onSearchReady?: (panelId: string, addon: SearchAddon) => void;
   onExit?: (panelId: string, code: number) => void;
   onCwd?: (panelId: string, cwd: string) => void;
   onRunningCommand?: (panelId: string, cmd: string | null) => void;
+  onScratchpadState?: (panelId: string, state: ScratchpadState) => void;
 };
 
 export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
@@ -62,10 +66,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       blocks = false,
       restoreOnRestart,
       persistentCommand,
+      initialScratchpad,
       onSearchReady,
       onExit,
       onCwd,
       onRunningCommand,
+      onScratchpadState,
     },
     ref,
   ) {
@@ -82,10 +88,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       blocks,
       restoreOnRestart,
       persistentCommand,
+      initialScratchpad,
       onSearchReady: (a) => onSearchReady?.(panelId, a),
       onExit: (c) => onExit?.(panelId, c),
       onCwd: (c) => onCwd?.(panelId, c),
       onRunningCommand: (cmd) => onRunningCommand?.(panelId, cmd),
+      onScratchpadState: (st) => onScratchpadState?.(panelId, st),
     });
 
     useEffect(() => {

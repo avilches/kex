@@ -11,12 +11,17 @@ import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } 
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  leafScratchpadOpen,
+  toggleScratchpad,
+} from "@/modules/terminal/lib/useTerminalSession";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
@@ -437,6 +442,19 @@ function DraggableTab({
               </>
             )}
             <ContextMenuSeparator />
+            {panel.kind === "terminal" && (
+              <ContextMenuCheckboxItem
+                checked={leafScratchpadOpen(panel.id)}
+                onSelect={() => toggleScratchpad(panel.id)}
+              >
+                Scratchpad
+                {shortcutLabels["terminal.scratchpad"] && (
+                  <ContextMenuShortcut>
+                    {shortcutLabels["terminal.scratchpad"]}
+                  </ContextMenuShortcut>
+                )}
+              </ContextMenuCheckboxItem>
+            )}
             <ContextMenuItem onSelect={onNewTerminal}>
               <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={2} />
               New Terminal Tab
@@ -519,6 +537,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
     "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
     "tab.toggleAutofocus": getShortcutLabel("tab.toggleAutofocus", userShortcuts),
+    "terminal.scratchpad": getShortcutLabel("terminal.scratchpad", userShortcuts),
   };
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
