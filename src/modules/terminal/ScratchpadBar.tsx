@@ -1,7 +1,6 @@
 import { useDroppable } from "@dnd-kit/core";
 import { Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Kbd } from "@/components/Kbd";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +9,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ENTER_KEY, SHIFT_KEY } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -58,9 +56,11 @@ function placeholderMessages(
 
 type Props = {
   leafId: string;
+  /** This pane is the active/focused tab. Hint only shows for the focused tab. */
+  paneFocused: boolean;
 };
 
-export function ScratchpadBar({ leafId }: Props) {
+export function ScratchpadBar({ leafId, paneFocused }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => getLeafScratchpadDraft(leafId));
   const [focused, setFocused] = useState(false);
@@ -156,12 +156,21 @@ export function ScratchpadBar({ leafId }: Props) {
   const messages = placeholderMessages(enterSends, switchLabel, hasAgent);
   const placeholder = messages[Math.floor(Date.now() / ROTATE_MS) % messages.length];
 
+  // Hint shows only on the focused tab and points to the other side of the
+  // toggle: in the scratchpad it offers the terminal, and vice versa. Hidden
+  // while typing in the scratchpad.
+  let hint: string | null = null;
+  if (paneFocused && switchLabel) {
+    if (focused) hint = text ? null : `${switchLabel} Terminal`;
+    else hint = `${switchLabel} Scratchpad`;
+  }
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex shrink-0 items-end gap-2 border-t px-3 py-2 transition-colors",
-        focused ? "border-primary/50" : "border-border/40",
+        "flex shrink-0 items-end gap-2 border-t border-border/40 px-3 py-2 transition-colors",
+        focused && "ring-1 ring-inset ring-primary/50",
         isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
       )}
     >
@@ -184,9 +193,9 @@ export function ScratchpadBar({ leafId }: Props) {
         }}
       />
       <div className="flex shrink-0 items-center gap-1.5 self-center">
-        {!text && switchLabel && (
+        {hint && (
           <span className="pointer-events-none shrink-0 select-none whitespace-nowrap text-[10px] text-muted-foreground/40">
-            {switchLabel} switch
+            {hint}
           </span>
         )}
         <DropdownMenu>
@@ -210,13 +219,10 @@ export function ScratchpadBar({ leafId }: Props) {
               }
             >
               <DropdownMenuRadioItem value="enter">
-                <Kbd>{ENTER_KEY}</Kbd>
+                Enter sends, like Terminal
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="shift-enter">
-                <span className="flex items-center gap-1">
-                  <Kbd>{SHIFT_KEY}</Kbd>
-                  <Kbd>{ENTER_KEY}</Kbd>
-                </span>
+                Enter new line, like text field
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>

@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { defaultMonoFontFamily } from "@/lib/fonts";
+import { fmtShortcut, SHIFT_KEY } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   type CursorInactiveStyle,
@@ -454,11 +455,13 @@ export function TerminalSection() {
       <div className="flex flex-col gap-2">
         <FieldLabel>Scratchpad</FieldLabel>
         <SettingRow
-          title="Press to send"
-          description="Which keypress sends the scratchpad text to the terminal. The other inserts a new line."
+          title={
+            scratchpadEnterSends
+              ? `Press Enter to send, ${fmtShortcut(SHIFT_KEY, "Enter")} for a new line`
+              : `Press ${fmtShortcut(SHIFT_KEY, "Enter")} to send, Enter for a new line`
+          }
         >
           <RadioGroup
-            className="flex-row gap-4"
             value={scratchpadEnterSends ? "enter" : "shift-enter"}
             onValueChange={(v) =>
               void setTerminalScratchpadEnterSends(v === "enter")
@@ -470,7 +473,7 @@ export function TerminalSection() {
                 htmlFor="scratchpad-send-enter"
                 className="cursor-pointer text-[12px]"
               >
-                Enter
+                Enter sends, like Terminal
               </label>
             </div>
             <div className="flex items-center gap-2">
@@ -479,7 +482,7 @@ export function TerminalSection() {
                 htmlFor="scratchpad-send-shift"
                 className="cursor-pointer text-[12px]"
               >
-                Shift+Enter
+                Enter new line, like text field
               </label>
             </div>
           </RadioGroup>
