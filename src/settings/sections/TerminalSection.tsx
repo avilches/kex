@@ -210,6 +210,49 @@ export function TerminalSection() {
       </SettingRow>
 
       <div className="flex flex-col gap-2">
+        <FieldLabel>Scratchpad</FieldLabel>
+        <SettingRow
+          title={
+            scratchpadEnterSends
+              ? `Press Enter to send, ${fmtShortcut(SHIFT_KEY, "Enter")} for a new line`
+              : `Press ${fmtShortcut(SHIFT_KEY, "Enter")} to send, Enter for a new line`
+          }
+        >
+          <RadioGroup
+            value={scratchpadEnterSends ? "enter" : "shift-enter"}
+            onValueChange={(v) =>
+              void setTerminalScratchpadEnterSends(v === "enter")
+            }
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="enter" id="scratchpad-send-enter" />
+              <label
+                htmlFor="scratchpad-send-enter"
+                className="cursor-pointer text-[12px]"
+              >
+                Enter sends{" "}
+                <span className="text-[10.5px] text-muted-foreground">
+                  Like Terminal
+                </span>
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="shift-enter" id="scratchpad-send-shift" />
+              <label
+                htmlFor="scratchpad-send-shift"
+                className="cursor-pointer text-[12px]"
+              >
+                Enter new line{" "}
+                <span className="text-[10.5px] text-muted-foreground">
+                  Like text field
+                </span>
+              </label>
+            </div>
+          </RadioGroup>
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
         <FieldLabel>Font</FieldLabel>
         <FontFamilyInput
           value={terminalFontFamily}
@@ -449,43 +492,6 @@ export function TerminalSection() {
             checked={terminalCursorBlink}
             onCheckedChange={(v) => void setTerminalCursorBlink(v)}
           />
-        </SettingRow>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <FieldLabel>Scratchpad</FieldLabel>
-        <SettingRow
-          title={
-            scratchpadEnterSends
-              ? `Press Enter to send, ${fmtShortcut(SHIFT_KEY, "Enter")} for a new line`
-              : `Press ${fmtShortcut(SHIFT_KEY, "Enter")} to send, Enter for a new line`
-          }
-        >
-          <RadioGroup
-            value={scratchpadEnterSends ? "enter" : "shift-enter"}
-            onValueChange={(v) =>
-              void setTerminalScratchpadEnterSends(v === "enter")
-            }
-          >
-            <div className="flex items-center gap-2">
-              <RadioGroupItem value="enter" id="scratchpad-send-enter" />
-              <label
-                htmlFor="scratchpad-send-enter"
-                className="cursor-pointer text-[12px]"
-              >
-                Enter sends, like Terminal
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <RadioGroupItem value="shift-enter" id="scratchpad-send-shift" />
-              <label
-                htmlFor="scratchpad-send-shift"
-                className="cursor-pointer text-[12px]"
-              >
-                Enter new line, like text field
-              </label>
-            </div>
-          </RadioGroup>
         </SettingRow>
       </div>
     </div>

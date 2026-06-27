@@ -4,13 +4,16 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setTerminalScratchpadEnterSends } from "@/modules/settings/store";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
@@ -178,7 +181,7 @@ export function ScratchpadBar({ leafId, paneFocused }: Props) {
         ref={textareaRef}
         value={text}
         rows={1}
-        placeholder={placeholder}
+        placeholder={focused ? placeholder : ""}
         className="min-h-[28px] w-0 flex-1 resize-none overflow-y-auto rounded bg-transparent font-mono text-sm leading-[1.4] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
         style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
         onChange={handleChange}
@@ -219,12 +222,23 @@ export function ScratchpadBar({ leafId, paneFocused }: Props) {
               }
             >
               <DropdownMenuRadioItem value="enter">
-                Enter sends, like Terminal
+                Enter sends{" "}
+                <span className="text-[10.5px] text-muted-foreground">
+                  Like Terminal
+                </span>
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="shift-enter">
-                Enter new line, like text field
+                Enter new line{" "}
+                <span className="text-[10.5px] text-muted-foreground">
+                  Like text field
+                </span>
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => void openSettingsWindow("terminal")}>
+              <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
+              Terminal settings
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
