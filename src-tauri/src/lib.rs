@@ -377,13 +377,17 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
 #[tauri::command]
 async fn open_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    create_new_window(&app)
+}
+
+fn create_new_window(app: &tauri::AppHandle) -> Result<(), String> {
     let id = window_state::generate_window_id();
     {
         let mgr = app.state::<window_state::WindowStateManager>();
         mgr.add_window(id.clone());
         mgr.save();
     }
-    create_app_window(&app, id, None)
+    create_app_window(app, id, None)
 }
 
 #[tauri::command]
@@ -491,6 +495,9 @@ pub fn run() {
                     .build()?;
 
                 // File
+                let new_window = MenuItemBuilder::with_id("new_window", "New Window")
+                    .accelerator("Cmd+Shift+N")
+                    .build(app)?;
                 let new_workspace = MenuItemBuilder::with_id("new_workspace", "New Workspace")
                     .accelerator("Cmd+N")
                     .build(app)?;
@@ -510,6 +517,8 @@ pub fn run() {
                 let close_all =
                     MenuItemBuilder::with_id("close_all", "Close All Tabs").build(app)?;
                 let file_menu = SubmenuBuilder::new(app, "File")
+                    .item(&new_window)
+                    .separator()
                     .item(&new_workspace)
                     .item(&new_terminal)
                     .item(&new_browser)
@@ -609,6 +618,13 @@ pub fn run() {
                         signal_quit_request(app);
                         return;
                     }
+                    if id == "new_window" {
+                        let app2 = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = create_new_window(&app2);
+                        });
+                        return;
+                    }
                     if id == "dock_browser" {
                         float_browser::dock_focused(app);
                         return;
@@ -623,6 +639,13 @@ pub fn run() {
                     let mgr = app.state::<window_state::WindowStateManager>();
                     if let Some(label) = mgr.get_focused_window() {
                         let _ = app.emit_to(label.as_str(), "kex:menu", id.to_string());
+                    } else if matches!(id, "new_workspace" | "new_terminal" | "new_browser") {
+                        // Windowless mode: no focused window. Create one — the new window
+                        // initialises with a default workspace and terminal on its own.
+                        let app2 = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = create_new_window(&app2);
+                        });
                     }
                 });
             }
@@ -786,6 +809,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
+            // Dock icon click with no open windows: open a new window.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
+                if !has_visible_windows {
+                    let _ = create_new_window(app_handle);
+                }
+                return;
+            }
             // Cmd+Q / menu Quit raise ExitRequested at the app level, bypassing
             // each window's CloseRequested (and the JS flush wired to it). Defer
             // the quit once so the frontend can flush dirty editors and workspace
