@@ -5,6 +5,7 @@ import {
   pointerWithin,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -14,6 +15,14 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { panelForDroppedPath } from "./lib/dropPanel";
 import { allPanes, findPanelPane } from "./lib/splitNode";
+import {
+  insertIntoLeafScratchpad,
+  leafCwd,
+} from "@/modules/terminal/lib/useTerminalSession";
+import {
+  scratchpadRefForDrop,
+  SCRATCHPAD_DROP_PREFIX,
+} from "@/modules/terminal/lib/scratchpadPath";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { basename, panelIcon, panelTitle } from "./lib/panelTitle";
 import type { Panel, Workspace } from "./lib/types";
@@ -44,6 +53,18 @@ export function useWorkspaceDnd(): WorkspaceDndContextValue {
 export function useWorkspaceDndInsert(): string | null {
   return useContext(WorkspaceDndInsertContext);
 }
+
+// The pane drop overlay (z-40, inset-0) sits on top of the scratchpad bar, so a
+// pointer over the bar collides with both. Prefer the scratchpad so a path drop
+// inserts a reference instead of opening a pane.
+const collisionDetection: CollisionDetection = (args) => {
+  const collisions = pointerWithin(args);
+  const onScratchpad = collisions.find((c) =>
+    String(c.id).startsWith(SCRATCHPAD_DROP_PREFIX),
+  );
+  if (!onScratchpad) return collisions;
+  return [onScratchpad, ...collisions.filter((c) => c !== onScratchpad)];
+};
 
 type Props = {
   workspaces: Workspace[];
@@ -172,19 +193,33 @@ export function WorkspaceDndProvider({
     const overId = String(over.id);
 
     if (activeId.startsWith("file:")) {
+      if (handleScratchpadDrop(activeId.slice(5), overId)) return;
       handleFileDragEnd(activeId.slice(5), overId, idx, false);
       return;
     }
     if (activeId.startsWith("dir-pane:")) {
+      if (handleScratchpadDrop(activeId.slice(9), overId)) return;
       handleFileDragEnd(activeId.slice(9), overId, idx, true);
       return;
     }
     if (activeId.startsWith("dir:")) {
+      if (handleScratchpadDrop(activeId.slice(4), overId)) return;
       handleFileDragEnd(activeId.slice(4), overId, idx, true);
       return;
     }
 
     handlePanelDragEnd(activeId, overId, idx);
+  }
+
+  // A file/folder dropped on a terminal's scratchpad bar inserts its path,
+  // relative to that terminal's cwd, as an `@`-prefixed reference.
+  function handleScratchpadDrop(filePath: string, overId: string): boolean {
+    if (!overId.startsWith(SCRATCHPAD_DROP_PREFIX)) return false;
+    const leafId = overId.slice(SCRATCHPAD_DROP_PREFIX.length);
+    const cwd = leafCwd(leafId);
+    const ref = cwd ? scratchpadRefForDrop(cwd, filePath) : `@${filePath}`;
+    insertIntoLeafScratchpad(leafId, ref);
+    return true;
   }
 
   function handleFileDragEnd(filePath: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>, isDir: boolean) {
@@ -314,7 +349,7 @@ export function WorkspaceDndProvider({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}

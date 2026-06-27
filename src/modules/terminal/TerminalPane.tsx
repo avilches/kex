@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { useTheme } from "@/modules/theme";
 import type { SearchAddon } from "@xterm/addon-search";
 import {
@@ -114,7 +115,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           className="zoom-exempt flex h-full w-full flex-col"
           style={hideStyle}
         >
-          <div className="relative min-h-0 flex-1">
+          <div
+            className={cn(
+              "relative min-h-0 flex-1 transition-opacity",
+              session.scratchpadFocused && "opacity-50",
+            )}
+          >
             {/* biome-ignore lint/a11y/noStaticElementInteractions: terminal surface; pointer selects command blocks */}
             <div
               ref={containerRef}
@@ -164,7 +170,13 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     return (
       <div className="zoom-exempt flex h-full w-full flex-col" style={hideStyle}>
-        <div ref={containerRef} className="min-h-0 flex-1" />
+        <div
+          ref={containerRef}
+          className={cn(
+            "min-h-0 flex-1 transition-opacity",
+            session.scratchpadFocused && "opacity-50",
+          )}
+        />
         {session.scratchpadOpen && <ScratchpadBar leafId={panelId} />}
       </div>
     );

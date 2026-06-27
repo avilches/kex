@@ -306,6 +306,16 @@ panel. `dir-pane:` drags set `draggingItem.paneOnly`, which excludes them from t
 move targets (`explorer-dir:` / `explorer-file:`) so the root and ".." rows can only open a terminal
 in a pane, never move files within the tree.
 
+Before routing to `handleFileDragEnd`, an explorer drag dropped on a terminal's scratchpad bar is
+intercepted by `handleScratchpadDrop`: the `ScratchpadBar` registers a `useDroppable` with id
+`scratchpad:<leafId>`, and the handler resolves the path relative to that terminal's live cwd
+(`leafCwd`), formats it as an `@`-prefixed reference (`scratchpadRefForDrop` in
+`terminal/lib/scratchpadPath.ts`, quoted only when the shell would mis-split it), and inserts it at
+the textarea cursor via `insertIntoLeafScratchpad`. Because the pane drop overlay (z-40, `inset-0`)
+sits on top of the bar, the `DndContext` uses a custom `collisionDetection` that wraps
+`pointerWithin` and promotes any `scratchpad:` collision to the front, so a path drop inserts a
+reference instead of opening a pane.
+
 **Panel drag** — two zone ID formats:
 
 `tab-insert:<panelId>:before|after` - tab border drop zones for positional insertion:

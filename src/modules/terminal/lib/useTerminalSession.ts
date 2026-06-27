@@ -105,6 +105,7 @@ type Session = {
   scratchpadOpen: boolean;
   scratchpadFocused: boolean;
   scratchpadFocus: (() => void) | null;
+  scratchpadInsert: ((text: string) => void) | null;
   scratchpadDraft: string;
   scratchpadListeners: Set<() => void>;
 };
@@ -286,7 +287,21 @@ export function setLeafScratchpadFocused(
   focused: boolean,
 ): void {
   const s = sessions.get(leafId);
-  if (s) s.scratchpadFocused = focused;
+  if (!s || s.scratchpadFocused === focused) return;
+  s.scratchpadFocused = focused;
+  notifyScratchpad(leafId);
+}
+
+export function setLeafScratchpadInsert(
+  leafId: string,
+  fn: ((text: string) => void) | null,
+): void {
+  const s = sessions.get(leafId);
+  if (s) s.scratchpadInsert = fn;
+}
+
+export function insertIntoLeafScratchpad(leafId: string, text: string): void {
+  sessions.get(leafId)?.scratchpadInsert?.(text);
 }
 
 export function getLeafScratchpadDraft(leafId: string): string {
@@ -475,6 +490,7 @@ function ensureSession(
     scratchpadOpen: false,
     scratchpadFocused: false,
     scratchpadFocus: null,
+    scratchpadInsert: null,
     scratchpadDraft: "",
     scratchpadListeners: new Set(),
   };
@@ -877,10 +893,18 @@ export function useTerminalSession({
   const [scratchpadOpen, setScratchpadOpen] = useState<boolean>(
     () => sessions.get(leafId)?.scratchpadOpen ?? false,
   );
+  const [scratchpadFocused, setScratchpadFocusedState] = useState<boolean>(
+    () => sessions.get(leafId)?.scratchpadFocused ?? false,
+  );
   useEffect(() => {
     const s = ensureSession(leafId, initialCwdRef.current, blocks);
     setScratchpadOpen(s.scratchpadOpen);
-    const cb = () => setScratchpadOpen(sessions.get(leafId)?.scratchpadOpen ?? false);
+    setScratchpadFocusedState(s.scratchpadFocused);
+    const cb = () => {
+      const cur = sessions.get(leafId);
+      setScratchpadOpen(cur?.scratchpadOpen ?? false);
+      setScratchpadFocusedState(cur?.scratchpadFocused ?? false);
+    };
     s.scratchpadListeners.add(cb);
     return () => {
       s.scratchpadListeners.delete(cb);
@@ -1086,6 +1110,7 @@ export function useTerminalSession({
       revealMatch,
       clearSearch,
       scratchpadOpen,
+      scratchpadFocused,
     }),
     [
       write,
@@ -1102,6 +1127,7 @@ export function useTerminalSession({
       revealMatch,
       clearSearch,
       scratchpadOpen,
+      scratchpadFocused,
     ],
   );
 }
