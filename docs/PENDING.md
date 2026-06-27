@@ -25,7 +25,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-40](pending/bugs/BUG-40-stage-unstage-all-incompleto.md) — Stage all / unstage all no procesa todos los ficheros (la logica de pathspecs parece correcta; el sintoma cuelga probablemente de BUG-06, renames sin original_rel. Reproducir antes de fix)
 - [BUG-42](pending/bugs/BUG-42-borrar-fichero-con-editor-abierto.md) — Borrar un fichero con el editor abierto: el editor muestra un error rojo generico (string crudo de IPC, sin distinguir ENOENT ni ofrecer accion) y la vista de diff no reacciona (contenido obsoleto). Definir mejor UX
 - [BUG-43](pending/bugs/BUG-43-restore-claude-code-con-worktree.md) — Restore de Claude Code cuando ha creado un worktree (sin verificar)
-- [BUG-44](pending/bugs/BUG-44-repaso-scratchpad.md) — URGENTE: repaso del scratchpad (switch Enter=Send no funciona, boton Send sin fondo, Cmd+U debe cerrar como Esc, arrastrar fichero/carpeta inserta su path relativo)
 
 ## Features (`docs/pending/features/`)
 
