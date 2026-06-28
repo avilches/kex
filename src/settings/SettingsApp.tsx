@@ -8,6 +8,7 @@ import {
   Cancel01Icon,
   ColorsIcon,
   ComputerTerminal01Icon,
+  DocumentCodeIcon,
   File02Icon,
   InformationCircleIcon,
   KeyboardIcon,
@@ -21,6 +22,7 @@ import { type JSX, useEffect, useRef, useState } from "react";
 import { DuplicateQuitModal } from "@/modules/explorer/DuplicateQuitModal";
 import { initDuplicateProgressListener } from "@/modules/explorer/lib/duplicateStore";
 import { AboutSection } from "./sections/AboutSection";
+import { ExternalEditorsSection } from "./sections/ExternalEditorsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
 import { FileTypesSection } from "./sections/FileTypesSection";
@@ -42,6 +44,7 @@ const SECTIONS: {
   { id: "appearance", label: "Appearance", icon: PaintBoardIcon, component: AppearanceSection },
   { id: "themes", label: "Themes", icon: ColorsIcon, component: ThemesSection },
   { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },
+  { id: "external-editors", label: "Ext. Editors", icon: DocumentCodeIcon, component: ExternalEditorsSection },
   { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
 ];
 

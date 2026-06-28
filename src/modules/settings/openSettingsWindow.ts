@@ -8,6 +8,7 @@ export type SettingsTab =
   | "appearance"
   | "themes"
   | "shortcuts"
+  | "external-editors"
   | "about";
 
 export async function openSettingsWindow(tab?: SettingsTab): Promise<void> {
