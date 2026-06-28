@@ -1,25 +1,47 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useEffect, useRef, useState } from "react";
 import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setPreferredEditorId, setCustomEditors } from "@/modules/settings/store";
+import { setCustomEditors } from "@/modules/settings/store";
 import { useExternalEditors, EditorIcon } from "@/modules/external-editors";
-import type { CustomEditor } from "@/modules/external-editors";
+import type { CustomEditor, DetectedEditor } from "@/modules/external-editors";
 
 export function ExternalEditorsSection() {
   const { detectedEditors, isScanning, scan } = useExternalEditors();
-  const preferredEditorId = usePreferencesStore((s) => s.preferredEditorId);
   const customEditors = usePreferencesStore((s) => s.customEditors);
 
-  const allEditors = [...detectedEditors, ...customEditors];
+  // Detected editors that the user manually removed this session
+  const [hiddenDetectedIds, setHiddenDetectedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  // Scan on mount if cache is empty (Settings webview misses the startup scan)
+  useEffect(() => {
+    if (detectedEditors.length === 0 && !isScanning) {
+      scan();
+    }
+    // Only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Clear hidden list when a new scan completes
+  const prevScanningRef = useRef(isScanning);
+  useEffect(() => {
+    if (prevScanningRef.current && !isScanning) {
+      setHiddenDetectedIds(new Set());
+    }
+    prevScanningRef.current = isScanning;
+  });
+
+  const visibleDetected = detectedEditors.filter((e) => !hiddenDetectedIds.has(e.id));
+
+  function handleDeleteDetected(e: DetectedEditor) {
+    setHiddenDetectedIds((prev) => new Set([...prev, e.id]));
+  }
 
   function handleAddCustom() {
+    // Block adding if there's already an editor with both name and binary empty
+    if (customEditors.some((e) => !e.name.trim() && !e.binary.trim())) return;
     const id = crypto.randomUUID();
     const newEditor: CustomEditor = { id, name: "", binary: "", argsBeforePath: [] };
     void setCustomEditors([...customEditors, newEditor]);
@@ -36,11 +58,7 @@ export function ExternalEditorsSection() {
   }
 
   function handleDeleteCustom(id: string) {
-    const next = customEditors.filter((e) => e.id !== id);
-    void setCustomEditors(next);
-    if (preferredEditorId === id) {
-      void setPreferredEditorId(null);
-    }
+    void setCustomEditors(customEditors.filter((e) => e.id !== id));
   }
 
   return (
@@ -48,31 +66,9 @@ export function ExternalEditorsSection() {
       <div>
         <h2 className="text-[13px] font-medium text-foreground">External Editors</h2>
         <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-          Choose which editor to open files and folders in.
+          Use the header button to open files or folders in an external editor.
+          Select your preferred editor from that button's dropdown.
         </p>
-      </div>
-
-      {/* Default editor */}
-      <div className="space-y-1.5">
-        <label className="text-[12px] font-medium text-foreground">Default editor</label>
-        <Select
-          value={preferredEditorId ?? "__none__"}
-          onValueChange={(v) => void setPreferredEditorId(v === "__none__" ? null : v)}
-        >
-          <SelectTrigger className="h-8 w-48 text-[12px]">
-            <SelectValue placeholder="Select editor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__" className="text-[12px]">
-              Auto (first detected)
-            </SelectItem>
-            {allEditors.map((e) => (
-              <SelectItem key={e.id} value={e.id} className="text-[12px]">
-                {e.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Detected editors */}
@@ -83,25 +79,35 @@ export function ExternalEditorsSection() {
             type="button"
             onClick={scan}
             disabled={isScanning}
-            className="flex h-[22px] items-center justify-center gap-1 rounded px-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-            title="Scan for available editors"
+            className="flex h-[26px] items-center gap-1.5 rounded border border-border bg-muted px-3 text-[11px] text-foreground transition-colors hover:bg-accent disabled:opacity-50"
           >
-            {isScanning ? "Scanning..." : "Scan for available editors"}
+            {isScanning ? "Scanning..." : "Scan"}
           </button>
         </div>
-        {detectedEditors.length === 0 && !isScanning && (
+        {visibleDetected.length === 0 && !isScanning && (
           <p className="text-[11.5px] text-muted-foreground">
-            No editors detected. Click "Scan" to search for installed editors.
+            No editors detected. Click Scan to search for installed editors.
           </p>
         )}
+        {isScanning && (
+          <p className="text-[11.5px] text-muted-foreground">Scanning for editors...</p>
+        )}
         <div className="space-y-0.5">
-          {detectedEditors.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 rounded px-1 py-0.5">
-              <EditorIcon id={e.id} />
+          {visibleDetected.map((e) => (
+            <div key={e.id} className="flex items-center gap-2 rounded px-1 py-1">
+              <EditorIcon id={e.id} size={18} />
               <span className="w-28 shrink-0 text-[12px] text-foreground">{e.name}</span>
               <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                 {e.binary}
               </span>
+              <button
+                type="button"
+                title="Remove from list"
+                onClick={() => handleDeleteDetected(e)}
+                className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+              </button>
             </div>
           ))}
         </div>
@@ -110,6 +116,20 @@ export function ExternalEditorsSection() {
       {/* Custom editors */}
       <div className="space-y-2">
         <span className="text-[12px] font-medium text-foreground">Custom editors</span>
+        {customEditors.length > 0 && (
+          <div className="mb-1 grid grid-cols-[1fr_2fr_auto_auto] gap-2 px-1">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Name
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Binary / path
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Args
+            </span>
+            <span />
+          </div>
+        )}
         <div className="space-y-1">
           {customEditors.map((e) => (
             <div key={e.id} className="flex items-center gap-2">
@@ -154,7 +174,8 @@ export function ExternalEditorsSection() {
         <button
           type="button"
           onClick={handleAddCustom}
-          className="flex h-7 items-center gap-1.5 rounded px-2 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          disabled={customEditors.some((e) => !e.name.trim() && !e.binary.trim())}
+          className="flex h-7 items-center gap-1.5 rounded px-2 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
           Add editor
