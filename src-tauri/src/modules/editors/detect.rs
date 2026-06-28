@@ -81,10 +81,17 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
 
 #[cfg(target_os = "macos")]
 fn resolve_launch_macos(entry: &EditorEntry, app_path: &str) -> Option<(String, Vec<String>)> {
-    // Editors launched via `open -b <bundle_id>` (no CLI)
+    // Editors launched via `open -b <bundle_id>` (no usable CLI).
+    // If the entry has args_before_path (e.g. --working-directory for Ghostty),
+    // inject --args so macOS passes them through to the app.
     if is_macos_open_only(entry.id) {
         let bundle_id = entry.bundle_id?;
-        return Some(("open".to_string(), vec!["-b".to_string(), bundle_id.to_string()]));
+        let mut args = vec!["-b".to_string(), bundle_id.to_string()];
+        if !entry.args_before_path.is_empty() {
+            args.push("--args".to_string());
+            args.extend(entry.args_before_path.iter().map(|s| s.to_string()));
+        }
+        return Some(("open".to_string(), args));
     }
 
     // Zed ships a CLI binary inside the bundle
