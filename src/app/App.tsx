@@ -31,6 +31,7 @@ import {
   type SearchTarget,
 } from "@/modules/header";
 import type { OpenInEditorTarget } from "@/modules/external-editors";
+import { runEditorScan } from "@/modules/external-editors";
 import type { BrowserPaneHandle } from "@/modules/browser";
 import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
@@ -282,6 +283,12 @@ export default function App() {
   const { zoomIn, zoomOut, zoomReset } = useZoom();
   useEditorFont();
   useTerminalFileDrop();
+
+  // ── Editor scan on startup ────────────────────────────────────────────────
+
+  useEffect(() => {
+    void runEditorScan();
+  }, []);
 
   // ── Workspace state persistence ───────────────────────────────────────────
 

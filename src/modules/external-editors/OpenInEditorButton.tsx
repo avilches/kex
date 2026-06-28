@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -35,27 +35,10 @@ function pathLabel(target: OpenInEditorTarget): string {
 
 
 export function OpenInEditorButton({ target, onOpenSettings }: Props) {
-  const { detectedEditors, isScanning, scan } = useExternalEditors();
+  const { detectedEditors, isScanning } = useExternalEditors();
   const preferredEditorId = usePreferencesStore((s) => s.preferredEditorId);
   const customEditors = usePreferencesStore((s) => s.customEditors);
   const [open, setOpen] = useState(false);
-  const didScan = useRef(false);
-
-  // Reset scan guard when dropdown closes
-  useEffect(() => {
-    if (!open) {
-      didScan.current = false;
-    }
-  }, [open]);
-
-  // Trigger a lazy scan the first time the dropdown is opened and no editors
-  // have been detected yet.
-  useEffect(() => {
-    if (open && !didScan.current && detectedEditors.length === 0 && !isScanning) {
-      didScan.current = true;
-      scan();
-    }
-  }, [open, detectedEditors.length, isScanning, scan]);
 
   const allEditors: AnyEditor[] = [...detectedEditors, ...customEditors];
 
@@ -120,20 +103,14 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52 text-[12px]">
-          {allEditors.length === 0 && !isScanning && (
-            <>
-              <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
-                No editors detected
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => onOpenSettings?.()}>
-                Open External Editors settings
-              </DropdownMenuItem>
-            </>
-          )}
           {isScanning && (
             <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
               Scanning...
+            </div>
+          )}
+          {!isScanning && allEditors.length === 0 && (
+            <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+              No editors detected
             </div>
           )}
           {allEditors.map((editor) => (
@@ -149,6 +126,11 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
               )}
             </DropdownMenuItem>
           ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => onOpenSettings?.()} className="gap-2 text-muted-foreground">
+            <HugeiconsIcon icon={DocumentCodeIcon} size={13} strokeWidth={1.75} />
+            Configure editors
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
