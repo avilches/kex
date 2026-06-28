@@ -98,6 +98,8 @@ type Options = {
 };
 
 export function useFileTree(rootPath: string | null, options?: Options) {
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   const showHidden = options?.showHidden ?? false;
   const showHiddenRef = useRef(showHidden);
   const keepLayout = usePreferencesStore(
@@ -522,7 +524,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
       try {
         await native.renameFile(clip.path, dest);
-        options?.onPathRenamed?.(clip.path, dest);
+        optionsRef.current?.onPathRenamed?.(clip.path, dest);
         await Promise.all([
           fetchChildren(dirname(clip.path)),
           fetchChildren(destDir),
@@ -534,7 +536,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         toast.error(`Failed to move ${baseName}`);
       }
     },
-    [fetchChildren, options],
+    [fetchChildren],
   );
 
   const beginRename = useCallback((path: string) => {
@@ -558,7 +560,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       const to = joinPath(parent, trimmed);
       try {
         await native.renameFile(renaming, to);
-        options?.onPathRenamed?.(renaming, to);
+        optionsRef.current?.onPathRenamed?.(renaming, to);
         await fetchChildren(parent);
       } catch (e) {
         console.error("fs_rename failed:", e);
@@ -569,14 +571,14 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         setRenaming(null);
       }
     },
-    [renaming, fetchChildren, options],
+    [renaming, fetchChildren],
   );
 
   const deletePath = useCallback(
     async (path: string) => {
       try {
         await invoke("fs_delete", { path, workspace: currentWorkspaceEnv() });
-        options?.onPathDeleted?.(path);
+        optionsRef.current?.onPathDeleted?.(path);
         await fetchChildren(dirname(path));
       } catch (e) {
         console.error("fs_delete failed:", e);
@@ -585,14 +587,14 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         });
       }
     },
-    [fetchChildren, options],
+    [fetchChildren],
   );
 
   const trashPath = useCallback(
     async (path: string) => {
       try {
         await invoke("fs_trash", { path, workspace: currentWorkspaceEnv() });
-        options?.onPathDeleted?.(path);
+        optionsRef.current?.onPathDeleted?.(path);
         await fetchChildren(dirname(path));
       } catch (e) {
         console.error("fs_trash failed:", e);
@@ -601,7 +603,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         });
       }
     },
-    [fetchChildren, options],
+    [fetchChildren],
   );
 
   const movePath = useCallback(
@@ -619,7 +621,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       }
       try {
         await native.renameFile(from, to);
-        options?.onPathRenamed?.(from, to);
+        optionsRef.current?.onPathRenamed?.(from, to);
         await Promise.all([fetchChildren(dirname(from)), fetchChildren(toDir)]);
       } catch (e) {
         console.error("fs_rename (move) failed:", e);
@@ -628,7 +630,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         });
       }
     },
-    [fetchChildren, options],
+    [fetchChildren],
   );
 
   return {
