@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setPreferredFileEditorId,
   setPreferredWorkspaceEditorId,
+  setPreferredTerminalEditorId,
 } from "@/modules/settings/store";
 import { useExternalEditors, openWithEditor } from "./useExternalEditors";
 import type { AnyEditor } from "./types";
@@ -46,11 +47,12 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   const { detectedEditors, isScanning } = useExternalEditors();
   const preferredFileEditorId = usePreferencesStore((s) => s.preferredFileEditorId);
   const preferredWorkspaceEditorId = usePreferencesStore((s) => s.preferredWorkspaceEditorId);
+  const preferredTerminalEditorId = usePreferencesStore((s) => s.preferredTerminalEditorId);
   const customEditors = usePreferencesStore((s) => s.customEditors);
   const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const [open, setOpen] = useState(false);
-  // Tracks the last editor explicitly picked from the dropdown so the icon
-  // updates immediately regardless of which context (file/folder) is active.
+  // Last editor explicitly chosen from the dropdown; takes priority over auto-selection.
+  // Cleared when the context type changes (file <-> dir) so auto-selection resumes.
   const [overrideEditorId, setOverrideEditorId] = useState<string | null>(null);
 
   const allEditors: AnyEditor[] = [
@@ -60,7 +62,6 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
 
   const hasFile = target?.kind === "file";
 
-  // For terminal editors: CWD when on terminal tab, parent dir when on file/other
   const currentFolderPath: string | null = (() => {
     if (!target) return null;
     if (target.kind === "dir") return target.path;
@@ -69,50 +70,76 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     return parts.join("/") || null;
   })();
 
-  // File editors only shown when a file is active
+  // Whether the active tab is a dir context (terminal CWD, git-diff root, etc.)
+  const isTerminalContext = !hasFile && !!currentFolderPath;
+
+  // Terminal CWD is inside the workspace root: prefer workspace editors over terminal apps.
+  const terminalInsideWorkspace =
+    isTerminalContext &&
+    !!workspaceRoot &&
+    !!currentFolderPath &&
+    (currentFolderPath === workspaceRoot ||
+      currentFolderPath.startsWith(workspaceRoot + "/") ||
+      currentFolderPath.startsWith(workspaceRoot + "\\"));
+
+  // Clear the override whenever the context type flips (file <-> dir) so the
+  // appropriate auto-selection takes effect without the user needing to re-pick.
+  const contextType: "file" | "dir" | "none" = hasFile ? "file" : isTerminalContext ? "dir" : "none";
+  useEffect(() => {
+    setOverrideEditorId(null);
+  }, [contextType]);
+
+  // Editors by type — dropdown sections are gated on context:
+  // - "Edit files" only when a file is active
+  // - "Workspace root" whenever a workspace root exists
+  // - "Terminals" whenever there is any folder context
   const fileEditors = hasFile
     ? allEditors.filter((e) => resolveEditorTargetType(e) === "file")
     : [];
-  // Workspace editors only when explicit workspace root exists
   const workspaceEditors = workspaceRoot
     ? allEditors.filter((e) => resolveEditorTargetType(e) === "workspace")
     : [];
-  // Terminal editors whenever there is any folder context
   const terminalEditors = currentFolderPath
     ? allEditors.filter((e) => resolveEditorTargetType(e) === "terminal")
     : [];
 
-  const anyAvailable = fileEditors.length > 0 || workspaceEditors.length > 0 || terminalEditors.length > 0;
+  const anyAvailable =
+    fileEditors.length > 0 || workspaceEditors.length > 0 || terminalEditors.length > 0;
 
-  // Active preferred per type category
+  // Per-category preferred editor (each has its own saved preference slot)
   const activeFileEditor =
     fileEditors.find((e) => e.id === preferredFileEditorId) ?? fileEditors[0] ?? null;
+  const activeWorkspaceEditor =
+    workspaceEditors.find((e) => e.id === preferredWorkspaceEditorId) ??
+    workspaceEditors[0] ??
+    null;
+  const activeTerminalEditor =
+    terminalEditors.find((e) => e.id === preferredTerminalEditorId) ??
+    terminalEditors[0] ??
+    null;
 
-  // Both workspace and terminal share the same "folder preferred" slot
-  const activeFolderEditor: AnyEditor | null = preferredWorkspaceEditorId
-    ? (workspaceEditors.find((e) => e.id === preferredWorkspaceEditorId) ??
-       terminalEditors.find((e) => e.id === preferredWorkspaceEditorId) ??
-       null)
-    : (workspaceEditors[0] ?? terminalEditors[0] ?? null);
-
-  // Primary: use the last explicitly picked editor (override) if it's still available;
-  // otherwise fall back to context-based: file editor when file is active, else folder.
+  // Primary editor selection:
+  //   - Explicit dropdown pick (override) always wins while context matches.
+  //   - File tab: prefer file editors.
+  //   - Dir tab inside workspace: prefer workspace editors, fall back to terminal.
+  //   - Dir tab outside workspace (or no workspace root): prefer terminal editors, fall back to workspace.
   const primaryEditor: AnyEditor | null = (() => {
     if (overrideEditorId) {
       const found = allEditors.find((e) => e.id === overrideEditorId);
       if (found) return found;
     }
-    return hasFile && preferredFileEditorId && activeFileEditor
-      ? activeFileEditor
-      : activeFolderEditor ?? activeFileEditor;
+    if (hasFile) return activeFileEditor;
+    if (terminalInsideWorkspace) return activeWorkspaceEditor ?? activeTerminalEditor ?? null;
+    if (isTerminalContext) return activeTerminalEditor ?? activeWorkspaceEditor ?? null;
+    return null;
   })();
 
   const primaryTarget: OpenInEditorTarget | null = (() => {
-    if (!primaryEditor) return hasFile ? target : null;
+    if (!primaryEditor) return null;
     const type = resolveEditorTargetType(primaryEditor);
     if (type === "workspace") return workspaceRoot ? { path: workspaceRoot, kind: "dir" } : null;
     if (type === "terminal") return currentFolderPath ? { path: currentFolderPath, kind: "dir" } : null;
-    return target;
+    return hasFile ? target : null;
   })();
 
   const disabled = !anyAvailable || !primaryTarget;
@@ -127,18 +154,21 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     if (err) toast.error(`Could not open in ${primaryEditor.name}: ${err}`);
   }, [primaryEditor, primaryTarget]);
 
-  // Dropdown only sets the preferred — opening happens via primary button click.
-  // Sets local override for immediate icon update + optimistic Zustand state +
-  // async persist to disk.
+  // Dropdown only sets the preference for the selected type; does not execute.
+  // Each category has its own preference slot so switching context restores the
+  // right default per type.
   const handleSetPreferred = useCallback((editor: AnyEditor) => {
     setOverrideEditorId(editor.id);
     const type = resolveEditorTargetType(editor);
     if (type === "file") {
       usePreferencesStore.setState({ preferredFileEditorId: editor.id });
       void setPreferredFileEditorId(editor.id);
-    } else {
+    } else if (type === "workspace") {
       usePreferencesStore.setState({ preferredWorkspaceEditorId: editor.id });
       void setPreferredWorkspaceEditorId(editor.id);
+    } else {
+      usePreferencesStore.setState({ preferredTerminalEditorId: editor.id });
+      void setPreferredTerminalEditorId(editor.id);
     }
   }, []);
 
@@ -149,7 +179,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
         disabled && "pointer-events-none opacity-40",
       )}
     >
-      {/* Primary click: icon + path label */}
+      {/* Primary click: icon + editor name + path label */}
       <button
         type="button"
         title={
@@ -214,7 +244,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
             </>
           )}
 
-          {/* Workspace root — only when workspace root exists */}
+          {/* Workspace root — when a workspace root exists */}
           {workspaceEditors.length > 0 && (
             <>
               {fileEditors.length > 0 && <DropdownMenuSeparator />}
@@ -229,7 +259,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
                 >
                   <EditorIcon id={editor.id} size={16} />
                   <span className="flex-1">{editor.name}</span>
-                  {editor.id === activeFolderEditor?.id && (
+                  {editor.id === activeWorkspaceEditor?.id && (
                     <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
                   )}
                 </DropdownMenuItem>
@@ -252,7 +282,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
                 >
                   <EditorIcon id={editor.id} size={16} />
                   <span className="flex-1">{editor.name}</span>
-                  {editor.id === activeFolderEditor?.id && (
+                  {editor.id === activeTerminalEditor?.id && (
                     <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
                   )}
                 </DropdownMenuItem>
@@ -272,7 +302,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
             className="gap-2 text-muted-foreground"
           >
             <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={1.75} />
-            Configure editors
+            Configure Tools
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
