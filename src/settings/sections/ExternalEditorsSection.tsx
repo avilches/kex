@@ -13,11 +13,22 @@ import {
   EditorIcon,
   EDITOR_CATALOG,
 } from "@/modules/external-editors";
-import type { CustomEditor, EditorGroup } from "@/modules/external-editors";
+import type { CustomEditor, EditorGroup, EditorTargetType } from "@/modules/external-editors";
 import { SectionHeader } from "../components/SectionHeader";
 import { cn } from "@/lib/utils";
 
 const COLS = "grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_5.5rem_3.5rem_1.5rem]";
+
+function targetTypeLabel(type: EditorTargetType): string {
+  if (type === "terminal") return "Opens the current folder";
+  if (type === "workspace") return "Opens in the working root";
+  return "Opens the current file";
+}
+
+function groupTargetType(group: EditorGroup): EditorTargetType {
+  const entry = EDITOR_CATALOG.find((e) => e.group === group);
+  return entry?.type ?? "file";
+}
 
 const EDITOR_SECTION_GROUPS: EditorGroup[] = ["VS Code", "Text Editors"];
 const TERMINAL_SECTION_GROUPS: EditorGroup[] = ["Terminals", "JetBrains", "Other IDEs"];
@@ -62,7 +73,7 @@ export function ExternalEditorsSection() {
     );
   }
 
-  function handleUpdateCustomTargetKind(id: string, kind: "file" | "workspace") {
+  function handleUpdateCustomTargetKind(id: string, kind: "file" | "workspace" | "terminal") {
     void setCustomEditors(
       customEditors.map((e) => (e.id === id ? { ...e, targetKind: kind } : e)),
     );
@@ -77,10 +88,13 @@ export function ExternalEditorsSection() {
     const installed = all.filter((e) => detectedIds.has(e.id));
     const notInstalled = all.filter((e) => !detectedIds.has(e.id));
     return (
-      <div key={group} className="flex flex-col gap-2">
-        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-          {group}
-        </h3>
+      <div key={group} className="flex flex-col gap-1.5">
+        <div>
+          <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+            {group}
+          </h3>
+          <p className="text-[10px] text-muted-foreground/60">{targetTypeLabel(groupTargetType(group))}</p>
+        </div>
         <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
           {installed.map((entry) => {
             const isDisabled = disabledDetectedEditorIds.includes(entry.id);
@@ -136,11 +150,10 @@ export function ExternalEditorsSection() {
         {EDITOR_SECTION_GROUPS.map(renderGroup)}
       </div>
 
-      {/* Terminals & IDEs — open the workspace root */}
+      {/* Terminals & IDEs */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-[12px] font-semibold text-foreground">Terminals &amp; IDEs</h2>
-          <p className="text-[11px] text-muted-foreground">Open the workspace root directory</p>
         </div>
         {TERMINAL_SECTION_GROUPS.map(renderGroup)}
       </div>
@@ -191,13 +204,14 @@ export function ExternalEditorsSection() {
                 <select
                   value={e.targetKind ?? "file"}
                   onChange={(ev) =>
-                    handleUpdateCustomTargetKind(e.id, ev.target.value as "file" | "workspace")
+                    handleUpdateCustomTargetKind(e.id, ev.target.value as "file" | "workspace" | "terminal")
                   }
                   className="h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   title="What to pass to the tool"
                 >
-                  <option value="file">File</option>
-                  <option value="workspace">Workspace root</option>
+                  <option value="file">Current file</option>
+                  <option value="workspace">Working root</option>
+                  <option value="terminal">Current folder</option>
                 </select>
                 <input
                   type="text"

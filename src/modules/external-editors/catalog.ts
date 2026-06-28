@@ -1,5 +1,5 @@
 export type EditorGroup = "VS Code" | "JetBrains" | "Text Editors" | "Terminals" | "Other IDEs";
-export type EditorTargetType = "file" | "workspace";
+export type EditorTargetType = "file" | "workspace" | "terminal";
 
 export interface CatalogEntry {
   id: string;
@@ -42,14 +42,14 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "phpstorm", name: "PhpStorm", group: "JetBrains", type: "workspace" },
   { id: "mps", name: "MPS", group: "JetBrains", type: "workspace" },
   { id: "android-studio-canary", name: "Android Studio Canary", group: "JetBrains", type: "workspace" },
-  // Terminals (open workspace/directory)
-  { id: "terminal-app", name: "Terminal", group: "Terminals", type: "workspace" },
-  { id: "wave", name: "Wave", group: "Terminals", type: "workspace" },
-  { id: "warp", name: "Warp", group: "Terminals", type: "workspace" },
-  { id: "ghostty", name: "Ghostty", group: "Terminals", type: "workspace" },
-  { id: "iterm2", name: "iTerm2", group: "Terminals", type: "workspace" },
-  { id: "alacritty", name: "Alacritty", group: "Terminals", type: "workspace" },
-  { id: "kitty", name: "Kitty", group: "Terminals", type: "workspace" },
+  // Terminals (open current folder: CWD when on terminal tab, parent dir when on file)
+  { id: "terminal-app", name: "Terminal", group: "Terminals", type: "terminal" },
+  { id: "wave", name: "Wave", group: "Terminals", type: "terminal" },
+  { id: "warp", name: "Warp", group: "Terminals", type: "terminal" },
+  { id: "ghostty", name: "Ghostty", group: "Terminals", type: "terminal" },
+  { id: "iterm2", name: "iTerm2", group: "Terminals", type: "terminal" },
+  { id: "alacritty", name: "Alacritty", group: "Terminals", type: "terminal" },
+  { id: "kitty", name: "Kitty", group: "Terminals", type: "terminal" },
   // Other IDEs
   { id: "xcode", name: "Xcode", group: "Other IDEs", type: "workspace" },
 ];
