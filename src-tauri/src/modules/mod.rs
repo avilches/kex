@@ -1,6 +1,6 @@
 pub mod agent;
-pub mod editors;
 pub mod float_browser;
+pub mod editors;
 pub mod fs;
 pub mod git;
 pub mod history;
