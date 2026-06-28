@@ -57,7 +57,13 @@ fn resolve_repo_in_authorized(
         return Ok(None);
     };
     let canonical_root = canonical_dir(registry, &root_line, &cwd.workspace)?;
-    let _ = registry.authorize(&canonical_root.local_path);
+    // Guard: do not extend authorization to an ancestor of the already-authorized cwd.
+    // A canonical_root strictly above cwd would silently escalate scope.
+    let cwd_path = std::path::Path::new(&cwd.local_path);
+    let root_path = std::path::Path::new(&canonical_root.local_path);
+    if !(cwd_path.starts_with(root_path) && cwd_path != root_path) {
+        let _ = registry.authorize(&canonical_root.local_path);
+    }
 
     let head = match git_stdout_lines(
         &canonical_root.workspace,
@@ -118,7 +124,13 @@ pub fn panel_snapshot(
         });
     };
     let canonical_root = canonical_dir(registry, &root_line, &cwd.workspace)?;
-    let _ = registry.authorize(&canonical_root.local_path);
+    // Guard: do not extend authorization to an ancestor of the already-authorized cwd.
+    // A canonical_root strictly above cwd would silently escalate scope.
+    let cwd_path = std::path::Path::new(&cwd.local_path);
+    let root_path = std::path::Path::new(&canonical_root.local_path);
+    if !(cwd_path.starts_with(root_path) && cwd_path != root_path) {
+        let _ = registry.authorize(&canonical_root.local_path);
+    }
 
     let status = status_inner(&canonical_root)?;
     let repo = GitRepoInfo {
@@ -183,12 +195,13 @@ pub fn diff(
 ) -> Result<GitDiffResult> {
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
-    diff_inner(&repo_root, path, staged)
+    diff_inner(&repo_root, path, None, staged)
 }
 
 fn diff_inner(
     repo_root: &ResolvedGitDirectory,
     path: Option<&str>,
+    original_path: Option<&str>,
     staged: bool,
 ) -> Result<GitDiffResult> {
     let mut args: Vec<OsString> = vec!["diff".into(), "--no-ext-diff".into()];
@@ -202,6 +215,10 @@ fn diff_inner(
     if let Some(spec) = pathspec.as_ref() {
         args.push("--".into());
         args.push(spec.clone().into());
+        if let Some(orig) = original_path.filter(|o| !o.is_empty() && *o != spec.as_str()) {
+            let orig_spec = pathspec_from_input(&repo_root.local_path, orig)?;
+            args.push(orig_spec.into());
+        }
     }
     let output = run_git(
         &repo_root.workspace,
@@ -265,13 +282,15 @@ pub fn diff_content(
     } else {
         read_text_file(&worktree_path)?
     };
-    let patch = diff_inner(&repo_root, Some(&rel_path), staged)?;
+    let patch = diff_inner(&repo_root, Some(&rel_path), original_rel.as_deref(), staged)?;
     let is_binary =
-        matches!(original, TextSource::Binary) || matches!(modified, TextSource::Binary);
+        matches!(original, TextSource::Binary)
+        || matches!(modified, TextSource::Binary)
+        || patch.diff_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"));
 
     Ok(GitDiffContentResult {
-        original_content: original.into_text(),
-        modified_content: modified.into_text(),
+        original_content: if is_binary { String::new() } else { original.into_text() },
+        modified_content: if is_binary { String::new() } else { modified.into_text() },
         is_binary,
         fallback_patch: patch.diff_text,
         truncated: patch.truncated,
@@ -674,7 +693,7 @@ pub fn commit_files(
         return Err(GitError::command("git diff-tree", "invalid commit sha"));
     }
 
-    let output = run_git(
+    let ns_output = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
         [
@@ -683,41 +702,29 @@ pub fn commit_files(
             OsStr::new("-r"),
             OsStr::new("-z"),
             OsStr::new("--name-status"),
+            OsStr::new(sha),
+        ],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&ns_output, "git diff-tree --name-status failed")?;
+    let mut files = parse_diff_tree_name_status(&ns_output.stdout);
+
+    let num_output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        [
+            OsStr::new("diff-tree"),
+            OsStr::new("--no-commit-id"),
+            OsStr::new("-r"),
+            OsStr::new("-z"),
             OsStr::new("--numstat"),
             OsStr::new(sha),
         ],
         DEFAULT_TIMEOUT_SECS,
     )?;
-    ensure_success(&output, "git diff-tree failed")?;
-
-    let (name_status_bytes, numstat_bytes) = split_name_status_numstat(&output.stdout);
-    let mut files = parse_diff_tree_name_status(name_status_bytes);
-    apply_numstat(&mut files, numstat_bytes);
+    ensure_success(&num_output, "git diff-tree --numstat failed")?;
+    apply_numstat_by_path(&mut files, &num_output.stdout);
     Ok(files)
-}
-
-fn split_name_status_numstat(bytes: &[u8]) -> (&[u8], &[u8]) {
-    let s = std::str::from_utf8(bytes).unwrap_or("");
-    let tokens: Vec<(usize, &str)> = s
-        .split('\0')
-        .scan(0usize, |off, t| {
-            let start = *off;
-            *off += t.len() + 1;
-            Some((start, t))
-        })
-        .collect();
-    let mut split_at = bytes.len();
-    for (idx, tok) in tokens.iter().enumerate() {
-        if tok.1.contains('\t') {
-            split_at = tok.0;
-            // Walk back: numstat for R/C with -z emits "<a>\t<r>" then two
-            // NUL-separated paths. The two trailing path tokens belong to the
-            // numstat block, not name-status.
-            let _ = idx;
-            break;
-        }
-    }
-    (&bytes[..split_at], &bytes[split_at..])
 }
 
 pub fn commit_file_diff(
@@ -796,11 +803,13 @@ pub fn commit_file_diff(
     };
 
     let is_binary =
-        matches!(original, TextSource::Binary) || matches!(modified, TextSource::Binary);
+        matches!(original, TextSource::Binary)
+        || matches!(modified, TextSource::Binary)
+        || patch_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"));
 
     Ok(GitDiffContentResult {
-        original_content: original.into_text(),
-        modified_content: modified.into_text(),
+        original_content: if is_binary { String::new() } else { original.into_text() },
+        modified_content: if is_binary { String::new() } else { modified.into_text() },
         is_binary,
         fallback_patch: patch_text,
         truncated: patch_output.truncated,
@@ -1185,53 +1194,43 @@ fn parse_diff_tree_name_status(bytes: &[u8]) -> Vec<GitCommitFileChange> {
     files
 }
 
-fn apply_numstat(files: &mut [GitCommitFileChange], bytes: &[u8]) {
+fn apply_numstat_by_path(files: &mut [GitCommitFileChange], bytes: &[u8]) {
+    // numstat -z format: "<added>\t<removed>\t<path>\0"
+    // Binary files:      "-\t-\t<path>\0"
+    // Renames:           "<added>\t<removed>\t\0<new_path>\0<old_path>\0"
     let s = std::str::from_utf8(bytes).unwrap_or("");
-    let tokens: Vec<&str> = s.split('\0').filter(|t| !t.is_empty()).collect();
-    let mut idx = 0;
-    while idx < tokens.len() {
-        let header = tokens[idx];
-        idx += 1;
+    let mut tokens = s.split('\0');
+    while let Some(header) = tokens.next() {
+        if header.is_empty() {
+            continue;
+        }
         let mut cols = header.splitn(3, '\t');
         let added_raw = cols.next().unwrap_or("0");
         let removed_raw = cols.next().unwrap_or("0");
         let inline_path = cols.next().unwrap_or("");
         let is_binary = added_raw == "-" && removed_raw == "-";
-        let added: u32 = if is_binary {
-            0
-        } else {
-            added_raw.parse().unwrap_or(0)
-        };
-        let removed: u32 = if is_binary {
-            0
-        } else {
-            removed_raw.parse().unwrap_or(0)
-        };
+        let added: u32 = if is_binary { 0 } else { added_raw.parse().unwrap_or(0) };
+        let removed: u32 = if is_binary { 0 } else { removed_raw.parse().unwrap_or(0) };
 
-        let (path, original) = if inline_path.is_empty() {
-            let original = tokens.get(idx).map(|s| s.to_string()).unwrap_or_default();
-            idx += 1;
-            let new_path = tokens.get(idx).map(|s| s.to_string()).unwrap_or_default();
-            idx += 1;
-            (new_path, Some(original))
+        let path = if inline_path.is_empty() {
+            // Rename case: next two tokens are new_path then old_path
+            let new_path = tokens.next().unwrap_or("").to_string();
+            let _ = tokens.next(); // old_path; already captured from name-status
+            new_path
         } else {
-            (inline_path.to_string(), None)
+            inline_path.to_string()
         };
 
         if path.is_empty() {
             continue;
         }
-        if let Some(file) = files.iter_mut().find(|f| f.path == path) {
-            file.added = added;
-            file.removed = removed;
-            file.is_binary = is_binary;
-            if file.original_path.is_none() {
-                if let Some(orig) = original {
-                    if !orig.is_empty() && orig != file.path {
-                        file.original_path = Some(orig);
-                    }
-                }
-            }
+        if let Some(f) = files
+            .iter_mut()
+            .find(|f| f.path == path || f.original_path.as_deref() == Some(path.as_str()))
+        {
+            f.added = added;
+            f.removed = removed;
+            f.is_binary = is_binary;
         }
     }
 }
@@ -1821,5 +1820,98 @@ mod tests {
             &WorkspaceEnv::Local,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn apply_numstat_does_not_break_on_binary_marker() {
+        let mut files = vec![
+            GitCommitFileChange {
+                status: "M".to_string(),
+                status_label: "Modified".to_string(),
+                path: "text.rs".to_string(),
+                original_path: None,
+                added: 0,
+                removed: 0,
+                is_binary: false,
+            },
+            GitCommitFileChange {
+                status: "M".to_string(),
+                status_label: "Modified".to_string(),
+                path: "image.png".to_string(),
+                original_path: None,
+                added: 0,
+                removed: 0,
+                is_binary: false,
+            },
+        ];
+        // numstat -z: "5\t3\ttext.rs\0-\t-\timage.png\0"
+        let numstat = b"5\t3\ttext.rs\x00-\t-\timage.png\x00";
+        apply_numstat_by_path(&mut files, numstat);
+        assert_eq!(files[0].added, 5, "text file added lines");
+        assert_eq!(files[0].removed, 3, "text file removed lines");
+        assert_eq!(files[0].is_binary, false, "text file is not binary");
+        // binary file keeps 0 counts and is marked binary
+        assert_eq!(files[1].added, 0, "binary file added must be 0");
+        assert_eq!(files[1].removed, 0, "binary file removed must be 0");
+        assert_eq!(files[1].is_binary, true, "binary file must be marked");
+    }
+}
+
+#[cfg(test)]
+mod workspace_auth_tests {
+    #[test]
+    fn repo_root_above_cwd_is_scope_escalation() {
+        let cwd = "/home/user/proj/sub";
+        let canonical_root = "/home/user/proj";
+        let cwd_path = std::path::Path::new(cwd);
+        let root_path = std::path::Path::new(canonical_root);
+        let is_escalation = cwd_path.starts_with(root_path) && cwd_path != root_path;
+        assert!(is_escalation, "must detect escalation");
+    }
+
+    #[test]
+    fn repo_root_same_as_cwd_is_not_escalation() {
+        let cwd = "/home/user/proj";
+        let canonical_root = "/home/user/proj";
+        let cwd_path = std::path::Path::new(cwd);
+        let root_path = std::path::Path::new(canonical_root);
+        let is_escalation = cwd_path.starts_with(root_path) && cwd_path != root_path;
+        assert!(!is_escalation, "same path is not escalation");
+    }
+
+    #[test]
+    fn repo_root_under_cwd_is_not_escalation() {
+        // Unusual but valid: worktree inside the authorized dir
+        let cwd = "/home/user/proj";
+        let canonical_root = "/home/user/proj/.claude/worktrees/feat";
+        let cwd_path = std::path::Path::new(cwd);
+        let root_path = std::path::Path::new(canonical_root);
+        let is_escalation = cwd_path.starts_with(root_path) && cwd_path != root_path;
+        assert!(!is_escalation, "root under cwd is not escalation");
+    }
+}
+
+#[cfg(test)]
+mod binary_detection_tests {
+    fn is_binary_patch(diff_text: &str) -> bool {
+        diff_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"))
+    }
+
+    #[test]
+    fn patch_binary_marker_detected() {
+        let patch = "diff --git a/image.png b/image.png\nBinary files a/image.png and b/image.png differ\n";
+        assert!(is_binary_patch(patch));
+    }
+
+    #[test]
+    fn patch_text_diff_not_binary() {
+        let patch = "@@ -1,3 +1,3 @@\n-foo\n+bar\n";
+        assert!(!is_binary_patch(patch));
+    }
+
+    #[test]
+    fn lfs_comment_not_false_positive() {
+        let patch = "@@ -1,1 +1,1 @@\n-Binary files are stored in LFS\n+Binary files are tracked in LFS\n";
+        assert!(!is_binary_patch(patch));
     }
 }

@@ -72,6 +72,14 @@ impl WorkspaceRegistry {
         lru.is_authorized(target)
     }
 
+    /// Returns true when any currently-authorized root is strictly under `root`.
+    /// Git commands legitimately need the repo root even when only a subdirectory
+    /// of the repo was explicitly authorized.
+    pub fn has_child_authorized(&self, root: &Path) -> bool {
+        let lru = self.roots.lock().expect("workspace registry poisoned");
+        lru.entries.iter().any(|r| r.starts_with(root) && r.as_path() != root)
+    }
+
     pub fn canonicalize_cached<P: AsRef<Path>>(&self, path: P) -> std::io::Result<PathBuf> {
         let key = path.as_ref().to_path_buf();
         {
@@ -1021,6 +1029,40 @@ mod auth_tests {
         let env = tempdir("envfb");
         let resolved = resolve_launch_cwd(Some("/no/such/kex/dir"), Some(env.clone()));
         assert_eq!(resolved, Some(env));
+    }
+
+    #[test]
+    fn has_child_authorized_returns_true_for_parent_of_authorized() {
+        let reg = WorkspaceRegistry::default();
+        let tmp = tempfile::tempdir().unwrap();
+        let sub = tmp.path().join("sub");
+        std::fs::create_dir_all(&sub).unwrap();
+        let _ = reg.authorize(&sub).unwrap();
+        // authorize canonicalizes the path; query must be canonical too
+        let canonical_tmp = fs::canonicalize(tmp.path()).unwrap();
+        assert!(reg.has_child_authorized(&canonical_tmp), "parent of authorized path should be accepted");
+    }
+
+    #[test]
+    fn has_child_authorized_false_for_exact_match() {
+        let reg = WorkspaceRegistry::default();
+        let tmp = tempfile::tempdir().unwrap();
+        let canonical_tmp = fs::canonicalize(tmp.path()).unwrap();
+        let _ = reg.authorize(&canonical_tmp).unwrap();
+        assert!(!reg.has_child_authorized(&canonical_tmp), "exact match is not a child");
+    }
+
+    #[test]
+    fn has_child_authorized_false_for_sibling() {
+        let reg = WorkspaceRegistry::default();
+        let tmp = tempfile::tempdir().unwrap();
+        let sub_a = tmp.path().join("a");
+        let sub_b = tmp.path().join("b");
+        std::fs::create_dir_all(&sub_a).unwrap();
+        std::fs::create_dir_all(&sub_b).unwrap();
+        let _ = reg.authorize(&sub_a).unwrap();
+        let canonical_b = fs::canonicalize(&sub_b).unwrap();
+        assert!(!reg.has_child_authorized(&canonical_b), "sibling should not match");
     }
 }
 

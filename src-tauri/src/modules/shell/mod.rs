@@ -264,7 +264,8 @@ pub fn shell_bg_logs(
 
 #[tauri::command]
 pub fn shell_bg_kill(state: tauri::State<ShellState>, handle: u32) -> Result<(), String> {
-    if let Some(proc) = state.bg.read().unwrap().get(&handle).cloned() {
+    let proc = state.bg.write().unwrap().remove(&handle);
+    if let Some(proc) = proc {
         proc.kill();
     }
     Ok(())
