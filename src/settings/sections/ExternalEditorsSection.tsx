@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Cancel01Icon, PlusSignIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
@@ -18,6 +18,8 @@ import { SectionHeader } from "../components/SectionHeader";
 import { cn } from "@/lib/utils";
 
 const COLS = "grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_5.5rem_3.5rem_1.5rem]";
+const ALL_GROUPS: EditorGroup[] = ["VS Code", "Text Editors", "Terminals", "JetBrains", "Other IDEs"];
+const NOT_INSTALLED_COLLAPSED = 2;
 
 function targetTypeLabel(type: EditorTargetType): string {
   if (type === "terminal") return "Opens the current folder";
@@ -30,8 +32,65 @@ function groupTargetType(group: EditorGroup): EditorTargetType {
   return entry?.type ?? "file";
 }
 
-const EDITOR_SECTION_GROUPS: EditorGroup[] = ["VS Code", "Text Editors"];
-const TERMINAL_SECTION_GROUPS: EditorGroup[] = ["Terminals", "JetBrains", "Other IDEs"];
+function GroupSection({
+  group,
+  detectedIds,
+  disabledDetectedEditorIds,
+  onToggle,
+}: {
+  group: EditorGroup;
+  detectedIds: Set<string>;
+  disabledDetectedEditorIds: string[];
+  onToggle: (id: string, enabled: boolean) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const all = EDITOR_CATALOG.filter((e) => e.group === group);
+  const installed = all.filter((e) => detectedIds.has(e.id));
+  const notInstalled = all.filter((e) => !detectedIds.has(e.id));
+  const hidden = Math.max(0, notInstalled.length - NOT_INSTALLED_COLLAPSED);
+  const visibleNotInstalled = expanded ? notInstalled : notInstalled.slice(0, NOT_INSTALLED_COLLAPSED);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div>
+        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          {group}
+        </h3>
+        <p className="text-[10px] text-muted-foreground/60">{targetTypeLabel(groupTargetType(group))}</p>
+      </div>
+      <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+        {installed.map((entry) => {
+          const isDisabled = disabledDetectedEditorIds.includes(entry.id);
+          return (
+            <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
+              <EditorIcon id={entry.id} size={18} />
+              <span className="flex-1 text-[12.5px]">{entry.name}</span>
+              <Switch
+                checked={!isDisabled}
+                onCheckedChange={(v) => onToggle(entry.id, v)}
+              />
+            </div>
+          );
+        })}
+        {visibleNotInstalled.map((entry) => (
+          <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 opacity-35">
+            <EditorIcon id={entry.id} size={18} />
+            <span className="flex-1 text-[12.5px] text-muted-foreground">{entry.name}</span>
+          </div>
+        ))}
+        {!expanded && hidden > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="px-3 py-2 text-left text-[11px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+          >
+            Show {hidden} more
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function ExternalEditorsSection() {
   const { isScanning, scan } = useExternalEditors();
@@ -83,43 +142,6 @@ export function ExternalEditorsSection() {
     void setCustomEditors(customEditors.filter((e) => e.id !== id));
   }
 
-  function renderGroup(group: EditorGroup) {
-    const all = EDITOR_CATALOG.filter((e) => e.group === group);
-    const installed = all.filter((e) => detectedIds.has(e.id));
-    const notInstalled = all.filter((e) => !detectedIds.has(e.id));
-    return (
-      <div key={group} className="flex flex-col gap-1.5">
-        <div>
-          <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-            {group}
-          </h3>
-          <p className="text-[10px] text-muted-foreground/60">{targetTypeLabel(groupTargetType(group))}</p>
-        </div>
-        <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-          {installed.map((entry) => {
-            const isDisabled = disabledDetectedEditorIds.includes(entry.id);
-            return (
-              <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
-                <EditorIcon id={entry.id} size={18} />
-                <span className="flex-1 text-[12.5px]">{entry.name}</span>
-                <Switch
-                  checked={!isDisabled}
-                  onCheckedChange={(v) => handleToggleDetected(entry.id, v)}
-                />
-              </div>
-            );
-          })}
-          {notInstalled.map((entry) => (
-            <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 opacity-40">
-              <EditorIcon id={entry.id} size={18} />
-              <span className="flex-1 text-[12.5px] text-muted-foreground">{entry.name}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -141,22 +163,15 @@ export function ExternalEditorsSection() {
         Select your preferred tool from that button&apos;s dropdown.
       </p>
 
-      {/* Editors — open individual files */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-[12px] font-semibold text-foreground">Editors</h2>
-          <p className="text-[11px] text-muted-foreground">Open the active file</p>
-        </div>
-        {EDITOR_SECTION_GROUPS.map(renderGroup)}
-      </div>
-
-      {/* Terminals & IDEs */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-[12px] font-semibold text-foreground">Terminals &amp; IDEs</h2>
-        </div>
-        {TERMINAL_SECTION_GROUPS.map(renderGroup)}
-      </div>
+      {ALL_GROUPS.map((group) => (
+        <GroupSection
+          key={group}
+          group={group}
+          detectedIds={detectedIds}
+          disabledDetectedEditorIds={disabledDetectedEditorIds}
+          onToggle={handleToggleDetected}
+        />
+      ))}
 
       {/* Custom tools */}
       <div className="flex flex-col gap-3">
@@ -166,27 +181,15 @@ export function ExternalEditorsSection() {
 
         {customEditors.length > 0 && (
           <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-            {/* Headers — same grid as rows */}
             <div className={cn("grid gap-2 px-3 py-1.5", COLS)}>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Name
-              </span>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Binary / path
-              </span>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Opens
-              </span>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Args
-              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Binary / path</span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Opens</span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Args</span>
               <span />
             </div>
             {customEditors.map((e) => (
-              <div
-                key={e.id}
-                className={cn("grid items-center gap-2 px-3 py-2", COLS)}
-              >
+              <div key={e.id} className={cn("grid items-center gap-2 px-3 py-2", COLS)}>
                 <input
                   type="text"
                   value={e.name}
