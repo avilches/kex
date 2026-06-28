@@ -61,7 +61,6 @@ import {
   SquareArrowDown02Icon,
   SquareArrowDown03Icon,
   SquareArrowUp02Icon,
-  StructureFolderIcon,
   UnfoldLessIcon,
   UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
