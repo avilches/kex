@@ -165,7 +165,16 @@ export function useDocument({ path, onDirtyChange }: Options) {
     [clearAutoSaveTimer, saveNow],
   );
 
-  useEffect(() => clearAutoSaveTimer, [path, clearAutoSaveTimer]);
+  useEffect(() => {
+    return () => {
+      clearAutoSaveTimer();
+      if (bufferRef.current !== savedRef.current) {
+        saveNow().catch((e) => {
+          console.error("[autosave flush]", e);
+        });
+      }
+    };
+  }, [path, clearAutoSaveTimer, saveNow]);
 
   return { doc, dirty, onChange, save, reload };
 }
