@@ -1,4 +1,4 @@
-export type EditorGroup = "VS Code" | "JetBrains" | "Text Editors";
+export type EditorGroup = "VS Code" | "JetBrains" | "Text Editors" | "Terminals" | "Other IDEs";
 export type EditorTargetType = "file" | "workspace";
 
 export interface CatalogEntry {
@@ -18,6 +18,7 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "windsurf", name: "Windsurf", group: "VS Code", type: "file" },
   { id: "kiro", name: "Kiro", group: "VS Code", type: "file" },
   { id: "trae", name: "Trae", group: "VS Code", type: "file" },
+  { id: "trae-solo", name: "Trae Solo", group: "VS Code", type: "file" },
   { id: "antigravity", name: "Antigravity", group: "VS Code", type: "file" },
   // Text editors
   { id: "zed", name: "Zed", group: "Text Editors", type: "file" },
@@ -41,9 +42,18 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "clion", name: "CLion", group: "JetBrains", type: "workspace" },
   { id: "phpstorm", name: "PhpStorm", group: "JetBrains", type: "workspace" },
   { id: "mps", name: "MPS", group: "JetBrains", type: "workspace" },
+  { id: "android-studio-canary", name: "Android Studio Canary", group: "JetBrains", type: "workspace" },
+  // Terminals (open workspace/directory)
+  { id: "warp", name: "Warp", group: "Terminals", type: "workspace" },
+  { id: "ghostty", name: "Ghostty", group: "Terminals", type: "workspace" },
+  { id: "iterm2", name: "iTerm2", group: "Terminals", type: "workspace" },
+  { id: "alacritty", name: "Alacritty", group: "Terminals", type: "workspace" },
+  { id: "kitty", name: "Kitty", group: "Terminals", type: "workspace" },
+  // Other IDEs
+  { id: "xcode", name: "Xcode", group: "Other IDEs", type: "workspace" },
 ];
 
-export const EDITOR_GROUPS: EditorGroup[] = ["VS Code", "JetBrains", "Text Editors"];
+export const EDITOR_GROUPS: EditorGroup[] = ["VS Code", "JetBrains", "Text Editors", "Terminals", "Other IDEs"];
 
 const CATALOG_MAP = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
 

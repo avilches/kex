@@ -115,7 +115,7 @@ fn resolve_launch_macos(entry: &EditorEntry, app_path: &str) -> Option<(String, 
 
     // General case: prefer CLI in PATH, fall back to `open -a`
     if let Some(cli) = which_binary(entry.cli_binary) {
-        return Some((cli, vec![]));
+        return Some((cli, entry.args_before_path.iter().map(|s| s.to_string()).collect()));
     }
 
     // Fall back to `open -a "<App Name>.app"`
