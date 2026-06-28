@@ -284,11 +284,13 @@ pub fn diff_content(
     };
     let patch = diff_inner(&repo_root, Some(&rel_path), original_rel.as_deref(), staged)?;
     let is_binary =
-        matches!(original, TextSource::Binary) || matches!(modified, TextSource::Binary);
+        matches!(original, TextSource::Binary)
+        || matches!(modified, TextSource::Binary)
+        || patch.diff_text.contains("Binary files");
 
     Ok(GitDiffContentResult {
-        original_content: original.into_text(),
-        modified_content: modified.into_text(),
+        original_content: if is_binary { String::new() } else { original.into_text() },
+        modified_content: if is_binary { String::new() } else { modified.into_text() },
         is_binary,
         fallback_patch: patch.diff_text,
         truncated: patch.truncated,
@@ -801,11 +803,13 @@ pub fn commit_file_diff(
     };
 
     let is_binary =
-        matches!(original, TextSource::Binary) || matches!(modified, TextSource::Binary);
+        matches!(original, TextSource::Binary)
+        || matches!(modified, TextSource::Binary)
+        || patch_text.contains("Binary files");
 
     Ok(GitDiffContentResult {
-        original_content: original.into_text(),
-        modified_content: modified.into_text(),
+        original_content: if is_binary { String::new() } else { original.into_text() },
+        modified_content: if is_binary { String::new() } else { modified.into_text() },
         is_binary,
         fallback_patch: patch_text,
         truncated: patch_output.truncated,
@@ -1884,5 +1888,20 @@ mod workspace_auth_tests {
         let root_path = std::path::Path::new(canonical_root);
         let is_escalation = cwd_path.starts_with(root_path) && cwd_path != root_path;
         assert!(!is_escalation, "root under cwd is not escalation");
+    }
+}
+
+#[cfg(test)]
+mod binary_detection_tests {
+    #[test]
+    fn patch_binary_marker_detected() {
+        let patch = "diff --git a/image.png b/image.png\nBinary files a/image.png and b/image.png differ\n";
+        assert!(patch.contains("Binary files"));
+    }
+
+    #[test]
+    fn patch_text_diff_not_binary() {
+        let patch = "@@ -1,3 +1,3 @@\n-foo\n+bar\n";
+        assert!(!patch.contains("Binary files"));
     }
 }
