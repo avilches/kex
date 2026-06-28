@@ -157,7 +157,7 @@ The shared cascade (`resolveSidebarTarget`, tested): given the panel's reference
 
 ### 3.4 Source control
 
-**Git status and staging.** The source control panel shows modified, staged, untracked, and conflicted files. You can stage / unstage individual files or hunks. The diff view uses the CodeMirror merge extension.
+**Git status and staging.** The source control panel shows modified, staged, untracked, and conflicted files. You can stage / unstage individual files or hunks. The diff view uses the CodeMirror merge extension. Git diffs render unified (inline `unifiedMergeView`) or split (side-by-side `MergeView`), controlled by the global `diffViewMode` preference (Settings -> Editor). Split mode mounts a `MergeView` class outside the `<CodeMirror>` wrapper because it is not an extension. Wrap and line numbers in diffs reuse the per-extension `editorViewByExt` config, edited from the diff bar's `[...]` dropdown.
 
 **Commit.** Type a commit message and commit with `Cmd+Enter` / `Ctrl+Enter`. No separate terminal command needed. A **Push** checkbox next to the Commit button, when checked, pushes to the remote right after a successful commit (the button label switches to "Commit & Push"). Both the draft commit message and the Push flag are git settings stored **per workspace** under the `git` section of `workspaces/<id>.json` (`{ commitMessage, pushOnCommit }`), so each workspace keeps its own in-progress message. The message edits live in panel-local state and are persisted to the workspace on a short debounce (and flushed on workspace switch and after a successful commit) to avoid re-rendering the app on every keystroke.
 
