@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DocumentCodeIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 export function EditorIcon({ id, size = 14 }: { id: string; size?: number }) {
   const [src, setSrc] = useState(`/assets/editors/${id}.svg`);
   const [failed, setFailed] = useState(false);
+
+  // useState initial value is only used on mount; reset when id changes.
+  useEffect(() => {
+    setSrc(`/assets/editors/${id}.svg`);
+    setFailed(false);
+  }, [id]);
 
   if (failed) {
     return <HugeiconsIcon icon={DocumentCodeIcon} size={size} strokeWidth={1.75} />;

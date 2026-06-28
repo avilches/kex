@@ -166,8 +166,11 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
         ) : (
           <HugeiconsIcon icon={DocumentCodeIcon} size={16} strokeWidth={1.75} />
         )}
+        {primaryEditor && (
+          <span className="truncate text-[11px]">{primaryEditor.name}</span>
+        )}
         {primaryTarget && (
-          <span className="max-w-[100px] truncate text-[11px]">
+          <span className="max-w-[80px] truncate text-[11px] text-muted-foreground/60">
             {pathLabel(primaryTarget.path)}
           </span>
         )}
