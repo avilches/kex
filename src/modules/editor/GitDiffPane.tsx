@@ -228,7 +228,6 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
 
   const initialLang = useMemo(() => resolveLanguageSync(path), [path]);
   const diffViewMode = usePreferencesStore((s) => s.diffViewMode);
-  const splitLang = useMemo(() => initialLang?.ext ?? [], [initialLang]);
   const extensions = useMemo(() => {
     const s = usePreferencesStore.getState();
     const v0 = resolveEditorView(path, s.editorViewByExt);
@@ -346,9 +345,9 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
           </ScrollArea>
         ) : diffViewMode === "split" ? (
           <GitDiffSplitView
+            path={path}
             originalContent={originalContent}
             modifiedContent={modifiedContent}
-            languageExt={splitLang}
             wrap={view.wrap}
             lineNumbers={view.lineNumbers}
             themeExt={themeExt}
