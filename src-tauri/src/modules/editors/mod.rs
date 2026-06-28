@@ -2,14 +2,7 @@ pub mod catalog;
 pub mod detect;
 
 use detect::DetectedEditor;
-use serde::Serialize;
 use std::process::Command;
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScanResult {
-    pub editors: Vec<DetectedEditor>,
-}
 
 /// Scans the system for installed editors and returns those found.
 /// Runs detection synchronously on a blocking thread to avoid blocking the async runtime.

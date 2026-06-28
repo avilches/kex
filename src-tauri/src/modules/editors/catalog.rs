@@ -55,7 +55,7 @@ pub fn is_jetbrains(id: &str) -> bool {
         | "phpstorm" | "mps")
 }
 
-/// Editors that have no CLI and are launched via `open -b <bundle_id>` on macOS only.
+/// Editors launched via `open -b <bundle_id>` on macOS regardless of CLI availability.
 pub fn is_macos_open_only(id: &str) -> bool {
     matches!(id, "bbedit" | "cotedit" | "textmate" | "coderunner")
 }

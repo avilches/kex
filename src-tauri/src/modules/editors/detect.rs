@@ -247,6 +247,7 @@ fn detect_entry_platform(_entry: &EditorEntry) -> Option<DetectedEditor> {
 
 // ---- shared helper for PATH fallback ----------------------------------------
 
+#[cfg(target_os = "macos")]
 fn detect_via_which(entry: &EditorEntry) -> Option<DetectedEditor> {
     if entry.cli_binary.is_empty() {
         return None;
