@@ -57,6 +57,8 @@ pub static CATALOG: &[EditorEntry] = &[
     EditorEntry { id: "iterm2", name: "iTerm2", bundle_id: Some("com.googlecode.iterm2"), cli_binary: "", args_before_path: &[], macos_app_name: None },
     EditorEntry { id: "alacritty", name: "Alacritty", bundle_id: Some("io.alacritty"), cli_binary: "alacritty", args_before_path: &["--working-directory"], macos_app_name: None },
     EditorEntry { id: "kitty", name: "Kitty", bundle_id: Some("net.kovidgoyal.kitty"), cli_binary: "kitty", args_before_path: &["--directory"], macos_app_name: None },
+    EditorEntry { id: "terminal-app", name: "Terminal", bundle_id: Some("com.apple.Terminal"), cli_binary: "", args_before_path: &[], macos_app_name: None },
+    EditorEntry { id: "wave", name: "Wave", bundle_id: Some("dev.wavterm.WaveTerm"), cli_binary: "", args_before_path: &[], macos_app_name: None },
 ];
 
 pub fn is_jetbrains(id: &str) -> bool {
@@ -67,5 +69,5 @@ pub fn is_jetbrains(id: &str) -> bool {
 
 /// Editors launched via `open -b <bundle_id>` on macOS regardless of CLI availability.
 pub fn is_macos_open_only(id: &str) -> bool {
-    matches!(id, "bbedit" | "cotedit" | "textmate" | "coderunner")
+    matches!(id, "bbedit" | "cotedit" | "textmate" | "coderunner" | "terminal-app" | "wave")
 }

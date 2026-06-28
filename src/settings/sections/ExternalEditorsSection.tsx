@@ -12,13 +12,15 @@ import {
   useExternalEditors,
   EditorIcon,
   EDITOR_CATALOG,
-  EDITOR_GROUPS,
 } from "@/modules/external-editors";
-import type { CustomEditor } from "@/modules/external-editors";
+import type { CustomEditor, EditorGroup } from "@/modules/external-editors";
 import { SectionHeader } from "../components/SectionHeader";
 import { cn } from "@/lib/utils";
 
 const COLS = "grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_5.5rem_3.5rem_1.5rem]";
+
+const EDITOR_SECTION_GROUPS: EditorGroup[] = ["VS Code", "Text Editors"];
+const TERMINAL_SECTION_GROUPS: EditorGroup[] = ["Terminals", "JetBrains", "Other IDEs"];
 
 export function ExternalEditorsSection() {
   const { isScanning, scan } = useExternalEditors();
@@ -70,13 +72,39 @@ export function ExternalEditorsSection() {
     void setCustomEditors(customEditors.filter((e) => e.id !== id));
   }
 
-  // Each group shows installed entries first, then not-installed at the bottom of the same group
-  const groupedEntries = EDITOR_GROUPS.map((group) => {
+  function renderGroup(group: EditorGroup) {
     const all = EDITOR_CATALOG.filter((e) => e.group === group);
     const installed = all.filter((e) => detectedIds.has(e.id));
     const notInstalled = all.filter((e) => !detectedIds.has(e.id));
-    return { group, installed, notInstalled };
-  });
+    return (
+      <div key={group} className="flex flex-col gap-2">
+        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          {group}
+        </h3>
+        <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+          {installed.map((entry) => {
+            const isDisabled = disabledDetectedEditorIds.includes(entry.id);
+            return (
+              <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
+                <EditorIcon id={entry.id} size={18} />
+                <span className="flex-1 text-[12.5px]">{entry.name}</span>
+                <Switch
+                  checked={!isDisabled}
+                  onCheckedChange={(v) => handleToggleDetected(entry.id, v)}
+                />
+              </div>
+            );
+          })}
+          {notInstalled.map((entry) => (
+            <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 opacity-40">
+              <EditorIcon id={entry.id} size={18} />
+              <span className="flex-1 text-[12.5px] text-muted-foreground">{entry.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -95,40 +123,26 @@ export function ExternalEditorsSection() {
       </div>
 
       <p className="text-[11.5px] text-muted-foreground -mt-2">
-        Use the header button to open files or folders in an external editor.
+        Use the header button to open files or folders in an external tool.
         Select your preferred tool from that button&apos;s dropdown.
       </p>
 
-      {/* Editors grouped by family — installed first, not-installed dimmed at end of each group */}
+      {/* Editors — open individual files */}
       <div className="flex flex-col gap-4">
-        {groupedEntries.map(({ group, installed, notInstalled }) => (
-          <div key={group} className="flex flex-col gap-2">
-            <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-              {group}
-            </h3>
-            <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-              {installed.map((entry) => {
-                const isDisabled = disabledDetectedEditorIds.includes(entry.id);
-                return (
-                  <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
-                    <EditorIcon id={entry.id} size={18} />
-                    <span className="flex-1 text-[12.5px]">{entry.name}</span>
-                    <Switch
-                      checked={!isDisabled}
-                      onCheckedChange={(v) => handleToggleDetected(entry.id, v)}
-                    />
-                  </div>
-                );
-              })}
-              {notInstalled.map((entry) => (
-                <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 opacity-40">
-                  <EditorIcon id={entry.id} size={18} />
-                  <span className="flex-1 text-[12.5px] text-muted-foreground">{entry.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[12px] font-semibold text-foreground">Editors</h2>
+          <p className="text-[11px] text-muted-foreground">Open the active file</p>
+        </div>
+        {EDITOR_SECTION_GROUPS.map(renderGroup)}
+      </div>
+
+      {/* Terminals & IDEs — open the workspace root */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-[12px] font-semibold text-foreground">Terminals &amp; IDEs</h2>
+          <p className="text-[11px] text-muted-foreground">Open the workspace root directory</p>
+        </div>
+        {TERMINAL_SECTION_GROUPS.map(renderGroup)}
       </div>
 
       {/* Custom tools */}

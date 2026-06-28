@@ -44,6 +44,8 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "mps", name: "MPS", group: "JetBrains", type: "workspace" },
   { id: "android-studio-canary", name: "Android Studio Canary", group: "JetBrains", type: "workspace" },
   // Terminals (open workspace/directory)
+  { id: "terminal-app", name: "Terminal", group: "Terminals", type: "workspace" },
+  { id: "wave", name: "Wave", group: "Terminals", type: "workspace" },
   { id: "warp", name: "Warp", group: "Terminals", type: "workspace" },
   { id: "ghostty", name: "Ghostty", group: "Terminals", type: "workspace" },
   { id: "iterm2", name: "iTerm2", group: "Terminals", type: "workspace" },
