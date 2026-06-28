@@ -8,10 +8,17 @@ import {
   setCustomEditors,
   setDisabledDetectedEditorIds,
 } from "@/modules/settings/store";
-import { useExternalEditors, EditorIcon, EDITOR_CATALOG } from "@/modules/external-editors";
+import {
+  useExternalEditors,
+  EditorIcon,
+  EDITOR_CATALOG,
+  EDITOR_GROUPS,
+} from "@/modules/external-editors";
 import type { CustomEditor } from "@/modules/external-editors";
 import { SectionHeader } from "../components/SectionHeader";
 import { cn } from "@/lib/utils";
+
+const COLS = "grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_5.5rem_3.5rem_1.5rem]";
 
 export function ExternalEditorsSection() {
   const { isScanning, scan } = useExternalEditors();
@@ -21,7 +28,6 @@ export function ExternalEditorsSection() {
 
   const detectedIds = new Set(detectedEditors.map((e) => e.id));
 
-  // Scan on first open if no cached data yet
   const didScanRef = useRef(false);
   useEffect(() => {
     if (!didScanRef.current && detectedEditors.length === 0 && !isScanning) {
@@ -40,7 +46,7 @@ export function ExternalEditorsSection() {
   function handleAddCustom() {
     if (customEditors.some((e) => !e.name.trim() && !e.binary.trim())) return;
     const id = crypto.randomUUID();
-    const newEditor: CustomEditor = { id, name: "", binary: "", argsBeforePath: [] };
+    const newEditor: CustomEditor = { id, name: "", binary: "", argsBeforePath: [], targetKind: "file" };
     void setCustomEditors([...customEditors, newEditor]);
   }
 
@@ -54,9 +60,23 @@ export function ExternalEditorsSection() {
     );
   }
 
+  function handleUpdateCustomTargetKind(id: string, kind: "file" | "workspace") {
+    void setCustomEditors(
+      customEditors.map((e) => (e.id === id ? { ...e, targetKind: kind } : e)),
+    );
+  }
+
   function handleDeleteCustom(id: string) {
     void setCustomEditors(customEditors.filter((e) => e.id !== id));
   }
+
+  // Build per-group lists (installed only) and a flat "not installed" list
+  const installedByGroup = EDITOR_GROUPS.map((group) => ({
+    group,
+    entries: EDITOR_CATALOG.filter((e) => e.group === group && detectedIds.has(e.id)),
+  })).filter((g) => g.entries.length > 0);
+
+  const notInstalled = EDITOR_CATALOG.filter((e) => !detectedIds.has(e.id));
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,48 +99,50 @@ export function ExternalEditorsSection() {
         Select your preferred tool from that button&apos;s dropdown.
       </p>
 
-      {/* Catalog — all known editors */}
-      <div className="flex flex-col gap-3">
-        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-          Editors &amp; IDEs
-        </h3>
-        <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-          {EDITOR_CATALOG.map((entry) => {
-            const isDetected = detectedIds.has(entry.id);
-            const isDisabled = disabledDetectedEditorIds.includes(entry.id);
-            const isEnabled = isDetected && !isDisabled;
-
-            return (
-              <div
-                key={entry.id}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5",
-                  !isDetected && "opacity-40",
-                )}
-              >
-                <EditorIcon id={entry.id} size={18} />
-                <span
-                  className={cn(
-                    "flex-1 text-[12.5px]",
-                    !isDetected && "text-muted-foreground",
-                  )}
-                >
-                  {entry.name}
-                </span>
-                {!isDetected && (
-                  <span className="text-[10px] text-muted-foreground">Not installed</span>
-                )}
-                {isDetected && (
-                  <Switch
-                    checked={isEnabled}
-                    onCheckedChange={(v) => handleToggleDetected(entry.id, v)}
-                  />
-                )}
+      {/* Installed editors grouped by family */}
+      {installedByGroup.length > 0 && (
+        <div className="flex flex-col gap-4">
+          {installedByGroup.map(({ group, entries }) => (
+            <div key={group} className="flex flex-col gap-2">
+              <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                {group}
+              </h3>
+              <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+                {entries.map((entry) => {
+                  const isDisabled = disabledDetectedEditorIds.includes(entry.id);
+                  return (
+                    <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
+                      <EditorIcon id={entry.id} size={18} />
+                      <span className="flex-1 text-[12.5px]">{entry.name}</span>
+                      <Switch
+                        checked={!isDisabled}
+                        onCheckedChange={(v) => handleToggleDetected(entry.id, v)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
+
+      {/* Not installed */}
+      {notInstalled.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+            Not installed
+          </h3>
+          <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden opacity-40">
+            {notInstalled.map((entry) => (
+              <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
+                <EditorIcon id={entry.id} size={18} />
+                <span className="flex-1 text-[12.5px] text-muted-foreground">{entry.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Custom tools */}
       <div className="flex flex-col gap-3">
@@ -130,13 +152,16 @@ export function ExternalEditorsSection() {
 
         {customEditors.length > 0 && (
           <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-            {/* Headers */}
-            <div className="grid grid-cols-[1fr_2fr_auto_auto] gap-3 px-3 py-1.5">
+            {/* Headers — same grid as rows */}
+            <div className={cn("grid gap-2 px-3 py-1.5", COLS)}>
               <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Name
               </span>
               <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Binary / path
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Opens
               </span>
               <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Args
@@ -146,7 +171,7 @@ export function ExternalEditorsSection() {
             {customEditors.map((e) => (
               <div
                 key={e.id}
-                className="grid grid-cols-[1fr_2fr_auto_auto] items-center gap-3 px-3 py-2"
+                className={cn("grid items-center gap-2 px-3 py-2", COLS)}
               >
                 <input
                   type="text"
@@ -162,6 +187,17 @@ export function ExternalEditorsSection() {
                   placeholder="/usr/local/bin/editor"
                   className="h-7 w-full rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
+                <select
+                  value={e.targetKind ?? "file"}
+                  onChange={(ev) =>
+                    handleUpdateCustomTargetKind(e.id, ev.target.value as "file" | "workspace")
+                  }
+                  className="h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  title="What to pass to the tool"
+                >
+                  <option value="file">File</option>
+                  <option value="workspace">Workspace root</option>
+                </select>
                 <input
                   type="text"
                   value={e.argsBeforePath.join(" ")}
@@ -173,7 +209,7 @@ export function ExternalEditorsSection() {
                     )
                   }
                   placeholder="--wait"
-                  className="h-7 w-20 rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="h-7 w-full rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <button
                   type="button"

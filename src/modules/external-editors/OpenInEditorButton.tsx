@@ -16,6 +16,7 @@ import {
 import { useExternalEditors, openWithEditor } from "./useExternalEditors";
 import type { AnyEditor } from "./types";
 import { EditorIcon } from "./EditorIcon";
+import { getEditorTargetType } from "./catalog";
 import { toast } from "sonner";
 
 export interface OpenInEditorTarget {
@@ -25,16 +26,32 @@ export interface OpenInEditorTarget {
 
 interface Props {
   target: OpenInEditorTarget | null;
+  workspaceRoot: string | null;
   onOpenSettings?: () => void;
 }
 
-function pathLabel(target: OpenInEditorTarget): string {
-  const parts = target.path.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] ?? target.path;
+function pathLabel(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] ?? path;
 }
 
+function resolveEditorTargetType(editor: AnyEditor): "file" | "workspace" {
+  if ("targetKind" in editor && editor.targetKind) return editor.targetKind;
+  return getEditorTargetType(editor.id);
+}
 
-export function OpenInEditorButton({ target, onOpenSettings }: Props) {
+function resolveEffectiveTarget(
+  editor: AnyEditor,
+  target: OpenInEditorTarget | null,
+  workspaceRoot: string | null,
+): OpenInEditorTarget | null {
+  if (resolveEditorTargetType(editor) === "workspace") {
+    return workspaceRoot ? { path: workspaceRoot, kind: "dir" } : null;
+  }
+  return target;
+}
+
+export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Props) {
   const { detectedEditors, isScanning } = useExternalEditors();
   const preferredEditorId = usePreferencesStore((s) => s.preferredEditorId);
   const customEditors = usePreferencesStore((s) => s.customEditors);
@@ -50,19 +67,23 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
   const preferredEditor =
     allEditors.find((e) => e.id === preferredEditorId) ?? allEditors[0] ?? null;
 
+  const effectiveTarget = preferredEditor
+    ? resolveEffectiveTarget(preferredEditor, target, workspaceRoot)
+    : target;
+
   const handleSetPreferred = useCallback((editor: AnyEditor) => {
     void setPreferredEditorId(editor.id);
   }, []);
 
   const handleDirectClick = useCallback(async () => {
-    if (!preferredEditor || !target) return;
-    const err = await openWithEditor(preferredEditor.binary, preferredEditor.argsBeforePath, target.path);
+    if (!preferredEditor || !effectiveTarget) return;
+    const err = await openWithEditor(preferredEditor.binary, preferredEditor.argsBeforePath, effectiveTarget.path);
     if (err) {
       toast.error(`Could not open in ${preferredEditor.name}: ${err}`);
     }
-  }, [preferredEditor, target]);
+  }, [preferredEditor, effectiveTarget]);
 
-  const disabled = !target;
+  const disabled = !effectiveTarget;
 
   return (
     <div
@@ -74,7 +95,7 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
       {/* Primary click area: icon + label */}
       <button
         type="button"
-        title={target ? `Open in ${preferredEditor?.name ?? "editor"}: ${target.path}` : "No active panel"}
+        title={effectiveTarget ? `Open in ${preferredEditor?.name ?? "editor"}: ${effectiveTarget.path}` : "No active panel"}
         onClick={() => void handleDirectClick()}
         disabled={disabled || !preferredEditor}
         className="flex h-7 items-center gap-1.5 rounded-l-md px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-default disabled:opacity-100"
@@ -84,9 +105,9 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
         ) : (
           <HugeiconsIcon icon={DocumentCodeIcon} size={16} strokeWidth={1.75} />
         )}
-        {target && (
+        {effectiveTarget && (
           <span className="max-w-[100px] truncate text-[11px]">
-            {pathLabel(target)}
+            {pathLabel(effectiveTarget.path)}
           </span>
         )}
       </button>

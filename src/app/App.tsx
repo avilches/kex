@@ -2377,6 +2377,7 @@ export default function App() {
             searchTarget={searchTarget}
             searchRef={searchInlineRef}
             openInEditorTarget={openInEditorTarget}
+            workspaceRoot={workspaceRootPath}
             onOpenExternalEditorSettings={onOpenExternalEditorSettings}
           />
 
