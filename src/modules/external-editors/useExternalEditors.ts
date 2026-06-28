@@ -1,57 +1,33 @@
 import { useCallback, useSyncExternalStore } from "react";
-import { emit, listen } from "@tauri-apps/api/event";
 import { native } from "@/lib/native";
-import type { DetectedEditor } from "./types";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setDetectedEditors } from "@/modules/settings/store";
 
-const EDITORS_SCANNED_EVENT = "kex://editors-scanned";
-
-// Module-level cache so all hook instances share state and the scan runs once.
-let cachedEditors: DetectedEditor[] = [];
+// Module-level scanning state — not persisted; each webview tracks its own spinner.
 let scanning = false;
-const listeners = new Set<() => void>();
+const scanListeners = new Set<() => void>();
 
-// Propagate scan results to all windows (main <-> settings are separate webviews).
-void listen<DetectedEditor[]>(EDITORS_SCANNED_EVENT, (e) => {
-  cachedEditors = e.payload;
-  notify();
-});
-
-function notify() {
-  for (const l of listeners) l();
+function notifyScanning() {
+  for (const l of scanListeners) l();
 }
 
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
-}
-
-function getSnapshot(): DetectedEditor[] {
-  return cachedEditors;
+function subscribeScan(cb: () => void) {
+  scanListeners.add(cb);
+  return () => scanListeners.delete(cb);
 }
 
 function getScanningSnapshot(): boolean {
   return scanning;
 }
 
-// Separate listener set for scanning state
-const scanListeners = new Set<() => void>();
-function notifyScanning() {
-  for (const l of scanListeners) l();
-}
-function subscribeScan(cb: () => void) {
-  scanListeners.add(cb);
-  return () => scanListeners.delete(cb);
-}
-
+/** Run a full editor scan and persist results via the prefs store (shared across webviews). */
 export async function runEditorScan(): Promise<void> {
   if (scanning) return;
   scanning = true;
   notifyScanning();
   try {
     const result = await native.editorScan();
-    cachedEditors = result;
-    notify();
-    void emit(EDITORS_SCANNED_EVENT, result);
+    await setDetectedEditors(result);
   } catch (e) {
     console.error("editor_scan failed:", e);
   } finally {
@@ -61,13 +37,11 @@ export async function runEditorScan(): Promise<void> {
 }
 
 export function useExternalEditors() {
-  const detectedEditors = useSyncExternalStore(subscribe, getSnapshot);
+  const detectedEditors = usePreferencesStore((s) => s.detectedEditors);
   const isScanning = useSyncExternalStore(subscribeScan, getScanningSnapshot);
-
   const scan = useCallback(() => {
     void runEditorScan();
   }, []);
-
   return { detectedEditors, isScanning, scan };
 }
 

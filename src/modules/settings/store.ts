@@ -8,6 +8,7 @@ import {
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import type { CustomEditor } from "@/modules/external-editors/types";
+import type { DetectedEditor } from "@/modules/external-editors/types";
 
 export type ThemePref = "system" | "light" | "dark";
 
@@ -174,6 +175,8 @@ export type Preferences = {
   scratchpadInNewTerminals: boolean;
   preferredEditorId: string | null;
   customEditors: CustomEditor[];
+  detectedEditors: DetectedEditor[];
+  disabledDetectedEditorIds: string[];
 };
 
 const STORE_PATH = "settings-general.json";
@@ -230,6 +233,8 @@ const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
 const KEY_PREFERRED_EDITOR_ID = "preferredEditorId";
 const KEY_CUSTOM_EDITORS = "customEditors";
+const KEY_DETECTED_EDITORS = "detectedEditors";
+const KEY_DISABLED_DETECTED_IDS = "disabledDetectedEditorIds";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 13;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -371,6 +376,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   scratchpadInNewTerminals: true,
   preferredEditorId: null,
   customEditors: [],
+  detectedEditors: [],
+  disabledDetectedEditorIds: [],
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -610,6 +617,14 @@ export async function loadPreferences(): Promise<Preferences> {
     customEditors: (() => {
       const v = get<CustomEditor[]>(KEY_CUSTOM_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.customEditors;
+    })(),
+    detectedEditors: (() => {
+      const v = get<DetectedEditor[]>(KEY_DETECTED_EDITORS);
+      return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
+    })(),
+    disabledDetectedEditorIds: (() => {
+      const v = get<string[]>(KEY_DISABLED_DETECTED_IDS);
+      return Array.isArray(v) ? v : DEFAULT_PREFERENCES.disabledDetectedEditorIds;
     })(),
   };
 
@@ -882,6 +897,14 @@ export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
   await writePref(KEY_CUSTOM_EDITORS, value);
 }
 
+export async function setDetectedEditors(value: DetectedEditor[]): Promise<void> {
+  await writePref(KEY_DETECTED_EDITORS, value);
+}
+
+export async function setDisabledDetectedEditorIds(value: string[]): Promise<void> {
+  await writePref(KEY_DISABLED_DETECTED_IDS, value);
+}
+
 export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
@@ -1045,6 +1068,8 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
   [KEY_PREFERRED_EDITOR_ID]: "preferredEditorId",
   [KEY_CUSTOM_EDITORS]: "customEditors",
+  [KEY_DETECTED_EDITORS]: "detectedEditors",
+  [KEY_DISABLED_DETECTED_IDS]: "disabledDetectedEditorIds",
 };
 
 /** Subscribe to changes from any window (settings → main). */

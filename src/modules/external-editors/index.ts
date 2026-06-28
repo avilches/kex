@@ -3,3 +3,4 @@ export { useExternalEditors, openWithEditor, runEditorScan } from "./useExternal
 export { OpenInEditorButton } from "./OpenInEditorButton";
 export type { OpenInEditorTarget } from "./OpenInEditorButton";
 export { EditorIcon } from "./EditorIcon";
+export { EDITOR_CATALOG } from "./catalog";

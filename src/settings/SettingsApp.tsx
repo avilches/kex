@@ -44,7 +44,7 @@ const SECTIONS: {
   { id: "appearance", label: "Appearance", icon: PaintBoardIcon, component: AppearanceSection },
   { id: "themes", label: "Themes", icon: ColorsIcon, component: ThemesSection },
   { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },
-  { id: "external-editors", label: "Ext. Editors", icon: DocumentCodeIcon, component: ExternalEditorsSection },
+  { id: "external-editors", label: "Tools", icon: DocumentCodeIcon, component: ExternalEditorsSection },
   { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
 ];
 

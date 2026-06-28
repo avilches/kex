@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DocumentCodeIcon, ArrowDown01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { DocumentCodeIcon, ArrowDown01Icon, Settings01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -35,49 +35,32 @@ function pathLabel(target: OpenInEditorTarget): string {
 
 
 export function OpenInEditorButton({ target, onOpenSettings }: Props) {
-  const { detectedEditors, isScanning, scan } = useExternalEditors();
+  const { detectedEditors, isScanning } = useExternalEditors();
   const preferredEditorId = usePreferencesStore((s) => s.preferredEditorId);
   const customEditors = usePreferencesStore((s) => s.customEditors);
+  const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const [open, setOpen] = useState(false);
-  const didScan = useRef(false);
 
-  // Reset scan guard when dropdown closes
-  useEffect(() => {
-    if (!open) {
-      didScan.current = false;
-    }
-  }, [open]);
-
-  // Trigger a lazy scan the first time the dropdown is opened and no editors
-  // have been detected yet.
-  useEffect(() => {
-    if (open && !didScan.current && detectedEditors.length === 0 && !isScanning) {
-      didScan.current = true;
-      scan();
-    }
-  }, [open, detectedEditors.length, isScanning, scan]);
-
-  const allEditors: AnyEditor[] = [...detectedEditors, ...customEditors];
+  // Only show editors that have both name and binary set, excluding user-disabled detected editors
+  const allEditors: AnyEditor[] = [
+    ...detectedEditors.filter((e) => !disabledDetectedEditorIds.includes(e.id)),
+    ...customEditors,
+  ].filter((e) => e.name.trim() && e.binary.trim());
 
   const preferredEditor =
     allEditors.find((e) => e.id === preferredEditorId) ?? allEditors[0] ?? null;
 
-  const handleLaunch = useCallback(
-    async (editor: AnyEditor) => {
-      if (!target) return;
-      void setPreferredEditorId(editor.id);
-      const err = await openWithEditor(editor.binary, editor.argsBeforePath, target.path);
-      if (err) {
-        toast.error(`Could not open in ${editor.name}: ${err}`);
-      }
-    },
-    [target],
-  );
+  const handleSetPreferred = useCallback((editor: AnyEditor) => {
+    void setPreferredEditorId(editor.id);
+  }, []);
 
-  const handleDirectClick = useCallback(() => {
+  const handleDirectClick = useCallback(async () => {
     if (!preferredEditor || !target) return;
-    void handleLaunch(preferredEditor);
-  }, [preferredEditor, target, handleLaunch]);
+    const err = await openWithEditor(preferredEditor.binary, preferredEditor.argsBeforePath, target.path);
+    if (err) {
+      toast.error(`Could not open in ${preferredEditor.name}: ${err}`);
+    }
+  }, [preferredEditor, target]);
 
   const disabled = !target;
 
@@ -92,14 +75,14 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
       <button
         type="button"
         title={target ? `Open in ${preferredEditor?.name ?? "editor"}: ${target.path}` : "No active panel"}
-        onClick={handleDirectClick}
+        onClick={() => void handleDirectClick()}
         disabled={disabled || !preferredEditor}
         className="flex h-7 items-center gap-1.5 rounded-l-md px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-default disabled:opacity-100"
       >
         {preferredEditor ? (
-          <EditorIcon id={preferredEditor.id} />
+          <EditorIcon id={preferredEditor.id} size={16} />
         ) : (
-          <HugeiconsIcon icon={DocumentCodeIcon} size={14} strokeWidth={1.75} />
+          <HugeiconsIcon icon={DocumentCodeIcon} size={16} strokeWidth={1.75} />
         )}
         {target && (
           <span className="max-w-[100px] truncate text-[11px]">
@@ -120,35 +103,34 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52 text-[12px]">
-          {allEditors.length === 0 && !isScanning && (
-            <>
-              <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
-                No editors detected
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => onOpenSettings?.()}>
-                Open External Editors settings
-              </DropdownMenuItem>
-            </>
-          )}
           {isScanning && (
             <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
               Scanning...
             </div>
           )}
+          {!isScanning && allEditors.length === 0 && (
+            <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+              No editors detected
+            </div>
+          )}
           {allEditors.map((editor) => (
             <DropdownMenuItem
               key={editor.id}
-              onSelect={() => void handleLaunch(editor)}
+              onSelect={() => handleSetPreferred(editor)}
               className="gap-2"
             >
-              <EditorIcon id={editor.id} />
+              <EditorIcon id={editor.id} size={16} />
               <span className="flex-1">{editor.name}</span>
-              {editor.id === preferredEditorId && (
+              {editor.id === (preferredEditorId ?? allEditors[0]?.id) && (
                 <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
               )}
             </DropdownMenuItem>
           ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => onOpenSettings?.()} className="gap-2 text-muted-foreground">
+            <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={1.75} />
+            Configure editors
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
