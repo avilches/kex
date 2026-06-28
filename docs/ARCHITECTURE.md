@@ -229,6 +229,38 @@ Navigation is a left vertical sidebar. Sections: General, Editor, Terminal, Appe
 - **Per-window right-panel chrome**: whether the right panel is `open`, its `activeTab` (Explorer / Git / History), its `width` (a react-resizable-panels percentage), and its `side` (left / right). Held as React state by `useRightPanelState(label)` (`modules/workspaces/lib/useRightPanelState.ts`), seeded from the restored `WindowEntry.rightPanel` and persisted per window through the lightweight `window_save_right_panel` command (debounced, index-only write). It is a property of the window, shared by all of that window's workspace tabs. Validation/defaults live in `windowUiState.ts` (`open=true`, `activeTab="explorer"`, `width=20`, `side="left"`; invalid `activeTab`/`side` fall back to `"explorer"`/`"left"`).
 - **Per-workspace explorer state**: `explorerRootMode` / `pinnedRoot` / `fsRoot` and `showHidden` (show dot-files), each remembered per workspace because every workspace points at a different project. They ride inside the workspace body via the existing `saveWorkspaceState` / `sanitizeWorkspace` path; no dedicated IPC. `showHidden` moved here from a former global preference.
 
+### 3.11 External tools
+
+The header bar exposes an "Open in editor" button that opens the active file (or workspace root) in an external editor or terminal. The system is composed of a Rust detection backend, a frontend catalog, and a settings UI.
+
+**Catalog.** Both the Rust backend (`src-tauri/src/modules/editors/catalog.rs`) and the TypeScript frontend (`src/modules/external-editors/catalog.ts`) maintain a parallel list of known tools. Each entry carries:
+- A stable `id` (used as the icon filename key and in preferences)
+- A macOS bundle ID for `mdfind` detection
+- A CLI binary name for `which`/`where` PATH lookup
+- `args_before_path`: arguments injected between the binary and the target path at launch time (e.g. `--working-directory` for Ghostty/Alacritty, `--directory` for Kitty)
+- `macos_app_name`: JetBrains `open -na <App>.app` fallback
+
+The frontend catalog additionally carries `group` and `type` metadata used by the settings UI. Groups: `VS Code`, `JetBrains`, `Text Editors`, `Terminals`, `Other IDEs`. Target type:
+- `"file"`: the tool receives the path of the currently open file (VS Code family, text editors)
+- `"workspace"`: the tool receives the workspace root directory (JetBrains, terminals, Xcode)
+
+**Detection (Rust).** `detect_all()` in `detect.rs` iterates the catalog and resolves each entry per platform:
+- **macOS**: `mdfind kMDItemCFBundleIdentifier == "<id>"` locates the `.app`; on failure, falls back to `which`. Resolution order: `open -b` for open-only editors (BBEdit, CotEditor, TextMate, CodeRunner), Zed CLI inside the bundle, JetBrains Toolbox script or `open -na`, then general case (PATH binary with `args_before_path`, or `open -a`).
+- **Linux/Windows**: Toolbox script or `which`/`where` binary lookup.
+- The result is a `DetectedEditor` with the resolved binary and `args_before_path` ready for process spawn.
+
+**Header button.** `OpenInEditorButton` (`src/modules/external-editors/OpenInEditorButton.tsx`) shows the preferred editor and a dropdown of all enabled editors. It receives both the panel-specific `target` (a file path) and the `workspaceRoot`. At click time `resolveEffectiveTarget` picks:
+- `workspaceRoot` if the editor's type is `"workspace"` (resolved from the catalog or from `CustomEditor.targetKind`)
+- `target` otherwise (the current open file)
+
+The button label shows the filename for file-type editors and the workspace root folder name for workspace-type editors, so the user always sees what will be opened.
+
+**Custom tools.** Users can add arbitrary editors in Settings > Tools. Each custom entry stores `name`, `binary`, `argsBeforePath`, and an optional `targetKind` (`"file"` or `"workspace"`, default `"file"` for backward compatibility). The type is user-selectable from a dropdown in the settings table.
+
+**Settings UI.** `ExternalEditorsSection` (`src/settings/sections/ExternalEditorsSection.tsx`) groups predefined tools by family. Within each group, installed (detected) entries appear first with an enable/disable toggle; not-installed entries are dimmed and shown at the bottom of their group with no toggle. Custom tools appear in a separate table below with column headers (Name / Binary / Opens / Args) aligned via a shared CSS grid constant.
+
+**Icons.** `EditorIcon` (`src/modules/external-editors/EditorIcon.tsx`) tries `/assets/editors/<id>.svg` first, then `/assets/editors/<id>.png`, then falls back to a generic document-code icon from HugeIcons.
+
 ---
 
 ## 4. Technical decisions with user-visible effects
