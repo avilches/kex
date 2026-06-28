@@ -118,6 +118,22 @@ previous workspaces or pane layout.
 - Editor and other non-terminal panels restore their content reference (`path`, `url`, etc.).
 - `sanitizeWorkspace` clears transient state at save time (e.g. `editor.dirty = false`).
 
+### Per-window right panel state
+
+**Problem in the original:** the right panel view (Explorer / Git / History), its open state, width, dock side, and the
+show-hidden toggle were global preferences in `settings-general.json`, so every OS window shared one value.
+
+**What was built:**
+
+- The right panel chrome (open, active tab, width, dock side) is now per OS window. It is persisted in the
+  `workspaces.json` index as a `rightPanel` field on each window entry and restored on startup, reusing the existing
+  per-window state plumbing (`window_get_state`) plus a dedicated `window_save_right_panel` command. The frontend holds
+  it in `useRightPanelState(label)` (debounced save).
+- `showHidden` moved from a global preference to a per-workspace field on `Workspace`, mirroring `explorerRootMode`, so
+  each workspace tab remembers its own.
+- The old global preferences and their setters were removed, along with the "Sidebar position" control in Settings (dock
+  side is now per window, toggled from each window header).
+
 ### UX improvements
 
 - **Focus restore on workspace switch** — when switching workspaces (via sidebar click or keyboard shortcut), the active
