@@ -609,6 +609,15 @@ export default function App() {
     [activeWorkspace, activeRootMode, setFsRoot],
   );
 
+  const handleNavigateToWorktree = useCallback(
+    (path: string) => {
+      if (activeWorkspace) {
+        setFsRoot(activeWorkspace.id, path);
+      }
+    },
+    [activeWorkspace, setFsRoot],
+  );
+
   const focusSidebar = useCallback(
     (folder: string, opts: { fromShortcut: boolean; pendingAction?: RevealAction }) => {
       const ws = activeWorkspace;
@@ -2433,6 +2442,7 @@ export default function App() {
                         onCommitMessagePersist={handleCommitMessagePersist}
                         onOpenDiff={openGitDiffInPanel}
                         onOpenGitGraph={openGitGraphFromContext}
+                        onNavigateToWorktree={handleNavigateToWorktree}
                         repoRoot={rightPanelRepoRoot}
                         onOpenCommitFile={onOpenCommitFileStable}
                         onSearchHandle={setGitHistoryHandle}
@@ -2521,6 +2531,7 @@ export default function App() {
                         onCommitMessagePersist={handleCommitMessagePersist}
                         onOpenDiff={openGitDiffInPanel}
                         onOpenGitGraph={openGitGraphFromContext}
+                        onNavigateToWorktree={handleNavigateToWorktree}
                         repoRoot={rightPanelRepoRoot}
                         onOpenCommitFile={onOpenCommitFileStable}
                         onSearchHandle={setGitHistoryHandle}

@@ -125,6 +125,7 @@ export type GitBranchInfo = {
   isRemote: boolean;
   remote: string | null;
   upstream: string | null;
+  worktree: string | null;
 };
 
 export type GitRemoteInfo = {
@@ -135,6 +136,13 @@ export type GitRemoteInfo = {
 export type GitWorktreeStatus = {
   worktreeName: string | null;
   worktreeCount: number;
+};
+
+export type GitWorktreeInfo = {
+  path: string;
+  branch: string | null;
+  isCurrent: boolean;
+  isMain: boolean;
 };
 
 export type GitDiscardEntry = {
@@ -339,6 +347,12 @@ export const native = {
       branch,
       workspace: currentWorkspaceEnv(),
     }),
+  gitCreateBranch: (repoRoot: string, name: string) =>
+    invoke<void>("git_create_branch", {
+      repoRoot,
+      name,
+      workspace: currentWorkspaceEnv(),
+    }),
   gitListRemotes: (repoRoot: string) =>
     invoke<GitRemoteInfo[]>("git_list_remotes", {
       repoRoot,
@@ -359,6 +373,11 @@ export const native = {
     }),
   gitWorktreeStatus: (repoRoot: string) =>
     invoke<GitWorktreeStatus>("git_worktree_status", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitListWorktrees: (repoRoot: string) =>
+    invoke<GitWorktreeInfo[]>("git_list_worktrees", {
       repoRoot,
       workspace: currentWorkspaceEnv(),
     }),

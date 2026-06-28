@@ -73,6 +73,7 @@ export type RightPanelProps = {
     title?: string;
   }) => void;
   onOpenGitGraph?: () => void;
+  onNavigateToWorktree?: (path: string) => void;
   // GitHistoryPane props
   repoRoot: string;
   onOpenCommitFile: (input: CommitFileDiffOpenInput) => void;
@@ -172,6 +173,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               onCommitMessagePersist={props.onCommitMessagePersist}
               onOpenDiff={props.onOpenDiff}
               onOpenFile={props.onOpenFile}
+              onNavigateToWorktree={props.onNavigateToWorktree}
             />
           </div>
           <div

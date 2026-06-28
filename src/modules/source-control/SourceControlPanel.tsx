@@ -53,7 +53,6 @@ import {
   FileDiffIcon,
   FolderOpenIcon,
   FolderTreeIcon,
-  GitForkIcon,
   Link01Icon,
   ListViewIcon,
   MinusSignIcon,
@@ -62,6 +61,7 @@ import {
   SquareArrowDown02Icon,
   SquareArrowDown03Icon,
   SquareArrowUp02Icon,
+  StructureFolderIcon,
   UnfoldLessIcon,
   UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
@@ -85,6 +85,7 @@ import {
 } from "./useSourceControlPanel";
 import { BranchPicker } from "./BranchPicker";
 import { RemoteSection } from "./RemoteSection";
+import { WorktreePicker } from "./WorktreePicker";
 import {
   buildScmTree,
   collectDirKeys,
@@ -108,6 +109,7 @@ type Props = {
     title?: string;
   }) => void;
   onOpenFile?: (absolutePath: string, pin?: boolean) => void;
+  onNavigateToWorktree?: (path: string) => void;
 };
 
 const ROW_HEIGHTS = {
@@ -155,10 +157,6 @@ function entriesUnderFolder(
   });
 }
 
-function upstreamBadgeLabel(upstream: string | null | undefined): string {
-  if (!upstream) return "No upstream";
-  return upstream;
-}
 
 function statusTextClass(code: string): string {
   switch (code) {
@@ -182,6 +180,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   onCommitMessagePersist,
   onOpenDiff,
   onOpenFile,
+  onNavigateToWorktree,
 }: Props) {
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff, {
     workspaceId: gitWorkspaceId,
@@ -300,7 +299,15 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     );
   }, [allFoldersCollapsed, allTreeDirKeys]);
 
-  const pushStatusLabel = upstreamBadgeLabel(scm.status?.upstream);
+  const pushStatusLabel = useMemo(() => {
+    const upstream = scm.status?.upstream;
+    if (!upstream) return "No upstream";
+    const remote = scm.selectedRemote;
+    if (!remote) return upstream;
+    const slashIdx = upstream.indexOf("/");
+    const branch = slashIdx >= 0 ? upstream.slice(slashIdx + 1) : upstream;
+    return `${remote}/${branch}`;
+  }, [scm.status?.upstream, scm.selectedRemote]);
   const hasUpstream = !!scm.status?.upstream;
   const isDiverged =
     !!scm.status && scm.status.ahead > 0 && scm.status.behind > 0;
@@ -637,19 +644,15 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     <TooltipProvider delayDuration={800} skipDelayDuration={300}>
       <aside className="flex h-full min-w-0 flex-col bg-sidebar [contain:layout_style]">
         <header className="flex shrink-0 items-start gap-1 border-b border-border/60 px-1.5 py-1">
-          <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-1 min-w-0 flex-col gap-1">
             <div className="flex h-6 min-w-0 items-center gap-1.5">
-              {scm.worktreeCount > 1 && scm.worktreeName !== null ? (
-                <span className="shrink-0 rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  Wt: {scm.worktreeName}
-                </span>
-              ) : null}
               <BranchPicker
                 currentBranch={repoLabel}
                 isDetached={scm.status?.isDetached ?? false}
                 disabled={!scm.repo || !!scm.actionBusy}
                 onFetchBranches={scm.fetchBranches}
                 onCheckout={scm.checkout}
+                onCreateBranch={scm.createBranch}
               />
               <div className="flex shrink-0 items-center gap-0.5">
                 <RemoteActionButton
@@ -706,31 +709,37 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   )}
                 </RemoteActionButton>
               </div>
-              <RemoteSection
-                remotes={scm.remotes}
-                selectedRemote={scm.selectedRemote}
-                busy={!!scm.actionBusy || !!sourceControl.busyAction}
-                onSelectRemote={scm.setSelectedRemote}
-                onAddRemote={scm.addRemote}
-              />
+              <div className="ml-auto shrink-0">
+                <RemoteSection
+                  remotes={scm.remotes}
+                  selectedRemote={scm.selectedRemote}
+                  busy={!!scm.actionBusy || !!sourceControl.busyAction}
+                  onSelectRemote={scm.setSelectedRemote}
+                  onAddRemote={scm.addRemote}
+                />
+              </div>
             </div>
             {scm.repo ? (
-              <span
-                title={scm.repo.repoRoot}
-                className="inline-flex w-fit max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
-              >
-                {scm.repo.isWorktree ? (
-                  <HugeiconsIcon
-                    icon={GitForkIcon}
-                    size={12}
-                    strokeWidth={1.9}
-                    className="shrink-0"
+              scm.worktreeCount > 1 && onNavigateToWorktree ? (
+                <div className="w-fit">
+                  <WorktreePicker
+                    label={
+                      scm.repo.isWorktree
+                        ? `Worktree: ${pathBasename(scm.repo.repoRoot)}`
+                        : "Main worktree"
+                    }
+                    onFetchWorktrees={scm.fetchWorktrees}
+                    onSelect={onNavigateToWorktree}
                   />
-                ) : null}
-                <span className="truncate">
-                  {pathBasename(scm.repo.repoRoot)}
+                </div>
+              ) : (
+                <span
+                  title={scm.repo.repoRoot}
+                  className="inline-flex w-fit max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
+                >
+                  <span className="truncate">{pathBasename(scm.repo.repoRoot)}</span>
                 </span>
-              </span>
+              )
             ) : null}
           </div>
         </header>

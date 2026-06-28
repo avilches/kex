@@ -10,8 +10,8 @@ use crate::modules::git::process::{
 use crate::modules::git::types::{
     DiscardEntry, GitBranchInfo, GitCommitFileChange, GitCommitResult, GitDiffContentResult,
     GitDiffResult, GitLogEntry, GitOutput, GitPanelSnapshot, GitPushResult, GitRemoteInfo,
-    GitRepoInfo, GitStatusSnapshot, GitWorktreeStatus, TextSource, DEFAULT_TIMEOUT_SECS,
-    NETWORK_TIMEOUT_SECS,
+    GitRepoInfo, GitStatusSnapshot, GitWorktreeInfo, GitWorktreeStatus, TextSource,
+    DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
     authorized_repo_root, canonical_dir, dir_path_for, resolve_within_repo, split_upstream,
@@ -858,6 +858,54 @@ pub fn list_branches(
     let local_text = std::str::from_utf8(&local_out.stdout).unwrap_or("").trim();
     let remote_text = std::str::from_utf8(&remote_out.stdout).unwrap_or("").trim();
 
+    // Build a map of branch -> worktree name for branches checked out in other worktrees
+    let branch_to_wt: std::collections::HashMap<String, String> = {
+        let mut map = std::collections::HashMap::new();
+        if let Ok(wt_out) = run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["worktree", "list", "--porcelain"],
+            DEFAULT_TIMEOUT_SECS,
+        ) {
+            let repo_canonical = std::fs::canonicalize(&repo_root.local_path)
+                .unwrap_or_else(|_| repo_root.local_path.clone());
+            let text = String::from_utf8_lossy(&wt_out.stdout);
+            let mut cur_path: Option<std::path::PathBuf> = None;
+            let mut cur_branch: Option<String> = None;
+            for line in text.lines() {
+                if line.starts_with("worktree ") {
+                    if let (Some(path), Some(branch)) = (cur_path.take(), cur_branch.take()) {
+                        let wt_canonical = std::fs::canonicalize(&path).unwrap_or(path.clone());
+                        if wt_canonical != repo_canonical {
+                            let wt_name = path
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("worktree")
+                                .to_owned();
+                            map.insert(branch, wt_name);
+                        }
+                    }
+                    cur_path = Some(std::path::PathBuf::from(line["worktree ".len()..].trim()));
+                    cur_branch = None;
+                } else if let Some(rest) = line.strip_prefix("branch refs/heads/") {
+                    cur_branch = Some(rest.trim().to_owned());
+                }
+            }
+            if let (Some(path), Some(branch)) = (cur_path, cur_branch) {
+                let wt_canonical = std::fs::canonicalize(&path).unwrap_or(path.clone());
+                if wt_canonical != repo_canonical {
+                    let wt_name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("worktree")
+                        .to_owned();
+                    map.insert(branch, wt_name);
+                }
+            }
+        }
+        map
+    };
+
     let mut branches: Vec<GitBranchInfo> = Vec::new();
 
     for line in local_text.lines() {
@@ -874,12 +922,14 @@ pub fn list_branches(
             let s = s.trim();
             if s.is_empty() { None } else { Some(s.to_string()) }
         });
+        let worktree = if is_current { None } else { branch_to_wt.get(name).cloned() };
         branches.push(GitBranchInfo {
             name: name.to_string(),
             is_current,
             is_remote: false,
             remote: None,
             upstream,
+            worktree,
         });
     }
 
@@ -902,6 +952,7 @@ pub fn list_branches(
                     is_remote: true,
                     remote: Some(remote),
                     upstream: None,
+                    worktree: None,
                 });
             }
         }
@@ -943,6 +994,29 @@ pub fn checkout_branch(
     };
 
     ensure_success(&output, "git checkout failed")
+}
+
+pub fn create_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    name: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    if name.is_empty() || name.len() > 255 || name.contains('\0') || name.contains('\n') {
+        return Err(GitError::command("git checkout", "invalid branch name"));
+    }
+
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["checkout", "-b", name],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+
+    ensure_success(&output, "git checkout -b failed")
 }
 
 pub fn list_remotes(
@@ -1278,6 +1352,64 @@ pub fn get_worktree_status(
         worktree_name: Some(name),
         worktree_count: count,
     })
+}
+
+pub fn list_worktrees(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Vec<GitWorktreeInfo>> {
+    let repo = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo.workspace)?;
+
+    let output = run_git(
+        &repo.workspace,
+        Some(&repo.git_path),
+        ["worktree", "list", "--porcelain"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git worktree list failed")?;
+
+    let repo_canonical = std::fs::canonicalize(&repo.local_path)
+        .unwrap_or_else(|_| repo.local_path.clone());
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Collect raw blocks: (path, branch)
+    let mut blocks: Vec<(std::path::PathBuf, Option<String>)> = Vec::new();
+    let mut cur_path: Option<std::path::PathBuf> = None;
+    let mut cur_branch: Option<String> = None;
+
+    for line in stdout.lines() {
+        if line.starts_with("worktree ") {
+            if let Some(p) = cur_path.take() {
+                blocks.push((p, cur_branch.take()));
+            }
+            cur_path = Some(std::path::PathBuf::from(line["worktree ".len()..].trim()));
+            cur_branch = None;
+        } else if let Some(rest) = line.strip_prefix("branch refs/heads/") {
+            cur_branch = Some(rest.trim().to_owned());
+        }
+    }
+    if let Some(p) = cur_path {
+        blocks.push((p, cur_branch));
+    }
+
+    let result = blocks
+        .into_iter()
+        .enumerate()
+        .map(|(i, (p, branch))| {
+            let canonical = std::fs::canonicalize(&p).unwrap_or_else(|_| p.clone());
+            GitWorktreeInfo {
+                path: p.to_string_lossy().replace('\\', "/"),
+                branch,
+                is_current: canonical == repo_canonical,
+                is_main: i == 0,
+            }
+        })
+        .collect();
+
+    Ok(result)
 }
 
 fn nothing_to_commit(output: &GitOutput) -> bool {

@@ -69,7 +69,9 @@ type SourceControlPanelState = {
   selectedRemote: string | null;
   setSelectedRemote: (name: string) => void;
   fetchBranches: () => Promise<GitBranchInfo[]>;
+  fetchWorktrees: () => Promise<import("@/lib/native").GitWorktreeInfo[]>;
   checkout: (branch: GitBranchInfo) => Promise<void>;
+  createBranch: (name: string) => Promise<void>;
   addRemote: (name: string, url: string) => Promise<void>;
   worktreeName: string | null;
   worktreeCount: number;
@@ -448,6 +450,11 @@ export function useSourceControlPanel(
     return native.gitListBranches(repo.repoRoot);
   }, [repo]);
 
+  const fetchWorktrees = useCallback(async () => {
+    if (!repo) return [];
+    return native.gitListWorktrees(repo.repoRoot);
+  }, [repo]);
+
   const checkout = useCallback(
     async (branch: GitBranchInfo) => {
       if (!repo) return;
@@ -460,6 +467,26 @@ export function useSourceControlPanel(
           ? branch.name.slice(branch.name.indexOf("/") + 1)
           : branch.name;
         setActionMessage(`Switched to ${localName}`);
+        await summary.refresh({ remote: "never" });
+      } catch (error) {
+        setActionError(normalizeError(error));
+        throw error;
+      } finally {
+        setLocalActionBusy(null);
+      }
+    },
+    [repo, summary],
+  );
+
+  const createBranch = useCallback(
+    async (name: string) => {
+      if (!repo) return;
+      setLocalActionBusy("create-branch");
+      setActionMessage(null);
+      setActionError(null);
+      try {
+        await native.gitCreateBranch(repo.repoRoot, name);
+        setActionMessage(`Created and switched to ${name}`);
         await summary.refresh({ remote: "never" });
       } catch (error) {
         setActionError(normalizeError(error));
@@ -513,7 +540,9 @@ export function useSourceControlPanel(
     }
     if (summary.repo) invalidateRepoDiffs(summary.repo.repoRoot);
     await summary.refresh({ remote: "never" });
-  }, [isOpen, summary]);
+    void loadRemotes();
+    void loadWorktreeStatus();
+  }, [isOpen, summary, loadRemotes, loadWorktreeStatus]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -896,7 +925,9 @@ export function useSourceControlPanel(
     selectedRemote,
     setSelectedRemote,
     fetchBranches,
+    fetchWorktrees,
     checkout,
+    createBranch,
     addRemote,
     worktreeName: worktreeStatus.worktreeName,
     worktreeCount: worktreeStatus.worktreeCount,

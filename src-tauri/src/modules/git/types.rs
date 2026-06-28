@@ -124,6 +124,7 @@ pub struct GitBranchInfo {
     pub is_remote: bool,
     pub remote: Option<String>,
     pub upstream: Option<String>,
+    pub worktree: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -138,6 +139,15 @@ pub struct GitRemoteInfo {
 pub struct GitWorktreeStatus {
     pub worktree_name: Option<String>,
     pub worktree_count: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitWorktreeInfo {
+    pub path: String,
+    pub branch: Option<String>,
+    pub is_current: bool,
+    pub is_main: bool,
 }
 
 pub(crate) struct GitOutput {

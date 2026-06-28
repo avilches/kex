@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/popover";
 import type { GitRemoteInfo } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { Add01Icon, GlobalIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, GlobalIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 
@@ -42,10 +42,10 @@ export function RemoteSection({
           type="button"
           onClick={() => setAddOpen(true)}
           title="No remote configured - click to add one"
-          className="inline-flex items-center gap-1 rounded bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+          className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-tight text-foreground transition-colors hover:bg-foreground/10"
         >
-          <HugeiconsIcon icon={Add01Icon} size={10} strokeWidth={2} />
-          Add remote
+          <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.9} className="shrink-0 text-muted-foreground" />
+          <span className="truncate">Add remote</span>
         </button>
         <AddRemoteDialog
           open={addOpen}
@@ -56,19 +56,23 @@ export function RemoteSection({
     );
   }
 
-  if (remotes.length === 1) {
-    return null;
-  }
-
   const activeRemote = selectedRemote ?? remotes[0]?.name ?? "";
 
   return (
-    <RemotePicker
-      remotes={remotes}
-      activeRemote={activeRemote}
-      busy={busy}
-      onSelect={onSelectRemote}
-    />
+    <>
+      <RemotePicker
+        remotes={remotes}
+        activeRemote={activeRemote}
+        busy={busy}
+        onSelect={onSelectRemote}
+        onAddRemote={() => setAddOpen(true)}
+      />
+      <AddRemoteDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onAdd={onAddRemote}
+      />
+    </>
   );
 }
 
@@ -77,11 +81,13 @@ function RemotePicker({
   activeRemote,
   busy,
   onSelect,
+  onAddRemote,
 }: {
   remotes: GitRemoteInfo[];
   activeRemote: string;
   busy: boolean;
   onSelect: (name: string) => void;
+  onAddRemote: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -93,18 +99,18 @@ function RemotePicker({
           disabled={busy}
           title="Select active remote"
           className={cn(
-            "inline-flex items-center gap-1 rounded bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors",
+            "inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-tight text-foreground transition-colors",
             busy
-              ? "cursor-default opacity-50"
-              : "hover:bg-muted/70 hover:text-foreground",
+              ? "cursor-default opacity-40"
+              : "hover:bg-foreground/10",
           )}
         >
-          <HugeiconsIcon icon={GlobalIcon} size={10} strokeWidth={2} />
-          <span>{activeRemote}</span>
+          <HugeiconsIcon icon={GlobalIcon} size={14} strokeWidth={1.9} className="shrink-0 text-muted-foreground" />
+          <span className="truncate">{activeRemote}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-52 p-1" align="start" side="bottom">
-        <div className="space-y-0.5">
+      <PopoverContent className="w-56 p-0" align="start" side="bottom">
+        <div className="p-1 space-y-0.5">
           {remotes.map((r) => (
             <button
               key={r.name}
@@ -114,16 +120,28 @@ function RemotePicker({
                 setOpen(false);
               }}
               className={cn(
-                "flex w-full flex-col rounded px-2 py-1.5 text-left transition-colors hover:bg-accent",
+                "flex w-full flex-col rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent",
                 activeRemote === r.name && "bg-accent/60",
               )}
             >
-              <span className="text-[11px] font-medium">{r.name}</span>
-              <span className="min-w-0 truncate text-[9px] text-muted-foreground">
+              <span className="text-[11.5px] font-medium">{r.name}</span>
+              <span className="min-w-0 truncate text-[10px] text-muted-foreground">
                 {r.url}
               </span>
             </button>
           ))}
+          <div className="my-0.5 border-t border-border/50" />
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onAddRemote();
+            }}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} size={11} strokeWidth={1.9} className="shrink-0 text-muted-foreground" />
+            <span className="text-[11.5px] font-medium text-muted-foreground">Add remote</span>
+          </button>
         </div>
       </PopoverContent>
     </Popover>

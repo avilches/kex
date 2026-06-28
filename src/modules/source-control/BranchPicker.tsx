@@ -14,7 +14,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import type { GitBranchInfo } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { GitBranchIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
@@ -24,6 +24,7 @@ type Props = {
   disabled: boolean;
   onFetchBranches: () => Promise<GitBranchInfo[]>;
   onCheckout: (branch: GitBranchInfo) => Promise<void>;
+  onCreateBranch?: (name: string) => Promise<void>;
 };
 
 export function BranchPicker({
@@ -32,16 +33,19 @@ export function BranchPicker({
   disabled,
   onFetchBranches,
   onCheckout,
+  onCreateBranch,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [branches, setBranches] = useState<GitBranchInfo[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [busyName, setBusyName] = useState<string | null>(null);
+  const [searchValue, setSearchValue] = useState("");
 
   const handleOpenChange = async (nextOpen: boolean) => {
     setOpen(nextOpen);
     if (!nextOpen) {
       setBranches(null);
+      setSearchValue("");
       return;
     }
     setLoading(true);
@@ -51,6 +55,20 @@ export function BranchPicker({
       setBranches([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreate = async (name: string) => {
+    if (!onCreateBranch) return;
+    setBusyName(name);
+    try {
+      await onCreateBranch(name);
+      setOpen(false);
+      setSearchValue("");
+    } catch {
+      // error shown via actionError toast
+    } finally {
+      setBusyName(null);
     }
   };
 
@@ -79,7 +97,7 @@ export function BranchPicker({
       <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-tight text-foreground">
         <HugeiconsIcon
           icon={GitBranchIcon}
-          size={12}
+          size={14}
           strokeWidth={1.9}
           className="shrink-0 text-muted-foreground"
         />
@@ -100,7 +118,7 @@ export function BranchPicker({
         >
           <HugeiconsIcon
             icon={GitBranchIcon}
-            size={12}
+            size={14}
             strokeWidth={1.9}
             className="shrink-0 text-muted-foreground"
           />
@@ -112,6 +130,8 @@ export function BranchPicker({
           <CommandInput
             placeholder="Filter branches..."
             className="h-8 text-[11.5px]"
+            value={searchValue}
+            onValueChange={setSearchValue}
           />
           <CommandList className="max-h-64">
             {loading ? (
@@ -150,6 +170,25 @@ export function BranchPicker({
               </>
             )}
           </CommandList>
+          {searchValue.trim() && onCreateBranch ? (
+            <div className="border-t border-border/40 p-1">
+              <button
+                type="button"
+                disabled={!!busyName}
+                onClick={() => void handleCreate(searchValue.trim())}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11.5px] transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                {busyName === searchValue.trim() ? (
+                  <Spinner className="size-3 shrink-0" />
+                ) : (
+                  <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={1.9} className="shrink-0 text-muted-foreground" />
+                )}
+                <span className="min-w-0 truncate">
+                  Create <span className="font-semibold">"{searchValue.trim()}"</span>
+                </span>
+              </button>
+            </div>
+          ) : null}
         </Command>
       </PopoverContent>
     </Popover>
@@ -166,13 +205,19 @@ function BranchItem({
   onSelect: (b: GitBranchInfo) => void;
 }) {
   const isBusy = busyName === branch.name;
+  const isLocked = !!branch.worktree;
   return (
     <CommandItem
       value={branch.name}
-      onSelect={() => onSelect(branch)}
+      onSelect={() => {
+        if (isLocked) return;
+        onSelect(branch);
+      }}
+      disabled={isLocked}
       className={cn(
-        "flex items-center gap-2 text-[11.5px]",
+        "flex items-center gap-2 rounded-md text-[11.5px]",
         branch.isCurrent && "font-semibold",
+        isLocked && "opacity-50 cursor-default",
       )}
     >
       <span className="flex size-3.5 shrink-0 items-center justify-center">
@@ -181,7 +226,7 @@ function BranchItem({
         ) : (
           <HugeiconsIcon
             icon={GitBranchIcon}
-            size={12}
+            size={14}
             strokeWidth={1.9}
             className={cn(
               branch.isCurrent
@@ -195,6 +240,11 @@ function BranchItem({
       {branch.isCurrent && (
         <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70">
           current
+        </span>
+      )}
+      {isLocked && (
+        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          wt
         </span>
       )}
     </CommandItem>
