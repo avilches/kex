@@ -55,9 +55,11 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   ].filter((e) => e.name.trim() && e.binary.trim());
 
   const hasFile = target?.kind === "file";
-  const hasWorkspace = !!workspaceRoot;
+  // Workspace path: explicit root takes priority; fall back to dir target (terminal/git-history panels)
+  const effectiveWorkspacePath = workspaceRoot ?? (target?.kind === "dir" ? target.path : null);
+  const hasWorkspace = !!effectiveWorkspacePath;
 
-  // File editors only shown when a file is active; workspace editors only when workspace root exists
+  // File editors only shown when a file is active; workspace editors only when a workspace path exists
   const fileEditors = hasFile
     ? allEditors.filter((e) => resolveEditorTargetType(e) === "file")
     : [];
@@ -84,7 +86,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   const primaryTarget: OpenInEditorTarget | null = (() => {
     if (!primaryEditor) return hasFile ? target : null;
     if (resolveEditorTargetType(primaryEditor) === "workspace") {
-      return workspaceRoot ? { path: workspaceRoot, kind: "dir" } : null;
+      return effectiveWorkspacePath ? { path: effectiveWorkspacePath, kind: "dir" } : null;
     }
     return target;
   })();
@@ -105,8 +107,8 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     async (editor: AnyEditor) => {
       const editorTarget =
         resolveEditorTargetType(editor) === "workspace"
-          ? workspaceRoot
-            ? { path: workspaceRoot, kind: "dir" as const }
+          ? effectiveWorkspacePath
+            ? { path: effectiveWorkspacePath, kind: "dir" as const }
             : null
           : target;
       if (!editorTarget) return;
