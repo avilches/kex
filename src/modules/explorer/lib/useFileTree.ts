@@ -121,6 +121,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
   const expandedRef = useRef(expanded);
   const nodesRef = useRef(nodes);
+  const fetchSeqRef = useRef<Map<string, number>>(new Map());
   const watchedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -151,6 +152,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   }, []);
 
   const fetchChildren = useCallback(async (path: string) => {
+    const seq = (fetchSeqRef.current.get(path) ?? 0) + 1;
+    fetchSeqRef.current.set(path, seq);
+
     if (nodesRef.current[path]?.status !== "loaded") {
       setNodes((s) => ({ ...s, [path]: { status: "loading" } }));
     }
@@ -164,6 +168,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         gitDecorations: gitDecorationsRef.current,
         workspace: currentWorkspaceEnv(),
       });
+
+      if (fetchSeqRef.current.get(path) !== seq) return;
 
       const prev = nodesRef.current[path];
       if (prev?.status === "loaded" && sameDirListing(prev.entries, entries)) {
@@ -210,6 +216,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         watchRemove(toUnwatch);
       }
     } catch (e) {
+      if (fetchSeqRef.current.get(path) !== seq) return;
       setNodes((s) => ({
         ...s,
         [path]: { status: "error", message: String(e) },
