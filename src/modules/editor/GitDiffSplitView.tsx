@@ -15,8 +15,6 @@ type Props = {
 
 const SPLIT_THEME = EditorView.theme({
   "&": { height: "100%" },
-  ".cm-mergeView, .cm-mergeViewEditors": { height: "100%" },
-  ".cm-editor": { height: "100%" },
   ".cm-scroller": { overflow: "auto" },
 });
 
@@ -55,5 +53,10 @@ export function GitDiffSplitView({
     return () => view.destroy();
   }, [originalContent, modifiedContent, languageExt, wrap, lineNumbers, themeExt]);
 
-  return <div ref={hostRef} className="h-full w-full overflow-hidden" />;
+  return (
+    <div
+      ref={hostRef}
+      className="h-full w-full overflow-hidden [&_.cm-mergeView]:h-full [&_.cm-mergeViewEditors]:h-full [&_.cm-mergeViewEditor]:h-full"
+    />
+  );
 }
