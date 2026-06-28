@@ -40,15 +40,17 @@ export function BranchPicker({
 
   const handleOpenChange = async (nextOpen: boolean) => {
     setOpen(nextOpen);
-    if (nextOpen && branches === null) {
-      setLoading(true);
-      try {
-        setBranches(await onFetchBranches());
-      } catch {
-        setBranches([]);
-      } finally {
-        setLoading(false);
-      }
+    if (!nextOpen) {
+      setBranches(null);
+      return;
+    }
+    setLoading(true);
+    try {
+      setBranches(await onFetchBranches());
+    } catch {
+      setBranches([]);
+    } finally {
+      setLoading(false);
     }
   };
 

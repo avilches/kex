@@ -447,6 +447,7 @@ export function useSourceControlPanel(
         await summary.refresh({ remote: "never" });
       } catch (error) {
         setActionError(normalizeError(error));
+        throw error;
       } finally {
         setLocalActionBusy(null);
       }
@@ -468,6 +469,7 @@ export function useSourceControlPanel(
         setActionMessage(`Remote "${name}" added`);
       } catch (error) {
         setActionError(normalizeError(error));
+        throw error;
       } finally {
         setLocalActionBusy(null);
       }
