@@ -1,11 +1,20 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { emit, listen } from "@tauri-apps/api/event";
 import { native } from "@/lib/native";
 import type { DetectedEditor } from "./types";
+
+const EDITORS_SCANNED_EVENT = "kex://editors-scanned";
 
 // Module-level cache so all hook instances share state and the scan runs once.
 let cachedEditors: DetectedEditor[] = [];
 let scanning = false;
 const listeners = new Set<() => void>();
+
+// Propagate scan results to all windows (main <-> settings are separate webviews).
+void listen<DetectedEditor[]>(EDITORS_SCANNED_EVENT, (e) => {
+  cachedEditors = e.payload;
+  notify();
+});
 
 function notify() {
   for (const l of listeners) l();
@@ -42,6 +51,7 @@ export async function runEditorScan(): Promise<void> {
     const result = await native.editorScan();
     cachedEditors = result;
     notify();
+    void emit(EDITORS_SCANNED_EVENT, result);
   } catch (e) {
     console.error("editor_scan failed:", e);
   } finally {

@@ -1031,6 +1031,8 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
   [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
+  [KEY_PREFERRED_EDITOR_ID]: "preferredEditorId",
+  [KEY_CUSTOM_EDITORS]: "customEditors",
 };
 
 /** Subscribe to changes from any window (settings → main). */
