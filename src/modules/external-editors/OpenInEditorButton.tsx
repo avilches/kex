@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -29,7 +29,6 @@ interface Props {
 
 function pathLabel(target: OpenInEditorTarget): string {
   const parts = target.path.split(/[\\/]/).filter(Boolean);
-  if (target.kind === "file") return parts[parts.length - 1] ?? target.path;
   return parts[parts.length - 1] ?? target.path;
 }
 
@@ -55,11 +54,20 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
   const preferredEditorId = usePreferencesStore((s) => s.preferredEditorId);
   const customEditors = usePreferencesStore((s) => s.customEditors);
   const [open, setOpen] = useState(false);
+  const didScan = useRef(false);
+
+  // Reset scan guard when dropdown closes
+  useEffect(() => {
+    if (!open) {
+      didScan.current = false;
+    }
+  }, [open]);
 
   // Trigger a lazy scan the first time the dropdown is opened and no editors
   // have been detected yet.
   useEffect(() => {
-    if (open && detectedEditors.length === 0 && !isScanning) {
+    if (open && !didScan.current && detectedEditors.length === 0 && !isScanning) {
+      didScan.current = true;
       scan();
     }
   }, [open, detectedEditors.length, isScanning, scan]);
