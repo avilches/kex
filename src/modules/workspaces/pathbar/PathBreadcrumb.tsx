@@ -50,7 +50,7 @@ export function PathBreadcrumb({
               <Badge
                 variant="outline"
                 className={cn(
-                  "gap-1 whitespace-nowrap",
+                  "gap-1 whitespace-nowrap text-[10px]",
                   RELATION_CLASS[s.relation],
                 )}
               >
