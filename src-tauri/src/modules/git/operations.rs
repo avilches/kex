@@ -57,7 +57,13 @@ fn resolve_repo_in_authorized(
         return Ok(None);
     };
     let canonical_root = canonical_dir(registry, &root_line, &cwd.workspace)?;
-    let _ = registry.authorize(&canonical_root.local_path);
+    // Guard: do not extend authorization to an ancestor of the already-authorized cwd.
+    // A canonical_root strictly above cwd would silently escalate scope.
+    let cwd_path = std::path::Path::new(&cwd.local_path);
+    let root_path = std::path::Path::new(&canonical_root.local_path);
+    if !(cwd_path.starts_with(root_path) && cwd_path != root_path) {
+        let _ = registry.authorize(&canonical_root.local_path);
+    }
 
     let head = match git_stdout_lines(
         &canonical_root.workspace,
@@ -118,7 +124,13 @@ pub fn panel_snapshot(
         });
     };
     let canonical_root = canonical_dir(registry, &root_line, &cwd.workspace)?;
-    let _ = registry.authorize(&canonical_root.local_path);
+    // Guard: do not extend authorization to an ancestor of the already-authorized cwd.
+    // A canonical_root strictly above cwd would silently escalate scope.
+    let cwd_path = std::path::Path::new(&cwd.local_path);
+    let root_path = std::path::Path::new(&canonical_root.local_path);
+    if !(cwd_path.starts_with(root_path) && cwd_path != root_path) {
+        let _ = registry.authorize(&canonical_root.local_path);
+    }
 
     let status = status_inner(&canonical_root)?;
     let repo = GitRepoInfo {
@@ -1838,5 +1850,39 @@ mod tests {
         assert_eq!(files[1].added, 0, "binary file added must be 0");
         assert_eq!(files[1].removed, 0, "binary file removed must be 0");
         assert_eq!(files[1].is_binary, true, "binary file must be marked");
+    }
+}
+
+#[cfg(test)]
+mod workspace_auth_tests {
+    #[test]
+    fn repo_root_above_cwd_is_scope_escalation() {
+        let cwd = "/home/user/proj/sub";
+        let canonical_root = "/home/user/proj";
+        let cwd_path = std::path::Path::new(cwd);
+        let root_path = std::path::Path::new(canonical_root);
+        let is_escalation = cwd_path.starts_with(root_path) && cwd_path != root_path;
+        assert!(is_escalation, "must detect escalation");
+    }
+
+    #[test]
+    fn repo_root_same_as_cwd_is_not_escalation() {
+        let cwd = "/home/user/proj";
+        let canonical_root = "/home/user/proj";
+        let cwd_path = std::path::Path::new(cwd);
+        let root_path = std::path::Path::new(canonical_root);
+        let is_escalation = cwd_path.starts_with(root_path) && cwd_path != root_path;
+        assert!(!is_escalation, "same path is not escalation");
+    }
+
+    #[test]
+    fn repo_root_under_cwd_is_not_escalation() {
+        // Unusual but valid: worktree inside the authorized dir
+        let cwd = "/home/user/proj";
+        let canonical_root = "/home/user/proj/.claude/worktrees/feat";
+        let cwd_path = std::path::Path::new(cwd);
+        let root_path = std::path::Path::new(canonical_root);
+        let is_escalation = cwd_path.starts_with(root_path) && cwd_path != root_path;
+        assert!(!is_escalation, "root under cwd is not escalation");
     }
 }
