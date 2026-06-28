@@ -899,7 +899,7 @@ pub fn list_branches(
             let mut cur_path: Option<std::path::PathBuf> = None;
             let mut cur_branch: Option<String> = None;
             for line in text.lines() {
-                if line.starts_with("worktree ") {
+                if let Some(rest) = line.strip_prefix("worktree ") {
                     if let (Some(path), Some(branch)) = (cur_path.take(), cur_branch.take()) {
                         let wt_canonical = std::fs::canonicalize(&path).unwrap_or(path.clone());
                         if wt_canonical != repo_canonical {
@@ -911,7 +911,7 @@ pub fn list_branches(
                             map.insert(branch, wt_name);
                         }
                     }
-                    cur_path = Some(std::path::PathBuf::from(line["worktree ".len()..].trim()));
+                    cur_path = Some(std::path::PathBuf::from(rest.trim()));
                     cur_branch = None;
                 } else if let Some(rest) = line.strip_prefix("branch refs/heads/") {
                     cur_branch = Some(rest.trim().to_owned());
@@ -1419,11 +1419,11 @@ pub fn list_worktrees(
     let mut cur_branch: Option<String> = None;
 
     for line in stdout.lines() {
-        if line.starts_with("worktree ") {
+        if let Some(rest) = line.strip_prefix("worktree ") {
             if let Some(p) = cur_path.take() {
                 blocks.push((p, cur_branch.take()));
             }
-            cur_path = Some(std::path::PathBuf::from(line["worktree ".len()..].trim()));
+            cur_path = Some(std::path::PathBuf::from(rest.trim()));
             cur_branch = None;
         } else if let Some(rest) = line.strip_prefix("branch refs/heads/") {
             cur_branch = Some(rest.trim().to_owned());
