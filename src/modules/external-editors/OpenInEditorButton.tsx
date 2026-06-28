@@ -4,6 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -117,33 +118,19 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     if (err) toast.error(`Could not open in ${primaryEditor.name}: ${err}`);
   }, [primaryEditor, primaryTarget]);
 
-  const handleOpenWith = useCallback(
-    async (editor: AnyEditor) => {
-      const type = resolveEditorTargetType(editor);
-      const editorTarget =
-        type === "workspace"
-          ? workspaceRoot ? { path: workspaceRoot, kind: "dir" as const } : null
-          : type === "terminal"
-            ? currentFolderPath ? { path: currentFolderPath, kind: "dir" as const } : null
-            : target;
-      if (!editorTarget) return;
-      const err = await openWithEditor(editor.binary, editor.argsBeforePath, editorTarget.path);
-      if (err) toast.error(`Could not open in ${editor.name}: ${err}`);
-    },
-    [target, workspaceRoot, currentFolderPath],
-  );
-
-  // Dropdown only sets the preferred — opening happens via primary button click
+  // Dropdown only sets the preferred — opening happens via primary button click.
+  // Optimistic Zustand update so the icon reflects the change immediately,
+  // without waiting for the async IPC round-trip to persist to disk.
   const handleSetPreferred = useCallback((editor: AnyEditor) => {
     const type = resolveEditorTargetType(editor);
     if (type === "file") {
+      usePreferencesStore.setState({ preferredFileEditorId: editor.id });
       void setPreferredFileEditorId(editor.id);
     } else {
+      usePreferencesStore.setState({ preferredWorkspaceEditorId: editor.id });
       void setPreferredWorkspaceEditorId(editor.id);
     }
   }, []);
-
-  const hasFolderEditors = workspaceEditors.length > 0 || terminalEditors.length > 0;
 
   return (
     <div
@@ -192,52 +179,73 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
             <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Scanning...</div>
           )}
 
-          {/* File editors — only visible when a file is active */}
-          {fileEditors.map((editor) => (
-            <DropdownMenuItem
-              key={editor.id}
-              onSelect={() => handleSetPreferred(editor)}
-              className="gap-2"
-            >
-              <EditorIcon id={editor.id} size={16} />
-              <span className="flex-1">{editor.name}</span>
-              {editor.id === activeFileEditor?.id && (
-                <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
-              )}
-            </DropdownMenuItem>
-          ))}
+          {/* Edit files — only when a file is active */}
+          {fileEditors.length > 0 && (
+            <>
+              <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                Edit files
+              </DropdownMenuLabel>
+              {fileEditors.map((editor) => (
+                <DropdownMenuItem
+                  key={editor.id}
+                  onSelect={() => handleSetPreferred(editor)}
+                  className="gap-2"
+                >
+                  <EditorIcon id={editor.id} size={16} />
+                  <span className="flex-1">{editor.name}</span>
+                  {editor.id === activeFileEditor?.id && (
+                    <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
 
-          {fileEditors.length > 0 && hasFolderEditors && <DropdownMenuSeparator />}
+          {/* Workspace root — only when workspace root exists */}
+          {workspaceEditors.length > 0 && (
+            <>
+              {fileEditors.length > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                Workspace root
+              </DropdownMenuLabel>
+              {workspaceEditors.map((editor) => (
+                <DropdownMenuItem
+                  key={editor.id}
+                  onSelect={() => handleSetPreferred(editor)}
+                  className="gap-2"
+                >
+                  <EditorIcon id={editor.id} size={16} />
+                  <span className="flex-1">{editor.name}</span>
+                  {editor.id === activeFolderEditor?.id && (
+                    <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
 
-          {/* Workspace editors (JetBrains, Xcode…) — open the pinned workspace root */}
-          {workspaceEditors.map((editor) => (
-            <DropdownMenuItem
-              key={editor.id}
-              onSelect={() => handleSetPreferred(editor)}
-              className="gap-2"
-            >
-              <EditorIcon id={editor.id} size={16} />
-              <span className="flex-1">{editor.name}</span>
-              {editor.id === activeFolderEditor?.id && (
-                <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
-              )}
-            </DropdownMenuItem>
-          ))}
-
-          {/* Terminal editors — open current folder */}
-          {terminalEditors.map((editor) => (
-            <DropdownMenuItem
-              key={editor.id}
-              onSelect={() => handleSetPreferred(editor)}
-              className="gap-2"
-            >
-              <EditorIcon id={editor.id} size={16} />
-              <span className="flex-1">{editor.name}</span>
-              {editor.id === activeFolderEditor?.id && (
-                <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
-              )}
-            </DropdownMenuItem>
-          ))}
+          {/* Terminals — whenever there is any folder context */}
+          {terminalEditors.length > 0 && (
+            <>
+              {(fileEditors.length > 0 || workspaceEditors.length > 0) && <DropdownMenuSeparator />}
+              <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                Terminals
+              </DropdownMenuLabel>
+              {terminalEditors.map((editor) => (
+                <DropdownMenuItem
+                  key={editor.id}
+                  onSelect={() => handleSetPreferred(editor)}
+                  className="gap-2"
+                >
+                  <EditorIcon id={editor.id} size={16} />
+                  <span className="flex-1">{editor.name}</span>
+                  {editor.id === activeFolderEditor?.id && (
+                    <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
 
           {!isScanning && !anyAvailable && (
             <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
