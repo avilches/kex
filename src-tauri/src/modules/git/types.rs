@@ -170,8 +170,30 @@ pub(crate) enum TextSource {
 impl TextSource {
     pub(crate) fn into_text(self) -> String {
         match self {
-            TextSource::Text(text) => text,
+            TextSource::Text(text) => text.replace("\r\n", "\n"),
             TextSource::Missing | TextSource::Binary => String::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn into_text_normalizes_crlf() {
+        let src = TextSource::Text("foo\r\nbar\r\nbaz".to_string());
+        assert_eq!(src.into_text(), "foo\nbar\nbaz");
+    }
+
+    #[test]
+    fn into_text_leaves_lf_unchanged() {
+        let src = TextSource::Text("foo\nbar\n".to_string());
+        assert_eq!(src.into_text(), "foo\nbar\n");
+    }
+
+    #[test]
+    fn into_text_binary_returns_empty() {
+        assert_eq!(TextSource::Binary.into_text(), "");
     }
 }
