@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
+import { OpenInEditorButton, type OpenInEditorTarget } from "@/modules/external-editors";
 import {
   CommandIcon,
   Settings01Icon,
@@ -24,6 +25,8 @@ type Props = {
   onOpenSettings: () => void;
   searchTarget: SearchTarget;
   searchRef: RefObject<SearchInlineHandle | null>;
+  openInEditorTarget: OpenInEditorTarget | null;
+  onOpenExternalEditorSettings: () => void;
 };
 
 const COMPACT_WIDTH = 720;
@@ -36,6 +39,8 @@ export function Header({
   onOpenSettings,
   searchTarget,
   searchRef,
+  openInEditorTarget,
+  onOpenExternalEditorSettings,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
@@ -113,6 +118,10 @@ export function Header({
 
       <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
 
+      <OpenInEditorButton
+        target={openInEditorTarget}
+        onOpenSettings={onOpenExternalEditorSettings}
+      />
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
 
       {IS_MAC && (

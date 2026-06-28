@@ -7,6 +7,7 @@ import {
 } from "@/modules/editor/lib/editorViewSettings";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
+import type { CustomEditor } from "@/modules/external-editors/types";
 
 export type ThemePref = "system" | "light" | "dark";
 
@@ -168,6 +169,8 @@ export type Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
   scratchpadInNewTerminals: boolean;
+  preferredEditorId: string | null;
+  customEditors: CustomEditor[];
 };
 
 const STORE_PATH = "settings-general.json";
@@ -221,6 +224,8 @@ const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_TERMINAL_NEW_FOLDER_MODE = "terminalNewFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
+const KEY_PREFERRED_EDITOR_ID = "preferredEditorId";
+const KEY_CUSTOM_EDITORS = "customEditors";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 13;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -359,6 +364,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: false,
   scratchpadEnterSends: true,
   scratchpadInNewTerminals: true,
+  preferredEditorId: null,
+  customEditors: [],
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -590,6 +597,13 @@ export async function loadPreferences(): Promise<Preferences> {
     scratchpadInNewTerminals:
       get<boolean>(KEY_SCRATCHPAD_IN_NEW_TERMINALS) ??
       DEFAULT_PREFERENCES.scratchpadInNewTerminals,
+    preferredEditorId:
+      get<string | null>(KEY_PREFERRED_EDITOR_ID) ??
+      DEFAULT_PREFERENCES.preferredEditorId,
+    customEditors: (() => {
+      const v = get<CustomEditor[]>(KEY_CUSTOM_EDITORS);
+      return Array.isArray(v) ? v : DEFAULT_PREFERENCES.customEditors;
+    })(),
   };
 
   // Persist any config keys that weren't present so they're discoverable in the JSON.
@@ -851,6 +865,14 @@ export async function setTerminalScratchpadEnterSends(value: boolean): Promise<v
 
 export async function setTerminalScratchpadInNewTerminals(value: boolean): Promise<void> {
   await writePref(KEY_SCRATCHPAD_IN_NEW_TERMINALS, value);
+}
+
+export async function setPreferredEditorId(value: string | null): Promise<void> {
+  await writePref(KEY_PREFERRED_EDITOR_ID, value);
+}
+
+export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
+  await writePref(KEY_CUSTOM_EDITORS, value);
 }
 
 export async function setZoomLevel(value: number): Promise<void> {

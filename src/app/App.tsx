@@ -30,6 +30,7 @@ import {
   type SearchInlineHandle,
   type SearchTarget,
 } from "@/modules/header";
+import type { OpenInEditorTarget } from "@/modules/external-editors";
 import type { BrowserPaneHandle } from "@/modules/browser";
 import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
@@ -225,6 +226,28 @@ export default function App() {
     ? ((activePanel as { cwd?: string }).cwd ?? null)
     : null;
   activeCwdRef.current = activeCwd;
+
+  const openInEditorTarget = useMemo<OpenInEditorTarget | null>(() => {
+    if (!activePanel) return null;
+    switch (activePanel.kind) {
+      case "terminal":
+        return activePanel.cwd ? { path: activePanel.cwd, kind: "dir" } : null;
+      case "editor":
+        return { path: activePanel.path, kind: "file" };
+      case "markdown":
+        return { path: activePanel.path, kind: "file" };
+      case "git-diff":
+      case "git-commit-file":
+        return { path: activePanel.repoRoot, kind: "dir" };
+      case "git-history":
+        return { path: activePanel.repoRoot, kind: "dir" };
+      case "browser":
+        return activeWorkspace?.cwd ? { path: activeWorkspace.cwd, kind: "dir" } : null;
+      default:
+        return null;
+    }
+  }, [activePanel, activeWorkspace]);
+
   const contextCwdFilePath = activePanel ? panelFilePath(activePanel) : null;
   const contextCwd =
     activePanel?.kind === "terminal"
@@ -2327,6 +2350,10 @@ export default function App() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const onOpenExternalEditorSettings = useCallback(() => {
+    void openSettingsWindow("external-editors");
+  }, []);
+
   const rightPanelRepoRoot =
     sourceControl.repo?.repoRoot ?? explorerRoot ?? home ?? "";
 
@@ -2342,6 +2369,8 @@ export default function App() {
             onOpenSettings={() => void openSettingsWindow()}
             searchTarget={searchTarget}
             searchRef={searchInlineRef}
+            openInEditorTarget={openInEditorTarget}
+            onOpenExternalEditorSettings={onOpenExternalEditorSettings}
           />
 
           {/* 3-column layout */}
