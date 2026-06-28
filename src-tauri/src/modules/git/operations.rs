@@ -679,7 +679,7 @@ pub fn commit_files(
         return Err(GitError::command("git diff-tree", "invalid commit sha"));
     }
 
-    let output = run_git(
+    let ns_output = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
         [
@@ -688,41 +688,29 @@ pub fn commit_files(
             OsStr::new("-r"),
             OsStr::new("-z"),
             OsStr::new("--name-status"),
+            OsStr::new(sha),
+        ],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&ns_output, "git diff-tree --name-status failed")?;
+    let mut files = parse_diff_tree_name_status(&ns_output.stdout);
+
+    let num_output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        [
+            OsStr::new("diff-tree"),
+            OsStr::new("--no-commit-id"),
+            OsStr::new("-r"),
+            OsStr::new("-z"),
             OsStr::new("--numstat"),
             OsStr::new(sha),
         ],
         DEFAULT_TIMEOUT_SECS,
     )?;
-    ensure_success(&output, "git diff-tree failed")?;
-
-    let (name_status_bytes, numstat_bytes) = split_name_status_numstat(&output.stdout);
-    let mut files = parse_diff_tree_name_status(name_status_bytes);
-    apply_numstat(&mut files, numstat_bytes);
+    ensure_success(&num_output, "git diff-tree --numstat failed")?;
+    apply_numstat_by_path(&mut files, &num_output.stdout);
     Ok(files)
-}
-
-fn split_name_status_numstat(bytes: &[u8]) -> (&[u8], &[u8]) {
-    let s = std::str::from_utf8(bytes).unwrap_or("");
-    let tokens: Vec<(usize, &str)> = s
-        .split('\0')
-        .scan(0usize, |off, t| {
-            let start = *off;
-            *off += t.len() + 1;
-            Some((start, t))
-        })
-        .collect();
-    let mut split_at = bytes.len();
-    for (idx, tok) in tokens.iter().enumerate() {
-        if tok.1.contains('\t') {
-            split_at = tok.0;
-            // Walk back: numstat for R/C with -z emits "<a>\t<r>" then two
-            // NUL-separated paths. The two trailing path tokens belong to the
-            // numstat block, not name-status.
-            let _ = idx;
-            break;
-        }
-    }
-    (&bytes[..split_at], &bytes[split_at..])
 }
 
 pub fn commit_file_diff(
@@ -1190,53 +1178,43 @@ fn parse_diff_tree_name_status(bytes: &[u8]) -> Vec<GitCommitFileChange> {
     files
 }
 
-fn apply_numstat(files: &mut [GitCommitFileChange], bytes: &[u8]) {
+fn apply_numstat_by_path(files: &mut [GitCommitFileChange], bytes: &[u8]) {
+    // numstat -z format: "<added>\t<removed>\t<path>\0"
+    // Binary files:      "-\t-\t<path>\0"
+    // Renames:           "<added>\t<removed>\t\0<new_path>\0<old_path>\0"
     let s = std::str::from_utf8(bytes).unwrap_or("");
-    let tokens: Vec<&str> = s.split('\0').filter(|t| !t.is_empty()).collect();
-    let mut idx = 0;
-    while idx < tokens.len() {
-        let header = tokens[idx];
-        idx += 1;
+    let mut tokens = s.split('\0');
+    while let Some(header) = tokens.next() {
+        if header.is_empty() {
+            continue;
+        }
         let mut cols = header.splitn(3, '\t');
         let added_raw = cols.next().unwrap_or("0");
         let removed_raw = cols.next().unwrap_or("0");
         let inline_path = cols.next().unwrap_or("");
         let is_binary = added_raw == "-" && removed_raw == "-";
-        let added: u32 = if is_binary {
-            0
-        } else {
-            added_raw.parse().unwrap_or(0)
-        };
-        let removed: u32 = if is_binary {
-            0
-        } else {
-            removed_raw.parse().unwrap_or(0)
-        };
+        let added: u32 = if is_binary { 0 } else { added_raw.parse().unwrap_or(0) };
+        let removed: u32 = if is_binary { 0 } else { removed_raw.parse().unwrap_or(0) };
 
-        let (path, original) = if inline_path.is_empty() {
-            let original = tokens.get(idx).map(|s| s.to_string()).unwrap_or_default();
-            idx += 1;
-            let new_path = tokens.get(idx).map(|s| s.to_string()).unwrap_or_default();
-            idx += 1;
-            (new_path, Some(original))
+        let path = if inline_path.is_empty() {
+            // Rename case: next two tokens are new_path then old_path
+            let new_path = tokens.next().unwrap_or("").to_string();
+            let _ = tokens.next(); // old_path; already captured from name-status
+            new_path
         } else {
-            (inline_path.to_string(), None)
+            inline_path.to_string()
         };
 
         if path.is_empty() {
             continue;
         }
-        if let Some(file) = files.iter_mut().find(|f| f.path == path) {
-            file.added = added;
-            file.removed = removed;
-            file.is_binary = is_binary;
-            if file.original_path.is_none() {
-                if let Some(orig) = original {
-                    if !orig.is_empty() && orig != file.path {
-                        file.original_path = Some(orig);
-                    }
-                }
-            }
+        if let Some(f) = files
+            .iter_mut()
+            .find(|f| f.path == path || f.original_path.as_deref() == Some(path.as_str()))
+        {
+            f.added = added;
+            f.removed = removed;
+            f.is_binary = is_binary;
         }
     }
 }
@@ -1826,5 +1804,39 @@ mod tests {
             &WorkspaceEnv::Local,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn apply_numstat_does_not_break_on_binary_marker() {
+        let mut files = vec![
+            GitCommitFileChange {
+                status: "M".to_string(),
+                status_label: "Modified".to_string(),
+                path: "text.rs".to_string(),
+                original_path: None,
+                added: 0,
+                removed: 0,
+                is_binary: false,
+            },
+            GitCommitFileChange {
+                status: "M".to_string(),
+                status_label: "Modified".to_string(),
+                path: "image.png".to_string(),
+                original_path: None,
+                added: 0,
+                removed: 0,
+                is_binary: false,
+            },
+        ];
+        // numstat -z: "5\t3\ttext.rs\0-\t-\timage.png\0"
+        let numstat = b"5\t3\ttext.rs\x00-\t-\timage.png\x00";
+        apply_numstat_by_path(&mut files, numstat);
+        assert_eq!(files[0].added, 5, "text file added lines");
+        assert_eq!(files[0].removed, 3, "text file removed lines");
+        assert_eq!(files[0].is_binary, false, "text file is not binary");
+        // binary file keeps 0 counts and is marked binary
+        assert_eq!(files[1].added, 0, "binary file added must be 0");
+        assert_eq!(files[1].removed, 0, "binary file removed must be 0");
+        assert_eq!(files[1].is_binary, true, "binary file must be marked");
     }
 }
