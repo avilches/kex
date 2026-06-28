@@ -57,7 +57,6 @@ import {
   cycleScratchpad,
   disposeSession,
   leafHasForegroundProcess,
-  navigateFocusedBlocks,
   type TerminalPaneHandle,
   useTerminalFileDrop,
   useTerminalMetricsSampler,
@@ -762,30 +761,6 @@ export default function App() {
       });
     },
     [openPanel],
-  );
-
-  const openNewBlock = useCallback(
-    (targetPaneId?: string) => {
-      if (!activeWorkspace) return;
-      const { terminalNewFolderMode } = usePreferencesStore.getState();
-      openPanel(
-        activeWorkspace.id,
-        targetPaneId ?? activeWorkspace.activePaneId,
-        {
-          id: newPanelId(),
-          kind: "terminal",
-          blocks: true,
-          cwd: resolveNewTerminalCwd({
-            mode: terminalNewFolderMode,
-            home: homeRef.current,
-            lastFolder: contextCwdRef.current ?? activeWorkspace.cwd ?? null,
-            workspaceRoot:
-              activeWorkspace.pinnedRoot ?? activeWorkspace.fsRoot ?? null,
-          }),
-        },
-      );
-    },
-    [activeWorkspace, openPanel],
   );
 
   // ── Window title ──────────────────────────────────────────────────────────
@@ -1896,7 +1871,6 @@ export default function App() {
       "tab.new": () => {
         openNewTerminal();
       },
-      "tab.newBlock": () => openNewBlock(),
       "workspace.new": () => addWorkspace(home ?? undefined),
       "workspace.close": () => {
         if (activeWorkspace) void requestCloseWorkspace(activeWorkspace.id);
@@ -2007,8 +1981,6 @@ export default function App() {
           cycleScratchpad(activePanelId);
         }
       },
-      "blocks.prev": () => navigateFocusedBlocks(-1),
-      "blocks.next": () => navigateFocusedBlocks(1),
       "search.focus": () => searchInlineRef.current?.focus(),
       "settings.open": () => void openSettingsWindow(),
       "notifications.toggle": () => useBellStore.getState().toggle(),
@@ -2112,7 +2084,6 @@ export default function App() {
       requestCloseWorkspace,
       focusSidebar,
       openNewTerminal,
-      openNewBlock,
       addWorkspace,
       openPanel,
       openBrowserInPanel,
@@ -2164,12 +2135,6 @@ export default function App() {
         const target =
           (e.target as HTMLElement | null) ?? document.activeElement;
         return !(target as HTMLElement | null)?.closest?.(".xterm");
-      }
-      if (id === "blocks.prev" || id === "blocks.next") {
-        return !(
-          activePanel?.kind === "terminal" &&
-          (activePanel as { blocks?: boolean }).blocks === true
-        );
       }
       if (id === "file.rename") {
         return rightPanelRef.current?.isExplorerFocused() ?? false;

@@ -350,21 +350,3 @@ Estado: idea anotada (2026-06-24); la navegacion por indice ya esta hecha, queda
 
 En Windows/Linux `MOD_PROP` es Ctrl, asi que Ctrl+0 (ultimo tab) se solapa con `view.zoomReset`; el tab gana por orden de registro y Reset Zoom queda reasignable. En macOS no hay conflicto (Cmd vs Ctrl son distintos).
 
----
-
-## Deshabilitar blocks (sin borrar el codigo)
-
-Estado: pedido 2026-06-27. Dejar el subsistema de blocks intacto en el codigo pero inaccesible desde la UI, para poder reactivarlo mas adelante.
-
-### Que quitar
-
-- **Shortcuts** (`src/modules/shortcuts/shortcuts.ts`): retirar de `SHORTCUTS` (y de los handlers que los cablean en `App.tsx`) los atajos `tab.newBlock`, `blocks.prev` y `blocks.next`, de modo que no aparezcan en Settings ni respondan. No borrar los `ShortcutId` del union si complica; basta con que no se registren ni se muestren.
-- **Comandos**: quitar las entradas que crean/abren un block terminal (boton "New block terminal", item de menu o command palette, y el split/new que use `blocks: true`). Localizar los call sites que pasan `blocks: true` al crear un panel terminal.
-
-### Que NO tocar
-
-- El modulo `terminal/block/*`, el flag `blocks` del `Panel`/`Session`, `BlockOverlay`, `BlockWatermark`, la deteccion OSC 133 y el `ShellInput`. Todo se queda para reactivar el modo en el futuro.
-
-### Verificar
-
-- Que no quede ninguna via de UI para crear un block terminal y que los terminales normales siguen funcionando igual.

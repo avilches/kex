@@ -8,7 +8,6 @@ export type ShortcutId =
   | "commandPalette.open"
   | "commandPalette.content"
   | "tab.new"
-  | "tab.newBlock"
   | "tab.newBrowser"
   | "tab.newEditor"
   | "tab.close"
@@ -33,8 +32,6 @@ export type ShortcutId =
   | "pane.focusRight"
   | "terminal.clear"
   | "terminal.scratchpad"
-  | "blocks.prev"
-  | "blocks.next"
   | "search.focus"
   | "explorer.search"
   | "sidebar.toggle"
@@ -242,12 +239,6 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
   },
   {
-    id: "tab.newBlock",
-    label: "New Blocks Terminal",
-    group: "Tabs",
-    defaultBindings: [],
-  },
-  {
     id: "tab.newBrowser",
     label: "New Browser Tab",
     group: "Tabs",
@@ -354,20 +345,6 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Toggle Scratchpad Bar",
     group: "Terminal",
     defaultBindings: IS_MAC ? [{ meta: true, key: "u" }] : [],
-  },
-  {
-    id: "blocks.prev",
-    label: "Previous Command Block",
-    group: "Terminal",
-    defaultBindings: [],
-    allowRepeat: true,
-  },
-  {
-    id: "blocks.next",
-    label: "Next Command Block",
-    group: "Terminal",
-    defaultBindings: [],
-    allowRepeat: true,
   },
   {
     id: "tab.next",

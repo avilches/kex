@@ -1,5 +1,4 @@
-import { Kbd, ShortcutKeys } from "@/components/Kbd";
-import type { ShortcutId } from "@/modules/shortcuts";
+import { Kbd } from "@/components/Kbd";
 import { cn } from "@/lib/utils";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
@@ -52,26 +51,19 @@ export function BlockWatermark({ leafId, subscribe }: Props) {
       <div className="grid grid-cols-[auto_auto] items-center gap-x-12 gap-y-3 text-[13px]">
         <Hint label="Browse your command history" keys="↑" />
         <Hint label="Autocomplete paths and commands" keys="Tab" />
-        <Hint label="Previous command block" shortcut="blocks.prev" />
-        <Hint label="Next command block" shortcut="blocks.next" />
-        <Hint label="New block terminal" shortcut="tab.newBlock" />
       </div>
     </div>
   );
 }
 
-function Hint(props: { label: string; keys?: string; shortcut?: ShortcutId }) {
+function Hint(props: { label: string; keys?: string }) {
   return (
     <>
       <span className="justify-self-start text-muted-foreground">
         {props.label}
       </span>
       <span className="flex items-center gap-1 justify-self-end">
-        {props.shortcut ? (
-          <ShortcutKeys id={props.shortcut} />
-        ) : (
-          <Kbd>{props.keys}</Kbd>
-        )}
+        <Kbd>{props.keys}</Kbd>
       </span>
     </>
   );
