@@ -9,6 +9,7 @@ import {
 import {
   type DiffViewMode,
   setDiffViewMode,
+  setEditorViewForExt,
 } from "@/modules/settings/store";
 import {
   LayoutTwoColumnIcon,
@@ -19,7 +20,6 @@ import {
   type EditorViewSettings,
   extOf,
 } from "./lib/editorViewSettings";
-import { setEditorViewForExt } from "@/modules/settings/store";
 import { EditorPathBreadcrumb } from "./EditorPathBreadcrumb";
 import { diffRenameLabel } from "./lib/diffRename";
 

@@ -33,6 +33,7 @@ import {
 } from "./lib/diffSize";
 import { resolveLanguage, resolveLanguageSync } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
+import { joinRepoPath } from "./lib/diffRename";
 
 type WorkingSource = {
   kind: "working";
@@ -207,6 +208,8 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
   const path = source.path;
   const repoRoot = source.repoRoot;
   const mode = source.kind === "working" ? source.mode : "+";
+  const absPath = joinRepoPath(repoRoot, path);
+  const absOriginalPath = originalPath ? joinRepoPath(repoRoot, originalPath) : null;
   const loaded = state.kind === "loaded" ? state : null;
   const originalContent = loaded?.originalContent ?? "";
   const modifiedContent = loaded?.modifiedContent ?? "";
@@ -302,8 +305,8 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
   return (
     <div className="flex h-full min-h-0 flex-col rounded-md border border-border/60 bg-background">
       <GitDiffPathBar
-        path={path}
-        originalPath={originalPath}
+        path={absPath}
+        originalPath={absOriginalPath}
         repoRoot={repoRoot}
         mode={mode}
         chipLabel={chipLabel}
