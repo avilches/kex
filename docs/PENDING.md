@@ -8,18 +8,9 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 
 ## Bugs (`docs/pending/bugs/`)
 
-- [BUG-02](pending/bugs/BUG-02-diff-no-normaliza-crlf.md) — Diff no normaliza CRLF
-- [BUG-03](pending/bugs/BUG-03-autosave-timer-perdido-al-desmontar.md) — Autosave: timer perdido al desmontar
 - [BUG-04](pending/bugs/BUG-04-diff-editor-reconstruido-por-cambio.md) — Diff editor reconstruido por cambio de dep
-- [BUG-06](pending/bugs/BUG-06-diff-rename-staged-pathspec-incompleto.md) — Diff rename staged: pathspec incompleto
-- [BUG-07](pending/bugs/BUG-07-split-name-status-numstat-heuristica-tab.md) — Split name-status/numstat: heuristica por tab
-- [BUG-08](pending/bugs/BUG-08-fuga-procesos-background-shellstate.md) — Fuga de procesos background en ShellState
-- [BUG-12](pending/bugs/BUG-12-toctou-auto-autorizacion-repo-root.md) — TOCTOU en auto-autorizacion de repo root
-- [BUG-13](pending/bugs/BUG-13-deteccion-binario-8kb-incoherente.md) — Deteccion de binario con 8 KB incoherente
 - [BUG-14](pending/bugs/BUG-14-git-show-truncamiento-blobs-memoria.md) — git show: truncamiento de blobs en memoria (alcance reducido: el diff principal ya propaga `truncated` via `diff_inner`; solo afecta el flujo git-history/commit-file)
-- [BUG-15](pending/bugs/BUG-15-usefiletree-callbacks-inestables.md) — useFileTree: callbacks inestables
 - [BUG-17](pending/bugs/BUG-17-busqueda-ipc-sin-cancelacion.md) — Busqueda IPC sin cancelacion (fs_search resuelto; fs_grep_interactive pendiente)
-- [BUG-18](pending/bugs/BUG-18-race-refetch-fs-changed-explorer.md) — Race entre refetch y fs-changed en explorer
 - [BUG-38](pending/bugs/BUG-38-busqueda-cmdF-incompleta.md) - Cmd+F: no busca en markdown/git-diff (terminal y editor resueltos)
 - [BUG-39](pending/bugs/BUG-39-file-search-ux-poco-clara.md) - Busqueda de ficheros: UX poco clara (no es bug de codigo; los atajos funcionan, falta descubribilidad: tratar como mejora de UI)
 - [BUG-40](pending/bugs/BUG-40-stage-unstage-all-incompleto.md) — Stage all / unstage all no procesa todos los ficheros (la logica de pathspecs parece correcta; el sintoma cuelga probablemente de BUG-06, renames sin original_rel. Reproducir antes de fix)
