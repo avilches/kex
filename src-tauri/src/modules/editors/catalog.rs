@@ -27,6 +27,7 @@ pub static CATALOG: &[EditorEntry] = &[
     EditorEntry { id: "kiro", name: "Kiro", bundle_id: Some("software.amazon.kiro.Kiro"), cli_binary: "kiro", args_before_path: &[], macos_app_name: None },
     EditorEntry { id: "trae", name: "Trae", bundle_id: Some("com.bytedance.trae"), cli_binary: "trae", args_before_path: &[], macos_app_name: None },
     EditorEntry { id: "antigravity", name: "Antigravity", bundle_id: Some("com.google.antigravity"), cli_binary: "antigravity", args_before_path: &[], macos_app_name: None },
+    EditorEntry { id: "trae-solo", name: "Trae Solo", bundle_id: Some("com.bytedance.trae.solo"), cli_binary: "trae", args_before_path: &[], macos_app_name: None },
     // --- Text editors ---
     EditorEntry { id: "sublime-text", name: "Sublime Text", bundle_id: Some("com.sublimetext.4"), cli_binary: "subl", args_before_path: &[], macos_app_name: None },
     EditorEntry { id: "atom", name: "Atom", bundle_id: Some("com.github.atom"), cli_binary: "atom", args_before_path: &[], macos_app_name: None },
@@ -47,12 +48,21 @@ pub static CATALOG: &[EditorEntry] = &[
     EditorEntry { id: "clion", name: "CLion", bundle_id: Some("com.jetbrains.clion"), cli_binary: "clion", args_before_path: &[], macos_app_name: Some("CLion") },
     EditorEntry { id: "phpstorm", name: "PhpStorm", bundle_id: Some("com.jetbrains.PhpStorm"), cli_binary: "phpstorm", args_before_path: &[], macos_app_name: Some("PhpStorm") },
     EditorEntry { id: "mps", name: "MPS", bundle_id: Some("com.jetbrains.mps"), cli_binary: "mps", args_before_path: &[], macos_app_name: Some("MPS") },
+    EditorEntry { id: "android-studio-canary", name: "Android Studio Canary", bundle_id: Some("com.google.android.studio.canary"), cli_binary: "studio", args_before_path: &[], macos_app_name: Some("Android Studio Canary") },
+    // --- Other IDEs ---
+    EditorEntry { id: "xcode", name: "Xcode", bundle_id: Some("com.apple.dt.Xcode"), cli_binary: "xed", args_before_path: &[], macos_app_name: None },
+    // --- Terminals ---
+    EditorEntry { id: "warp", name: "Warp", bundle_id: Some("dev.warp.Warp-Stable"), cli_binary: "", args_before_path: &[], macos_app_name: None },
+    EditorEntry { id: "ghostty", name: "Ghostty", bundle_id: Some("com.mitchellh.ghostty"), cli_binary: "ghostty", args_before_path: &["--working-directory"], macos_app_name: None },
+    EditorEntry { id: "iterm2", name: "iTerm2", bundle_id: Some("com.googlecode.iterm2"), cli_binary: "", args_before_path: &[], macos_app_name: None },
+    EditorEntry { id: "alacritty", name: "Alacritty", bundle_id: Some("io.alacritty"), cli_binary: "alacritty", args_before_path: &["--working-directory"], macos_app_name: None },
+    EditorEntry { id: "kitty", name: "Kitty", bundle_id: Some("net.kovidgoyal.kitty"), cli_binary: "kitty", args_before_path: &["--directory"], macos_app_name: None },
 ];
 
 pub fn is_jetbrains(id: &str) -> bool {
     matches!(id, "intellij" | "pycharm" | "webstorm" | "goland" | "rubymine"
-        | "rustrover" | "android-studio" | "rider" | "appcode" | "clion"
-        | "phpstorm" | "mps")
+        | "rustrover" | "android-studio" | "android-studio-canary" | "rider"
+        | "appcode" | "clion" | "phpstorm" | "mps")
 }
 
 /// Editors launched via `open -b <bundle_id>` on macOS regardless of CLI availability.
