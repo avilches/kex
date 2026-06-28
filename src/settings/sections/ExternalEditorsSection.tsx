@@ -70,13 +70,13 @@ export function ExternalEditorsSection() {
     void setCustomEditors(customEditors.filter((e) => e.id !== id));
   }
 
-  // Build per-group lists (installed only) and a flat "not installed" list
-  const installedByGroup = EDITOR_GROUPS.map((group) => ({
-    group,
-    entries: EDITOR_CATALOG.filter((e) => e.group === group && detectedIds.has(e.id)),
-  })).filter((g) => g.entries.length > 0);
-
-  const notInstalled = EDITOR_CATALOG.filter((e) => !detectedIds.has(e.id));
+  // Each group shows installed entries first, then not-installed at the bottom of the same group
+  const groupedEntries = EDITOR_GROUPS.map((group) => {
+    const all = EDITOR_CATALOG.filter((e) => e.group === group);
+    const installed = all.filter((e) => detectedIds.has(e.id));
+    const notInstalled = all.filter((e) => !detectedIds.has(e.id));
+    return { group, installed, notInstalled };
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -99,50 +99,37 @@ export function ExternalEditorsSection() {
         Select your preferred tool from that button&apos;s dropdown.
       </p>
 
-      {/* Installed editors grouped by family */}
-      {installedByGroup.length > 0 && (
-        <div className="flex flex-col gap-4">
-          {installedByGroup.map(({ group, entries }) => (
-            <div key={group} className="flex flex-col gap-2">
-              <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                {group}
-              </h3>
-              <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-                {entries.map((entry) => {
-                  const isDisabled = disabledDetectedEditorIds.includes(entry.id);
-                  return (
-                    <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
-                      <EditorIcon id={entry.id} size={18} />
-                      <span className="flex-1 text-[12.5px]">{entry.name}</span>
-                      <Switch
-                        checked={!isDisabled}
-                        onCheckedChange={(v) => handleToggleDetected(entry.id, v)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+      {/* Editors grouped by family — installed first, not-installed dimmed at end of each group */}
+      <div className="flex flex-col gap-4">
+        {groupedEntries.map(({ group, installed, notInstalled }) => (
+          <div key={group} className="flex flex-col gap-2">
+            <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+              {group}
+            </h3>
+            <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+              {installed.map((entry) => {
+                const isDisabled = disabledDetectedEditorIds.includes(entry.id);
+                return (
+                  <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <EditorIcon id={entry.id} size={18} />
+                    <span className="flex-1 text-[12.5px]">{entry.name}</span>
+                    <Switch
+                      checked={!isDisabled}
+                      onCheckedChange={(v) => handleToggleDetected(entry.id, v)}
+                    />
+                  </div>
+                );
+              })}
+              {notInstalled.map((entry) => (
+                <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 opacity-40">
+                  <EditorIcon id={entry.id} size={18} />
+                  <span className="flex-1 text-[12.5px] text-muted-foreground">{entry.name}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Not installed */}
-      {notInstalled.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Not installed
-          </h3>
-          <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden opacity-40">
-            {notInstalled.map((entry) => (
-              <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
-                <EditorIcon id={entry.id} size={18} />
-                <span className="flex-1 text-[12.5px] text-muted-foreground">{entry.name}</span>
-              </div>
-            ))}
           </div>
-        </div>
-      )}
+        ))}
+      </div>
 
       {/* Custom tools */}
       <div className="flex flex-col gap-3">
