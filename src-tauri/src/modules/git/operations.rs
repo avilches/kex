@@ -183,12 +183,13 @@ pub fn diff(
 ) -> Result<GitDiffResult> {
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
-    diff_inner(&repo_root, path, staged)
+    diff_inner(&repo_root, path, None, staged)
 }
 
 fn diff_inner(
     repo_root: &ResolvedGitDirectory,
     path: Option<&str>,
+    original_path: Option<&str>,
     staged: bool,
 ) -> Result<GitDiffResult> {
     let mut args: Vec<OsString> = vec!["diff".into(), "--no-ext-diff".into()];
@@ -202,6 +203,10 @@ fn diff_inner(
     if let Some(spec) = pathspec.as_ref() {
         args.push("--".into());
         args.push(spec.clone().into());
+        if let Some(orig) = original_path.filter(|o| !o.is_empty() && *o != spec.as_str()) {
+            let orig_spec = pathspec_from_input(&repo_root.local_path, orig)?;
+            args.push(orig_spec.into());
+        }
     }
     let output = run_git(
         &repo_root.workspace,
@@ -265,7 +270,7 @@ pub fn diff_content(
     } else {
         read_text_file(&worktree_path)?
     };
-    let patch = diff_inner(&repo_root, Some(&rel_path), staged)?;
+    let patch = diff_inner(&repo_root, Some(&rel_path), original_rel.as_deref(), staged)?;
     let is_binary =
         matches!(original, TextSource::Binary) || matches!(modified, TextSource::Binary);
 
