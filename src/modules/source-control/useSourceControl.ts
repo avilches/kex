@@ -48,6 +48,7 @@ export type SourceControlSummary = {
   }) => Promise<void>;
   runRemoteAction: (
     mode?: SourceControlRemoteActionMode,
+    options?: { remote?: string },
   ) => Promise<SourceControlRemoteActionResult>;
   clearRemoteError: () => void;
 };
@@ -381,6 +382,7 @@ export function useSourceControl(
   const runRemoteAction = useCallback(
     async (
       mode: SourceControlRemoteActionMode = "contextual",
+      options?: { remote?: string },
     ): Promise<SourceControlRemoteActionResult> => {
       const { repo, status } = stateRef.current;
       if (!repo || !status) {
@@ -399,7 +401,11 @@ export function useSourceControl(
 
       try {
         if (action === "fetch") {
-          await native.gitFetch(repo.repoRoot);
+          if (options?.remote) {
+            await native.gitFetchRemote(repo.repoRoot, options.remote);
+          } else {
+            await native.gitFetch(repo.repoRoot);
+          }
           touchAutoFetch(autoFetchByRepoRef.current, repo.repoRoot);
         } else if (action === "pull") {
           await native.gitFetch(repo.repoRoot);

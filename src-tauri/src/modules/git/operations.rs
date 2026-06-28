@@ -8,9 +8,10 @@ use crate::modules::git::process::{
     read_text_file, run_git,
 };
 use crate::modules::git::types::{
-    DiscardEntry, GitCommitFileChange, GitCommitResult, GitDiffContentResult, GitDiffResult,
-    GitLogEntry, GitOutput, GitPanelSnapshot, GitPushResult, GitRepoInfo, GitStatusSnapshot,
-    TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    DiscardEntry, GitBranchInfo, GitCommitFileChange, GitCommitResult, GitDiffContentResult,
+    GitDiffResult, GitLogEntry, GitOutput, GitPanelSnapshot, GitPushResult, GitRemoteInfo,
+    GitRepoInfo, GitStatusSnapshot, GitWorktreeStatus, TextSource, DEFAULT_TIMEOUT_SECS,
+    NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
     authorized_repo_root, canonical_dir, dir_path_for, resolve_within_repo, split_upstream,
@@ -828,6 +829,206 @@ fn is_remote_name_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.'
 }
 
+pub fn list_branches(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Vec<GitBranchInfo>> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    let local_out = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        [
+            "branch",
+            "--format=%(refname:short)\t%(HEAD)\t%(upstream:short)",
+            "--no-color",
+        ],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+
+    let remote_out = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["branch", "-r", "--format=%(refname:short)", "--no-color"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+
+    let local_text = std::str::from_utf8(&local_out.stdout).unwrap_or("").trim();
+    let remote_text = std::str::from_utf8(&remote_out.stdout).unwrap_or("").trim();
+
+    let mut branches: Vec<GitBranchInfo> = Vec::new();
+
+    for line in local_text.lines() {
+        let mut parts = line.splitn(3, '\t');
+        let name = match parts.next() {
+            Some(n) => n.trim(),
+            None => continue,
+        };
+        if name.is_empty() {
+            continue;
+        }
+        let is_current = parts.next().map(|s| s.trim() == "*").unwrap_or(false);
+        let upstream = parts.next().and_then(|s| {
+            let s = s.trim();
+            if s.is_empty() { None } else { Some(s.to_string()) }
+        });
+        branches.push(GitBranchInfo {
+            name: name.to_string(),
+            is_current,
+            is_remote: false,
+            remote: None,
+            upstream,
+        });
+    }
+
+    let local_names: std::collections::HashSet<String> =
+        branches.iter().map(|b| b.name.clone()).collect();
+
+    let mut remote_branches: Vec<GitBranchInfo> = Vec::new();
+    for line in remote_text.lines() {
+        let name = line.trim();
+        if name.is_empty() || name.contains("/HEAD") {
+            continue;
+        }
+        if let Some(slash_pos) = name.find('/') {
+            let remote = name[..slash_pos].to_string();
+            let local_branch = &name[slash_pos + 1..];
+            if !local_names.contains(local_branch) {
+                remote_branches.push(GitBranchInfo {
+                    name: name.to_string(),
+                    is_current: false,
+                    is_remote: true,
+                    remote: Some(remote),
+                    upstream: None,
+                });
+            }
+        }
+    }
+    branches.extend(remote_branches);
+
+    Ok(branches)
+}
+
+pub fn checkout_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branch: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    if branch.is_empty() || branch.len() > 255 || branch.contains('\0') || branch.contains('\n') {
+        return Err(GitError::command("git checkout", "invalid branch name"));
+    }
+
+    let output = if let Some(slash_pos) = branch.find('/') {
+        let local_name = &branch[slash_pos + 1..];
+        let args: Vec<&str> = vec!["checkout", "-b", local_name, "--track", branch];
+        run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            args,
+            DEFAULT_TIMEOUT_SECS,
+        )?
+    } else {
+        run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["checkout", branch],
+            DEFAULT_TIMEOUT_SECS,
+        )?
+    };
+
+    ensure_success(&output, "git checkout failed")
+}
+
+pub fn list_remotes(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Vec<GitRemoteInfo>> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["remote", "-v"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+
+    let text = std::str::from_utf8(&output.stdout).unwrap_or("").trim();
+    let mut seen: std::collections::HashMap<String, String> = Default::default();
+
+    for line in text.lines() {
+        if let Some((name_part, rest)) = line.split_once('\t') {
+            let name = name_part.trim().to_string();
+            if rest.trim_end().ends_with("(fetch)") {
+                let url = rest.trim_end_matches("(fetch)").trim().to_string();
+                seen.entry(name).or_insert(url);
+            }
+        }
+    }
+
+    let mut remotes: Vec<GitRemoteInfo> = seen
+        .into_iter()
+        .map(|(name, url)| GitRemoteInfo { name, url })
+        .collect();
+    remotes.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(remotes)
+}
+
+pub fn add_remote(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    name: &str,
+    url: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    if name.is_empty() || name.len() > 64 || !name.chars().all(is_remote_name_char) {
+        return Err(GitError::command("git remote add", "invalid remote name"));
+    }
+    if url.is_empty() || url.len() > 2048 {
+        return Err(GitError::command("git remote add", "invalid remote URL"));
+    }
+
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["remote", "add", name, url],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git remote add failed")
+}
+
+pub fn fetch_remote(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    remote: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    if remote.is_empty() || remote.len() > 64 || !remote.chars().all(is_remote_name_char) {
+        return Err(GitError::command("git fetch", "invalid remote name"));
+    }
+
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["fetch", remote, "--prune"],
+        NETWORK_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git fetch failed")
+}
+
 fn parse_diff_tree_name_status(bytes: &[u8]) -> Vec<GitCommitFileChange> {
     let s = std::str::from_utf8(bytes).unwrap_or("");
     let mut tokens = s.split('\0').filter(|t| !t.is_empty());
@@ -1021,6 +1222,62 @@ pub fn mv(
         DEFAULT_TIMEOUT_SECS,
     )?;
     ensure_success(&output, "git mv failed")
+}
+
+pub fn get_worktree_status(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitWorktreeStatus> {
+    let repo = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo.workspace)?;
+
+    let output = run_git(
+        &repo.workspace,
+        Some(&repo.git_path),
+        ["worktree", "list", "--porcelain"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git worktree list failed")?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let paths: Vec<String> = stdout
+        .lines()
+        .filter(|l| l.starts_with("worktree "))
+        .map(|l| l["worktree ".len()..].trim().to_owned())
+        .collect();
+
+    let count = paths.len();
+    if count <= 1 {
+        return Ok(GitWorktreeStatus {
+            worktree_name: None,
+            worktree_count: count,
+        });
+    }
+
+    let main_path = paths.first().map(|s| s.as_str()).unwrap_or("");
+    let repo_canonical = std::fs::canonicalize(repo_root)
+        .unwrap_or_else(|_| std::path::PathBuf::from(repo_root));
+    let main_canonical = std::fs::canonicalize(main_path)
+        .unwrap_or_else(|_| std::path::PathBuf::from(main_path));
+
+    if repo_canonical == main_canonical {
+        return Ok(GitWorktreeStatus {
+            worktree_name: None,
+            worktree_count: count,
+        });
+    }
+
+    let name = repo_canonical
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("worktree")
+        .to_owned();
+
+    Ok(GitWorktreeStatus {
+        worktree_name: Some(name),
+        worktree_count: count,
+    })
 }
 
 fn nothing_to_commit(output: &GitOutput) -> bool {
@@ -1255,5 +1512,143 @@ mod tests {
 
         let result = super::mv(&registry, &from, &to, &WorkspaceEnv::Local);
         assert!(result.is_err(), "expected error outside git repo");
+    }
+
+    #[test]
+    fn list_branches_returns_current_branch() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        let branches = super::list_branches(&registry, &root, &WorkspaceEnv::Local).unwrap();
+
+        assert!(!branches.is_empty(), "expected at least one branch");
+        let current = branches.iter().find(|b| b.is_current);
+        assert!(current.is_some(), "expected a branch marked as current");
+        assert!(!current.unwrap().is_remote, "current branch should not be remote");
+    }
+
+    #[test]
+    fn list_branches_includes_second_local_branch() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+        Cmd::new("git")
+            .args(["checkout", "-b", "feature"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        let branches = super::list_branches(&registry, &root, &WorkspaceEnv::Local).unwrap();
+
+        let names: Vec<&str> = branches.iter().map(|b| b.name.as_str()).collect();
+        assert!(names.contains(&"feature"), "expected feature branch, got: {names:?}");
+        let feature = branches.iter().find(|b| b.name == "feature").unwrap();
+        assert!(feature.is_current, "feature should be current");
+    }
+
+    #[test]
+    fn checkout_branch_switches_branch() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+        Cmd::new("git")
+            .args(["checkout", "-b", "other"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["checkout", "main"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        super::checkout_branch(&registry, &root, "other", &WorkspaceEnv::Local).unwrap();
+
+        let out = Cmd::new("git")
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        let head = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        assert_eq!(head, "other");
+    }
+
+    #[test]
+    fn checkout_branch_rejects_empty_name() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        let result = super::checkout_branch(&registry, &root, "", &WorkspaceEnv::Local);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn list_remotes_returns_empty_for_no_remote() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        let remotes = super::list_remotes(&registry, &root, &WorkspaceEnv::Local).unwrap();
+        assert!(remotes.is_empty());
+    }
+
+    #[test]
+    fn add_remote_and_list_remotes_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        super::add_remote(
+            &registry,
+            &root,
+            "origin",
+            "https://github.com/example/repo.git",
+            &WorkspaceEnv::Local,
+        )
+        .unwrap();
+
+        let remotes = super::list_remotes(&registry, &root, &WorkspaceEnv::Local).unwrap();
+        assert_eq!(remotes.len(), 1);
+        assert_eq!(remotes[0].name, "origin");
+        assert_eq!(remotes[0].url, "https://github.com/example/repo.git");
+    }
+
+    #[test]
+    fn add_remote_rejects_invalid_name() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        let result = super::add_remote(
+            &registry,
+            &root,
+            "bad name!",
+            "https://github.com/example/repo.git",
+            &WorkspaceEnv::Local,
+        );
+        assert!(result.is_err());
     }
 }
