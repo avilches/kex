@@ -8,8 +8,6 @@ import {
   GitHistoryPane,
   type GitHistorySearchHandle,
 } from "@/modules/git-history/GitHistoryPane";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setRightPanelActiveTab } from "@/modules/settings/store";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SourceControlSummary } from "@/modules/source-control";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
@@ -36,10 +34,15 @@ type CommitFileDiffOpenInput = {
 };
 
 export type RightPanelProps = {
+  // Right-panel chrome (per-window)
+  activeTab: RightPanelTab;
+  onChangeActiveTab: (tab: RightPanelTab) => void;
   // FileExplorer props
   rootPath: string | null;
   rootMode: ExplorerRootMode;
   onChangeRootMode: (mode: ExplorerRootMode) => void;
+  showHidden: boolean;
+  onToggleShowHidden: () => void;
   onSetAsRoot: (path: string) => void;
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
@@ -88,7 +91,7 @@ const TABS: { id: RightPanelTab; label: string }[] = [
 
 export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
   function RightPanel(props, ref) {
-    const activeTab = usePreferencesStore((s) => s.rightPanelActiveTab);
+    const activeTab = props.activeTab;
     const explorerRef = useRef<FileExplorerHandle>(null);
 
     useImperativeHandle(ref, () => ({
@@ -106,7 +109,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
             <button
               key={tab.id}
               type="button"
-              onClick={() => void setRightPanelActiveTab(tab.id)}
+              onClick={() => props.onChangeActiveTab(tab.id)}
               className={cn(
                 "relative h-full px-3 text-[11px] font-medium transition-colors",
                 activeTab === tab.id
@@ -136,6 +139,8 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               rootPath={props.rootPath}
               rootMode={props.rootMode}
               onChangeRootMode={props.onChangeRootMode}
+              showHidden={props.showHidden}
+              onToggleShowHidden={props.onToggleShowHidden}
               onSetAsRoot={props.onSetAsRoot}
               onEnterFolder={props.onEnterFolder}
               onNavigateUp={props.onNavigateUp}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Panel, SplitNode, Workspace } from "./types";
-import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, applyShowHidden, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -15,6 +15,19 @@ describe("applyExplorerRootMode", () => {
     const out = applyExplorerRootMode([ws(), ws({ id: "w2" })], "w1", "filesystem");
     expect(out[0].explorerRootMode).toBe("filesystem");
     expect(out[1].explorerRootMode).toBeUndefined();
+  });
+});
+
+describe("applyShowHidden", () => {
+  it("sets showHidden on the matching workspace only", () => {
+    const out = applyShowHidden([ws(), ws({ id: "w2" })], "w1", true);
+    expect(out[0].showHidden).toBe(true);
+    expect(out[1].showHidden).toBeUndefined();
+  });
+
+  it("can clear showHidden back to false", () => {
+    const out = applyShowHidden([ws({ showHidden: true })], "w1", false);
+    expect(out[0].showHidden).toBe(false);
   });
 });
 

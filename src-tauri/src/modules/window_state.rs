@@ -26,6 +26,16 @@ impl Default for WindowGeometry {
     }
 }
 
+/// Right panel chrome state, persisted per OS window in the index file.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RightPanelState {
+    pub open: bool,
+    pub active_tab: String,
+    pub width: u32,
+    pub side: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowEntry {
@@ -33,6 +43,8 @@ pub struct WindowEntry {
     pub geometry: WindowGeometry,
     pub workspaces: Value,
     pub active_index: usize,
+    #[serde(default)]
+    pub right_panel: Option<RightPanelState>,
 }
 
 impl Default for WindowEntry {
@@ -41,6 +53,7 @@ impl Default for WindowEntry {
             geometry: WindowGeometry::default(),
             workspaces: Value::Array(vec![]),
             active_index: 0,
+            right_panel: None,
         }
     }
 }
@@ -65,6 +78,8 @@ struct IndexEntry {
     geometry: WindowGeometry,
     workspace_ids: Vec<String>,
     active_index: usize,
+    #[serde(default)]
+    right_panel: Option<RightPanelState>,
 }
 
 /// On-disk index file (`workspaces.json`). `BTreeMap` so serialization is
@@ -200,6 +215,7 @@ impl WindowStateManager {
                     geometry: ie.geometry.clone(),
                     workspaces: Value::Array(bodies),
                     active_index: ie.active_index,
+                    right_panel: ie.right_panel.clone(),
                 },
             );
         }
@@ -266,6 +282,7 @@ impl WindowStateManager {
                     geometry: entry.geometry.clone(),
                     workspace_ids: ids,
                     active_index: entry.active_index,
+                    right_panel: entry.right_panel.clone(),
                 },
             );
         }
@@ -348,6 +365,24 @@ impl WindowStateManager {
         let mut state = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = state.windows.get_mut(label) {
             entry.geometry = WindowGeometry { width, height, maximized };
+        }
+    }
+
+    pub fn update_right_panel(&self, label: &str, state: RightPanelState) {
+        let active_tab = match state.active_tab.as_str() {
+            "explorer" | "git" | "history" => state.active_tab,
+            _ => "explorer".to_string(),
+        };
+        let side = match state.side.as_str() {
+            "left" | "right" => state.side,
+            _ => "left".to_string(),
+        };
+        let sanitized = RightPanelState { open: state.open, active_tab, width: state.width, side };
+        let mut guard = self.inner.write().expect("window state lock poisoned");
+        if let Some(entry) = guard.windows.get_mut(label) {
+            entry.right_panel = Some(sanitized);
+        } else {
+            log::warn!("[window-state] update_right_panel: label '{label}' not found in state");
         }
     }
 }
@@ -577,5 +612,112 @@ mod tests {
         let mgr = WindowStateManager::new(path);
         assert!(!mgr.load());
         assert!(mgr.window_order().is_empty());
+    }
+
+    #[test]
+    fn right_panel_round_trips_some_and_none() {
+        let with = WindowEntry {
+            right_panel: Some(RightPanelState {
+                open: false,
+                active_tab: "git".to_string(),
+                width: 33,
+                side: "right".to_string(),
+            }),
+            ..WindowEntry::default()
+        };
+        let json = serde_json::to_string(&with).unwrap();
+        assert!(json.contains("rightPanel"));
+        assert!(json.contains("activeTab"));
+        let back: WindowEntry = serde_json::from_str(&json).unwrap();
+        let rp = back.right_panel.unwrap();
+        assert!(!rp.open);
+        assert_eq!(rp.active_tab, "git");
+        assert_eq!(rp.width, 33);
+        assert_eq!(rp.side, "right");
+
+        let without = WindowEntry::default();
+        let json = serde_json::to_string(&without).unwrap();
+        let back: WindowEntry = serde_json::from_str(&json).unwrap();
+        assert!(back.right_panel.is_none());
+    }
+
+    #[test]
+    fn index_without_right_panel_field_deserializes_to_none() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let index = serde_json::json!({
+            "version": INDEX_VERSION,
+            "windows": { "w-1": {
+                "width": 1280, "height": 800, "maximized": false,
+                "workspaceIds": [], "activeIndex": 0
+            } },
+            "windowOrder": ["w-1"],
+            "focusedWindow": "w-1"
+        });
+        std::fs::write(&path, serde_json::to_string(&index).unwrap()).unwrap();
+        let mgr = WindowStateManager::new(path);
+        assert!(mgr.load());
+        assert!(mgr.get_entry("w-1").unwrap().right_panel.is_none());
+    }
+
+    #[test]
+    fn update_right_panel_persists_and_reloads() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let mgr = WindowStateManager::new(path.clone());
+        mgr.add_window("w-1".to_string());
+        mgr.update_right_panel(
+            "w-1",
+            RightPanelState {
+                open: false,
+                active_tab: "history".to_string(),
+                width: 25,
+                side: "right".to_string(),
+            },
+        );
+        mgr.save();
+
+        let mgr2 = WindowStateManager::new(path);
+        assert!(mgr2.load());
+        let rp = mgr2.get_entry("w-1").unwrap().right_panel.unwrap();
+        assert!(!rp.open);
+        assert_eq!(rp.active_tab, "history");
+        assert_eq!(rp.width, 25);
+        assert_eq!(rp.side, "right");
+    }
+
+    #[test]
+    fn update_right_panel_sanitizes_invalid_values() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WindowStateManager::new(dir.path().join("state.json"));
+        mgr.add_window("w-1".to_string());
+        mgr.update_right_panel(
+            "w-1",
+            RightPanelState {
+                open: true,
+                active_tab: "bogus".to_string(),
+                width: 20,
+                side: "up".to_string(),
+            },
+        );
+        let rp = mgr.get_entry("w-1").unwrap().right_panel.unwrap();
+        assert_eq!(rp.active_tab, "explorer");
+        assert_eq!(rp.side, "left");
+    }
+
+    #[test]
+    fn update_right_panel_on_unknown_label_is_noop() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WindowStateManager::new(dir.path().join("state.json"));
+        mgr.update_right_panel(
+            "w-ghost",
+            RightPanelState {
+                open: true,
+                active_tab: "explorer".to_string(),
+                width: 20,
+                side: "left".to_string(),
+            },
+        );
+        assert!(mgr.get_entry("w-ghost").is_none());
     }
 }

@@ -2,11 +2,19 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { migrateExplorerRootMode } from "./explorerRoot";
 import type { Panel, SplitNode, Workspace } from "./types";
+import {
+  setSavedRightPanelState,
+  type RightPanelUiState,
+} from "./windowUiState";
 
 type SavedState = { workspaces: Workspace[]; activeIndex: number };
 
 // WindowEntry mirrors the Rust WindowEntry struct (camelCase via serde rename_all).
-type WindowEntry = { workspaces: Workspace[]; activeIndex: number };
+type WindowEntry = {
+  workspaces: Workspace[];
+  activeIndex: number;
+  rightPanel?: RightPanelUiState;
+};
 
 let cached: SavedState | null = null;
 
@@ -31,6 +39,7 @@ export function sanitizeWorkspace(w: Workspace): Workspace {
   return {
     ...w,
     explorerRootMode: migrateExplorerRootMode(w.explorerRootMode),
+    showHidden: w.showHidden,
     paneTree: sanitizeTree(w.paneTree),
   };
 }
@@ -46,6 +55,7 @@ export async function initWorkspaceState(): Promise<void> {
     if (entry && Array.isArray(entry.workspaces) && entry.workspaces.length > 0) {
       cached = { workspaces: entry.workspaces.map(sanitizeWorkspace), activeIndex: entry.activeIndex };
     }
+    setSavedRightPanelState(entry?.rightPanel);
   } catch (err) {
     console.error("[workspace-state] initWorkspaceState error:", err);
     cached = null;

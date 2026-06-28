@@ -36,10 +36,6 @@ import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
-  setPanelSide,
-  setRightPanelOpen,
-  setRightPanelActiveTab,
-  setShowHidden,
   setWarnOnCloseTabWithRunningProcess,
   setWarnOnCloseWorkspace,
 } from "@/modules/settings/store";
@@ -92,6 +88,7 @@ import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import type { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { IS_MAC } from "@/lib/platform";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
@@ -105,6 +102,7 @@ import {
   getSavedWorkspaceState,
   saveWorkspaceState,
 } from "@/modules/workspaces/lib/workspaceState";
+import { useRightPanelState } from "@/modules/workspaces/lib/useRightPanelState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
@@ -179,6 +177,7 @@ export default function App() {
     setTerminalPanelCwd,
     setWorkspaceCwd,
     setExplorerRootMode,
+    setShowHidden,
     setPinnedRoot,
     setFsRoot,
     setWorkspaceGitConfig,
@@ -363,11 +362,19 @@ export default function App() {
   const [revealRequest, setRevealRequest] = useState<RevealRequest | null>(
     null,
   );
-  const rightPanelOpen = usePreferencesStore((s) => s.rightPanelOpen);
-  const rightPanelActiveTab = usePreferencesStore((s) => s.rightPanelActiveTab);
-  const panelSide = usePreferencesStore((s) => s.panelSide);
+  const windowLabel = useMemo(() => getCurrentWebviewWindow().label, []);
+  const {
+    open: rightPanelOpen,
+    activeTab: rightPanelActiveTab,
+    width: rightPanelWidth,
+    side: panelSide,
+    stateRef: rightPanelStateRef,
+    setOpen: setRightPanelOpen,
+    setActiveTab: setRightPanelActiveTab,
+    setWidth: setRightPanelWidth,
+    setSide: setPanelSide,
+  } = useRightPanelState(windowLabel);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
-  const showHidden = usePreferencesStore((s) => s.showHidden);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
 
@@ -511,6 +518,8 @@ export default function App() {
   const activeRootMode: ExplorerRootMode =
     activeWorkspace?.explorerRootMode ?? "filesystem";
 
+  const activeShowHidden = activeWorkspace?.showHidden ?? false;
+
   const workspaceRootPath = activeWorkspace?.pinnedRoot ?? null;
   const fsFolderRoot = activeWorkspace?.fsRoot ?? null;
 
@@ -566,6 +575,11 @@ export default function App() {
     },
     [activeWorkspace, setExplorerRootMode],
   );
+
+  const handleToggleShowHidden = useCallback(() => {
+    if (activeWorkspace)
+      setShowHidden(activeWorkspace.id, !(activeWorkspace.showHidden ?? false));
+  }, [activeWorkspace, setShowHidden]);
 
   const handleSetAsRoot = useCallback(
     (path: string) => {
@@ -643,10 +657,10 @@ export default function App() {
         });
 
       if (opts.fromShortcut || opts.pendingAction) {
-        const state = usePreferencesStore.getState();
-        if (!state.rightPanelOpen) void setRightPanelOpen(true);
-        if (state.rightPanelActiveTab !== "explorer") {
-          void setRightPanelActiveTab("explorer");
+        const panel = rightPanelStateRef.current;
+        if (!panel.open) setRightPanelOpen(true);
+        if (panel.activeTab !== "explorer") {
+          setRightPanelActiveTab("explorer");
         }
       }
     },
@@ -658,6 +672,8 @@ export default function App() {
       home,
       setExplorerRootMode,
       setFsRoot,
+      setRightPanelOpen,
+      setRightPanelActiveTab,
     ],
   );
 
@@ -1398,54 +1414,51 @@ export default function App() {
   // ── Source control ────────────────────────────────────────────────────────
 
   const toggleRightPanel = useCallback(() => {
-    void setRightPanelOpen(!usePreferencesStore.getState().rightPanelOpen);
-  }, []);
+    setRightPanelOpen(!rightPanelStateRef.current.open);
+  }, [setRightPanelOpen]);
 
   const navigateRightPanelTo = useCallback(
     (tab: "explorer" | "git" | "history") => {
-      const state = usePreferencesStore.getState();
-      if (!state.rightPanelOpen) {
-        void setRightPanelOpen(true);
-        void setRightPanelActiveTab(tab);
-      } else if (state.rightPanelActiveTab === tab) {
-        void setRightPanelOpen(false);
+      const panel = rightPanelStateRef.current;
+      if (!panel.open) {
+        setRightPanelOpen(true);
+        setRightPanelActiveTab(tab);
+      } else if (panel.activeTab === tab) {
+        setRightPanelOpen(false);
       } else {
-        void setRightPanelActiveTab(tab);
+        setRightPanelActiveTab(tab);
       }
     },
-    [],
+    [setRightPanelOpen, setRightPanelActiveTab],
   );
 
   const showRightPanelTab = useCallback(
     (tab: "explorer" | "git" | "history") => {
-      const state = usePreferencesStore.getState();
-      if (!state.rightPanelOpen) {
-        void setRightPanelOpen(true);
+      if (!rightPanelStateRef.current.open) {
+        setRightPanelOpen(true);
       }
-      void setRightPanelActiveTab(tab);
+      setRightPanelActiveTab(tab);
     },
-    [],
+    [setRightPanelOpen, setRightPanelActiveTab],
   );
 
   const showExplorerWithMode = useCallback(
     (mode: ExplorerRootMode) => {
-      const state = usePreferencesStore.getState();
-      if (!state.rightPanelOpen) {
-        void setRightPanelOpen(true);
+      if (!rightPanelStateRef.current.open) {
+        setRightPanelOpen(true);
       }
-      void setRightPanelActiveTab("explorer");
+      setRightPanelActiveTab("explorer");
       handleChangeRootMode(mode);
     },
-    [handleChangeRootMode],
+    [handleChangeRootMode, setRightPanelOpen, setRightPanelActiveTab],
   );
 
   // Cmd+E: bring up the explorer, then on each press cycle its root between File
   // System and Workspace Root. With no pinned root the cycle stays on File
   // System (idempotent). It never closes the sidebar (use sidebar.toggle).
   const rotateExplorerRoot = useCallback(() => {
-    const state = usePreferencesStore.getState();
-    const inExplorer =
-      state.rightPanelOpen && state.rightPanelActiveTab === "explorer";
+    const panel = rightPanelStateRef.current;
+    const inExplorer = panel.open && panel.activeTab === "explorer";
     if (!inExplorer) {
       showRightPanelTab("explorer");
       return;
@@ -1855,13 +1868,13 @@ export default function App() {
   }, [activeWorkspace, onSplitTerminalDownStable]);
 
   const handleExplorerSearch = useCallback(() => {
-    const state = usePreferencesStore.getState();
-    if (state.rightPanelOpen && state.rightPanelActiveTab === "explorer") {
+    const panel = rightPanelStateRef.current;
+    if (panel.open && panel.activeTab === "explorer") {
       rightPanelRef.current?.toggleExplorerSearch?.();
     } else {
       pendingExplorerSearch.current = true;
-      void setRightPanelOpen(true);
-      void setRightPanelActiveTab("explorer");
+      setRightPanelOpen(true);
+      setRightPanelActiveTab("explorer");
     }
   }, [setRightPanelOpen, setRightPanelActiveTab]);
 
@@ -1984,8 +1997,7 @@ export default function App() {
       "sidebar.showHistory": () => showRightPanelTab("history"),
       "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
       "explorer.viewPinned": () => showExplorerWithMode("pinned"),
-      "explorer.toggleHidden": () =>
-        void setShowHidden(!usePreferencesStore.getState().showHidden),
+      "explorer.toggleHidden": handleToggleShowHidden,
       "explorer.search": handleExplorerSearch,
       "terminal.clear": () => {
         clearFocusedTerminal();
@@ -2249,14 +2261,10 @@ export default function App() {
         showRightPanelTab("history");
         break;
       case "toggle_hidden":
-        void setShowHidden(!usePreferencesStore.getState().showHidden);
+        handleToggleShowHidden();
         break;
       case "toggle_panel_side":
-        void setPanelSide(
-          usePreferencesStore.getState().panelSide === "left"
-            ? "right"
-            : "left",
-        );
+        setPanelSide(rightPanelStateRef.current.side === "left" ? "right" : "left");
         break;
     }
   };
@@ -2284,10 +2292,10 @@ export default function App() {
         sidebarOpen: rightPanelOpen,
         activeTab: rightPanelActiveTab,
         panelSide,
-        showHidden,
+        showHidden: activeShowHidden,
       },
     }).catch(() => {});
-  }, [editorAutoSave, rightPanelOpen, rightPanelActiveTab, panelSide, showHidden]);
+  }, [editorAutoSave, rightPanelOpen, rightPanelActiveTab, panelSide, activeShowHidden]);
 
   // ── Command palette ───────────────────────────────────────────────────────
 
@@ -2407,15 +2415,20 @@ export default function App() {
                   <>
                     <ResizablePanel
                       id="tool-panel"
-                      defaultSize="20%"
+                      defaultSize={`${rightPanelWidth}%`}
                       minSize="12%"
                       maxSize="35%"
+                      onResize={(size) => setRightPanelWidth(size.asPercentage)}
                     >
                       <RightPanel
                         ref={rightPanelRef}
+                        activeTab={rightPanelActiveTab}
+                        onChangeActiveTab={setRightPanelActiveTab}
                         rootPath={explorerRoot}
                         rootMode={activeRootMode}
                         onChangeRootMode={handleChangeRootMode}
+                        showHidden={activeShowHidden}
+                        onToggleShowHidden={handleToggleShowHidden}
                         onSetAsRoot={handleSetAsRoot}
                         onEnterFolder={handleEnterFolder}
                         onNavigateUp={handleNavigateUp}
@@ -2496,15 +2509,20 @@ export default function App() {
                     <ResizableHandle withHandle />
                     <ResizablePanel
                       id="tool-panel"
-                      defaultSize="20%"
+                      defaultSize={`${rightPanelWidth}%`}
                       minSize="12%"
                       maxSize="35%"
+                      onResize={(size) => setRightPanelWidth(size.asPercentage)}
                     >
                       <RightPanel
                         ref={rightPanelRef}
+                        activeTab={rightPanelActiveTab}
+                        onChangeActiveTab={setRightPanelActiveTab}
                         rootPath={explorerRoot}
                         rootMode={activeRootMode}
                         onChangeRootMode={handleChangeRootMode}
+                        showHidden={activeShowHidden}
+                        onToggleShowHidden={handleToggleShowHidden}
                         onSetAsRoot={handleSetAsRoot}
                         onEnterFolder={handleEnterFolder}
                         onNavigateUp={handleNavigateUp}

@@ -30,7 +30,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import { pathDirname } from "@/lib/pathUtils";
 import { fileIconUrl } from "./lib/iconResolver";
 import {
@@ -66,6 +65,7 @@ const PHASE_1_DEPTH = 3;
 
 type Props = {
   rootPath: string;
+  showHidden: boolean;
   onOpenFile: (path: string) => void;
   open: boolean;
   onRequestClose: () => void;
@@ -83,6 +83,7 @@ export type ExplorerSearchHandle = {
 
 export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function ExplorerSearch({
   rootPath,
+  showHidden,
   onOpenFile,
   open,
   onRequestClose,
@@ -94,7 +95,6 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
 }: Props,
   ref,
 ) {
-  const showHidden = usePreferencesStore((s) => s.showHidden);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);

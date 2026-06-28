@@ -4,14 +4,9 @@ import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setExplorerGitColorScheme,
-  setPanelSide,
   setZoomLevel,
 } from "@/modules/settings/store";
-import {
-  Refresh01Icon,
-  SidebarLeftIcon,
-  SidebarRightIcon,
-} from "@hugeicons/core-free-icons";
+import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
@@ -22,7 +17,6 @@ const ZOOM_STEP = 0.05;
 
 export function AppearanceSection() {
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
-  const panelSide = usePreferencesStore((s) => s.panelSide);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
 
   return (
@@ -53,31 +47,6 @@ export function AppearanceSection() {
             >
               <HugeiconsIcon icon={Refresh01Icon} size={11} />
             </button>
-          </div>
-        </div>
-        <div className="flex items-start justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <span className="text-[12.5px] font-medium">Sidebar position</span>
-          <div className="flex items-center gap-1">
-            {(["left", "right"] as const).map((side) => (
-              <button
-                key={side}
-                type="button"
-                onClick={() => void setPanelSide(side)}
-                className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11.5px] transition-all",
-                  panelSide === side
-                    ? "border-foreground/60 bg-card ring-1 ring-foreground/20"
-                    : "border-border/60 bg-transparent hover:border-border",
-                )}
-              >
-                <HugeiconsIcon
-                  icon={side === "left" ? SidebarLeftIcon : SidebarRightIcon}
-                  size={12}
-                  strokeWidth={1.75}
-                />
-                <span className="capitalize">{side}</span>
-              </button>
-            ))}
           </div>
         </div>
       </div>
