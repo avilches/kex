@@ -126,6 +126,9 @@ export type GitBranchInfo = {
   remote: string | null;
   upstream: string | null;
   worktree: string | null;
+  ahead: number | null;
+  behind: number | null;
+  lastCommitAt: number | null;
 };
 
 export type GitRemoteInfo = {

@@ -125,6 +125,9 @@ pub struct GitBranchInfo {
     pub remote: Option<String>,
     pub upstream: Option<String>,
     pub worktree: Option<String>,
+    pub ahead: Option<u32>,
+    pub behind: Option<u32>,
+    pub last_commit_at: Option<i64>,
 }
 
 #[derive(Serialize)]

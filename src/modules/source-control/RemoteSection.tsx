@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/popover";
 import type { GitRemoteInfo } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { Add01Icon, GlobalIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, CheckmarkCircle01Icon, GlobalIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 
@@ -109,27 +109,39 @@ function RemotePicker({
           <span className="truncate">{activeRemote}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-0" align="start" side="bottom">
+      <PopoverContent className="w-[420px] max-w-[calc(100vw-2rem)] p-0" align="start" side="bottom">
         <div className="p-1 space-y-0.5">
-          {remotes.map((r) => (
-            <button
-              key={r.name}
-              type="button"
-              onClick={() => {
-                onSelect(r.name);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex w-full flex-col rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent",
-                activeRemote === r.name && "bg-accent/60",
-              )}
-            >
-              <span className="text-[11.5px] font-medium">{r.name}</span>
-              <span className="min-w-0 truncate text-[10px] text-muted-foreground">
-                {r.url}
-              </span>
-            </button>
-          ))}
+          {[...remotes]
+            .sort((a, b) => (b.name === activeRemote ? 1 : 0) - (a.name === activeRemote ? 1 : 0))
+            .map((r) => {
+              const isActive = r.name === activeRemote;
+              return (
+                <button
+                  key={r.name}
+                  type="button"
+                  onClick={() => {
+                    if (!isActive) onSelect(r.name);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-start gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent"
+                >
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-[11.5px] font-medium">{r.name}</span>
+                    <span className="min-w-0 truncate text-[10px] text-muted-foreground">
+                      {r.url}
+                    </span>
+                  </div>
+                  {isActive && (
+                    <HugeiconsIcon
+                      icon={CheckmarkCircle01Icon}
+                      size={12}
+                      strokeWidth={1.9}
+                      className="mt-0.5 shrink-0 text-muted-foreground/70"
+                    />
+                  )}
+                </button>
+              );
+            })}
           <div className="my-0.5 border-t border-border/50" />
           <button
             type="button"

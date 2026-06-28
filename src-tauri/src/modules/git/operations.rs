@@ -829,6 +829,23 @@ fn is_remote_name_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.'
 }
 
+fn parse_ahead_behind(track: &str) -> (Option<u32>, Option<u32>) {
+    if track.is_empty() || track == "gone" {
+        return (None, None);
+    }
+    let mut ahead = None;
+    let mut behind = None;
+    for part in track.split(',') {
+        let part = part.trim();
+        if let Some(n) = part.strip_prefix("ahead ") {
+            ahead = n.trim().parse().ok();
+        } else if let Some(n) = part.strip_prefix("behind ") {
+            behind = n.trim().parse().ok();
+        }
+    }
+    (ahead, behind)
+}
+
 pub fn list_branches(
     registry: &WorkspaceRegistry,
     repo_root: &str,
@@ -842,7 +859,7 @@ pub fn list_branches(
         Some(&repo_root.git_path),
         [
             "branch",
-            "--format=%(refname:short)\t%(HEAD)\t%(upstream:short)",
+            "--format=%(refname:short)\t%(HEAD)\t%(upstream:short)\t%(upstream:track,nobracket)\t%(committerdate:unix)",
             "--no-color",
         ],
         DEFAULT_TIMEOUT_SECS,
@@ -851,7 +868,7 @@ pub fn list_branches(
     let remote_out = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
-        ["branch", "-r", "--format=%(refname:short)", "--no-color"],
+        ["branch", "-r", "--format=%(refname:short)\t%(committerdate:unix)", "--no-color"],
         DEFAULT_TIMEOUT_SECS,
     )?;
 
@@ -909,7 +926,7 @@ pub fn list_branches(
     let mut branches: Vec<GitBranchInfo> = Vec::new();
 
     for line in local_text.lines() {
-        let mut parts = line.splitn(3, '\t');
+        let mut parts = line.splitn(5, '\t');
         let name = match parts.next() {
             Some(n) => n.trim(),
             None => continue,
@@ -922,6 +939,14 @@ pub fn list_branches(
             let s = s.trim();
             if s.is_empty() { None } else { Some(s.to_string()) }
         });
+        let (ahead, behind) = parts
+            .next()
+            .map(|s| parse_ahead_behind(s.trim()))
+            .unwrap_or((None, None));
+        let last_commit_at = parts
+            .next()
+            .and_then(|s| s.trim().parse::<i64>().ok())
+            .filter(|&t| t > 0);
         let worktree = if is_current { None } else { branch_to_wt.get(name).cloned() };
         branches.push(GitBranchInfo {
             name: name.to_string(),
@@ -930,6 +955,9 @@ pub fn list_branches(
             remote: None,
             upstream,
             worktree,
+            ahead,
+            behind,
+            last_commit_at,
         });
     }
 
@@ -938,10 +966,18 @@ pub fn list_branches(
 
     let mut remote_branches: Vec<GitBranchInfo> = Vec::new();
     for line in remote_text.lines() {
-        let name = line.trim();
+        let mut parts = line.splitn(2, '\t');
+        let name = match parts.next() {
+            Some(n) => n.trim(),
+            None => continue,
+        };
         if name.is_empty() || name.contains("/HEAD") {
             continue;
         }
+        let last_commit_at = parts
+            .next()
+            .and_then(|s| s.trim().parse::<i64>().ok())
+            .filter(|&t| t > 0);
         if let Some(slash_pos) = name.find('/') {
             let remote = name[..slash_pos].to_string();
             let local_branch = &name[slash_pos + 1..];
@@ -953,6 +989,9 @@ pub fn list_branches(
                     remote: Some(remote),
                     upstream: None,
                     worktree: None,
+                    ahead: None,
+                    behind: None,
+                    last_commit_at,
                 });
             }
         }

@@ -14,7 +14,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import type { GitBranchInfo } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { Add01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, CheckmarkCircle01Icon, GitBranchIcon, GlobalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
@@ -106,8 +106,12 @@ export function BranchPicker({
     );
   }
 
-  const localBranches = (branches ?? []).filter((b) => !b.isRemote);
-  const remoteBranches = (branches ?? []).filter((b) => b.isRemote);
+  const byDate = (a: { isCurrent: boolean; lastCommitAt: number | null }, b: { isCurrent: boolean; lastCommitAt: number | null }) => {
+    if (b.isCurrent !== a.isCurrent) return b.isCurrent ? 1 : -1;
+    return (b.lastCommitAt ?? 0) - (a.lastCommitAt ?? 0);
+  };
+  const localBranches = (branches ?? []).filter((b) => !b.isRemote).sort(byDate);
+  const remoteBranches = (branches ?? []).filter((b) => b.isRemote).sort(byDate);
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -125,7 +129,7 @@ export function BranchPicker({
           <span className="truncate">{label}</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start" side="bottom">
+      <PopoverContent className="w-[420px] max-w-[calc(100vw-2rem)] p-0" align="start" side="bottom">
         <Command>
           <CommandInput
             placeholder="Filter branches..."
@@ -225,28 +229,41 @@ function BranchItem({
           <Spinner className="size-3" />
         ) : (
           <HugeiconsIcon
-            icon={GitBranchIcon}
+            icon={branch.isRemote ? GlobalIcon : GitBranchIcon}
             size={14}
             strokeWidth={1.9}
             className={cn(
-              branch.isCurrent
-                ? "text-foreground"
-                : "text-muted-foreground",
+              branch.isCurrent ? "text-foreground" : "text-muted-foreground",
             )}
           />
         )}
       </span>
       <span className="min-w-0 flex-1 truncate">{branch.name}</span>
-      {branch.isCurrent && (
-        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-          current
-        </span>
-      )}
-      {isLocked && (
-        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-          wt
-        </span>
-      )}
+      <span className="flex shrink-0 items-center gap-0.5">
+        {(branch.ahead ?? 0) > 0 && (
+          <span className="flex items-center gap-0.5 text-[9px] font-semibold tabular-nums text-emerald-500">
+            ↑{branch.ahead}
+          </span>
+        )}
+        {(branch.behind ?? 0) > 0 && (
+          <span className="flex items-center gap-0.5 text-[9px] font-semibold tabular-nums text-blue-400">
+            ↓{branch.behind}
+          </span>
+        )}
+        {branch.isCurrent && (
+          <HugeiconsIcon
+            icon={CheckmarkCircle01Icon}
+            size={12}
+            strokeWidth={1.9}
+            className="shrink-0 text-muted-foreground/70"
+          />
+        )}
+        {isLocked && (
+          <span className="text-[9px] font-medium text-muted-foreground/70">
+            Worktree
+          </span>
+        )}
+      </span>
     </CommandItem>
   );
 }
