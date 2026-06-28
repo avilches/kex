@@ -70,7 +70,6 @@ import { IS_MAC } from "@/lib/platform";
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import { useWorkspaceDnd } from "@/modules/workspaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setShowHidden } from "@/modules/settings/store";
 import {
   getBindingTokens,
   matchesShortcut,
@@ -99,6 +98,8 @@ type Props = {
   rootPath: string | null;
   rootMode: ExplorerRootMode;
   onChangeRootMode: (mode: ExplorerRootMode) => void;
+  showHidden: boolean;
+  onToggleShowHidden: () => void;
   onSetAsRoot: (path: string) => void;
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
@@ -332,6 +333,8 @@ export const FileExplorer = memo(
       rootPath,
       rootMode,
       onChangeRootMode,
+      showHidden,
+      onToggleShowHidden,
       onSetAsRoot,
       onEnterFolder,
       onNavigateUp,
@@ -355,7 +358,11 @@ export const FileExplorer = memo(
     },
     ref,
   ) {
-    const tree = useFileTree(rootPath, { onPathRenamed, onPathDeleted });
+    const tree = useFileTree(rootPath, {
+      onPathRenamed,
+      onPathDeleted,
+      showHidden,
+    });
 
     // Move a dragged file/folder when dropped on a folder row. The drop target
     // is only registered for valid destinations (see TreeRow), so over here is
@@ -382,7 +389,6 @@ export const FileExplorer = memo(
 
     const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-    const showHidden = usePreferencesStore((s) => s.showHidden);
     const editorPreviewOnClick = usePreferencesStore(
       (s) => s.editorPreviewOnClick,
     );
@@ -1146,7 +1152,7 @@ export const FileExplorer = memo(
             variant="ghost"
             size="icon"
             className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={() => void setShowHidden(!showHidden)}
+            onClick={onToggleShowHidden}
             title={showHidden ? "Hide hidden files" : "Show hidden files"}
             aria-label="Toggle hidden files"
           >
@@ -1216,6 +1222,7 @@ export const FileExplorer = memo(
             <ExplorerSearch
               ref={searchRef}
               rootPath={rootPath}
+              showHidden={showHidden}
               onOpenFile={onOpenFile}
               open={isSearchOpen}
               onRequestClose={closeSearch}

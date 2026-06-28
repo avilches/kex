@@ -65,6 +65,7 @@ export type Workspace = {
   paneTree: SplitNode;
   activePaneId: string;
   explorerRootMode?: ExplorerRootMode;
+  showHidden?: boolean;
   pinnedRoot?: string;
   fsRoot?: string;
   git?: WorkspaceGitConfig;

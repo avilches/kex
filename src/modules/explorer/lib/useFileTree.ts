@@ -94,10 +94,11 @@ function sameDirListing(a: DirEntry[], b: DirEntry[]): boolean {
 type Options = {
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
+  showHidden?: boolean;
 };
 
 export function useFileTree(rootPath: string | null, options?: Options) {
-  const showHidden = usePreferencesStore((s) => s.showHidden);
+  const showHidden = options?.showHidden ?? false;
   const showHiddenRef = useRef(showHidden);
   const keepLayout = usePreferencesStore(
     (s) => s.keepFolderLayoutOnChangeExplorerRoot,

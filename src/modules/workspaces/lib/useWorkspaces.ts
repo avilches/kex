@@ -68,6 +68,16 @@ export function applyExplorerRootMode(
   );
 }
 
+export function applyShowHidden(
+  workspaces: Workspace[],
+  workspaceId: string,
+  value: boolean,
+): Workspace[] {
+  return workspaces.map((w) =>
+    w.id === workspaceId ? { ...w, showHidden: value } : w,
+  );
+}
+
 export function applyPinnedRoot(
   workspaces: Workspace[],
   workspaceId: string,
@@ -610,6 +620,13 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
+  const setShowHidden = useCallback(
+    (workspaceId: string, value: boolean) => {
+      setWorkspaces((prev) => applyShowHidden(prev, workspaceId, value));
+    },
+    [],
+  );
+
   const setPinnedRoot = useCallback((workspaceId: string, path: string) => {
     setWorkspaces((prev) => applyPinnedRoot(prev, workspaceId, path));
   }, []);
@@ -676,6 +693,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setTerminalPanelCwd,
     setWorkspaceCwd,
     setExplorerRootMode,
+    setShowHidden,
     setPinnedRoot,
     setFsRoot,
     setWorkspaceGitConfig,

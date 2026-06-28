@@ -127,7 +127,6 @@ export type Preferences = {
   editorLetterSpacing: number;
   editorLineHeight: number;
   autostart: boolean;
-  showHidden: boolean;
   autofocusNewTabs: boolean;
   explorerGitColorScheme: GitColorScheme;
   scmViewMode: ScmViewMode;
@@ -163,10 +162,6 @@ export type Preferences = {
   editorBracketMatching: boolean;
   editorCloseBrackets: boolean;
   editorAutocompletion: boolean;
-  rightPanelOpen: boolean;
-  rightPanelWidth: number;
-  rightPanelActiveTab: "explorer" | "git" | "history";
-  panelSide: "left" | "right";
   tabBarStyle: TabBarStyle;
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
@@ -185,8 +180,6 @@ const KEY_EDITOR_FONT_SIZE = "editorFontSize";
 const KEY_EDITOR_LETTER_SPACING = "editorLetterSpacing";
 const KEY_EDITOR_LINE_HEIGHT = "editorLineHeight";
 const KEY_AUTOSTART = "autostart";
-const KEY_SHOW_HIDDEN = "showHidden";
-const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
 const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
@@ -221,10 +214,6 @@ const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "editorHighlightActiveLine";
 const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
 const KEY_EDITOR_CLOSE_BRACKETS = "editorCloseBrackets";
 const KEY_EDITOR_AUTOCOMPLETION = "editorAutocompletion";
-const KEY_RIGHT_PANEL_OPEN = "rightPanelOpen";
-const KEY_RIGHT_PANEL_WIDTH = "rightPanelWidth";
-const KEY_RIGHT_PANEL_ACTIVE_TAB = "rightPanelActiveTab";
-const KEY_PANEL_SIDE = "panelSide";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
@@ -329,7 +318,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorLetterSpacing: LETTER_SPACING_DEFAULT,
   editorLineHeight: EDITOR_LINE_HEIGHT_DEFAULT,
   autostart: false,
-  showHidden: false,
   autofocusNewTabs: false,
   explorerGitColorScheme: "vscode",
   scmViewMode: "tree",
@@ -365,10 +353,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorBracketMatching: true,
   editorCloseBrackets: true,
   editorAutocompletion: true,
-  rightPanelOpen: true,
-  rightPanelWidth: 240,
-  rightPanelActiveTab: "explorer",
-  panelSide: "left",
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
@@ -450,10 +434,6 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_EDITOR_LINE_HEIGHT) ??
       DEFAULT_PREFERENCES.editorLineHeight,
     autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
-    showHidden:
-      get<boolean>(KEY_SHOW_HIDDEN) ??
-      get<boolean>(LEGACY_KEY_SHOW_HIDDEN_DIRS) ??
-      DEFAULT_PREFERENCES.showHidden,
     autofocusNewTabs:
       get<boolean>(KEY_AUTOFOCUS_NEW_TABS) ??
       DEFAULT_PREFERENCES.autofocusNewTabs,
@@ -586,19 +566,6 @@ export async function loadPreferences(): Promise<Preferences> {
     editorAutocompletion:
       get<boolean>(KEY_EDITOR_AUTOCOMPLETION) ??
       DEFAULT_PREFERENCES.editorAutocompletion,
-    rightPanelOpen:
-      get<boolean>(KEY_RIGHT_PANEL_OPEN) ?? DEFAULT_PREFERENCES.rightPanelOpen,
-    rightPanelWidth: (() => {
-      const w = get<number>(KEY_RIGHT_PANEL_WIDTH) ?? DEFAULT_PREFERENCES.rightPanelWidth;
-      return Number.isFinite(w) ? Math.min(480, Math.max(160, w)) : DEFAULT_PREFERENCES.rightPanelWidth;
-    })(),
-    rightPanelActiveTab:
-      get<"explorer" | "git" | "history">(KEY_RIGHT_PANEL_ACTIVE_TAB) ??
-      DEFAULT_PREFERENCES.rightPanelActiveTab,
-    panelSide: (() => {
-      const v = get<string>(KEY_PANEL_SIDE);
-      return v === "left" || v === "right" ? v : DEFAULT_PREFERENCES.panelSide;
-    })(),
     tabBarStyle: (() => {
       const v = get<string>(KEY_TAB_BAR_STYLE);
       return v === "connected" || v === "pill" ? v : DEFAULT_PREFERENCES.tabBarStyle;
@@ -706,10 +673,6 @@ export async function setEditorLineHeight(value: number): Promise<void> {
 
 export async function setAutostart(value: boolean): Promise<void> {
   await writePref(KEY_AUTOSTART, value);
-}
-
-export async function setShowHidden(value: boolean): Promise<void> {
-  await writePref(KEY_SHOW_HIDDEN, value);
 }
 
 export async function setAutofocusNewTabs(value: boolean): Promise<void> {
@@ -990,25 +953,6 @@ export async function resetShortcuts(): Promise<void> {
   await writeShortcutsPref(DEFAULT_PREFERENCES.shortcuts);
 }
 
-export async function setRightPanelOpen(value: boolean): Promise<void> {
-  await writePref(KEY_RIGHT_PANEL_OPEN, value);
-}
-
-export async function setRightPanelWidth(value: number): Promise<void> {
-  const clamped = Number.isFinite(value) ? Math.min(480, Math.max(160, Math.round(value))) : 240;
-  await writePref(KEY_RIGHT_PANEL_WIDTH, clamped);
-}
-
-export async function setRightPanelActiveTab(
-  value: "explorer" | "git" | "history",
-): Promise<void> {
-  await writePref(KEY_RIGHT_PANEL_ACTIVE_TAB, value);
-}
-
-export async function setPanelSide(value: "left" | "right"): Promise<void> {
-  await writePref(KEY_PANEL_SIDE, value);
-}
-
 export async function setTabBarStyle(value: TabBarStyle): Promise<void> {
   await writePref(KEY_TAB_BAR_STYLE, value);
 }
@@ -1027,7 +971,6 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_LETTER_SPACING]: "editorLetterSpacing",
   [KEY_EDITOR_LINE_HEIGHT]: "editorLineHeight",
   [KEY_AUTOSTART]: "autostart",
-  [KEY_SHOW_HIDDEN]: "showHidden",
   [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
@@ -1062,10 +1005,6 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
   [KEY_EDITOR_CLOSE_BRACKETS]: "editorCloseBrackets",
   [KEY_EDITOR_AUTOCOMPLETION]: "editorAutocompletion",
-  [KEY_RIGHT_PANEL_OPEN]: "rightPanelOpen",
-  [KEY_RIGHT_PANEL_WIDTH]: "rightPanelWidth",
-  [KEY_RIGHT_PANEL_ACTIVE_TAB]: "rightPanelActiveTab",
-  [KEY_PANEL_SIDE]: "panelSide",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
