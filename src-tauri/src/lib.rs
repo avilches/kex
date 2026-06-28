@@ -416,6 +416,23 @@ fn window_save_workspace_state(
     mgr.save();
 }
 
+#[tauri::command]
+fn window_save_right_panel(
+    app: tauri::AppHandle,
+    label: String,
+    open: bool,
+    active_tab: String,
+    width: u32,
+    side: String,
+) {
+    let mgr = app.state::<window_state::WindowStateManager>();
+    mgr.update_right_panel(
+        &label,
+        window_state::RightPanelState { open, active_tab, width, side },
+    );
+    mgr.save();
+}
+
 /// Called from main.tsx on startup (on_window_ready equivalent) to restore window size.
 /// Uses physical pixels from inner_size(), matching tauri-plugin-window-state behaviour.
 /// Position is not restored — see WORKSPACES_GOTCHAS.md for why.
@@ -819,6 +836,7 @@ pub fn run() {
             open_main_window,
             window_get_state,
             window_save_workspace_state,
+            window_save_right_panel,
             restore_window_geometry,
             agent::agent_enable_claude_hooks,
             agent::agent_disable_claude_hooks,
