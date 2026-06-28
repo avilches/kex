@@ -119,6 +119,19 @@ export type GitPanelSnapshot = {
   status: GitStatusSnapshot | null;
 };
 
+export type GitBranchInfo = {
+  name: string;
+  isCurrent: boolean;
+  isRemote: boolean;
+  remote: string | null;
+  upstream: string | null;
+};
+
+export type GitRemoteInfo = {
+  name: string;
+  url: string;
+};
+
 export type GitDiscardEntry = {
   path: string;
   untracked: boolean;
@@ -308,6 +321,35 @@ export const native = {
     invoke<string | null>("git_remote_url", {
       repoRoot,
       name: name ?? null,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitListBranches: (repoRoot: string) =>
+    invoke<GitBranchInfo[]>("git_list_branches", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitCheckoutBranch: (repoRoot: string, branch: string) =>
+    invoke<void>("git_checkout_branch", {
+      repoRoot,
+      branch,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitListRemotes: (repoRoot: string) =>
+    invoke<GitRemoteInfo[]>("git_list_remotes", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitAddRemote: (repoRoot: string, name: string, url: string) =>
+    invoke<void>("git_add_remote", {
+      repoRoot,
+      name,
+      url,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitFetchRemote: (repoRoot: string, remote: string) =>
+    invoke<void>("git_fetch_remote", {
+      repoRoot,
+      remote,
       workspace: currentWorkspaceEnv(),
     }),
 };
