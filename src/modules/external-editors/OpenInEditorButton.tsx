@@ -49,6 +49,9 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   const customEditors = usePreferencesStore((s) => s.customEditors);
   const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const [open, setOpen] = useState(false);
+  // Tracks the last editor explicitly picked from the dropdown so the icon
+  // updates immediately regardless of which context (file/folder) is active.
+  const [overrideEditorId, setOverrideEditorId] = useState<string | null>(null);
 
   const allEditors: AnyEditor[] = [
     ...detectedEditors.filter((e) => !disabledDetectedEditorIds.includes(e.id)),
@@ -92,11 +95,17 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
        null)
     : (workspaceEditors[0] ?? terminalEditors[0] ?? null);
 
-  // Primary: preferred file editor when a file is active and set; else folder editor fallback
-  const primaryEditor: AnyEditor | null =
-    hasFile && preferredFileEditorId && activeFileEditor
+  // Primary: use the last explicitly picked editor (override) if it's still available;
+  // otherwise fall back to context-based: file editor when file is active, else folder.
+  const primaryEditor: AnyEditor | null = (() => {
+    if (overrideEditorId) {
+      const found = allEditors.find((e) => e.id === overrideEditorId);
+      if (found) return found;
+    }
+    return hasFile && preferredFileEditorId && activeFileEditor
       ? activeFileEditor
       : activeFolderEditor ?? activeFileEditor;
+  })();
 
   const primaryTarget: OpenInEditorTarget | null = (() => {
     if (!primaryEditor) return hasFile ? target : null;
@@ -119,9 +128,10 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   }, [primaryEditor, primaryTarget]);
 
   // Dropdown only sets the preferred — opening happens via primary button click.
-  // Optimistic Zustand update so the icon reflects the change immediately,
-  // without waiting for the async IPC round-trip to persist to disk.
+  // Sets local override for immediate icon update + optimistic Zustand state +
+  // async persist to disk.
   const handleSetPreferred = useCallback((editor: AnyEditor) => {
+    setOverrideEditorId(editor.id);
     const type = resolveEditorTargetType(editor);
     if (type === "file") {
       usePreferencesStore.setState({ preferredFileEditorId: editor.id });
