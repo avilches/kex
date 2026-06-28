@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { currentWorkspaceEnv } from "@/modules/workspace";
+import type { DetectedEditor } from "@/modules/external-editors/types";
 
 export type ReadResult =
   | { kind: "text"; content: string; size: number }
@@ -384,4 +385,8 @@ export const native = {
       repoRoot,
       workspace: currentWorkspaceEnv(),
     }),
+  editorScan: (): Promise<DetectedEditor[]> =>
+    invoke<DetectedEditor[]>("editor_scan"),
+  editorOpen: (binary: string, argsBeforePath: string[], path: string): Promise<void> =>
+    invoke<void>("editor_open", { binary, argsBeforePath, path }),
 };
