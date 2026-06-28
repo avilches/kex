@@ -1,31 +1,53 @@
-/** Frontend mirror of the Rust editor catalog — id/name pairs only. */
-export const EDITOR_CATALOG: { id: string; name: string }[] = [
-  { id: "vscode", name: "VS Code" },
-  { id: "vscode-insiders", name: "VS Code Insiders" },
-  { id: "vscodium", name: "VSCodium" },
-  { id: "cursor", name: "Cursor" },
-  { id: "windsurf", name: "Windsurf" },
-  { id: "zed", name: "Zed" },
-  { id: "zed-preview", name: "Zed Preview" },
-  { id: "kiro", name: "Kiro" },
-  { id: "trae", name: "Trae" },
-  { id: "antigravity", name: "Antigravity" },
-  { id: "sublime-text", name: "Sublime Text" },
-  { id: "atom", name: "Atom" },
-  { id: "bbedit", name: "BBEdit" },
-  { id: "cotedit", name: "CotEditor" },
-  { id: "textmate", name: "TextMate" },
-  { id: "coderunner", name: "CodeRunner" },
-  { id: "intellij", name: "IntelliJ IDEA" },
-  { id: "pycharm", name: "PyCharm" },
-  { id: "webstorm", name: "WebStorm" },
-  { id: "goland", name: "GoLand" },
-  { id: "rubymine", name: "RubyMine" },
-  { id: "rustrover", name: "RustRover" },
-  { id: "android-studio", name: "Android Studio" },
-  { id: "rider", name: "Rider" },
-  { id: "appcode", name: "AppCode" },
-  { id: "clion", name: "CLion" },
-  { id: "phpstorm", name: "PhpStorm" },
-  { id: "mps", name: "MPS" },
+export type EditorGroup = "VS Code" | "JetBrains" | "Text Editors";
+export type EditorTargetType = "file" | "workspace";
+
+export interface CatalogEntry {
+  id: string;
+  name: string;
+  group: EditorGroup;
+  /** Whether this editor opens individual files or a project directory. */
+  type: EditorTargetType;
+}
+
+export const EDITOR_CATALOG: CatalogEntry[] = [
+  // VS Code family
+  { id: "vscode", name: "VS Code", group: "VS Code", type: "file" },
+  { id: "vscode-insiders", name: "VS Code Insiders", group: "VS Code", type: "file" },
+  { id: "vscodium", name: "VSCodium", group: "VS Code", type: "file" },
+  { id: "cursor", name: "Cursor", group: "VS Code", type: "file" },
+  { id: "windsurf", name: "Windsurf", group: "VS Code", type: "file" },
+  { id: "kiro", name: "Kiro", group: "VS Code", type: "file" },
+  { id: "trae", name: "Trae", group: "VS Code", type: "file" },
+  { id: "antigravity", name: "Antigravity", group: "VS Code", type: "file" },
+  // Text editors
+  { id: "zed", name: "Zed", group: "Text Editors", type: "file" },
+  { id: "zed-preview", name: "Zed Preview", group: "Text Editors", type: "file" },
+  { id: "sublime-text", name: "Sublime Text", group: "Text Editors", type: "file" },
+  { id: "atom", name: "Atom", group: "Text Editors", type: "file" },
+  { id: "bbedit", name: "BBEdit", group: "Text Editors", type: "file" },
+  { id: "cotedit", name: "CotEditor", group: "Text Editors", type: "file" },
+  { id: "textmate", name: "TextMate", group: "Text Editors", type: "file" },
+  { id: "coderunner", name: "CodeRunner", group: "Text Editors", type: "file" },
+  // JetBrains (project/workspace-based)
+  { id: "intellij", name: "IntelliJ IDEA", group: "JetBrains", type: "workspace" },
+  { id: "pycharm", name: "PyCharm", group: "JetBrains", type: "workspace" },
+  { id: "webstorm", name: "WebStorm", group: "JetBrains", type: "workspace" },
+  { id: "goland", name: "GoLand", group: "JetBrains", type: "workspace" },
+  { id: "rubymine", name: "RubyMine", group: "JetBrains", type: "workspace" },
+  { id: "rustrover", name: "RustRover", group: "JetBrains", type: "workspace" },
+  { id: "android-studio", name: "Android Studio", group: "JetBrains", type: "workspace" },
+  { id: "rider", name: "Rider", group: "JetBrains", type: "workspace" },
+  { id: "appcode", name: "AppCode", group: "JetBrains", type: "workspace" },
+  { id: "clion", name: "CLion", group: "JetBrains", type: "workspace" },
+  { id: "phpstorm", name: "PhpStorm", group: "JetBrains", type: "workspace" },
+  { id: "mps", name: "MPS", group: "JetBrains", type: "workspace" },
 ];
+
+export const EDITOR_GROUPS: EditorGroup[] = ["VS Code", "JetBrains", "Text Editors"];
+
+const CATALOG_MAP = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
+
+/** Returns the target type for a known editor id; defaults to "file" for unknowns. */
+export function getEditorTargetType(id: string): EditorTargetType {
+  return CATALOG_MAP.get(id)?.type ?? "file";
+}

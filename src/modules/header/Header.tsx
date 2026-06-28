@@ -26,6 +26,7 @@ type Props = {
   searchTarget: SearchTarget;
   searchRef: RefObject<SearchInlineHandle | null>;
   openInEditorTarget: OpenInEditorTarget | null;
+  workspaceRoot: string | null;
   onOpenExternalEditorSettings: () => void;
 };
 
@@ -40,6 +41,7 @@ export function Header({
   searchTarget,
   searchRef,
   openInEditorTarget,
+  workspaceRoot,
   onOpenExternalEditorSettings,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -120,6 +122,7 @@ export function Header({
 
       <OpenInEditorButton
         target={openInEditorTarget}
+        workspaceRoot={workspaceRoot}
         onOpenSettings={onOpenExternalEditorSettings}
       />
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
