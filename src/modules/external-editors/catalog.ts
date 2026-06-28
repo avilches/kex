@@ -27,7 +27,6 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "atom", name: "Atom", group: "Text Editors", type: "file" },
   { id: "bbedit", name: "BBEdit", group: "Text Editors", type: "file" },
   { id: "cotedit", name: "CotEditor", group: "Text Editors", type: "file" },
-  { id: "textmate", name: "TextMate", group: "Text Editors", type: "file" },
   { id: "coderunner", name: "CodeRunner", group: "Text Editors", type: "file" },
   // JetBrains (project/workspace-based)
   { id: "intellij", name: "IntelliJ IDEA", group: "JetBrains", type: "workspace" },

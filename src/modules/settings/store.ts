@@ -173,7 +173,8 @@ export type Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
   scratchpadInNewTerminals: boolean;
-  preferredEditorId: string | null;
+  preferredFileEditorId: string | null;
+  preferredWorkspaceEditorId: string | null;
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
   disabledDetectedEditorIds: string[];
@@ -231,7 +232,8 @@ const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_TERMINAL_NEW_FOLDER_MODE = "terminalNewFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
-const KEY_PREFERRED_EDITOR_ID = "preferredEditorId";
+const KEY_PREFERRED_FILE_EDITOR_ID = "preferredFileEditorId";
+const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
 const KEY_CUSTOM_EDITORS = "customEditors";
 const KEY_DETECTED_EDITORS = "detectedEditors";
 const KEY_DISABLED_DETECTED_IDS = "disabledDetectedEditorIds";
@@ -374,7 +376,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: false,
   scratchpadEnterSends: true,
   scratchpadInNewTerminals: true,
-  preferredEditorId: null,
+  preferredFileEditorId: null,
+  preferredWorkspaceEditorId: null,
   customEditors: [],
   detectedEditors: [],
   disabledDetectedEditorIds: [],
@@ -611,9 +614,12 @@ export async function loadPreferences(): Promise<Preferences> {
     scratchpadInNewTerminals:
       get<boolean>(KEY_SCRATCHPAD_IN_NEW_TERMINALS) ??
       DEFAULT_PREFERENCES.scratchpadInNewTerminals,
-    preferredEditorId:
-      get<string | null>(KEY_PREFERRED_EDITOR_ID) ??
-      DEFAULT_PREFERENCES.preferredEditorId,
+    preferredFileEditorId:
+      get<string | null>(KEY_PREFERRED_FILE_EDITOR_ID) ??
+      DEFAULT_PREFERENCES.preferredFileEditorId,
+    preferredWorkspaceEditorId:
+      get<string | null>(KEY_PREFERRED_WORKSPACE_EDITOR_ID) ??
+      DEFAULT_PREFERENCES.preferredWorkspaceEditorId,
     customEditors: (() => {
       const v = get<CustomEditor[]>(KEY_CUSTOM_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.customEditors;
@@ -889,8 +895,12 @@ export async function setTerminalScratchpadInNewTerminals(value: boolean): Promi
   await writePref(KEY_SCRATCHPAD_IN_NEW_TERMINALS, value);
 }
 
-export async function setPreferredEditorId(value: string | null): Promise<void> {
-  await writePref(KEY_PREFERRED_EDITOR_ID, value);
+export async function setPreferredFileEditorId(value: string | null): Promise<void> {
+  await writePref(KEY_PREFERRED_FILE_EDITOR_ID, value);
+}
+
+export async function setPreferredWorkspaceEditorId(value: string | null): Promise<void> {
+  await writePref(KEY_PREFERRED_WORKSPACE_EDITOR_ID, value);
 }
 
 export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
@@ -1066,7 +1076,8 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
   [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
-  [KEY_PREFERRED_EDITOR_ID]: "preferredEditorId",
+  [KEY_PREFERRED_FILE_EDITOR_ID]: "preferredFileEditorId",
+  [KEY_PREFERRED_WORKSPACE_EDITOR_ID]: "preferredWorkspaceEditorId",
   [KEY_CUSTOM_EDITORS]: "customEditors",
   [KEY_DETECTED_EDITORS]: "detectedEditors",
   [KEY_DISABLED_DETECTED_IDS]: "disabledDetectedEditorIds",

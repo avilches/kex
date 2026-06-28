@@ -33,7 +33,6 @@ pub static CATALOG: &[EditorEntry] = &[
     EditorEntry { id: "atom", name: "Atom", bundle_id: Some("com.github.atom"), cli_binary: "atom", args_before_path: &[], macos_app_name: None },
     EditorEntry { id: "bbedit", name: "BBEdit", bundle_id: Some("com.barebones.bbedit"), cli_binary: "bbedit", args_before_path: &[], macos_app_name: None },
     EditorEntry { id: "cotedit", name: "CotEditor", bundle_id: Some("com.coteditor.CotEditor"), cli_binary: "cot", args_before_path: &[], macos_app_name: None },
-    EditorEntry { id: "textmate", name: "TextMate", bundle_id: Some("com.macromates.TextMate"), cli_binary: "mate", args_before_path: &[], macos_app_name: None },
     EditorEntry { id: "coderunner", name: "CodeRunner", bundle_id: Some("com.krill.CodeRunner"), cli_binary: "", args_before_path: &[], macos_app_name: None },
     // --- JetBrains IDEs ---
     EditorEntry { id: "intellij", name: "IntelliJ IDEA", bundle_id: Some("com.jetbrains.intellij"), cli_binary: "idea", args_before_path: &[], macos_app_name: Some("IntelliJ IDEA") },
@@ -69,5 +68,5 @@ pub fn is_jetbrains(id: &str) -> bool {
 
 /// Editors launched via `open -b <bundle_id>` on macOS regardless of CLI availability.
 pub fn is_macos_open_only(id: &str) -> bool {
-    matches!(id, "bbedit" | "cotedit" | "textmate" | "coderunner" | "terminal-app" | "wave")
+    matches!(id, "bbedit" | "cotedit" | "coderunner" | "terminal-app" | "wave")
 }
