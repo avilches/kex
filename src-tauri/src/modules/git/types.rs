@@ -116,6 +116,23 @@ pub struct GitPushResult {
     pub pushed: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBranchInfo {
+    pub name: String,
+    pub is_current: bool,
+    pub is_remote: bool,
+    pub remote: Option<String>,
+    pub upstream: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRemoteInfo {
+    pub name: String,
+    pub url: String,
+}
+
 pub(crate) struct GitOutput {
     pub(crate) stdout: Vec<u8>,
     pub(crate) stderr: Vec<u8>,
