@@ -256,7 +256,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               workspaceRoot={workspaceRoot}
               home={home}
               gitRootPath={gitRootPath}
-              onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
+              onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
               onFocusOnExplorer={callbacks.onFocusOnExplorer}
               onRenameFile={callbacks.onRenameFile}
               onSetAsRoot={callbacks.onSetAsRoot}
@@ -370,7 +370,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               workspaceRoot={workspaceRoot}
               home={home}
               gitRootPath={gitRootPath}
-              onRevealPath={(p) => callbacks.onFocusOnExplorer?.(p)}
+              onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
               onFocusOnExplorer={callbacks.onFocusOnExplorer}
               onRenameFile={callbacks.onRenameFile}
               onSetAsRoot={callbacks.onSetAsRoot}
@@ -411,6 +411,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
           <GitDiffPane
             source={{ kind: "working", repoRoot: panel.repoRoot, path: panel.path, mode: panel.mode, originalPath: panel.originalPath }}
             active={visible}
+            workspaceRoot={workspaceRoot}
+            home={home}
+            onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
           />
         </Suspense>
       );
@@ -422,6 +425,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
           <GitDiffPane
             source={{ kind: "commit", repoRoot: panel.repoRoot, sha: panel.sha, path: panel.path, originalPath: panel.originalPath }}
             active={visible}
+            workspaceRoot={workspaceRoot}
+            home={home}
+            onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
           />
         </Suspense>
       );

@@ -1,5 +1,6 @@
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { GitDiffPathBar } from "./GitDiffPathBar";
+import { GitDiffSplitView } from "./GitDiffSplitView";
 import { Spinner } from "@/components/ui/spinner";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { unifiedMergeView } from "@codemirror/merge";
@@ -53,6 +54,9 @@ type Props = {
   source: WorkingSource | CommitSource;
   chipLabel?: string;
   active: boolean;
+  workspaceRoot?: string | null;
+  home?: string | null;
+  onRevealPath?: (path: string) => void;
 };
 
 const READONLY_EXT = [
@@ -138,7 +142,7 @@ function loadStateFromCache(
   };
 }
 
-export function GitDiffPane({ source, chipLabel, active }: Props) {
+export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, home = null, onRevealPath }: Props) {
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const themeExt = useEditorThemeExt();
   const [state, setState] = useState<LoadState>(() =>
@@ -220,6 +224,8 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
   const view = resolveEditorView(path, editorViewByExt);
 
   const initialLang = useMemo(() => resolveLanguageSync(path), [path]);
+  const diffViewMode = usePreferencesStore((s) => s.diffViewMode);
+  const splitLang = useMemo(() => initialLang?.ext ?? [], [initialLang]);
   const extensions = useMemo(() => {
     const s = usePreferencesStore.getState();
     const v0 = resolveEditorView(path, s.editorViewByExt);
@@ -295,53 +301,23 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-md border border-border/60 bg-background">
-      <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-border/60 px-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <Badge
-            variant="outline"
-            className="text-[10px] uppercase tracking-wide"
-          >
-            {chipLabel ?? mode}
-          </Badge>
-          {isBinary ? (
-            <Badge variant="secondary" className="text-[10px]">
-              Binary / patch fallback
-            </Badge>
-          ) : isTooLarge ? (
-            <Badge variant="secondary" className="text-[10px]">
-              Large file / patch view
-            </Badge>
-          ) : null}
-          {truncated ? (
-            <Badge
-              variant="secondary"
-              className="text-[10px] text-amber-600 dark:text-amber-400"
-              title="The diff exceeded the size limit and was truncated; content may be incomplete."
-            >
-              Truncated
-            </Badge>
-          ) : null}
-          <span
-            className="truncate font-mono text-[11px] text-muted-foreground"
-            title={path}
-          >
-            {path}
-          </span>
-        </div>
-        <div className="flex shrink-0 items-center gap-3 text-[10.5px] tabular-nums text-muted-foreground">
-          <span className="truncate max-w-80 font-mono">{repoRoot}</span>
-          {useFallback ? (
-            <>
-              <span className="text-emerald-600 dark:text-emerald-400">
-                +{stats.added}
-              </span>
-              <span className="text-rose-600 dark:text-rose-400">
-                -{stats.removed}
-              </span>
-            </>
-          ) : null}
-        </div>
-      </div>
+      <GitDiffPathBar
+        path={path}
+        originalPath={originalPath}
+        repoRoot={repoRoot}
+        mode={mode}
+        chipLabel={chipLabel}
+        useFallback={useFallback}
+        isBinary={isBinary}
+        isTooLarge={isTooLarge}
+        truncated={truncated}
+        stats={stats}
+        view={view}
+        diffViewMode={diffViewMode}
+        workspaceRoot={workspaceRoot}
+        home={home}
+        onRevealPath={onRevealPath ?? (() => {})}
+      />
 
       <div className="min-h-0 flex-1 overflow-hidden">
         {state.kind === "loading" || state.kind === "idle" ? (
@@ -365,6 +341,15 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
               </div>
             ) : null}
           </ScrollArea>
+        ) : diffViewMode === "split" ? (
+          <GitDiffSplitView
+            originalContent={originalContent}
+            modifiedContent={modifiedContent}
+            languageExt={splitLang}
+            wrap={view.wrap}
+            lineNumbers={view.lineNumbers}
+            themeExt={themeExt}
+          />
         ) : (
           <CodeMirror
             ref={cmRef}
