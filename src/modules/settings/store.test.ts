@@ -132,6 +132,12 @@ describe("DEFAULT_PREFERENCES", () => {
   });
 });
 
+describe("diffViewMode", () => {
+  it("defaults to unified", () => {
+    expect(DEFAULT_PREFERENCES.diffViewMode).toBe("unified");
+  });
+});
+
 describe("PREF_KEY_MAP", () => {
   // A preference with a UI setter that is missing here never propagates to live
   // windows: onPreferencesChange looks the store key up in this map and drops

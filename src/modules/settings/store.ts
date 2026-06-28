@@ -19,6 +19,8 @@ export type ScmViewMode = "list" | "tree";
 
 export type TerminalNewFolderMode = "home" | "workspace" | "context";
 
+export type DiffViewMode = "unified" | "split";
+
 export type CursorStyle = "bar" | "block" | "underline";
 
 export type CursorInactiveStyle =
@@ -159,6 +161,7 @@ export type Preferences = {
   editorPreviewOnClick: boolean;
   editorViewByExt: EditorViewMap;
   editorScrollPastEnd: boolean;
+  diffViewMode: DiffViewMode;
   editorHighlightActiveLine: boolean; // JSON-only: no settings UI, edit settings-general.json
   editorBracketMatching: boolean;
   editorCloseBrackets: boolean;
@@ -213,6 +216,7 @@ const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
 const KEY_EDITOR_PREVIEW_ON_CLICK = "editorPreviewOnClick";
 const KEY_EDITOR_VIEW_BY_EXT = "editorViewByExt";
 const KEY_EDITOR_SCROLL_PAST_END = "editorScrollPastEnd";
+const KEY_DIFF_VIEW_MODE = "diffViewMode";
 const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "editorHighlightActiveLine";
 const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
 const KEY_EDITOR_CLOSE_BRACKETS = "editorCloseBrackets";
@@ -354,6 +358,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorPreviewOnClick: true,
   editorViewByExt: {},
   editorScrollPastEnd: false,
+  diffViewMode: "unified",
   editorHighlightActiveLine: true,
   editorBracketMatching: true,
   editorCloseBrackets: true,
@@ -561,6 +566,8 @@ export async function loadPreferences(): Promise<Preferences> {
     editorScrollPastEnd:
       get<boolean>(KEY_EDITOR_SCROLL_PAST_END) ??
       DEFAULT_PREFERENCES.editorScrollPastEnd,
+    diffViewMode:
+      get<DiffViewMode>(KEY_DIFF_VIEW_MODE) ?? DEFAULT_PREFERENCES.diffViewMode,
     editorHighlightActiveLine:
       get<boolean>(KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE) ??
       DEFAULT_PREFERENCES.editorHighlightActiveLine,
@@ -948,6 +955,10 @@ export async function setEditorScrollPastEnd(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_SCROLL_PAST_END, value);
 }
 
+export async function setDiffViewMode(value: DiffViewMode): Promise<void> {
+  await writePref(KEY_DIFF_VIEW_MODE, value);
+}
+
 export async function setEditorBracketMatching(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_BRACKET_MATCHING, value);
 }
@@ -1023,6 +1034,7 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_PREVIEW_ON_CLICK]: "editorPreviewOnClick",
   [KEY_EDITOR_VIEW_BY_EXT]: "editorViewByExt",
   [KEY_EDITOR_SCROLL_PAST_END]: "editorScrollPastEnd",
+  [KEY_DIFF_VIEW_MODE]: "diffViewMode",
   [KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE]: "editorHighlightActiveLine",
   [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
   [KEY_EDITOR_CLOSE_BRACKETS]: "editorCloseBrackets",

@@ -15,6 +15,7 @@ import { useEffect, useRef } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   type CursorStyle,
+  type DiffViewMode,
   CURSOR_STYLES,
   EDITOR_BLINK_RATE_DEFAULT,
   EDITOR_BLINK_RATE_MAX,
@@ -32,6 +33,7 @@ import {
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_MIN,
   LINE_HEIGHT_STEP,
+  setDiffViewMode,
   setEditorAutoSave,
   setEditorAutocompletion,
   setEditorBracketMatching,
@@ -76,6 +78,7 @@ export function EditorSection() {
     (s) => s.editorCursorBlinkRate,
   );
   const editorCursorStyle = usePreferencesStore((s) => s.editorCursorStyle);
+  const diffViewMode = usePreferencesStore((s) => s.diffViewMode);
 
   return (
     <div className="flex flex-col gap-6">
@@ -169,6 +172,27 @@ export function EditorSection() {
             checked={editorAutocompletion}
             onCheckedChange={(v) => void setEditorAutocompletion(v)}
           />
+        </SettingRow>
+        <SettingRow
+          title="Diff layout"
+          description="Show file diffs inline (unified) or as two side-by-side panes (split)."
+        >
+          <Select
+            value={diffViewMode}
+            onValueChange={(v) => void setDiffViewMode(v as DiffViewMode)}
+          >
+            <SelectTrigger size="sm" className="h-8 w-28 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unified" className="text-[12px]">
+                Unified
+              </SelectItem>
+              <SelectItem value="split" className="text-[12px]">
+                Split
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </SettingRow>
       </div>
 
