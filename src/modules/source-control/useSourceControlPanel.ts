@@ -6,6 +6,7 @@ import {
   type GitRemoteInfo,
   type GitRepoInfo,
   type GitStatusSnapshot,
+  type GitWorktreeStatus,
 } from "@/lib/native";
 import {
   invalidateDiff,
@@ -70,6 +71,8 @@ type SourceControlPanelState = {
   fetchBranches: () => Promise<GitBranchInfo[]>;
   checkout: (branch: GitBranchInfo) => Promise<void>;
   addRemote: (name: string, url: string) => Promise<void>;
+  worktreeName: string | null;
+  worktreeCount: number;
   setCommitMessage: (value: string) => void;
   refresh: () => Promise<void>;
   selectEntry: (entry: SourceControlEntry) => Promise<void>;
@@ -347,6 +350,10 @@ export function useSourceControlPanel(
   const [remotes, setRemotes] = useState<GitRemoteInfo[]>([]);
   const [remotesLoading, setRemotesLoading] = useState(false);
   const [selectedRemote, setSelectedRemote] = useState<string | null>(null);
+  const [worktreeStatus, setWorktreeStatus] = useState<GitWorktreeStatus>({
+    worktreeName: null,
+    worktreeCount: 0,
+  });
   const selectedRef = useRef<DiffSelection | null>(null);
   const reconcileTimerRef = useRef(0);
 
@@ -426,6 +433,15 @@ export function useSourceControlPanel(
       setRemotesLoading(false);
     }
   }, [repo, status?.upstream]);
+
+  const loadWorktreeStatus = useCallback(async () => {
+    if (!repo) return;
+    try {
+      setWorktreeStatus(await native.gitWorktreeStatus(repo.repoRoot));
+    } catch {
+      // non-fatal
+    }
+  }, [repo]);
 
   const fetchBranches = useCallback(async (): Promise<GitBranchInfo[]> => {
     if (!repo) return [];
@@ -578,8 +594,9 @@ export function useSourceControlPanel(
   useEffect(() => {
     if (panelState === "ready") {
       void loadRemotes();
+      void loadWorktreeStatus();
     }
-  }, [panelState, loadRemotes]);
+  }, [panelState, loadRemotes, loadWorktreeStatus]);
 
   const selectEntry = useCallback(
     async (entry: SourceControlEntry) => {
@@ -881,6 +898,8 @@ export function useSourceControlPanel(
     fetchBranches,
     checkout,
     addRemote,
+    worktreeName: worktreeStatus.worktreeName,
+    worktreeCount: worktreeStatus.worktreeCount,
     setCommitMessage,
     refresh,
     selectEntry,

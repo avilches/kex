@@ -132,6 +132,11 @@ export type GitRemoteInfo = {
   url: string;
 };
 
+export type GitWorktreeStatus = {
+  worktreeName: string | null;
+  worktreeCount: number;
+};
+
 export type GitDiscardEntry = {
   path: string;
   untracked: boolean;
@@ -350,6 +355,11 @@ export const native = {
     invoke<void>("git_fetch_remote", {
       repoRoot,
       remote,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitWorktreeStatus: (repoRoot: string) =>
+    invoke<GitWorktreeStatus>("git_worktree_status", {
+      repoRoot,
       workspace: currentWorkspaceEnv(),
     }),
 };

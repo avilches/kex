@@ -749,6 +749,7 @@ pub fn run() {
             git::commands::git_list_remotes,
             git::commands::git_add_remote,
             git::commands::git_fetch_remote,
+            git::commands::git_worktree_status,
             shell::shell_run_command,
             shell::shell_session_open,
             shell::shell_session_run,

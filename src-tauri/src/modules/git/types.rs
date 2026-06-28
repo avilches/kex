@@ -133,6 +133,13 @@ pub struct GitRemoteInfo {
     pub url: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitWorktreeStatus {
+    pub worktree_name: Option<String>,
+    pub worktree_count: usize,
+}
+
 pub(crate) struct GitOutput {
     pub(crate) stdout: Vec<u8>,
     pub(crate) stderr: Vec<u8>,

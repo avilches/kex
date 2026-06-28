@@ -10,7 +10,8 @@ use crate::modules::git::process::{
 use crate::modules::git::types::{
     DiscardEntry, GitBranchInfo, GitCommitFileChange, GitCommitResult, GitDiffContentResult,
     GitDiffResult, GitLogEntry, GitOutput, GitPanelSnapshot, GitPushResult, GitRemoteInfo,
-    GitRepoInfo, GitStatusSnapshot, TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    GitRepoInfo, GitStatusSnapshot, GitWorktreeStatus, TextSource, DEFAULT_TIMEOUT_SECS,
+    NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
     authorized_repo_root, canonical_dir, dir_path_for, resolve_within_repo, split_upstream,
@@ -1221,6 +1222,62 @@ pub fn mv(
         DEFAULT_TIMEOUT_SECS,
     )?;
     ensure_success(&output, "git mv failed")
+}
+
+pub fn get_worktree_status(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitWorktreeStatus> {
+    let repo = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo.workspace)?;
+
+    let output = run_git(
+        &repo.workspace,
+        Some(&repo.git_path),
+        ["worktree", "list", "--porcelain"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git worktree list failed")?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let paths: Vec<String> = stdout
+        .lines()
+        .filter(|l| l.starts_with("worktree "))
+        .map(|l| l["worktree ".len()..].trim().to_owned())
+        .collect();
+
+    let count = paths.len();
+    if count <= 1 {
+        return Ok(GitWorktreeStatus {
+            worktree_name: None,
+            worktree_count: count,
+        });
+    }
+
+    let main_path = paths.first().map(|s| s.as_str()).unwrap_or("");
+    let repo_canonical = std::fs::canonicalize(repo_root)
+        .unwrap_or_else(|_| std::path::PathBuf::from(repo_root));
+    let main_canonical = std::fs::canonicalize(main_path)
+        .unwrap_or_else(|_| std::path::PathBuf::from(main_path));
+
+    if repo_canonical == main_canonical {
+        return Ok(GitWorktreeStatus {
+            worktree_name: None,
+            worktree_count: count,
+        });
+    }
+
+    let name = repo_canonical
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("worktree")
+        .to_owned();
+
+    Ok(GitWorktreeStatus {
+        worktree_name: Some(name),
+        worktree_count: count,
+    })
 }
 
 fn nothing_to_commit(output: &GitOutput) -> bool {

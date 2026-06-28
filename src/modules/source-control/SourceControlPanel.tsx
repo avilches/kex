@@ -639,6 +639,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         <header className="flex shrink-0 items-start gap-1 border-b border-border/60 px-1.5 py-1">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex h-6 min-w-0 items-center gap-1.5">
+              {scm.worktreeCount > 1 && scm.worktreeName !== null ? (
+                <span className="shrink-0 rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  Wt: {scm.worktreeName}
+                </span>
+              ) : null}
               <BranchPicker
                 currentBranch={repoLabel}
                 isDetached={scm.status?.isDetached ?? false}

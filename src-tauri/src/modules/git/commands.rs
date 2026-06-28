@@ -4,7 +4,7 @@ use crate::modules::git::operations;
 use crate::modules::git::types::{
     DiscardEntry, GitBranchInfo, GitCommitFileChange, GitCommitResult, GitDiffContentResult,
     GitDiffResult, GitLogEntry, GitPanelSnapshot, GitPushResult, GitRemoteInfo, GitRepoInfo,
-    GitStatusSnapshot,
+    GitStatusSnapshot, GitWorktreeStatus,
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
@@ -362,6 +362,19 @@ pub async fn git_fetch_remote(
     let workspace = WorkspaceEnv::from_option(workspace);
     blocking(app, move |r| {
         operations::fetch_remote(r, &repo_root, &remote, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_worktree_status(
+    repo_root: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<GitWorktreeStatus, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        operations::get_worktree_status(r, &repo_root, &workspace).map_err(Into::into)
     })
     .await
 }
