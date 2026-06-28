@@ -27,7 +27,6 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "atom", name: "Atom", group: "Text Editors", type: "file" },
   { id: "bbedit", name: "BBEdit", group: "Text Editors", type: "file" },
   { id: "cotedit", name: "CotEditor", group: "Text Editors", type: "file" },
-  { id: "textmate", name: "TextMate", group: "Text Editors", type: "file" },
   { id: "coderunner", name: "CodeRunner", group: "Text Editors", type: "file" },
   // JetBrains (project/workspace-based)
   { id: "intellij", name: "IntelliJ IDEA", group: "JetBrains", type: "workspace" },
@@ -44,6 +43,8 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "mps", name: "MPS", group: "JetBrains", type: "workspace" },
   { id: "android-studio-canary", name: "Android Studio Canary", group: "JetBrains", type: "workspace" },
   // Terminals (open workspace/directory)
+  { id: "terminal-app", name: "Terminal", group: "Terminals", type: "workspace" },
+  { id: "wave", name: "Wave", group: "Terminals", type: "workspace" },
   { id: "warp", name: "Warp", group: "Terminals", type: "workspace" },
   { id: "ghostty", name: "Ghostty", group: "Terminals", type: "workspace" },
   { id: "iterm2", name: "iTerm2", group: "Terminals", type: "workspace" },
