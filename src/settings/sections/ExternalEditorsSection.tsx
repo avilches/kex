@@ -1,46 +1,43 @@
-import { useEffect, useRef, useState } from "react";
-import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { useEffect, useRef } from "react";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Cancel01Icon, PlusSignIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setCustomEditors } from "@/modules/settings/store";
-import { useExternalEditors, EditorIcon } from "@/modules/external-editors";
-import type { CustomEditor, DetectedEditor } from "@/modules/external-editors";
+import {
+  setCustomEditors,
+  setDisabledDetectedEditorIds,
+} from "@/modules/settings/store";
+import { useExternalEditors, EditorIcon, EDITOR_CATALOG } from "@/modules/external-editors";
+import type { CustomEditor } from "@/modules/external-editors";
+import { SectionHeader } from "../components/SectionHeader";
+import { cn } from "@/lib/utils";
 
 export function ExternalEditorsSection() {
-  const { detectedEditors, isScanning, scan } = useExternalEditors();
+  const { isScanning, scan } = useExternalEditors();
+  const detectedEditors = usePreferencesStore((s) => s.detectedEditors);
+  const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const customEditors = usePreferencesStore((s) => s.customEditors);
 
-  // Detected editors that the user manually removed this session
-  const [hiddenDetectedIds, setHiddenDetectedIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const detectedIds = new Set(detectedEditors.map((e) => e.id));
 
-  // Scan on mount if cache is empty (Settings webview misses the startup scan)
+  // Scan on first open if no cached data yet
+  const didScanRef = useRef(false);
   useEffect(() => {
-    if (detectedEditors.length === 0 && !isScanning) {
+    if (!didScanRef.current && detectedEditors.length === 0 && !isScanning) {
+      didScanRef.current = true;
       scan();
     }
-    // Only on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [detectedEditors.length, isScanning, scan]);
 
-  // Clear hidden list when a new scan completes
-  const prevScanningRef = useRef(isScanning);
-  useEffect(() => {
-    if (prevScanningRef.current && !isScanning) {
-      setHiddenDetectedIds(new Set());
-    }
-    prevScanningRef.current = isScanning;
-  });
-
-  const visibleDetected = detectedEditors.filter((e) => !hiddenDetectedIds.has(e.id));
-
-  function handleDeleteDetected(e: DetectedEditor) {
-    setHiddenDetectedIds((prev) => new Set([...prev, e.id]));
+  function handleToggleDetected(id: string, enabled: boolean) {
+    const next = enabled
+      ? disabledDetectedEditorIds.filter((d) => d !== id)
+      : [...disabledDetectedEditorIds, id];
+    void setDisabledDetectedEditorIds(next);
   }
 
   function handleAddCustom() {
-    // Block adding if there's already an editor with both name and binary empty
     if (customEditors.some((e) => !e.name.trim() && !e.binary.trim())) return;
     const id = crypto.randomUUID();
     const newEditor: CustomEditor = { id, name: "", binary: "", argsBeforePath: [] };
@@ -62,124 +59,145 @@ export function ExternalEditorsSection() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-[13px] font-medium text-foreground">External Editors</h2>
-        <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-          Use the header button to open files or folders in an external editor.
-          Select your preferred editor from that button's dropdown.
-        </p>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Tools" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 px-2.5 text-[11px]"
+          onClick={scan}
+          disabled={isScanning}
+        >
+          <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
+          {isScanning ? "Scanning..." : "Scan"}
+        </Button>
       </div>
 
-      {/* Detected editors */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] font-medium text-foreground">Detected editors</span>
-          <button
-            type="button"
-            onClick={scan}
-            disabled={isScanning}
-            className="flex h-[26px] items-center gap-1.5 rounded border border-border bg-muted px-3 text-[11px] text-foreground transition-colors hover:bg-accent disabled:opacity-50"
-          >
-            {isScanning ? "Scanning..." : "Scan"}
-          </button>
-        </div>
-        {visibleDetected.length === 0 && !isScanning && (
-          <p className="text-[11.5px] text-muted-foreground">
-            No editors detected. Click Scan to search for installed editors.
-          </p>
-        )}
-        {isScanning && (
-          <p className="text-[11.5px] text-muted-foreground">Scanning for editors...</p>
-        )}
-        <div className="space-y-0.5">
-          {visibleDetected.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 rounded px-1 py-1">
-              <EditorIcon id={e.id} size={18} />
-              <span className="w-28 shrink-0 text-[12px] text-foreground">{e.name}</span>
-              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                {e.binary}
-              </span>
-              <button
-                type="button"
-                title="Remove from list"
-                onClick={() => handleDeleteDetected(e)}
-                className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+      <p className="text-[11.5px] text-muted-foreground -mt-2">
+        Use the header button to open files or folders in an external editor.
+        Select your preferred tool from that button&apos;s dropdown.
+      </p>
+
+      {/* Catalog — all known editors */}
+      <div className="flex flex-col gap-3">
+        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          Editors &amp; IDEs
+        </h3>
+        <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+          {EDITOR_CATALOG.map((entry) => {
+            const isDetected = detectedIds.has(entry.id);
+            const isDisabled = disabledDetectedEditorIds.includes(entry.id);
+            const isEnabled = isDetected && !isDisabled;
+
+            return (
+              <div
+                key={entry.id}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5",
+                  !isDetected && "opacity-40",
+                )}
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
-              </button>
-            </div>
-          ))}
+                <EditorIcon id={entry.id} size={18} />
+                <span
+                  className={cn(
+                    "flex-1 text-[12.5px]",
+                    !isDetected && "text-muted-foreground",
+                  )}
+                >
+                  {entry.name}
+                </span>
+                {!isDetected && (
+                  <span className="text-[10px] text-muted-foreground">Not installed</span>
+                )}
+                {isDetected && (
+                  <Switch
+                    checked={isEnabled}
+                    onCheckedChange={(v) => handleToggleDetected(entry.id, v)}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Custom editors */}
-      <div className="space-y-2">
-        <span className="text-[12px] font-medium text-foreground">Custom editors</span>
+      {/* Custom tools */}
+      <div className="flex flex-col gap-3">
+        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          Custom tools
+        </h3>
+
         {customEditors.length > 0 && (
-          <div className="mb-1 grid grid-cols-[1fr_2fr_auto_auto] gap-2 px-1">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Name
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Binary / path
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Args
-            </span>
-            <span />
+          <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+            {/* Headers */}
+            <div className="grid grid-cols-[1fr_2fr_auto_auto] gap-3 px-3 py-1.5">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Name
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Binary / path
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Args
+              </span>
+              <span />
+            </div>
+            {customEditors.map((e) => (
+              <div
+                key={e.id}
+                className="grid grid-cols-[1fr_2fr_auto_auto] items-center gap-3 px-3 py-2"
+              >
+                <input
+                  type="text"
+                  value={e.name}
+                  onChange={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
+                  placeholder="Name"
+                  className="h-7 w-full rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  type="text"
+                  value={e.binary}
+                  onChange={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
+                  placeholder="/usr/local/bin/editor"
+                  className="h-7 w-full rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  type="text"
+                  value={e.argsBeforePath.join(" ")}
+                  onChange={(ev) =>
+                    handleUpdateCustom(
+                      e.id,
+                      "argsBeforePath",
+                      ev.target.value.split(/\s+/).filter(Boolean),
+                    )
+                  }
+                  placeholder="--wait"
+                  className="h-7 w-20 rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <button
+                  type="button"
+                  title="Remove"
+                  onClick={() => handleDeleteCustom(e.id)}
+                  className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
-        <div className="space-y-1">
-          {customEditors.map((e) => (
-            <div key={e.id} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={e.name}
-                onChange={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
-                placeholder="Name"
-                className="h-7 w-28 shrink-0 rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <input
-                type="text"
-                value={e.binary}
-                onChange={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
-                placeholder="/usr/local/bin/editor"
-                className="h-7 min-w-0 flex-1 rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <input
-                type="text"
-                value={e.argsBeforePath.join(" ")}
-                onChange={(ev) =>
-                  handleUpdateCustom(
-                    e.id,
-                    "argsBeforePath",
-                    ev.target.value.split(/\s+/).filter(Boolean),
-                  )
-                }
-                placeholder="--wait"
-                className="h-7 w-24 shrink-0 rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <button
-                type="button"
-                title="Remove"
-                onClick={() => handleDeleteCustom(e.id)}
-                className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
-              </button>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-fit gap-1.5 px-2 text-[12px]"
           onClick={handleAddCustom}
           disabled={customEditors.some((e) => !e.name.trim() && !e.binary.trim())}
-          className="flex h-7 items-center gap-1.5 rounded px-2 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
-          Add editor
-        </button>
+          Add tool
+        </Button>
       </div>
     </div>
   );

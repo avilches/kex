@@ -38,12 +38,14 @@ export function OpenInEditorButton({ target, onOpenSettings }: Props) {
   const { detectedEditors, isScanning } = useExternalEditors();
   const preferredEditorId = usePreferencesStore((s) => s.preferredEditorId);
   const customEditors = usePreferencesStore((s) => s.customEditors);
+  const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const [open, setOpen] = useState(false);
 
-  // Only show editors that have both name and binary set
-  const allEditors: AnyEditor[] = [...detectedEditors, ...customEditors].filter(
-    (e) => e.name.trim() && e.binary.trim(),
-  );
+  // Only show editors that have both name and binary set, excluding user-disabled detected editors
+  const allEditors: AnyEditor[] = [
+    ...detectedEditors.filter((e) => !disabledDetectedEditorIds.includes(e.id)),
+    ...customEditors,
+  ].filter((e) => e.name.trim() && e.binary.trim());
 
   const preferredEditor =
     allEditors.find((e) => e.id === preferredEditorId) ?? allEditors[0] ?? null;
