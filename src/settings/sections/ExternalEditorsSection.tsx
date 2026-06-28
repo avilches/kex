@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Select,
   SelectContent,
@@ -6,27 +5,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Cancel01Icon, DocumentCodeIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setPreferredEditorId, setCustomEditors } from "@/modules/settings/store";
-import { useExternalEditors } from "@/modules/external-editors";
+import { useExternalEditors, EditorIcon } from "@/modules/external-editors";
 import type { CustomEditor } from "@/modules/external-editors";
-
-function EditorIcon({ id }: { id: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return <HugeiconsIcon icon={DocumentCodeIcon} size={14} strokeWidth={1.75} />;
-  return (
-    <img
-      src={`/assets/editors/${id}.svg`}
-      alt=""
-      width={14}
-      height={14}
-      className="shrink-0"
-      onError={() => setFailed(true)}
-    />
-  );
-}
 
 export function ExternalEditorsSection() {
   const { detectedEditors, isScanning, scan } = useExternalEditors();
@@ -41,7 +25,11 @@ export function ExternalEditorsSection() {
     void setCustomEditors([...customEditors, newEditor]);
   }
 
-  function handleUpdateCustom(id: string, field: "name" | "binary", value: string) {
+  function handleUpdateCustom(
+    id: string,
+    field: "name" | "binary" | "argsBeforePath",
+    value: string | string[],
+  ) {
     void setCustomEditors(
       customEditors.map((e) => (e.id === id ? { ...e, [field]: value } : e)),
     );
@@ -138,6 +126,19 @@ export function ExternalEditorsSection() {
                 onChange={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
                 placeholder="/usr/local/bin/editor"
                 className="h-7 min-w-0 flex-1 rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <input
+                type="text"
+                value={e.argsBeforePath.join(" ")}
+                onChange={(ev) =>
+                  handleUpdateCustom(
+                    e.id,
+                    "argsBeforePath",
+                    ev.target.value.split(/\s+/).filter(Boolean),
+                  )
+                }
+                placeholder="--wait"
+                className="h-7 w-24 shrink-0 rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               />
               <button
                 type="button"

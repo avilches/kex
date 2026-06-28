@@ -15,6 +15,7 @@ import {
 } from "@/modules/settings/store";
 import { useExternalEditors, openWithEditor } from "./useExternalEditors";
 import type { AnyEditor } from "./types";
+import { EditorIcon } from "./EditorIcon";
 import { toast } from "sonner";
 
 export interface OpenInEditorTarget {
@@ -32,22 +33,6 @@ function pathLabel(target: OpenInEditorTarget): string {
   return parts[parts.length - 1] ?? target.path;
 }
 
-function EditorIcon({ id }: { id: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
-    return <HugeiconsIcon icon={DocumentCodeIcon} size={14} strokeWidth={1.75} />;
-  }
-  return (
-    <img
-      src={`/assets/editors/${id}.svg`}
-      alt={id}
-      width={14}
-      height={14}
-      className="shrink-0"
-      onError={() => setFailed(true)}
-    />
-  );
-}
 
 export function OpenInEditorButton({ target, onOpenSettings }: Props) {
   const { detectedEditors, isScanning, scan } = useExternalEditors();

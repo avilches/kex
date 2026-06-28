@@ -238,11 +238,9 @@ export default function App() {
         return { path: activePanel.path, kind: "file" };
       case "git-diff":
       case "git-commit-file":
-        return activeWorkspace?.cwd ? { path: activeWorkspace.cwd, kind: "dir" } : null;
+        return { path: activePanel.repoRoot, kind: "dir" };
       case "git-history":
-        return "repoRoot" in activePanel && activePanel.repoRoot
-          ? { path: activePanel.repoRoot, kind: "dir" }
-          : null;
+        return { path: activePanel.repoRoot, kind: "dir" };
       case "browser":
         return activeWorkspace?.cwd ? { path: activeWorkspace.cwd, kind: "dir" } : null;
       default:
