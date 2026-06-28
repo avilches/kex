@@ -203,7 +203,7 @@ describe("tab.lock shortcut", () => {
 test("file.delete default binding is a bare Delete key", () => {
   const s = SHORTCUTS.find((x) => x.id === "file.delete");
   expect(s).toBeDefined();
-  expect(s!.group).toBe("General");
+  expect(s!.group).toBe("Explorer");
   const b = s!.defaultBindings[0];
   expect(b.key).toBe("Delete");
   expect(b.meta).toBeFalsy();
