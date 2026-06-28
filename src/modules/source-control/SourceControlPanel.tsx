@@ -53,7 +53,6 @@ import {
   FileDiffIcon,
   FolderOpenIcon,
   FolderTreeIcon,
-  GitBranchIcon,
   GitForkIcon,
   Link01Icon,
   ListViewIcon,
@@ -84,6 +83,8 @@ import {
   type DiffSelection,
   type SourceControlEntry,
 } from "./useSourceControlPanel";
+import { BranchPicker } from "./BranchPicker";
+import { RemoteSection } from "./RemoteSection";
 import {
   buildScmTree,
   collectDirKeys,
@@ -349,8 +350,10 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   }, [scm]);
 
   const handleFetch = useCallback(() => {
-    void sourceControl.runRemoteAction("fetch");
-  }, [sourceControl]);
+    void sourceControl.runRemoteAction("fetch", {
+      remote: scm.selectedRemote ?? undefined,
+    });
+  }, [sourceControl, scm.selectedRemote]);
 
   const handlePull = useCallback(() => {
     void sourceControl.runRemoteAction("pull");
@@ -636,20 +639,13 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         <header className="flex shrink-0 items-start gap-1 border-b border-border/60 px-1.5 py-1">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex h-6 min-w-0 items-center gap-1.5">
-              <div className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-tight text-foreground">
-                <HugeiconsIcon
-                  icon={GitBranchIcon}
-                  size={12}
-                  strokeWidth={1.9}
-                  className="shrink-0 text-muted-foreground"
-                />
-                <span className="truncate">{repoLabel}</span>
-              </div>
-              {scm.status?.isDetached ? (
-                <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  detached
-                </span>
-              ) : null}
+              <BranchPicker
+                currentBranch={repoLabel}
+                isDetached={scm.status?.isDetached ?? false}
+                disabled={!scm.repo || !!scm.actionBusy}
+                onFetchBranches={scm.fetchBranches}
+                onCheckout={scm.checkout}
+              />
               <div className="flex shrink-0 items-center gap-0.5">
                 <RemoteActionButton
                   label={fetchLabel}
@@ -705,6 +701,13 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   )}
                 </RemoteActionButton>
               </div>
+              <RemoteSection
+                remotes={scm.remotes}
+                selectedRemote={scm.selectedRemote}
+                busy={!!scm.actionBusy || !!sourceControl.busyAction}
+                onSelectRemote={scm.setSelectedRemote}
+                onAddRemote={scm.addRemote}
+              />
             </div>
             {scm.repo ? (
               <span

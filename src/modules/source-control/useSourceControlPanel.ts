@@ -1,7 +1,9 @@
 import {
   native,
+  type GitBranchInfo,
   type GitChangedFile,
   type GitDiscardEntry,
+  type GitRemoteInfo,
   type GitRepoInfo,
   type GitStatusSnapshot,
 } from "@/lib/native";
@@ -61,6 +63,13 @@ type SourceControlPanelState = {
   pushHint: string | null;
   selectionTransition: SelectionTransition;
   pendingDiscard: PendingDiscard | null;
+  remotes: GitRemoteInfo[];
+  remotesLoading: boolean;
+  selectedRemote: string | null;
+  setSelectedRemote: (name: string) => void;
+  fetchBranches: () => Promise<GitBranchInfo[]>;
+  checkout: (branch: GitBranchInfo) => Promise<void>;
+  addRemote: (name: string, url: string) => Promise<void>;
   setCommitMessage: (value: string) => void;
   refresh: () => Promise<void>;
   selectEntry: (entry: SourceControlEntry) => Promise<void>;
@@ -335,6 +344,9 @@ export function useSourceControlPanel(
     | { scope: "all"; entries: SourceControlEntry[] }
     | null
   >(null);
+  const [remotes, setRemotes] = useState<GitRemoteInfo[]>([]);
+  const [remotesLoading, setRemotesLoading] = useState(false);
+  const [selectedRemote, setSelectedRemote] = useState<string | null>(null);
   const selectedRef = useRef<DiffSelection | null>(null);
   const reconcileTimerRef = useRef(0);
 
@@ -392,6 +404,76 @@ export function useSourceControlPanel(
   }, [cancelReconcile, summary]);
 
   useEffect(() => () => cancelReconcile(), [cancelReconcile]);
+
+  const loadRemotes = useCallback(async () => {
+    if (!repo) return;
+    setRemotesLoading(true);
+    try {
+      const list = await native.gitListRemotes(repo.repoRoot);
+      setRemotes(list);
+      setSelectedRemote((current) => {
+        if (current && list.some((r) => r.name === current)) return current;
+        const trackingRemote = status?.upstream?.split("/")[0] ?? null;
+        return (
+          list.find((r) => r.name === trackingRemote)?.name ??
+          list[0]?.name ??
+          null
+        );
+      });
+    } catch {
+      setRemotes([]);
+    } finally {
+      setRemotesLoading(false);
+    }
+  }, [repo, status?.upstream]);
+
+  const fetchBranches = useCallback(async (): Promise<GitBranchInfo[]> => {
+    if (!repo) return [];
+    return native.gitListBranches(repo.repoRoot);
+  }, [repo]);
+
+  const checkout = useCallback(
+    async (branch: GitBranchInfo) => {
+      if (!repo) return;
+      setLocalActionBusy("checkout");
+      setActionMessage(null);
+      setActionError(null);
+      try {
+        await native.gitCheckoutBranch(repo.repoRoot, branch.name);
+        const localName = branch.isRemote
+          ? branch.name.slice(branch.name.indexOf("/") + 1)
+          : branch.name;
+        setActionMessage(`Switched to ${localName}`);
+        await summary.refresh({ remote: "never" });
+      } catch (error) {
+        setActionError(normalizeError(error));
+      } finally {
+        setLocalActionBusy(null);
+      }
+    },
+    [repo, summary],
+  );
+
+  const addRemote = useCallback(
+    async (name: string, url: string) => {
+      if (!repo) return;
+      setLocalActionBusy("add-remote");
+      setActionMessage(null);
+      setActionError(null);
+      try {
+        await native.gitAddRemote(repo.repoRoot, name, url);
+        const list = await native.gitListRemotes(repo.repoRoot);
+        setRemotes(list);
+        setSelectedRemote(name);
+        setActionMessage(`Remote "${name}" added`);
+      } catch (error) {
+        setActionError(normalizeError(error));
+      } finally {
+        setLocalActionBusy(null);
+      }
+    },
+    [repo],
+  );
 
   const openSelection = useCallback(
     (sel: DiffSelection, repoRoot: string, file: GitChangedFile | undefined) => {
@@ -490,6 +572,12 @@ export function useSourceControlPanel(
     summary.status,
     dismissFeedback,
   ]);
+
+  useEffect(() => {
+    if (panelState === "ready") {
+      void loadRemotes();
+    }
+  }, [panelState, loadRemotes]);
 
   const selectEntry = useCallback(
     async (entry: SourceControlEntry) => {
@@ -784,6 +872,13 @@ export function useSourceControlPanel(
     pushHint,
     selectionTransition,
     pendingDiscard: pendingDiscardView,
+    remotes,
+    remotesLoading,
+    selectedRemote,
+    setSelectedRemote,
+    fetchBranches,
+    checkout,
+    addRemote,
     setCommitMessage,
     refresh,
     selectEntry,
