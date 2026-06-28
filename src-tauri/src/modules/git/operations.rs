@@ -286,7 +286,7 @@ pub fn diff_content(
     let is_binary =
         matches!(original, TextSource::Binary)
         || matches!(modified, TextSource::Binary)
-        || patch.diff_text.contains("Binary files");
+        || patch.diff_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"));
 
     Ok(GitDiffContentResult {
         original_content: if is_binary { String::new() } else { original.into_text() },
@@ -805,7 +805,7 @@ pub fn commit_file_diff(
     let is_binary =
         matches!(original, TextSource::Binary)
         || matches!(modified, TextSource::Binary)
-        || patch_text.contains("Binary files");
+        || patch_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"));
 
     Ok(GitDiffContentResult {
         original_content: if is_binary { String::new() } else { original.into_text() },
@@ -1893,15 +1893,25 @@ mod workspace_auth_tests {
 
 #[cfg(test)]
 mod binary_detection_tests {
+    fn is_binary_patch(diff_text: &str) -> bool {
+        diff_text.lines().any(|l| l.starts_with("Binary files ") && l.ends_with(" differ"))
+    }
+
     #[test]
     fn patch_binary_marker_detected() {
         let patch = "diff --git a/image.png b/image.png\nBinary files a/image.png and b/image.png differ\n";
-        assert!(patch.contains("Binary files"));
+        assert!(is_binary_patch(patch));
     }
 
     #[test]
     fn patch_text_diff_not_binary() {
         let patch = "@@ -1,3 +1,3 @@\n-foo\n+bar\n";
-        assert!(!patch.contains("Binary files"));
+        assert!(!is_binary_patch(patch));
+    }
+
+    #[test]
+    fn lfs_comment_not_false_positive() {
+        let patch = "@@ -1,1 +1,1 @@\n-Binary files are stored in LFS\n+Binary files are tracked in LFS\n";
+        assert!(!is_binary_patch(patch));
     }
 }
