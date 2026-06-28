@@ -14,7 +14,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import type { GitBranchInfo } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { Add01Icon, CheckmarkCircle01Icon, GitBranchIcon, GlobalIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, CheckmarkCircle01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
@@ -229,7 +229,7 @@ function BranchItem({
           <Spinner className="size-3" />
         ) : (
           <HugeiconsIcon
-            icon={branch.isRemote ? GlobalIcon : GitBranchIcon}
+            icon={GitBranchIcon}
             size={14}
             strokeWidth={1.9}
             className={cn(

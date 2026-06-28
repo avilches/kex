@@ -125,6 +125,12 @@ function RemotePicker({
                   }}
                   className="flex w-full items-start gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent"
                 >
+                  <HugeiconsIcon
+                    icon={GlobalIcon}
+                    size={12}
+                    strokeWidth={1.9}
+                    className="mt-0.5 shrink-0 text-muted-foreground"
+                  />
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="text-[11.5px] font-medium">{r.name}</span>
                     <span className="min-w-0 truncate text-[10px] text-muted-foreground">
