@@ -18,6 +18,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -51,13 +52,6 @@ function abbrev(title: string, kind: string): string {
   return text.slice(0, 2).toUpperCase();
 }
 
-// Stable hue 0–359 derived from the workspace ID string.
-function idHue(id: string): number {
-  let h = 5381;
-  for (let i = 0; i < id.length; i++) h = ((h << 5) + h + id.charCodeAt(i)) | 0;
-  return (h >>> 0) % 360;
-}
-
 function SortableWorkspaceItem({
   ws,
   active,
@@ -74,7 +68,7 @@ function SortableWorkspaceItem({
   onOpenSettings: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ws.id });
-  const hue = idHue(ws.id);
+  const displayColor = resolveWorkspaceColor(ws.color, ws.id);
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -137,10 +131,15 @@ function SortableWorkspaceItem({
         )}
         style={
           active
-            ? {
-                backgroundColor: `hsl(${hue} 55% 42%)`,
-                boxShadow: `0 0 0 2px hsl(var(--card) / 1), 0 0 0 4px hsl(${hue} 55% 55%)`,
-              }
+            ? displayColor !== null
+              ? {
+                  backgroundColor: displayColor,
+                  boxShadow: `0 0 0 2px hsl(var(--card) / 1), 0 0 0 4px ${displayColor}`,
+                }
+              : {
+                  backgroundColor: "hsl(var(--muted))",
+                  boxShadow: "0 0 0 2px hsl(var(--card) / 1), 0 0 0 4px hsl(var(--border))",
+                }
             : undefined
         }
         {...attributes}
@@ -149,6 +148,12 @@ function SortableWorkspaceItem({
       >
         {abbrev(ws.title, ws.kind)}
       </button>
+      {!active && displayColor && (
+        <span
+          className="absolute inset-y-2 left-0 w-[3px] rounded-full"
+          style={{ backgroundColor: displayColor }}
+        />
+      )}
       {onClose && (
         <button
           type="button"
