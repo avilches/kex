@@ -160,12 +160,12 @@ export type Preferences = {
   agentNotifications: boolean;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
-  editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-general.json
+  editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-editor.json
   editorPreviewOnClick: boolean;
   editorViewByExt: EditorViewMap;
   editorScrollPastEnd: boolean;
   diffViewMode: DiffViewMode;
-  editorHighlightActiveLine: boolean; // JSON-only: no settings UI, edit settings-general.json
+  editorHighlightActiveLine: boolean; // JSON-only: no settings UI, edit settings-editor.json
   editorBracketMatching: boolean;
   editorCloseBrackets: boolean;
   editorAutocompletion: boolean;
@@ -184,6 +184,8 @@ export type Preferences = {
 };
 
 const STORE_PATH = "settings-general.json";
+const TERMINAL_STORE_PATH = "settings-terminal.json";
+const EDITOR_STORE_PATH = "settings-editor.json";
 const SHORTCUTS_STORE_PATH = "settings-shortcuts.json";
 const TOOLS_STORE_PATH = "settings-tools.json";
 const KEY_THEME = "theme";
@@ -397,9 +399,11 @@ function buildColdStartMap(): EditorViewMap {
   return m;
 }
 
-// Keybindings live in their own file so reassigning a shortcut never rewrites
-// the (much larger) general settings, and vice versa.
+// Each domain lives in its own file so changes never cross-contaminate:
+// general settings, terminal settings, editor settings, keybindings, tools.
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
+const terminalStore = new LazyStore(TERMINAL_STORE_PATH, { defaults: {}, autoSave: 200 });
+const editorStore = new LazyStore(EDITOR_STORE_PATH, { defaults: {}, autoSave: 200 });
 const shortcutsStore = new LazyStore(SHORTCUTS_STORE_PATH, { defaults: {}, autoSave: 200 });
 const toolsStore = new LazyStore(TOOLS_STORE_PATH, { defaults: {}, autoSave: 200 });
 
@@ -430,6 +434,18 @@ async function writePref<T>(key: string, value: T): Promise<void> {
   await emit(PREFS_CHANGED_EVENT, { key, value });
 }
 
+async function writeTerminalPref<T>(key: string, value: T): Promise<void> {
+  await terminalStore.set(key, value);
+  await terminalStore.save();
+  await emit(PREFS_CHANGED_EVENT, { key, value });
+}
+
+async function writeEditorPref<T>(key: string, value: T): Promise<void> {
+  await editorStore.set(key, value);
+  await editorStore.save();
+  await emit(PREFS_CHANGED_EVENT, { key, value });
+}
+
 async function writeToolsPref<T>(key: string, value: T): Promise<void> {
   await toolsStore.set(key, value);
   await toolsStore.save();
@@ -444,16 +460,36 @@ async function writeShortcutsPref(
   await emit(PREFS_CHANGED_EVENT, { key: KEY_SHORTCUTS, value });
 }
 
+// Keys that belong in settings-terminal.json (migrated from settings-general.json).
+const TERMINAL_KEYS = [
+  KEY_TERMINAL_WEBGL_ENABLED, KEY_TERMINAL_CURSOR_BLINK, KEY_TERMINAL_FONT_FAMILY,
+  KEY_TERMINAL_SHELL, KEY_TERMINAL_FONT_WEIGHT, KEY_TERMINAL_LETTER_SPACING,
+  KEY_TERMINAL_FONT_SIZE, KEY_TERMINAL_LINE_HEIGHT, KEY_TERMINAL_SCROLLBACK,
+  KEY_TERMINAL_CURSOR_STYLE, KEY_TERMINAL_CURSOR_INACTIVE_STYLE, KEY_TERMINAL_CURSOR_WIDTH,
+  KEY_TERMINAL_SCROLL_SENSITIVITY, KEY_TERMINAL_NEW_FOLDER_MODE,
+  KEY_SCRATCHPAD_ENTER_SENDS, KEY_SCRATCHPAD_IN_NEW_TERMINALS,
+];
+
+// Keys that belong in settings-editor.json (migrated from settings-general.json).
+const EDITOR_KEYS = [
+  KEY_EDITOR_THEME, KEY_EDITOR_FONT_FAMILY, KEY_EDITOR_FONT_SIZE,
+  KEY_EDITOR_LETTER_SPACING, KEY_EDITOR_LINE_HEIGHT, KEY_EDITOR_CURSOR_BLINK,
+  KEY_EDITOR_CURSOR_BLINK_RATE, KEY_EDITOR_CURSOR_STYLE, KEY_EDITOR_AUTO_SAVE,
+  KEY_EDITOR_AUTO_SAVE_DELAY, KEY_EDITOR_PREVIEW_ON_CLICK, KEY_EDITOR_VIEW_BY_EXT,
+  KEY_EDITOR_SCROLL_PAST_END, KEY_DIFF_VIEW_MODE, KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE,
+  KEY_EDITOR_BRACKET_MATCHING, KEY_EDITOR_CLOSE_BRACKETS, KEY_EDITOR_AUTOCOMPLETION,
+];
+
 export async function loadPreferences(): Promise<Preferences> {
-  // Single IPC roundtrip for general settings — fetching keys individually
-  // fans out to one `plugin:store|get` per setting and is the dominant boot
-  // cost. Shortcuts live in their own file, fetched in parallel.
-  const [entries, toolsEntries, shortcutsValue] = await Promise.all([
+  // Fetch all stores in parallel — one IPC roundtrip per store.
+  const [entries, terminalEntries, editorEntries, toolsEntries, shortcutsValue] = await Promise.all([
     store.entries(),
+    terminalStore.entries(),
+    editorStore.entries(),
     toolsStore.entries(),
     shortcutsStore.get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS),
   ]);
-  const map = new Map<string, unknown>([...entries, ...toolsEntries]);
+  const map = new Map<string, unknown>([...entries, ...terminalEntries, ...editorEntries, ...toolsEntries]);
   const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
   const result: Preferences = {
     theme: get<ThemePref>(KEY_THEME) ?? DEFAULT_PREFERENCES.theme,
@@ -654,11 +690,16 @@ export async function loadPreferences(): Promise<Preferences> {
     })(),
   };
 
-  // Persist any config keys that weren't present so they're discoverable in the JSON.
+  // Persist JSON-only general keys so they're discoverable in settings-general.json.
   const configDefaults: [string, unknown][] = [];
   if (!map.has(KEY_WORKSPACE_PANE_LIMIT)) configDefaults.push([KEY_WORKSPACE_PANE_LIMIT, DEFAULT_PREFERENCES.workspacePaneLimit]);
   if (!map.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
   if (!map.has(KEY_KEEP_FOLDER_LAYOUT)) configDefaults.push([KEY_KEEP_FOLDER_LAYOUT, DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot]);
+  if (configDefaults.length > 0) {
+    void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
+  }
+
+  // Persist editorViewByExt to settings-editor.json so it's discoverable there.
   const storedExtMap = map.get(KEY_EDITOR_VIEW_BY_EXT);
   const storedExtKeys =
     storedExtMap && typeof storedExtMap === "object" && !Array.isArray(storedExtMap)
@@ -669,10 +710,35 @@ export async function loadPreferences(): Promise<Preferences> {
     !storedExtKeys.includes("*") ||
     storedExtKeys.some((k) => k.includes(","));
   if (needsExtPersist) {
-    configDefaults.push([KEY_EDITOR_VIEW_BY_EXT, result.editorViewByExt]);
+    void editorStore.set(KEY_EDITOR_VIEW_BY_EXT, result.editorViewByExt).then(() => editorStore.save());
   }
-  if (configDefaults.length > 0) {
-    void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
+
+  // One-time migration: move terminal/editor keys from settings-general.json to their stores.
+  const generalEntryMap = new Map(entries);
+  const terminalMigrations: Promise<unknown>[] = [];
+  const editorMigrations: Promise<unknown>[] = [];
+  for (const key of TERMINAL_KEYS) {
+    if (generalEntryMap.has(key)) {
+      const val = generalEntryMap.get(key);
+      terminalMigrations.push(terminalStore.set(key, val));
+      terminalMigrations.push(store.delete(key));
+    }
+  }
+  for (const key of EDITOR_KEYS) {
+    if (generalEntryMap.has(key)) {
+      const val = generalEntryMap.get(key);
+      editorMigrations.push(editorStore.set(key, val));
+      editorMigrations.push(store.delete(key));
+    }
+  }
+  if (terminalMigrations.length > 0) {
+    void Promise.all(terminalMigrations).then(() => terminalStore.save());
+  }
+  if (editorMigrations.length > 0) {
+    void Promise.all(editorMigrations).then(() => editorStore.save());
+  }
+  if (terminalMigrations.length > 0 || editorMigrations.length > 0) {
+    void store.save();
   }
 
   return result;
@@ -687,15 +753,15 @@ export async function setThemeId(value: string): Promise<void> {
 }
 
 export async function setEditorTheme(value: EditorThemePref): Promise<void> {
-  await writePref(KEY_EDITOR_THEME, value);
+  await writeEditorPref(KEY_EDITOR_THEME, value);
 }
 
 export async function setEditorFontFamily(value: string): Promise<void> {
-  await writePref(KEY_EDITOR_FONT_FAMILY, value.trim());
+  await writeEditorPref(KEY_EDITOR_FONT_FAMILY, value.trim());
 }
 
 export async function setEditorFontSize(value: number): Promise<void> {
-  await writePref(
+  await writeEditorPref(
     KEY_EDITOR_FONT_SIZE,
     clampToStep(
       value,
@@ -708,7 +774,7 @@ export async function setEditorFontSize(value: number): Promise<void> {
 }
 
 export async function setEditorLetterSpacing(value: number): Promise<void> {
-  await writePref(
+  await writeEditorPref(
     KEY_EDITOR_LETTER_SPACING,
     clampToStep(
       value,
@@ -721,7 +787,7 @@ export async function setEditorLetterSpacing(value: number): Promise<void> {
 }
 
 export async function setEditorLineHeight(value: number): Promise<void> {
-  await writePref(
+  await writeEditorPref(
     KEY_EDITOR_LINE_HEIGHT,
     clampToStep(
       value,
@@ -750,19 +816,19 @@ export async function setScmViewMode(value: ScmViewMode): Promise<void> {
 }
 
 export async function setTerminalWebglEnabled(value: boolean): Promise<void> {
-  await writePref(KEY_TERMINAL_WEBGL_ENABLED, value);
+  await writeTerminalPref(KEY_TERMINAL_WEBGL_ENABLED, value);
 }
 
 export async function setTerminalCursorBlink(value: boolean): Promise<void> {
-  await writePref(KEY_TERMINAL_CURSOR_BLINK, value);
+  await writeTerminalPref(KEY_TERMINAL_CURSOR_BLINK, value);
 }
 
 export async function setEditorCursorBlink(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_CURSOR_BLINK, value);
+  await writeEditorPref(KEY_EDITOR_CURSOR_BLINK, value);
 }
 
 export async function setEditorCursorBlinkRate(value: number): Promise<void> {
-  await writePref(
+  await writeEditorPref(
     KEY_EDITOR_CURSOR_BLINK_RATE,
     clampToStep(
       value,
@@ -775,7 +841,7 @@ export async function setEditorCursorBlinkRate(value: number): Promise<void> {
 }
 
 export async function setEditorCursorStyle(value: CursorStyle): Promise<void> {
-  await writePref(KEY_EDITOR_CURSOR_STYLE, value);
+  await writeEditorPref(KEY_EDITOR_CURSOR_STYLE, value);
 }
 
 export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promise<void> {
@@ -789,15 +855,15 @@ export async function setWarnOnCloseWorkspace(value: boolean): Promise<void> {
 export async function setTerminalNewFolderMode(
   value: TerminalNewFolderMode,
 ): Promise<void> {
-  await writePref(KEY_TERMINAL_NEW_FOLDER_MODE, value);
+  await writeTerminalPref(KEY_TERMINAL_NEW_FOLDER_MODE, value);
 }
 
 export async function setTerminalFontFamily(value: string): Promise<void> {
-  await writePref(KEY_TERMINAL_FONT_FAMILY, value.trim());
+  await writeTerminalPref(KEY_TERMINAL_FONT_FAMILY, value.trim());
 }
 
 export async function setTerminalShell(value: string): Promise<void> {
-  await writePref(KEY_TERMINAL_SHELL, value);
+  await writeTerminalPref(KEY_TERMINAL_SHELL, value);
 }
 
 const TERMINAL_FONT_WEIGHT_VALUES = new Set(["normal", "500", "600", "bold"]);
@@ -808,11 +874,11 @@ export function coerceFontWeight(value: string): string {
 }
 
 export async function setTerminalFontWeight(value: string): Promise<void> {
-  await writePref(KEY_TERMINAL_FONT_WEIGHT, coerceFontWeight(value));
+  await writeTerminalPref(KEY_TERMINAL_FONT_WEIGHT, coerceFontWeight(value));
 }
 
 export async function setTerminalLetterSpacing(value: number): Promise<void> {
-  await writePref(
+  await writeTerminalPref(
     KEY_TERMINAL_LETTER_SPACING,
     clampToStep(
       value,
@@ -825,7 +891,7 @@ export async function setTerminalLetterSpacing(value: number): Promise<void> {
 }
 
 export async function setTerminalFontSize(value: number): Promise<void> {
-  await writePref(
+  await writeTerminalPref(
     KEY_TERMINAL_FONT_SIZE,
     clampToStep(
       value,
@@ -838,7 +904,7 @@ export async function setTerminalFontSize(value: number): Promise<void> {
 }
 
 export async function setTerminalLineHeight(value: number): Promise<void> {
-  await writePref(
+  await writeTerminalPref(
     KEY_TERMINAL_LINE_HEIGHT,
     clampToStep(
       value,
@@ -859,24 +925,24 @@ function clampScrollback(value: number): number {
 }
 
 export async function setTerminalScrollback(value: number): Promise<void> {
-  await writePref(KEY_TERMINAL_SCROLLBACK, clampScrollback(value));
+  await writeTerminalPref(KEY_TERMINAL_SCROLLBACK, clampScrollback(value));
 }
 
 export async function setTerminalCursorStyle(value: CursorStyle): Promise<void> {
-  await writePref(KEY_TERMINAL_CURSOR_STYLE, parseCursorStyle(value));
+  await writeTerminalPref(KEY_TERMINAL_CURSOR_STYLE, parseCursorStyle(value));
 }
 
 export async function setTerminalCursorInactiveStyle(
   value: CursorInactiveStyle,
 ): Promise<void> {
-  await writePref(
+  await writeTerminalPref(
     KEY_TERMINAL_CURSOR_INACTIVE_STYLE,
     parseCursorInactiveStyle(value),
   );
 }
 
 export async function setTerminalCursorWidth(value: number): Promise<void> {
-  await writePref(
+  await writeTerminalPref(
     KEY_TERMINAL_CURSOR_WIDTH,
     clampToStep(
       value,
@@ -891,7 +957,7 @@ export async function setTerminalCursorWidth(value: number): Promise<void> {
 export async function setTerminalScrollSensitivity(
   value: number,
 ): Promise<void> {
-  await writePref(
+  await writeTerminalPref(
     KEY_TERMINAL_SCROLL_SENSITIVITY,
     clampToStep(
       value,
@@ -908,11 +974,11 @@ export async function setLastWslDistro(value: string | null): Promise<void> {
 }
 
 export async function setTerminalScratchpadEnterSends(value: boolean): Promise<void> {
-  await writePref(KEY_SCRATCHPAD_ENTER_SENDS, value);
+  await writeTerminalPref(KEY_SCRATCHPAD_ENTER_SENDS, value);
 }
 
 export async function setTerminalScratchpadInNewTerminals(value: boolean): Promise<void> {
-  await writePref(KEY_SCRATCHPAD_IN_NEW_TERMINALS, value);
+  await writeTerminalPref(KEY_SCRATCHPAD_IN_NEW_TERMINALS, value);
 }
 
 export async function setPreferredFileEditorId(value: string | null): Promise<void> {
@@ -949,15 +1015,15 @@ function clampAutoSaveDelay(v: number): number {
 }
 
 export async function setEditorAutoSave(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_AUTO_SAVE, value);
+  await writeEditorPref(KEY_EDITOR_AUTO_SAVE, value);
 }
 
 export async function setEditorAutoSaveDelay(value: number): Promise<void> {
-  await writePref(KEY_EDITOR_AUTO_SAVE_DELAY, clampAutoSaveDelay(value));
+  await writeEditorPref(KEY_EDITOR_AUTO_SAVE_DELAY, clampAutoSaveDelay(value));
 }
 
 export async function setEditorPreviewOnClick(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_PREVIEW_ON_CLICK, value);
+  await writeEditorPref(KEY_EDITOR_PREVIEW_ON_CLICK, value);
 }
 
 export async function setEditorViewForExt(
@@ -965,13 +1031,13 @@ export async function setEditorViewForExt(
   value: EditorViewSettings,
 ): Promise<void> {
   const current =
-    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
-  await writePref(KEY_EDITOR_VIEW_BY_EXT, { ...current, [ext]: value });
+    (await editorStore.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+  await writeEditorPref(KEY_EDITOR_VIEW_BY_EXT, { ...current, [ext]: value });
 }
 
 export async function addEditorViewEntries(exts: string[]): Promise<void> {
   const current =
-    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+    (await editorStore.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
   const starBase: EditorViewSettings = { ...CODE_DEFAULTS, ...(current["*"] ?? {}) };
   const next = { ...current };
   for (const ext of exts) {
@@ -979,7 +1045,7 @@ export async function addEditorViewEntries(exts: string[]): Promise<void> {
       next[ext] = { ...starBase };
     }
   }
-  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+  await writeEditorPref(KEY_EDITOR_VIEW_BY_EXT, next);
 }
 
 export async function patchEditorViewEntry(
@@ -987,45 +1053,45 @@ export async function patchEditorViewEntry(
   patch: Partial<EditorViewSettings>,
 ): Promise<void> {
   const current =
-    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+    (await editorStore.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
   if (current[key] === undefined) return;
   const next = { ...current, [key]: { ...current[key], ...patch } };
-  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+  await writeEditorPref(KEY_EDITOR_VIEW_BY_EXT, next);
 }
 
 export async function deleteEditorViewEntry(key: string): Promise<void> {
   if (key === "*") return;
   const current =
-    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+    (await editorStore.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
   const next = { ...current };
   delete next[key];
-  await writePref(KEY_EDITOR_VIEW_BY_EXT, next);
+  await writeEditorPref(KEY_EDITOR_VIEW_BY_EXT, next);
 }
 
 export async function resetEditorViewEntry(): Promise<void> {
   const current =
-    (await store.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
-  await writePref(KEY_EDITOR_VIEW_BY_EXT, { ...current, "*": { ...CODE_DEFAULTS } });
+    (await editorStore.get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT)) ?? {};
+  await writeEditorPref(KEY_EDITOR_VIEW_BY_EXT, { ...current, "*": { ...CODE_DEFAULTS } });
 }
 
 export async function setEditorScrollPastEnd(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_SCROLL_PAST_END, value);
+  await writeEditorPref(KEY_EDITOR_SCROLL_PAST_END, value);
 }
 
 export async function setDiffViewMode(value: DiffViewMode): Promise<void> {
-  await writePref(KEY_DIFF_VIEW_MODE, value);
+  await writeEditorPref(KEY_DIFF_VIEW_MODE, value);
 }
 
 export async function setEditorBracketMatching(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_BRACKET_MATCHING, value);
+  await writeEditorPref(KEY_EDITOR_BRACKET_MATCHING, value);
 }
 
 export async function setEditorCloseBrackets(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_CLOSE_BRACKETS, value);
+  await writeEditorPref(KEY_EDITOR_CLOSE_BRACKETS, value);
 }
 
 export async function setEditorAutocompletion(value: boolean): Promise<void> {
-  await writePref(KEY_EDITOR_AUTOCOMPLETION, value);
+  await writeEditorPref(KEY_EDITOR_AUTOCOMPLETION, value);
 }
 
 export async function setAgentNotifications(value: boolean): Promise<void> {
@@ -1050,8 +1116,8 @@ export async function setTabBarStyle(value: TabBarStyle): Promise<void> {
 export type PrefKey = keyof Preferences;
 
 // Defined once; maps store keys to Preferences property names. Any preference
-// written through writePref must appear here, or onPreferencesChange drops the
-// update and live windows never see the new value.
+// written through writePref/writeTerminalPref/writeEditorPref must appear here,
+// or onPreferencesChange drops the update and live windows never see the new value.
 export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_THEME]: "theme",
   [KEY_THEME_ID]: "themeId",
@@ -1108,13 +1174,21 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_DISABLED_DETECTED_IDS]: "disabledDetectedEditorIds",
 };
 
-/** Subscribe to changes from any window (settings → main). */
+/** Subscribe to changes from any window (settings -> main). */
 export async function onPreferencesChange(
   cb: (key: PrefKey, value: unknown) => void,
 ): Promise<UnlistenFn> {
   // Same-process writes still fire onChange immediately; cross-window writes
-  // arrive via the Tauri event emitted by writePref().
+  // arrive via the Tauri event emitted by writePref/writeTerminalPref/writeEditorPref.
   const unsubLocal = await store.onChange<unknown>((key, value) => {
+    const mapped = PREF_KEY_MAP[key];
+    if (mapped) cb(mapped, value);
+  });
+  const unsubTerminal = await terminalStore.onChange<unknown>((key, value) => {
+    const mapped = PREF_KEY_MAP[key];
+    if (mapped) cb(mapped, value);
+  });
+  const unsubEditor = await editorStore.onChange<unknown>((key, value) => {
     const mapped = PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
@@ -1135,6 +1209,8 @@ export async function onPreferencesChange(
   );
   return () => {
     unsubLocal();
+    unsubTerminal();
+    unsubEditor();
     unsubTools();
     unsubShortcuts();
     unsubEvent();
