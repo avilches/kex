@@ -25,6 +25,7 @@ function ResizablePanel({ ...props }: ResizablePrimitive.PanelProps) {
 function ResizableHandle({
   withHandle,
   className,
+  onPointerDown,
   ...props
 }: ResizablePrimitive.SeparatorProps & {
   withHandle?: boolean
@@ -32,6 +33,13 @@ function ResizableHandle({
   return (
     <ResizablePrimitive.Separator
       data-slot="resizable-handle"
+      onPointerDown={(e) => {
+        document.documentElement.setAttribute("data-resizing", "");
+        const cleanup = () => document.documentElement.removeAttribute("data-resizing");
+        document.addEventListener("pointerup", cleanup, { once: true });
+        document.addEventListener("pointercancel", cleanup, { once: true });
+        onPointerDown?.(e);
+      }}
       className={cn(
         // The horizontal separator is intentionally 10px tall (not 1px).
         // react-resizable-panels expands any separator shorter than 10px to a minimum

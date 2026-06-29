@@ -68,6 +68,12 @@ Nunca usar `setInterval + setTick` para releer estado mutable externo (arrays a 
 
 Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una segunda instancia. Los componentes ya montados siguen usando la instancia vieja. Para diagnosticar bugs de estado mutable, siempre hacer kill del proceso y `pnpm tauri dev` fresco antes de leer logs. No confiar en resultados de sesiones con cambios via HMR.
 
+### Animaciones CSS que "no funcionan" en Tauri/WKWebView
+
+Lo primero que hay que verificar es `prefers-reduced-motion`. Si el usuario tiene activado en macOS **Ajustes del Sistema > Accesibilidad > Pantalla > Reducir movimiento**, el bloque `@media (prefers-reduced-motion: reduce)` en `globals.css` reasigna `--dur-base`, `--dur-fast` y `--dur-slow` a `0.01ms`, convirtiendo cualquier `transition` que use esas variables en un snap instantaneo. Las transiciones que usen valores literales (`0.25s`) tienen sus propios overrides `transition: none !important` en ese bloque. Con reduced-motion activo, la animacion desaparece completamente sin errores en consola ni cambios en el computed `transition` (que ya sera `none` o `0.01ms`).
+
+Segundo punto habitual: el selector CSS no matchea. Con `react-resizable-panels` v4 las claves son `[data-group]` (grupo), `[data-panel]` (panel), `[data-separator]` (handle). La pseudo-clase `:has([data-separator]:active)` SÍ funciona en WKWebView (se verifico en 2026-06-29). Para desactivar la transicion durante drag usar ambas condiciones belt-and-suspenders: `:not(:has([data-separator]:active))` en CSS (sincrono) + `html[data-resizing]` via JS desde `onPointerDown`/`pointerup` en `ResizableHandle` (backup).
+
 ## Documentacion viva
 
 - `docs/ARCHITECTURE.md` + `docs/IPC.md` + `docs/BUILD.md` — referencia principal (ver AGENTS.md para politica de actualizacion)

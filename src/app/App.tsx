@@ -547,8 +547,9 @@ export default function App() {
     }
   }, [rightPanelOpen, rightPanelActiveTab]);
 
+
   // Drive the tool panel open/close animation via imperative API.
-  // CSS transition (globals.css) animates the flex change.
+  // CSS transition (globals.css) animates the flex-grow change.
   useEffect(() => {
     const ref = panelSide === "left" ? leftToolPanelRef : rightToolPanelRef;
     if (rightPanelOpen) {
@@ -2425,6 +2426,7 @@ export default function App() {
               <ResizablePanelGroup
                 orientation="horizontal"
                 className="min-h-0 flex-1"
+                data-layout="main"
               >
                 {/* Tool panel on LEFT when panelSide === "left" */}
                 {panelSide === "left" && (
@@ -2438,7 +2440,11 @@ export default function App() {
                       minSize="12%"
                       maxSize="35%"
                       onResize={(size) => {
-                        if (size.asPercentage > 0) setRightPanelWidth(size.asPercentage);
+                        if (size.asPercentage > 0) {
+                          setRightPanelWidth(size.asPercentage);
+                        } else if (rightPanelStateRef.current.open) {
+                          setRightPanelOpen(false);
+                        }
                       }}
                     >
                       <RightPanel
@@ -2545,7 +2551,11 @@ export default function App() {
                       minSize="12%"
                       maxSize="35%"
                       onResize={(size) => {
-                        if (size.asPercentage > 0) setRightPanelWidth(size.asPercentage);
+                        if (size.asPercentage > 0) {
+                          setRightPanelWidth(size.asPercentage);
+                        } else if (rightPanelStateRef.current.open) {
+                          setRightPanelOpen(false);
+                        }
                       }}
                     >
                       <RightPanel

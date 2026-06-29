@@ -507,14 +507,13 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
    * no spatial movement, so it does not trigger motion sensitivity. */
 }
 
-/* Slide animation for the right panel open/close.
- * Disabled during handle drag (:active on [data-separator]) to avoid lag. */
-[data-group]:not(:has([data-separator]:active)) [data-panel] {
-  transition: flex 0.25s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-group] [data-panel] {
-    transition: none !important;
-  }
+/* Slide animation for the tool panel open/close.
+ * [data-layout="main"] targets only the 3-column outer group (not inner pane-split groups).
+ * Direct child (>) excludes panels nested inside WorkspaceView.
+ * :not(:has([data-separator]:active)) is synchronous CSS — disables transition the instant
+ *   the user presses on any handle, before any JS runs. Belt-and-suspenders: html[data-resizing]
+ *   (set by ResizableHandle.onPointerDown) covers the case where :has() is slow to re-evaluate.
+ * prefers-reduced-motion is handled automatically via var(--dur-base). */
+html:not([data-resizing]) [data-group][data-layout="main"]:not(:has([data-separator]:active)) > [data-panel] {
+  transition: flex-grow var(--dur-base) var(--ease-soft);
 }
