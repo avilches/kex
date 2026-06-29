@@ -23,6 +23,12 @@ Workspace           — a named environment (local or WSL distro)
               └── activePanelId      — which tab is shown
 ```
 
+**Workspace fields.** A `Workspace` carries additional configuration:
+- `color?: string | null` — optional workspace accent color (hex string or null)
+- `runConfigs?: RunConfig[]` — list of saved run configurations (command, name, optional cwd, optional panelId)
+- `activeRunConfigId?: string` — id of the currently selected run config in the Run button
+- `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. The legacy `"pinned"` mode is migrated via `migrateWorkspace` in `workspaceState.ts` for backward compatibility. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
+
 A `Panel` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
 its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`). A `terminal` panel also persists

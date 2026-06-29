@@ -123,7 +123,7 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **Fuzzy search.** The search bar in the explorer panel searches file names under the active explorer root using the `nucleo-matcher` crate on the Rust side. Because the finder is scoped to the current root, it never surfaces files outside the view, and each result's path is shown relative to that root.
 
-**Root modes (per workspace).** The explorer root is chosen by an explicit mode stored per workspace (`explorerRootMode`, `pinnedRoot` in the workspace body file `workspaces/<id>.json`) and selected from the dropdown above the tree. The "show hidden files" toggle (`showHidden`) is likewise per workspace and lives in the same body file (it was previously a global preference). The mode is the single source of truth for the root, whether a terminal or an editor pane is focused. The two modes:
+**Root modes (per workspace).** The explorer root is chosen by an explicit mode stored per workspace (`explorerRootMode` in the workspace body file `workspaces/<id>.json`) and selected from the dropdown above the tree. The "show hidden files" toggle (`showHidden`) is likewise per workspace and lives in the same body file (it was previously a global preference). The mode is the single source of truth for the root, whether a terminal or an editor pane is focused. The two modes (the legacy `"pinned"` mode is migrated via `migrateWorkspace` in `workspaceState.ts` for backward compatibility):
 
 In every mode the tree is prefixed by a non-collapsible header row showing the current root's full path (left-truncated when long, so the tail stays visible). The selector trigger shows the active mode's label (not the folder name) and its icon; each option's subtitle is its resolved path.
 
@@ -227,7 +227,7 @@ Navigation is a left vertical sidebar. Sections: General, Editor, Terminal, Appe
 
 - **Global preferences** (`settings-general.json`, shared by every window): fonts, cursors, themes, behavior toggles, etc. Edited from the Settings window and surfaced live via `onPreferencesChange`.
 - **Per-window right-panel chrome**: whether the right panel is `open`, its `activeTab` (Explorer / Git / History), its `width` (a react-resizable-panels percentage), and its `side` (left / right). Held as React state by `useRightPanelState(label)` (`modules/workspaces/lib/useRightPanelState.ts`), seeded from the restored `WindowEntry.rightPanel` and persisted per window through the lightweight `window_save_right_panel` command (debounced, index-only write). It is a property of the window, shared by all of that window's workspace tabs. Validation/defaults live in `windowUiState.ts` (`open=true`, `activeTab="explorer"`, `width=20`, `side="left"`; invalid `activeTab`/`side` fall back to `"explorer"`/`"left"`).
-- **Per-workspace explorer state**: `explorerRootMode` / `pinnedRoot` / `fsRoot` and `showHidden` (show dot-files), each remembered per workspace because every workspace points at a different project. They ride inside the workspace body via the existing `saveWorkspaceState` / `sanitizeWorkspace` path; no dedicated IPC. `showHidden` moved here from a former global preference.
+- **Per-workspace explorer state**: `explorerRootMode` / `fsRoot` and `showHidden` (show dot-files), each remembered per workspace because every workspace points at a different project. They ride inside the workspace body via the existing `saveWorkspaceState` / `sanitizeWorkspace` path; no dedicated IPC. `showHidden` moved here from a former global preference.
 
 ### 3.11 External tools
 
@@ -464,7 +464,10 @@ src/
     ├── header/                    — Top bar, inline search
     ├── workspaces/                — Workspace/Pane/Panel model; useWorkspaces (source of truth),
     │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/PanelContent,
-    │                                WorkspaceDndProvider (DndContext + file/tab drag handlers)
+    │                                WorkspaceDndProvider (DndContext + file/tab drag handlers).
+    │                                Workspace carries: color (accent color, hex or null), runConfigs (array of
+    │                                run configurations with command, name, optional cwd/panelId), and
+    │                                activeRunConfigId (selected run config id). See WORKSPACES.md for render tree details.
     ├── sidebar/                   — SidebarViewId type (residual; side panels moved to RightPanel)
     ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image
