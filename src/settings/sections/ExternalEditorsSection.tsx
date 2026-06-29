@@ -30,7 +30,7 @@ const ALL_GROUPS: EditorGroup[] = ["Text Editors", "VS Code", "JetBrains", "Othe
 const NOT_INSTALLED_COLLAPSED = 1;
 
 function targetTypeLabel(type: EditorTargetType): string {
-  if (type === "workspace") return "Opens in the working root";
+  if (type === "workspace") return "Opens in the workspace root";
   return "Opens the current file";
 }
 
@@ -104,8 +104,8 @@ function GroupSection({
 }
 
 const TEXT_EDITOR_MODE_OPTIONS: { value: TextEditorMode; label: string }[] = [
-  { value: "workspace-and-files", label: "Open working root and files too" },
-  { value: "workspace-only", label: "Open in the working root only" },
+  { value: "workspace-and-files", label: "Open workspace root and files too" },
+  { value: "workspace-only", label: "Open in the workspace root only" },
 ];
 
 export function ExternalEditorsSection() {
@@ -197,7 +197,7 @@ export function ExternalEditorsSection() {
               <RadioGroup
                 value={textEditorMode}
                 onValueChange={(v) => handleTextEditorModeChange(v as TextEditorMode)}
-                className="mt-1 flex flex-col gap-1"
+                className="mt-1.5 gap-1.5"
               >
                 {TEXT_EDITOR_MODE_OPTIONS.map((opt) => (
                   <div key={opt.value} className="flex items-center gap-2">
@@ -225,59 +225,71 @@ export function ExternalEditorsSection() {
         {customEditors.length > 0 && (
           <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
             {customEditors.map((e) => (
-              <div key={e.id} className="flex flex-col gap-2 px-3 py-3">
-                {/* Row 1: Name + Opens */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={e.name}
-                    onChange={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
-                    placeholder="Name"
-                    className="h-8 min-w-0 flex-1 rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <Select
-                    value={e.targetKind ?? "file"}
-                    onValueChange={(v) => handleUpdateCustomTargetKind(e.id, v as "file" | "workspace")}
-                  >
-                    <SelectTrigger size="sm" className="h-8 w-36 shrink-0 text-[12px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="file" className="text-[12px]">Current file</SelectItem>
-                      <SelectItem value="workspace" className="text-[12px]">Working root</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div key={e.id} className="flex flex-col gap-2.5 px-3 py-3">
+                {/* Row 1: Name (50%) + Opens (50%) + delete */}
+                <div className="flex items-end gap-2">
+                  <div className="flex w-1/2 flex-col gap-1">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</span>
+                    <input
+                      type="text"
+                      value={e.name}
+                      onChange={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
+                      placeholder="My Tool"
+                      className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="flex w-1/2 flex-col gap-1">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Opens</span>
+                    <Select
+                      value={e.targetKind ?? "file"}
+                      onValueChange={(v) => handleUpdateCustomTargetKind(e.id, v as "file" | "workspace")}
+                    >
+                      <SelectTrigger size="sm" className="h-8 w-full text-[12px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="file" className="text-[12px]">Current file</SelectItem>
+                        <SelectItem value="workspace" className="text-[12px]">Workspace root</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <button
                     type="button"
                     title="Remove"
                     onClick={() => handleDeleteCustom(e.id)}
-                    className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                    className="mb-[7px] flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
                   >
                     <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
                   </button>
                 </div>
-                {/* Row 2: Binary + Args */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={e.binary}
-                    onChange={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
-                    placeholder="Binary or /path/to/tool"
-                    className="h-8 min-w-0 flex-1 rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    type="text"
-                    value={e.argsBeforePath.join(" ")}
-                    onChange={(ev) =>
-                      handleUpdateCustom(
-                        e.id,
-                        "argsBeforePath",
-                        ev.target.value.split(/\s+/).filter(Boolean),
-                      )
-                    }
-                    placeholder="Args (e.g. --wait)"
-                    className="h-8 w-36 shrink-0 rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
+                {/* Row 2: Binary (50%) + Args (50%) */}
+                <div className="flex items-end gap-2">
+                  <div className="flex w-1/2 flex-col gap-1">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Binary / path</span>
+                    <input
+                      type="text"
+                      value={e.binary}
+                      onChange={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
+                      placeholder="/usr/local/bin/tool"
+                      className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                  <div className="flex w-1/2 flex-col gap-1">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Args</span>
+                    <input
+                      type="text"
+                      value={e.argsBeforePath.join(" ")}
+                      onChange={(ev) =>
+                        handleUpdateCustom(
+                          e.id,
+                          "argsBeforePath",
+                          ev.target.value.split(/\s+/).filter(Boolean),
+                        )
+                      }
+                      placeholder="--wait"
+                      className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
                   {/* spacer to align with delete button above */}
                   <div className="size-[22px] shrink-0" />
                 </div>
