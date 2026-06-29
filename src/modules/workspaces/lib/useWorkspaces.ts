@@ -20,7 +20,7 @@ import {
   updateDivider,
   updatePane,
 } from "./splitNode";
-import { type ClosedEntry, type Panel, type PaneNode, type Workspace, type WorkspaceGitConfig, isAutofocusPanel } from "./types";
+import { type ClosedEntry, type Panel, type PaneNode, type RunConfig, type Workspace, type WorkspaceGitConfig, isAutofocusPanel } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newPanelId } from "@/lib/ids";
 
@@ -86,7 +86,7 @@ export function applyPinnedRoot(
   const normalized = path.length > 1 ? path.replace(/\/$/, "") : path;
   return workspaces.map((w) =>
     w.id === workspaceId
-      ? { ...w, pinnedRoot: normalized, explorerRootMode: "pinned" }
+      ? { ...w, pinnedRoot: normalized, explorerRootMode: "workspace" }
       : w,
   );
 }
@@ -642,6 +642,106 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
+  const setWorkspaceTitle = useCallback((workspaceId: string, title: string) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => w.id === workspaceId ? { ...w, title } : w),
+    );
+  }, []);
+
+  const setWorkspaceColor = useCallback((workspaceId: string, color: string | null) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => w.id === workspaceId ? { ...w, color } : w),
+    );
+  }, []);
+
+  const addRunConfig = useCallback((workspaceId: string, config: RunConfig) => {
+    setWorkspaces((prev) =>
+      prev.map((w) =>
+        w.id === workspaceId
+          ? { ...w, runConfigs: [...(w.runConfigs ?? []), config] }
+          : w,
+      ),
+    );
+  }, []);
+
+  const updateRunConfig = useCallback(
+    (workspaceId: string, configId: string, patch: Partial<Omit<RunConfig, "id">>) => {
+      setWorkspaces((prev) =>
+        prev.map((w) =>
+          w.id !== workspaceId
+            ? w
+            : {
+                ...w,
+                runConfigs: (w.runConfigs ?? []).map((c) =>
+                  c.id === configId ? { ...c, ...patch } : c,
+                ),
+              },
+        ),
+      );
+    },
+    [],
+  );
+
+  const removeRunConfig = useCallback((workspaceId: string, configId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((w) =>
+        w.id !== workspaceId
+          ? w
+          : {
+              ...w,
+              runConfigs: (w.runConfigs ?? []).filter((c) => c.id !== configId),
+              activeRunConfigId:
+                w.activeRunConfigId === configId ? undefined : w.activeRunConfigId,
+            },
+      ),
+    );
+  }, []);
+
+  const reorderRunConfigs = useCallback((workspaceId: string, fromId: string, toId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w;
+        const configs = w.runConfigs ?? [];
+        const from = configs.findIndex((c) => c.id === fromId);
+        const to = configs.findIndex((c) => c.id === toId);
+        if (from === -1 || to === -1 || from === to) return w;
+        const next = [...configs];
+        const [item] = next.splice(from, 1);
+        next.splice(to, 0, item!);
+        return { ...w, runConfigs: next };
+      }),
+    );
+  }, []);
+
+  const setActiveRunConfig = useCallback((workspaceId: string, configId: string | null) => {
+    setWorkspaces((prev) =>
+      prev.map((w) =>
+        w.id === workspaceId
+          ? { ...w, activeRunConfigId: configId ?? undefined }
+          : w,
+      ),
+    );
+  }, []);
+
+  const validateRunConfigPanels = useCallback(
+    (workspaceId: string, livingPanelIds: Set<string>) => {
+      setWorkspaces((prev) =>
+        prev.map((w) => {
+          if (w.id !== workspaceId) return w;
+          const configs = w.runConfigs ?? [];
+          const cleaned = configs.map((c) =>
+            c.panelId && !livingPanelIds.has(c.panelId)
+              ? { ...c, panelId: undefined }
+              : c,
+          );
+          if (cleaned.every((c, i) => c === configs[i])) return w;
+          return { ...w, runConfigs: cleaned };
+        }),
+      );
+    },
+    [],
+  );
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -697,6 +797,14 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setPinnedRoot,
     setFsRoot,
     setWorkspaceGitConfig,
+    setWorkspaceTitle,
+    setWorkspaceColor,
+    addRunConfig,
+    updateRunConfig,
+    removeRunConfig,
+    reorderRunConfigs,
+    setActiveRunConfig,
+    validateRunConfigPanels,
     setTerminalRunningCommand,
     setPanelView,
     toggleOverlayPreview,

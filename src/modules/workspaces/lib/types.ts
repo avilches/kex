@@ -1,4 +1,13 @@
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
+export type { ExplorerRootMode };
+
+export type RunConfig = {
+  id: string;
+  name: string;
+  command: string;
+  cwd?: string;
+  panelId?: string;
+};
 
 // Common to every panel. `locked` (prevent close) applies to all kinds with no
 // exception. `autofocus` lives here too so any new path-bearing kind opts in
@@ -69,6 +78,9 @@ export type Workspace = {
   pinnedRoot?: string;
   fsRoot?: string;
   git?: WorkspaceGitConfig;
+  color?: string | null;
+  runConfigs?: RunConfig[];
+  activeRunConfigId?: string;
 };
 
 export type ClosedEntry = {

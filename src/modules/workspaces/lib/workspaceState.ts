@@ -35,13 +35,33 @@ function sanitizeTree(node: SplitNode): SplitNode {
   return { ...node, first: sanitizeTree(node.first), second: sanitizeTree(node.second) };
 }
 
+export function migrateWorkspace(raw: Workspace): Workspace {
+  let ws = { ...raw };
+
+  // Migrate legacy "pinned" mode (now called "workspace")
+  if ((ws.explorerRootMode as string) === "pinned") {
+    ws = { ...ws, explorerRootMode: "workspace" };
+  }
+
+  // "workspace" mode requires a pinnedRoot; fall back gracefully if missing
+  if (ws.explorerRootMode === "workspace" && !ws.pinnedRoot) {
+    if (ws.cwd) {
+      ws = { ...ws, pinnedRoot: ws.cwd };
+    } else {
+      ws = { ...ws, explorerRootMode: "filesystem" };
+    }
+  }
+
+  return ws;
+}
+
 export function sanitizeWorkspace(w: Workspace): Workspace {
-  return {
+  return migrateWorkspace({
     ...w,
     explorerRootMode: migrateExplorerRootMode(w.explorerRootMode),
     showHidden: w.showHidden,
     paneTree: sanitizeTree(w.paneTree),
-  };
+  });
 }
 
 export async function initWorkspaceState(): Promise<void> {

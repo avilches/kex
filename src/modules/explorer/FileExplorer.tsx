@@ -128,13 +128,13 @@ const ROOT_MODES: {
   icon: typeof Search01Icon;
 }[] = [
   { id: "filesystem", label: "File System", icon: HierarchyFilesIcon },
-  { id: "pinned", label: "Workspace Root", icon: PinIcon },
+  { id: "workspace", label: "Workspace Root", icon: PinIcon },
 ];
 
 // Both modes surface Cmd+E, the key that cycles the explorer root between them.
 const MODE_SHORTCUT: Record<string, ShortcutId> = {
   filesystem: "sidebar.showExplorer",
-  pinned: "sidebar.showExplorer",
+  workspace: "sidebar.showExplorer",
 };
 
 type RootModeContext = {
@@ -150,7 +150,7 @@ function rootModeInfo(
   switch (id) {
     case "filesystem":
       return { subtitle: ctx.fsRootPath, disabled: false };
-    case "pinned":
+    case "workspace":
       if (!ctx.workspaceRootPath)
         return {
           subtitle: "No workspace defined yet. Set a new one in the explorer",
@@ -980,7 +980,7 @@ export const FileExplorer = memo(
           return (
             <FsRootRow
               path={row.path}
-              isWorkspaceRoot={rootMode === "pinned"}
+              isWorkspaceRoot={rootMode === "workspace"}
               flashToken={flash.path === row.path ? flash.token : 0}
               onSetAsRoot={onSetAsRoot}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
@@ -1173,7 +1173,7 @@ export const FileExplorer = memo(
           </Button>
         </div>
 
-        {rootMode === "pinned" &&
+        {rootMode === "workspace" &&
         (workspaceRootPath === null || root?.status === "error") ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
             <HugeiconsIcon
@@ -1299,11 +1299,11 @@ export const FileExplorer = memo(
                   {onSetAsRoot && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
-                      disabled={rootMode === "pinned"}
+                      disabled={rootMode === "workspace"}
                       onSelect={() => onSetAsRoot(rootPath)}
                     >
                       <HugeiconsIcon icon={PinIcon} size={14} strokeWidth={2} />
-                      {rootMode === "pinned"
+                      {rootMode === "workspace"
                         ? "This is the Workspace Root"
                         : "Set as Workspace Root"}
                     </ContextMenuItem>

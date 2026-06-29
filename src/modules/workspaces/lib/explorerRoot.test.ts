@@ -29,13 +29,13 @@ describe("resolveExplorerRoot", () => {
     );
   });
 
-  it("pinned mode returns the pinned path", () => {
-    expect(resolveExplorerRoot({ ...base, mode: "pinned" })).toBe("/pinned");
+  it("workspace mode returns the pinned path", () => {
+    expect(resolveExplorerRoot({ ...base, mode: "workspace" })).toBe("/pinned");
   });
 
-  it("pinned mode returns null when nothing is pinned", () => {
+  it("workspace mode returns null when nothing is pinned", () => {
     expect(
-      resolveExplorerRoot({ ...base, mode: "pinned", pinnedRoot: null }),
+      resolveExplorerRoot({ ...base, mode: "workspace", pinnedRoot: null }),
     ).toBeNull();
   });
 });
@@ -118,7 +118,7 @@ describe("ancestorsToExpand", () => {
 describe("resolveSidebarTarget", () => {
   const home = "/Users/me";
 
-  it("uses pinned mode when the folder is under the workspace root", () => {
+  it("uses workspace mode when the folder is under the workspace root", () => {
     const t = resolveSidebarTarget({
       folder: "/a/b/c/d",
       workspaceRoot: "/a/b",
@@ -127,7 +127,7 @@ describe("resolveSidebarTarget", () => {
       currentFsRoot: null,
       home,
     });
-    expect(t).toEqual({ mode: "pinned", fsRoot: null });
+    expect(t).toEqual({ mode: "workspace", fsRoot: null });
   });
 
   it("treats the workspace root folder itself as under it", () => {
@@ -139,7 +139,7 @@ describe("resolveSidebarTarget", () => {
       currentFsRoot: null,
       home,
     });
-    expect(t.mode).toBe("pinned");
+    expect(t.mode).toBe("workspace");
   });
 
   it("re-roots to a git repo nested under a workspace root that is itself a repo", () => {
@@ -154,7 +154,7 @@ describe("resolveSidebarTarget", () => {
     expect(t).toEqual({ mode: "filesystem", fsRoot: "/proj/wt" });
   });
 
-  it("stays pinned in a non-repo container workspace holding a nested repo", () => {
+  it("stays in workspace mode in a non-repo container workspace holding a nested repo", () => {
     const t = resolveSidebarTarget({
       folder: "/Work/terax-ai/src/App.tsx",
       workspaceRoot: "/Work",
@@ -163,10 +163,10 @@ describe("resolveSidebarTarget", () => {
       currentFsRoot: null,
       home,
     });
-    expect(t).toEqual({ mode: "pinned", fsRoot: null });
+    expect(t).toEqual({ mode: "workspace", fsRoot: null });
   });
 
-  it("stays pinned when the focused file shares the workspace root's own repo", () => {
+  it("stays in workspace mode when the focused file shares the workspace root's own repo", () => {
     const t = resolveSidebarTarget({
       folder: "/repo/sub/x/file.ts",
       workspaceRoot: "/repo/sub",
@@ -175,10 +175,10 @@ describe("resolveSidebarTarget", () => {
       currentFsRoot: null,
       home,
     });
-    expect(t).toEqual({ mode: "pinned", fsRoot: null });
+    expect(t).toEqual({ mode: "workspace", fsRoot: null });
   });
 
-  it("stays pinned when the nearest git root is the pinned root itself", () => {
+  it("stays in workspace mode when the nearest git root is the workspace root itself", () => {
     const t = resolveSidebarTarget({
       folder: "/proj/src/file.ts",
       workspaceRoot: "/proj",
@@ -187,7 +187,7 @@ describe("resolveSidebarTarget", () => {
       currentFsRoot: null,
       home,
     });
-    expect(t).toEqual({ mode: "pinned", fsRoot: null });
+    expect(t).toEqual({ mode: "workspace", fsRoot: null });
   });
 
   it("normalizes backslashes comparing a nested git root with the workspace repo", () => {
@@ -246,7 +246,11 @@ describe("migrateExplorerRootMode", () => {
   });
   it("keeps valid modes", () => {
     expect(migrateExplorerRootMode("filesystem")).toBe("filesystem");
-    expect(migrateExplorerRootMode("pinned")).toBe("pinned");
+    expect(migrateExplorerRootMode("workspace")).toBe("workspace");
+  });
+
+  it("migrates legacy pinned mode to workspace", () => {
+    expect(migrateExplorerRootMode("pinned")).toBe("workspace");
   });
   it("returns undefined for missing/unknown", () => {
     expect(migrateExplorerRootMode(undefined)).toBeUndefined();

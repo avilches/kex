@@ -1,6 +1,6 @@
 import { pathDirname } from "@/lib/pathUtils";
 
-export type ExplorerRootMode = "filesystem" | "pinned";
+export type ExplorerRootMode = "workspace" | "filesystem";
 
 export type ResolveExplorerRootInput = {
   mode: ExplorerRootMode;
@@ -11,7 +11,7 @@ export type ResolveExplorerRootInput = {
 
 export function resolveExplorerRoot(r: ResolveExplorerRootInput): string | null {
   switch (r.mode) {
-    case "pinned":
+    case "workspace":
       return r.pinnedRoot;
     case "filesystem":
     default:
@@ -102,7 +102,7 @@ export function resolveSidebarTarget(input: {
     return { mode: "filesystem", fsRoot: gitRoot };
   }
   if (pinned && isUnder(folder, pinned)) {
-    return { mode: "pinned", fsRoot: null };
+    return { mode: "workspace", fsRoot: null };
   }
   if (gitRoot && isUnder(folder, gitRoot)) {
     return { mode: "filesystem", fsRoot: gitRoot };
@@ -116,6 +116,7 @@ export function migrateExplorerRootMode(
   mode: string | undefined,
 ): ExplorerRootMode | undefined {
   if (mode === "terminal" || mode === "git") return "filesystem";
-  if (mode === "filesystem" || mode === "pinned") return mode;
+  if (mode === "pinned") return "workspace";
+  if (mode === "filesystem" || mode === "workspace") return mode;
   return undefined;
 }

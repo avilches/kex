@@ -1470,7 +1470,7 @@ export default function App() {
     }
     const mode = activeWorkspace?.explorerRootMode ?? "filesystem";
     if (mode === "filesystem") {
-      if (activeWorkspace?.pinnedRoot) handleChangeRootMode("pinned");
+      if (activeWorkspace?.pinnedRoot) handleChangeRootMode("workspace");
     } else {
       handleChangeRootMode("filesystem");
     }
@@ -2000,7 +2000,7 @@ export default function App() {
       "sidebar.showGit": () => showRightPanelTab("git"),
       "sidebar.showHistory": () => showRightPanelTab("history"),
       "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
-      "explorer.viewPinned": () => showExplorerWithMode("pinned"),
+      "explorer.viewPinned": () => showExplorerWithMode("workspace"),
       "explorer.toggleHidden": handleToggleShowHidden,
       "explorer.search": handleExplorerSearch,
       "terminal.clear": () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { ClosedEntry, Panel, SplitNode, Workspace } from "./types";
+import type { ClosedEntry, Panel, RunConfig, SplitNode, Workspace } from "./types";
 import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, applyShowHidden, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { migrateWorkspace } from "./workspaceState";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -32,10 +33,10 @@ describe("applyShowHidden", () => {
 });
 
 describe("applyPinnedRoot", () => {
-  it("sets pinnedRoot and switches mode to pinned", () => {
+  it("sets pinnedRoot and switches mode to workspace", () => {
     const out = applyPinnedRoot([ws()], "w1", "/some/dir");
     expect(out[0].pinnedRoot).toBe("/some/dir");
-    expect(out[0].explorerRootMode).toBe("pinned");
+    expect(out[0].explorerRootMode).toBe("workspace");
   });
 
   it("strips a trailing slash from the pinned path", () => {
@@ -323,5 +324,67 @@ describe("findReopenTarget", () => {
       workspaceId: "w1",
     };
     expect(findReopenTarget([], "w1", entry)).toBeNull();
+  });
+});
+
+describe("migrateWorkspace", () => {
+  it("migrates pinned mode to workspace", () => {
+    const raw = ws({ explorerRootMode: "pinned" as unknown as "workspace", pinnedRoot: "/foo" });
+    const migrated = migrateWorkspace(raw);
+    expect(migrated.explorerRootMode).toBe("workspace");
+    expect(migrated.pinnedRoot).toBe("/foo");
+  });
+
+  it("workspace mode with no pinnedRoot copies cwd", () => {
+    const raw = ws({ explorerRootMode: "workspace", cwd: "/home/user/proj" });
+    const migrated = migrateWorkspace(raw);
+    expect(migrated.pinnedRoot).toBe("/home/user/proj");
+    expect(migrated.explorerRootMode).toBe("workspace");
+  });
+
+  it("workspace mode with no pinnedRoot and no cwd falls back to filesystem", () => {
+    const raw = ws({ explorerRootMode: "workspace" });
+    const migrated = migrateWorkspace(raw);
+    expect(migrated.explorerRootMode).toBe("filesystem");
+  });
+
+  it("leaves filesystem mode and pinnedRoot unchanged", () => {
+    const raw = ws({ explorerRootMode: "filesystem", pinnedRoot: "/foo" });
+    const migrated = migrateWorkspace(raw);
+    expect(migrated.explorerRootMode).toBe("filesystem");
+    expect(migrated.pinnedRoot).toBe("/foo");
+  });
+
+  it("is a no-op when already correct", () => {
+    const raw = ws({ explorerRootMode: "workspace", pinnedRoot: "/foo" });
+    const migrated = migrateWorkspace(raw);
+    expect(migrated.explorerRootMode).toBe("workspace");
+    expect(migrated.pinnedRoot).toBe("/foo");
+  });
+});
+
+describe("RunConfig actions (pure helpers via applyPinnedRoot pattern)", () => {
+  const cfg = (id: string): RunConfig => ({ id, name: `Config ${id}`, command: `cmd-${id}` });
+
+  it("applyPinnedRoot sets mode to workspace (not pinned)", () => {
+    const out = applyPinnedRoot([ws()], "w1", "/proj");
+    expect(out[0].explorerRootMode).toBe("workspace");
+  });
+
+  it("Workspace type accepts color, runConfigs, and activeRunConfigId", () => {
+    const w: Workspace = {
+      ...ws(),
+      color: "#ff0000",
+      runConfigs: [cfg("r1")],
+      activeRunConfigId: "r1",
+    };
+    expect(w.color).toBe("#ff0000");
+    expect(w.runConfigs).toHaveLength(1);
+    expect(w.activeRunConfigId).toBe("r1");
+  });
+
+  it("RunConfig panelId is optional", () => {
+    const c: RunConfig = { id: "1", name: "Dev", command: "pnpm dev" };
+    expect(c.panelId).toBeUndefined();
   });
 });
