@@ -363,14 +363,14 @@ describe("migrateWorkspace", () => {
   });
 
   it("migrates runConfigs to scripts", () => {
-    const raw = { runConfigs: [{ id: "r1", name: "dev", command: "pnpm dev" }] };
+    const raw = { runConfigs: [{ id: "r1", name: "dev", command: "pnpm dev" }] } as unknown as Workspace;
     const result = migrateWorkspace(raw);
     expect(result.scripts).toEqual([{ id: "r1", name: "dev", command: "pnpm dev" }]);
     expect((result as Record<string, unknown>).runConfigs).toBeUndefined();
   });
 
   it("migrates activeRunConfigId to activeScript", () => {
-    const raw = { activeRunConfigId: "r1" };
+    const raw = { activeRunConfigId: "r1" } as unknown as Workspace;
     const result = migrateWorkspace(raw);
     expect(result.activeScript).toBe("r1");
     expect((result as Record<string, unknown>).activeRunConfigId).toBeUndefined();
