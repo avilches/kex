@@ -54,7 +54,7 @@ export function WorkspaceSettingsDialog(props: Props) {
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings(); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Workspace Settings</DialogTitle>
+          <DialogTitle>Workspace Properties</DialogTitle>
         </DialogHeader>
         {ws && (
           <WorkspaceSettingsForm key={ws.id} ws={ws} {...props} />
@@ -65,6 +65,112 @@ export function WorkspaceSettingsDialog(props: Props) {
 }
 
 type FormProps = { ws: Workspace } & Omit<Props, "workspaces">;
+
+const PALETTE_ROW1 = WORKSPACE_COLOR_PALETTE.slice(0, 4);
+const PALETTE_ROW2 = WORKSPACE_COLOR_PALETTE.slice(4);
+
+function ColorPicker({
+  wsId,
+  wsColor,
+  displayColor,
+  onSetColor,
+}: {
+  wsId: string;
+  wsColor: string | null | undefined;
+  displayColor: string | null;
+  onSetColor: (id: string, color: string | null) => void;
+}) {
+  const customHex =
+    wsColor != null && !(WORKSPACE_COLOR_PALETTE as readonly string[]).includes(wsColor)
+      ? wsColor
+      : "";
+
+  return (
+    <div className="flex flex-col gap-1">
+      {/* Row 1: no-color chip + first 4 palette colors */}
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          title="No color"
+          onClick={() => onSetColor(wsId, null)}
+          className={cn(
+            "size-6 rounded-full border-2 flex items-center justify-center bg-muted text-muted-foreground transition-colors",
+            wsColor === null
+              ? "border-foreground"
+              : "border-transparent hover:border-muted-foreground/50",
+          )}
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+        </button>
+        {PALETTE_ROW1.map((hex) => (
+          <button
+            key={hex}
+            type="button"
+            title={hex}
+            onClick={() => onSetColor(wsId, hex)}
+            className={cn(
+              "size-6 rounded-full border-2 transition-opacity",
+              wsColor === hex
+                ? "border-foreground"
+                : "border-transparent hover:border-foreground/40",
+            )}
+            style={{ backgroundColor: hex }}
+          />
+        ))}
+      </div>
+
+      {/* Row 2: remaining 5 palette colors */}
+      <div className="flex items-center gap-1">
+        {PALETTE_ROW2.map((hex) => (
+          <button
+            key={hex}
+            type="button"
+            title={hex}
+            onClick={() => onSetColor(wsId, hex)}
+            className={cn(
+              "size-6 rounded-full border-2 transition-opacity",
+              wsColor === hex
+                ? "border-foreground"
+                : "border-transparent hover:border-foreground/40",
+            )}
+            style={{ backgroundColor: hex }}
+          />
+        ))}
+      </div>
+
+      {/* Row 3: color preview + hex input + native color picker */}
+      <div className="flex items-center gap-1.5">
+        <div
+          className="size-5 shrink-0 rounded-full border border-border"
+          style={displayColor ? { backgroundColor: displayColor } : undefined}
+        />
+        <input
+          className="h-6 w-20 rounded border border-border bg-background px-1.5 text-[11px] font-mono outline-none ring-ring focus-visible:ring-1"
+          placeholder="#rrggbb"
+          defaultValue={customHex}
+          key={customHex}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (/^#[0-9a-fA-F]{6}$/.test(v)) onSetColor(wsId, v);
+          }}
+        />
+        <label
+          title="Pick color"
+          className="relative flex size-6 cursor-pointer items-center justify-center overflow-hidden rounded border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+          style={displayColor ? { backgroundColor: displayColor + "33" } : undefined}
+        >
+          <input
+            type="color"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            value={displayColor ?? "#4f8ef7"}
+            onChange={(e) => onSetColor(wsId, e.target.value)}
+          />
+          <span className="pointer-events-none text-[10px] font-bold leading-none">H</span>
+        </label>
+      </div>
+    </div>
+  );
+}
 
 function WorkspaceSettingsForm({ ws, ...props }: FormProps) {
   const [cwdValue, setCwdValue] = useState(ws.pinnedRoot ?? "");
@@ -90,77 +196,30 @@ function WorkspaceSettingsForm({ ws, ...props }: FormProps) {
 
   return (
     <div className="flex flex-col gap-5 py-1">
-      {/* General: name + color */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium">Name</label>
-        <input
-          className="h-8 rounded-md border border-border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
-          defaultValue={ws.title}
-          onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v) props.onSetTitle(ws.id, v);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="text-xs font-medium">Color</label>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* No color chip */}
-          <button
-            type="button"
-            title="No color"
-            onClick={() => props.onSetColor(ws.id, null)}
-            className={cn(
-              "size-6 rounded-full border-2 flex items-center justify-center bg-muted text-muted-foreground transition-colors",
-              ws.color === null
-                ? "border-foreground"
-                : "border-transparent hover:border-muted-foreground/50",
-            )}
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-          </button>
-
-          {/* Palette chips */}
-          {WORKSPACE_COLOR_PALETTE.map((hex) => (
-            <button
-              key={hex}
-              type="button"
-              title={hex}
-              onClick={() => props.onSetColor(ws.id, hex)}
-              className={cn(
-                "size-6 rounded-full border-2 transition-opacity",
-                ws.color === hex
-                  ? "border-foreground"
-                  : "border-transparent hover:border-foreground/40",
-              )}
-              style={{ backgroundColor: hex }}
-            />
-          ))}
+      {/* Name + Color: 50% / 50% */}
+      <div className="flex gap-4">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label className="text-xs font-medium">Name</label>
+          <input
+            className="h-8 rounded-md border border-border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
+            defaultValue={ws.title}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v) props.onSetTitle(ws.id, v);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+          />
         </div>
 
-        {/* Custom hex input */}
-        <div className="flex items-center gap-2">
-          <div
-            className="size-6 shrink-0 rounded-full border border-border"
-            style={displayColor ? { backgroundColor: displayColor } : undefined}
-          />
-          <input
-            className="h-7 w-28 rounded border border-border bg-background px-2 text-xs font-mono outline-none ring-ring focus-visible:ring-1"
-            placeholder="#rrggbb"
-            value={
-              ws.color != null &&
-              !(WORKSPACE_COLOR_PALETTE as readonly string[]).includes(ws.color)
-                ? ws.color
-                : ""
-            }
-            onChange={(e) => {
-              const v = e.target.value;
-              if (/^#[0-9a-fA-F]{6}$/.test(v)) props.onSetColor(ws.id, v);
-            }}
+        <div className="flex flex-1 flex-col gap-1.5">
+          <label className="text-xs font-medium">Color</label>
+          <ColorPicker
+            wsId={ws.id}
+            wsColor={ws.color}
+            displayColor={displayColor}
+            onSetColor={props.onSetColor}
           />
         </div>
       </div>
@@ -252,6 +311,7 @@ function RunConfigSection({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
   const configs = ws.runConfigs ?? [];
+  const hasIncomplete = configs.some((c) => !c.name.trim() || !c.command.trim());
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -266,6 +326,7 @@ function RunConfigSection({
         <label className="text-xs font-medium">Run Configurations</label>
         <button
           type="button"
+          disabled={hasIncomplete}
           onClick={() =>
             onAddRunConfig(ws.id, {
               id: crypto.randomUUID(),
@@ -273,7 +334,12 @@ function RunConfigSection({
               command: "",
             })
           }
-          className="text-[11px] text-primary hover:underline"
+          className={cn(
+            "rounded border px-2 py-0.5 text-[11px] transition-colors",
+            hasIncomplete
+              ? "cursor-not-allowed border-border/40 text-muted-foreground/40"
+              : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+          )}
         >
           + Add
         </button>
@@ -288,14 +354,16 @@ function RunConfigSection({
           items={configs.map((c) => c.id)}
           strategy={verticalListSortingStrategy}
         >
-          {configs.map((cfg) => (
-            <RunConfigRow
-              key={cfg.id}
-              config={cfg}
-              onUpdate={(patch) => onUpdateRunConfig(ws.id, cfg.id, patch)}
-              onRemove={() => onRemoveRunConfig(ws.id, cfg.id)}
-            />
-          ))}
+          <div className={configs.length > 2 ? "flex max-h-[180px] flex-col gap-1 overflow-y-auto pr-1" : "flex flex-col gap-1"}>
+            {configs.map((cfg) => (
+              <RunConfigRow
+                key={cfg.id}
+                config={cfg}
+                onUpdate={(patch) => onUpdateRunConfig(ws.id, cfg.id, patch)}
+                onRemove={() => onRemoveRunConfig(ws.id, cfg.id)}
+              />
+            ))}
+          </div>
         </SortableContext>
       </DndContext>
 
