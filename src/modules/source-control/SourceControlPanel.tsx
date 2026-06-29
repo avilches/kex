@@ -1576,7 +1576,7 @@ const EntryRow = memo(function EntryRow({
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"))}
+          onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"), "Copied relative path")}
         >
           <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
@@ -1584,7 +1584,7 @@ const EntryRow = memo(function EntryRow({
         {absolutePath ? (
           <ContextMenuItem
             className={COMPACT_ITEM}
-            onSelect={() => void copyToClipboard(absolutePath)}
+            onSelect={() => void copyToClipboard(absolutePath, "Copied absolute path")}
           >
             <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
             Copy Absolute Path

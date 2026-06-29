@@ -1,13 +1,15 @@
 import { IS_MAC } from "@/lib/platform";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { toast } from "sonner";
 
 export const REVEAL_LABEL = IS_MAC
   ? "Reveal in Finder"
   : "Reveal in File Manager";
 
-export async function copyToClipboard(text: string): Promise<void> {
+export async function copyToClipboard(text: string, label?: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
+    if (label) toast.success(label, { description: text });
   } catch {
     // Best-effort; ignore in environments without clipboard permission.
   }

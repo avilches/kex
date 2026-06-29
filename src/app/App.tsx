@@ -34,6 +34,7 @@ import type { OpenInEditorTarget } from "@/modules/external-editors";
 import { runEditorScan } from "@/modules/external-editors";
 import type { BrowserPaneHandle } from "@/modules/browser";
 import { useFloatBrowser } from "@/modules/browser/useFloatBrowser";
+import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -2204,18 +2205,22 @@ export default function App() {
       },
       "path.copy": () => {
         if (!activePanel) return;
-        let path: string | undefined;
+        let value: string | undefined;
+        let label: string;
         if (activePanel.kind === "editor" || activePanel.kind === "markdown") {
-          path = activePanel.path;
+          value = activePanel.path;
+          label = "Copied current path";
         } else if (activePanel.kind === "terminal") {
-          path = activePanel.cwd;
+          value = activePanel.cwd;
+          label = "Copied current path";
         } else if (activePanel.kind === "browser") {
-          path = activePanel.url;
+          value = activePanel.url;
+          label = "Copied current URL";
+        } else {
+          return;
         }
-        if (!path) return;
-        void navigator.clipboard.writeText(path).then(() => {
-          toast.success("Path copied");
-        });
+        if (!value) return;
+        void copyToClipboard(value, label);
       },
     }),
     [

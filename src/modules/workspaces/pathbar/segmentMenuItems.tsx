@@ -44,7 +44,7 @@ function copyRelativeItem(path: string, workspaceRoot: string | null) {
       className={COMPACT_ITEM}
       disabled={!inRoot}
       onSelect={() => {
-        if (relText != null) void copyToClipboard(relText);
+        if (relText != null) void copyToClipboard(relText, "Copied relative path");
       }}
     >
       <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
@@ -64,7 +64,7 @@ function copyAbsoluteItem(path: string) {
   return (
     <ContextMenuItem
       className={COMPACT_ITEM}
-      onSelect={() => void copyToClipboard(path)}
+      onSelect={() => void copyToClipboard(path, "Copied absolute path")}
     >
       <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
       <span className="flex min-w-0 flex-col">

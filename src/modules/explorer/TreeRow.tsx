@@ -429,14 +429,14 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(relativePath(rootPath, path))}
+          onSelect={() => void copyToClipboard(relativePath(rootPath, path), "Copied relative path")}
         >
           <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
           Copy Relative Path
         </ContextMenuItem>
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(path)}
+          onSelect={() => void copyToClipboard(path, "Copied absolute path")}
         >
           <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
           Copy Absolute Path
@@ -650,7 +650,7 @@ export function FsRootRow({
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(path)}
+          onSelect={() => void copyToClipboard(path, "Copied absolute path")}
         >
           <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
           Copy Absolute Path
@@ -733,7 +733,7 @@ export function FsUpRow({
         <ContextMenuSeparator />
         <ContextMenuItem
           className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(path)}
+          onSelect={() => void copyToClipboard(path, "Copied absolute path")}
         >
           <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
           Copy Absolute Path
