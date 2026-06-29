@@ -42,6 +42,24 @@ Al anadir un ajuste al editor hay que ubicarlo segun su alcance:
 
 Asi el usuario puede tocar lo visual rapido desde el editor y la configuracion global queda accesible tanto en contexto como en la pantalla de ajustes.
 
+### Controles de formulario en Settings
+
+Usar siempre los componentes de shadcn, nunca elementos HTML nativos con estilos ad-hoc:
+
+- **Radio buttons**: `RadioGroup` + `RadioGroupItem` de `@/components/ui/radio-group`. Patron:
+  ```tsx
+  <RadioGroup value={value} onValueChange={(v) => handler(v as MyType)}>
+    <div className="flex items-center gap-2">
+      <RadioGroupItem value="opt-a" id="my-opt-a" />
+      <label htmlFor="my-opt-a" className="cursor-pointer text-[12px]">Label</label>
+    </div>
+  </RadioGroup>
+  ```
+- **Checkboxes**: `Checkbox` de `@/components/ui/checkbox` con `id` y `<label htmlFor={...}>` asociado.
+- **Switches**: `Switch` de `@/components/ui/switch` (para toggles on/off dentro de `SettingRow`).
+
+Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ExternalEditorsSection.tsx` (RadioGroup en Text Editors).
+
 ### Estado mutable externo en React
 
 Nunca usar `setInterval + setTick` para releer estado mutable externo (arrays a nivel de modulo, pools, caches). El state setter queda stale tras el primer render cycle y no causa re-renders. Usar `useSyncExternalStore(subscribe, getSnapshot)`. `getSnapshot` debe devolver la MISMA referencia si nada cambio (cache obligatorio), de lo contrario React lanza "infinite loop" error. Patron correcto: snapshot cacheado en el modulo, funcion `notify*()` que lo recalcula y notifica, llamar `notify*()` en todos los puntos donde el estado cambia.
