@@ -155,10 +155,9 @@ function SortableWorkspaceItem({
         {...listeners}
         aria-pressed={active}
       >
-        <span className={compact ? "text-[11px]" : "text-[14px] font-bold"}>
-          {abbrev(ws.title, ws.kind)}
-        </span>
-        {!compact && (
+        {compact ? (
+          <span className="text-[11px]">{abbrev(ws.title, ws.kind)}</span>
+        ) : (
           <span className="max-w-full truncate text-center text-[10px] font-normal leading-tight">
             {ws.title || ws.kind}
           </span>
