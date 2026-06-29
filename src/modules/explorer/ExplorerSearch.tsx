@@ -430,7 +430,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 className={COMPACT_ITEM}
                 onSelect={() =>
                   contextHit &&
-                  void copyToClipboard(relativePath(rootPath, contextHit.path))
+                  void copyToClipboard(relativePath(rootPath, contextHit.path), "Copied relative path")
                 }
               >
                 <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
@@ -438,7 +438,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
               </ContextMenuItem>
               <ContextMenuItem
                 className={COMPACT_ITEM}
-                onSelect={() => contextHit && void copyToClipboard(contextHit.path)}
+                onSelect={() => contextHit && void copyToClipboard(contextHit.path, "Copied absolute path")}
               >
                 <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
                 Copy Absolute Path

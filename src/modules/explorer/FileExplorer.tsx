@@ -1380,7 +1380,7 @@ export const FileExplorer = memo(
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     className={COMPACT_ITEM}
-                    onSelect={() => void copyToClipboard(rootPath)}
+                    onSelect={() => void copyToClipboard(rootPath, "Copied absolute path")}
                   >
                     <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
                     Copy Absolute Path
