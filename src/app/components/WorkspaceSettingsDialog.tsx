@@ -1,7 +1,25 @@
 import { useEffect, useState } from "react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
-import { Cancel01Icon, FolderOpenIcon } from "@hugeicons/core-free-icons";
+import {
+  Cancel01Icon,
+  DragDropVerticalIcon,
+  FolderOpenIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Dialog,
   DialogContent,
@@ -207,11 +225,152 @@ function WorkspaceSettingsForm({ ws, ...props }: FormProps) {
         )}
       </div>
 
-      {/* Run Configurations — wired in Task 7 */}
-      <div className="flex flex-col gap-1.5">
+      {/* Run Configurations */}
+      <RunConfigSection
+        ws={ws}
+        onAddRunConfig={props.onAddRunConfig}
+        onUpdateRunConfig={props.onUpdateRunConfig}
+        onRemoveRunConfig={props.onRemoveRunConfig}
+        onReorderRunConfigs={props.onReorderRunConfigs}
+      />
+    </div>
+  );
+}
+
+function RunConfigSection({
+  ws,
+  onAddRunConfig,
+  onUpdateRunConfig,
+  onRemoveRunConfig,
+  onReorderRunConfigs,
+}: {
+  ws: Workspace;
+  onAddRunConfig: Props["onAddRunConfig"];
+  onUpdateRunConfig: Props["onUpdateRunConfig"];
+  onRemoveRunConfig: Props["onRemoveRunConfig"];
+  onReorderRunConfigs: Props["onReorderRunConfigs"];
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+  const configs = ws.runConfigs ?? [];
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      onReorderRunConfigs(ws.id, String(active.id), String(over.id));
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
         <label className="text-xs font-medium">Run Configurations</label>
-        <p className="text-[11px] text-muted-foreground">Configure in the next update.</p>
+        <button
+          type="button"
+          onClick={() =>
+            onAddRunConfig(ws.id, {
+              id: crypto.randomUUID(),
+              name: "",
+              command: "",
+            })
+          }
+          className="text-[11px] text-primary hover:underline"
+        >
+          + Add
+        </button>
       </div>
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={configs.map((c) => c.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {configs.map((cfg) => (
+            <RunConfigRow
+              key={cfg.id}
+              config={cfg}
+              onUpdate={(patch) => onUpdateRunConfig(ws.id, cfg.id, patch)}
+              onRemove={() => onRemoveRunConfig(ws.id, cfg.id)}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
+
+      {configs.length === 0 && (
+        <p className="text-[11px] text-muted-foreground">No run configurations yet.</p>
+      )}
+    </div>
+  );
+}
+
+function RunConfigRow({
+  config,
+  onUpdate,
+  onRemove,
+}: {
+  config: RunConfig;
+  onUpdate: (patch: Partial<Omit<RunConfig, "id">>) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: config.id,
+  });
+  const [showCwd, setShowCwd] = useState(!!config.cwd);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className="flex flex-col gap-1 rounded-md border border-border/60 p-2"
+    >
+      <div className="flex items-center gap-1">
+        <span
+          {...attributes}
+          {...listeners}
+          className="cursor-grab text-muted-foreground"
+        >
+          <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
+        </span>
+        <input
+          className="h-6 flex-1 rounded border border-border/60 bg-background px-2 text-[11px]"
+          placeholder="Name (e.g. Dev server)"
+          defaultValue={config.name}
+          onBlur={(e) => onUpdate({ name: e.target.value })}
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="size-[20px] flex items-center justify-center rounded text-muted-foreground hover:text-destructive"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+        </button>
+      </div>
+      <input
+        className="h-6 w-full rounded border border-border/60 bg-background px-2 font-mono text-[11px]"
+        placeholder="Command (e.g. pnpm dev)"
+        defaultValue={config.command}
+        onBlur={(e) => onUpdate({ command: e.target.value })}
+      />
+      <button
+        type="button"
+        className="self-start text-[10px] text-muted-foreground hover:text-foreground"
+        onClick={() => setShowCwd((v) => !v)}
+      >
+        {showCwd ? "Hide working dir" : "+ Working dir"}
+      </button>
+      {showCwd && (
+        <input
+          className="h-6 w-full rounded border border-border/60 bg-background px-2 font-mono text-[11px]"
+          placeholder="Working dir (optional, defaults to workspace root)"
+          defaultValue={config.cwd ?? ""}
+          onBlur={(e) => onUpdate({ cwd: e.target.value || undefined })}
+        />
+      )}
     </div>
   );
 }
