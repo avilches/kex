@@ -45,6 +45,8 @@ pub struct WindowEntry {
     pub active_index: usize,
     #[serde(default)]
     pub right_panel: Option<RightPanelState>,
+    #[serde(default)]
+    pub workspace_sidebar_width: Option<u32>,
 }
 
 impl Default for WindowEntry {
@@ -54,6 +56,7 @@ impl Default for WindowEntry {
             workspaces: Value::Array(vec![]),
             active_index: 0,
             right_panel: None,
+            workspace_sidebar_width: None,
         }
     }
 }
@@ -80,6 +83,8 @@ struct IndexEntry {
     active_index: usize,
     #[serde(default)]
     right_panel: Option<RightPanelState>,
+    #[serde(default)]
+    workspace_sidebar_width: Option<u32>,
 }
 
 /// On-disk index file (`workspaces.json`). `BTreeMap` so serialization is
@@ -216,6 +221,7 @@ impl WindowStateManager {
                     workspaces: Value::Array(bodies),
                     active_index: ie.active_index,
                     right_panel: ie.right_panel.clone(),
+                    workspace_sidebar_width: ie.workspace_sidebar_width,
                 },
             );
         }
@@ -283,6 +289,7 @@ impl WindowStateManager {
                     workspace_ids: ids,
                     active_index: entry.active_index,
                     right_panel: entry.right_panel.clone(),
+                    workspace_sidebar_width: entry.workspace_sidebar_width,
                 },
             );
         }
@@ -383,6 +390,13 @@ impl WindowStateManager {
             entry.right_panel = Some(sanitized);
         } else {
             log::warn!("[window-state] update_right_panel: label '{label}' not found in state");
+        }
+    }
+
+    pub fn update_workspace_sidebar_width(&self, label: &str, width: u32) {
+        let mut inner = self.inner.write().expect("window state lock poisoned");
+        if let Some(entry) = inner.windows.get_mut(label) {
+            entry.workspace_sidebar_width = Some(width);
         }
     }
 }

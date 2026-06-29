@@ -433,6 +433,13 @@ fn window_save_right_panel(
     mgr.save();
 }
 
+#[tauri::command]
+fn window_save_workspace_sidebar(app: tauri::AppHandle, label: String, width: u32) {
+    let mgr = app.state::<window_state::WindowStateManager>();
+    mgr.update_workspace_sidebar_width(&label, width);
+    mgr.save();
+}
+
 /// Called from main.tsx on startup (on_window_ready equivalent) to restore window size.
 /// Uses physical pixels from inner_size(), matching tauri-plugin-window-state behaviour.
 /// Position is not restored — see WORKSPACES_GOTCHAS.md for why.
@@ -479,6 +486,7 @@ pub fn run() {
                 .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview))
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // macOS: the predefined Quit menu item (Cmd+Q) terminates natively and
@@ -841,6 +849,7 @@ pub fn run() {
             window_get_state,
             window_save_workspace_state,
             window_save_right_panel,
+            window_save_workspace_sidebar,
             restore_window_geometry,
             agent::agent_enable_claude_hooks,
             agent::agent_disable_claude_hooks,
