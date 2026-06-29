@@ -9,6 +9,14 @@ Ver `docs/FORK.md` para la lista completa de diferencias respecto al upstream y 
 
 ## Reglas de trabajo
 
+### Sin compatibilidad hacia atras
+
+Nunca anadir codigo de migracion, shims, fallbacks de clave antigua, ni ningun mecanismo de compatibilidad hacia atras. Si se renombra un campo JSON, se cambia una API interna, o se reestructura el store, los usuarios simplemente parten de los valores por defecto. No hay excepciones.
+
+### Generacion de IDs
+
+Todos los IDs de entidades de la aplicacion (workspaces, panes, panels, temas, scripts, editores personalizados, etc.) se generan con la funcion `nid()` de `src/lib/ids.ts`, usando los exportados prefijados: `newWorkspaceId()`, `newPanelId()`, `newEditorId()`, etc. Nunca usar `crypto.randomUUID()` ni `Math.random()` para IDs de entidades. Si se necesita un nuevo tipo de entidad, anadir su exportado `new<Tipo>Id()` en `ids.ts` antes de usarlo.
+
 ### Commits
 
 - Todos los commits deben ser **atomicos**: un unico cambio logico por commit. No mezclar cambios no relacionados.
@@ -59,6 +67,22 @@ Usar siempre los componentes de shadcn, nunca elementos HTML nativos con estilos
 - **Switches**: `Switch` de `@/components/ui/switch` (para toggles on/off dentro de `SettingRow`).
 
 Referencia viva: `TerminalSection.tsx` (RadioGroup en scratchpad), `ExternalEditorsSection.tsx` (RadioGroup en Text Editors).
+
+### Estilo de inputs en Settings
+
+Todos los `<input>` nativos en pantallas de settings deben usar este patron exacto:
+
+```
+"h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+```
+
+Diferencias importantes respecto a inputs generales:
+- **`focus:outline-none focus:ring-1 focus:ring-ring`** (NO `focus-visible:ring-1`): evitar el borde azul del SO en navegacion con Tab.
+- `bg-transparent` (no `bg-background`): hereda el fondo del panel de settings.
+- Referencia viva: `ExternalEditorsSection.tsx` constante `INPUT_CLASS`.
+
+Para botones de tab dentro de dialogs/modals (como `WorkspaceSettingsDialog`):
+- Anadir `outline-none focus-visible:outline-none` para eliminar el borde de foco del sistema operativo.
 
 ### Estado mutable externo en React
 

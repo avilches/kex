@@ -134,7 +134,7 @@ function SortableWorkspaceItem({
           "flex w-full items-center justify-center rounded-lg font-semibold transition-all select-none",
           compact
             ? "h-9 text-[11px]"
-            : "h-auto flex-col gap-0.5 px-2 py-1.5 text-[11px]",
+            : "h-9 px-2 text-[11px]",
           active
             ? "text-white"
             : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -159,7 +159,7 @@ function SortableWorkspaceItem({
         {compact ? (
           <span className="text-[11px]">{abbrev(ws.title, ws.kind)}</span>
         ) : (
-          <span className="max-w-full truncate text-center text-[10px] font-normal leading-tight">
+          <span className="max-w-full truncate text-center text-[11px]">
             {ws.title || ws.kind}
           </span>
         )}
@@ -296,7 +296,7 @@ export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReor
 
       {/* Resize handle on the right edge */}
       <div
-        className="absolute inset-y-0 right-0 w-1 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50"
+        className="absolute inset-y-0 right-0 flex w-1 cursor-ew-resize items-center justify-center outline-none hover:bg-primary/20 active:bg-primary/30"
         onPointerDown={(e) => {
           const startX = e.clientX;
           const startWidth = width;
@@ -313,7 +313,9 @@ export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReor
           document.addEventListener("pointermove", onMove);
           document.addEventListener("pointerup", onUp);
         }}
-      />
+      >
+        <div className="pointer-events-none h-6 w-0.5 rounded-full bg-border" />
+      </div>
     </nav>
   );
 }

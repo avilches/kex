@@ -43,14 +43,13 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   const preferredWorkspaceEditorId = usePreferencesStore((s) => s.preferredWorkspaceEditorId);
   const textEditorMode = usePreferencesStore((s) => s.textEditorMode);
   const customEditors = usePreferencesStore((s) => s.customEditors);
-  const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const [open, setOpen] = useState(false);
   // Last editor explicitly chosen from the dropdown; takes priority over auto-selection.
   // Cleared when the context type changes (file <-> dir) so auto-selection resumes.
   const [overrideEditorId, setOverrideEditorId] = useState<string | null>(null);
 
   const allEditors: AnyEditor[] = [
-    ...detectedEditors.filter((e) => !disabledDetectedEditorIds.includes(e.id)),
+    ...detectedEditors.filter((e) => e.enabled !== false),
     ...customEditors,
   ].filter((e) => e.name.trim() && e.binary.trim());
 
@@ -122,7 +121,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     return hasFile ? target : null;
   })();
 
-  const disabled = !anyAvailable || !primaryTarget;
+  const leftDisabled = !anyAvailable || !primaryTarget;
 
   const handleDirectClick = useCallback(async () => {
     if (!primaryEditor || !primaryTarget) return;
@@ -149,12 +148,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   }, [textEditorMode, hasFile]);
 
   return (
-    <div
-      className={cn(
-        "flex items-center rounded-md transition-opacity",
-        disabled && "pointer-events-none opacity-40",
-      )}
-    >
+    <div className="flex items-center rounded-md">
       <button
         type="button"
         title={
@@ -163,8 +157,11 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
             : "No active panel"
         }
         onClick={() => void handleDirectClick()}
-        disabled={disabled || !primaryEditor}
-        className="flex h-7 items-center gap-1.5 rounded-l-md px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-default disabled:opacity-100"
+        disabled={leftDisabled}
+        className={cn(
+          "flex h-7 items-center gap-1.5 rounded-l-md px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          leftDisabled && "cursor-default opacity-40",
+        )}
       >
         {primaryEditor ? (
           <EditorIcon id={primaryEditor.id} size={16} />
@@ -185,8 +182,10 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            disabled={disabled}
-            className="flex h-7 items-center rounded-r-md px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-default disabled:opacity-100"
+            className={cn(
+              "flex h-7 items-center rounded-r-md px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+              leftDisabled && !onOpenSettings && "cursor-default opacity-40",
+            )}
           >
             <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
           </button>
@@ -241,7 +240,9 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
 
           {!isScanning && !anyAvailable && (
             <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
-              No editors detected
+              {!hasFile && !workspaceRoot
+                ? "Please set a Workspace Root"
+                : "No tools selected"}
             </div>
           )}
 

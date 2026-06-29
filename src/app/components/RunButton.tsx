@@ -4,6 +4,7 @@ import {
   PlayIcon,
   StopIcon,
   Tick02Icon,
+  Loading03Icon,
 } from "@hugeicons/core-free-icons";
 import {
   DropdownMenu,
@@ -49,13 +50,22 @@ export function RunButton({
   const completeConfigs = scripts.filter(isComplete);
   const activeConfig =
     completeConfigs.find((c) => c.id === activeScript) ?? completeConfigs[0];
-  const isRunning = !!(activeConfig?.panelId && runningMap.get(activeConfig.panelId));
+  const activeState = activeConfig?.panelId ? runningMap.get(activeConfig.panelId) : undefined;
+  const isRunning = activeState === "running";
+  const isWaiting = activeState === "waiting";
+  const isActive_ = isRunning || isWaiting;
+
+  function cfgState(cfg: RunConfig) {
+    return cfg.panelId ? runningMap.get(cfg.panelId) : undefined;
+  }
 
   const dropdownContent = (
     <DropdownMenuContent align="end">
       {completeConfigs.map((cfg) => {
-        const cfgRunning = !!(cfg.panelId && runningMap.get(cfg.panelId));
-        const isActive = cfg.id === activeConfig?.id;
+        const state = cfgState(cfg);
+        const cfgRunning = state === "running";
+        const cfgWaiting = state === "waiting";
+        const isActiveCfg = cfg.id === activeConfig?.id;
         return (
           <DropdownMenuItem
             key={cfg.id}
@@ -64,32 +74,36 @@ export function RunButton({
           >
             <button
               type="button"
-              title={cfgRunning ? "Stop" : "Run"}
+              title={cfgRunning ? "Stop" : cfgWaiting ? "Stopping..." : "Run"}
+              disabled={cfgWaiting}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
               }}
               onClick={(e) => {
                 e.stopPropagation();
+                if (cfgWaiting) return;
                 cfgRunning ? onStop(cfg) : onRun(cfg);
               }}
               className={cn(
                 "size-[22px] shrink-0 flex items-center justify-center rounded transition-colors",
                 cfgRunning
                   ? "text-destructive hover:bg-destructive/10"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  : cfgWaiting
+                    ? "text-amber-500/60 cursor-not-allowed"
+                    : "text-green-500 hover:bg-accent",
               )}
             >
-              <HugeiconsIcon
-                icon={cfgRunning ? StopIcon : PlayIcon}
-                size={12}
-                strokeWidth={2}
-              />
+              {cfgWaiting ? (
+                <HugeiconsIcon icon={Loading03Icon} size={12} strokeWidth={2} className="animate-spin" />
+              ) : (
+                <HugeiconsIcon icon={cfgRunning ? StopIcon : PlayIcon} size={12} strokeWidth={2} />
+              )}
             </button>
             <span className="flex-1 truncate px-1.5 text-[12px]">
               {cfg.name || cfg.command}
             </span>
-            {isActive && (
+            {isActiveCfg && (
               <HugeiconsIcon
                 icon={Tick02Icon}
                 size={11}
@@ -115,7 +129,7 @@ export function RunButton({
             type="button"
             className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <HugeiconsIcon icon={PlayIcon} size={13} strokeWidth={2} />
+            <HugeiconsIcon icon={PlayIcon} size={13} strokeWidth={2} className="text-green-500" />
             <span>Run</span>
             <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
           </button>
@@ -132,24 +146,34 @@ export function RunButton({
         title={
           isRunning
             ? `Stop: ${activeConfig?.name || activeConfig?.command}`
-            : `Run: ${activeConfig?.name || activeConfig?.command}`
+            : isWaiting
+              ? `Stopping: ${activeConfig?.name || activeConfig?.command}`
+              : `Run: ${activeConfig?.name || activeConfig?.command}`
         }
+        disabled={isWaiting}
         onClick={() => {
-          if (!activeConfig) return;
+          if (!activeConfig || isWaiting) return;
           isRunning ? onStop(activeConfig) : onRun(activeConfig);
         }}
         className={cn(
           "flex h-7 items-center gap-1.5 rounded-l-md px-2 text-[11px] transition-colors",
           isRunning
             ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
-            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+            : isWaiting
+              ? "bg-amber-500/10 text-amber-500/70 cursor-not-allowed"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground",
         )}
       >
-        <HugeiconsIcon
-          icon={isRunning ? StopIcon : PlayIcon}
-          size={13}
-          strokeWidth={2}
-        />
+        {isWaiting ? (
+          <HugeiconsIcon icon={Loading03Icon} size={13} strokeWidth={2} className="animate-spin" />
+        ) : (
+          <HugeiconsIcon
+            icon={isActive_ ? StopIcon : PlayIcon}
+            size={13}
+            strokeWidth={2}
+            className={!isActive_ ? "text-green-500" : undefined}
+          />
+        )}
         <span className="max-w-[120px] truncate">
           {activeConfig?.name || activeConfig?.command || "Run"}
         </span>

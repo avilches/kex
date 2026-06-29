@@ -111,6 +111,10 @@ import {
   getSavedWorkspaceSidebarWidth,
   saveWorkspaceSidebarWidth,
 } from "@/modules/workspaces/lib/workspaceSidebarState";
+import {
+  getSavedExplorerSidebarWidth,
+  saveExplorerSidebarWidth,
+} from "@/modules/workspaces/lib/explorerSidebarState";
 import { useRightPanelState } from "@/modules/workspaces/lib/useRightPanelState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
@@ -432,15 +436,18 @@ export default function App() {
     setWorkspaceSidebarWidth(w);
     saveWorkspaceSidebarWidth(windowLabel, w);
   }, [windowLabel]);
+  const [explorerSidebarWidth, setExplorerSidebarWidth] = useState(getSavedExplorerSidebarWidth);
+  const handleExplorerSidebarWidthChange = useCallback((w: number) => {
+    setExplorerSidebarWidth(w);
+    saveExplorerSidebarWidth(windowLabel, w);
+  }, [windowLabel]);
   const {
     open: rightPanelOpen,
     activeTab: rightPanelActiveTab,
-    width: rightPanelWidth,
     side: panelSide,
     stateRef: rightPanelStateRef,
     setOpen: setRightPanelOpen,
     setActiveTab: setRightPanelActiveTab,
-    setWidth: setRightPanelWidth,
     setSide: setPanelSide,
   } = useRightPanelState(windowLabel);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
@@ -532,7 +539,7 @@ export default function App() {
               const handle = terminalHandles.current.get(panelId);
               if (handle) {
                 handle.write(config.command + "\r");
-                setRunConfigRunning(panelId, true);
+                setRunConfigRunning(panelId, "running");
               } else if (attempts < 20) {
                 setTimeout(() => tryWrite(attempts + 1), 100);
               }
@@ -580,7 +587,7 @@ export default function App() {
         const handle = terminalHandles.current.get(freshPanelId);
         if (handle) {
           handle.write(config.command + "\r");
-          setRunConfigRunning(freshPanelId, true);
+          setRunConfigRunning(freshPanelId, "running");
         } else if (attempts < 20) {
           setTimeout(() => tryWrite(attempts + 1), 100);
         }
@@ -593,12 +600,13 @@ export default function App() {
   const stopWorkspaceConfig = useCallback(
     (config: RunConfig) => {
       if (!config.panelId) return;
+      // Focus the terminal so OSC 133;D can be received and update the waiting state
+      activatePanel(activeWorkspace?.id ?? "", config.panelId);
+      setRunConfigRunning(config.panelId, "waiting");
       const handle = terminalHandles.current.get(config.panelId);
       handle?.write("\x03");
-      setRunConfigRunning(config.panelId, false);
-      runConfigCommandSeen.current.delete(config.panelId);
     },
-    [],
+    [activatePanel, activeWorkspace?.id],
   );
 
   const handleCloseWorkspace = useCallback(
@@ -2045,7 +2053,12 @@ export default function App() {
       },
       "workspace.settings": () => {
         if (activeWorkspaceId) {
-          useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId);
+          const store = useWorkspaceSettingsStore.getState();
+          if (store.open && store.workspaceId === activeWorkspaceId) {
+            store.closeSettings();
+          } else {
+            store.openSettings(activeWorkspaceId);
+          }
         }
       },
       "workspace.run": () => {
@@ -2596,10 +2609,10 @@ export default function App() {
                   <>
                     <ResizablePanel
                       id="tool-panel"
-                      defaultSize={`${rightPanelWidth}%`}
+                      defaultSize={`${explorerSidebarWidth}%`}
                       minSize="12%"
                       maxSize="70%"
-                      onResize={(size) => setRightPanelWidth(size.asPercentage)}
+                      onResize={(size) => handleExplorerSidebarWidthChange(size.asPercentage)}
                     >
                       <RightPanel
                         ref={rightPanelRef}
@@ -2690,10 +2703,10 @@ export default function App() {
                     <ResizableHandle withHandle />
                     <ResizablePanel
                       id="tool-panel"
-                      defaultSize={`${rightPanelWidth}%`}
+                      defaultSize={`${explorerSidebarWidth}%`}
                       minSize="12%"
                       maxSize="70%"
-                      onResize={(size) => setRightPanelWidth(size.asPercentage)}
+                      onResize={(size) => handleExplorerSidebarWidthChange(size.asPercentage)}
                     >
                       <RightPanel
                         ref={rightPanelRef}

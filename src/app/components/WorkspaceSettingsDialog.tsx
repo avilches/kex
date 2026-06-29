@@ -54,8 +54,19 @@ export function WorkspaceSettingsDialog(props: Props) {
   const { open, workspaceId, initialTab, closeSettings } = useWorkspaceSettingsStore();
   const ws = props.workspaces.find((w) => w.id === workspaceId);
 
+  function handleClose() {
+    if (ws) {
+      for (const sc of ws.scripts ?? []) {
+        if (!sc.command.trim()) {
+          props.onRemoveRunConfig(ws.id, sc.id);
+        }
+      }
+    }
+    closeSettings();
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings(); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Workspace {ws?.title}</DialogTitle>
@@ -65,6 +76,7 @@ export function WorkspaceSettingsDialog(props: Props) {
             key={`${ws.id}-${initialTab}`}
             ws={ws}
             initialTab={initialTab}
+            onRequestClose={handleClose}
             {...props}
           />
         )}
@@ -72,8 +84,6 @@ export function WorkspaceSettingsDialog(props: Props) {
     </Dialog>
   );
 }
-
-type FormProps = { ws: Workspace; initialTab: WorkspaceSettingsTab } & Omit<Props, "workspaces">;
 
 const PALETTE_ROW1 = WORKSPACE_COLOR_PALETTE.slice(0, 4);
 const PALETTE_ROW2 = WORKSPACE_COLOR_PALETTE.slice(4);
@@ -172,10 +182,21 @@ function ColorPicker({
   );
 }
 
-function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
+type FormProps = { ws: Workspace; initialTab: WorkspaceSettingsTab; onRequestClose: () => void } & Omit<Props, "workspaces">;
+
+function WorkspaceSettingsForm({ ws, initialTab, onRequestClose, ...props }: FormProps) {
   const [activeTab, setActiveTab] = useState<WorkspaceSettingsTab>(initialTab);
   const [cwdValue, setCwdValue] = useState(ws.pinnedRoot ?? "");
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
+  const [titleValue, setTitleValue] = useState(ws.title ?? "");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const cwdInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (activeTab === "properties") {
+      setTimeout(() => nameInputRef.current?.focus(), 0);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!cwdValue) {
@@ -205,7 +226,7 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
             type="button"
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "-mb-px px-3 py-1.5 text-[12px] font-medium transition-colors",
+              "-mb-px px-3 py-1.5 text-[12px] font-medium outline-none transition-colors focus-visible:outline-none",
               activeTab === tab
                 ? "border-b-2 border-primary text-foreground"
                 : "text-muted-foreground hover:text-foreground",
@@ -222,16 +243,17 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium">Name</label>
             <input
-              className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
+              ref={nameInputRef}
+              className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               placeholder="Name"
               spellCheck={false}
-              defaultValue={ws.title}
-              onBlur={(e) => {
-                const v = e.target.value.trim();
-                if (v) props.onSetTitle(ws.id, v);
+              value={titleValue}
+              onChange={(e) => {
+                setTitleValue(e.target.value);
+                if (e.target.value.trim()) props.onSetTitle(ws.id, e.target.value.trim());
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Enter") { e.preventDefault(); cwdInputRef.current?.focus(); }
               }}
             />
           </div>
@@ -251,8 +273,9 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
             <label className="text-xs font-medium">Workspace Root</label>
             <div className="flex items-center gap-1">
               <input
+                ref={cwdInputRef}
                 className={cn(
-                  "h-8 flex-1 rounded-md border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1",
+                  "h-8 flex-1 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring",
                   cwdValid === false ? "border-destructive" : "border-border",
                 )}
                 spellCheck={false}
@@ -264,6 +287,9 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
                   } else if (cwdValid !== false) {
                     props.onSetPinnedRoot(ws.id, cwdValue);
                   }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); onRequestClose(); }
                 }}
                 placeholder="Not set"
               />

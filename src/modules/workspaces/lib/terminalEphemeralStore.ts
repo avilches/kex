@@ -40,12 +40,15 @@ export function clearRunningCommandEntry(panelId: string): void {
 }
 
 // ── Run config running state ───────────────────────────────────────────────
-// Only set to true by the Run button; set to false by OSC 133;D.
+// "running": command is executing (set by Run button, cleared by OSC 133;D)
+// "waiting": stop was requested; waiting for OSC 133;D to confirm termination
 // Manual commands typed by the user do NOT touch this map.
 
-const runConfigRunning = new Map<string, boolean>();
+export type RunConfigState = "running" | "waiting";
+
+const runConfigRunning = new Map<string, RunConfigState>();
 const rcListeners = new Set<Listener>();
-let rcSnapshot: ReadonlyMap<string, boolean> = new Map();
+let rcSnapshot: ReadonlyMap<string, RunConfigState> = new Map();
 
 function notifyRc(): void {
   rcSnapshot = new Map(runConfigRunning);
@@ -57,14 +60,14 @@ export function subscribeToRunConfigRunning(listener: Listener): () => void {
   return () => { rcListeners.delete(listener); };
 }
 
-export function getRunConfigRunningSnapshot(): ReadonlyMap<string, boolean> {
+export function getRunConfigRunningSnapshot(): ReadonlyMap<string, RunConfigState> {
   return rcSnapshot;
 }
 
-export function setRunConfigRunning(panelId: string, running: boolean): void {
-  if (running) {
-    if (runConfigRunning.get(panelId) === true) return;
-    runConfigRunning.set(panelId, true);
+export function setRunConfigRunning(panelId: string, state: RunConfigState | false): void {
+  if (state) {
+    if (runConfigRunning.get(panelId) === state) return;
+    runConfigRunning.set(panelId, state);
   } else {
     if (!runConfigRunning.has(panelId)) return;
     runConfigRunning.delete(panelId);

@@ -161,7 +161,7 @@ export function SettingsApp() {
               title="Close"
               aria-label="Close settings"
               onClick={() => void getCurrentWebviewWindow().close()}
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="flex size-7 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={2} />
             </button>
