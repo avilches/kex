@@ -46,6 +46,46 @@ pub(crate) fn which_binary(name: &str) -> Option<String> {
 
 // ---- macOS ------------------------------------------------------------------
 
+/// Standard macOS application directories searched when Spotlight is unavailable or stale.
+/// Includes `/Applications/Setapp` for SetApp-installed apps.
+#[cfg(target_os = "macos")]
+static MACOS_APP_DIRS: &[&str] = &[
+    "/Applications",
+    "/Applications/Setapp",
+    "/System/Applications",
+];
+
+/// Scan known app directories for a `.app` bundle whose `Info.plist` declares `bundle_id`.
+/// Falls back to this when `mdfind` returns nothing (Spotlight not indexed or stale).
+#[cfg(target_os = "macos")]
+fn find_app_by_bundle_id_in_dirs(bundle_id: &str) -> Option<String> {
+    let mut dirs: Vec<std::path::PathBuf> = MACOS_APP_DIRS
+        .iter()
+        .map(std::path::PathBuf::from)
+        .collect();
+    if let Some(home) = dirs::home_dir() {
+        dirs.push(home.join("Applications"));
+    }
+
+    let needle = format!("<string>{}</string>", bundle_id);
+    for dir in &dirs {
+        let Ok(entries) = std::fs::read_dir(dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("app") {
+                continue;
+            }
+            let plist = path.join("Contents/Info.plist");
+            if let Ok(contents) = std::fs::read_to_string(&plist) {
+                if contents.contains(&needle) {
+                    return path.to_str().map(str::to_string);
+                }
+            }
+        }
+    }
+    None
+}
+
 #[cfg(target_os = "macos")]
 fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
     // Skip editors with no CLI and no bundle (nothing to detect).
@@ -54,17 +94,20 @@ fn detect_entry_platform(entry: &EditorEntry) -> Option<DetectedEditor> {
     }
 
     let app_path = entry.bundle_id.and_then(|bid| {
+        // Primary: Spotlight (fast, system-wide).
         let query = format!("kMDItemCFBundleIdentifier == \"{}\"", bid);
         let out = Command::new("mdfind").arg(&query).output().ok()?;
         if out.status.success() {
-            extract_first_app_path(&String::from_utf8_lossy(&out.stdout))
-        } else {
-            None
+            if let Some(p) = extract_first_app_path(&String::from_utf8_lossy(&out.stdout)) {
+                return Some(p);
+            }
         }
+        // Fallback: filesystem scan (handles Setapp and non-indexed locations).
+        find_app_by_bundle_id_in_dirs(bid)
     });
 
     let Some(app_path) = app_path else {
-        // Bundle not found: try PATH for editors that have a CLI
+        // Bundle not found anywhere: try PATH for editors that have a CLI
         return detect_via_which(entry);
     };
 

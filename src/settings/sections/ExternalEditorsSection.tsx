@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Cancel01Icon, PlusSignIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -188,24 +189,23 @@ export function ExternalEditorsSection() {
           onToggle={handleToggleDetected}
           headerExtra={
             group === "Text Editors" ? (
-              <div className="mt-1 flex flex-col gap-0.5">
+              <RadioGroup
+                value={textEditorMode}
+                onValueChange={(v) => handleTextEditorModeChange(v as TextEditorMode)}
+                className="mt-1 flex flex-col gap-1"
+              >
                 {TEXT_EDITOR_MODE_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-muted-foreground"
-                  >
-                    <input
-                      type="radio"
-                      name="textEditorMode"
-                      value={opt.value}
-                      checked={textEditorMode === opt.value}
-                      onChange={() => handleTextEditorModeChange(opt.value)}
-                      className="accent-foreground"
-                    />
-                    {opt.label}
-                  </label>
+                  <div key={opt.value} className="flex items-center gap-2">
+                    <RadioGroupItem value={opt.value} id={`text-editor-mode-${opt.value}`} />
+                    <label
+                      htmlFor={`text-editor-mode-${opt.value}`}
+                      className="cursor-pointer text-[12px]"
+                    >
+                      {opt.label}
+                    </label>
+                  </div>
                 ))}
-              </div>
+              </RadioGroup>
             ) : undefined
           }
         />
