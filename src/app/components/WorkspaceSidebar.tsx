@@ -13,7 +13,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Cancel01Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, Delete02Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -196,22 +196,22 @@ function SortableWorkspaceItem({
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
           <ContextMenuItem onSelect={() => startRename(ws.id)}>
             <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
-            Rename Workspace
+            Rename
             {renameLabel && <ContextMenuShortcut>{renameLabel}</ContextMenuShortcut>}
           </ContextMenuItem>
-          <ContextMenuItem onSelect={() => onOpenSettings(ws.id)}>
-            <HugeiconsIcon icon={Settings01Icon} size={14} strokeWidth={2} />
-            Workspace Settings
-            {settingsLabel && <ContextMenuShortcut>{settingsLabel}</ContextMenuShortcut>}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
           {onClose && (
             <ContextMenuItem onSelect={() => onClose(ws.id)} className="text-destructive focus:text-destructive">
-              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
-              Close Workspace
+              <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
+              Delete
               {closeLabel && <ContextMenuShortcut>{closeLabel}</ContextMenuShortcut>}
             </ContextMenuItem>
           )}
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => onOpenSettings(ws.id)}>
+            <HugeiconsIcon icon={Settings01Icon} size={14} strokeWidth={2} />
+            Properties
+            {settingsLabel && <ContextMenuShortcut>{settingsLabel}</ContextMenuShortcut>}
+          </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
       <PopoverContent
