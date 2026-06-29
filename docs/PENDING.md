@@ -17,6 +17,10 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-42](pending/bugs/BUG-42-borrar-fichero-con-editor-abierto.md) — Borrar un fichero con el editor abierto: el editor muestra un error rojo generico (string crudo de IPC, sin distinguir ENOENT ni ofrecer accion) y la vista de diff no reacciona (contenido obsoleto). Definir mejor UX
 - [BUG-43](pending/bugs/BUG-43-restore-claude-code-con-worktree.md) — Restore de Claude Code cuando ha creado un worktree (sin verificar)
 
+## WIP en ramas
+
+- [F16](pending/features/F16-sidebar-slide-animation.md) — Animacion slide del panel lateral (rama `worktree-feat+sidebar-slide-animation`, baja prioridad, incompleto)
+
 ## Features (`docs/pending/features/`)
 
 - [F1](pending/features/F1-diff-side-by-side.md) — Diff side-by-side
