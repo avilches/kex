@@ -521,6 +521,19 @@ export default function App() {
         if (found) {
           setActiveWorkspaceId(found.workspace.id);
           activatePanel(found.workspace.id, config.panelId);
+          if (!getRunConfigRunningSnapshot().get(config.panelId)) {
+            const panelId = config.panelId;
+            const tryWrite = (attempts = 0) => {
+              const handle = terminalHandles.current.get(panelId);
+              if (handle) {
+                handle.write(config.command + "\r");
+                setRunConfigRunning(panelId, true);
+              } else if (attempts < 20) {
+                setTimeout(() => tryWrite(attempts + 1), 100);
+              }
+            };
+            setTimeout(tryWrite, 50);
+          }
           return;
         }
       }
@@ -2496,7 +2509,7 @@ export default function App() {
             onRunConfig={runWorkspaceConfig}
             onStopConfig={stopWorkspaceConfig}
             onOpenRunSettings={() =>
-              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId)
+              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "run-configurations")
             }
           />
 
