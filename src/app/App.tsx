@@ -93,6 +93,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { IS_MAC } from "@/lib/platform";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
+import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
 import { RightPanel, type RightPanelHandle } from "./components/RightPanel";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceSidebar } from "./components/WorkspaceSidebar";
@@ -110,6 +111,7 @@ import {
 import { useRightPanelState } from "@/modules/workspaces/lib/useRightPanelState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
+import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
   clearRunningCommandEntry,
@@ -185,9 +187,15 @@ export default function App() {
     setExplorerRootMode,
     setShowHidden,
     setPinnedRoot,
+    clearPinnedRoot,
     setFsRoot,
     setWorkspaceTitle,
+    setWorkspaceColor,
     setWorkspaceGitConfig,
+    addRunConfig,
+    updateRunConfig,
+    removeRunConfig,
+    reorderRunConfigs,
     setTerminalRunningCommand,
     setPanelView,
     toggleOverlayPreview,
@@ -1920,7 +1928,9 @@ export default function App() {
         if (activeWorkspaceId) useWorkspaceRenameStore.getState().startRename(activeWorkspaceId);
       },
       "workspace.settings": () => {
-        // no-op until Task 6 wires workspace settings window
+        if (activeWorkspaceId) {
+          useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId);
+        }
       },
       "tab.newBrowser": () => openBrowserInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
@@ -2415,7 +2425,7 @@ export default function App() {
               onReorder={reorderWorkspaces}
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
-              onOpenSettings={() => {}}
+              onOpenSettings={(id) => useWorkspaceSettingsStore.getState().openSettings(id)}
               width={workspaceSidebarWidth}
               onWidthChange={handleSidebarWidthChange}
             />
@@ -2613,6 +2623,21 @@ export default function App() {
           />
 
           <UpdaterDialog />
+
+          <WorkspaceSettingsDialog
+            workspaces={workspaces}
+            onSetTitle={setWorkspaceTitle}
+            onSetColor={setWorkspaceColor}
+            onSetPinnedRoot={(id, path) => {
+              if (path !== undefined) setPinnedRoot(id, path);
+              else clearPinnedRoot(id);
+            }}
+            onSetExplorerRootMode={setExplorerRootMode}
+            onAddRunConfig={addRunConfig}
+            onUpdateRunConfig={updateRunConfig}
+            onRemoveRunConfig={removeRunConfig}
+            onReorderRunConfigs={reorderRunConfigs}
+          />
 
           <CloseDialogs
             pendingClosePanel={pendingClosePanel}
