@@ -140,7 +140,7 @@ export function Header({
         onSelectConfig={onSelectRunConfig}
         onRun={onRunConfig}
         onStop={onStopConfig}
-        onOpenSettings={onOpenRunSettings}
+        onOpenRunConfigurations={onOpenRunSettings}
       />
 
       <OpenInEditorButton
