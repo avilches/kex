@@ -6,6 +6,7 @@ import {
   setSavedRightPanelState,
   type RightPanelUiState,
 } from "./windowUiState";
+import { setSavedWorkspaceSidebarWidth } from "./workspaceSidebarState";
 
 type SavedState = { workspaces: Workspace[]; activeIndex: number };
 
@@ -14,6 +15,7 @@ type WindowEntry = {
   workspaces: Workspace[];
   activeIndex: number;
   rightPanel?: RightPanelUiState;
+  workspaceSidebarWidth?: number;
 };
 
 let cached: SavedState | null = null;
@@ -76,6 +78,7 @@ export async function initWorkspaceState(): Promise<void> {
       cached = { workspaces: entry.workspaces.map(sanitizeWorkspace), activeIndex: entry.activeIndex };
     }
     setSavedRightPanelState(entry?.rightPanel);
+    setSavedWorkspaceSidebarWidth(entry?.workspaceSidebarWidth);
   } catch (err) {
     console.error("[workspace-state] initWorkspaceState error:", err);
     cached = null;

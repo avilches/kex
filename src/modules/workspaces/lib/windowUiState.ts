@@ -16,7 +16,7 @@ export type RightPanelUiState = {
 };
 
 // width is a react-resizable-panels percentage; defaults match the panel's
-// min/max bounds (12%-35%) and the historical 20% default size.
+// min/max bounds (12%-70%) and the historical 20% default size.
 export const DEFAULT_RIGHT_PANEL_STATE: RightPanelUiState = {
   open: true,
   activeTab: "explorer",
@@ -25,7 +25,7 @@ export const DEFAULT_RIGHT_PANEL_STATE: RightPanelUiState = {
 };
 
 const RIGHT_PANEL_WIDTH_MIN = 12;
-const RIGHT_PANEL_WIDTH_MAX = 35;
+const RIGHT_PANEL_WIDTH_MAX = 70;
 
 function parseActiveTab(value: unknown): RightPanelTabId {
   return value === "git" || value === "history" ? value : "explorer";

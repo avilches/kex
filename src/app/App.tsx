@@ -103,6 +103,10 @@ import {
   getSavedWorkspaceState,
   saveWorkspaceState,
 } from "@/modules/workspaces/lib/workspaceState";
+import {
+  getSavedWorkspaceSidebarWidth,
+  saveWorkspaceSidebarWidth,
+} from "@/modules/workspaces/lib/workspaceSidebarState";
 import { useRightPanelState } from "@/modules/workspaces/lib/useRightPanelState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
@@ -394,6 +398,11 @@ export default function App() {
     null,
   );
   const windowLabel = useMemo(() => getCurrentWebviewWindow().label, []);
+  const [workspaceSidebarWidth, setWorkspaceSidebarWidth] = useState(getSavedWorkspaceSidebarWidth);
+  const handleSidebarWidthChange = useCallback((w: number) => {
+    setWorkspaceSidebarWidth(w);
+    saveWorkspaceSidebarWidth(windowLabel, w);
+  }, [windowLabel]);
   const {
     open: rightPanelOpen,
     activeTab: rightPanelActiveTab,
@@ -2407,6 +2416,8 @@ export default function App() {
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
               onOpenSettings={() => {}}
+              width={workspaceSidebarWidth}
+              onWidthChange={handleSidebarWidthChange}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
@@ -2430,7 +2441,7 @@ export default function App() {
                       id="tool-panel"
                       defaultSize={`${rightPanelWidth}%`}
                       minSize="12%"
-                      maxSize="35%"
+                      maxSize="70%"
                       onResize={(size) => setRightPanelWidth(size.asPercentage)}
                     >
                       <RightPanel
@@ -2524,7 +2535,7 @@ export default function App() {
                       id="tool-panel"
                       defaultSize={`${rightPanelWidth}%`}
                       minSize="12%"
-                      maxSize="35%"
+                      maxSize="70%"
                       onResize={(size) => setRightPanelWidth(size.asPercentage)}
                     >
                       <RightPanel

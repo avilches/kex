@@ -43,6 +43,8 @@ export type WorkspaceSidebarProps = {
   onClose?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onOpenSettings: (id: string) => void;
+  width: number;
+  onWidthChange: (w: number) => void;
 };
 
 function abbrev(title: string, kind: string): string {
@@ -55,6 +57,7 @@ function abbrev(title: string, kind: string): string {
 function SortableWorkspaceItem({
   ws,
   active,
+  sidebarWidth,
   onSelect,
   onClose,
   onRename,
@@ -62,6 +65,7 @@ function SortableWorkspaceItem({
 }: {
   ws: WorkspaceItem;
   active: boolean;
+  sidebarWidth: number;
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
@@ -117,14 +121,19 @@ function SortableWorkspaceItem({
     clearRename();
   }
 
+  const compact = sidebarWidth <= 80;
+
   const button = (
-    <div ref={setNodeRef} className="group relative" style={style}>
+    <div ref={setNodeRef} className="group relative w-full px-1.5" style={style}>
       <button
         type="button"
         title={ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : (ws.title || ws.kind)}
         onClick={() => onSelect(ws.id)}
         className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-lg text-[11px] font-semibold transition-all select-none",
+          "flex w-full items-center justify-center rounded-lg font-semibold transition-all select-none",
+          compact
+            ? "h-9 text-[11px]"
+            : "h-auto flex-col gap-0.5 px-2 py-1.5 text-[11px]",
           active
             ? "text-white"
             : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -146,11 +155,18 @@ function SortableWorkspaceItem({
         {...listeners}
         aria-pressed={active}
       >
-        {abbrev(ws.title, ws.kind)}
+        <span className={compact ? "text-[11px]" : "text-[14px] font-bold"}>
+          {abbrev(ws.title, ws.kind)}
+        </span>
+        {!compact && (
+          <span className="max-w-full truncate text-center text-[10px] font-normal leading-tight">
+            {ws.title || ws.kind}
+          </span>
+        )}
       </button>
       {!active && displayColor && (
         <span
-          className="absolute inset-y-2 left-0 w-[3px] rounded-full"
+          className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
           style={{ backgroundColor: displayColor }}
         />
       )}
@@ -159,7 +175,7 @@ function SortableWorkspaceItem({
           type="button"
           title="Close workspace"
           onClick={(e) => { e.stopPropagation(); onClose(ws.id); }}
-          className="absolute -right-1 -top-1 hidden size-[14px] items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
+          className="absolute -right-0 -top-1 hidden size-[14px] items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
         </button>
@@ -223,7 +239,7 @@ function SortableWorkspaceItem({
   );
 }
 
-export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReorder, onClose, onRename, onOpenSettings }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReorder, onClose, onRename, onOpenSettings, width, onWidthChange }: WorkspaceSidebarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [isDragging, setIsDragging] = useState(false);
 
@@ -247,9 +263,10 @@ export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReor
     <nav
       aria-label="Workspaces"
       className={cn(
-        "flex w-[52px] shrink-0 flex-col items-center gap-1.5 border-r border-border/60 bg-card/60 py-2",
+        "relative flex shrink-0 flex-col items-center gap-1.5 border-r border-border/60 bg-card/60 py-2",
         isDragging && "[&_*]:!cursor-grabbing cursor-grabbing",
       )}
+      style={{ width }}
     >
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <SortableContext items={workspaces.map((w) => w.id)} strategy={verticalListSortingStrategy}>
@@ -258,6 +275,7 @@ export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReor
               key={ws.id}
               ws={ws}
               active={ws.id === activeId}
+              sidebarWidth={width}
               onSelect={onSelect}
               onClose={onClose}
               onRename={onRename}
@@ -275,6 +293,27 @@ export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReor
       >
         +
       </button>
+
+      {/* Resize handle on the right edge */}
+      <div
+        className="absolute inset-y-0 right-0 w-1 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50"
+        onPointerDown={(e) => {
+          const startX = e.clientX;
+          const startWidth = width;
+          e.currentTarget.setPointerCapture(e.pointerId);
+
+          const onMove = (ev: PointerEvent) => {
+            const next = Math.min(220, Math.max(52, startWidth + (ev.clientX - startX)));
+            onWidthChange(next);
+          };
+          const onUp = () => {
+            document.removeEventListener("pointermove", onMove);
+            document.removeEventListener("pointerup", onUp);
+          };
+          document.addEventListener("pointermove", onMove);
+          document.addEventListener("pointerup", onUp);
+        }}
+      />
     </nav>
   );
 }

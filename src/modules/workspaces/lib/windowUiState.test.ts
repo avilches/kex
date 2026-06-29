@@ -32,7 +32,7 @@ describe("sanitizeRightPanelState", () => {
 
   it("clamps width to the panel's min/max percentage bounds", () => {
     expect(sanitizeRightPanelState({ width: 5 }).width).toBe(12);
-    expect(sanitizeRightPanelState({ width: 99 }).width).toBe(35);
+    expect(sanitizeRightPanelState({ width: 99 }).width).toBe(70);
     expect(sanitizeRightPanelState({ width: 25 }).width).toBe(25);
   });
 
