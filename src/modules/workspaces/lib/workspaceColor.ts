@@ -7,6 +7,7 @@ export const WORKSPACE_COLOR_PALETTE = [
   "#f7c34f", // yellow
   "#4fc97a", // green
   "#4fc9c9", // teal
+  "#f75a5a", // red
 ] as const;
 
 // Stable hue 0-359 derived from the workspace ID string.
