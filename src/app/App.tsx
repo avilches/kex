@@ -204,6 +204,7 @@ export default function App() {
     reorderRunConfigs,
     setActiveRunConfig,
     validateRunConfigPanels,
+    setScriptPaneId,
     setTerminalRunningCommand,
     setPanelView,
     toggleOverlayPreview,
@@ -287,6 +288,7 @@ export default function App() {
     useState<SearchAddon | null>(null);
   const searchInlineRef = useRef<SearchInlineHandle | null>(null);
   const terminalHandles = useRef<Map<string, TerminalPaneHandle>>(new Map());
+  const runConfigCommandSeen = useRef<Set<string>>(new Set());
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
@@ -463,6 +465,7 @@ export default function App() {
         disposeSession(id);
         searchAddons.current.delete(id);
         terminalHandles.current.delete(id);
+        runConfigCommandSeen.current.delete(id);
         clearRunningCommandEntry(id);
         clearRunConfigRunningEntry(id);
         clearMetricsEntry(id);
@@ -517,6 +520,7 @@ export default function App() {
     (config: RunConfig) => {
       if (!activeWorkspace) return;
 
+      // Case 1: panel already exists -- focus it and re-run if idle
       if (config.panelId) {
         const found = findPanelGlobal(config.panelId);
         if (found) {
@@ -539,26 +543,44 @@ export default function App() {
         }
       }
 
-      const newPanelId = crypto.randomUUID();
-      const panelCwd =
-        config.cwd ?? activeWorkspace.pinnedRoot ?? activeWorkspace.cwd;
-      const panel: Panel = { id: newPanelId, kind: "terminal", cwd: panelCwd };
+      const freshPanelId = newPanelId();
+      const panelCwd = config.cwd ?? activeWorkspace.pinnedRoot ?? activeWorkspace.cwd;
+      const panel: Panel = { id: freshPanelId, kind: "terminal", cwd: panelCwd };
 
-      splitPaneAndOpenPanel(activeWorkspace.id, activeWorkspace.activePaneId, "bottom", panel);
-      updateRunConfig(activeWorkspace.id, config.id, { panelId: newPanelId });
+      // Case 2: existing script pane -- add panel to it without splitting
+      const existingScriptPane = activeWorkspace.scriptPaneId
+        ? findPane(activeWorkspace.paneTree, activeWorkspace.scriptPaneId)
+        : null;
+
+      if (existingScriptPane) {
+        openPanel(activeWorkspace.id, activeWorkspace.scriptPaneId!, panel);
+        setActiveWorkspaceId(activeWorkspace.id);
+        activatePanel(activeWorkspace.id, freshPanelId);
+      } else {
+        // Case 3: no script pane yet -- split and record the new pane
+        const freshPaneId = splitPaneAndOpenPanel(
+          activeWorkspace.id,
+          activeWorkspace.activePaneId,
+          "bottom",
+          panel,
+        );
+        setScriptPaneId(activeWorkspace.id, freshPaneId);
+      }
+
+      updateRunConfig(activeWorkspace.id, config.id, { panelId: freshPanelId });
 
       const tryWrite = (attempts = 0) => {
-        const handle = terminalHandles.current.get(newPanelId);
+        const handle = terminalHandles.current.get(freshPanelId);
         if (handle) {
           handle.write(config.command + "\r");
-          setRunConfigRunning(newPanelId, true);
+          setRunConfigRunning(freshPanelId, true);
         } else if (attempts < 20) {
           setTimeout(() => tryWrite(attempts + 1), 100);
         }
       };
       setTimeout(tryWrite, 150);
     },
-    [activeWorkspace, findPanelGlobal, setActiveWorkspaceId, activatePanel, splitPaneAndOpenPanel, updateRunConfig],
+    [activeWorkspace, findPanelGlobal, setActiveWorkspaceId, activatePanel, splitPaneAndOpenPanel, updateRunConfig, openPanel, setScriptPaneId],
   );
 
   const stopWorkspaceConfig = useCallback(
@@ -1700,8 +1722,14 @@ export default function App() {
       onRunningCommand: (panelId, cmd) => {
         const found = findPanelGlobal(panelId);
         if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
-        if (cmd === null && getRunConfigRunningSnapshot().has(panelId)) {
+        if (cmd !== null) {
+          runConfigCommandSeen.current.add(panelId);
+        } else if (
+          runConfigCommandSeen.current.has(panelId) &&
+          getRunConfigRunningSnapshot().has(panelId)
+        ) {
           setRunConfigRunning(panelId, false);
+          runConfigCommandSeen.current.delete(panelId);
         }
       },
       onScratchpadState: (panelId, state) => {
@@ -2013,10 +2041,10 @@ export default function App() {
       },
       "workspace.run": () => {
         if (!activeWorkspace) return;
-        const configs = activeWorkspace.runConfigs ?? [];
+        const configs = activeWorkspace.scripts ?? [];
         if (configs.length === 0) return;
         const active =
-          configs.find((c) => c.id === activeWorkspace.activeRunConfigId) ??
+          configs.find((c) => c.id === activeWorkspace.activeScript) ??
           configs[0];
         if (!active) return;
         const isRunning = !!(
@@ -2508,8 +2536,8 @@ export default function App() {
             openInEditorTarget={openInEditorTarget}
             workspaceRoot={workspaceRootPath}
             onOpenExternalEditorSettings={onOpenExternalEditorSettings}
-            runConfigs={activeWorkspace?.runConfigs ?? []}
-            activeRunConfigId={activeWorkspace?.activeRunConfigId}
+            scripts={activeWorkspace?.scripts ?? []}
+            activeScript={activeWorkspace?.activeScript}
             onSelectRunConfig={(id) => setActiveRunConfig(activeWorkspaceId, id)}
             onRunConfig={runWorkspaceConfig}
             onStopConfig={stopWorkspaceConfig}
