@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import {
   Cancel01Icon,
@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
+import type { WorkspaceSettingsTab } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
@@ -47,7 +48,7 @@ type Props = {
 };
 
 export function WorkspaceSettingsDialog(props: Props) {
-  const { open, workspaceId, closeSettings } = useWorkspaceSettingsStore();
+  const { open, workspaceId, initialTab, closeSettings } = useWorkspaceSettingsStore();
   const ws = props.workspaces.find((w) => w.id === workspaceId);
 
   return (
@@ -57,14 +58,19 @@ export function WorkspaceSettingsDialog(props: Props) {
           <DialogTitle>Workspace Properties</DialogTitle>
         </DialogHeader>
         {ws && (
-          <WorkspaceSettingsForm key={ws.id} ws={ws} {...props} />
+          <WorkspaceSettingsForm
+            key={`${ws.id}-${initialTab}`}
+            ws={ws}
+            initialTab={initialTab}
+            {...props}
+          />
         )}
       </DialogContent>
     </Dialog>
   );
 }
 
-type FormProps = { ws: Workspace } & Omit<Props, "workspaces">;
+type FormProps = { ws: Workspace; initialTab: WorkspaceSettingsTab } & Omit<Props, "workspaces">;
 
 const PALETTE_ROW1 = WORKSPACE_COLOR_PALETTE.slice(0, 4);
 const PALETTE_ROW2 = WORKSPACE_COLOR_PALETTE.slice(4);
@@ -87,7 +93,6 @@ function ColorPicker({
 
   return (
     <div className="flex flex-col gap-1">
-      {/* Row 1: no-color chip + first 4 palette colors */}
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -110,16 +115,12 @@ function ColorPicker({
             onClick={() => onSetColor(wsId, hex)}
             className={cn(
               "size-6 rounded-full border-2 transition-opacity",
-              wsColor === hex
-                ? "border-foreground"
-                : "border-transparent hover:border-foreground/40",
+              wsColor === hex ? "border-foreground" : "border-transparent hover:border-foreground/40",
             )}
             style={{ backgroundColor: hex }}
           />
         ))}
       </div>
-
-      {/* Row 2: remaining 5 palette colors */}
       <div className="flex items-center gap-1">
         {PALETTE_ROW2.map((hex) => (
           <button
@@ -129,16 +130,12 @@ function ColorPicker({
             onClick={() => onSetColor(wsId, hex)}
             className={cn(
               "size-6 rounded-full border-2 transition-opacity",
-              wsColor === hex
-                ? "border-foreground"
-                : "border-transparent hover:border-foreground/40",
+              wsColor === hex ? "border-foreground" : "border-transparent hover:border-foreground/40",
             )}
             style={{ backgroundColor: hex }}
           />
         ))}
       </div>
-
-      {/* Row 3: color preview + hex input + native color picker */}
       <div className="flex items-center gap-1.5">
         <div
           className="size-5 shrink-0 rounded-full border border-border"
@@ -157,7 +154,7 @@ function ColorPicker({
         <label
           title="Pick color"
           className="relative flex size-6 cursor-pointer items-center justify-center overflow-hidden rounded border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
-          style={displayColor ? { backgroundColor: displayColor + "33" } : undefined}
+          style={displayColor ? { backgroundColor: `${displayColor}33` } : undefined}
         >
           <input
             type="color"
@@ -172,7 +169,8 @@ function ColorPicker({
   );
 }
 
-function WorkspaceSettingsForm({ ws, ...props }: FormProps) {
+function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
+  const [activeTab, setActiveTab] = useState<WorkspaceSettingsTab>(initialTab);
   const [cwdValue, setCwdValue] = useState(ws.pinnedRoot ?? "");
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
 
@@ -195,104 +193,200 @@ function WorkspaceSettingsForm({ ws, ...props }: FormProps) {
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
 
   return (
-    <div className="flex flex-col gap-5 py-1">
-      {/* Name + Color: 50% / 50% */}
-      <div className="flex gap-4">
-        <div className="flex flex-1 flex-col gap-1.5">
-          <label className="text-xs font-medium">Name</label>
-          <input
-            className="h-8 rounded-md border border-border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
-            defaultValue={ws.title}
-            onBlur={(e) => {
-              const v = e.target.value.trim();
-              if (v) props.onSetTitle(ws.id, v);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-          />
-        </div>
-
-        <div className="flex flex-1 flex-col gap-1.5">
-          <label className="text-xs font-medium">Color</label>
-          <ColorPicker
-            wsId={ws.id}
-            wsColor={ws.color}
-            displayColor={displayColor}
-            onSetColor={props.onSetColor}
-          />
-        </div>
-      </div>
-
-      {/* Working Directory */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium">Working Directory</label>
-        <div className="flex items-center gap-1">
-          <input
-            className={cn(
-              "h-8 flex-1 rounded-md border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1",
-              cwdValid === false ? "border-destructive" : "border-border",
-            )}
-            value={cwdValue}
-            onChange={(e) => setCwdValue(e.target.value)}
-            onBlur={() => {
-              if (!cwdValue) {
-                props.onSetPinnedRoot(ws.id, undefined);
-              } else if (cwdValid !== false) {
-                props.onSetPinnedRoot(ws.id, cwdValue);
-              }
-            }}
-            placeholder="Not set"
-          />
-          {cwdValue && (
-            <button
-              type="button"
-              title="Clear"
-              onClick={() => {
-                setCwdValue("");
-                setCwdValid(null);
-                props.onSetPinnedRoot(ws.id, undefined);
-              }}
-              className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
-            </button>
-          )}
+    <div className="flex flex-col gap-0 py-1">
+      {/* Tab bar */}
+      <div className="mb-4 flex gap-0 border-b border-border">
+        {(["properties", "run-configurations"] as const).map((tab) => (
           <button
+            key={tab}
             type="button"
-            title="Browse"
-            onClick={async () => {
-              const selected = await openFolderDialog({
-                directory: true,
-                defaultPath: cwdValue || undefined,
-              });
-              if (typeof selected === "string") {
-                setCwdValue(selected);
-                setCwdValid(null);
-                props.onSetPinnedRoot(ws.id, selected);
-              }
-            }}
-            className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "-mb-px px-3 py-1.5 text-[12px] font-medium transition-colors",
+              activeTab === tab
+                ? "border-b-2 border-primary text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
-            <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
+            {tab === "properties" ? "Properties" : "Run Configurations"}
           </button>
-        </div>
-        {cwdValid === false && (
-          <p className="text-[11px] text-destructive">Folder does not exist</p>
-        )}
+        ))}
       </div>
 
-      {/* Run Configurations */}
-      <RunConfigSection
-        ws={ws}
-        onAddRunConfig={props.onAddRunConfig}
-        onUpdateRunConfig={props.onUpdateRunConfig}
-        onRemoveRunConfig={props.onRemoveRunConfig}
-        onReorderRunConfigs={props.onReorderRunConfigs}
-      />
+      {activeTab === "properties" && (
+        <div className="flex flex-col gap-5">
+          {/* Name + Color: 50% / 50% */}
+          <div className="flex gap-4">
+            <div className="flex flex-1 flex-col gap-1.5">
+              <label className="text-xs font-medium">Name</label>
+              <input
+                className="h-8 rounded-md border border-border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
+                defaultValue={ws.title}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (v) props.onSetTitle(ws.id, v);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+              />
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <label className="text-xs font-medium">Color</label>
+              <ColorPicker
+                wsId={ws.id}
+                wsColor={ws.color}
+                displayColor={displayColor}
+                onSetColor={props.onSetColor}
+              />
+            </div>
+          </div>
+
+          {/* Working Directory */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium">Working Directory</label>
+            <div className="flex items-center gap-1">
+              <input
+                className={cn(
+                  "h-8 flex-1 rounded-md border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1",
+                  cwdValid === false ? "border-destructive" : "border-border",
+                )}
+                value={cwdValue}
+                onChange={(e) => setCwdValue(e.target.value)}
+                onBlur={() => {
+                  if (!cwdValue) {
+                    props.onSetPinnedRoot(ws.id, undefined);
+                  } else if (cwdValid !== false) {
+                    props.onSetPinnedRoot(ws.id, cwdValue);
+                  }
+                }}
+                placeholder="Not set"
+              />
+              {cwdValue && (
+                <button
+                  type="button"
+                  title="Clear"
+                  onClick={() => {
+                    setCwdValue("");
+                    setCwdValid(null);
+                    props.onSetPinnedRoot(ws.id, undefined);
+                  }}
+                  className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                </button>
+              )}
+              <button
+                type="button"
+                title="Browse"
+                onClick={async () => {
+                  const selected = await openFolderDialog({
+                    directory: true,
+                    defaultPath: cwdValue || undefined,
+                  });
+                  if (typeof selected === "string") {
+                    setCwdValue(selected);
+                    setCwdValid(null);
+                    props.onSetPinnedRoot(ws.id, selected);
+                  }
+                }}
+                className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
+              </button>
+            </div>
+            {cwdValid === false && (
+              <p className="text-[11px] text-destructive">Folder does not exist</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "run-configurations" && (
+        <RunConfigSection
+          ws={ws}
+          onAddRunConfig={props.onAddRunConfig}
+          onUpdateRunConfig={props.onUpdateRunConfig}
+          onRemoveRunConfig={props.onRemoveRunConfig}
+          onReorderRunConfigs={props.onReorderRunConfigs}
+        />
+      )}
     </div>
   );
 }
+
+type RunConfigRowHandle = { focusCommand: () => void };
+
+const RunConfigRow = forwardRef<
+  RunConfigRowHandle,
+  {
+    config: RunConfig;
+    onUpdate: (patch: Partial<Omit<RunConfig, "id">>) => void;
+    onRemove: () => void;
+  }
+>(function RunConfigRow({ config, onUpdate, onRemove }, ref) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: config.id,
+  });
+  const [showCwd, setShowCwd] = useState(!!config.cwd);
+  const commandRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusCommand: () => {
+      commandRef.current?.focus();
+      commandRef.current?.select();
+    },
+  }));
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2"
+    >
+      <div className="flex items-center gap-1.5">
+        <span {...attributes} {...listeners} className="cursor-grab text-muted-foreground">
+          <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
+        </span>
+        <input
+          ref={commandRef}
+          className="h-8 flex-1 rounded-md border border-border/60 bg-background px-3 font-mono text-sm outline-none ring-ring focus-visible:ring-1"
+          placeholder="Command (e.g. pnpm dev)"
+          defaultValue={config.command}
+          onBlur={(e) => onUpdate({ command: e.target.value })}
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="size-[22px] flex items-center justify-center rounded text-muted-foreground hover:text-destructive"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+        </button>
+      </div>
+      <input
+        className="h-8 w-full rounded-md border border-border/60 bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
+        placeholder="Name (optional)"
+        defaultValue={config.name}
+        onBlur={(e) => onUpdate({ name: e.target.value })}
+      />
+      <button
+        type="button"
+        className="self-start text-[11px] text-muted-foreground hover:text-foreground"
+        onClick={() => setShowCwd((v) => !v)}
+      >
+        {showCwd ? "Hide working dir" : "+ Working dir"}
+      </button>
+      {showCwd && (
+        <input
+          className="h-8 w-full rounded-md border border-border/60 bg-background px-3 font-mono text-sm outline-none ring-ring focus-visible:ring-1"
+          placeholder="Working dir (optional)"
+          defaultValue={config.cwd ?? ""}
+          onBlur={(e) => onUpdate({ cwd: e.target.value || undefined })}
+        />
+      )}
+    </div>
+  );
+});
 
 function RunConfigSection({
   ws,
@@ -311,7 +405,16 @@ function RunConfigSection({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
   const configs = ws.runConfigs ?? [];
-  const hasIncomplete = configs.some((c) => !c.name.trim() || !c.command.trim());
+  const configRefs = useRef<Map<string, RunConfigRowHandle>>(new Map());
+
+  function handleAdd() {
+    const firstMissingCommand = configs.find((c) => !c.command.trim());
+    if (firstMissingCommand) {
+      configRefs.current.get(firstMissingCommand.id)?.focusCommand();
+      return;
+    }
+    onAddRunConfig(ws.id, { id: crypto.randomUUID(), name: "", command: "" });
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -326,38 +429,23 @@ function RunConfigSection({
         <label className="text-xs font-medium">Run Configurations</label>
         <button
           type="button"
-          disabled={hasIncomplete}
-          onClick={() =>
-            onAddRunConfig(ws.id, {
-              id: crypto.randomUUID(),
-              name: "",
-              command: "",
-            })
-          }
-          className={cn(
-            "rounded border px-2 py-0.5 text-[11px] transition-colors",
-            hasIncomplete
-              ? "cursor-not-allowed border-border/40 text-muted-foreground/40"
-              : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-          )}
+          onClick={handleAdd}
+          className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
         >
-          + Add
+          + Run Configuration
         </button>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={configs.map((c) => c.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className={configs.length > 2 ? "flex max-h-[180px] flex-col gap-1 overflow-y-auto pr-1" : "flex flex-col gap-1"}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={configs.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+          <div className="flex max-h-[200px] flex-col gap-1.5 overflow-y-auto pr-0.5">
             {configs.map((cfg) => (
               <RunConfigRow
                 key={cfg.id}
+                ref={(handle) => {
+                  if (handle) configRefs.current.set(cfg.id, handle);
+                  else configRefs.current.delete(cfg.id);
+                }}
                 config={cfg}
                 onUpdate={(patch) => onUpdateRunConfig(ws.id, cfg.id, patch)}
                 onRemove={() => onRemoveRunConfig(ws.id, cfg.id)}
@@ -369,73 +457,6 @@ function RunConfigSection({
 
       {configs.length === 0 && (
         <p className="text-[11px] text-muted-foreground">No run configurations yet.</p>
-      )}
-    </div>
-  );
-}
-
-function RunConfigRow({
-  config,
-  onUpdate,
-  onRemove,
-}: {
-  config: RunConfig;
-  onUpdate: (patch: Partial<Omit<RunConfig, "id">>) => void;
-  onRemove: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-    id: config.id,
-  });
-  const [showCwd, setShowCwd] = useState(!!config.cwd);
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className="flex flex-col gap-1 rounded-md border border-border/60 p-2"
-    >
-      <div className="flex items-center gap-1">
-        <span
-          {...attributes}
-          {...listeners}
-          className="cursor-grab text-muted-foreground"
-        >
-          <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
-        </span>
-        <input
-          className="h-6 flex-1 rounded border border-border/60 bg-background px-2 text-[11px]"
-          placeholder="Name (e.g. Dev server)"
-          defaultValue={config.name}
-          onBlur={(e) => onUpdate({ name: e.target.value })}
-        />
-        <button
-          type="button"
-          onClick={onRemove}
-          className="size-[20px] flex items-center justify-center rounded text-muted-foreground hover:text-destructive"
-        >
-          <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
-        </button>
-      </div>
-      <input
-        className="h-6 w-full rounded border border-border/60 bg-background px-2 font-mono text-[11px]"
-        placeholder="Command (e.g. pnpm dev)"
-        defaultValue={config.command}
-        onBlur={(e) => onUpdate({ command: e.target.value })}
-      />
-      <button
-        type="button"
-        className="self-start text-[10px] text-muted-foreground hover:text-foreground"
-        onClick={() => setShowCwd((v) => !v)}
-      >
-        {showCwd ? "Hide working dir" : "+ Working dir"}
-      </button>
-      {showCwd && (
-        <input
-          className="h-6 w-full rounded border border-border/60 bg-background px-2 font-mono text-[11px]"
-          placeholder="Working dir (optional, defaults to workspace root)"
-          defaultValue={config.cwd ?? ""}
-          onBlur={(e) => onUpdate({ cwd: e.target.value || undefined })}
-        />
       )}
     </div>
   );
