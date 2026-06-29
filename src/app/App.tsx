@@ -558,13 +558,20 @@ export default function App() {
         activatePanel(activeWorkspace.id, freshPanelId);
       } else {
         // Case 3: no script pane yet -- split and record the new pane
-        const freshPaneId = splitPaneAndOpenPanel(
-          activeWorkspace.id,
-          activeWorkspace.activePaneId,
-          "bottom",
-          panel,
-        );
-        setScriptPaneId(activeWorkspace.id, freshPaneId);
+        const { workspacePaneLimit } = usePreferencesStore.getState();
+        const atLimit = allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit;
+        if (atLimit) {
+          openPanel(activeWorkspace.id, activeWorkspace.activePaneId, panel);
+          setScriptPaneId(activeWorkspace.id, activeWorkspace.activePaneId);
+        } else {
+          const freshPaneId = splitPaneAndOpenPanel(
+            activeWorkspace.id,
+            activeWorkspace.activePaneId,
+            "bottom",
+            panel,
+          );
+          setScriptPaneId(activeWorkspace.id, freshPaneId);
+        }
       }
 
       updateRunConfig(activeWorkspace.id, config.id, { panelId: freshPanelId });

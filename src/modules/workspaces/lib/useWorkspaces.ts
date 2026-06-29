@@ -748,7 +748,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           const configs = w.scripts ?? [];
           const cleaned = configs.map((c) =>
             c.panelId && !livingPanelIds.has(c.panelId)
-              ? { ...c, panelId: undefined, paneId: undefined }
+              ? { ...c, panelId: undefined }
               : c,
           );
           const paneStillLive = w.scriptPaneId ? allPanes(w.paneTree).some((p) => p.id === w.scriptPaneId) : true;
