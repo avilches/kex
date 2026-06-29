@@ -595,6 +595,8 @@ export default function App() {
       if (!config.panelId) return;
       const handle = terminalHandles.current.get(config.panelId);
       handle?.write("\x03");
+      setRunConfigRunning(config.panelId, false);
+      runConfigCommandSeen.current.delete(config.panelId);
     },
     [],
   );

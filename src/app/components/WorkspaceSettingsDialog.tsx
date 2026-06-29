@@ -56,7 +56,7 @@ export function WorkspaceSettingsDialog(props: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Workspace {ws?.title}</DialogTitle>
         </DialogHeader>
@@ -196,7 +196,7 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
 
   return (
-    <div className="flex min-h-[460px] flex-col gap-0 py-1">
+    <div className="flex min-h-[380px] flex-col gap-0 py-1">
       {/* Tab bar */}
       <div className="mb-4 flex gap-0 border-b border-border">
         {(["properties", "run-configurations"] as const).map((tab) => (
@@ -218,31 +218,32 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
 
       {activeTab === "properties" && (
         <div className="flex flex-col gap-5">
-          {/* Name + Color: 50% / 50% */}
-          <div className="flex gap-4">
-            <div className="flex flex-1 flex-col gap-1.5">
-              <label className="text-xs font-medium">Name</label>
-              <input
-                className="h-8 rounded-md border border-border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
-                defaultValue={ws.title}
-                onBlur={(e) => {
-                  const v = e.target.value.trim();
-                  if (v) props.onSetTitle(ws.id, v);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-              />
-            </div>
-            <div className="flex flex-1 flex-col gap-1.5">
-              <label className="text-xs font-medium">Color</label>
-              <ColorPicker
-                wsId={ws.id}
-                wsColor={ws.color}
-                displayColor={displayColor}
-                onSetColor={props.onSetColor}
-              />
-            </div>
+          {/* Name: full width */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium">Name</label>
+            <input
+              className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
+              placeholder="Name"
+              spellCheck={false}
+              defaultValue={ws.title}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v) props.onSetTitle(ws.id, v);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+            />
+          </div>
+          {/* Color: below name */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium">Color</label>
+            <ColorPicker
+              wsId={ws.id}
+              wsColor={ws.color}
+              displayColor={displayColor}
+              onSetColor={props.onSetColor}
+            />
           </div>
 
           {/* Working Directory */}
@@ -254,6 +255,7 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
                   "h-8 flex-1 rounded-md border bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1",
                   cwdValid === false ? "border-destructive" : "border-border",
                 )}
+                spellCheck={false}
                 value={cwdValue}
                 onChange={(e) => setCwdValue(e.target.value)}
                 onBlur={() => {
@@ -360,6 +362,7 @@ const RunConfigRow = forwardRef<
             commandDirty && !commandValue ? "border-destructive" : "border-border/60",
           )}
           placeholder="Command (e.g. pnpm dev)"
+          spellCheck={false}
           defaultValue={config.command}
           onBlur={(e) => {
             setCommandDirty(true);
@@ -369,7 +372,8 @@ const RunConfigRow = forwardRef<
         />
         <input
           className="h-8 flex-[1_1_0%] min-w-0 rounded-md border border-border/60 bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
-          placeholder="Name (optional)"
+          placeholder="Name"
+          spellCheck={false}
           defaultValue={config.name}
           onBlur={(e) => onUpdate({ name: e.target.value })}
         />
@@ -447,7 +451,7 @@ function RunConfigSection({
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={configs.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-          <div className="flex max-h-[200px] flex-col gap-1.5 overflow-y-auto pr-0.5">
+          <div className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto pr-0.5">
             {configs.map((cfg) => (
               <RunConfigRow
                 key={cfg.id}
