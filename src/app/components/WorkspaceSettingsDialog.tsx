@@ -4,8 +4,11 @@ import {
   Cancel01Icon,
   DragDropVerticalIcon,
   FolderOpenIcon,
+  PlusSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "@/components/ui/button";
+import { newScriptId } from "@/lib/ids";
 import {
   DndContext,
   closestCenter,
@@ -53,9 +56,9 @@ export function WorkspaceSettingsDialog(props: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Workspace Properties</DialogTitle>
+          <DialogTitle>Workspace {ws?.title}</DialogTitle>
         </DialogHeader>
         {ws && (
           <WorkspaceSettingsForm
@@ -193,7 +196,7 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
 
   return (
-    <div className="flex flex-col gap-0 py-1">
+    <div className="flex min-h-[460px] flex-col gap-0 py-1">
       {/* Tab bar */}
       <div className="mb-4 flex gap-0 border-b border-border">
         {(["properties", "run-configurations"] as const).map((tab) => (
@@ -208,7 +211,7 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {tab === "properties" ? "Properties" : "Run Configurations"}
+            {tab === "properties" ? "Properties" : "Run Scripts"}
           </button>
         ))}
       </div>
@@ -244,7 +247,7 @@ function WorkspaceSettingsForm({ ws, initialTab, ...props }: FormProps) {
 
           {/* Working Directory */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium">Working Directory</label>
+            <label className="text-xs font-medium">Workspace Root</label>
             <div className="flex items-center gap-1">
               <input
                 className={cn(
@@ -325,6 +328,8 @@ const RunConfigRow = forwardRef<
     onRemove: () => void;
   }
 >(function RunConfigRow({ config, onUpdate, onRemove }, ref) {
+  const [commandDirty, setCommandDirty] = useState(false);
+  const [commandValue, setCommandValue] = useState(config.command);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: config.id,
   });
@@ -345,31 +350,38 @@ const RunConfigRow = forwardRef<
       className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2"
     >
       <div className="flex items-center gap-1.5">
-        <span {...attributes} {...listeners} className="cursor-grab text-muted-foreground">
+        <span {...attributes} {...listeners} className="cursor-grab text-muted-foreground shrink-0">
           <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
         </span>
         <input
           ref={commandRef}
-          className="h-8 flex-1 rounded-md border border-border/60 bg-background px-3 font-mono text-sm outline-none ring-ring focus-visible:ring-1"
+          className={cn(
+            "h-8 flex-[3_3_0%] min-w-0 rounded-md border bg-background px-3 font-mono text-sm outline-none ring-ring focus-visible:ring-1",
+            commandDirty && !commandValue ? "border-destructive" : "border-border/60",
+          )}
           placeholder="Command (e.g. pnpm dev)"
           defaultValue={config.command}
-          onBlur={(e) => onUpdate({ command: e.target.value })}
+          onBlur={(e) => {
+            setCommandDirty(true);
+            setCommandValue(e.target.value);
+            onUpdate({ command: e.target.value });
+          }}
+        />
+        <input
+          className="h-8 flex-[1_1_0%] min-w-0 rounded-md border border-border/60 bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
+          placeholder="Name (optional)"
+          defaultValue={config.name}
+          onBlur={(e) => onUpdate({ name: e.target.value })}
         />
         <button
           type="button"
           title="Remove"
           onClick={onRemove}
-          className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-destructive"
+          className="size-[22px] shrink-0 flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-destructive"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
         </button>
       </div>
-      <input
-        className="h-8 w-full rounded-md border border-border/60 bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-1"
-        placeholder="Name (optional)"
-        defaultValue={config.name}
-        onBlur={(e) => onUpdate({ name: e.target.value })}
-      />
       <button
         type="button"
         className="self-start text-[11px] text-muted-foreground transition-colors hover:text-foreground"
@@ -405,7 +417,7 @@ function RunConfigSection({
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
-  const configs = ws.runConfigs ?? [];
+  const configs = ws.scripts ?? [];
   const configRefs = useRef<Map<string, RunConfigRowHandle>>(new Map());
 
   function handleAdd() {
@@ -414,7 +426,7 @@ function RunConfigSection({
       configRefs.current.get(firstMissingCommand.id)?.focusCommand();
       return;
     }
-    onAddRunConfig(ws.id, { id: crypto.randomUUID(), name: "", command: "" });
+    onAddRunConfig(ws.id, { id: newScriptId(), name: "", command: "" });
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -426,15 +438,11 @@ function RunConfigSection({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-medium">Run Configurations</label>
-        <button
-          type="button"
-          onClick={handleAdd}
-          className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
-        >
-          + Run Configuration
-        </button>
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" className="h-7 w-fit gap-1.5 px-2 text-[12px]" onClick={handleAdd}>
+          <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
+          Add Script
+        </Button>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
