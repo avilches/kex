@@ -569,7 +569,7 @@ export default function App() {
   handleCloseWorkspaceRef.current = handleCloseWorkspace;
 
   const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState<
-    { id: string; isLast: boolean } | null
+    { id: string } | null
   >(null);
   const [pendingWorkspaceProcesses, setPendingWorkspaceProcesses] = useState<
     { id: string; processes: { panelId: string; label: string }[] } | null
@@ -590,10 +590,7 @@ export default function App() {
       }
     }
     if (prefs.warnOnCloseWorkspace) {
-      setPendingCloseWorkspace({
-        id: wsId,
-        isLast: workspacesRef.current.length === 1,
-      });
+      setPendingCloseWorkspace({ id: wsId });
       return;
     }
     void handleCloseWorkspaceRef.current(wsId);

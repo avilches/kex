@@ -26,7 +26,7 @@ type Props = {
   pendingDeletePanels: PanelInfo[] | null;
   onCancelDeleteClose: () => void;
   onConfirmDeleteClose: () => void;
-  pendingCloseWorkspace: { id: string; isLast: boolean } | null;
+  pendingCloseWorkspace: { id: string } | null;
   onCancelCloseWorkspace: () => void;
   onConfirmCloseWorkspace: (dontAskAgain: boolean) => void;
   pendingWorkspaceProcesses: { id: string; processes: { panelId: string; label: string }[] } | null;
@@ -151,11 +151,9 @@ export function CloseDialogs({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Close this workspace?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Workspace</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingCloseWorkspace?.isLast
-                ? "This is the last workspace. Closing it will close all windows."
-                : "The workspace and all of its tabs will be closed."}
+              The workspace and all its tabs will be closed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
@@ -173,7 +171,7 @@ export function CloseDialogs({
               onClick={() => onConfirmCloseWorkspace(dontAskAgain)}
               autoFocus
             >
-              Close
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
