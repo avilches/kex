@@ -67,7 +67,9 @@ fn find_app_by_bundle_id_in_dirs(bundle_id: &str) -> Option<String> {
         dirs.push(home.join("Applications"));
     }
 
+    // Many Setapp apps append "-setapp" to their bundle ID (e.g. "com.krill.CodeRunner-setapp").
     let needle = format!("<string>{}</string>", bundle_id);
+    let needle_setapp = format!("<string>{}-setapp</string>", bundle_id);
     for dir in &dirs {
         let Ok(entries) = std::fs::read_dir(dir) else { continue };
         for entry in entries.flatten() {
@@ -77,7 +79,7 @@ fn find_app_by_bundle_id_in_dirs(bundle_id: &str) -> Option<String> {
             }
             let plist = path.join("Contents/Info.plist");
             if let Ok(contents) = std::fs::read_to_string(&plist) {
-                if contents.contains(&needle) {
+                if contents.contains(&needle) || contents.contains(&needle_setapp) {
                     return path.to_str().map(str::to_string);
                 }
             }
