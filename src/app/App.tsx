@@ -552,7 +552,7 @@ export default function App() {
   useEffect(() => {
     const ref = panelSide === "left" ? leftToolPanelRef : rightToolPanelRef;
     if (rightPanelOpen) {
-      ref.current?.expand();
+      ref.current?.resize(rightPanelStateRef.current.width);
     } else {
       ref.current?.collapse();
     }
