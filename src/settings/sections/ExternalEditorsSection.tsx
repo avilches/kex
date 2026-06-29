@@ -2,6 +2,13 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Cancel01Icon, PlusSignIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -18,9 +25,7 @@ import {
 } from "@/modules/external-editors";
 import type { CustomEditor, EditorGroup, EditorTargetType } from "@/modules/external-editors";
 import { SectionHeader } from "../components/SectionHeader";
-import { cn } from "@/lib/utils";
 
-const COLS = "grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_5.5rem_3.5rem_1.5rem]";
 const ALL_GROUPS: EditorGroup[] = ["Text Editors", "VS Code", "JetBrains", "Other IDEs"];
 const NOT_INSTALLED_COLLAPSED = 1;
 
@@ -219,61 +224,63 @@ export function ExternalEditorsSection() {
 
         {customEditors.length > 0 && (
           <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-            <div className={cn("grid gap-2 px-3 py-1.5", COLS)}>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</span>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Binary / path</span>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Opens</span>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Args</span>
-              <span />
-            </div>
             {customEditors.map((e) => (
-              <div key={e.id} className={cn("grid items-center gap-2 px-3 py-2", COLS)}>
-                <input
-                  type="text"
-                  value={e.name}
-                  onChange={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
-                  placeholder="Name"
-                  className="h-7 w-full rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <input
-                  type="text"
-                  value={e.binary}
-                  onChange={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
-                  placeholder="/usr/local/bin/editor"
-                  className="h-7 w-full rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <select
-                  value={e.targetKind ?? "file"}
-                  onChange={(ev) =>
-                    handleUpdateCustomTargetKind(e.id, ev.target.value as "file" | "workspace")
-                  }
-                  className="h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  title="What to pass to the tool"
-                >
-                  <option value="file">Current file</option>
-                  <option value="workspace">Working root</option>
-                </select>
-                <input
-                  type="text"
-                  value={e.argsBeforePath.join(" ")}
-                  onChange={(ev) =>
-                    handleUpdateCustom(
-                      e.id,
-                      "argsBeforePath",
-                      ev.target.value.split(/\s+/).filter(Boolean),
-                    )
-                  }
-                  placeholder="--wait"
-                  className="h-7 w-full rounded border border-border bg-transparent px-2 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <button
-                  type="button"
-                  title="Remove"
-                  onClick={() => handleDeleteCustom(e.id)}
-                  className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
-                </button>
+              <div key={e.id} className="flex flex-col gap-2 px-3 py-3">
+                {/* Row 1: Name + Opens */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={e.name}
+                    onChange={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
+                    placeholder="Name"
+                    className="h-8 min-w-0 flex-1 rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <Select
+                    value={e.targetKind ?? "file"}
+                    onValueChange={(v) => handleUpdateCustomTargetKind(e.id, v as "file" | "workspace")}
+                  >
+                    <SelectTrigger size="sm" className="h-8 w-36 shrink-0 text-[12px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="file" className="text-[12px]">Current file</SelectItem>
+                      <SelectItem value="workspace" className="text-[12px]">Working root</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <button
+                    type="button"
+                    title="Remove"
+                    onClick={() => handleDeleteCustom(e.id)}
+                    className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                  </button>
+                </div>
+                {/* Row 2: Binary + Args */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={e.binary}
+                    onChange={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
+                    placeholder="Binary or /path/to/tool"
+                    className="h-8 min-w-0 flex-1 rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <input
+                    type="text"
+                    value={e.argsBeforePath.join(" ")}
+                    onChange={(ev) =>
+                      handleUpdateCustom(
+                        e.id,
+                        "argsBeforePath",
+                        ev.target.value.split(/\s+/).filter(Boolean),
+                      )
+                    }
+                    placeholder="Args (e.g. --wait)"
+                    className="h-8 w-36 shrink-0 rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  {/* spacer to align with delete button above */}
+                  <div className="size-[22px] shrink-0" />
+                </div>
               </div>
             ))}
           </div>
