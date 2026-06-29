@@ -552,7 +552,7 @@ export default function App() {
   useEffect(() => {
     const ref = panelSide === "left" ? leftToolPanelRef : rightToolPanelRef;
     if (rightPanelOpen) {
-      ref.current?.resize(rightPanelStateRef.current.width);
+      ref.current?.resize(`${rightPanelStateRef.current.width}%`);
     } else {
       ref.current?.collapse();
     }
@@ -2434,7 +2434,7 @@ export default function App() {
                       panelRef={leftToolPanelRef}
                       collapsible
                       collapsedSize={0}
-                      defaultSize={rightPanelOpen ? rightPanelWidth : 0}
+                      defaultSize={rightPanelOpen ? `${rightPanelWidth}%` : 0}
                       minSize="12%"
                       maxSize="35%"
                       onResize={(size) => {
@@ -2541,7 +2541,7 @@ export default function App() {
                       panelRef={rightToolPanelRef}
                       collapsible
                       collapsedSize={0}
-                      defaultSize={rightPanelOpen ? rightPanelWidth : 0}
+                      defaultSize={rightPanelOpen ? `${rightPanelWidth}%` : 0}
                       minSize="12%"
                       maxSize="35%"
                       onResize={(size) => {
