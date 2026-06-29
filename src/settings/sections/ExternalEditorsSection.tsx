@@ -108,6 +108,99 @@ const TEXT_EDITOR_MODE_OPTIONS: { value: TextEditorMode; label: string }[] = [
   { value: "workspace-and-files", label: "Opens the workspace root and files too" },
 ];
 
+const INPUT_CLASS =
+  "h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
+
+const LABEL_CLASS = "text-[10px] font-medium uppercase tracking-wide text-muted-foreground";
+
+function CustomEditorRow({
+  editor,
+  onUpdate,
+  onDelete,
+}: {
+  editor: CustomEditor;
+  onUpdate: (id: string, partial: Partial<Pick<CustomEditor, "name" | "binary" | "argsBeforePath" | "targetKind">>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [name, setName] = useState(editor.name);
+  const [binary, setBinary] = useState(editor.binary);
+  const [args, setArgs] = useState(editor.argsBeforePath.join(" "));
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/40 px-3 py-3">
+      {/* Row 1: Name + Opens + delete */}
+      <div className="flex items-end gap-2">
+        <div className="flex w-1/2 flex-col gap-1">
+          <span className={LABEL_CLASS}>Name</span>
+          <input
+            type="text"
+            value={name}
+            onChange={(ev) => setName(ev.target.value)}
+            onBlur={() => onUpdate(editor.id, { name })}
+            placeholder="My Tool"
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div className="flex w-1/2 flex-col gap-1">
+          <span className={LABEL_CLASS}>Opens</span>
+          <Select
+            value={editor.targetKind ?? "file"}
+            onValueChange={(v) =>
+              onUpdate(editor.id, { targetKind: v as "file" | "workspace" | "workspace-and-files" })
+            }
+          >
+            <SelectTrigger size="sm" className="h-8 w-full text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="file" className="text-[12px]">Opens single files only</SelectItem>
+              <SelectItem value="workspace" className="text-[12px]">Opens workspace root only</SelectItem>
+              <SelectItem value="workspace-and-files" className="text-[12px]">Opens workspace root and files too</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <button
+          type="button"
+          title="Remove"
+          onClick={() => onDelete(editor.id)}
+          className="mb-[7px] flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+        </button>
+      </div>
+      {/* Row 2: Command + Args */}
+      <div className="flex items-end gap-2">
+        <div className="flex w-1/2 flex-col gap-1">
+          <span className={LABEL_CLASS}>Command</span>
+          <input
+            type="text"
+            value={binary}
+            onChange={(ev) => setBinary(ev.target.value)}
+            onBlur={() => onUpdate(editor.id, { binary })}
+            placeholder="subl, /usr/local/bin/tool"
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div className="flex w-1/2 flex-col gap-1">
+          <span className={LABEL_CLASS}>Args</span>
+          <input
+            type="text"
+            value={args}
+            onChange={(ev) => setArgs(ev.target.value)}
+            onBlur={() =>
+              onUpdate(editor.id, { argsBeforePath: args.split(/\s+/).filter(Boolean) })
+            }
+            placeholder="--wait"
+            className={INPUT_CLASS}
+          />
+        </div>
+        {/* spacer aligned with delete button above */}
+        <div className="size-[22px] shrink-0" />
+      </div>
+    </div>
+  );
+}
+
 export function ExternalEditorsSection() {
   const { isScanning, scan } = useExternalEditors();
   const detectedEditors = usePreferencesStore((s) => s.detectedEditors);
@@ -125,6 +218,17 @@ export function ExternalEditorsSection() {
     }
   }, [detectedEditors.length, isScanning, scan]);
 
+  // Clean up tools left with neither name nor command when the panel unmounts.
+  const customEditorsRef = useRef(customEditors);
+  useEffect(() => { customEditorsRef.current = customEditors; }, [customEditors]);
+  useEffect(() => {
+    return () => {
+      const latest = customEditorsRef.current;
+      const cleaned = latest.filter((e) => e.name.trim() || e.binary.trim());
+      if (cleaned.length !== latest.length) void setCustomEditors(cleaned);
+    };
+  }, []);
+
   function handleToggleDetected(id: string, enabled: boolean) {
     const next = enabled
       ? disabledDetectedEditorIds.filter((d) => d !== id)
@@ -134,24 +238,14 @@ export function ExternalEditorsSection() {
 
   function handleAddCustom() {
     const id = crypto.randomUUID();
-    const newEditor: CustomEditor = { id, name: "", binary: "", argsBeforePath: [], targetKind: "file" };
-    void setCustomEditors([...customEditors, newEditor]);
+    void setCustomEditors([...customEditors, { id, name: "", binary: "", argsBeforePath: [], targetKind: "file" }]);
   }
 
   function handleUpdateCustom(
     id: string,
-    field: "name" | "binary" | "argsBeforePath",
-    value: string | string[],
+    partial: Partial<Pick<CustomEditor, "name" | "binary" | "argsBeforePath" | "targetKind">>,
   ) {
-    void setCustomEditors(
-      customEditors.map((e) => (e.id === id ? { ...e, [field]: value } : e)),
-    );
-  }
-
-  function handleUpdateCustomTargetKind(id: string, kind: "file" | "workspace" | "workspace-and-files") {
-    void setCustomEditors(
-      customEditors.map((e) => (e.id === id ? { ...e, targetKind: kind } : e)),
-    );
+    void setCustomEditors(customEditors.map((e) => (e.id === id ? { ...e, ...partial } : e)));
   }
 
   function handleDeleteCustom(id: string) {
@@ -162,6 +256,8 @@ export function ExternalEditorsSection() {
     usePreferencesStore.setState({ textEditorMode: mode });
     void setTextEditorMode(mode);
   }
+
+  const hasIncompleteCustomTool = customEditors.some((e) => !e.name.trim() || !e.binary.trim());
 
   return (
     <div className="flex flex-col gap-6">
@@ -222,78 +318,14 @@ export function ExternalEditorsSection() {
         </h3>
 
         {customEditors.length > 0 && (
-          <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+          <div className="flex flex-col gap-2">
             {customEditors.map((e) => (
-              <div key={e.id} className="flex flex-col gap-2.5 px-3 py-3">
-                {/* Row 1: Name (50%) + Opens (50%) + delete */}
-                <div className="flex items-end gap-2">
-                  <div className="flex w-1/2 flex-col gap-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</span>
-                    <input
-                      type="text"
-                      defaultValue={e.name}
-                      onBlur={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
-                      placeholder="My Tool"
-                      className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
-                  <div className="flex w-1/2 flex-col gap-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Opens</span>
-                    <Select
-                      value={e.targetKind ?? "file"}
-                      onValueChange={(v) => handleUpdateCustomTargetKind(e.id, v as "file" | "workspace" | "workspace-and-files")}
-                    >
-                      <SelectTrigger size="sm" className="h-8 w-full text-[12px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="file" className="text-[12px]">Opens single files only</SelectItem>
-                        <SelectItem value="workspace" className="text-[12px]">Opens workspace root only</SelectItem>
-                        <SelectItem value="workspace-and-files" className="text-[12px]">Opens workspace root and files too</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <button
-                    type="button"
-                    title="Remove"
-                    onClick={() => handleDeleteCustom(e.id)}
-                    className="mb-[7px] flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
-                  </button>
-                </div>
-                {/* Row 2: Binary (50%) + Args (50%) */}
-                <div className="flex items-end gap-2">
-                  <div className="flex w-1/2 flex-col gap-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Command</span>
-                    <input
-                      type="text"
-                      defaultValue={e.binary}
-                      onBlur={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
-                      placeholder="subl, /usr/local/bin/tool"
-                      className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
-                  <div className="flex w-1/2 flex-col gap-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Args</span>
-                    <input
-                      type="text"
-                      defaultValue={e.argsBeforePath.join(" ")}
-                      onBlur={(ev) =>
-                        handleUpdateCustom(
-                          e.id,
-                          "argsBeforePath",
-                          ev.target.value.split(/\s+/).filter(Boolean),
-                        )
-                      }
-                      placeholder="--wait"
-                      className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
-                  {/* spacer to align with delete button above */}
-                  <div className="size-[22px] shrink-0" />
-                </div>
-              </div>
+              <CustomEditorRow
+                key={e.id}
+                editor={e}
+                onUpdate={handleUpdateCustom}
+                onDelete={handleDeleteCustom}
+              />
             ))}
           </div>
         )}
@@ -303,6 +335,7 @@ export function ExternalEditorsSection() {
           size="sm"
           className="h-7 w-fit gap-1.5 px-2 text-[12px]"
           onClick={handleAddCustom}
+          disabled={hasIncompleteCustomTool}
         >
           <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
           Add tool
