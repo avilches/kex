@@ -506,3 +506,15 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
    * functional cue (revealed file, locked tab) and animates opacity only, with
    * no spatial movement, so it does not trigger motion sensitivity. */
 }
+
+/* Slide animation for the right panel open/close.
+ * Disabled during handle drag (:active on [data-separator]) to avoid lag. */
+[data-panel-group]:not(:has([data-separator]:active)) [data-panel] {
+  transition: flex 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-panel-group] [data-panel] {
+    transition: none !important;
+  }
+}
