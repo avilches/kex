@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Cancel01Icon, PlusSignIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, DragDropVerticalIcon, PlusSignIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -40,8 +40,8 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Drag04Icon } from "@hugeicons/core-free-icons";
 import type { CSSProperties } from "react";
+import { cn } from "@/lib/utils";
 
 const ALL_GROUPS: EditorGroup[] = ["Text Editors", "VS Code", "JetBrains", "Other IDEs"];
 const NOT_INSTALLED_COLLAPSED = 1;
@@ -144,8 +144,8 @@ function CustomEditorRow({
   const [name, setName] = useState(editor.name);
   const [binary, setBinary] = useState(editor.binary);
   const [args, setArgs] = useState(editor.argsBeforePath.join(" "));
-
-  const isIncomplete = !name.trim() || !binary.trim();
+  const [nameTouched, setNameTouched] = useState(false);
+  const [binaryTouched, setBinaryTouched] = useState(false);
 
   const {
     attributes,
@@ -167,9 +167,7 @@ function CustomEditorRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex flex-col gap-2.5 rounded-lg border bg-card/40 px-3 py-3 ${
-        isIncomplete ? "border-destructive/60" : "border-border/60"
-      }`}
+      className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/40 px-3 py-3"
     >
       {/* Row 1: drag handle + Name + Opens + delete */}
       <div className="flex items-end gap-2">
@@ -181,7 +179,7 @@ function CustomEditorRow({
           {...attributes}
           {...listeners}
         >
-          <HugeiconsIcon icon={Drag04Icon} size={12} strokeWidth={2} />
+          <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
         </button>
         <div className="flex w-1/2 flex-col gap-1">
           <span className={LABEL_CLASS}>Name</span>
@@ -190,9 +188,9 @@ function CustomEditorRow({
             ref={(el) => onRegisterNameRef(editor.id, el)}
             value={name}
             onChange={(ev) => setName(ev.target.value)}
-            onBlur={() => onUpdate(editor.id, { name })}
+            onBlur={() => { setNameTouched(true); onUpdate(editor.id, { name }); }}
             placeholder="My Tool"
-            className={INPUT_CLASS}
+            className={cn(INPUT_CLASS, nameTouched && !name.trim() && "border-destructive/60 focus:ring-destructive/60")}
           />
         </div>
         <div className="flex w-1/2 flex-col gap-1">
@@ -232,9 +230,9 @@ function CustomEditorRow({
             type="text"
             value={binary}
             onChange={(ev) => setBinary(ev.target.value)}
-            onBlur={() => onUpdate(editor.id, { binary })}
+            onBlur={() => { setBinaryTouched(true); onUpdate(editor.id, { binary }); }}
             placeholder="subl, /usr/local/bin/tool"
-            className={INPUT_CLASS}
+            className={cn(INPUT_CLASS, binaryTouched && !binary.trim() && "border-destructive/60 focus:ring-destructive/60")}
           />
         </div>
         <div className="flex w-1/2 flex-col gap-1">

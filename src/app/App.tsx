@@ -2209,13 +2209,13 @@ export default function App() {
         let label: string;
         if (activePanel.kind === "editor" || activePanel.kind === "markdown") {
           value = activePanel.path;
-          label = "Copied current path";
+          label = "Copied current Editor file path";
         } else if (activePanel.kind === "terminal") {
           value = activePanel.cwd;
-          label = "Copied current path";
+          label = "Copied current Terminal folder";
         } else if (activePanel.kind === "browser") {
           value = activePanel.url;
-          label = "Copied current URL";
+          label = "Copied current Browser url";
         } else {
           return;
         }

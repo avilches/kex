@@ -1,5 +1,7 @@
 import { IS_MAC } from "@/lib/platform";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { ClipboardCopyIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { toast } from "sonner";
 
 export const REVEAL_LABEL = IS_MAC
@@ -9,7 +11,11 @@ export const REVEAL_LABEL = IS_MAC
 export async function copyToClipboard(text: string, label?: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
-    if (label) toast.success(label, { description: text });
+    if (label)
+      toast.success(label, {
+        description: text,
+        icon: <HugeiconsIcon icon={ClipboardCopyIcon} size={16} strokeWidth={1.5} />,
+      });
   } catch {
     // Best-effort; ignore in environments without clipboard permission.
   }
