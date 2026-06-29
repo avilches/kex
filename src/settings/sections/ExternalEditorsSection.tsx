@@ -306,7 +306,7 @@ export function ExternalEditorsSection() {
       el.focus();
       setPendingFocusId(null);
     }
-  }, [pendingFocusId]);
+  }, [pendingFocusId, customEditors]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
