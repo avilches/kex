@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -25,6 +25,23 @@ import {
 } from "@/modules/external-editors";
 import type { CustomEditor, EditorGroup, EditorTargetType } from "@/modules/external-editors";
 import { SectionHeader } from "../components/SectionHeader";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Drag04Icon } from "@hugeicons/core-free-icons";
+import type { CSSProperties } from "react";
 
 const ALL_GROUPS: EditorGroup[] = ["Text Editors", "VS Code", "JetBrains", "Other IDEs"];
 const NOT_INSTALLED_COLLAPSED = 1;
@@ -117,23 +134,60 @@ function CustomEditorRow({
   editor,
   onUpdate,
   onDelete,
+  onRegisterNameRef,
 }: {
   editor: CustomEditor;
   onUpdate: (id: string, partial: Partial<Pick<CustomEditor, "name" | "binary" | "argsBeforePath" | "targetKind">>) => void;
   onDelete: (id: string) => void;
+  onRegisterNameRef: (id: string, el: HTMLInputElement | null) => void;
 }) {
   const [name, setName] = useState(editor.name);
   const [binary, setBinary] = useState(editor.binary);
   const [args, setArgs] = useState(editor.argsBeforePath.join(" "));
 
+  const isIncomplete = !name.trim() || !binary.trim();
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: editor.id });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/40 px-3 py-3">
-      {/* Row 1: Name + Opens + delete */}
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex flex-col gap-2.5 rounded-lg border bg-card/40 px-3 py-3 ${
+        isIncomplete ? "border-destructive/60" : "border-border/60"
+      }`}
+    >
+      {/* Row 1: drag handle + Name + Opens + delete */}
       <div className="flex items-end gap-2">
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          title="Drag to reorder"
+          className="mb-[7px] flex size-[22px] shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground/40 transition-colors hover:text-muted-foreground active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <HugeiconsIcon icon={Drag04Icon} size={12} strokeWidth={2} />
+        </button>
         <div className="flex w-1/2 flex-col gap-1">
           <span className={LABEL_CLASS}>Name</span>
           <input
             type="text"
+            ref={(el) => onRegisterNameRef(editor.id, el)}
             value={name}
             onChange={(ev) => setName(ev.target.value)}
             onBlur={() => onUpdate(editor.id, { name })}
@@ -170,6 +224,8 @@ function CustomEditorRow({
       </div>
       {/* Row 2: Command + Args */}
       <div className="flex items-end gap-2">
+        {/* spacer aligned with drag handle above */}
+        <div className="size-[22px] shrink-0" />
         <div className="flex w-1/2 flex-col gap-1">
           <span className={LABEL_CLASS}>Command</span>
           <input
@@ -229,6 +285,39 @@ export function ExternalEditorsSection() {
     };
   }, []);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
+
+  const nameInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const handleRegisterNameRef = useCallback(
+    (id: string, el: HTMLInputElement | null) => {
+      if (el) nameInputRefs.current.set(id, el);
+      else nameInputRefs.current.delete(id);
+    },
+    [],
+  );
+
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pendingFocusId) return;
+    const el = nameInputRefs.current.get(pendingFocusId);
+    if (el) {
+      el.focus();
+      setPendingFocusId(null);
+    }
+  }, [pendingFocusId]);
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = customEditors.findIndex((e) => e.id === String(active.id));
+    const newIndex = customEditors.findIndex((e) => e.id === String(over.id));
+    if (oldIndex !== -1 && newIndex !== -1) {
+      void setCustomEditors(arrayMove(customEditors, oldIndex, newIndex));
+    }
+  }
+
   function handleToggleDetected(id: string, enabled: boolean) {
     const next = enabled
       ? disabledDetectedEditorIds.filter((d) => d !== id)
@@ -237,8 +326,14 @@ export function ExternalEditorsSection() {
   }
 
   function handleAddCustom() {
+    const incomplete = customEditors.find((e) => !e.name.trim() || !e.binary.trim());
+    if (incomplete) {
+      nameInputRefs.current.get(incomplete.id)?.focus();
+      return;
+    }
     const id = crypto.randomUUID();
     void setCustomEditors([...customEditors, { id, name: "", binary: "", argsBeforePath: [], targetKind: "file" }]);
+    setPendingFocusId(id);
   }
 
   function handleUpdateCustom(
@@ -256,8 +351,6 @@ export function ExternalEditorsSection() {
     usePreferencesStore.setState({ textEditorMode: mode });
     void setTextEditorMode(mode);
   }
-
-  const hasIncompleteCustomTool = customEditors.some((e) => !e.name.trim() || !e.binary.trim());
 
   return (
     <div className="flex flex-col gap-6">
@@ -279,6 +372,48 @@ export function ExternalEditorsSection() {
         Use the header button to open files or folders in an external tool.
         Select your preferred tool from that button&apos;s dropdown.
       </p>
+
+      {/* Custom tools - shown first */}
+      <div className="flex flex-col gap-3">
+        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          Custom tools
+        </h3>
+
+        {customEditors.length > 0 && (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={customEditors.map((e) => e.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex flex-col gap-2">
+                {customEditors.map((e) => (
+                  <CustomEditorRow
+                    key={e.id}
+                    editor={e}
+                    onUpdate={handleUpdateCustom}
+                    onDelete={handleDeleteCustom}
+                    onRegisterNameRef={handleRegisterNameRef}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-fit gap-1.5 px-2 text-[12px]"
+          onClick={handleAddCustom}
+        >
+          <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
+          Add tool
+        </Button>
+      </div>
 
       {ALL_GROUPS.map((group) => (
         <GroupSection
@@ -310,37 +445,6 @@ export function ExternalEditorsSection() {
           }
         />
       ))}
-
-      {/* Custom tools */}
-      <div className="flex flex-col gap-3">
-        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-          Custom tools
-        </h3>
-
-        {customEditors.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {customEditors.map((e) => (
-              <CustomEditorRow
-                key={e.id}
-                editor={e}
-                onUpdate={handleUpdateCustom}
-                onDelete={handleDeleteCustom}
-              />
-            ))}
-          </div>
-        )}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-fit gap-1.5 px-2 text-[12px]"
-          onClick={handleAddCustom}
-          disabled={hasIncompleteCustomTool}
-        >
-          <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
-          Add tool
-        </Button>
-      </div>
     </div>
   );
 }
