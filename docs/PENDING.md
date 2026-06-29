@@ -25,7 +25,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [F6](pending/features/F6-scrollback-persistente.md) — Scrollback persistente
 - [F7](pending/features/F7-tab-bar-style-en-settings.md) — Exponer el estilo de tab bar en Settings
 - [F10](pending/features/F10-confirm-quit-proceso-vivo.md) — Confirmar salida de la app con un proceso de terminal vivo (upstream d782f7d, aplazado en sync 2026-06-22)
-- [F12](pending/features/F12-boton-run-proyecto-workspace.md) - URGENTE: boton Run para ejecutar el proyecto del workspace (run configs por workspace)
 - [F13](pending/features/F13-workspace-mostrar-prs-repo.md) - Workspace: mostrar PRs del repo (lista de PRs via gh CLI / GitHub API)
 - [F14](pending/features/F14-pr-de-la-rama-actual.md) - PR de la rama actual (IPC `git_current_pr`, gh con fallback a REST via ureq). Base tecnica de F13 y del punto 3 de "barra superior" en TODO.md
 - [F15](pending/features/F15-blocks-improvements.md) - Mejoras del sistema de blocks: collapse de outputs largos (B1), filtrado (B2), persistencia de historial (B3), panel command-history (B4), export (B5), notebooks (B6)
