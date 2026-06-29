@@ -104,8 +104,8 @@ function GroupSection({
 }
 
 const TEXT_EDITOR_MODE_OPTIONS: { value: TextEditorMode; label: string }[] = [
-  { value: "workspace-and-files", label: "Open workspace root and files too" },
-  { value: "workspace-only", label: "Open in the workspace root only" },
+  { value: "file-only", label: "Opens single files only" },
+  { value: "workspace-and-files", label: "Opens the workspace root and files too" },
 ];
 
 export function ExternalEditorsSection() {
@@ -133,7 +133,6 @@ export function ExternalEditorsSection() {
   }
 
   function handleAddCustom() {
-    if (customEditors.some((e) => !e.name.trim() && !e.binary.trim())) return;
     const id = crypto.randomUUID();
     const newEditor: CustomEditor = { id, name: "", binary: "", argsBeforePath: [], targetKind: "file" };
     void setCustomEditors([...customEditors, newEditor]);
@@ -149,7 +148,7 @@ export function ExternalEditorsSection() {
     );
   }
 
-  function handleUpdateCustomTargetKind(id: string, kind: "file" | "workspace") {
+  function handleUpdateCustomTargetKind(id: string, kind: "file" | "workspace" | "workspace-and-files") {
     void setCustomEditors(
       customEditors.map((e) => (e.id === id ? { ...e, targetKind: kind } : e)),
     );
@@ -232,8 +231,8 @@ export function ExternalEditorsSection() {
                     <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</span>
                     <input
                       type="text"
-                      value={e.name}
-                      onChange={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
+                      defaultValue={e.name}
+                      onBlur={(ev) => handleUpdateCustom(e.id, "name", ev.target.value)}
                       placeholder="My Tool"
                       className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
@@ -242,14 +241,15 @@ export function ExternalEditorsSection() {
                     <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Opens</span>
                     <Select
                       value={e.targetKind ?? "file"}
-                      onValueChange={(v) => handleUpdateCustomTargetKind(e.id, v as "file" | "workspace")}
+                      onValueChange={(v) => handleUpdateCustomTargetKind(e.id, v as "file" | "workspace" | "workspace-and-files")}
                     >
                       <SelectTrigger size="sm" className="h-8 w-full text-[12px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="file" className="text-[12px]">Current file</SelectItem>
-                        <SelectItem value="workspace" className="text-[12px]">Workspace root</SelectItem>
+                        <SelectItem value="file" className="text-[12px]">Opens single files only</SelectItem>
+                        <SelectItem value="workspace" className="text-[12px]">Opens workspace root only</SelectItem>
+                        <SelectItem value="workspace-and-files" className="text-[12px]">Opens workspace root and files too</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -268,8 +268,8 @@ export function ExternalEditorsSection() {
                     <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Binary / path</span>
                     <input
                       type="text"
-                      value={e.binary}
-                      onChange={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
+                      defaultValue={e.binary}
+                      onBlur={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
                       placeholder="/usr/local/bin/tool"
                       className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
@@ -278,8 +278,8 @@ export function ExternalEditorsSection() {
                     <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Args</span>
                     <input
                       type="text"
-                      value={e.argsBeforePath.join(" ")}
-                      onChange={(ev) =>
+                      defaultValue={e.argsBeforePath.join(" ")}
+                      onBlur={(ev) =>
                         handleUpdateCustom(
                           e.id,
                           "argsBeforePath",
@@ -303,7 +303,6 @@ export function ExternalEditorsSection() {
           size="sm"
           className="h-7 w-fit gap-1.5 px-2 text-[12px]"
           onClick={handleAddCustom}
-          disabled={customEditors.some((e) => !e.name.trim() && !e.binary.trim())}
         >
           <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
           Add tool

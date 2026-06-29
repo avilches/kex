@@ -22,7 +22,7 @@ export type TerminalNewFolderMode = "home" | "workspace" | "context";
 
 export type DiffViewMode = "unified" | "split";
 
-export type TextEditorMode = "workspace-only" | "workspace-and-files";
+export type TextEditorMode = "file-only" | "workspace-and-files";
 
 export type CursorStyle = "bar" | "block" | "underline";
 
@@ -420,7 +420,7 @@ export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMod
 }
 
 export function parseTextEditorMode(value: unknown): TextEditorMode {
-  if (value === "workspace-only") return "workspace-only";
+  if (value === "file-only") return "file-only";
   return "workspace-and-files";
 }
 

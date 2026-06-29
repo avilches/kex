@@ -56,14 +56,18 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
 
   const hasFile = target?.kind === "file";
 
-  // Text editors in "workspace-and-files" mode open the file when one is active, and the
-  // workspace root when navigating a directory. In "workspace-only" mode they always open the root.
+  // Custom editors with "workspace-and-files" or text editors in "workspace-and-files" mode:
+  // open the file when one is active, workspace root when navigating a directory.
+  // Text editors in "file-only" mode only open individual files (never workspace root).
   function resolveEditorEffectiveType(editor: AnyEditor): "file" | "workspace" {
-    if ("targetKind" in editor && editor.targetKind) return editor.targetKind;
+    if ("targetKind" in editor && editor.targetKind) {
+      if (editor.targetKind === "workspace-and-files") return hasFile ? "file" : "workspace";
+      return editor.targetKind;
+    }
     const catalogType = getEditorTargetType(editor.id);
     if (catalogType === "file" && isTextEditorGroup(editor.id)) {
-      if (textEditorMode === "workspace-only") return "workspace";
-      return hasFile ? "file" : "workspace";
+      if (textEditorMode === "workspace-and-files") return hasFile ? "file" : "workspace";
+      return "file"; // "file-only": always open the file, never workspace root
     }
     return catalogType;
   }
