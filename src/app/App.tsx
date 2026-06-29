@@ -3,6 +3,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { usePanelRef } from "react-resizable-panels";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,7 +12,7 @@ import { native } from "@/lib/native";
 import { newPanelId } from "@/lib/ids";
 import { useZoom } from "@/lib/useZoom";
 import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
-import { isMarkdownPath, isHtmlPath } from "@/lib/utils";
+import { cn, isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -388,6 +389,8 @@ export default function App() {
   }, []);
 
   const rightPanelRef = useRef<RightPanelHandle>(null);
+  const leftToolPanelRef = usePanelRef();
+  const rightToolPanelRef = usePanelRef();
   const [revealRequest, setRevealRequest] = useState<RevealRequest | null>(
     null,
   );
@@ -543,6 +546,17 @@ export default function App() {
       rightPanelRef.current?.focusExplorer();
     }
   }, [rightPanelOpen, rightPanelActiveTab]);
+
+  // Drive the tool panel open/close animation via imperative API.
+  // CSS transition (globals.css) animates the flex change.
+  useEffect(() => {
+    const ref = panelSide === "left" ? leftToolPanelRef : rightToolPanelRef;
+    if (rightPanelOpen) {
+      ref.current?.expand();
+    } else {
+      ref.current?.collapse();
+    }
+  }, [rightPanelOpen, panelSide]);
 
   const activeRootMode: ExplorerRootMode =
     activeWorkspace?.explorerRootMode ?? "filesystem";
@@ -2413,14 +2427,19 @@ export default function App() {
                 className="min-h-0 flex-1"
               >
                 {/* Tool panel on LEFT when panelSide === "left" */}
-                {rightPanelOpen && panelSide === "left" && (
+                {panelSide === "left" && (
                   <>
                     <ResizablePanel
-                      id="tool-panel"
-                      defaultSize={`${rightPanelWidth}%`}
+                      id="tool-panel-left"
+                      panelRef={leftToolPanelRef}
+                      collapsible
+                      collapsedSize={0}
+                      defaultSize={rightPanelOpen ? rightPanelWidth : 0}
                       minSize="12%"
                       maxSize="35%"
-                      onResize={(size) => setRightPanelWidth(size.asPercentage)}
+                      onResize={(size) => {
+                        if (size.asPercentage > 0) setRightPanelWidth(size.asPercentage);
+                      }}
                     >
                       <RightPanel
                         ref={rightPanelRef}
@@ -2463,7 +2482,11 @@ export default function App() {
                         onSearchHandle={setGitHistoryHandle}
                       />
                     </ResizablePanel>
-                    <ResizableHandle withHandle />
+                    <ResizableHandle
+                      withHandle
+                      disabled={!rightPanelOpen}
+                      className={cn(!rightPanelOpen && "invisible pointer-events-none")}
+                    />
                   </>
                 )}
 
@@ -2506,15 +2529,24 @@ export default function App() {
                 </ResizablePanel>
 
                 {/* Tool panel on RIGHT when panelSide === "right" (default) */}
-                {rightPanelOpen && panelSide === "right" && (
+                {panelSide === "right" && (
                   <>
-                    <ResizableHandle withHandle />
+                    <ResizableHandle
+                      withHandle
+                      disabled={!rightPanelOpen}
+                      className={cn(!rightPanelOpen && "invisible pointer-events-none")}
+                    />
                     <ResizablePanel
-                      id="tool-panel"
-                      defaultSize={`${rightPanelWidth}%`}
+                      id="tool-panel-right"
+                      panelRef={rightToolPanelRef}
+                      collapsible
+                      collapsedSize={0}
+                      defaultSize={rightPanelOpen ? rightPanelWidth : 0}
                       minSize="12%"
                       maxSize="35%"
-                      onResize={(size) => setRightPanelWidth(size.asPercentage)}
+                      onResize={(size) => {
+                        if (size.asPercentage > 0) setRightPanelWidth(size.asPercentage);
+                      }}
                     >
                       <RightPanel
                         ref={rightPanelRef}
