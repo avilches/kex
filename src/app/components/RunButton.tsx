@@ -3,6 +3,7 @@ import {
   ArrowDown01Icon,
   PlayIcon,
   StopIcon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import {
   DropdownMenu,
@@ -27,6 +28,10 @@ type Props = {
   onOpenSettings: () => void;
 };
 
+function isComplete(c: RunConfig): boolean {
+  return c.name.trim() !== "" && c.command.trim() !== "";
+}
+
 export function RunButton({
   runConfigs,
   activeRunConfigId,
@@ -40,18 +45,18 @@ export function RunButton({
     getRunConfigRunningSnapshot,
   );
 
+  const completeConfigs = runConfigs.filter(isComplete);
   const activeConfig =
-    runConfigs.find((c) => c.id === activeRunConfigId) ?? runConfigs[0];
-
+    completeConfigs.find((c) => c.id === activeRunConfigId) ?? completeConfigs[0];
   const isRunning = !!(activeConfig?.panelId && runningMap.get(activeConfig.panelId));
 
-  if (runConfigs.length === 0) {
+  if (completeConfigs.length === 0) {
     return (
       <button
         type="button"
-        title="Configure Run in Workspace Settings"
+        title="Configure Run in Workspace Properties"
         onClick={onOpenSettings}
-        className="flex h-7 items-center gap-1 rounded px-2 text-[11px] text-muted-foreground hover:text-foreground"
+        className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <HugeiconsIcon icon={PlayIcon} size={13} strokeWidth={2} />
         <span>Run</span>
@@ -59,17 +64,17 @@ export function RunButton({
     );
   }
 
-  if (runConfigs.length === 1 && activeConfig) {
+  if (completeConfigs.length === 1 && activeConfig) {
     return (
       <button
         type="button"
         title={isRunning ? "Stop" : `Run: ${activeConfig.command}`}
         onClick={() => (isRunning ? onStop(activeConfig) : onRun(activeConfig))}
         className={cn(
-          "flex h-7 items-center gap-1 rounded px-2 text-[11px] transition-colors",
+          "flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] transition-colors",
           isRunning
             ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
-            : "text-muted-foreground hover:text-foreground",
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
         )}
       >
         <HugeiconsIcon
@@ -78,70 +83,63 @@ export function RunButton({
           strokeWidth={2}
         />
         <span className="max-w-[120px] truncate">
-          {activeConfig.name || activeConfig.command}
+          {activeConfig.name}
         </span>
       </button>
     );
   }
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center rounded-md">
+      <button
+        type="button"
+        title={isRunning ? `Stop: ${activeConfig?.name}` : `Run: ${activeConfig?.name}`}
+        onClick={() => {
+          if (!activeConfig) return;
+          isRunning ? onStop(activeConfig) : onRun(activeConfig);
+        }}
+        className={cn(
+          "flex h-7 items-center gap-1.5 rounded-l-md px-2 text-[11px] transition-colors",
+          isRunning
+            ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        )}
+      >
+        <HugeiconsIcon
+          icon={isRunning ? StopIcon : PlayIcon}
+          size={13}
+          strokeWidth={2}
+        />
+        <span className="max-w-[120px] truncate">
+          {activeConfig?.name ?? "Run"}
+        </span>
+      </button>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex h-7 items-center gap-1 rounded-l border-r border-border/40 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+            className="flex h-7 items-center rounded-r-md px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <span className="max-w-[120px] truncate">
-              {activeConfig?.name || activeConfig?.command || "Run"}
-            </span>
             <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {runConfigs.map((cfg) => (
-            <DropdownMenuItem key={cfg.id} onSelect={() => onSelectConfig(cfg.id)}>
-              <span
-                className={cn(
-                  "flex-1",
-                  cfg.id === activeRunConfigId && "font-medium",
-                )}
-              >
-                {cfg.name || cfg.command}
-              </span>
-              {cfg.id === activeRunConfigId && (
+        <DropdownMenuContent align="end">
+          {completeConfigs.map((cfg) => (
+            <DropdownMenuItem key={cfg.id} onSelect={() => onSelectConfig(cfg.id)} className="gap-2">
+              <span className="flex-1">{cfg.name}</span>
+              {cfg.id === (activeConfig?.id) && (
                 <HugeiconsIcon
-                  icon={PlayIcon}
-                  size={11}
+                  icon={Tick02Icon}
+                  size={12}
                   strokeWidth={2}
-                  className="ml-2 text-primary"
+                  className="text-muted-foreground"
                 />
               )}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      {activeConfig && (
-        <button
-          type="button"
-          title={isRunning ? "Stop" : "Run"}
-          onClick={() =>
-            isRunning ? onStop(activeConfig) : onRun(activeConfig)
-          }
-          className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-r text-[11px] transition-colors",
-            isRunning
-              ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <HugeiconsIcon
-            icon={isRunning ? StopIcon : PlayIcon}
-            size={13}
-            strokeWidth={2}
-          />
-        </button>
-      )}
     </div>
   );
 }
