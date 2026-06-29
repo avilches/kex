@@ -54,3 +54,8 @@ const CATALOG_MAP = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
 export function getEditorTargetType(id: string): EditorTargetType {
   return CATALOG_MAP.get(id)?.type ?? "file";
 }
+
+/** Returns true if the editor id belongs to the "Text Editors" catalog group. */
+export function isTextEditorGroup(id: string): boolean {
+  return CATALOG_MAP.get(id)?.group === "Text Editors";
+}

@@ -18,7 +18,7 @@ import {
 import { useExternalEditors, openWithEditor } from "./useExternalEditors";
 import type { AnyEditor } from "./types";
 import { EditorIcon } from "./EditorIcon";
-import { getEditorTargetType } from "./catalog";
+import { getEditorTargetType, isTextEditorGroup } from "./catalog";
 import { toast } from "sonner";
 
 export interface OpenInEditorTarget {
@@ -37,15 +37,11 @@ function pathLabel(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-function resolveEditorTargetType(editor: AnyEditor): "file" | "workspace" {
-  if ("targetKind" in editor && editor.targetKind) return editor.targetKind;
-  return getEditorTargetType(editor.id);
-}
-
 export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Props) {
   const { detectedEditors, isScanning } = useExternalEditors();
   const preferredFileEditorId = usePreferencesStore((s) => s.preferredFileEditorId);
   const preferredWorkspaceEditorId = usePreferencesStore((s) => s.preferredWorkspaceEditorId);
+  const textEditorMode = usePreferencesStore((s) => s.textEditorMode);
   const customEditors = usePreferencesStore((s) => s.customEditors);
   const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const [open, setOpen] = useState(false);
@@ -59,6 +55,18 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   ].filter((e) => e.name.trim() && e.binary.trim());
 
   const hasFile = target?.kind === "file";
+
+  // Text editors in "workspace-and-files" mode open the file when one is active, and the
+  // workspace root when navigating a directory. In "workspace-only" mode they always open the root.
+  function resolveEditorEffectiveType(editor: AnyEditor): "file" | "workspace" {
+    if ("targetKind" in editor && editor.targetKind) return editor.targetKind;
+    const catalogType = getEditorTargetType(editor.id);
+    if (catalogType === "file" && isTextEditorGroup(editor.id)) {
+      if (textEditorMode === "workspace-only") return "workspace";
+      return hasFile ? "file" : "workspace";
+    }
+    return catalogType;
+  }
 
   const currentFolderPath: string | null = (() => {
     if (!target) return null;
@@ -77,10 +85,10 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
 
   // File editors shown only when a file is active; workspace editors when a root exists.
   const fileEditors = hasFile
-    ? allEditors.filter((e) => resolveEditorTargetType(e) === "file")
+    ? allEditors.filter((e) => resolveEditorEffectiveType(e) === "file")
     : [];
   const workspaceEditors = workspaceRoot
-    ? allEditors.filter((e) => resolveEditorTargetType(e) === "workspace")
+    ? allEditors.filter((e) => resolveEditorEffectiveType(e) === "workspace")
     : [];
 
   const anyAvailable = fileEditors.length > 0 || workspaceEditors.length > 0;
@@ -105,7 +113,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
 
   const primaryTarget: OpenInEditorTarget | null = (() => {
     if (!primaryEditor) return null;
-    const type = resolveEditorTargetType(primaryEditor);
+    const type = resolveEditorEffectiveType(primaryEditor);
     if (type === "workspace") return workspaceRoot ? { path: workspaceRoot, kind: "dir" } : null;
     return hasFile ? target : null;
   })();
@@ -125,7 +133,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   // Dropdown only sets the preference for the selected category; does not execute.
   const handleSetPreferred = useCallback((editor: AnyEditor) => {
     setOverrideEditorId(editor.id);
-    const type = resolveEditorTargetType(editor);
+    const type = resolveEditorEffectiveType(editor);
     if (type === "file") {
       usePreferencesStore.setState({ preferredFileEditorId: editor.id });
       void setPreferredFileEditorId(editor.id);
@@ -133,7 +141,8 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
       usePreferencesStore.setState({ preferredWorkspaceEditorId: editor.id });
       void setPreferredWorkspaceEditorId(editor.id);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textEditorMode, hasFile]);
 
   return (
     <div

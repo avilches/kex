@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Cancel01Icon, PlusSignIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
@@ -7,6 +7,8 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setCustomEditors,
   setDisabledDetectedEditorIds,
+  setTextEditorMode,
+  type TextEditorMode,
 } from "@/modules/settings/store";
 import {
   useExternalEditors,
@@ -18,7 +20,7 @@ import { SectionHeader } from "../components/SectionHeader";
 import { cn } from "@/lib/utils";
 
 const COLS = "grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_5.5rem_3.5rem_1.5rem]";
-const ALL_GROUPS: EditorGroup[] = ["VS Code", "Text Editors", "JetBrains", "Other IDEs"];
+const ALL_GROUPS: EditorGroup[] = ["Text Editors", "VS Code", "JetBrains", "Other IDEs"];
 const NOT_INSTALLED_COLLAPSED = 1;
 
 function targetTypeLabel(type: EditorTargetType): string {
@@ -36,11 +38,13 @@ function GroupSection({
   detectedIds,
   disabledDetectedEditorIds,
   onToggle,
+  headerExtra,
 }: {
   group: EditorGroup;
   detectedIds: Set<string>;
   disabledDetectedEditorIds: string[];
   onToggle: (id: string, enabled: boolean) => void;
+  headerExtra?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
   const all = EDITOR_CATALOG.filter((e) => e.group === group);
@@ -55,7 +59,9 @@ function GroupSection({
         <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
           {group}
         </h3>
-        <p className="text-[10px] text-muted-foreground/60">{targetTypeLabel(groupTargetType(group))}</p>
+        {headerExtra ?? (
+          <p className="text-[10px] text-muted-foreground/60">{targetTypeLabel(groupTargetType(group))}</p>
+        )}
       </div>
       <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
         {installed.map((entry) => {
@@ -91,11 +97,17 @@ function GroupSection({
   );
 }
 
+const TEXT_EDITOR_MODE_OPTIONS: { value: TextEditorMode; label: string }[] = [
+  { value: "workspace-and-files", label: "Open working root and files too" },
+  { value: "workspace-only", label: "Open in the working root only" },
+];
+
 export function ExternalEditorsSection() {
   const { isScanning, scan } = useExternalEditors();
   const detectedEditors = usePreferencesStore((s) => s.detectedEditors);
   const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const customEditors = usePreferencesStore((s) => s.customEditors);
+  const textEditorMode = usePreferencesStore((s) => s.textEditorMode);
 
   const detectedIds = new Set(detectedEditors.map((e) => e.id));
 
@@ -141,6 +153,11 @@ export function ExternalEditorsSection() {
     void setCustomEditors(customEditors.filter((e) => e.id !== id));
   }
 
+  function handleTextEditorModeChange(mode: TextEditorMode) {
+    usePreferencesStore.setState({ textEditorMode: mode });
+    void setTextEditorMode(mode);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -169,6 +186,28 @@ export function ExternalEditorsSection() {
           detectedIds={detectedIds}
           disabledDetectedEditorIds={disabledDetectedEditorIds}
           onToggle={handleToggleDetected}
+          headerExtra={
+            group === "Text Editors" ? (
+              <div className="mt-1 flex flex-col gap-0.5">
+                {TEXT_EDITOR_MODE_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-muted-foreground"
+                  >
+                    <input
+                      type="radio"
+                      name="textEditorMode"
+                      value={opt.value}
+                      checked={textEditorMode === opt.value}
+                      onChange={() => handleTextEditorModeChange(opt.value)}
+                      className="accent-foreground"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            ) : undefined
+          }
         />
       ))}
 

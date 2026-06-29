@@ -22,6 +22,8 @@ export type TerminalNewFolderMode = "home" | "workspace" | "context";
 
 export type DiffViewMode = "unified" | "split";
 
+export type TextEditorMode = "workspace-only" | "workspace-and-files";
+
 export type CursorStyle = "bar" | "block" | "underline";
 
 export type CursorInactiveStyle =
@@ -173,6 +175,7 @@ export type Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
   scratchpadInNewTerminals: boolean;
+  textEditorMode: TextEditorMode;
   preferredFileEditorId: string | null;
   preferredWorkspaceEditorId: string | null;
   customEditors: CustomEditor[];
@@ -232,6 +235,7 @@ const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_TERMINAL_NEW_FOLDER_MODE = "terminalNewFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
+const KEY_TEXT_EDITOR_MODE = "textEditorMode";
 const KEY_PREFERRED_FILE_EDITOR_ID = "preferredFileEditorId";
 const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
 const KEY_CUSTOM_EDITORS = "customEditors";
@@ -376,6 +380,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: false,
   scratchpadEnterSends: true,
   scratchpadInNewTerminals: true,
+  textEditorMode: "workspace-and-files",
   preferredFileEditorId: null,
   preferredWorkspaceEditorId: null,
   customEditors: [],
@@ -410,6 +415,11 @@ export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMod
   if (value === "home") return "home";
   if (value === "workspace") return "workspace";
   return "context";
+}
+
+export function parseTextEditorMode(value: unknown): TextEditorMode {
+  if (value === "workspace-only") return "workspace-only";
+  return "workspace-and-files";
 }
 
 async function writePref<T>(key: string, value: T): Promise<void> {
@@ -614,6 +624,7 @@ export async function loadPreferences(): Promise<Preferences> {
     scratchpadInNewTerminals:
       get<boolean>(KEY_SCRATCHPAD_IN_NEW_TERMINALS) ??
       DEFAULT_PREFERENCES.scratchpadInNewTerminals,
+    textEditorMode: parseTextEditorMode(get<string>(KEY_TEXT_EDITOR_MODE)),
     preferredFileEditorId:
       get<string | null>(KEY_PREFERRED_FILE_EDITOR_ID) ??
       DEFAULT_PREFERENCES.preferredFileEditorId,
@@ -903,6 +914,10 @@ export async function setPreferredWorkspaceEditorId(value: string | null): Promi
   await writePref(KEY_PREFERRED_WORKSPACE_EDITOR_ID, value);
 }
 
+export async function setTextEditorMode(value: TextEditorMode): Promise<void> {
+  await writePref(KEY_TEXT_EDITOR_MODE, value);
+}
+
 export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
   await writePref(KEY_CUSTOM_EDITORS, value);
 }
@@ -1076,6 +1091,7 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
   [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
+  [KEY_TEXT_EDITOR_MODE]: "textEditorMode",
   [KEY_PREFERRED_FILE_EDITOR_ID]: "preferredFileEditorId",
   [KEY_PREFERRED_WORKSPACE_EDITOR_ID]: "preferredWorkspaceEditorId",
   [KEY_CUSTOM_EDITORS]: "customEditors",
