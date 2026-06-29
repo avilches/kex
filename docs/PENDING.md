@@ -25,7 +25,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [F6](pending/features/F6-scrollback-persistente.md) — Scrollback persistente
 - [F7](pending/features/F7-tab-bar-style-en-settings.md) — Exponer el estilo de tab bar en Settings
 - [F10](pending/features/F10-confirm-quit-proceso-vivo.md) — Confirmar salida de la app con un proceso de terminal vivo (upstream d782f7d, aplazado en sync 2026-06-22)
-- [F11](pending/features/F11-launcher-ide-externo.md) - URGENTE: boton para abrir el proyecto en un IDE/editor/terminal externo (estilo Supacode/Emdash/Nimbalyst)
 - [F12](pending/features/F12-boton-run-proyecto-workspace.md) - URGENTE: boton Run para ejecutar el proyecto del workspace (run configs por workspace)
 - [F13](pending/features/F13-workspace-mostrar-prs-repo.md) - Workspace: mostrar PRs del repo (lista de PRs via gh CLI / GitHub API)
 - [F14](pending/features/F14-pr-de-la-rama-actual.md) - PR de la rama actual (IPC `git_current_pr`, gh con fallback a REST via ureq). Base tecnica de F13 y del punto 3 de "barra superior" en TODO.md

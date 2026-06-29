@@ -15,8 +15,8 @@ export interface CustomEditor {
   name: string;
   binary: string;
   argsBeforePath: string[];
-  /** Whether to open the active file or workspace root. Defaults to "file". */
-  targetKind?: "file" | "workspace";
+  /** Whether to open the active file, workspace root, or both depending on context. Defaults to "file". */
+  targetKind?: "file" | "workspace" | "workspace-and-files";
 }
 
 export type AnyEditor = DetectedEditor | CustomEditor;
