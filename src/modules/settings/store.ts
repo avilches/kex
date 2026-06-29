@@ -175,7 +175,6 @@ export type Preferences = {
   scratchpadInNewTerminals: boolean;
   preferredFileEditorId: string | null;
   preferredWorkspaceEditorId: string | null;
-  preferredTerminalEditorId: string | null;
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
   disabledDetectedEditorIds: string[];
@@ -235,7 +234,6 @@ const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
 const KEY_PREFERRED_FILE_EDITOR_ID = "preferredFileEditorId";
 const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
-const KEY_PREFERRED_TERMINAL_EDITOR_ID = "preferredTerminalEditorId";
 const KEY_CUSTOM_EDITORS = "customEditors";
 const KEY_DETECTED_EDITORS = "detectedEditors";
 const KEY_DISABLED_DETECTED_IDS = "disabledDetectedEditorIds";
@@ -380,7 +378,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   scratchpadInNewTerminals: true,
   preferredFileEditorId: null,
   preferredWorkspaceEditorId: null,
-  preferredTerminalEditorId: null,
   customEditors: [],
   detectedEditors: [],
   disabledDetectedEditorIds: [],
@@ -623,9 +620,6 @@ export async function loadPreferences(): Promise<Preferences> {
     preferredWorkspaceEditorId:
       get<string | null>(KEY_PREFERRED_WORKSPACE_EDITOR_ID) ??
       DEFAULT_PREFERENCES.preferredWorkspaceEditorId,
-    preferredTerminalEditorId:
-      get<string | null>(KEY_PREFERRED_TERMINAL_EDITOR_ID) ??
-      DEFAULT_PREFERENCES.preferredTerminalEditorId,
     customEditors: (() => {
       const v = get<CustomEditor[]>(KEY_CUSTOM_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.customEditors;
@@ -909,10 +903,6 @@ export async function setPreferredWorkspaceEditorId(value: string | null): Promi
   await writePref(KEY_PREFERRED_WORKSPACE_EDITOR_ID, value);
 }
 
-export async function setPreferredTerminalEditorId(value: string | null): Promise<void> {
-  await writePref(KEY_PREFERRED_TERMINAL_EDITOR_ID, value);
-}
-
 export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
   await writePref(KEY_CUSTOM_EDITORS, value);
 }
@@ -1088,7 +1078,6 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
   [KEY_PREFERRED_FILE_EDITOR_ID]: "preferredFileEditorId",
   [KEY_PREFERRED_WORKSPACE_EDITOR_ID]: "preferredWorkspaceEditorId",
-  [KEY_PREFERRED_TERMINAL_EDITOR_ID]: "preferredTerminalEditorId",
   [KEY_CUSTOM_EDITORS]: "customEditors",
   [KEY_DETECTED_EDITORS]: "detectedEditors",
   [KEY_DISABLED_DETECTED_IDS]: "disabledDetectedEditorIds",

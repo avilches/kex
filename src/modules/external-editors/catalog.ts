@@ -1,5 +1,5 @@
-export type EditorGroup = "VS Code" | "JetBrains" | "Text Editors" | "Terminals" | "Other IDEs";
-export type EditorTargetType = "file" | "workspace" | "terminal";
+export type EditorGroup = "VS Code" | "JetBrains" | "Text Editors" | "Other IDEs";
+export type EditorTargetType = "file" | "workspace";
 
 export interface CatalogEntry {
   id: string;
@@ -10,16 +10,16 @@ export interface CatalogEntry {
 }
 
 export const EDITOR_CATALOG: CatalogEntry[] = [
-  // VS Code family
-  { id: "vscode", name: "VS Code", group: "VS Code", type: "file" },
-  { id: "vscode-insiders", name: "VS Code Insiders", group: "VS Code", type: "file" },
-  { id: "vscodium", name: "VSCodium", group: "VS Code", type: "file" },
-  { id: "cursor", name: "Cursor", group: "VS Code", type: "file" },
-  { id: "windsurf", name: "Windsurf", group: "VS Code", type: "file" },
-  { id: "kiro", name: "Kiro", group: "VS Code", type: "file" },
-  { id: "trae", name: "Trae", group: "VS Code", type: "file" },
-  { id: "trae-solo", name: "Trae Solo", group: "VS Code", type: "file" },
-  { id: "antigravity", name: "Antigravity", group: "VS Code", type: "file" },
+  // VS Code family (open workspace root)
+  { id: "vscode", name: "VS Code", group: "VS Code", type: "workspace" },
+  { id: "vscode-insiders", name: "VS Code Insiders", group: "VS Code", type: "workspace" },
+  { id: "vscodium", name: "VSCodium", group: "VS Code", type: "workspace" },
+  { id: "cursor", name: "Cursor", group: "VS Code", type: "workspace" },
+  { id: "windsurf", name: "Windsurf", group: "VS Code", type: "workspace" },
+  { id: "kiro", name: "Kiro", group: "VS Code", type: "workspace" },
+  { id: "trae", name: "Trae", group: "VS Code", type: "workspace" },
+  { id: "trae-solo", name: "Trae Solo", group: "VS Code", type: "workspace" },
+  { id: "antigravity", name: "Antigravity", group: "VS Code", type: "workspace" },
   // Text editors
   { id: "zed", name: "Zed", group: "Text Editors", type: "file" },
   { id: "zed-preview", name: "Zed Preview", group: "Text Editors", type: "file" },
@@ -42,19 +42,11 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "phpstorm", name: "PhpStorm", group: "JetBrains", type: "workspace" },
   { id: "mps", name: "MPS", group: "JetBrains", type: "workspace" },
   { id: "android-studio-canary", name: "Android Studio Canary", group: "JetBrains", type: "workspace" },
-  // Terminals (open current folder: CWD when on terminal tab, parent dir when on file)
-  { id: "terminal-app", name: "Terminal", group: "Terminals", type: "terminal" },
-  { id: "wave", name: "Wave", group: "Terminals", type: "terminal" },
-  { id: "warp", name: "Warp", group: "Terminals", type: "terminal" },
-  { id: "ghostty", name: "Ghostty", group: "Terminals", type: "terminal" },
-  { id: "iterm2", name: "iTerm2", group: "Terminals", type: "terminal" },
-  { id: "alacritty", name: "Alacritty", group: "Terminals", type: "terminal" },
-  { id: "kitty", name: "Kitty", group: "Terminals", type: "terminal" },
   // Other IDEs
   { id: "xcode", name: "Xcode", group: "Other IDEs", type: "workspace" },
 ];
 
-export const EDITOR_GROUPS: EditorGroup[] = ["VS Code", "JetBrains", "Text Editors", "Terminals", "Other IDEs"];
+export const EDITOR_GROUPS: EditorGroup[] = ["VS Code", "JetBrains", "Text Editors", "Other IDEs"];
 
 const CATALOG_MAP = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
 

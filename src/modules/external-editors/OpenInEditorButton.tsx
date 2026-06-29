@@ -14,7 +14,6 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setPreferredFileEditorId,
   setPreferredWorkspaceEditorId,
-  setPreferredTerminalEditorId,
 } from "@/modules/settings/store";
 import { useExternalEditors, openWithEditor } from "./useExternalEditors";
 import type { AnyEditor } from "./types";
@@ -38,7 +37,7 @@ function pathLabel(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-function resolveEditorTargetType(editor: AnyEditor): "file" | "workspace" | "terminal" {
+function resolveEditorTargetType(editor: AnyEditor): "file" | "workspace" {
   if ("targetKind" in editor && editor.targetKind) return editor.targetKind;
   return getEditorTargetType(editor.id);
 }
@@ -47,7 +46,6 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   const { detectedEditors, isScanning } = useExternalEditors();
   const preferredFileEditorId = usePreferencesStore((s) => s.preferredFileEditorId);
   const preferredWorkspaceEditorId = usePreferencesStore((s) => s.preferredWorkspaceEditorId);
-  const preferredTerminalEditorId = usePreferencesStore((s) => s.preferredTerminalEditorId);
   const customEditors = usePreferencesStore((s) => s.customEditors);
   const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const [open, setOpen] = useState(false);
@@ -70,75 +68,45 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     return parts.join("/") || null;
   })();
 
-  // Whether the active tab is a dir context (terminal CWD, git-diff root, etc.)
-  const isTerminalContext = !hasFile && !!currentFolderPath;
+  const contextType: "file" | "dir" | "none" = hasFile ? "file" : currentFolderPath ? "dir" : "none";
 
-  // Terminal CWD is inside the workspace root: prefer workspace editors over terminal apps.
-  const terminalInsideWorkspace =
-    isTerminalContext &&
-    !!workspaceRoot &&
-    !!currentFolderPath &&
-    (currentFolderPath === workspaceRoot ||
-      currentFolderPath.startsWith(workspaceRoot + "/") ||
-      currentFolderPath.startsWith(workspaceRoot + "\\"));
-
-  // Clear the override whenever the context type flips (file <-> dir) so the
-  // appropriate auto-selection takes effect without the user needing to re-pick.
-  const contextType: "file" | "dir" | "none" = hasFile ? "file" : isTerminalContext ? "dir" : "none";
+  // Clear the override whenever the context type flips so auto-selection resumes.
   useEffect(() => {
     setOverrideEditorId(null);
   }, [contextType]);
 
-  // Editors by type — dropdown sections are gated on context:
-  // - "Edit files" only when a file is active
-  // - "Workspace root" whenever a workspace root exists
-  // - "Terminals" whenever there is any folder context
+  // File editors shown only when a file is active; workspace editors when a root exists.
   const fileEditors = hasFile
     ? allEditors.filter((e) => resolveEditorTargetType(e) === "file")
     : [];
   const workspaceEditors = workspaceRoot
     ? allEditors.filter((e) => resolveEditorTargetType(e) === "workspace")
     : [];
-  const terminalEditors = currentFolderPath
-    ? allEditors.filter((e) => resolveEditorTargetType(e) === "terminal")
-    : [];
 
-  const anyAvailable =
-    fileEditors.length > 0 || workspaceEditors.length > 0 || terminalEditors.length > 0;
+  const anyAvailable = fileEditors.length > 0 || workspaceEditors.length > 0;
 
-  // Per-category preferred editor (each has its own saved preference slot)
   const activeFileEditor =
     fileEditors.find((e) => e.id === preferredFileEditorId) ?? fileEditors[0] ?? null;
   const activeWorkspaceEditor =
     workspaceEditors.find((e) => e.id === preferredWorkspaceEditorId) ??
     workspaceEditors[0] ??
     null;
-  const activeTerminalEditor =
-    terminalEditors.find((e) => e.id === preferredTerminalEditorId) ??
-    terminalEditors[0] ??
-    null;
 
-  // Primary editor selection:
-  //   - Explicit dropdown pick (override) always wins while context matches.
-  //   - File tab: prefer file editors.
-  //   - Dir tab inside workspace: prefer workspace editors, fall back to terminal.
-  //   - Dir tab outside workspace (or no workspace root): prefer terminal editors, fall back to workspace.
+  // Primary editor: explicit override wins; otherwise file tab gets file editor,
+  // dir tab (terminal CWD, git panel) gets workspace editor.
   const primaryEditor: AnyEditor | null = (() => {
     if (overrideEditorId) {
       const found = allEditors.find((e) => e.id === overrideEditorId);
       if (found) return found;
     }
     if (hasFile) return activeFileEditor;
-    if (terminalInsideWorkspace) return activeWorkspaceEditor ?? activeTerminalEditor ?? null;
-    if (isTerminalContext) return activeTerminalEditor ?? activeWorkspaceEditor ?? null;
-    return null;
+    return activeWorkspaceEditor;
   })();
 
   const primaryTarget: OpenInEditorTarget | null = (() => {
     if (!primaryEditor) return null;
     const type = resolveEditorTargetType(primaryEditor);
     if (type === "workspace") return workspaceRoot ? { path: workspaceRoot, kind: "dir" } : null;
-    if (type === "terminal") return currentFolderPath ? { path: currentFolderPath, kind: "dir" } : null;
     return hasFile ? target : null;
   })();
 
@@ -154,21 +122,16 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     if (err) toast.error(`Could not open in ${primaryEditor.name}: ${err}`);
   }, [primaryEditor, primaryTarget]);
 
-  // Dropdown only sets the preference for the selected type; does not execute.
-  // Each category has its own preference slot so switching context restores the
-  // right default per type.
+  // Dropdown only sets the preference for the selected category; does not execute.
   const handleSetPreferred = useCallback((editor: AnyEditor) => {
     setOverrideEditorId(editor.id);
     const type = resolveEditorTargetType(editor);
     if (type === "file") {
       usePreferencesStore.setState({ preferredFileEditorId: editor.id });
       void setPreferredFileEditorId(editor.id);
-    } else if (type === "workspace") {
+    } else {
       usePreferencesStore.setState({ preferredWorkspaceEditorId: editor.id });
       void setPreferredWorkspaceEditorId(editor.id);
-    } else {
-      usePreferencesStore.setState({ preferredTerminalEditorId: editor.id });
-      void setPreferredTerminalEditorId(editor.id);
     }
   }, []);
 
@@ -179,7 +142,6 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
         disabled && "pointer-events-none opacity-40",
       )}
     >
-      {/* Primary click: icon + editor name + path label */}
       <button
         type="button"
         title={
@@ -206,7 +168,6 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
         )}
       </button>
 
-      {/* Dropdown trigger */}
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <button
@@ -222,7 +183,6 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
             <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Scanning...</div>
           )}
 
-          {/* Edit files — only when a file is active */}
           {fileEditors.length > 0 && (
             <>
               <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
@@ -244,7 +204,6 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
             </>
           )}
 
-          {/* Workspace root — when a workspace root exists */}
           {workspaceEditors.length > 0 && (
             <>
               {fileEditors.length > 0 && <DropdownMenuSeparator />}
@@ -260,29 +219,6 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
                   <EditorIcon id={editor.id} size={16} />
                   <span className="flex-1">{editor.name}</span>
                   {editor.id === activeWorkspaceEditor?.id && (
-                    <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </>
-          )}
-
-          {/* Terminals — whenever there is any folder context */}
-          {terminalEditors.length > 0 && (
-            <>
-              {(fileEditors.length > 0 || workspaceEditors.length > 0) && <DropdownMenuSeparator />}
-              <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                Terminals
-              </DropdownMenuLabel>
-              {terminalEditors.map((editor) => (
-                <DropdownMenuItem
-                  key={editor.id}
-                  onSelect={() => handleSetPreferred(editor)}
-                  className="gap-2"
-                >
-                  <EditorIcon id={editor.id} size={16} />
-                  <span className="flex-1">{editor.name}</span>
-                  {editor.id === activeTerminalEditor?.id && (
                     <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-muted-foreground" />
                   )}
                 </DropdownMenuItem>

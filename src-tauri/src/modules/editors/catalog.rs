@@ -50,14 +50,6 @@ pub static CATALOG: &[EditorEntry] = &[
     EditorEntry { id: "android-studio-canary", name: "Android Studio Canary", bundle_id: Some("com.google.android.studio.canary"), cli_binary: "studio", args_before_path: &[], macos_app_name: Some("Android Studio Canary") },
     // --- Other IDEs ---
     EditorEntry { id: "xcode", name: "Xcode", bundle_id: Some("com.apple.dt.Xcode"), cli_binary: "xed", args_before_path: &[], macos_app_name: None },
-    // --- Terminals ---
-    EditorEntry { id: "warp", name: "Warp", bundle_id: Some("dev.warp.Warp-Stable"), cli_binary: "", args_before_path: &[], macos_app_name: None },
-    EditorEntry { id: "ghostty", name: "Ghostty", bundle_id: Some("com.mitchellh.ghostty"), cli_binary: "ghostty", args_before_path: &["--working-directory"], macos_app_name: None },
-    EditorEntry { id: "iterm2", name: "iTerm2", bundle_id: Some("com.googlecode.iterm2"), cli_binary: "", args_before_path: &[], macos_app_name: None },
-    EditorEntry { id: "alacritty", name: "Alacritty", bundle_id: Some("io.alacritty"), cli_binary: "alacritty", args_before_path: &["--working-directory"], macos_app_name: None },
-    EditorEntry { id: "kitty", name: "Kitty", bundle_id: Some("net.kovidgoyal.kitty"), cli_binary: "kitty", args_before_path: &["--directory"], macos_app_name: None },
-    EditorEntry { id: "terminal-app", name: "Terminal", bundle_id: Some("com.apple.Terminal"), cli_binary: "", args_before_path: &[], macos_app_name: None },
-    EditorEntry { id: "wave", name: "Wave", bundle_id: Some("dev.wavterm.WaveTerm"), cli_binary: "", args_before_path: &[], macos_app_name: None },
 ];
 
 pub fn is_jetbrains(id: &str) -> bool {
@@ -68,5 +60,5 @@ pub fn is_jetbrains(id: &str) -> bool {
 
 /// Editors launched via `open -b <bundle_id>` on macOS regardless of CLI availability.
 pub fn is_macos_open_only(id: &str) -> bool {
-    matches!(id, "bbedit" | "cotedit" | "coderunner" | "terminal-app" | "wave" | "ghostty")
+    matches!(id, "bbedit" | "cotedit" | "coderunner")
 }

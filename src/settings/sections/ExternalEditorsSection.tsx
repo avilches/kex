@@ -18,11 +18,10 @@ import { SectionHeader } from "../components/SectionHeader";
 import { cn } from "@/lib/utils";
 
 const COLS = "grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_5.5rem_3.5rem_1.5rem]";
-const ALL_GROUPS: EditorGroup[] = ["VS Code", "Text Editors", "Terminals", "JetBrains", "Other IDEs"];
-const NOT_INSTALLED_COLLAPSED = 2;
+const ALL_GROUPS: EditorGroup[] = ["VS Code", "Text Editors", "JetBrains", "Other IDEs"];
+const NOT_INSTALLED_COLLAPSED = 1;
 
 function targetTypeLabel(type: EditorTargetType): string {
-  if (type === "terminal") return "Opens the current folder";
   if (type === "workspace") return "Opens in the working root";
   return "Opens the current file";
 }
@@ -132,7 +131,7 @@ export function ExternalEditorsSection() {
     );
   }
 
-  function handleUpdateCustomTargetKind(id: string, kind: "file" | "workspace" | "terminal") {
+  function handleUpdateCustomTargetKind(id: string, kind: "file" | "workspace") {
     void setCustomEditors(
       customEditors.map((e) => (e.id === id ? { ...e, targetKind: kind } : e)),
     );
@@ -207,14 +206,13 @@ export function ExternalEditorsSection() {
                 <select
                   value={e.targetKind ?? "file"}
                   onChange={(ev) =>
-                    handleUpdateCustomTargetKind(e.id, ev.target.value as "file" | "workspace" | "terminal")
+                    handleUpdateCustomTargetKind(e.id, ev.target.value as "file" | "workspace")
                   }
                   className="h-7 w-full rounded border border-border bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   title="What to pass to the tool"
                 >
                   <option value="file">Current file</option>
                   <option value="workspace">Working root</option>
-                  <option value="terminal">Current folder</option>
                 </select>
                 <input
                   type="text"
