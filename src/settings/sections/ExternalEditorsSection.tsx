@@ -135,11 +135,15 @@ function CustomEditorRow({
   onUpdate,
   onDelete,
   onRegisterNameRef,
+  onRegisterBinaryRef,
+  showDragHandle,
 }: {
   editor: CustomEditor;
   onUpdate: (id: string, partial: Partial<Pick<CustomEditor, "name" | "binary" | "argsBeforePath" | "targetKind">>) => void;
   onDelete: (id: string) => void;
   onRegisterNameRef: (id: string, el: HTMLInputElement | null) => void;
+  onRegisterBinaryRef: (id: string, el: HTMLInputElement | null) => void;
+  showDragHandle: boolean;
 }) {
   const [name, setName] = useState(editor.name);
   const [binary, setBinary] = useState(editor.binary);
@@ -171,16 +175,20 @@ function CustomEditorRow({
     >
       {/* Row 1: drag handle + Name + Opens + delete */}
       <div className="flex items-end gap-2">
-        <button
-          ref={setActivatorNodeRef}
-          type="button"
-          title="Drag to reorder"
-          className="mb-[7px] flex size-[22px] shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground/40 transition-colors hover:text-muted-foreground active:cursor-grabbing"
-          {...attributes}
-          {...listeners}
-        >
-          <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
-        </button>
+        {showDragHandle ? (
+          <button
+            ref={setActivatorNodeRef}
+            type="button"
+            title="Drag to reorder"
+            className="mb-[7px] flex size-[22px] shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground/40 transition-colors hover:text-muted-foreground active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
+          </button>
+        ) : (
+          <div className="size-[22px] shrink-0" />
+        )}
         <div className="flex w-1/2 flex-col gap-1">
           <span className={LABEL_CLASS}>Name</span>
           <input
@@ -215,7 +223,7 @@ function CustomEditorRow({
           type="button"
           title="Remove"
           onClick={() => onDelete(editor.id)}
-          className="mb-[7px] flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+          className="mb-[7px] flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-destructive"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
         </button>
@@ -228,6 +236,7 @@ function CustomEditorRow({
           <span className={LABEL_CLASS}>Command</span>
           <input
             type="text"
+            ref={(el) => onRegisterBinaryRef(editor.id, el)}
             value={binary}
             onChange={(ev) => setBinary(ev.target.value)}
             onBlur={() => { setBinaryTouched(true); onUpdate(editor.id, { binary }); }}
@@ -296,6 +305,15 @@ export function ExternalEditorsSection() {
     [],
   );
 
+  const binaryInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const handleRegisterBinaryRef = useCallback(
+    (id: string, el: HTMLInputElement | null) => {
+      if (el) binaryInputRefs.current.set(id, el);
+      else binaryInputRefs.current.delete(id);
+    },
+    [],
+  );
+
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   useEffect(() => {
     if (!pendingFocusId) return;
@@ -326,7 +344,11 @@ export function ExternalEditorsSection() {
   function handleAddCustom() {
     const incomplete = customEditors.find((e) => !e.name.trim() || !e.binary.trim());
     if (incomplete) {
-      nameInputRefs.current.get(incomplete.id)?.focus();
+      if (!incomplete.name.trim()) {
+        nameInputRefs.current.get(incomplete.id)?.focus();
+      } else {
+        binaryInputRefs.current.get(incomplete.id)?.focus();
+      }
       return;
     }
     const id = crypto.randomUUID();
@@ -395,6 +417,8 @@ export function ExternalEditorsSection() {
                     onUpdate={handleUpdateCustom}
                     onDelete={handleDeleteCustom}
                     onRegisterNameRef={handleRegisterNameRef}
+                    onRegisterBinaryRef={handleRegisterBinaryRef}
+                    showDragHandle={customEditors.length > 1}
                   />
                 ))}
               </div>
