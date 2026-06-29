@@ -185,6 +185,7 @@ export type Preferences = {
 
 const STORE_PATH = "settings-general.json";
 const SHORTCUTS_STORE_PATH = "settings-shortcuts.json";
+const TOOLS_STORE_PATH = "settings-tools.json";
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
 const KEY_EDITOR_THEME = "editorTheme";
@@ -400,6 +401,7 @@ function buildColdStartMap(): EditorViewMap {
 // the (much larger) general settings, and vice versa.
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
 const shortcutsStore = new LazyStore(SHORTCUTS_STORE_PATH, { defaults: {}, autoSave: 200 });
+const toolsStore = new LazyStore(TOOLS_STORE_PATH, { defaults: {}, autoSave: 200 });
 
 // LazyStore.onChange only fires within the writing process. The settings
 // page lives in a separate webview, so writes there never reach the main
@@ -428,6 +430,12 @@ async function writePref<T>(key: string, value: T): Promise<void> {
   await emit(PREFS_CHANGED_EVENT, { key, value });
 }
 
+async function writeToolsPref<T>(key: string, value: T): Promise<void> {
+  await toolsStore.set(key, value);
+  await toolsStore.save();
+  await emit(PREFS_CHANGED_EVENT, { key, value });
+}
+
 async function writeShortcutsPref(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
@@ -440,11 +448,12 @@ export async function loadPreferences(): Promise<Preferences> {
   // Single IPC roundtrip for general settings — fetching keys individually
   // fans out to one `plugin:store|get` per setting and is the dominant boot
   // cost. Shortcuts live in their own file, fetched in parallel.
-  const [entries, shortcutsValue] = await Promise.all([
+  const [entries, toolsEntries, shortcutsValue] = await Promise.all([
     store.entries(),
+    toolsStore.entries(),
     shortcutsStore.get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS),
   ]);
-  const map = new Map<string, unknown>(entries);
+  const map = new Map<string, unknown>([...entries, ...toolsEntries]);
   const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
   const result: Preferences = {
     theme: get<ThemePref>(KEY_THEME) ?? DEFAULT_PREFERENCES.theme,
@@ -907,27 +916,27 @@ export async function setTerminalScratchpadInNewTerminals(value: boolean): Promi
 }
 
 export async function setPreferredFileEditorId(value: string | null): Promise<void> {
-  await writePref(KEY_PREFERRED_FILE_EDITOR_ID, value);
+  await writeToolsPref(KEY_PREFERRED_FILE_EDITOR_ID, value);
 }
 
 export async function setPreferredWorkspaceEditorId(value: string | null): Promise<void> {
-  await writePref(KEY_PREFERRED_WORKSPACE_EDITOR_ID, value);
+  await writeToolsPref(KEY_PREFERRED_WORKSPACE_EDITOR_ID, value);
 }
 
 export async function setTextEditorMode(value: TextEditorMode): Promise<void> {
-  await writePref(KEY_TEXT_EDITOR_MODE, value);
+  await writeToolsPref(KEY_TEXT_EDITOR_MODE, value);
 }
 
 export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
-  await writePref(KEY_CUSTOM_EDITORS, value);
+  await writeToolsPref(KEY_CUSTOM_EDITORS, value);
 }
 
 export async function setDetectedEditors(value: DetectedEditor[]): Promise<void> {
-  await writePref(KEY_DETECTED_EDITORS, value);
+  await writeToolsPref(KEY_DETECTED_EDITORS, value);
 }
 
 export async function setDisabledDetectedEditorIds(value: string[]): Promise<void> {
-  await writePref(KEY_DISABLED_DETECTED_IDS, value);
+  await writeToolsPref(KEY_DISABLED_DETECTED_IDS, value);
 }
 
 export async function setZoomLevel(value: number): Promise<void> {
@@ -1109,6 +1118,10 @@ export async function onPreferencesChange(
     const mapped = PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
+  const unsubTools = await toolsStore.onChange<unknown>((key, value) => {
+    const mapped = PREF_KEY_MAP[key];
+    if (mapped) cb(mapped, value);
+  });
   const unsubShortcuts = await shortcutsStore.onChange<unknown>((key, value) => {
     const mapped = PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
@@ -1122,6 +1135,7 @@ export async function onPreferencesChange(
   );
   return () => {
     unsubLocal();
+    unsubTools();
     unsubShortcuts();
     unsubEvent();
   };
