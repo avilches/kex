@@ -509,12 +509,12 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
 
 /* Slide animation for the right panel open/close.
  * Disabled during handle drag (:active on [data-separator]) to avoid lag. */
-[data-panel-group]:not(:has([data-separator]:active)) [data-panel] {
+[data-group]:not(:has([data-separator]:active)) [data-panel] {
   transition: flex 0.25s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-panel-group] [data-panel] {
+  [data-group] [data-panel] {
     transition: none !important;
   }
 }
