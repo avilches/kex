@@ -265,12 +265,12 @@ export function ExternalEditorsSection() {
                 {/* Row 2: Binary (50%) + Args (50%) */}
                 <div className="flex items-end gap-2">
                   <div className="flex w-1/2 flex-col gap-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Binary / path</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Command</span>
                     <input
                       type="text"
                       defaultValue={e.binary}
                       onBlur={(ev) => handleUpdateCustom(e.id, "binary", ev.target.value)}
-                      placeholder="/usr/local/bin/tool"
+                      placeholder="subl, /usr/local/bin/tool"
                       className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                   </div>
