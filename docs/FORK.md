@@ -350,6 +350,17 @@ The git diff and commit-file panes were brought in line with the editor: their o
 
 The diff can now render two ways. Unified is the existing inline `unifiedMergeView` extension inside the `<CodeMirror>` wrapper; split is a new side-by-side view (`GitDiffSplitView`) that mounts `@codemirror/merge`'s `MergeView` class directly on a host div, outside the React-CodeMirror wrapper, because `MergeView` is a class with its own DOM rather than an extension. Both editors are read-only and share the diff theme; the split view resolves its language asynchronously and reconfigures both panes via a compartment, so an uncached language pack still highlights without a remount. The mode is driven by a new global `diffViewMode` preference (`"unified" | "split"`, default `"unified"`), shown in Settings -> Editor and toggled from the bar. Word wrap and line numbers in diffs reuse the per-extension `editorViewByExt` config (the same store the editor `[...]` menu writes), so they are not new global settings. The upstream has only the inline unified diff and no diff options bar.
 
+### Run configurations and Run button (F12)
+
+Per-workspace run configurations (`RunConfig[]` on `Workspace`) let users save named shell commands (with optional cwd override) and execute them from the header bar with one click or F12. Not present in upstream Terax.
+
+- **Header Run button** (`src/app/components/RunButton.tsx`): renders in three modes based on the number of saved run configs in the active workspace. Zero configs: a muted placeholder that opens Workspace Settings on the run-configs tab. One config: a simple play/stop toggle. Two or more configs: a split button with a dropdown config selector on the left and a play/stop icon on the right.
+- **Run execution** (`runWorkspaceConfig` in `App.tsx`): if the config's saved `panelId` still refers to a live terminal panel, navigates to it; otherwise splits the active pane downward, creates a new terminal panel in the config's cwd, saves the new panel id on the config, and writes the command followed by CR. Uses a 150ms + retry loop to wait for the terminal handle to register.
+- **Stop** (`stopWorkspaceConfig` in `App.tsx`): sends Ctrl+C (`\x03`) to the terminal handle.
+- **isRunning state** (`runConfigRunning` in `terminalEphemeralStore`): a `Map<panelId, boolean>` (outside the workspaces React tree, `useSyncExternalStore`) set to `true` on run and cleared to `false` when OSC 133;D fires for that panel. Manual commands typed by the user do not touch this map.
+- **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active run config of the current workspace, toggleing based on the current isRunning state.
+- **Startup validation** (`validateRunConfigPanels`): on mount, App.tsx collects all living panel ids and calls `validateRunConfigPanels` for each workspace, clearing `panelId` references that no longer exist (stale from a previous session).
+
 ---
 
 ## Roadmap (planned, not yet built)

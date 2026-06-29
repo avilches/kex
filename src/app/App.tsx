@@ -76,11 +76,13 @@ import {
   findPanelPane,
   panelTitle,
   siblingPane,
+  type Panel,
   type PanelCallbacks,
   type Rect,
   useWorkspaces,
   WorkspaceView,
 } from "@/modules/workspaces";
+import type { RunConfig } from "@/modules/workspaces/lib/types";
 import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
@@ -116,6 +118,8 @@ import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
   clearRunningCommandEntry,
   getRunningCommandsSnapshot,
+  setRunConfigRunning,
+  getRunConfigRunningSnapshot,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { clearMetricsEntry } from "@/modules/workspaces/lib/terminalMetricsStore";
 import {
@@ -196,6 +200,8 @@ export default function App() {
     updateRunConfig,
     removeRunConfig,
     reorderRunConfigs,
+    setActiveRunConfig,
+    validateRunConfigPanels,
     setTerminalRunningCommand,
     setPanelView,
     toggleOverlayPreview,
@@ -323,6 +329,17 @@ export default function App() {
       }
       pruneOrphanedPlans(knownIds);
     });
+  }, []);
+
+  useEffect(() => {
+    for (const ws of workspacesRef.current) {
+      const livingPanelIds = new Set<string>();
+      for (const pane of allPanes(ws.paneTree)) {
+        for (const panel of pane.panels) livingPanelIds.add(panel.id);
+      }
+      validateRunConfigPanels(ws.id, livingPanelIds);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const restoredRef = useRef(false);
@@ -490,6 +507,52 @@ export default function App() {
     setActiveSearchAddon(null);
     setActiveEditorHandle(null);
   }, []);
+
+  // ── Run config execution ──────────────────────────────────────────────────
+
+  const runWorkspaceConfig = useCallback(
+    (config: RunConfig) => {
+      if (!activeWorkspace) return;
+
+      if (config.panelId) {
+        const found = findPanelGlobal(config.panelId);
+        if (found) {
+          setActiveWorkspaceId(found.workspace.id);
+          activatePanel(found.workspace.id, config.panelId);
+          return;
+        }
+      }
+
+      const newPanelId = crypto.randomUUID();
+      const panelCwd =
+        config.cwd ?? activeWorkspace.pinnedRoot ?? activeWorkspace.cwd;
+      const panel: Panel = { id: newPanelId, kind: "terminal", cwd: panelCwd };
+
+      splitPaneAndOpenPanel(activeWorkspace.id, activeWorkspace.activePaneId, "bottom", panel);
+      updateRunConfig(activeWorkspace.id, config.id, { panelId: newPanelId });
+      setRunConfigRunning(newPanelId, true);
+
+      const tryWrite = (attempts = 0) => {
+        const handle = terminalHandles.current.get(newPanelId);
+        if (handle) {
+          handle.write(config.command + "\r");
+        } else if (attempts < 20) {
+          setTimeout(() => tryWrite(attempts + 1), 100);
+        }
+      };
+      setTimeout(tryWrite, 150);
+    },
+    [activeWorkspace, findPanelGlobal, setActiveWorkspaceId, activatePanel, splitPaneAndOpenPanel, updateRunConfig],
+  );
+
+  const stopWorkspaceConfig = useCallback(
+    (config: RunConfig) => {
+      if (!config.panelId) return;
+      const handle = terminalHandles.current.get(config.panelId);
+      handle?.write("\x03");
+    },
+    [],
+  );
 
   const handleCloseWorkspace = useCallback(
     async (wsId: string) => {
@@ -1624,6 +1687,9 @@ export default function App() {
       onRunningCommand: (panelId, cmd) => {
         const found = findPanelGlobal(panelId);
         if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
+        if (cmd === null && getRunConfigRunningSnapshot().has(panelId)) {
+          setRunConfigRunning(panelId, false);
+        }
       },
       onScratchpadState: (panelId, state) => {
         const found = findPanelGlobal(panelId);
@@ -1932,6 +1998,23 @@ export default function App() {
           useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId);
         }
       },
+      "workspace.run": () => {
+        if (!activeWorkspace) return;
+        const configs = activeWorkspace.runConfigs ?? [];
+        if (configs.length === 0) return;
+        const active =
+          configs.find((c) => c.id === activeWorkspace.activeRunConfigId) ??
+          configs[0];
+        if (!active) return;
+        const isRunning = !!(
+          active.panelId && getRunConfigRunningSnapshot().get(active.panelId)
+        );
+        if (isRunning) {
+          stopWorkspaceConfig(active);
+        } else {
+          runWorkspaceConfig(active);
+        }
+      },
       "tab.newBrowser": () => openBrowserInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActivePanel,
@@ -2159,6 +2242,8 @@ export default function App() {
       rotateExplorerRoot,
       toggleOverlayPreview,
       toggleSplitPreview,
+      runWorkspaceConfig,
+      stopWorkspaceConfig,
     ],
   );
 
@@ -2406,6 +2491,15 @@ export default function App() {
             openInEditorTarget={openInEditorTarget}
             workspaceRoot={workspaceRootPath}
             onOpenExternalEditorSettings={onOpenExternalEditorSettings}
+            workspaceId={activeWorkspaceId}
+            runConfigs={activeWorkspace?.runConfigs ?? []}
+            activeRunConfigId={activeWorkspace?.activeRunConfigId}
+            onSelectRunConfig={(id) => setActiveRunConfig(activeWorkspaceId, id)}
+            onRunConfig={runWorkspaceConfig}
+            onStopConfig={stopWorkspaceConfig}
+            onOpenRunSettings={() =>
+              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "run-configs")
+            }
           />
 
           {/* 3-column layout */}

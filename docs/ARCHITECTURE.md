@@ -461,13 +461,21 @@ src/
     ├── explorer/                  — File tree, fuzzy search, icons, inline rename, internal clipboard copy/cut/paste (copy reuses the duplicate background task, cut uses `fs_rename`/`git_mv`), background duplication with progress emitted as the global event `kex:duplicate-progress` (so every app window, including Settings, can render it) and a global floating progress bar (`DuplicateProgressBar`, bottom-left) with cancel support (cancel deletes the partial copy). Quitting (Cmd+Q) while a copy is running is intercepted by Rust, which defers the exit and emits `kex:duplicate-quit-prompt` to all windows; the resulting modal offers wait, keep-open (`cancel_quit`), or cancel-copy-and-quit.
     ├── source-control/            — Git stage/commit/push panel. Supports a List/Tree view toggle (persisted as `scmViewMode` in settings); Tree mode keeps the Staged Changes / Changes roots and renders each as a directory tree with compacted single-child chains (explorer-style icons and spacing), built by the pure `scmTree.ts`.
     ├── git-history/               — Commit graph, per-file diffs
-    ├── header/                    — Top bar, inline search
+    ├── header/                    — Top bar, inline search, and the RunButton (0/1/2+ config variants).
+    │                                `RunButton` (in `src/app/components/RunButton.tsx`) reads the run-config
+    │                                running state from `terminalEphemeralStore.runConfigRunning`
+    │                                (`useSyncExternalStore`) and renders as a muted "Run" placeholder (0 configs),
+    │                                a simple toggle (1 config), or a split selector+play/stop button (2+ configs).
     ├── workspaces/                — Workspace/Pane/Panel model; useWorkspaces (source of truth),
     │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/PanelContent,
     │                                WorkspaceDndProvider (DndContext + file/tab drag handlers).
     │                                Workspace carries: color (accent color, hex or null), runConfigs (array of
     │                                run configurations with command, name, optional cwd/panelId), and
     │                                activeRunConfigId (selected run config id). See WORKSPACES.md for render tree details.
+    │                                `terminalEphemeralStore` has a second section, `runConfigRunning` (Map<panelId,
+    │                                boolean>), tracking which terminal panels are running a run-config command.
+    │                                Set to true by `runWorkspaceConfig` in App.tsx; cleared by OSC 133;D
+    │                                (`onRunningCommand` with cmd=null). Never persisted.
     ├── sidebar/                   — SidebarViewId type (residual; side panels moved to RightPanel)
     ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image

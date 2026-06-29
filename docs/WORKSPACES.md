@@ -29,6 +29,10 @@ Workspace           — a named environment (local or WSL distro)
 - `activeRunConfigId?: string` — id of the currently selected run config in the Run button
 - `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. The legacy `"pinned"` mode is migrated via `migrateWorkspace` in `workspaceState.ts` for backward compatibility. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
+**Run-config ephemeral state.** `terminalEphemeralStore` (`src/modules/workspaces/lib/terminalEphemeralStore.ts`) has two independent sections:
+- `runningCommands` (`Map<panelId, string>`) — foreground command name from OSC 133 C, for all terminal panels. Set and cleared by every `onRunningCommand` callback regardless of whether a run config is involved.
+- `runConfigRunning` (`Map<panelId, boolean>`) — tracks which terminal panels are currently executing a run-config command. Set to `true` by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared to `false` when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the panel id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
+
 A `Panel` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
 its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`). A `terminal` panel also persists

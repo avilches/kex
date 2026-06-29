@@ -3,6 +3,8 @@ import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
 import { OpenInEditorButton, type OpenInEditorTarget } from "@/modules/external-editors";
+import type { RunConfig } from "@/modules/workspaces/lib/types";
+import { RunButton } from "@/app/components/RunButton";
 import {
   CommandIcon,
   Settings01Icon,
@@ -28,6 +30,13 @@ type Props = {
   openInEditorTarget: OpenInEditorTarget | null;
   workspaceRoot: string | null;
   onOpenExternalEditorSettings: () => void;
+  workspaceId: string;
+  runConfigs: RunConfig[];
+  activeRunConfigId: string | undefined;
+  onSelectRunConfig: (configId: string) => void;
+  onRunConfig: (config: RunConfig) => void;
+  onStopConfig: (config: RunConfig) => void;
+  onOpenRunSettings: () => void;
 };
 
 const COMPACT_WIDTH = 720;
@@ -43,6 +52,13 @@ export function Header({
   openInEditorTarget,
   workspaceRoot,
   onOpenExternalEditorSettings,
+  workspaceId,
+  runConfigs,
+  activeRunConfigId,
+  onSelectRunConfig,
+  onRunConfig,
+  onStopConfig,
+  onOpenRunSettings,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
@@ -119,6 +135,16 @@ export function Header({
       {IS_MAC && <span className="mr-1 h-full w-px shrink-0 bg-border/70" />}
 
       <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
+
+      <RunButton
+        workspaceId={workspaceId}
+        runConfigs={runConfigs}
+        activeRunConfigId={activeRunConfigId}
+        onSelectConfig={onSelectRunConfig}
+        onRun={onRunConfig}
+        onStop={onStopConfig}
+        onOpenSettings={onOpenRunSettings}
+      />
 
       <OpenInEditorButton
         target={openInEditorTarget}

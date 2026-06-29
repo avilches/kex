@@ -47,6 +47,7 @@ export type ShortcutId =
   | "workspace.close"
   | "workspace.rename"
   | "workspace.settings"
+  | "workspace.run"
   | "workspace.prev"
   | "workspace.next"
   | "workspace.selectByIndex"
@@ -120,6 +121,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Workspace Settings",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "," }],
+  },
+  {
+    id: "workspace.run",
+    label: "Run / Stop Active Run Config",
+    group: "General",
+    defaultBindings: [{ key: "F12" }],
   },
   {
     id: "workspace.prev",

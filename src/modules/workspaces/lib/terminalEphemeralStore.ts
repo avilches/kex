@@ -38,3 +38,42 @@ export function clearRunningCommandEntry(panelId: string): void {
   runningCommands.delete(panelId);
   notify();
 }
+
+// ── Run config running state ───────────────────────────────────────────────
+// Only set to true by the Run button; set to false by OSC 133;D.
+// Manual commands typed by the user do NOT touch this map.
+
+const runConfigRunning = new Map<string, boolean>();
+const rcListeners = new Set<Listener>();
+let rcSnapshot: ReadonlyMap<string, boolean> = new Map();
+
+function notifyRc(): void {
+  rcSnapshot = new Map(runConfigRunning);
+  for (const l of rcListeners) l();
+}
+
+export function subscribeToRunConfigRunning(listener: Listener): () => void {
+  rcListeners.add(listener);
+  return () => { rcListeners.delete(listener); };
+}
+
+export function getRunConfigRunningSnapshot(): ReadonlyMap<string, boolean> {
+  return rcSnapshot;
+}
+
+export function setRunConfigRunning(panelId: string, running: boolean): void {
+  if (running) {
+    if (runConfigRunning.get(panelId) === true) return;
+    runConfigRunning.set(panelId, true);
+  } else {
+    if (!runConfigRunning.has(panelId)) return;
+    runConfigRunning.delete(panelId);
+  }
+  notifyRc();
+}
+
+export function clearRunConfigRunningEntry(panelId: string): void {
+  if (!runConfigRunning.has(panelId)) return;
+  runConfigRunning.delete(panelId);
+  notifyRc();
+}
