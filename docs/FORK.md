@@ -358,7 +358,7 @@ Per-workspace run configurations (`RunConfig[]` on `Workspace`) let users save n
 - **Run execution** (`runWorkspaceConfig` in `App.tsx`): if the config's saved `panelId` still refers to a live terminal panel, navigates to it; otherwise splits the active pane downward, creates a new terminal panel in the config's cwd, saves the new panel id on the config, and writes the command followed by CR. Uses a 150ms + retry loop to wait for the terminal handle to register.
 - **Stop** (`stopWorkspaceConfig` in `App.tsx`): sends Ctrl+C (`\x03`) to the terminal handle.
 - **isRunning state** (`runConfigRunning` in `terminalEphemeralStore`): a `Map<panelId, boolean>` (outside the workspaces React tree, `useSyncExternalStore`) set to `true` on run and cleared to `false` when OSC 133;D fires for that panel. Manual commands typed by the user do not touch this map.
-- **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active run config of the current workspace, toggleing based on the current isRunning state.
+- **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active run config of the current workspace, toggling based on the current isRunning state.
 - **Startup validation** (`validateRunConfigPanels`): on mount, App.tsx collects all living panel ids and calls `validateRunConfigPanels` for each workspace, clearing `panelId` references that no longer exist (stale from a previous session).
 
 ---

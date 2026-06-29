@@ -117,6 +117,7 @@ import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSet
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
   clearRunningCommandEntry,
+  clearRunConfigRunningEntry,
   getRunningCommandsSnapshot,
   setRunConfigRunning,
   getRunConfigRunningSnapshot,
@@ -462,6 +463,7 @@ export default function App() {
         searchAddons.current.delete(id);
         terminalHandles.current.delete(id);
         clearRunningCommandEntry(id);
+        clearRunConfigRunningEntry(id);
         clearMetricsEntry(id);
       }
     }
@@ -530,12 +532,12 @@ export default function App() {
 
       splitPaneAndOpenPanel(activeWorkspace.id, activeWorkspace.activePaneId, "bottom", panel);
       updateRunConfig(activeWorkspace.id, config.id, { panelId: newPanelId });
-      setRunConfigRunning(newPanelId, true);
 
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(newPanelId);
         if (handle) {
           handle.write(config.command + "\r");
+          setRunConfigRunning(newPanelId, true);
         } else if (attempts < 20) {
           setTimeout(() => tryWrite(attempts + 1), 100);
         }
@@ -2491,14 +2493,13 @@ export default function App() {
             openInEditorTarget={openInEditorTarget}
             workspaceRoot={workspaceRootPath}
             onOpenExternalEditorSettings={onOpenExternalEditorSettings}
-            workspaceId={activeWorkspaceId}
             runConfigs={activeWorkspace?.runConfigs ?? []}
             activeRunConfigId={activeWorkspace?.activeRunConfigId}
             onSelectRunConfig={(id) => setActiveRunConfig(activeWorkspaceId, id)}
             onRunConfig={runWorkspaceConfig}
             onStopConfig={stopWorkspaceConfig}
             onOpenRunSettings={() =>
-              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "run-configs")
+              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId)
             }
           />
 
@@ -2726,7 +2727,6 @@ export default function App() {
               if (path !== undefined) setPinnedRoot(id, path);
               else clearPinnedRoot(id);
             }}
-            onSetExplorerRootMode={setExplorerRootMode}
             onAddRunConfig={addRunConfig}
             onUpdateRunConfig={updateRunConfig}
             onRemoveRunConfig={removeRunConfig}

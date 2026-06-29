@@ -19,7 +19,6 @@ import {
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 
 type Props = {
-  workspaceId: string;
   runConfigs: RunConfig[];
   activeRunConfigId: string | undefined;
   onSelectConfig: (configId: string) => void;

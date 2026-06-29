@@ -34,14 +34,12 @@ import {
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 import type { Workspace, RunConfig } from "@/modules/workspaces/lib/types";
-import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 
 type Props = {
   workspaces: Workspace[];
   onSetTitle: (id: string, title: string) => void;
   onSetColor: (id: string, color: string | null) => void;
   onSetPinnedRoot: (id: string, path: string | undefined) => void;
-  onSetExplorerRootMode: (id: string, mode: ExplorerRootMode) => void;
   onAddRunConfig: (id: string, config: RunConfig) => void;
   onUpdateRunConfig: (id: string, configId: string, patch: Partial<RunConfig>) => void;
   onRemoveRunConfig: (id: string, configId: string) => void;
