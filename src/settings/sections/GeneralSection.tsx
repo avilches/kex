@@ -4,7 +4,7 @@ import {
   setAgentNotifications,
   setAutofocusNewTabs,
   setAutostart,
-  setEditorPreviewOnClick,
+  setPreviewOnClick,
   setWarnOnCloseWorkspace,
 } from "@/modules/settings/store";
 import { CrosshairIcon } from "@hugeicons/core-free-icons";
@@ -19,9 +19,7 @@ import { SettingRow } from "../components/SettingRow";
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
   const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
-  const editorPreviewOnClick = usePreferencesStore(
-    (s) => s.editorPreviewOnClick,
-  );
+  const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
   const warnOnCloseWorkspace = usePreferencesStore(
     (s) => s.warnOnCloseWorkspace,
@@ -111,8 +109,8 @@ export function GeneralSection() {
           description="Single click opens file in a temporary preview tab."
         >
           <Switch
-            checked={editorPreviewOnClick}
-            onCheckedChange={(v) => void setEditorPreviewOnClick(v)}
+            checked={previewOnClick}
+            onCheckedChange={(v) => void setPreviewOnClick(v)}
           />
         </SettingRow>
       </div>

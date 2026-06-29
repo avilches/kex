@@ -422,13 +422,12 @@ fn window_save_right_panel(
     label: String,
     open: bool,
     active_tab: String,
-    width: u32,
     side: String,
 ) {
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_right_panel(
         &label,
-        window_state::RightPanelState { open, active_tab, width, side },
+        window_state::RightPanelState { open, active_tab, side },
     );
     mgr.save();
 }
@@ -437,6 +436,13 @@ fn window_save_right_panel(
 fn window_save_workspace_sidebar(app: tauri::AppHandle, label: String, width: u32) {
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_workspace_sidebar_width(&label, width);
+    mgr.save();
+}
+
+#[tauri::command]
+fn window_save_explorer_sidebar(app: tauri::AppHandle, label: String, width: u32) {
+    let mgr = app.state::<window_state::WindowStateManager>();
+    mgr.update_explorer_sidebar_width(&label, width);
     mgr.save();
 }
 
@@ -850,6 +856,7 @@ pub fn run() {
             window_save_workspace_state,
             window_save_right_panel,
             window_save_workspace_sidebar,
+            window_save_explorer_sidebar,
             restore_window_geometry,
             agent::agent_enable_claude_hooks,
             agent::agent_disable_claude_hooks,

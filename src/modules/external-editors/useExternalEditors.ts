@@ -2,6 +2,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { native } from "@/lib/native";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setDetectedEditors } from "@/modules/settings/store";
+import type { DetectedEditor } from "./types";
 
 // Module-level scanning state — not persisted; each webview tracks its own spinner.
 let scanning = false;
@@ -20,14 +21,20 @@ function getScanningSnapshot(): boolean {
   return scanning;
 }
 
-/** Run a full editor scan and persist results via the prefs store (shared across webviews). */
+/** Run a full editor scan and persist results, preserving user-set enabled flags. */
 export async function runEditorScan(): Promise<void> {
   if (scanning) return;
   scanning = true;
   notifyScanning();
   try {
     const result = await native.editorScan();
-    await setDetectedEditors(result);
+    const existing: DetectedEditor[] = usePreferencesStore.getState().detectedEditors;
+    const enabledById = new Map(existing.map((e) => [e.id, e.enabled]));
+    const merged = result.map((e) => {
+      const saved = enabledById.get(e.id);
+      return saved !== undefined ? { ...e, enabled: saved } : e;
+    });
+    await setDetectedEditors(merged);
   } catch (e) {
     console.error("editor_scan failed:", e);
   } finally {

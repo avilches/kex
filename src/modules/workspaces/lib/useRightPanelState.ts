@@ -37,10 +37,6 @@ export function useRightPanelState(label: string) {
     (activeTab: RightPanelTabId) => apply({ activeTab }),
     [apply],
   );
-  const setWidth = useCallback(
-    (width: number) => apply({ width }),
-    [apply],
-  );
   const setSide = useCallback(
     (side: RightPanelSide) => apply({ side }),
     [apply],
@@ -49,12 +45,10 @@ export function useRightPanelState(label: string) {
   return {
     open: state.open,
     activeTab: state.activeTab,
-    width: state.width,
     side: state.side,
     stateRef,
     setOpen,
     setActiveTab,
-    setWidth,
     setSide,
   };
 }

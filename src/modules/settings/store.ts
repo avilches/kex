@@ -161,7 +161,7 @@ export type Preferences = {
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number; // JSON-only: no settings UI, edit settings-editor.json
-  editorPreviewOnClick: boolean;
+  previewOnClick: boolean;
   editorViewByExt: EditorViewMap;
   editorScrollPastEnd: boolean;
   diffViewMode: DiffViewMode;
@@ -180,7 +180,6 @@ export type Preferences = {
   preferredWorkspaceEditorId: string | null;
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
-  disabledDetectedEditorIds: string[];
 };
 
 const STORE_PATH = "settings-general.json";
@@ -188,62 +187,71 @@ const TERMINAL_STORE_PATH = "settings-terminal.json";
 const EDITOR_STORE_PATH = "settings-editor.json";
 const SHORTCUTS_STORE_PATH = "settings-shortcuts.json";
 const TOOLS_STORE_PATH = "settings-tools.json";
+
+// General store keys
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
-const KEY_EDITOR_THEME = "editorTheme";
-const KEY_EDITOR_FONT_FAMILY = "editorFontFamily";
-const KEY_EDITOR_FONT_SIZE = "editorFontSize";
-const KEY_EDITOR_LETTER_SPACING = "editorLetterSpacing";
-const KEY_EDITOR_LINE_HEIGHT = "editorLineHeight";
 const KEY_AUTOSTART = "autostart";
 const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
-const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
-const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
-const KEY_EDITOR_CURSOR_BLINK = "editorCursorBlink";
-const KEY_EDITOR_CURSOR_BLINK_RATE = "editorCursorBlinkRate";
-const KEY_EDITOR_CURSOR_STYLE = "editorCursorStyle";
-const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
 const KEY_WARN_ON_CLOSE_WORKSPACE = "warnOnCloseWorkspace";
-const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
-const KEY_TERMINAL_SHELL = "terminalShell";
-const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
-const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
-const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
-const KEY_TERMINAL_LINE_HEIGHT = "terminalLineHeight";
-const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
-const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
-const KEY_TERMINAL_CURSOR_INACTIVE_STYLE = "terminalCursorInactiveStyle";
-const KEY_TERMINAL_CURSOR_WIDTH = "terminalCursorWidth";
-const KEY_TERMINAL_SCROLL_SENSITIVITY = "terminalScrollSensitivity";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
-const KEY_SHORTCUTS = "shortcuts";
-const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
-const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
-const KEY_EDITOR_PREVIEW_ON_CLICK = "editorPreviewOnClick";
-const KEY_EDITOR_VIEW_BY_EXT = "editorViewByExt";
-const KEY_EDITOR_SCROLL_PAST_END = "editorScrollPastEnd";
-const KEY_DIFF_VIEW_MODE = "diffViewMode";
-const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "editorHighlightActiveLine";
-const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
-const KEY_EDITOR_CLOSE_BRACKETS = "editorCloseBrackets";
-const KEY_EDITOR_AUTOCOMPLETION = "editorAutocompletion";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
-const KEY_TERMINAL_NEW_FOLDER_MODE = "terminalNewFolderMode";
+const KEY_PREVIEW_ON_CLICK = "previewOnClick";
+
+// Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
+const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
+const KEY_TERMINAL_WEBGL_ENABLED = "webglEnabled";
+const KEY_TERMINAL_CURSOR_BLINK = "cursorBlink";
+const KEY_TERMINAL_FONT_FAMILY = "fontFamily";
+const KEY_TERMINAL_SHELL = "shell";
+const KEY_TERMINAL_FONT_WEIGHT = "fontWeight";
+const KEY_TERMINAL_LETTER_SPACING = "letterSpacing";
+const KEY_TERMINAL_FONT_SIZE = "fontSize";
+const KEY_TERMINAL_LINE_HEIGHT = "lineHeight";
+const KEY_TERMINAL_SCROLLBACK = "scrollback";
+const KEY_TERMINAL_CURSOR_STYLE = "cursorStyle";
+const KEY_TERMINAL_CURSOR_INACTIVE_STYLE = "cursorInactiveStyle";
+const KEY_TERMINAL_CURSOR_WIDTH = "cursorWidth";
+const KEY_TERMINAL_SCROLL_SENSITIVITY = "scrollSensitivity";
+const KEY_TERMINAL_NEW_FOLDER_MODE = "newFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
+
+// Editor store keys — no "editor" prefix since the file is already settings-editor.json
+const KEY_EDITOR_THEME = "theme";
+const KEY_EDITOR_FONT_FAMILY = "fontFamily";
+const KEY_EDITOR_FONT_SIZE = "fontSize";
+const KEY_EDITOR_LETTER_SPACING = "letterSpacing";
+const KEY_EDITOR_LINE_HEIGHT = "lineHeight";
+const KEY_EDITOR_CURSOR_BLINK = "cursorBlink";
+const KEY_EDITOR_CURSOR_BLINK_RATE = "cursorBlinkRate";
+const KEY_EDITOR_CURSOR_STYLE = "cursorStyle";
+const KEY_EDITOR_AUTO_SAVE = "autoSave";
+const KEY_EDITOR_AUTO_SAVE_DELAY = "autoSaveDelay";
+const KEY_EDITOR_VIEW_BY_EXT = "viewByExt";
+const KEY_EDITOR_SCROLL_PAST_END = "scrollPastEnd";
+const KEY_DIFF_VIEW_MODE = "diffViewMode";
+const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "highlightActiveLine";
+const KEY_EDITOR_BRACKET_MATCHING = "bracketMatching";
+const KEY_EDITOR_CLOSE_BRACKETS = "closeBrackets";
+const KEY_EDITOR_AUTOCOMPLETION = "autocompletion";
+
+// Shortcuts store
+const KEY_SHORTCUTS = "shortcuts";
+
+// Tools store keys
 const KEY_TEXT_EDITOR_MODE = "textEditorMode";
 const KEY_PREFERRED_FILE_EDITOR_ID = "preferredFileEditorId";
 const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
 const KEY_CUSTOM_EDITORS = "custom";
 const KEY_DETECTED_EDITORS = "tools";
-const KEY_DISABLED_DETECTED_IDS = "disabledDetectedEditorIds";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 13;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -369,7 +377,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 15000,
-  editorPreviewOnClick: true,
+  previewOnClick: true,
   editorViewByExt: {},
   editorScrollPastEnd: false,
   diffViewMode: "unified",
@@ -388,7 +396,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   preferredWorkspaceEditorId: null,
   customEditors: [],
   detectedEditors: [],
-  disabledDetectedEditorIds: [],
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -413,6 +420,9 @@ const toolsStore = new LazyStore(TOOLS_STORE_PATH, { defaults: {}, autoSave: 200
 // window can listen.
 const PREFS_CHANGED_EVENT = "kex://prefs-changed";
 
+type StoreId = "general" | "terminal" | "editor" | "tools" | "shortcuts";
+type PrefsChangedPayload = { store: StoreId; key: string; value: unknown };
+
 export function parseScmViewMode(value: unknown): ScmViewMode {
   return value === "list" ? "list" : "tree";
 }
@@ -431,25 +441,25 @@ export function parseTextEditorMode(value: unknown): TextEditorMode {
 async function writePref<T>(key: string, value: T): Promise<void> {
   await store.set(key, value);
   await store.save();
-  await emit(PREFS_CHANGED_EVENT, { key, value });
+  await emit(PREFS_CHANGED_EVENT, { store: "general", key, value } satisfies PrefsChangedPayload);
 }
 
 async function writeTerminalPref<T>(key: string, value: T): Promise<void> {
   await terminalStore.set(key, value);
   await terminalStore.save();
-  await emit(PREFS_CHANGED_EVENT, { key, value });
+  await emit(PREFS_CHANGED_EVENT, { store: "terminal", key, value } satisfies PrefsChangedPayload);
 }
 
 async function writeEditorPref<T>(key: string, value: T): Promise<void> {
   await editorStore.set(key, value);
   await editorStore.save();
-  await emit(PREFS_CHANGED_EVENT, { key, value });
+  await emit(PREFS_CHANGED_EVENT, { store: "editor", key, value } satisfies PrefsChangedPayload);
 }
 
 async function writeToolsPref<T>(key: string, value: T): Promise<void> {
   await toolsStore.set(key, value);
   await toolsStore.save();
-  await emit(PREFS_CHANGED_EVENT, { key, value });
+  await emit(PREFS_CHANGED_EVENT, { store: "tools", key, value } satisfies PrefsChangedPayload);
 }
 
 async function writeShortcutsPref(
@@ -457,28 +467,8 @@ async function writeShortcutsPref(
 ): Promise<void> {
   await shortcutsStore.set(KEY_SHORTCUTS, value);
   await shortcutsStore.save();
-  await emit(PREFS_CHANGED_EVENT, { key: KEY_SHORTCUTS, value });
+  await emit(PREFS_CHANGED_EVENT, { store: "shortcuts", key: KEY_SHORTCUTS, value } satisfies PrefsChangedPayload);
 }
-
-// Keys that belong in settings-terminal.json (migrated from settings-general.json).
-const TERMINAL_KEYS = [
-  KEY_TERMINAL_WEBGL_ENABLED, KEY_TERMINAL_CURSOR_BLINK, KEY_TERMINAL_FONT_FAMILY,
-  KEY_TERMINAL_SHELL, KEY_TERMINAL_FONT_WEIGHT, KEY_TERMINAL_LETTER_SPACING,
-  KEY_TERMINAL_FONT_SIZE, KEY_TERMINAL_LINE_HEIGHT, KEY_TERMINAL_SCROLLBACK,
-  KEY_TERMINAL_CURSOR_STYLE, KEY_TERMINAL_CURSOR_INACTIVE_STYLE, KEY_TERMINAL_CURSOR_WIDTH,
-  KEY_TERMINAL_SCROLL_SENSITIVITY, KEY_TERMINAL_NEW_FOLDER_MODE,
-  KEY_SCRATCHPAD_ENTER_SENDS, KEY_SCRATCHPAD_IN_NEW_TERMINALS,
-];
-
-// Keys that belong in settings-editor.json (migrated from settings-general.json).
-const EDITOR_KEYS = [
-  KEY_EDITOR_THEME, KEY_EDITOR_FONT_FAMILY, KEY_EDITOR_FONT_SIZE,
-  KEY_EDITOR_LETTER_SPACING, KEY_EDITOR_LINE_HEIGHT, KEY_EDITOR_CURSOR_BLINK,
-  KEY_EDITOR_CURSOR_BLINK_RATE, KEY_EDITOR_CURSOR_STYLE, KEY_EDITOR_AUTO_SAVE,
-  KEY_EDITOR_AUTO_SAVE_DELAY, KEY_EDITOR_PREVIEW_ON_CLICK, KEY_EDITOR_VIEW_BY_EXT,
-  KEY_EDITOR_SCROLL_PAST_END, KEY_DIFF_VIEW_MODE, KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE,
-  KEY_EDITOR_BRACKET_MATCHING, KEY_EDITOR_CLOSE_BRACKETS, KEY_EDITOR_AUTOCOMPLETION,
-];
 
 export async function loadPreferences(): Promise<Preferences> {
   // Fetch all stores in parallel — one IPC roundtrip per store.
@@ -604,9 +594,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_EDITOR_AUTO_SAVE_DELAY) ??
         DEFAULT_PREFERENCES.editorAutoSaveDelay,
     ),
-    editorPreviewOnClick:
-      get<boolean>(KEY_EDITOR_PREVIEW_ON_CLICK) ??
-      DEFAULT_PREFERENCES.editorPreviewOnClick,
+    previewOnClick:
+      get<boolean>(KEY_PREVIEW_ON_CLICK) ??
+      DEFAULT_PREFERENCES.previewOnClick,
     editorViewByExt: (() => {
       const v = get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT);
       const raw =
@@ -684,10 +674,6 @@ export async function loadPreferences(): Promise<Preferences> {
       const v = get<DetectedEditor[]>(KEY_DETECTED_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
     })(),
-    disabledDetectedEditorIds: (() => {
-      const v = get<string[]>(KEY_DISABLED_DETECTED_IDS);
-      return Array.isArray(v) ? v : DEFAULT_PREFERENCES.disabledDetectedEditorIds;
-    })(),
   };
 
   // Persist JSON-only general keys so they're discoverable in settings-general.json.
@@ -699,7 +685,7 @@ export async function loadPreferences(): Promise<Preferences> {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
   }
 
-  // Persist editorViewByExt to settings-editor.json so it's discoverable there.
+  // Persist viewByExt to settings-editor.json so it's discoverable there.
   const storedExtMap = map.get(KEY_EDITOR_VIEW_BY_EXT);
   const storedExtKeys =
     storedExtMap && typeof storedExtMap === "object" && !Array.isArray(storedExtMap)
@@ -711,34 +697,6 @@ export async function loadPreferences(): Promise<Preferences> {
     storedExtKeys.some((k) => k.includes(","));
   if (needsExtPersist) {
     void editorStore.set(KEY_EDITOR_VIEW_BY_EXT, result.editorViewByExt).then(() => editorStore.save());
-  }
-
-  // One-time migration: move terminal/editor keys from settings-general.json to their stores.
-  const generalEntryMap = new Map(entries);
-  const terminalMigrations: Promise<unknown>[] = [];
-  const editorMigrations: Promise<unknown>[] = [];
-  for (const key of TERMINAL_KEYS) {
-    if (generalEntryMap.has(key)) {
-      const val = generalEntryMap.get(key);
-      terminalMigrations.push(terminalStore.set(key, val));
-      terminalMigrations.push(store.delete(key));
-    }
-  }
-  for (const key of EDITOR_KEYS) {
-    if (generalEntryMap.has(key)) {
-      const val = generalEntryMap.get(key);
-      editorMigrations.push(editorStore.set(key, val));
-      editorMigrations.push(store.delete(key));
-    }
-  }
-  if (terminalMigrations.length > 0) {
-    void Promise.all(terminalMigrations).then(() => terminalStore.save());
-  }
-  if (editorMigrations.length > 0) {
-    void Promise.all(editorMigrations).then(() => editorStore.save());
-  }
-  if (terminalMigrations.length > 0 || editorMigrations.length > 0) {
-    void store.save();
   }
 
   return result;
@@ -845,7 +803,7 @@ export async function setEditorCursorStyle(value: CursorStyle): Promise<void> {
 }
 
 export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promise<void> {
-  await writePref(KEY_WARN_ON_CLOSE_RUNNING, value);
+  await writeTerminalPref(KEY_WARN_ON_CLOSE_RUNNING, value);
 }
 
 export async function setWarnOnCloseWorkspace(value: boolean): Promise<void> {
@@ -1001,10 +959,6 @@ export async function setDetectedEditors(value: DetectedEditor[]): Promise<void>
   await writeToolsPref(KEY_DETECTED_EDITORS, value);
 }
 
-export async function setDisabledDetectedEditorIds(value: string[]): Promise<void> {
-  await writeToolsPref(KEY_DISABLED_DETECTED_IDS, value);
-}
-
 export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
@@ -1022,8 +976,8 @@ export async function setEditorAutoSaveDelay(value: number): Promise<void> {
   await writeEditorPref(KEY_EDITOR_AUTO_SAVE_DELAY, clampAutoSaveDelay(value));
 }
 
-export async function setEditorPreviewOnClick(value: boolean): Promise<void> {
-  await writeEditorPref(KEY_EDITOR_PREVIEW_ON_CLICK, value);
+export async function setPreviewOnClick(value: boolean): Promise<void> {
+  await writePref(KEY_PREVIEW_ON_CLICK, value);
 }
 
 export async function setEditorViewForExt(
@@ -1115,28 +1069,28 @@ export async function setTabBarStyle(value: TabBarStyle): Promise<void> {
 
 export type PrefKey = keyof Preferences;
 
-// Defined once; maps store keys to Preferences property names. Any preference
-// written through writePref/writeTerminalPref/writeEditorPref must appear here,
-// or onPreferencesChange drops the update and live windows never see the new value.
-export const PREF_KEY_MAP: Record<string, PrefKey> = {
+// Per-store maps from JSON key → Preferences field name. Keeping them separate
+// avoids collisions when terminal and editor share short key names (e.g. "cursorBlink").
+// onPreferencesChange routes each store's onChange/event to its own map.
+const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_THEME]: "theme",
   [KEY_THEME_ID]: "themeId",
-  [KEY_EDITOR_THEME]: "editorTheme",
-  [KEY_EDITOR_FONT_FAMILY]: "editorFontFamily",
-  [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
-  [KEY_EDITOR_LETTER_SPACING]: "editorLetterSpacing",
-  [KEY_EDITOR_LINE_HEIGHT]: "editorLineHeight",
   [KEY_AUTOSTART]: "autostart",
   [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
+  [KEY_WARN_ON_CLOSE_WORKSPACE]: "warnOnCloseWorkspace",
+  [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
+  [KEY_ZOOM_LEVEL]: "zoomLevel",
+  [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
+  [KEY_TAB_BAR_STYLE]: "tabBarStyle",
+  [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
+};
+
+export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
+  [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",
   [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
   [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
-  [KEY_EDITOR_CURSOR_BLINK]: "editorCursorBlink",
-  [KEY_EDITOR_CURSOR_BLINK_RATE]: "editorCursorBlinkRate",
-  [KEY_EDITOR_CURSOR_STYLE]: "editorCursorStyle",
-  [KEY_WARN_ON_CLOSE_RUNNING]: "warnOnCloseTabWithRunningProcess",
-  [KEY_WARN_ON_CLOSE_WORKSPACE]: "warnOnCloseWorkspace",
   [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
   [KEY_TERMINAL_SHELL]: "terminalShell",
   [KEY_TERMINAL_FONT_WEIGHT]: "terminalFontWeight",
@@ -1148,13 +1102,22 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_CURSOR_INACTIVE_STYLE]: "terminalCursorInactiveStyle",
   [KEY_TERMINAL_CURSOR_WIDTH]: "terminalCursorWidth",
   [KEY_TERMINAL_SCROLL_SENSITIVITY]: "terminalScrollSensitivity",
-  [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
-  [KEY_ZOOM_LEVEL]: "zoomLevel",
-  [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
-  [KEY_SHORTCUTS]: "shortcuts",
+  [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
+  [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
+  [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
+};
+
+const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
+  [KEY_EDITOR_THEME]: "editorTheme",
+  [KEY_EDITOR_FONT_FAMILY]: "editorFontFamily",
+  [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
+  [KEY_EDITOR_LETTER_SPACING]: "editorLetterSpacing",
+  [KEY_EDITOR_LINE_HEIGHT]: "editorLineHeight",
+  [KEY_EDITOR_CURSOR_BLINK]: "editorCursorBlink",
+  [KEY_EDITOR_CURSOR_BLINK_RATE]: "editorCursorBlinkRate",
+  [KEY_EDITOR_CURSOR_STYLE]: "editorCursorStyle",
   [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
   [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",
-  [KEY_EDITOR_PREVIEW_ON_CLICK]: "editorPreviewOnClick",
   [KEY_EDITOR_VIEW_BY_EXT]: "editorViewByExt",
   [KEY_EDITOR_SCROLL_PAST_END]: "editorScrollPastEnd",
   [KEY_DIFF_VIEW_MODE]: "diffViewMode",
@@ -1162,16 +1125,37 @@ export const PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
   [KEY_EDITOR_CLOSE_BRACKETS]: "editorCloseBrackets",
   [KEY_EDITOR_AUTOCOMPLETION]: "editorAutocompletion",
-  [KEY_TAB_BAR_STYLE]: "tabBarStyle",
-  [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
-  [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
-  [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
+};
+
+const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TEXT_EDITOR_MODE]: "textEditorMode",
   [KEY_PREFERRED_FILE_EDITOR_ID]: "preferredFileEditorId",
   [KEY_PREFERRED_WORKSPACE_EDITOR_ID]: "preferredWorkspaceEditorId",
   [KEY_CUSTOM_EDITORS]: "customEditors",
   [KEY_DETECTED_EDITORS]: "detectedEditors",
-  [KEY_DISABLED_DETECTED_IDS]: "disabledDetectedEditorIds",
+};
+
+const SHORTCUTS_PREF_KEY_MAP: Record<string, PrefKey> = {
+  [KEY_SHORTCUTS]: "shortcuts",
+};
+
+// Backwards-compat export used by tests — maps store keys from all stores
+// except where terminal/editor keys collide. Non-colliding entries are correct.
+// Do NOT use this map inside onPreferencesChange; use the per-store maps instead.
+export const PREF_KEY_MAP: Record<string, PrefKey> = {
+  ...GENERAL_PREF_KEY_MAP,
+  ...TERMINAL_PREF_KEY_MAP,
+  ...EDITOR_PREF_KEY_MAP,
+  ...TOOLS_PREF_KEY_MAP,
+  ...SHORTCUTS_PREF_KEY_MAP,
+};
+
+const STORE_PREF_KEY_MAPS: Record<StoreId, Record<string, PrefKey>> = {
+  general: GENERAL_PREF_KEY_MAP,
+  terminal: TERMINAL_PREF_KEY_MAP,
+  editor: EDITOR_PREF_KEY_MAP,
+  tools: TOOLS_PREF_KEY_MAP,
+  shortcuts: SHORTCUTS_PREF_KEY_MAP,
 };
 
 /** Subscribe to changes from any window (settings -> main). */
@@ -1181,29 +1165,30 @@ export async function onPreferencesChange(
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref/writeTerminalPref/writeEditorPref.
   const unsubLocal = await store.onChange<unknown>((key, value) => {
-    const mapped = PREF_KEY_MAP[key];
+    const mapped = GENERAL_PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
   const unsubTerminal = await terminalStore.onChange<unknown>((key, value) => {
-    const mapped = PREF_KEY_MAP[key];
+    const mapped = TERMINAL_PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
   const unsubEditor = await editorStore.onChange<unknown>((key, value) => {
-    const mapped = PREF_KEY_MAP[key];
+    const mapped = EDITOR_PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
   const unsubTools = await toolsStore.onChange<unknown>((key, value) => {
-    const mapped = PREF_KEY_MAP[key];
+    const mapped = TOOLS_PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
   const unsubShortcuts = await shortcutsStore.onChange<unknown>((key, value) => {
-    const mapped = PREF_KEY_MAP[key];
+    const mapped = SHORTCUTS_PREF_KEY_MAP[key];
     if (mapped) cb(mapped, value);
   });
-  const unsubEvent = await listen<{ key: string; value: unknown }>(
+  const unsubEvent = await listen<PrefsChangedPayload>(
     PREFS_CHANGED_EVENT,
     (e) => {
-      const mapped = PREF_KEY_MAP[e.payload.key];
+      const storeMap = STORE_PREF_KEY_MAPS[e.payload.store];
+      const mapped = storeMap?.[e.payload.key];
       if (mapped) cb(mapped, e.payload.value);
     },
   );

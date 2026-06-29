@@ -112,7 +112,7 @@ export type EntryRowProps = {
   onAddToGitignore?: (path: string, isDir: boolean) => void;
   gitRootPath?: string | null;
   onEnterFolder?: (path: string) => void;
-  editorPreviewOnClick: boolean;
+  previewOnClick: boolean;
   hasClipboard: boolean;
   isCutSource: boolean;
 };
@@ -142,7 +142,7 @@ function EntryRowImpl(props: EntryRowProps) {
     onAddToGitignore,
     gitRootPath,
     onEnterFolder,
-    editorPreviewOnClick,
+    previewOnClick,
     hasClipboard,
     isCutSource,
   } = props;
@@ -222,7 +222,7 @@ function EntryRowImpl(props: EntryRowProps) {
     if (renameInProgress) return;
     onSelectPath(path);
     if (isDir) actions.toggle(path);
-    else if (editorPreviewOnClick) onOpenFile(path);
+    else if (previewOnClick) onOpenFile(path);
   };
 
   return (

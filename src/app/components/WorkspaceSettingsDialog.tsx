@@ -67,7 +67,7 @@ export function WorkspaceSettingsDialog(props: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Workspace {ws?.title}</DialogTitle>
         </DialogHeader>

@@ -6,11 +6,13 @@ export interface DetectedEditor {
   binary: string;
   /** Args inserted between binary and the target path at launch time. */
   argsBeforePath: string[];
+  /** false means user-disabled. Absent or true means enabled. */
+  enabled?: boolean;
 }
 
 /** User-defined editor entry stored in Settings preferences. */
 export interface CustomEditor {
-  /** Client-generated stable ID (use crypto.randomUUID()). */
+  /** Client-generated stable ID (use newEditorId() from @/lib/ids). */
   id: string;
   name: string;
   binary: string;

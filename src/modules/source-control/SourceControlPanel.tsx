@@ -1384,7 +1384,7 @@ const EntryRow = memo(function EntryRow({
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
   const disabled = actionBusy !== null;
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
-  const previewOnClick = usePreferencesStore((s) => s.editorPreviewOnClick);
+  const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const statusHex = gitStatusHexColor(
     entry.statusCode as GitStatusCode,
     gitColorScheme,

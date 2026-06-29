@@ -389,9 +389,7 @@ export const FileExplorer = memo(
 
     const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-    const editorPreviewOnClick = usePreferencesStore(
-      (s) => s.editorPreviewOnClick,
-    );
+    const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
     const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     // Drives the attention flash on the just-revealed row. The token bumps on
@@ -933,7 +931,7 @@ export const FileExplorer = memo(
           const row = rows[idx];
           if (row.kind !== "entry") break;
           if (row.isDir) tree.toggle(row.path);
-          else if (editorPreviewOnClick) onOpenFile(row.path);
+          else if (previewOnClick) onOpenFile(row.path);
           break;
         }
       }
@@ -968,7 +966,7 @@ export const FileExplorer = memo(
               onAddToGitignore={onAddToGitignore}
               gitRootPath={gitRootPath}
               onEnterFolder={onEnterFolder}
-              editorPreviewOnClick={editorPreviewOnClick}
+              previewOnClick={previewOnClick}
               hasClipboard={tree.clipboard !== null}
               isCutSource={
                 tree.clipboard?.mode === "cut" && tree.clipboard.path === row.path

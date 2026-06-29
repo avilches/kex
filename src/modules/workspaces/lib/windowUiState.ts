@@ -11,21 +11,14 @@ export type RightPanelSide = "left" | "right";
 export type RightPanelUiState = {
   open: boolean;
   activeTab: RightPanelTabId;
-  width: number;
   side: RightPanelSide;
 };
 
-// width is a react-resizable-panels percentage; defaults match the panel's
-// min/max bounds (12%-70%) and the historical 20% default size.
 export const DEFAULT_RIGHT_PANEL_STATE: RightPanelUiState = {
   open: true,
   activeTab: "explorer",
-  width: 20,
   side: "left",
 };
-
-const RIGHT_PANEL_WIDTH_MIN = 12;
-const RIGHT_PANEL_WIDTH_MAX = 70;
 
 function parseActiveTab(value: unknown): RightPanelTabId {
   return value === "git" || value === "history" ? value : "explorer";
@@ -33,13 +26,6 @@ function parseActiveTab(value: unknown): RightPanelTabId {
 
 function parseSide(value: unknown): RightPanelSide {
   return value === "right" ? "right" : "left";
-}
-
-function parseWidth(value: unknown): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return DEFAULT_RIGHT_PANEL_STATE.width;
-  }
-  return Math.min(RIGHT_PANEL_WIDTH_MAX, Math.max(RIGHT_PANEL_WIDTH_MIN, value));
 }
 
 export function sanitizeRightPanelState(
@@ -52,7 +38,6 @@ export function sanitizeRightPanelState(
         ? raw.open
         : DEFAULT_RIGHT_PANEL_STATE.open,
     activeTab: parseActiveTab(raw.activeTab),
-    width: parseWidth(raw.width),
     side: parseSide(raw.side),
   };
 }
@@ -90,7 +75,6 @@ export function saveRightPanelState(
       label: p.label,
       open: p.state.open,
       activeTab: p.state.activeTab,
-      width: Math.round(p.state.width),
       side: p.state.side,
     }).catch((err) =>
       console.error("[window-ui-state] save error:", err),

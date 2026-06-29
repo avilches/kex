@@ -14,7 +14,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setCustomEditors,
-  setDisabledDetectedEditorIds,
+  setDetectedEditors,
   setTextEditorMode,
   type TextEditorMode,
 } from "@/modules/settings/store";
@@ -23,7 +23,8 @@ import {
   EditorIcon,
   EDITOR_CATALOG,
 } from "@/modules/external-editors";
-import type { CustomEditor, EditorGroup, EditorTargetType } from "@/modules/external-editors";
+import type { CustomEditor, DetectedEditor, EditorGroup, EditorTargetType } from "@/modules/external-editors";
+import { newEditorId } from "@/lib/ids";
 import { SectionHeader } from "../components/SectionHeader";
 import {
   DndContext,
@@ -58,21 +59,20 @@ function groupTargetType(group: EditorGroup): EditorTargetType {
 
 function GroupSection({
   group,
-  detectedIds,
-  disabledDetectedEditorIds,
+  detectedEditors,
   onToggle,
   headerExtra,
 }: {
   group: EditorGroup;
-  detectedIds: Set<string>;
-  disabledDetectedEditorIds: string[];
+  detectedEditors: DetectedEditor[];
   onToggle: (id: string, enabled: boolean) => void;
   headerExtra?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const detectedById = new Map(detectedEditors.map((e) => [e.id, e]));
   const all = EDITOR_CATALOG.filter((e) => e.group === group);
-  const installed = all.filter((e) => detectedIds.has(e.id));
-  const notInstalled = all.filter((e) => !detectedIds.has(e.id));
+  const installed = all.filter((e) => detectedById.has(e.id));
+  const notInstalled = all.filter((e) => !detectedById.has(e.id));
   const hidden = Math.max(0, notInstalled.length - NOT_INSTALLED_COLLAPSED);
   const visibleNotInstalled = expanded ? notInstalled : notInstalled.slice(0, NOT_INSTALLED_COLLAPSED);
 
@@ -88,13 +88,14 @@ function GroupSection({
       </div>
       <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
         {installed.map((entry) => {
-          const isDisabled = disabledDetectedEditorIds.includes(entry.id);
+          const stored = detectedById.get(entry.id);
+          const isEnabled = stored?.enabled !== false;
           return (
             <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
               <EditorIcon id={entry.id} size={18} />
               <span className="flex-1 text-[12.5px]">{entry.name}</span>
               <Switch
-                checked={!isDisabled}
+                checked={isEnabled}
                 onCheckedChange={(v) => onToggle(entry.id, v)}
               />
             </div>
@@ -267,11 +268,8 @@ function CustomEditorRow({
 export function ExternalEditorsSection() {
   const { isScanning, scan } = useExternalEditors();
   const detectedEditors = usePreferencesStore((s) => s.detectedEditors);
-  const disabledDetectedEditorIds = usePreferencesStore((s) => s.disabledDetectedEditorIds);
   const customEditors = usePreferencesStore((s) => s.customEditors);
   const textEditorMode = usePreferencesStore((s) => s.textEditorMode);
-
-  const detectedIds = new Set(detectedEditors.map((e) => e.id));
 
   const didScanRef = useRef(false);
   useEffect(() => {
@@ -335,10 +333,8 @@ export function ExternalEditorsSection() {
   }
 
   function handleToggleDetected(id: string, enabled: boolean) {
-    const next = enabled
-      ? disabledDetectedEditorIds.filter((d) => d !== id)
-      : [...disabledDetectedEditorIds, id];
-    void setDisabledDetectedEditorIds(next);
+    const next = detectedEditors.map((e) => e.id === id ? { ...e, enabled } : e);
+    void setDetectedEditors(next);
   }
 
   function handleAddCustom() {
@@ -351,7 +347,7 @@ export function ExternalEditorsSection() {
       }
       return;
     }
-    const id = crypto.randomUUID();
+    const id = newEditorId();
     void setCustomEditors([...customEditors, { id, name: "", binary: "", argsBeforePath: [], targetKind: "file" }]);
     setPendingFocusId(id);
   }
@@ -441,8 +437,7 @@ export function ExternalEditorsSection() {
         <GroupSection
           key={group}
           group={group}
-          detectedIds={detectedIds}
-          disabledDetectedEditorIds={disabledDetectedEditorIds}
+          detectedEditors={detectedEditors}
           onToggle={handleToggleDetected}
           headerExtra={
             group === "Text Editors" ? (

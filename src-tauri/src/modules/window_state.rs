@@ -32,7 +32,6 @@ impl Default for WindowGeometry {
 pub struct RightPanelState {
     pub open: bool,
     pub active_tab: String,
-    pub width: u32,
     pub side: String,
 }
 
@@ -47,6 +46,8 @@ pub struct WindowEntry {
     pub right_panel: Option<RightPanelState>,
     #[serde(default)]
     pub workspace_sidebar_width: Option<u32>,
+    #[serde(default)]
+    pub explorer_sidebar_width: Option<u32>,
 }
 
 impl Default for WindowEntry {
@@ -57,6 +58,7 @@ impl Default for WindowEntry {
             active_index: 0,
             right_panel: None,
             workspace_sidebar_width: None,
+            explorer_sidebar_width: None,
         }
     }
 }
@@ -85,6 +87,8 @@ struct IndexEntry {
     right_panel: Option<RightPanelState>,
     #[serde(default)]
     workspace_sidebar_width: Option<u32>,
+    #[serde(default)]
+    explorer_sidebar_width: Option<u32>,
 }
 
 /// On-disk index file (`workspaces.json`). `BTreeMap` so serialization is
@@ -222,6 +226,7 @@ impl WindowStateManager {
                     active_index: ie.active_index,
                     right_panel: ie.right_panel.clone(),
                     workspace_sidebar_width: ie.workspace_sidebar_width,
+                    explorer_sidebar_width: ie.explorer_sidebar_width,
                 },
             );
         }
@@ -290,6 +295,7 @@ impl WindowStateManager {
                     active_index: entry.active_index,
                     right_panel: entry.right_panel.clone(),
                     workspace_sidebar_width: entry.workspace_sidebar_width,
+                    explorer_sidebar_width: entry.explorer_sidebar_width,
                 },
             );
         }
@@ -384,7 +390,7 @@ impl WindowStateManager {
             "left" | "right" => state.side,
             _ => "left".to_string(),
         };
-        let sanitized = RightPanelState { open: state.open, active_tab, width: state.width, side };
+        let sanitized = RightPanelState { open: state.open, active_tab, side };
         let mut guard = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = guard.windows.get_mut(label) {
             entry.right_panel = Some(sanitized);
@@ -397,6 +403,13 @@ impl WindowStateManager {
         let mut inner = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = inner.windows.get_mut(label) {
             entry.workspace_sidebar_width = Some(width);
+        }
+    }
+
+    pub fn update_explorer_sidebar_width(&self, label: &str, width: u32) {
+        let mut inner = self.inner.write().expect("window state lock poisoned");
+        if let Some(entry) = inner.windows.get_mut(label) {
+            entry.explorer_sidebar_width = Some(width);
         }
     }
 }
@@ -634,7 +647,6 @@ mod tests {
             right_panel: Some(RightPanelState {
                 open: false,
                 active_tab: "git".to_string(),
-                width: 33,
                 side: "right".to_string(),
             }),
             ..WindowEntry::default()
@@ -646,7 +658,6 @@ mod tests {
         let rp = back.right_panel.unwrap();
         assert!(!rp.open);
         assert_eq!(rp.active_tab, "git");
-        assert_eq!(rp.width, 33);
         assert_eq!(rp.side, "right");
 
         let without = WindowEntry::default();
@@ -685,7 +696,6 @@ mod tests {
             RightPanelState {
                 open: false,
                 active_tab: "history".to_string(),
-                width: 25,
                 side: "right".to_string(),
             },
         );
@@ -696,7 +706,6 @@ mod tests {
         let rp = mgr2.get_entry("w-1").unwrap().right_panel.unwrap();
         assert!(!rp.open);
         assert_eq!(rp.active_tab, "history");
-        assert_eq!(rp.width, 25);
         assert_eq!(rp.side, "right");
     }
 
@@ -710,7 +719,6 @@ mod tests {
             RightPanelState {
                 open: true,
                 active_tab: "bogus".to_string(),
-                width: 20,
                 side: "up".to_string(),
             },
         );
@@ -728,10 +736,23 @@ mod tests {
             RightPanelState {
                 open: true,
                 active_tab: "explorer".to_string(),
-                width: 20,
                 side: "left".to_string(),
             },
         );
         assert!(mgr.get_entry("w-ghost").is_none());
+    }
+
+    #[test]
+    fn update_explorer_sidebar_width_persists_and_reloads() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let mgr = WindowStateManager::new(path.clone());
+        mgr.add_window("w-1".to_string());
+        mgr.update_explorer_sidebar_width("w-1", 30);
+        mgr.save();
+
+        let mgr2 = WindowStateManager::new(path);
+        assert!(mgr2.load());
+        assert_eq!(mgr2.get_entry("w-1").unwrap().explorer_sidebar_width, Some(30));
     }
 }
