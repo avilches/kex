@@ -239,8 +239,8 @@ const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
 const KEY_TEXT_EDITOR_MODE = "textEditorMode";
 const KEY_PREFERRED_FILE_EDITOR_ID = "preferredFileEditorId";
 const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
-const KEY_CUSTOM_EDITORS = "customEditors";
-const KEY_DETECTED_EDITORS = "detectedEditors";
+const KEY_CUSTOM_EDITORS = "custom";
+const KEY_DETECTED_EDITORS = "tools";
 const KEY_DISABLED_DETECTED_IDS = "disabledDetectedEditorIds";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 13;
