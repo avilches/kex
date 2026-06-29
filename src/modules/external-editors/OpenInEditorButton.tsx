@@ -100,14 +100,14 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     workspaceEditors[0] ??
     null;
 
-  // Primary editor: explicit override wins; otherwise file tab gets file editor,
-  // dir tab (terminal CWD, git panel) gets workspace editor.
+  // Primary editor: explicit override wins; otherwise file tab gets file editor
+  // (falling back to workspace editor when none available), dir tab gets workspace editor.
   const primaryEditor: AnyEditor | null = (() => {
     if (overrideEditorId) {
       const found = allEditors.find((e) => e.id === overrideEditorId);
       if (found) return found;
     }
-    if (hasFile) return activeFileEditor;
+    if (hasFile) return activeFileEditor ?? activeWorkspaceEditor;
     return activeWorkspaceEditor;
   })();
 
