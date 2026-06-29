@@ -10,3 +10,4 @@ export const newPaneId      = () => `grp-${nid()}`;
 export const newSplitId     = () => `sp-${nid()}`;
 export const newPanelId     = () => `tab-${nid()}`;
 export const newThemeId     = () => `th-${nid()}`;
+export const newScriptId    = () => `sc-${nid()}`;

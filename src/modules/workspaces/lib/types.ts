@@ -7,6 +7,7 @@ export type RunConfig = {
   command: string;
   cwd?: string;
   panelId?: string;
+  paneId?: string;
 };
 
 // Common to every panel. `locked` (prevent close) applies to all kinds with no
@@ -79,8 +80,9 @@ export type Workspace = {
   fsRoot?: string;
   git?: WorkspaceGitConfig;
   color?: string | null;
-  runConfigs?: RunConfig[];
-  activeRunConfigId?: string;
+  scripts?: RunConfig[];
+  activeScript?: string;
+  scriptPaneId?: string;
 };
 
 export type ClosedEntry = {

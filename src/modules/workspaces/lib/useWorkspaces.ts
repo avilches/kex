@@ -438,7 +438,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     targetPaneId: string,
     direction: "left" | "right" | "top" | "bottom",
     panel: Panel,
-  ) => {
+  ): string => {
+    const freshPaneId = newPaneId();
+    const freshSplitId = newSplitId();
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -446,13 +448,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
-        const freshPaneId = newPaneId();
-        const freshSplitId = newSplitId();
         const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, withNewTabAutofocus(panel));
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };
       }),
     );
+    return freshPaneId;
   }, []);
 
   // ── Panel operations ──────────────────────────────────────────────────────
@@ -668,7 +669,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) =>
       prev.map((w) =>
         w.id === workspaceId
-          ? { ...w, runConfigs: [...(w.runConfigs ?? []), config] }
+          ? { ...w, scripts: [...(w.scripts ?? []), config] }
           : w,
       ),
     );
@@ -682,7 +683,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
             ? w
             : {
                 ...w,
-                runConfigs: (w.runConfigs ?? []).map((c) =>
+                scripts: (w.scripts ?? []).map((c) =>
                   c.id === configId ? { ...c, ...patch } : c,
                 ),
               },
@@ -699,9 +700,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           ? w
           : {
               ...w,
-              runConfigs: (w.runConfigs ?? []).filter((c) => c.id !== configId),
-              activeRunConfigId:
-                w.activeRunConfigId === configId ? undefined : w.activeRunConfigId,
+              scripts: (w.scripts ?? []).filter((c) => c.id !== configId),
+              activeScript:
+                w.activeScript === configId ? undefined : w.activeScript,
             },
       ),
     );
@@ -711,14 +712,14 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const configs = w.runConfigs ?? [];
+        const configs = w.scripts ?? [];
         const from = configs.findIndex((c) => c.id === fromId);
         const to = configs.findIndex((c) => c.id === toId);
         if (from === -1 || to === -1 || from === to) return w;
         const next = [...configs];
         const [item] = next.splice(from, 1);
         next.splice(to, 0, item!);
-        return { ...w, runConfigs: next };
+        return { ...w, scripts: next };
       }),
     );
   }, []);
@@ -727,9 +728,15 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) =>
       prev.map((w) =>
         w.id === workspaceId
-          ? { ...w, activeRunConfigId: configId ?? undefined }
+          ? { ...w, activeScript: configId ?? undefined }
           : w,
       ),
+    );
+  }, []);
+
+  const setScriptPaneId = useCallback((workspaceId: string, paneId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => w.id === workspaceId ? { ...w, scriptPaneId: paneId } : w),
     );
   }, []);
 
@@ -738,14 +745,16 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       setWorkspaces((prev) =>
         prev.map((w) => {
           if (w.id !== workspaceId) return w;
-          const configs = w.runConfigs ?? [];
+          const configs = w.scripts ?? [];
           const cleaned = configs.map((c) =>
             c.panelId && !livingPanelIds.has(c.panelId)
-              ? { ...c, panelId: undefined }
+              ? { ...c, panelId: undefined, paneId: undefined }
               : c,
           );
-          if (cleaned.every((c, i) => c === configs[i])) return w;
-          return { ...w, runConfigs: cleaned };
+          const paneStillLive = w.scriptPaneId ? allPanes(w.paneTree).some((p) => p.id === w.scriptPaneId) : true;
+          const scriptPaneId = paneStillLive ? w.scriptPaneId : undefined;
+          if (cleaned.every((c, i) => c === configs[i]) && scriptPaneId === w.scriptPaneId) return w;
+          return { ...w, scripts: cleaned, scriptPaneId };
         }),
       );
     },
@@ -815,6 +824,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     removeRunConfig,
     reorderRunConfigs,
     setActiveRunConfig,
+    setScriptPaneId,
     validateRunConfigPanels,
     setTerminalRunningCommand,
     setPanelView,
