@@ -45,6 +45,8 @@ export type ShortcutId =
   | "window.new"
   | "workspace.new"
   | "workspace.close"
+  | "workspace.rename"
+  | "workspace.settings"
   | "workspace.prev"
   | "workspace.next"
   | "workspace.selectByIndex"
@@ -106,6 +108,18 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Close Workspace",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "w" }],
+  },
+  {
+    id: "workspace.rename",
+    label: "Rename Workspace",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "r" }],
+  },
+  {
+    id: "workspace.settings",
+    label: "Workspace Settings",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "," }],
   },
   {
     id: "workspace.prev",

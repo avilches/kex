@@ -105,6 +105,7 @@ import {
 } from "@/modules/workspaces/lib/workspaceState";
 import { useRightPanelState } from "@/modules/workspaces/lib/useRightPanelState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
+import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
   clearRunningCommandEntry,
@@ -181,6 +182,7 @@ export default function App() {
     setShowHidden,
     setPinnedRoot,
     setFsRoot,
+    setWorkspaceTitle,
     setWorkspaceGitConfig,
     setTerminalRunningCommand,
     setPanelView,
@@ -1905,6 +1907,12 @@ export default function App() {
       "workspace.close": () => {
         if (activeWorkspace) void requestCloseWorkspace(activeWorkspace.id);
       },
+      "workspace.rename": () => {
+        if (activeWorkspaceId) useWorkspaceRenameStore.getState().startRename(activeWorkspaceId);
+      },
+      "workspace.settings": () => {
+        // no-op until Task 6 wires workspace settings window
+      },
       "tab.newBrowser": () => openBrowserInPanel(""),
       "tab.newEditor": () => setNewEditorOpen(true),
       "tab.close": handleCloseActivePanel,
@@ -2390,12 +2398,15 @@ export default function App() {
                 title: w.title,
                 kind: "terminal",
                 cwd: w.cwd,
+                color: w.color,
               }))}
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(home ?? undefined)}
               onReorder={reorderWorkspaces}
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
+              onRename={(id, title) => setWorkspaceTitle(id, title)}
+              onOpenSettings={() => {}}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}

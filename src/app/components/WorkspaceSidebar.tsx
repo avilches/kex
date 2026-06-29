@@ -13,13 +13,25 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
+import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
-type WorkspaceItem = { id: string; title: string; kind: string; cwd?: string };
+type WorkspaceItem = { id: string; title: string; kind: string; cwd?: string; color?: string | null };
 
 export type WorkspaceSidebarProps = {
   workspaces: WorkspaceItem[];
@@ -28,6 +40,8 @@ export type WorkspaceSidebarProps = {
   onNew: () => void;
   onReorder: (fromId: string, toId: string) => void;
   onClose?: (id: string) => void;
+  onRename: (id: string, newTitle: string) => void;
+  onOpenSettings: (id: string) => void;
 };
 
 function abbrev(title: string, kind: string): string {
@@ -49,11 +63,15 @@ function SortableWorkspaceItem({
   active,
   onSelect,
   onClose,
+  onRename,
+  onOpenSettings,
 }: {
   ws: WorkspaceItem;
   active: boolean;
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
+  onRename: (id: string, newTitle: string) => void;
+  onOpenSettings: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ws.id });
   const hue = idHue(ws.id);
@@ -64,7 +82,48 @@ function SortableWorkspaceItem({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  return (
+  const isRenaming = useWorkspaceRenameStore((s) => s.renamingId === ws.id);
+  const clearRename = useWorkspaceRenameStore((s) => s.clearRename);
+  const startRename = useWorkspaceRenameStore((s) => s.startRename);
+
+  const shortcuts = usePreferencesStore((s) => s.shortcuts);
+  const renameLabel = getShortcutLabel("workspace.rename", shortcuts);
+  const settingsLabel = getShortcutLabel("workspace.settings", shortcuts);
+  const closeLabel = getShortcutLabel("workspace.close", shortcuts);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const handledRef = useRef(false);
+
+  useEffect(() => {
+    if (isRenaming) {
+      handledRef.current = false;
+      // Focus the input after the popover opens
+      requestAnimationFrame(() => {
+        const el = inputRef.current;
+        if (el) {
+          el.value = ws.title;
+          el.select();
+          el.focus();
+        }
+      });
+    }
+  }, [isRenaming, ws.title]);
+
+  function handleSave() {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    const value = inputRef.current?.value.trim() ?? "";
+    if (value) onRename(ws.id, value);
+    clearRename();
+  }
+
+  function handleCancel() {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    clearRename();
+  }
+
+  const button = (
     <div ref={setNodeRef} className="group relative" style={style}>
       <button
         type="button"
@@ -102,9 +161,64 @@ function SortableWorkspaceItem({
       )}
     </div>
   );
+
+  return (
+    <Popover
+      open={isRenaming}
+      onOpenChange={(open) => { if (!open) handleSave(); }}
+    >
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <PopoverAnchor asChild>
+            {button}
+          </PopoverAnchor>
+        </ContextMenuTrigger>
+        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+          <ContextMenuItem onSelect={() => startRename(ws.id)}>
+            <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
+            Rename Workspace
+            {renameLabel && <ContextMenuShortcut>{renameLabel}</ContextMenuShortcut>}
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => onOpenSettings(ws.id)}>
+            <HugeiconsIcon icon={Settings01Icon} size={14} strokeWidth={2} />
+            Workspace Settings
+            {settingsLabel && <ContextMenuShortcut>{settingsLabel}</ContextMenuShortcut>}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          {onClose && (
+            <ContextMenuItem onSelect={() => onClose(ws.id)} className="text-destructive focus:text-destructive">
+              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
+              Close Workspace
+              {closeLabel && <ContextMenuShortcut>{closeLabel}</ContextMenuShortcut>}
+            </ContextMenuItem>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+      <PopoverContent
+        side="right"
+        align="center"
+        className="w-48 p-1.5"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={handleSave}
+        onEscapeKeyDown={handleCancel}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          defaultValue={ws.title}
+          placeholder={ws.kind}
+          className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); handleSave(); }
+            else if (e.key === "Escape") { e.preventDefault(); handleCancel(); }
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
-export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReorder, onClose }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReorder, onClose, onRename, onOpenSettings }: WorkspaceSidebarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [isDragging, setIsDragging] = useState(false);
 
@@ -141,6 +255,8 @@ export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReor
               active={ws.id === activeId}
               onSelect={onSelect}
               onClose={onClose}
+              onRename={onRename}
+              onOpenSettings={onOpenSettings}
             />
           ))}
         </SortableContext>
