@@ -357,8 +357,9 @@ const RunConfigRow = forwardRef<
         />
         <button
           type="button"
+          title="Remove"
           onClick={onRemove}
-          className="size-[22px] flex items-center justify-center rounded text-muted-foreground hover:text-destructive"
+          className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-destructive"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
         </button>
@@ -371,7 +372,7 @@ const RunConfigRow = forwardRef<
       />
       <button
         type="button"
-        className="self-start text-[11px] text-muted-foreground hover:text-foreground"
+        className="self-start text-[11px] text-muted-foreground transition-colors hover:text-foreground"
         onClick={() => setShowCwd((v) => !v)}
       >
         {showCwd ? "Hide working dir" : "+ Working dir"}
