@@ -361,6 +361,20 @@ describe("migrateWorkspace", () => {
     expect(migrated.explorerRootMode).toBe("workspace");
     expect(migrated.pinnedRoot).toBe("/foo");
   });
+
+  it("migrates runConfigs to scripts", () => {
+    const raw = { runConfigs: [{ id: "r1", name: "dev", command: "pnpm dev" }] };
+    const result = migrateWorkspace(raw);
+    expect(result.scripts).toEqual([{ id: "r1", name: "dev", command: "pnpm dev" }]);
+    expect((result as Record<string, unknown>).runConfigs).toBeUndefined();
+  });
+
+  it("migrates activeRunConfigId to activeScript", () => {
+    const raw = { activeRunConfigId: "r1" };
+    const result = migrateWorkspace(raw);
+    expect(result.activeScript).toBe("r1");
+    expect((result as Record<string, unknown>).activeRunConfigId).toBeUndefined();
+  });
 });
 
 describe("RunConfig actions (pure helpers via applyPinnedRoot pattern)", () => {
@@ -371,16 +385,16 @@ describe("RunConfig actions (pure helpers via applyPinnedRoot pattern)", () => {
     expect(out[0].explorerRootMode).toBe("workspace");
   });
 
-  it("Workspace type accepts color, runConfigs, and activeRunConfigId", () => {
+  it("Workspace type accepts color, scripts, and activeScript", () => {
     const w: Workspace = {
       ...ws(),
       color: "#ff0000",
-      runConfigs: [cfg("r1")],
-      activeRunConfigId: "r1",
+      scripts: [cfg("r1")],
+      activeScript: "r1",
     };
     expect(w.color).toBe("#ff0000");
-    expect(w.runConfigs).toHaveLength(1);
-    expect(w.activeRunConfigId).toBe("r1");
+    expect(w.scripts).toHaveLength(1);
+    expect(w.activeScript).toBe("r1");
   });
 
   it("RunConfig panelId is optional", () => {
