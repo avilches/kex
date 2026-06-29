@@ -30,8 +30,8 @@ type Props = {
   openInEditorTarget: OpenInEditorTarget | null;
   workspaceRoot: string | null;
   onOpenExternalEditorSettings: () => void;
-  runConfigs: RunConfig[];
-  activeRunConfigId: string | undefined;
+  scripts: RunConfig[];
+  activeScript: string | undefined;
   onSelectRunConfig: (configId: string) => void;
   onRunConfig: (config: RunConfig) => void;
   onStopConfig: (config: RunConfig) => void;
@@ -51,8 +51,8 @@ export function Header({
   openInEditorTarget,
   workspaceRoot,
   onOpenExternalEditorSettings,
-  runConfigs,
-  activeRunConfigId,
+  scripts,
+  activeScript,
   onSelectRunConfig,
   onRunConfig,
   onStopConfig,
@@ -135,8 +135,8 @@ export function Header({
       <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
 
       <RunButton
-        runConfigs={runConfigs}
-        activeRunConfigId={activeRunConfigId}
+        scripts={scripts}
+        activeScript={activeScript}
         onSelectConfig={onSelectRunConfig}
         onRun={onRunConfig}
         onStop={onStopConfig}

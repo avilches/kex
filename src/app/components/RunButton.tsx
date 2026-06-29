@@ -21,8 +21,8 @@ import {
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 
 type Props = {
-  runConfigs: RunConfig[];
-  activeRunConfigId: string | undefined;
+  scripts: RunConfig[];
+  activeScript: string | undefined;
   onSelectConfig: (configId: string) => void;
   onRun: (config: RunConfig) => void;
   onStop: (config: RunConfig) => void;
@@ -34,8 +34,8 @@ function isComplete(c: RunConfig): boolean {
 }
 
 export function RunButton({
-  runConfigs,
-  activeRunConfigId,
+  scripts,
+  activeScript,
   onSelectConfig,
   onRun,
   onStop,
@@ -46,29 +46,63 @@ export function RunButton({
     getRunConfigRunningSnapshot,
   );
 
-  const completeConfigs = runConfigs.filter(isComplete);
+  const completeConfigs = scripts.filter(isComplete);
   const activeConfig =
-    completeConfigs.find((c) => c.id === activeRunConfigId) ?? completeConfigs[0];
+    completeConfigs.find((c) => c.id === activeScript) ?? completeConfigs[0];
   const isRunning = !!(activeConfig?.panelId && runningMap.get(activeConfig.panelId));
 
   const dropdownContent = (
     <DropdownMenuContent align="end">
-      {completeConfigs.map((cfg) => (
-        <DropdownMenuItem key={cfg.id} onSelect={() => onSelectConfig(cfg.id)} className="gap-2">
-          <span className="flex-1">{cfg.name || cfg.command}</span>
-          {cfg.id === activeConfig?.id && (
-            <HugeiconsIcon
-              icon={Tick02Icon}
-              size={12}
-              strokeWidth={2}
-              className="text-muted-foreground"
-            />
-          )}
-        </DropdownMenuItem>
-      ))}
+      {completeConfigs.map((cfg) => {
+        const cfgRunning = !!(cfg.panelId && runningMap.get(cfg.panelId));
+        const isActive = cfg.id === activeConfig?.id;
+        return (
+          <DropdownMenuItem
+            key={cfg.id}
+            className="gap-0 px-1 py-0.5"
+            onSelect={() => onSelectConfig(cfg.id)}
+          >
+            <button
+              type="button"
+              title={cfgRunning ? "Stop" : "Run"}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                cfgRunning ? onStop(cfg) : onRun(cfg);
+              }}
+              className={cn(
+                "size-[22px] shrink-0 flex items-center justify-center rounded transition-colors",
+                cfgRunning
+                  ? "text-destructive hover:bg-destructive/10"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+              <HugeiconsIcon
+                icon={cfgRunning ? StopIcon : PlayIcon}
+                size={12}
+                strokeWidth={2}
+              />
+            </button>
+            <span className="flex-1 truncate px-1.5 text-[12px]">
+              {cfg.name || cfg.command}
+            </span>
+            {isActive && (
+              <HugeiconsIcon
+                icon={Tick02Icon}
+                size={11}
+                strokeWidth={2}
+                className="shrink-0 text-muted-foreground"
+              />
+            )}
+          </DropdownMenuItem>
+        );
+      })}
       {completeConfigs.length > 0 && <DropdownMenuSeparator />}
       <DropdownMenuItem onSelect={onOpenRunConfigurations} className="text-muted-foreground">
-        + Add Run configuration
+        + Add Script
       </DropdownMenuItem>
     </DropdownMenuContent>
   );
