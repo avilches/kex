@@ -280,7 +280,7 @@ if (import.meta.env?.DEV && typeof window !== "undefined") {
     sessions() {
       return Object.values(useAgentStore.getState().sessions);
     },
-    fakeNotification(tabId, kind = "attention", agent = "claude-code") {
+    fakeNotification(tabId, kind = "attention", agent = "claude") {
       const session = useAgentStore.getState().sessions[tabId];
       const workspaceId = session?.workspaceId ?? tabId;
       useAgentStore.getState().pushNotification({ source: "terminal", tabId, workspaceId, agent, kind });
