@@ -273,6 +273,8 @@ One atomic rename of the core. Touches the type union, the pure tree library, th
 - Rename: `src/modules/workspaces/PanelContent.tsx` -> `TabContent.tsx` (`PanelCallbacks` -> `TabCallbacks`); `src/modules/workspaces/lib/panelTitle.tsx` -> `tabTitle.tsx`, `lib/panelPath.ts` -> `tabPath.ts`, `lib/panelClose.ts` -> `tabClose.ts`
 - Modify: `src/modules/workspaces/PaneView.tsx` (`onActivatePanel` -> `onActivateTab`, `onClosePanel` -> `onCloseTab`, `onCloseManyPanels` -> `onCloseManyTabs`)
 - Modify: `src/modules/workspaces/lib/workspaceState.ts` (`sanitizePanel` -> `sanitizeTab`; `sanitizeTree` reads `node.panels` -> `node.tabs`; the `Panel` import -> `Tab`)
+- Modify: `src/modules/header/Header.tsx` (import `Panel` type -> `Tab`; prop `activePanel` -> `activeTab`, passed to `WorkspaceTitle`)
+- Modify: `src/modules/header/WorkspaceTitle.tsx` (NEW file added mid-conversation in commit 438c343, not seen by the original analysis: import `Panel` -> `Tab` and `panelTitle` -> `tabTitle`; prop `panel: Panel | null` -> `tab: Tab | null`; `panel.id`/`panel.kind`/`panelTitle(panel, ...)` -> `tab.*`/`tabTitle(tab, ...)`; the `s.sessions[panel.id]` lookup keys by the tab id, so it becomes `s.sessions[tab.id]`)
 - Modify: `src/app/App.tsx` and every other importer of these symbols
 - Docs: `docs/ARCHITECTURE.md`, `docs/WORKSPACES.md`, `AGENTS.md`, `CLAUDE.md` (Workspace/Pane/Panel model -> Workspace/Pane/Tab; `PanelContent` -> `TabContent`)
 
@@ -295,7 +297,7 @@ Workspace/Pane/Panel -> Workspace/Pane/Tab in `ARCHITECTURE.md`, `WORKSPACES.md`
 
 ```bash
 pnpm check-types && pnpm exec biome lint ./src && pnpm test
-rg '\bPanelCommon\b|\bisAutofocusPanel\b|\.panels\b|activePanelId|PanelContent|panelTitle|panelPath|panelClose|findPanelPane|activatePanel|closePanel' src
+rg '\bPanelCommon\b|\bisAutofocusPanel\b|\.panels\b|activePanelId|\bactivePanel\b|PanelContent|panelTitle|panelPath|panelClose|findPanelPane|activatePanel|closePanel' src
 ```
 Expected: checks PASS (`splitNode.test.ts`, `useWorkspaces.test.ts` green); rg finds nothing. The `Panel` type itself: confirm no remaining `: Panel` / `Panel[]` annotations with `rg ': Panel\b|Panel\[\]' src`.
 
