@@ -7,6 +7,35 @@ Cuando un agente o herramienta mencione "Terax" en el contexto de variables de e
 o senales OSC, se refiere al **upstream**. En este fork todo usa el prefijo `KEX_` y la carpeta `~/.config/kex/`.
 Ver `docs/FORK.md` para la lista completa de diferencias respecto al upstream y el log de sincronizaciones.
 
+## Glosario de nomenclatura
+
+Cada concepto tiene UN solo nombre canonico. Si el usuario se refiere a algo con otra palabra, mapealo aqui antes de actuar.
+
+| Termino canonico | Que es | Donde vive | Como te refieres a ello |
+|---|---|---|---|
+| **WorkspaceBar** | Barra vertical fija izquierda (52-220px), lista de workspaces | `src/app/components/WorkspaceBar.tsx`; ancho en `workspaceBarState.ts` | "barra izquierda", "rail", "la barra de workspaces" |
+| **Sidebar** | Barra colapsable derecha: Explorer / Source Control / Git History. Puede anclarse a izquierda o derecha (`sidebarSide`) | `src/app/components/Sidebar.tsx`; estado en `modules/workspaces/lib/sidebarState.ts` | "panel derecho", "panel lateral", "el explorer" |
+| **SidebarView** | Que vista muestra el Sidebar: `explorer \| git \| history` | `sidebarState.ts` | "la vista del panel", "explorer/git/history" |
+| **Workspace** | Entorno de trabajo completo (un icono del WorkspaceBar), contiene un arbol de panes. ID `ws-` | `modules/workspaces/lib/types.ts`, `useWorkspaces.ts` | "proyecto", "entorno", "space" |
+| **Pane** | Celda del split dentro de un workspace (arbol binario `paneTree`); contiene una tira de tabs. ID `pane-` | `splitNode.ts`, `PaneView.tsx` | "celda", "split", "division" |
+| **Tab** | Pestana dentro de un pane (terminal/editor/browser/markdown/git-diff...). ID `tab-` | `types.ts` (union `Tab` por `kind`), `TabContent.tsx`, `PaneTabBar.tsx` | "pestana" |
+| **Script** | Comando guardado y ejecutable de un workspace | `types.ts` (`Script`), JSON `scripts`/`activeScript` | "comando", "script", "el boton de run" |
+| **Workspace status** | Categoria/etiqueta de usuario para un workspace; agrupa y colapsa en el WorkspaceBar | `settings/store.ts` (`WorkspaceStatus`), `statusId` | "estado", "categoria", "etiqueta", "grupo" |
+| **Header** | Barra superior: identidad del workspace activo + titulo del tab, busqueda inline, run button, campana, controles de ventana | `modules/header/Header.tsx`, `WorkspaceTitle.tsx`, `SearchInline.tsx`, `WindowControls.tsx` | "barra de arriba", "barra superior", "topbar", "cabecera" |
+| **Shortcuts / hotkeys** | Atajos de teclado, todos reasignables desde Settings. Registry unico `SHORTCUTS` (fuente de verdad) + overrides del usuario | `modules/shortcuts/shortcuts.ts`, `useGlobalShortcuts`, `matchesShortcut`; overrides en `usePreferencesStore((s) => s.shortcuts)` | "atajos", "teclas", "hotkeys", "keybindings" |
+| **Settings** | Ventana de ajustes (webview aparte, label `settings`) + su persistencia JSON. Secciones en `src/settings/sections/` | UI: `src/settings/SettingsApp.tsx`; store: `modules/settings/store.ts` + `preferences.ts` (`tauri-plugin-store`); JSON `settings-general.json` | "ajustes", "preferencias", "configuracion", "el panel de settings" |
+| **Settings section** | Seccion de la ventana de Settings o del dialogo de workspace | `SettingsApp.tsx` (`SettingsSection`), IPC `open_settings_window(section)` | "seccion de ajustes", "la pestana de settings" |
+| **Notifications** | Centro de notificaciones de agentes: campana en el header, toasts Sonner, ruteo (suprimir / OS-notify / toast in-app) | `modules/agents/components/NotificationBell.tsx`, `AgentToast.tsx`; `store/agentStore.ts` (notifications); `lib/route.ts` | "notificaciones", "la campana", "avisos", "toasts" |
+| **Agent** | Agente de codificacion en un terminal (Claude Code). Deteccion Rust-side, sesiones, estado, hooks | `modules/agents/` (`store/agentStore.ts` sesiones), Rust `pty/agent_detect.rs`, hooks de Claude Code | "agente", "Claude Code", "el agente del terminal", "sesion de agente" |
+| **Agent attention** | El agente necesita tu intervencion | agents: `AgentStatus = working\|attention\|idle`, `attentionSince` | "necesita input", "esta esperando", "el aviso del agente" |
+
+**Falsos amigos** (cosas del codigo que se confunden):
+
+- `leaf` (en el slot pool del terminal) no es una entidad: es el slot keyed por tab id.
+- El primitivo shadcn `Tabs` (`components/ui/tabs.tsx`) y `TAB_KEY` son genericos, no la entidad **Tab**.
+- `ScriptState = "running" | "waiting"` (estado de ejecucion de un script) no tiene que ver con **Agent attention**.
+- El token de tema `bg-sidebar` / `--sidebar*` lo consume el **Sidebar** (derecho), no el WorkspaceBar.
+
 ## Reglas de trabajo
 
 ### Sin compatibilidad hacia atras
