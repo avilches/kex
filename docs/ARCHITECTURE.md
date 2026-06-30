@@ -221,7 +221,9 @@ Hooks must be installed via "Set up Claude Code" (notification bell popover) for
 
 Settings open in a separate window (not a panel in the main window). Deep-linking is supported — `openSettingsWindow("shortcuts")` opens directly to the Shortcuts section. The settings window is `always_on_top` relative to the main window.
 
-Navigation is a left vertical sidebar. Sections: General, Editor, Terminal, Appearance, Themes, Shortcuts, About. General holds tabs, explorer, agents, and startup; Editor and Terminal each own their font, behavior, and cursor settings; Appearance holds zoom and Git file colors; Themes holds the color mode, theme picker, and editor (syntax) theme. The right-panel dock side is no longer a global setting: it is per-window state (see below) flipped from each window's header toggle, since the standalone Settings window cannot target a specific main window.
+Navigation is a left vertical sidebar. Sections: General, Workspaces, Editor, Terminal, Appearance, Themes, Shortcuts, About. General holds tabs, explorer, agents, and startup; Workspaces holds the global workspace status list (see below); Editor and Terminal each own their font, behavior, and cursor settings; Appearance holds zoom and Git file colors; Themes holds the color mode, theme picker, and editor (syntax) theme. The right-panel dock side is no longer a global setting: it is per-window state (see below) flipped from each window's header toggle, since the standalone Settings window cannot target a specific main window.
+
+**Workspace statuses.** A global ordered list of named statuses (`WorkspaceStatus[]`, persisted in `settings-general.json` as `workspaceStatuses`). Each status has an immutable `id` (prefix `st-`, generated with `newStatusId()`) and a user-editable `label`. Defaults: Archived, Work in progress, On hold, Canceled, Completed. Managed in Settings > Workspaces via a drag-to-reorder, inline-rename, delete list. Each workspace can be assigned one status via a pill selector in its Properties dialog (Workspace Settings > Properties). The sidebar groups workspaces by status: workspaces with no status appear at the top; each status group with at least one member appears below, separated by a text label (expanded sidebar) or a thin divider (compact mode). Drag-and-drop in the sidebar is multi-container: dragging a workspace into a different group reassigns its status and repositions it. Workspaces whose `statusId` no longer matches a valid status are normalized to no-status on preferences hydration.
 
 **State granularity (global vs per-window vs per-workspace).** Three tiers:
 
@@ -470,8 +472,10 @@ src/
     │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/PanelContent,
     │                                WorkspaceDndProvider (DndContext + file/tab drag handlers).
     │                                Workspace carries: color (accent color, hex or null), runConfigs (array of
-    │                                run configurations with command, name, optional cwd/panelId), and
-    │                                activeRunConfigId (selected run config id). See WORKSPACES.md for render tree details.
+    │                                run configurations with command, name, optional cwd/panelId),
+    │                                activeRunConfigId (selected run config id), and statusId (optional foreign key
+    │                                to a WorkspaceStatus id in the preferences store). See WORKSPACES.md for render
+    │                                tree details.
     │                                `terminalEphemeralStore` has a second section, `runConfigRunning` (Map<panelId,
     │                                boolean>), tracking which terminal panels are running a run-config command.
     │                                Set to true by `runWorkspaceConfig` in App.tsx; cleared by OSC 133;D
@@ -479,7 +483,11 @@ src/
     ├── sidebar/                   — SidebarViewId type (residual; side panels moved to RightPanel)
     ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image
-    ├── settings/                  — Settings store, preferences, window opener
+    ├── settings/                  — Settings store, preferences, window opener.
+    │                                The `Preferences` type includes `workspaceStatuses: WorkspaceStatus[]`
+    │                                (the global ordered status list, key `workspaceStatuses` in
+    │                                `settings-general.json`, synced cross-window via `GENERAL_PREF_KEY_MAP`).
+    │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
     ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser panels can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the panel stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  — Markdown renderer pane
     ├── workspace/                 — Local + WSL environment switching
