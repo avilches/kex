@@ -57,6 +57,7 @@ import {
   Link01Icon,
   ListViewIcon,
   MinusSignIcon,
+  PlusSignIcon,
   Refresh01Icon,
   RemoveSquareIcon,
   SquareArrowDown02Icon,
@@ -832,8 +833,8 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                     disabled={initRunning}
                     onClick={() => void handleGitInit()}
                   >
-                    <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />
-                    {initRunning ? "Initializing..." : "Git init"}
+                    <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
+                    {initRunning ? "Initializing..." : "Init"}
                   </Button>
                   {initError && (
                     <p className="text-[11px] text-destructive">{initError}</p>
@@ -844,13 +845,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="w-full text-[12px]"
+                  className="w-full gap-1.5 text-[12px]"
                   onClick={() => {
                     setCloneOpen(true);
                     setCloneError(null);
                     window.setTimeout(() => cloneInputRef.current?.focus(), 0);
                   }}
                 >
+                  <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />
                   Clone
                 </Button>
               ) : (
@@ -874,6 +876,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   <div className="flex gap-1.5">
                     <Button
                       size="sm"
+                      variant="ghost"
+                      className="text-[12px]"
+                      onClick={() => { setCloneOpen(false); setCloneUrl(""); setCloneError(null); }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
                       className="flex-1 gap-1.5 text-[12px]"
                       disabled={!cloneUrl.trim() || cloneRunning}
                       onClick={() => void handleGitClone()}
@@ -881,15 +891,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       {cloneRunning && <Spinner className="size-3" />}
                       {cloneRunning
                         ? `Cloning... ${cloneElapsed > 0 ? `(${cloneElapsed}s)` : ""}`
-                        : "Clone"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-[12px]"
-                      onClick={() => { setCloneOpen(false); setCloneUrl(""); setCloneError(null); }}
-                    >
-                      Cancel
+                        : <><HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />Clone</>}
                     </Button>
                   </div>
                 </div>
