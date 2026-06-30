@@ -88,9 +88,9 @@ export type TabCallbacks = {
   onOpenCommitFile?: (input: CommitFileDiffOpenInput) => void;
   onGitHistorySearchHandle?: (tabId: string, handle: GitHistorySearchHandle | null) => void;
   // Tab rename
-  onRenamePanel?: (tabId: string, title: string | undefined) => void;
+  onRenameTab?: (tabId: string, title: string | undefined) => void;
   // Tab data update (used by tab bar lock/restore toggles)
-  onUpdatePanel?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   // File rename (editor/markdown tabs - renames the file on disk)
   onRenameFile?: (tabId: string, newName: string) => void;
   // Reveal an editor/markdown/git file in the explorer tree
@@ -107,13 +107,13 @@ type Props = {
   visible: boolean;
   focused: boolean;
   callbacks: TabCallbacks;
-  onFloatBrowserPanel?: (tabId: string) => void;
-  onDockBrowserPanel?: (tabId: string) => void;
-  onFocusFloatBrowserPanel?: (tabId: string) => void;
-  onNavigateFloatBrowserPanel?: (tabId: string, url: string) => void;
+  onFloatBrowserTab?: (tabId: string) => void;
+  onDockBrowserTab?: (tabId: string) => void;
+  onFocusFloatBrowserTab?: (tabId: string) => void;
+  onNavigateFloatBrowserTab?: (tabId: string, url: string) => void;
 };
 
-export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPanel, onDockBrowserPanel, onFocusFloatBrowserPanel, onNavigateFloatBrowserPanel }: Props) {
+export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab, onDockBrowserTab, onFocusFloatBrowserTab, onNavigateFloatBrowserTab }: Props) {
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
@@ -198,7 +198,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPan
             gitRootPath={gitRootPath}
             restoreOnRestart={tab.restoreOnRestart}
             persistentCommand={tab.persistentCommand}
-            onUpdatePanel={(updater) => callbacks.onUpdatePanel?.(tab.id, updater)}
+            onUpdateTab={(updater) => callbacks.onUpdateTab?.(tab.id, updater)}
             onReveal={(p) => callbacks.onFocusOnExplorer?.(p)}
             onSetAsRoot={callbacks.onSetAsRoot}
             onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
@@ -277,7 +277,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPan
                 const willShowPreview = lang
                   ? isMarkdownPath(`x.${lang}`) || isHtmlPath(`x.${lang}`)
                   : isMarkdownPath(tab.path) || isHtmlPath(tab.path);
-                callbacks.onUpdatePanel?.(tab.id, (p) => {
+                callbacks.onUpdateTab?.(tab.id, (p) => {
                   if (p.kind !== "editor") return p;
                   return {
                     ...p,
@@ -352,10 +352,10 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPan
             floating={tab.floating ?? false}
             visible={visible}
             onUrlChange={(url: string) => callbacks.onBrowserUrlChange?.(tab.id, url)}
-            onFloat={() => onFloatBrowserPanel?.(tab.id)}
-            onDock={() => onDockBrowserPanel?.(tab.id)}
-            onFocusFloat={() => onFocusFloatBrowserPanel?.(tab.id)}
-            onNavigateFloat={(url: string) => onNavigateFloatBrowserPanel?.(tab.id, url)}
+            onFloat={() => onFloatBrowserTab?.(tab.id)}
+            onDock={() => onDockBrowserTab?.(tab.id)}
+            onFocusFloat={() => onFocusFloatBrowserTab?.(tab.id)}
+            onNavigateFloat={(url: string) => onNavigateFloatBrowserTab?.(tab.id, url)}
           />
         </Suspense>
       );
@@ -380,7 +380,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPan
               view={{
                 mode: "overlay",
                 onToggleOverlay: () => callbacks.onSetMarkdownView?.(tab.id, "raw"),
-                onToggleSplit: () => callbacks.onUpdatePanel?.(tab.id, (p) => {
+                onToggleSplit: () => callbacks.onUpdateTab?.(tab.id, (p) => {
                   if (p.kind !== "markdown") return p;
                   return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus };
                 }),

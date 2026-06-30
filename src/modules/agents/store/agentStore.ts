@@ -30,7 +30,7 @@ type AgentStoreState = {
   setMeta: (tabId: string, meta: Partial<AgentSessionMeta>) => void;
   setLocalAgent: (state: LocalAgentState) => void;
   pushNotification: (n: Omit<AgentNotification, "id" | "at" | "read">) => void;
-  markPanelSeen: (tabId: string) => void;
+  markTabSeen: (tabId: string) => void;
   markAllRead: () => void;
   clearNotifications: () => void;
   clearAll: () => void;
@@ -190,7 +190,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   pushNotification: (n) =>
     set((s) => {
       // One notification per agent (tabId): drop any previous entry for the
-      // same panel and reinsert at the front so it bubbles to the top.
+      // same tab and reinsert at the front so it bubbles to the top.
       const rest = s.notifications.filter((x) => x.tabId !== n.tabId);
       return {
         notifications: [
@@ -200,7 +200,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  markPanelSeen: (tabId) =>
+  markTabSeen: (tabId) =>
     set((s) => {
       const prev = s.sessions[tabId];
       const clearsDot = prev?.status === "attention";

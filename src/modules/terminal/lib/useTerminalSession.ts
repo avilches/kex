@@ -451,7 +451,7 @@ export function leafIdForPty(ptyId: number): string | null {
   return null;
 }
 
-export function ptyIdForPanel(tabId: string): number | null {
+export function ptyIdForTab(tabId: string): number | null {
   return sessions.get(tabId)?.pty?.id ?? null;
 }
 
@@ -464,7 +464,7 @@ configureRendererPool({
         // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) clear it —
         // these are explicit user interrupts. Multi-byte ESC sequences (xterm protocol
         // auto-responses like "\x1b[?1;2c") must NOT clear the spinner.
-        // The attention dot ("attention") is cleared by focusing the panel, not by typing.
+        // The attention dot ("attention") is cleared by focusing the tab, not by typing.
         // The session is kept alive; only the visual indicator is cleared.
         const session = useAgentStore.getState().sessions[leafId];
         if (session && (data === "\x03" || data === "\x1b")) {
@@ -770,7 +770,7 @@ function attachSession(
                 s.pty?.write(" " + plan.resumeCmd + "\r");
               }, 200);
             } else if (plan.errorReason) {
-              console.error(`[kex] session restore failed for panel ${leafId} (${plan.agent}): ${plan.errorReason}`);
+              console.error(`[kex] session restore failed for tab ${leafId} (${plan.agent}): ${plan.errorReason}`);
               useAgentStore.getState().setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
             }
             // else: no command, no error - PTY just opened at plan.cwdLaunch, nothing to do

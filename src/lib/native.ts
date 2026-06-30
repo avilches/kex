@@ -115,7 +115,7 @@ export type GitCommitFileChange = {
   isBinary: boolean;
 };
 
-export type GitPanelSnapshot = {
+export type GitSidebarSnapshot = {
   repo: GitRepoInfo | null;
   status: GitStatusSnapshot | null;
 };
@@ -233,8 +233,8 @@ export const native = {
       cwd,
       workspace: currentWorkspaceEnv(),
     }),
-  gitPanelSnapshot: (cwd: string) =>
-    invoke<GitPanelSnapshot>("git_panel_snapshot", {
+  gitSidebarSnapshot: (cwd: string) =>
+    invoke<GitSidebarSnapshot>("git_panel_snapshot", {
       cwd,
       workspace: currentWorkspaceEnv(),
     }),

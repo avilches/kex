@@ -37,10 +37,10 @@ type Props = {
   callbacks: TabCallbacks;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
-  onFloatBrowserPanel?: (tabId: string) => void;
-  onDockBrowserPanel?: (tabId: string) => void;
-  onFocusFloatBrowserPanel?: (tabId: string) => void;
-  onNavigateFloatBrowserPanel?: (tabId: string, url: string) => void;
+  onFloatBrowserTab?: (tabId: string) => void;
+  onDockBrowserTab?: (tabId: string) => void;
+  onFocusFloatBrowserTab?: (tabId: string) => void;
+  onNavigateFloatBrowserTab?: (tabId: string, url: string) => void;
   welcomeActions?: WelcomeActions;
 };
 
@@ -89,10 +89,10 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, e
           callbacks={rest.callbacks}
           gitStatus={rest.gitStatus}
           gitColorScheme={rest.gitColorScheme}
-          onFloatBrowserPanel={rest.onFloatBrowserPanel}
-          onDockBrowserPanel={rest.onDockBrowserPanel}
-          onFocusFloatBrowserPanel={rest.onFocusFloatBrowserPanel}
-          onNavigateFloatBrowserPanel={rest.onNavigateFloatBrowserPanel}
+          onFloatBrowserTab={rest.onFloatBrowserTab}
+          onDockBrowserTab={rest.onDockBrowserTab}
+          onFocusFloatBrowserTab={rest.onFocusFloatBrowserTab}
+          onNavigateFloatBrowserTab={rest.onNavigateFloatBrowserTab}
           welcomeActions={rest.welcomeActions}
         />
       </div>

@@ -283,7 +283,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
 
   const previousWorkspaceIdRef = useRef<string | null>(null);
-  const closedPanelsRef = useRef<ClosedEntry[]>([]);
+  const closedTabsRef = useRef<ClosedEntry[]>([]);
 
   // paneId -> MRU activation history (tabIds, most recent first). Drives which
   // tab gets focus when the active one closes. In memory only, never persisted.
@@ -473,11 +473,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const splitPaneAndOpenPanel = useCallback((
+  const splitPaneAndOpenTab = useCallback((
     workspaceId: string,
     targetPaneId: string,
     direction: "left" | "right" | "top" | "bottom",
-    panel: Tab,
+    tab: Tab,
   ): string => {
     const freshPaneId = newPaneId();
     const freshSplitId = newSplitId();
@@ -488,7 +488,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
-        const newTree = splitPaneAndInsertTab(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, withNewTabAutofocus(panel));
+        const newTree = splitPaneAndInsertTab(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, withNewTabAutofocus(tab));
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };
       }),
@@ -498,9 +498,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   // ── Tab operations ────────────────────────────────────────────────────────
 
-  const openPanel = useCallback((workspaceId: string, paneId: string, panel: Tab, insertionIndex?: number) => {
-    const newPanel = withNewTabAutofocus(panel);
-    recordActivation(paneId, newPanel.id);
+  const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
+    const newTab = withNewTabAutofocus(tab);
+    recordActivation(paneId, newTab.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -509,8 +509,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           paneTree: updatePane(w.paneTree, paneId, (p) => {
             const idx = tabInsertionIndex(p.tabs, p.activeTabId, insertionIndex);
             const newTabs = [...p.tabs];
-            newTabs.splice(idx, 0, newPanel);
-            return { ...p, tabs: newTabs, activeTabId: newPanel.id };
+            newTabs.splice(idx, 0, newTab);
+            return { ...p, tabs: newTabs, activeTabId: newTab.id };
           }),
         };
       }),
@@ -545,7 +545,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       const found = findTabPane(ws.paneTree, tabId);
       if (found) {
         history = paneActivationHistoryRef.current.get(found.pane.id);
-        closedPanelsRef.current = captureClosedEntry(closedPanelsRef.current, {
+        closedTabsRef.current = captureClosedEntry(closedTabsRef.current, {
           tab: found.tab,
           paneId: found.pane.id,
           workspaceId,
@@ -556,22 +556,22 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, []);
 
   const reopenClosed = useCallback(() => {
-    const [entry, ...rest] = closedPanelsRef.current;
+    const [entry, ...rest] = closedTabsRef.current;
     if (!entry) return;
     const target = findReopenTarget(workspacesRef.current, activeWorkspaceId, entry);
     if (!target) return;
-    closedPanelsRef.current = rest;
-    const newPanel: Tab = (() => {
+    closedTabsRef.current = rest;
+    const newTab: Tab = (() => {
       const base = { ...entry.tab, id: newTabId() };
       if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
       if (base.kind === "terminal" || base.kind === "git-diff") return { ...base, locked: false };
       return base;
     })();
-    openPanel(target.workspaceId, target.paneId, newPanel);
-  }, [openPanel, activeWorkspaceId]);
+    openTab(target.workspaceId, target.paneId, newTab);
+  }, [openTab, activeWorkspaceId]);
 
-  const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newPanel: Tab) => {
-    recordActivation(paneId, newPanel.id);
+  const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
+    recordActivation(paneId, newTab.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -581,8 +581,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
             const idx = p.tabs.findIndex((tab) => tab.id === oldTabId);
             if (idx === -1) return p;
             const newTabs = [...p.tabs];
-            newTabs[idx] = newPanel;
-            return { ...p, tabs: newTabs, activeTabId: newPanel.id };
+            newTabs[idx] = newTab;
+            return { ...p, tabs: newTabs, activeTabId: newTab.id };
           }),
         };
       }),
@@ -606,7 +606,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const setTerminalPanelCwd = useCallback((workspaceId: string, tabId: string, cwd: string) => {
+  const setTerminalTabCwd = useCallback((workspaceId: string, tabId: string, cwd: string) => {
     const normalized = cwd.length > 1 ? cwd.replace(/\/$/, "") : cwd;
     updateTabData(workspaceId, tabId, (p) => p.kind === "terminal" ? { ...p, cwd: normalized } : p);
   }, [updateTabData]);
@@ -850,14 +850,14 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     moveTab,
     reorderTab,
     splitPaneAndPlace,
-    splitPaneAndOpenPanel,
-    openPanel,
+    splitPaneAndOpenTab,
+    openTab,
     activateTab,
     closeTab,
     reopenClosed,
     updateTabData,
     replaceTab,
-    setTerminalPanelCwd,
+    setTerminalTabCwd,
     setWorkspaceCwd,
     setExplorerRootMode,
     setShowHidden,

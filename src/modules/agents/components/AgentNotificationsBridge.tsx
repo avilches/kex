@@ -26,7 +26,7 @@ type Ctx = {
   onActivate: Activate;
 };
 
-function panelInfo(
+function tabInfo(
   workspaces: Workspace[],
   tabId: string,
 ): { workspaceId: string; title: string } | null {
@@ -62,7 +62,7 @@ function route(
   ctx: Ctx,
   extraBody?: string,
 ): void {
-  const info = panelInfo(ctx.workspaces, session.tabId);
+  const info = tabInfo(ctx.workspaces, session.tabId);
   // Prefer the tab's OSC title (what the agent emits) so multiple agents are
   // distinguishable in the toast / OS notification; fall back to the agent name.
   const name = getOscTitle(session.tabId) ?? session.agent;
@@ -93,7 +93,7 @@ function route(
 function ensureSession(tabId: string, ctx: Ctx, agent: string): boolean {
   const store = useAgentStore.getState();
   if (store.sessions[tabId]) return true;
-  const info = panelInfo(ctx.workspaces, tabId);
+  const info = tabInfo(ctx.workspaces, tabId);
   if (!info) return false;
   store.start(tabId, info.workspaceId, agent);
   return true;
@@ -102,7 +102,7 @@ function ensureSession(tabId: string, ctx: Ctx, agent: string): boolean {
 function ensureSessionIdle(tabId: string, ctx: Ctx, agent: string): boolean {
   const store = useAgentStore.getState();
   if (store.sessions[tabId]) return true;
-  const info = panelInfo(ctx.workspaces, tabId);
+  const info = tabInfo(ctx.workspaces, tabId);
   if (!info) return false;
   store.startIdle(tabId, info.workspaceId, agent);
   return true;
@@ -204,7 +204,7 @@ export function AgentNotificationsBridge({
     const ws = workspaces.find((w) => w.id === activeWorkspaceId);
     if (!ws) return;
     const tabId = focusedTabId(ws.paneTree, ws.activePaneId);
-    if (tabId) useAgentStore.getState().markPanelSeen(tabId);
+    if (tabId) useAgentStore.getState().markTabSeen(tabId);
   }, [workspaces, activeWorkspaceId, focused]);
 
   useEffect(() => {

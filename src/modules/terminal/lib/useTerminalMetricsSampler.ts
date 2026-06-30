@@ -2,8 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import type { SplitNode } from "@/modules/workspaces/lib/types";
 import { setMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
-import { ptyIdForPanel } from "./useTerminalSession";
-import { visibleTerminalPanels } from "./visibleTerminals";
+import { ptyIdForTab } from "./useTerminalSession";
+import { visibleTerminalTabs } from "./visibleTerminals";
 
 export const TERMINAL_METRICS_INTERVAL_MS = 5000;
 
@@ -26,8 +26,8 @@ export function useTerminalMetricsSampler(paneTree: SplitNode | null): void {
       if (document.hidden) return;
       const tree = treeRef.current;
       if (!tree) return;
-      const pairs = visibleTerminalPanels(tree)
-        .map((p) => ({ tabId: p.tabId, ptyId: ptyIdForPanel(p.tabId) }))
+      const pairs = visibleTerminalTabs(tree)
+        .map((p) => ({ tabId: p.tabId, ptyId: ptyIdForTab(p.tabId) }))
         .filter((x): x is { tabId: string; ptyId: number } => x.ptyId != null);
       if (pairs.length === 0) return;
       const byPty = new Map(pairs.map((x) => [x.ptyId, x.tabId]));

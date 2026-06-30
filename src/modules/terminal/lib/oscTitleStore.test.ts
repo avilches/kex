@@ -17,23 +17,23 @@ beforeEach(() => {
 });
 
 describe("oscTitleStore", () => {
-  it("returns undefined for an unknown panel", () => {
-    expect(getOscTitle("panel-a")).toBeUndefined();
+  it("returns undefined for an unknown tab", () => {
+    expect(getOscTitle("tab-a")).toBeUndefined();
   });
 
   it("stores and retrieves a title", () => {
-    setOscTitle("panel-a", "My Title");
-    expect(getOscTitle("panel-a")).toBe("My Title");
+    setOscTitle("tab-a", "My Title");
+    expect(getOscTitle("tab-a")).toBe("My Title");
   });
 
   it("clearOscTitle removes the title", () => {
-    setOscTitle("panel-a", "My Title");
-    clearOscTitle("panel-a");
-    expect(getOscTitle("panel-a")).toBeUndefined();
+    setOscTitle("tab-a", "My Title");
+    clearOscTitle("tab-a");
+    expect(getOscTitle("tab-a")).toBeUndefined();
   });
 
-  it("clearOscTitle is a no-op for unknown panel", () => {
-    expect(() => clearOscTitle("panel-unknown")).not.toThrow();
+  it("clearOscTitle is a no-op for unknown tab", () => {
+    expect(() => clearOscTitle("tab-unknown")).not.toThrow();
   });
 
   it("getSnapshot returns same reference when nothing changes", () => {
@@ -44,15 +44,15 @@ describe("oscTitleStore", () => {
 
   it("getSnapshot returns new reference after setOscTitle", () => {
     const snap1 = getSnapshot();
-    setOscTitle("panel-a", "Title");
+    setOscTitle("tab-a", "Title");
     const snap2 = getSnapshot();
     expect(snap1).not.toBe(snap2);
   });
 
   it("getSnapshot returns new reference after clearOscTitle", () => {
-    setOscTitle("panel-a", "Title");
+    setOscTitle("tab-a", "Title");
     const snap1 = getSnapshot();
-    clearOscTitle("panel-a");
+    clearOscTitle("tab-a");
     const snap2 = getSnapshot();
     expect(snap1).not.toBe(snap2);
   });
@@ -60,7 +60,7 @@ describe("oscTitleStore", () => {
   it("subscribe notifies listeners when title changes", () => {
     const cb = vi.fn();
     const unsub = subscribe(cb);
-    setOscTitle("panel-a", "New");
+    setOscTitle("tab-a", "New");
     expect(cb).toHaveBeenCalledTimes(1);
     unsub();
   });
@@ -69,42 +69,42 @@ describe("oscTitleStore", () => {
     const cb = vi.fn();
     const unsub = subscribe(cb);
     unsub();
-    setOscTitle("panel-a", "New");
+    setOscTitle("tab-a", "New");
     expect(cb).not.toHaveBeenCalled();
   });
 
   it("strips leading status symbol from stored title", () => {
-    setOscTitle("panel-a", "* doing something");
-    expect(getOscTitle("panel-a")).toBe("doing something");
+    setOscTitle("tab-a", "* doing something");
+    expect(getOscTitle("tab-a")).toBe("doing something");
   });
 
   it("strips unicode status symbol from stored title", () => {
-    setOscTitle("panel-a", "⏺ working on task");
-    expect(getOscTitle("panel-a")).toBe("working on task");
+    setOscTitle("tab-a", "⏺ working on task");
+    expect(getOscTitle("tab-a")).toBe("working on task");
   });
 
   it("does not strip leading letter", () => {
-    setOscTitle("panel-a", "vim file.ts");
-    expect(getOscTitle("panel-a")).toBe("vim file.ts");
+    setOscTitle("tab-a", "vim file.ts");
+    expect(getOscTitle("tab-a")).toBe("vim file.ts");
   });
 
   it("setOscTitle is a no-op when title is unchanged", () => {
-    setOscTitle("panel-a", "Same");
+    setOscTitle("tab-a", "Same");
     const snap1 = getSnapshot();
     const cb = vi.fn();
     const unsub = subscribe(cb);
-    setOscTitle("panel-a", "Same");
+    setOscTitle("tab-a", "Same");
     expect(cb).not.toHaveBeenCalled();
     expect(getSnapshot()).toBe(snap1);
     unsub();
   });
 
   it("setOscTitle is a no-op when cleaned title is unchanged", () => {
-    setOscTitle("panel-a", "* Same");
+    setOscTitle("tab-a", "* Same");
     const snap1 = getSnapshot();
     const cb = vi.fn();
     const unsub = subscribe(cb);
-    setOscTitle("panel-a", "* Same");
+    setOscTitle("tab-a", "* Same");
     expect(cb).not.toHaveBeenCalled();
     expect(getSnapshot()).toBe(snap1);
     unsub();

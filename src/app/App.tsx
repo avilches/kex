@@ -186,14 +186,14 @@ export default function App() {
     moveTab,
     reorderTab,
     splitPaneAndPlace,
-    splitPaneAndOpenPanel,
-    openPanel,
+    splitPaneAndOpenTab,
+    openTab,
     activateTab,
     closeTab,
     reopenClosed,
     updateTabData,
     replaceTab,
-    setTerminalPanelCwd,
+    setTerminalTabCwd,
     setWorkspaceCwd,
     setExplorerRootMode,
     setShowHidden,
@@ -224,12 +224,12 @@ export default function App() {
   workspacesRef.current = workspaces;
 
   const {
-    floatPanel,
+    floatTab,
     closeFloatWindow,
     focusFloatWindow,
     dockViaCommand,
     navigateFloatWindow,
-    restoreFloatingPanels,
+    restoreFloatingTabs,
     destroyWorkspaceFloats,
   } = useFloatBrowser({ updateTabData, findTabGlobal });
 
@@ -237,7 +237,7 @@ export default function App() {
   const contextCwdRef = useRef<string | null>(null);
   const homeRef = useRef<string | null>(null);
 
-  // ── Active panel derivation ───────────────────────────────────────────────
+  // ── Active tab derivation ───────────────────────────────────────────────
 
   const activePane = activeWorkspace
     ? findPane(activeWorkspace.paneTree, activeWorkspace.activePaneId)
@@ -250,10 +250,10 @@ export default function App() {
     ? (activePane?.tabs.find((p) => p.id === activeTabId) ?? null)
     : null;
 
-  const isTerminalPanel = activeTab?.kind === "terminal";
-  const isEditorPanel = activeTab?.kind === "editor";
-  const isGitHistoryPanel = activeTab?.kind === "git-history";
-  const activeCwd = isTerminalPanel
+  const isTerminalTab = activeTab?.kind === "terminal";
+  const isEditorTab = activeTab?.kind === "editor";
+  const isGitHistoryTab = activeTab?.kind === "git-history";
+  const activeCwd = isTerminalTab
     ? ((activeTab as { cwd?: string }).cwd ?? null)
     : null;
   activeCwdRef.current = activeCwd;
@@ -357,7 +357,7 @@ export default function App() {
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
-    void restoreFloatingPanels(workspacesRef.current);
+    void restoreFloatingTabs(workspacesRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -486,7 +486,7 @@ export default function App() {
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
 
-  // ── Live terminal panel tracking for session disposal ─────────────────────
+  // ── Live terminal tab tracking for session disposal ─────────────────────
 
   const liveTabIdsRef = useRef<Set<string>>(new Set());
 
@@ -521,7 +521,7 @@ export default function App() {
     }
   }, [workspaces, findTabGlobal]);
 
-  // Update active search addon / editor handle when active panel changes.
+  // Update active search addon / editor handle when active tab changes.
   // Switching tab or workspace flushes any dirty editor we just left.
   useEffect(() => {
     void flushDirtyEditorsRef.current();
@@ -559,7 +559,7 @@ export default function App() {
     (config: Script) => {
       if (!activeWorkspace) return;
 
-      // Case 1: panel already exists -- focus it and re-run if idle
+      // Case 1: tab already exists -- focus it and re-run if idle
       if (config.tabId) {
         const found = findTabGlobal(config.tabId);
         if (found) {
@@ -583,16 +583,16 @@ export default function App() {
       }
 
       const freshTabId = newTabId();
-      const panelCwd = config.cwd ?? activeWorkspace.workspaceRoot ?? activeWorkspace.cwd;
-      const tab: Tab = { id: freshTabId, kind: "terminal", cwd: panelCwd, title: config.name || undefined };
+      const tabCwd = config.cwd ?? activeWorkspace.workspaceRoot ?? activeWorkspace.cwd;
+      const tab: Tab = { id: freshTabId, kind: "terminal", cwd: tabCwd, title: config.name || undefined };
 
-      // Case 2: existing script pane -- add panel to it without splitting
+      // Case 2: existing script pane -- add tab to it without splitting
       const existingScriptPane = activeWorkspace.scriptPaneId
         ? findPane(activeWorkspace.paneTree, activeWorkspace.scriptPaneId)
         : null;
 
       if (existingScriptPane) {
-        openPanel(activeWorkspace.id, activeWorkspace.scriptPaneId!, tab);
+        openTab(activeWorkspace.id, activeWorkspace.scriptPaneId!, tab);
         setActiveWorkspaceId(activeWorkspace.id);
         activateTab(activeWorkspace.id, freshTabId);
       } else {
@@ -600,10 +600,10 @@ export default function App() {
         const { workspacePaneLimit } = usePreferencesStore.getState();
         const atLimit = allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit;
         if (atLimit) {
-          openPanel(activeWorkspace.id, activeWorkspace.activePaneId, tab);
+          openTab(activeWorkspace.id, activeWorkspace.activePaneId, tab);
           setScriptPaneId(activeWorkspace.id, activeWorkspace.activePaneId);
         } else {
-          const freshPaneId = splitPaneAndOpenPanel(
+          const freshPaneId = splitPaneAndOpenTab(
             activeWorkspace.id,
             activeWorkspace.activePaneId,
             "bottom",
@@ -626,7 +626,7 @@ export default function App() {
       };
       setTimeout(tryWrite, 150);
     },
-    [activeWorkspace, findTabGlobal, setActiveWorkspaceId, activateTab, splitPaneAndOpenPanel, updateScript, openPanel, setScriptPaneId],
+    [activeWorkspace, findTabGlobal, setActiveWorkspaceId, activateTab, splitPaneAndOpenTab, updateScript, openTab, setScriptPaneId],
   );
 
   const stopWorkspaceConfig = useCallback(
@@ -697,7 +697,7 @@ export default function App() {
     });
   homeRef.current = home;
 
-  // When Cmd+Shift+F is pressed while the panel is closed, the panel opens
+  // When Cmd+Shift+F is pressed while the sidebar is closed, the sidebar opens
   // asynchronously (Tauri IPC). This effect fires once both conditions are met
   // and calls focusExplorer() to open and focus the search input.
   useEffect(() => {
@@ -853,9 +853,9 @@ export default function App() {
         });
 
       if (opts.fromShortcut || opts.pendingAction) {
-        const panel = sidebarStateRef.current;
-        if (!panel.open) setSidebarOpen(true);
-        if (panel.view !== "explorer") {
+        const sidebar = sidebarStateRef.current;
+        if (!sidebar.open) setSidebarOpen(true);
+        if (sidebar.view !== "explorer") {
           setSidebarView("explorer");
         }
       }
@@ -873,10 +873,10 @@ export default function App() {
     ],
   );
 
-  // Drive the sidebar when the ACTIVE panel becomes an autofocus terminal,
+  // Drive the sidebar when the ACTIVE tab becomes an autofocus terminal,
   // whether by gaining focus or by turning autofocus on while already focused
   // (shortcut / hover / context menu). Toggling autofocus on a non-active tab
-  // does nothing here because the active panel does not change. The startup
+  // does nothing here because the active tab does not change. The startup
   // mount is skipped so restoring a session never auto-fires.
   const prevAutofocusSignalRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
@@ -946,7 +946,7 @@ export default function App() {
           );
       if (!ws) return;
       const { terminalNewFolderMode } = usePreferencesStore.getState();
-      openPanel(ws.id, targetPaneId ?? ws.activePaneId, {
+      openTab(ws.id, targetPaneId ?? ws.activePaneId, {
         id: newTabId(),
         kind: "terminal",
         cwd: resolveNewTerminalCwd({
@@ -957,7 +957,7 @@ export default function App() {
         }),
       });
     },
-    [openPanel],
+    [openTab],
   );
 
   // ── Window title ──────────────────────────────────────────────────────────
@@ -993,9 +993,9 @@ export default function App() {
     [],
   );
 
-  // ── Open panel helpers ────────────────────────────────────────────────────
+  // ── Open tab helpers ────────────────────────────────────────────────────
 
-  const openFileInPanel = useCallback(
+  const openFileInTab = useCallback(
     (path: string, pin?: boolean) => {
       if (!activeWorkspace) return undefined;
       const markdown = isMarkdownPath(path);
@@ -1044,7 +1044,7 @@ export default function App() {
         }
       }
 
-      openPanel(
+      openTab(
         activeWorkspace.id,
         activeWorkspace.activePaneId,
         markdown
@@ -1059,7 +1059,7 @@ export default function App() {
       );
       return tabId;
     },
-    [activeWorkspace, activateTab, openPanel, replaceTab],
+    [activeWorkspace, activateTab, openTab, replaceTab],
   );
 
   const openFileInRightSplit = useCallback(
@@ -1079,7 +1079,7 @@ export default function App() {
         }
       }
       const tabId = newTabId();
-      const panel = markdown
+      const newTab = markdown
         ? ({ id: tabId, kind: "markdown" as const, path } as const)
         : ({ id: tabId, kind: "editor" as const, path, dirty: false, preview: false } as const);
       const sourcePaneId = sourceTabId
@@ -1088,19 +1088,19 @@ export default function App() {
       if (sourcePaneId) {
         const sibling = siblingPane(activeWorkspace.paneTree, sourcePaneId);
         if (sibling) {
-          openPanel(activeWorkspace.id, sibling.id, panel);
+          openTab(activeWorkspace.id, sibling.id, newTab);
         } else {
-          splitPaneAndOpenPanel(activeWorkspace.id, sourcePaneId, "right", panel);
+          splitPaneAndOpenTab(activeWorkspace.id, sourcePaneId, "right", newTab);
         }
       } else {
-        openPanel(activeWorkspace.id, activeWorkspace.activePaneId, panel);
+        openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
       }
       return tabId;
     },
-    [activeWorkspace, activateTab, openPanel, splitPaneAndOpenPanel],
+    [activeWorkspace, activateTab, openTab, splitPaneAndOpenTab],
   );
 
-  const openGitDiffInPanel = useCallback(
+  const openGitDiffInTab = useCallback(
     (params: {
       repoRoot: string;
       path: string;
@@ -1108,32 +1108,32 @@ export default function App() {
       originalPath: string | null;
     }) => {
       if (!activeWorkspace) return;
-      openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+      openTab(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: newTabId(),
         kind: "git-diff",
         ...params,
       });
     },
-    [activeWorkspace, openPanel],
+    [activeWorkspace, openTab],
   );
 
-  const openGitHistoryInPanel = useCallback(
+  const openGitHistoryInTab = useCallback(
     (args: { repoRoot: string; branch: string | null }) => {
       if (!activeWorkspace) return;
-      openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+      openTab(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: newTabId(),
         kind: "git-history",
         repoRoot: args.repoRoot,
       });
     },
-    [activeWorkspace, openPanel],
+    [activeWorkspace, openTab],
   );
 
-  const openBrowserInPanel = useCallback(
+  const openBrowserInTab = useCallback(
     (url: string) => {
       if (!activeWorkspace) return undefined;
       const tabId = newTabId();
-      openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+      openTab(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: tabId,
         kind: "browser",
         url,
@@ -1146,7 +1146,7 @@ export default function App() {
       }
       return tabId;
     },
-    [activeWorkspace, openPanel],
+    [activeWorkspace, openTab],
   );
 
   fileLinkHandlerRef.current = (path, cwd, line, _col, sourceTabId) => {
@@ -1189,30 +1189,30 @@ export default function App() {
 
   // ── Float browser callbacks ───────────────────────────────────────────────
 
-  const onFloatBrowserPanel = useCallback(
+  const onFloatBrowserTab = useCallback(
     (tabId: string) => {
       const found = findTabGlobal(tabId);
       if (!found || found.tab.kind !== "browser") return;
-      void floatPanel(found.tab, found.workspace.id);
+      void floatTab(found.tab, found.workspace.id);
     },
-    [findTabGlobal, floatPanel],
+    [findTabGlobal, floatTab],
   );
 
-  const onDockBrowserPanel = useCallback(
+  const onDockBrowserTab = useCallback(
     (tabId: string) => {
       void dockViaCommand(tabId);
     },
     [dockViaCommand],
   );
 
-  const onFocusFloatBrowserPanel = useCallback(
+  const onFocusFloatBrowserTab = useCallback(
     (tabId: string) => {
       void focusFloatWindow(tabId);
     },
     [focusFloatWindow],
   );
 
-  const onNavigateFloatBrowserPanel = useCallback(
+  const onNavigateFloatBrowserTab = useCallback(
     (tabId: string, url: string) => {
       void navigateFloatWindow(tabId, url);
     },
@@ -1264,7 +1264,7 @@ export default function App() {
       const newPaneId = splitPane(wsId, paneId, "horizontal");
       setZenPaneId(null);
       const { terminalNewFolderMode } = usePreferencesStore.getState();
-      openPanel(wsId, newPaneId, {
+      openTab(wsId, newPaneId, {
         id: newTabId(),
         kind: "terminal",
         cwd: resolveNewTerminalCwd({
@@ -1275,7 +1275,7 @@ export default function App() {
         }),
       });
     },
-    [splitPane, openPanel],
+    [splitPane, openTab],
   );
 
   const onSplitTerminalDownStable = useCallback(
@@ -1298,7 +1298,7 @@ export default function App() {
       const newPaneId = splitPane(wsId, paneId, "vertical");
       setZenPaneId(null);
       const { terminalNewFolderMode } = usePreferencesStore.getState();
-      openPanel(wsId, newPaneId, {
+      openTab(wsId, newPaneId, {
         id: newTabId(),
         kind: "terminal",
         cwd: resolveNewTerminalCwd({
@@ -1309,19 +1309,19 @@ export default function App() {
         }),
       });
     },
-    [splitPane, openPanel],
+    [splitPane, openTab],
   );
 
   const onNewBrowserStable = useCallback(
     (wsId: string, paneId: string) => {
       const tabId = newTabId();
-      openPanel(wsId, paneId, { id: tabId, kind: "browser", url: "" });
+      openTab(wsId, paneId, { id: tabId, kind: "browser", url: "" });
       setTimeout(
         () => browserHandles.current.get(tabId)?.focusAddressBar(),
         0,
       );
     },
-    [openPanel],
+    [openTab],
   );
 
   const onSplitBrowserRightStable = useCallback(
@@ -1344,13 +1344,13 @@ export default function App() {
       const newPaneId = splitPane(wsId, paneId, "horizontal");
       setZenPaneId(null);
       const tabId = newTabId();
-      openPanel(wsId, newPaneId, { id: tabId, kind: "browser", url: "" });
+      openTab(wsId, newPaneId, { id: tabId, kind: "browser", url: "" });
       setTimeout(
         () => browserHandles.current.get(tabId)?.focusAddressBar(),
         0,
       );
     },
-    [splitPane, openPanel],
+    [splitPane, openTab],
   );
 
   const onSplitBrowserDownStable = useCallback(
@@ -1373,13 +1373,13 @@ export default function App() {
       const newPaneId = splitPane(wsId, paneId, "vertical");
       setZenPaneId(null);
       const tabId = newTabId();
-      openPanel(wsId, newPaneId, { id: tabId, kind: "browser", url: "" });
+      openTab(wsId, newPaneId, { id: tabId, kind: "browser", url: "" });
       setTimeout(
         () => browserHandles.current.get(tabId)?.focusAddressBar(),
         0,
       );
     },
-    [splitPane, openPanel],
+    [splitPane, openTab],
   );
 
   const onDividerChangeStable = useCallback(
@@ -1397,7 +1397,7 @@ export default function App() {
     }) => {
       const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
       if (!ws) return;
-      openPanel(ws.id, ws.activePaneId, {
+      openTab(ws.id, ws.activePaneId, {
         id: newTabId(),
         kind: "git-commit-file",
         repoRoot: params.repoRoot,
@@ -1406,7 +1406,7 @@ export default function App() {
         originalPath: params.originalPath,
       });
     },
-    [activeWorkspaceId, openPanel],
+    [activeWorkspaceId, openTab],
   );
 
   // ── TabCallbacks ─────────────────────────────────────────────────────────
@@ -1449,9 +1449,9 @@ export default function App() {
     async (tabId: string, newName: string) => {
       const found = findTabGlobal(tabId);
       if (!found) return;
-      const panel = found.tab;
-      if (panel.kind !== "editor" && panel.kind !== "markdown") return;
-      const oldPath = panel.path;
+      const foundTab = found.tab;
+      if (foundTab.kind !== "editor" && foundTab.kind !== "markdown") return;
+      const oldPath = foundTab.path;
       const lastSlash = oldPath.lastIndexOf("/");
       const parent = lastSlash >= 0 ? oldPath.slice(0, lastSlash) : oldPath;
       const newPath = `${parent}/${newName}`;
@@ -1537,7 +1537,7 @@ export default function App() {
 
   // ── Path rename ───────────────────────────────────────────────────────────
 
-  // ── useEditorFileSync (editor panel shim) ─────────────────────────────────
+  // ── useEditorFileSync (editor tab shim) ─────────────────────────────────
 
   type EditorShim = {
     kind: "editor";
@@ -1547,7 +1547,7 @@ export default function App() {
     preview: boolean;
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const editorPanels = useMemo<EditorShim[]>(() => {
+  const editorTabs = useMemo<EditorShim[]>(() => {
     const acc: EditorShim[] = [];
     for (const ws of workspaces) {
       for (const pane of allPanes(ws.paneTree)) {
@@ -1567,20 +1567,20 @@ export default function App() {
     }
     return acc;
   }, [workspaces]);
-  const editorPanelsRef = useRef(editorPanels);
-  editorPanelsRef.current = editorPanels;
+  const editorTabsRef = useRef(editorTabs);
+  editorTabsRef.current = editorTabs;
 
   useEditorFileSync({
-    tabs: editorPanels,
-    tabsRef: editorPanelsRef,
+    tabs: editorTabs,
+    tabsRef: editorTabsRef,
     editorRefs: editorHandles,
   });
 
   // ── useThemeFileEditing ───────────────────────────────────────────────────
 
   useThemeFileEditing({
-    tabsRef: editorPanelsRef,
-    openFileTab: (path) => openFileInPanel(path, true),
+    tabsRef: editorTabsRef,
+    openFileTab: (path) => openFileInTab(path, true),
   });
 
   // ── Source control ────────────────────────────────────────────────────────
@@ -1591,11 +1591,11 @@ export default function App() {
 
   const navigateSidebarTo = useCallback(
     (tab: "explorer" | "git" | "history") => {
-      const panel = sidebarStateRef.current;
-      if (!panel.open) {
+      const sidebar = sidebarStateRef.current;
+      if (!sidebar.open) {
         setSidebarOpen(true);
         setSidebarView(tab);
-      } else if (panel.view === tab) {
+      } else if (sidebar.view === tab) {
         setSidebarOpen(false);
       } else {
         setSidebarView(tab);
@@ -1629,8 +1629,8 @@ export default function App() {
   // System and Workspace Root. With no pinned root the cycle stays on File
   // System (idempotent). It never closes the sidebar (use sidebar.toggle).
   const rotateExplorerRoot = useCallback(() => {
-    const panel = sidebarStateRef.current;
-    const inExplorer = panel.open && panel.view === "explorer";
+    const sidebar = sidebarStateRef.current;
+    const inExplorer = sidebar.open && sidebar.view === "explorer";
     if (!inExplorer) {
       showSidebarView("explorer");
       return;
@@ -1650,7 +1650,7 @@ export default function App() {
       launchCwdResolved,
       home,
       cycleSidebarView: () => navigateSidebarTo("git"),
-      openCommitHistoryTab: openGitHistoryInPanel,
+      openCommitHistoryTab: openGitHistoryInTab,
     });
 
   // Git root for explorer tree decorations and the gitignore action follows the
@@ -1672,7 +1672,7 @@ export default function App() {
       // When .gitignore is open in an editor the buffer is the source of truth:
       // edit it there so unsaved changes are never clobbered, regardless of
       // autosave. The user saves it like any other edit.
-      const open = editorPanelsRef.current.find((p) => p.path === gitignorePath);
+      const open = editorTabsRef.current.find((p) => p.path === gitignorePath);
       const handle = open ? editorHandles.current.get(open.id) : undefined;
       if (handle) {
         const buffer = handle.getContent();
@@ -1684,7 +1684,7 @@ export default function App() {
               appendGitignoreEntry(buffer, entry).slice(buffer.length),
             );
           }
-          openFileInPanel(gitignorePath, true);
+          openFileInTab(gitignorePath, true);
           return;
         }
       }
@@ -1702,9 +1702,9 @@ export default function App() {
       } else {
         await native.writeFile(gitignorePath, appendGitignoreEntry(content, entry));
       }
-      openFileInPanel(gitignorePath, true);
+      openFileInTab(gitignorePath, true);
     },
-    [gitRoot, openFileInPanel],
+    [gitRoot, openFileInTab],
   );
 
   // ── Terminal helpers ──────────────────────────────────────────────────────
@@ -1713,14 +1713,14 @@ export default function App() {
     (path: string) => {
       if (!activeWorkspace) return;
       const tabId = newTabId();
-      openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+      openTab(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: tabId,
         kind: "terminal",
         cwd: path,
       });
       setTimeout(() => terminalHandles.current.get(tabId)?.focus(), 80);
     },
-    [activeWorkspace, openPanel],
+    [activeWorkspace, openTab],
   );
 
   const newWorkspaceFromFolder = useCallback(
@@ -1731,16 +1731,16 @@ export default function App() {
         const ws = workspacesRef.current.find((w) => w.id === wsId);
         if (!ws) return;
         const pane = allPanes(ws.paneTree)[0];
-        const panel = pane?.activeTabId
+        const tab = pane?.activeTabId
           ? pane.tabs.find((p) => p.id === pane.activeTabId)
           : pane?.tabs[0];
-        if (panel) terminalHandles.current.get(panel.id)?.focus();
+        if (tab) terminalHandles.current.get(tab.id)?.focus();
       }, 80);
     },
     [addWorkspace, setWorkspaceRoot],
   );
 
-  const panelCallbacks = useMemo<TabCallbacks>(
+  const tabCallbacks = useMemo<TabCallbacks>(
     () => ({
       onSearchReady: (tabId, addon) => {
         searchAddons.current.set(tabId, addon);
@@ -1753,7 +1753,7 @@ export default function App() {
       onCwd: (tabId, cwd) => {
         const found = findTabGlobal(tabId);
         if (found) {
-          setTerminalPanelCwd(found.workspace.id, tabId, cwd);
+          setTerminalTabCwd(found.workspace.id, tabId, cwd);
           const isFocused =
             found.workspace.activePaneId === found.pane.id &&
             found.pane.activeTabId === tabId;
@@ -1844,7 +1844,7 @@ export default function App() {
       },
       onOpenCommitFile: (input) => {
         if (!activeWorkspace) return;
-        openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
+        openTab(activeWorkspace.id, activeWorkspace.activePaneId, {
           id: newTabId(),
           kind: "git-commit-file",
           repoRoot: input.repoRoot,
@@ -1856,7 +1856,7 @@ export default function App() {
       onGitHistorySearchHandle: (_tabId, handle) => {
         setGitHistoryHandle(handle);
       },
-      onRenamePanel: (tabId, title) => {
+      onRenameTab: (tabId, title) => {
         const found = findTabGlobal(tabId);
         if (found)
           updateTabData(found.workspace.id, tabId, (p) => ({
@@ -1864,7 +1864,7 @@ export default function App() {
             title,
           }));
       },
-      onUpdatePanel: (tabId, updater) => {
+      onUpdateTab: (tabId, updater) => {
         const found = findTabGlobal(tabId);
         if (found) updateTabData(found.workspace.id, tabId, updater);
       },
@@ -1881,7 +1881,7 @@ export default function App() {
       activeTabId,
       findTabGlobal,
       closeTab,
-      setTerminalPanelCwd,
+      setTerminalTabCwd,
       setWorkspaceCwd,
       setTerminalRunningCommand,
       setTabView,
@@ -1889,7 +1889,7 @@ export default function App() {
       toggleSplitPreview,
       updateTabData,
       activeWorkspace,
-      openPanel,
+      openTab,
       handleRenameFileFromTab,
       focusSidebar,
       handleSetAsRoot,
@@ -1901,42 +1901,42 @@ export default function App() {
 
   const openContentHit = useCallback(
     (path: string, line: number) => {
-      const id = openFileInPanel(path, true);
+      const id = openFileInTab(path, true);
       if (id == null) return;
       const h = editorHandles.current.get(id);
       if (h) h.gotoLine(line);
       else pendingGotoLine.current.set(id, line);
     },
-    [openFileInPanel],
+    [openFileInTab],
   );
 
   const insertHistoryCommand = useMemo(
     () =>
-      isTerminalPanel && activeTabId !== null
+      isTerminalTab && activeTabId !== null
         ? (cmd: string) => {
             writeToSession(activeTabId, cmd);
             terminalHandles.current.get(activeTabId)?.focus();
           }
         : null,
-    [isTerminalPanel, activeTabId],
+    [isTerminalTab, activeTabId],
   );
 
   // ── Search ────────────────────────────────────────────────────────────────
 
   const searchTarget = useMemo<SearchTarget>(() => {
-    if (isTerminalPanel && activeTabId !== null && activeSearchAddon)
+    if (isTerminalTab && activeTabId !== null && activeSearchAddon)
       return {
         kind: "terminal",
         addon: activeSearchAddon,
         focus: () => terminalHandles.current.get(activeTabId)?.focus(),
       };
-    if (isEditorPanel && activeEditorHandle)
+    if (isEditorTab && activeEditorHandle)
       return {
         kind: "editor",
         handle: activeEditorHandle,
         focus: () => activeEditorHandle.focus(),
       };
-    if (isGitHistoryPanel && gitHistoryHandle)
+    if (isGitHistoryTab && gitHistoryHandle)
       return {
         kind: "git-history",
         handle: gitHistoryHandle,
@@ -1944,9 +1944,9 @@ export default function App() {
       };
     return null;
   }, [
-    isTerminalPanel,
-    isEditorPanel,
-    isGitHistoryPanel,
+    isTerminalTab,
+    isEditorTab,
+    isGitHistoryTab,
     activeTabId,
     activeSearchAddon,
     activeEditorHandle,
@@ -1971,7 +1971,7 @@ export default function App() {
     }
   }, [activeWorkspace?.activePaneId, zenPaneId]);
 
-  const handleCloseActivePanel = useCallback(() => {
+  const handleCloseActiveTab = useCallback(() => {
     if (!activeWorkspace) return;
     if (!activeTabId) {
       // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
@@ -1988,7 +1988,7 @@ export default function App() {
     closeTabsRef.current([activeTabId]);
   }, [activeWorkspace, activeTabId, activeTab, requestCloseWorkspace]);
 
-  const handleCloseOtherPanels = useCallback(() => {
+  const handleCloseOtherTabs = useCallback(() => {
     if (!activePane || !activeTabId) return;
     const ids = activePane.tabs
       .filter(
@@ -1998,7 +1998,7 @@ export default function App() {
     if (ids.length) closeTabsRef.current(ids);
   }, [activePane, activeTabId]);
 
-  const handleCloseAllPanels = useCallback(() => {
+  const handleCloseAllTabs = useCallback(() => {
     if (!activePane) return;
     const ids = activePane.tabs
       .filter((p) => !(p as { locked?: boolean }).locked)
@@ -2056,8 +2056,8 @@ export default function App() {
   }, [activeWorkspace, onSplitTerminalDownStable]);
 
   const handleExplorerSearch = useCallback(() => {
-    const panel = sidebarStateRef.current;
-    if (panel.open && panel.view === "explorer") {
+    const sidebar = sidebarStateRef.current;
+    if (sidebar.open && sidebar.view === "explorer") {
       sidebarRef.current?.toggleExplorerSearch?.();
     } else {
       pendingExplorerSearch.current = true;
@@ -2069,12 +2069,12 @@ export default function App() {
   const welcomeActions = useMemo<WelcomeActions>(
     () => ({
       onNewTerminal: () => openNewTerminal(),
-      onNewBrowser: () => openBrowserInPanel(""),
+      onNewBrowser: () => openBrowserInTab(""),
       onSearchFiles: handleExplorerSearch,
       onCommandPalette: () => openCommandPalette("commands"),
       onSettings: () => void openSettingsWindow(),
     }),
-    [openNewTerminal, openBrowserInPanel, handleExplorerSearch, openCommandPalette],
+    [openNewTerminal, openBrowserInTab, handleExplorerSearch, openCommandPalette],
   );
 
   const shortcutHandlers = useMemo<ShortcutHandlers>(
@@ -2118,9 +2118,9 @@ export default function App() {
           runWorkspaceConfig(active);
         }
       },
-      "tab.newBrowser": () => openBrowserInPanel(""),
+      "tab.newBrowser": () => openBrowserInTab(""),
       "tab.newEditor": () => setNewEditorOpen(true),
-      "tab.close": handleCloseActivePanel,
+      "tab.close": handleCloseActiveTab,
       "tab.reopenClosed": () => {
         if (activeWorkspace) reopenClosed();
       },
@@ -2144,8 +2144,8 @@ export default function App() {
         )
           return;
         if (!activeTabId) return;
-        const panel = findTabGlobal(activeTabId)?.tab;
-        if (panel?.kind === "editor" || panel?.kind === "markdown") {
+        const tab = findTabGlobal(activeTabId)?.tab;
+        if (tab?.kind === "editor" || tab?.kind === "markdown") {
           useFileRenameStore.getState().trigger(activeTabId);
         }
       },
@@ -2179,28 +2179,28 @@ export default function App() {
       },
       "tab.next": () => {
         if (!activeWorkspace || !activePane) return;
-        const panels = activePane.tabs;
-        if (panels.length < 2) return;
-        const idx = panels.findIndex((p) => p.id === activePane.activeTabId);
-        const next = panels[(idx + 1) % panels.length];
+        const tabs = activePane.tabs;
+        if (tabs.length < 2) return;
+        const idx = tabs.findIndex((p) => p.id === activePane.activeTabId);
+        const next = tabs[(idx + 1) % tabs.length];
         activateTab(activeWorkspace.id, next.id);
       },
       "tab.prev": () => {
         if (!activeWorkspace || !activePane) return;
-        const panels = activePane.tabs;
-        if (panels.length < 2) return;
-        const idx = panels.findIndex((p) => p.id === activePane.activeTabId);
-        const prev = panels[(idx - 1 + panels.length) % panels.length];
+        const tabs = activePane.tabs;
+        if (tabs.length < 2) return;
+        const idx = tabs.findIndex((p) => p.id === activePane.activeTabId);
+        const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
         activateTab(activeWorkspace.id, prev.id);
       },
       "tab.selectByIndex": (e) => {
         if (!activeWorkspace || !activePane) return;
-        const panels = activePane.tabs;
-        if (panels.length === 0) return;
+        const tabs = activePane.tabs;
+        if (tabs.length === 0) return;
         const digit = parseInt(e.key, 10);
-        const idx = digit === 0 ? panels.length - 1 : digit - 1;
-        if (idx >= 0 && idx < panels.length)
-          activateTab(activeWorkspace.id, panels[idx].id);
+        const idx = digit === 0 ? tabs.length - 1 : digit - 1;
+        if (idx >= 0 && idx < tabs.length)
+          activateTab(activeWorkspace.id, tabs[idx].id);
       },
       "pane.splitRight": doSplitRight,
       "pane.splitDown": doSplitDown,
@@ -2334,14 +2334,14 @@ export default function App() {
       openCommandPalette,
       cycleWorkspace,
       activateTab,
-      handleCloseActivePanel,
+      handleCloseActiveTab,
       reopenClosed,
       requestCloseWorkspace,
       focusSidebar,
       openNewTerminal,
       addWorkspace,
-      openPanel,
-      openBrowserInPanel,
+      openTab,
+      openBrowserInTab,
       doSplitRight,
       doSplitDown,
       focusPane,
@@ -2456,19 +2456,19 @@ export default function App() {
         openNewTerminal();
         break;
       case "new_browser":
-        openBrowserInPanel("");
+        openBrowserInTab("");
         break;
       case "toggle_autosave":
         void setEditorAutoSave(!usePreferencesStore.getState().editorAutoSave);
         break;
       case "close_tab":
-        handleCloseActivePanel();
+        handleCloseActiveTab();
         break;
       case "close_others":
-        handleCloseOtherPanels();
+        handleCloseOtherTabs();
         break;
       case "close_all":
-        handleCloseAllPanels();
+        handleCloseAllTabs();
         break;
       case "toggle_sidebar":
         toggleSidebar();
@@ -2536,10 +2536,10 @@ export default function App() {
             },
             openNewWorkspace: () => addWorkspace(home ?? undefined),
             openNewEditor: () => setNewEditorOpen(true),
-            openNewBrowser: () => openBrowserInPanel(""),
+            openNewBrowser: () => openBrowserInTab(""),
             openGitGraph: openGitGraphFromContext,
             toggleSourceControl,
-            closeActiveTabOrPane: handleCloseActivePanel,
+            closeActiveTabOrPane: handleCloseActiveTab,
             splitPaneRight: doSplitRight,
             splitPaneDown: doSplitDown,
             focusSearch: () => searchInlineRef.current?.focus(),
@@ -2572,10 +2572,10 @@ export default function App() {
       home,
       addWorkspace,
       openNewTerminal,
-      openBrowserInPanel,
+      openBrowserInTab,
       openGitGraphFromContext,
       toggleSourceControl,
-      handleCloseActivePanel,
+      handleCloseActiveTab,
       doSplitRight,
       doSplitDown,
       toggleSidebar,
@@ -2660,18 +2660,18 @@ export default function App() {
               onMoveTab={moveTab}
               onReorderTab={reorderTab}
               onSplitPaneAndPlace={splitPaneAndPlace}
-              onSplitPaneAndOpenPanel={splitPaneAndOpenPanel}
-              onOpenPanel={openPanel}
+              onSplitPaneAndOpenTab={splitPaneAndOpenTab}
+              onOpenTab={openTab}
             >
               <ResizablePanelGroup
                 orientation="horizontal"
                 className="min-h-0 flex-1"
               >
-                {/* Tool panel on LEFT when sidebarSide === "left" */}
+                {/* Tool sidebar on LEFT when sidebarSide === "left" */}
                 {sidebarOpen && sidebarSide === "left" && (
                   <>
                     <ResizablePanel
-                      id="tool-panel"
+                      id="tool-sidebar"
                       defaultSize={`${sidebarWidth}%`}
                       minSize="12%"
                       maxSize="70%"
@@ -2697,7 +2697,7 @@ export default function App() {
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
                         revealRequest={revealRequest}
-                        onOpenFile={(path, pin) => openFileInPanel(path, pin)}
+                        onOpenFile={(path, pin) => openFileInTab(path, pin)}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={openFolderInTerminal}
@@ -2716,7 +2716,7 @@ export default function App() {
                         gitWorkspaceId={activeWorkspaceId}
                         savedCommitMessage={savedCommitMessage}
                         onCommitMessagePersist={handleCommitMessagePersist}
-                        onOpenDiff={openGitDiffInPanel}
+                        onOpenDiff={openGitDiffInTab}
                         onOpenGitGraph={openGitGraphFromContext}
                         onNavigateToWorktree={handleNavigateToWorktree}
                         repoRoot={sidebarRepoRoot}
@@ -2747,13 +2747,13 @@ export default function App() {
                         onSplitBrowserRight={onSplitBrowserRightStable}
                         onSplitBrowserDown={onSplitBrowserDownStable}
                         onDividerChange={onDividerChangeStable}
-                        callbacks={panelCallbacks}
+                        callbacks={tabCallbacks}
                         gitStatus={sourceControl.status}
                         gitColorScheme={gitColorScheme}
-                        onFloatBrowserPanel={onFloatBrowserPanel}
-                        onDockBrowserPanel={onDockBrowserPanel}
-                        onFocusFloatBrowserPanel={onFocusFloatBrowserPanel}
-                        onNavigateFloatBrowserPanel={onNavigateFloatBrowserPanel}
+                        onFloatBrowserTab={onFloatBrowserTab}
+                        onDockBrowserTab={onDockBrowserTab}
+                        onFocusFloatBrowserTab={onFocusFloatBrowserTab}
+                        onNavigateFloatBrowserTab={onNavigateFloatBrowserTab}
                         welcomeActions={welcomeActions}
                       />
                       </EditorChromeProvider>
@@ -2766,12 +2766,12 @@ export default function App() {
                   </div>
                 </ResizablePanel>
 
-                {/* Tool panel on RIGHT when sidebarSide === "right" (default) */}
+                {/* Tool sidebar on RIGHT when sidebarSide === "right" (default) */}
                 {sidebarOpen && sidebarSide === "right" && (
                   <>
                     <ResizableHandle withHandle />
                     <ResizablePanel
-                      id="tool-panel"
+                      id="tool-sidebar"
                       defaultSize={`${sidebarWidth}%`}
                       minSize="12%"
                       maxSize="70%"
@@ -2797,7 +2797,7 @@ export default function App() {
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
                         revealRequest={revealRequest}
-                        onOpenFile={(path, pin) => openFileInPanel(path, pin)}
+                        onOpenFile={(path, pin) => openFileInTab(path, pin)}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={openFolderInTerminal}
@@ -2816,7 +2816,7 @@ export default function App() {
                         gitWorkspaceId={activeWorkspaceId}
                         savedCommitMessage={savedCommitMessage}
                         onCommitMessagePersist={handleCommitMessagePersist}
-                        onOpenDiff={openGitDiffInPanel}
+                        onOpenDiff={openGitDiffInTab}
                         onOpenGitGraph={openGitGraphFromContext}
                         onNavigateToWorktree={handleNavigateToWorktree}
                         repoRoot={sidebarRepoRoot}
@@ -2854,7 +2854,7 @@ export default function App() {
             open={newEditorOpen}
             onOpenChange={setNewEditorOpen}
             rootPath={explorerRoot ?? home}
-            onCreated={(path) => openFileInPanel(path, true)}
+            onCreated={(path) => openFileInTab(path, true)}
           />
 
           <UpdaterDialog />

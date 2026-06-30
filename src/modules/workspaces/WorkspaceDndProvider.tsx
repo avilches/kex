@@ -13,7 +13,7 @@ import {
 import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { tabForDroppedPath } from "./lib/dropPanel";
+import { tabForDroppedPath } from "./lib/dropTab";
 import { allPanes, findTabPane } from "./lib/splitNode";
 import {
   insertIntoLeafScratchpad,
@@ -72,8 +72,8 @@ type Props = {
   onMoveTab: UseWorkspacesReturn["moveTab"];
   onReorderTab: UseWorkspacesReturn["reorderTab"];
   onSplitPaneAndPlace: UseWorkspacesReturn["splitPaneAndPlace"];
-  onSplitPaneAndOpenPanel: UseWorkspacesReturn["splitPaneAndOpenPanel"];
-  onOpenPanel: UseWorkspacesReturn["openPanel"];
+  onSplitPaneAndOpenTab: UseWorkspacesReturn["splitPaneAndOpenTab"];
+  onOpenTab: UseWorkspacesReturn["openTab"];
   children: ReactNode;
 };
 
@@ -83,8 +83,8 @@ export function WorkspaceDndProvider({
   onMoveTab,
   onReorderTab,
   onSplitPaneAndPlace,
-  onSplitPaneAndOpenPanel,
-  onOpenPanel,
+  onSplitPaneAndOpenTab,
+  onOpenTab,
   children,
 }: Props) {
   const [draggingItem, setDraggingItem] = useState<DraggingItem | null>(null);
@@ -228,7 +228,7 @@ export function WorkspaceDndProvider({
     const panes = allPanes(activeWs.paneTree);
 
     // Folders open a fresh terminal at that cwd; files reuse an already-open editor.
-    const makePanel = (): Tab => tabForDroppedPath(filePath, isDir);
+    const makeTab = (): Tab => tabForDroppedPath(filePath, isDir);
 
     let existingTabId: string | null = null;
     if (!isDir) {
@@ -249,10 +249,10 @@ export function WorkspaceDndProvider({
       const targetPaneId = targetEntry.paneId;
       const targetPane = panes.find((p) => p.id === targetPaneId);
       if (!targetPane) return;
-      const refPanelIndex = targetPane.tabs.findIndex((p) => p.id === refTabId);
-      if (refPanelIndex === -1) return;
+      const refTabIndex = targetPane.tabs.findIndex((p) => p.id === refTabId);
+      if (refTabIndex === -1) return;
 
-      const insertionIndex = refPanelIndex + (side === "after" ? 1 : 0);
+      const insertionIndex = refTabIndex + (side === "after" ? 1 : 0);
 
       if (existingTabId) {
         const sourcePaneId = idx.get(existingTabId)?.paneId ?? null;
@@ -263,7 +263,7 @@ export function WorkspaceDndProvider({
           onMoveTab(activeWorkspaceIdRef.current, existingTabId, targetPaneId, insertionIndex);
         }
       } else {
-        onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, makePanel(), insertionIndex);
+        onOpenTab(activeWorkspaceIdRef.current, targetPaneId, makeTab(), insertionIndex);
       }
       return;
     }
@@ -282,7 +282,7 @@ export function WorkspaceDndProvider({
         if (sourcePaneId === targetPaneId) return;
         onMoveTab(activeWorkspaceIdRef.current, existingTabId, targetPaneId);
       } else {
-        onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, makePanel());
+        onOpenTab(activeWorkspaceIdRef.current, targetPaneId, makeTab());
       }
     } else {
       const { workspacePaneLimit } = usePreferencesStore.getState();
@@ -290,7 +290,7 @@ export function WorkspaceDndProvider({
       if (existingTabId) {
         onSplitPaneAndPlace(activeWorkspaceIdRef.current, targetPaneId, zone, existingTabId);
       } else {
-        onSplitPaneAndOpenPanel(activeWorkspaceIdRef.current, targetPaneId, zone, makePanel());
+        onSplitPaneAndOpenTab(activeWorkspaceIdRef.current, targetPaneId, zone, makeTab());
       }
     }
   }
@@ -314,10 +314,10 @@ export function WorkspaceDndProvider({
       const targetPaneId = targetEntry.paneId;
       const targetPane = allPanes(sourceWs.paneTree).find((p) => p.id === targetPaneId);
       if (!targetPane) return;
-      const refPanelIndex = targetPane.tabs.findIndex((p) => p.id === refTabId);
-      if (refPanelIndex === -1) return;
+      const refTabIndex = targetPane.tabs.findIndex((p) => p.id === refTabId);
+      if (refTabIndex === -1) return;
 
-      const insertionIndex = refPanelIndex + (side === "after" ? 1 : 0);
+      const insertionIndex = refTabIndex + (side === "after" ? 1 : 0);
       if (sourcePaneId === targetPaneId) {
         onReorderTab(sourceWorkspaceId, tabId, insertionIndex);
       } else {

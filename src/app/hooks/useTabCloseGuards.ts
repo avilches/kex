@@ -28,7 +28,7 @@ type Params = {
 };
 
 /**
- * Guards panel closing: dirty editors and terminals with a live foreground
+ * Guards tab closing: dirty editors and terminals with a live foreground
  * process route through a confirmation dialog. Closes run through one
  * sequential queue so bulk closes pause on each guard and a cancel stops the
  * whole run.
@@ -54,12 +54,12 @@ export function useTabCloseGuards({
     (tabId: string) =>
       new Promise<EditorCloseDecision>((resolve) => {
         const found = findTab(tabId);
-        const panel = found?.tab;
+        const tab = found?.tab;
         setPendingCloseTab({
           id: tabId,
-          title: panel?.title ?? panel?.path ?? "file",
+          title: tab?.title ?? tab?.path ?? "file",
           kind: "editor",
-          path: panel?.path,
+          path: tab?.path,
         });
         editorResolverRef.current = resolve;
       }),
@@ -100,7 +100,7 @@ export function useTabCloseGuards({
     async (tabIds: string[]) => {
       try {
         await runCloseQueue(tabIds, {
-          getPanel: (id) => {
+          getTab: (id) => {
             const found = findTab(id);
             if (!found) return null;
             return {

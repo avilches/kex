@@ -37,7 +37,7 @@ type Props = {
   leafId: string;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
-  onUpdatePanel: (updater: (p: Tab) => Tab) => void;
+  onUpdateTab: (updater: (p: Tab) => Tab) => void;
   agentSession: AgentSession | null;
   runningCommand: string | null;
 };
@@ -46,7 +46,7 @@ export function TerminalPathBarMenu({
   leafId,
   restoreOnRestart,
   persistentCommand,
-  onUpdatePanel,
+  onUpdateTab,
   agentSession,
   runningCommand,
 }: Props) {
@@ -111,7 +111,7 @@ export function TerminalPathBarMenu({
           checked={checked}
           onSelect={(e) => e.preventDefault()}
           onCheckedChange={(next) => {
-            onUpdatePanel((p) => ({
+            onUpdateTab((p) => ({
               ...p,
               restoreOnRestart: next,
               persistentCommand: next
@@ -131,7 +131,7 @@ export function TerminalPathBarMenu({
               defaultValue={persistentCommand ?? ""}
               onBlur={(e) => {
                 const v = e.target.value.trim();
-                onUpdatePanel((p) => ({ ...p, persistentCommand: v || undefined }));
+                onUpdateTab((p) => ({ ...p, persistentCommand: v || undefined }));
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.currentTarget.blur();

@@ -193,7 +193,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings, onSe
         title={
           primaryTarget
             ? `Open in ${primaryEditor?.name ?? "editor"}: ${primaryTarget.path}`
-            : "No active panel"
+            : "No active tab"
         }
         onClick={() => void handleDirectClick()}
         disabled={leftDisabled}

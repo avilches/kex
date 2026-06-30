@@ -67,7 +67,7 @@ export function useWorkspaceSwitcher({
       }
       const dirty = workspacesRef.current.some((ws) =>
         allPanes(ws.paneTree).some((p) =>
-          p.tabs.some((panel) => panel.kind === "editor" && panel.dirty),
+          p.tabs.some((tab) => tab.kind === "editor" && tab.dirty),
         ),
       );
       if (dirty) {

@@ -36,7 +36,7 @@ type Props = {
   gitRootPath: string | null;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
-  onUpdatePanel?: (updater: (p: Tab) => Tab) => void;
+  onUpdateTab?: (updater: (p: Tab) => Tab) => void;
   onReveal?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
@@ -52,7 +52,7 @@ export function TerminalPathBar({
   gitRootPath,
   restoreOnRestart,
   persistentCommand,
-  onUpdatePanel,
+  onUpdateTab,
   onReveal,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
@@ -132,7 +132,7 @@ export function TerminalPathBar({
           leafId={tabId}
           restoreOnRestart={restoreOnRestart}
           persistentCommand={persistentCommand}
-          onUpdatePanel={onUpdatePanel ?? (() => {})}
+          onUpdateTab={onUpdateTab ?? (() => {})}
           agentSession={agentSession}
           runningCommand={running}
         />

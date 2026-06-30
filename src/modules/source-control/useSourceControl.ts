@@ -259,7 +259,7 @@ export function useSourceControl(
               };
             }
           } catch {
-            const snapshot = await native.gitPanelSnapshot(contextPath);
+            const snapshot = await native.gitSidebarSnapshot(contextPath);
             if (requestId !== requestIdRef.current) return;
             if (!snapshot.repo) {
               setState((current) => ({
@@ -276,7 +276,7 @@ export function useSourceControl(
             status = snapshot.status ?? null;
           }
         } else {
-          const snapshot = await native.gitPanelSnapshot(contextPath);
+          const snapshot = await native.gitSidebarSnapshot(contextPath);
           if (requestId !== requestIdRef.current) return;
           if (!snapshot.repo) {
             setState((current) => ({

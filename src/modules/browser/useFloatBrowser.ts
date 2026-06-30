@@ -56,23 +56,23 @@ export function useFloatBrowser({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function floatPanel(
-    panel: Tab & { kind: "browser" },
+  async function floatTab(
+    tab: Tab & { kind: "browser" },
     workspaceId: string,
   ): Promise<void> {
-    if (!panel.url) return;
+    if (!tab.url) return;
     // Mark as floating in state first so the placeholder renders immediately
-    updateTabData(workspaceId, panel.id, (p) => ({ ...p, floating: true }));
+    updateTabData(workspaceId, tab.id, (p) => ({ ...p, floating: true }));
     try {
       await invoke("float_browser_open", {
-        tabId: panel.id,
-        url: panel.url,
+        tabId: tab.id,
+        url: tab.url,
         originWindowLabel,
         workspaceId,
       });
     } catch (err) {
       // Rollback on failure
-      updateTabData(workspaceId, panel.id, (p) => ({ ...p, floating: false }));
+      updateTabData(workspaceId, tab.id, (p) => ({ ...p, floating: false }));
       console.error("[float-browser] open failed:", err);
     }
   }
@@ -112,7 +112,7 @@ export function useFloatBrowser({
 
   // Called once on startup with the restored workspace list.
   // Re-opens floating windows for any tab with floating: true.
-  async function restoreFloatingPanels(wss: Workspace[]): Promise<void> {
+  async function restoreFloatingTabs(wss: Workspace[]): Promise<void> {
     for (const ws of wss) {
       for (const pane of allPanes(ws.paneTree)) {
         for (const tab of pane.tabs) {
@@ -150,12 +150,12 @@ export function useFloatBrowser({
   }
 
   return {
-    floatPanel,
+    floatTab,
     dockViaCommand,
     closeFloatWindow,
     focusFloatWindow,
     navigateFloatWindow,
-    restoreFloatingPanels,
+    restoreFloatingTabs,
     destroyWorkspaceFloats,
   };
 }

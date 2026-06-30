@@ -2,20 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import {
   runCloseQueue,
   type CloseQueueDeps,
-  type CloseQueuePanel,
+  type CloseQueueTab,
 } from "./closeQueue";
 
-type Panels = Record<string, CloseQueuePanel>;
+type Tabs = Record<string, CloseQueueTab>;
 
 function makeDeps(
-  panels: Panels,
+  tabs: Tabs,
   overrides: Partial<CloseQueueDeps> = {},
 ): { deps: CloseQueueDeps; closed: string[]; saved: string[]; warnSet: boolean[] } {
   const closed: string[] = [];
   const saved: string[] = [];
   const warnSet: boolean[] = [];
   const deps: CloseQueueDeps = {
-    getPanel: (id) => panels[id] ?? null,
+    getTab: (id) => tabs[id] ?? null,
     hasForegroundProcess: async () => null,
     isWarnEnabled: () => true,
     setWarnEnabled: async (v) => {

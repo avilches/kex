@@ -12,38 +12,38 @@ describe("agentStore.setMeta", () => {
   });
 
   test("asigna sessionId a una sesion existente", () => {
-    useAgentStore.getState().start("panel-1", "tab-1", "claude");
-    useAgentStore.getState().setMeta("panel-1", { sessionId: "sess-abc" });
-    expect(useAgentStore.getState().sessions["panel-1"].meta?.sessionId).toBe(
+    useAgentStore.getState().start("tab-1", "tab-1", "claude");
+    useAgentStore.getState().setMeta("tab-1", { sessionId: "sess-abc" });
+    expect(useAgentStore.getState().sessions["tab-1"].meta?.sessionId).toBe(
       "sess-abc",
     );
   });
 
   test("merge con meta existente sin pisar otros campos", () => {
-    useAgentStore.getState().start("panel-1", "tab-1", "claude");
-    useAgentStore.getState().setMeta("panel-1", { sessionId: "sess-abc" });
+    useAgentStore.getState().start("tab-1", "tab-1", "claude");
+    useAgentStore.getState().setMeta("tab-1", { sessionId: "sess-abc" });
     useAgentStore
       .getState()
-      .setMeta("panel-1", { cwdLaunch: "/home/user/proyecto" });
-    const meta = useAgentStore.getState().sessions["panel-1"].meta;
+      .setMeta("tab-1", { cwdLaunch: "/home/user/proyecto" });
+    const meta = useAgentStore.getState().sessions["tab-1"].meta;
     expect(meta?.sessionId).toBe("sess-abc");
     expect(meta?.cwdLaunch).toBe("/home/user/proyecto");
   });
 
   test("sobreescribe un campo de meta en una llamada posterior", () => {
-    useAgentStore.getState().start("panel-1", "tab-1", "claude");
-    useAgentStore.getState().setMeta("panel-1", { sessionId: "viejo" });
-    useAgentStore.getState().setMeta("panel-1", { sessionId: "nuevo" });
-    expect(useAgentStore.getState().sessions["panel-1"].meta?.sessionId).toBe(
+    useAgentStore.getState().start("tab-1", "tab-1", "claude");
+    useAgentStore.getState().setMeta("tab-1", { sessionId: "viejo" });
+    useAgentStore.getState().setMeta("tab-1", { sessionId: "nuevo" });
+    expect(useAgentStore.getState().sessions["tab-1"].meta?.sessionId).toBe(
       "nuevo",
     );
   });
 
   test("setMeta no modifica otros campos de la sesion", () => {
-    useAgentStore.getState().start("panel-1", "tab-1", "claude");
-    const before = useAgentStore.getState().sessions["panel-1"];
-    useAgentStore.getState().setMeta("panel-1", { sessionId: "abc" });
-    const after = useAgentStore.getState().sessions["panel-1"];
+    useAgentStore.getState().start("tab-1", "tab-1", "claude");
+    const before = useAgentStore.getState().sessions["tab-1"];
+    useAgentStore.getState().setMeta("tab-1", { sessionId: "abc" });
+    const after = useAgentStore.getState().sessions["tab-1"];
     expect(after.agent).toBe(before.agent);
     expect(after.status).toBe(before.status);
     expect(after.startedAt).toBe(before.startedAt);
@@ -55,7 +55,7 @@ describe("agentStore.pushNotification (una por agente)", () => {
     useAgentStore.setState({ sessions: {}, notifications: [] });
   });
 
-  test("dos eventos del mismo panel dejan una sola notificacion", () => {
+  test("dos eventos del mismo tab dejan una sola notificacion", () => {
     const push = useAgentStore.getState().pushNotification;
     push({
       source: "terminal",
@@ -105,7 +105,7 @@ describe("agentStore.pushNotification (una por agente)", () => {
   });
 });
 
-describe("agentStore.markPanelSeen", () => {
+describe("agentStore.markTabSeen", () => {
   beforeEach(() => {
     useAgentStore.setState({ sessions: {}, notifications: [] });
   });
@@ -114,7 +114,7 @@ describe("agentStore.markPanelSeen", () => {
     const st = useAgentStore.getState();
     st.start("p1", "t", "claude");
     st.setStatus("p1", "attention");
-    st.markPanelSeen("p1");
+    st.markTabSeen("p1");
     const session = useAgentStore.getState().sessions.p1;
     expect(session.status).toBe("idle");
     expect(session.attentionSince).toBeNull();
@@ -124,11 +124,11 @@ describe("agentStore.markPanelSeen", () => {
     const st = useAgentStore.getState();
     st.start("p1", "t", "claude");
     st.setStatus("p1", "working");
-    st.markPanelSeen("p1");
+    st.markTabSeen("p1");
     expect(useAgentStore.getState().sessions.p1.status).toBe("working");
   });
 
-  test("marca como leida la notificacion del panel", () => {
+  test("marca como leida la notificacion del tab", () => {
     const st = useAgentStore.getState();
     st.pushNotification({
       source: "terminal",
@@ -137,7 +137,7 @@ describe("agentStore.markPanelSeen", () => {
       workspaceId: "t",
       tabId: "p1",
     });
-    st.markPanelSeen("p1");
+    st.markTabSeen("p1");
     expect(useAgentStore.getState().notifications[0].read).toBe(true);
   });
 });
@@ -148,9 +148,9 @@ describe("agentStore.setMeta transcriptPath", () => {
   });
 
   test("setMeta stores transcriptPath", () => {
-    useAgentStore.getState().start("panel-t", "tab-t", "claude");
-    useAgentStore.getState().setMeta("panel-t", { transcriptPath: "/home/user/.claude/projects/abc/session.jsonl" });
-    const meta = useAgentStore.getState().sessions["panel-t"]?.meta;
+    useAgentStore.getState().start("tab-t", "tab-t", "claude");
+    useAgentStore.getState().setMeta("tab-t", { transcriptPath: "/home/user/.claude/projects/abc/session.jsonl" });
+    const meta = useAgentStore.getState().sessions["tab-t"]?.meta;
     expect(meta?.transcriptPath).toBe("/home/user/.claude/projects/abc/session.jsonl");
   });
 });

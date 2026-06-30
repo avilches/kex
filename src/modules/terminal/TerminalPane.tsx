@@ -35,11 +35,11 @@ export type TerminalPaneHandle = {
 };
 
 type Props = {
-  /** Stable identifier for this panel (passed back through callbacks). */
+  /** Stable identifier for this tab (passed back through callbacks). */
   tabId: string;
   /** Tab containing this pane is on screen. */
   visible: boolean;
-  /** This panel is the active pane within its tab — receives auto-focus. */
+  /** This tab is the active one within its pane — receives auto-focus. */
   focused?: boolean;
   initialCwd?: string;
   /** Enable command-block decorations (OSC 133) for this terminal. */

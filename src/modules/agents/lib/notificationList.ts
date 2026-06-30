@@ -30,20 +30,20 @@ export function buildAgentEntries(
   sessions: Record<string, AgentSession>,
   notifications: AgentNotification[],
 ): AgentEntry[] {
-  const notifByPanel = new Map<string, AgentNotification>();
+  const notifByTab = new Map<string, AgentNotification>();
   for (const n of notifications) {
-    if (!notifByPanel.has(n.tabId)) notifByPanel.set(n.tabId, n);
+    if (!notifByTab.has(n.tabId)) notifByTab.set(n.tabId, n);
   }
 
   const tabIds = new Set<string>([
     ...Object.keys(sessions),
-    ...notifByPanel.keys(),
+    ...notifByTab.keys(),
   ]);
 
   const entries: AgentEntry[] = [];
   for (const tabId of tabIds) {
     const session = sessions[tabId];
-    const notif = notifByPanel.get(tabId);
+    const notif = notifByTab.get(tabId);
     const agent = session?.agent ?? notif?.agent ?? "claude";
     const workspaceId = session?.workspaceId ?? notif?.workspaceId ?? "";
 

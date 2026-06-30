@@ -49,7 +49,7 @@ describe("routeAgentNotification", () => {
       visible: false,
       allowToast: false,
       workspaceId: "ws-abc",
-      tabId: "panel-xyz",
+      tabId: "tab-xyz",
       onActivate: vi.fn(),
     });
 
@@ -58,14 +58,14 @@ describe("routeAgentNotification", () => {
     expect(invoke).toHaveBeenCalledWith("agent_queue_nav", {
       windowLabel: "w-1",
       workspaceId: "ws-abc",
-      tabId: "panel-xyz",
+      tabId: "tab-xyz",
     });
     expect(sendNotification).toHaveBeenCalledWith({
       title: "claude finished",
       body: "my-project",
     });
     expect(pushNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "finished", workspaceId: "ws-abc", tabId: "panel-xyz" }),
+      expect.objectContaining({ kind: "finished", workspaceId: "ws-abc", tabId: "tab-xyz" }),
     );
   });
 

@@ -7,14 +7,14 @@ export type EditorCloseDecision =
   | { type: "save" }
   | { type: "dont-save" };
 
-export type CloseQueuePanel = {
+export type CloseQueueTab = {
   kind: string;
   locked?: boolean;
   dirty?: boolean;
 };
 
 export type CloseQueueDeps = {
-  getPanel: (tabId: string) => CloseQueuePanel | null;
+  getTab: (tabId: string) => CloseQueueTab | null;
   hasForegroundProcess: (tabId: string) => Promise<string | null>;
   isWarnEnabled: () => boolean;
   setWarnEnabled: (value: boolean) => Promise<void>;
@@ -29,9 +29,9 @@ export type CloseQueueDeps = {
 };
 
 /**
- * Closes panels one at a time. A panel that needs confirmation pauses the
+ * Closes tabs one at a time. A tab that needs confirmation pauses the
  * queue until the user answers; a cancel stops the entire run before closing
- * the current panel. Once the user opts out of the running-process warning,
+ * the current tab. Once the user opts out of the running-process warning,
  * the rest of the run closes without re-asking.
  */
 export async function runCloseQueue(
@@ -40,11 +40,11 @@ export async function runCloseQueue(
 ): Promise<void> {
   let suppressTerminalWarn = false;
   for (const tabId of tabIds) {
-    const panel = deps.getPanel(tabId);
-    if (!panel) continue;
+    const tab = deps.getTab(tabId);
+    if (!tab) continue;
 
-    if (panel.kind === "terminal") {
-      if (panel.locked) continue;
+    if (tab.kind === "terminal") {
+      if (tab.locked) continue;
       if (deps.isWarnEnabled() && !suppressTerminalWarn) {
         const processName = await deps
           .hasForegroundProcess(tabId)
@@ -58,9 +58,9 @@ export async function runCloseQueue(
           }
         }
       }
-    } else if (panel.kind === "editor") {
-      if (panel.locked) continue;
-      if (panel.dirty) {
+    } else if (tab.kind === "editor") {
+      if (tab.locked) continue;
+      if (tab.dirty) {
         if (deps.isAutoSaveEnabled()) {
           await deps.saveTab(tabId);
         } else {

@@ -1,4 +1,4 @@
-// Ephemeral per-panel terminal state that must NOT live in the workspaces tree.
+// Ephemeral per-tab terminal state that must NOT live in the workspaces tree.
 // Updating here does not produce a new `workspaces` reference and therefore
 // does not trigger React re-renders of the workspace tree or the persistence effect.
 

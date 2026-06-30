@@ -41,9 +41,9 @@ describe("Script", () => {
       name: "Build",
       command: "pnpm build",
       cwd: "/home/user/proj",
-      tabId: "panel-1",
+      tabId: "tab-1",
     };
     expect(cfg.id).toBe("3");
-    expect(cfg.tabId).toBe("panel-1");
+    expect(cfg.tabId).toBe("tab-1");
   });
 });

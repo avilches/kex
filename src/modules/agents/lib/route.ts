@@ -11,7 +11,7 @@ type RouteArgs = {
   title: string;
   body?: string;
   focused: boolean;
-  /** True when the user is currently looking at this agent's panel. */
+  /** True when the user is currently looking at this agent's tab. */
   visible: boolean;
   /** Allow an in-app toast when focused but not looking at the agent. */
   allowToast: boolean;

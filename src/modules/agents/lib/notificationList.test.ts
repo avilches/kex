@@ -37,7 +37,7 @@ function notif(
 }
 
 describe("buildAgentEntries", () => {
-  test("una sola entrada por agente aunque haya varias notificaciones del mismo panel", () => {
+  test("una sola entrada por agente aunque haya varias notificaciones del mismo tab", () => {
     const notifs = [
       notif({ tabId: "p1", kind: "error", at: 30 }),
       notif({ tabId: "p1", kind: "error", at: 20, id: "old1" }),
@@ -104,9 +104,9 @@ describe("buildAgentEntries", () => {
       notif({ tabId: "b", kind: "error", at: 20, read: true }),
     ];
     const entries = buildAgentEntries({}, notifs);
-    const byPanel = Object.fromEntries(entries.map((e) => [e.tabId, e]));
-    expect(byPanel.a.pending).toBe(true);
-    expect(byPanel.b.pending).toBe(false);
+    const byTab = Object.fromEntries(entries.map((e) => [e.tabId, e]));
+    expect(byTab.a.pending).toBe(true);
+    expect(byTab.b.pending).toBe(false);
   });
 
   test("restoreError se muestra como error pendiente", () => {

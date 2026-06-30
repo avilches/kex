@@ -39,16 +39,16 @@ type Props = {
   onActivate: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onNewTerminal: () => void;
-  onCloseOtherPanels: (tabId: string) => void;
-  onCloseAllPanels: () => void;
+  onCloseOtherTabs: (tabId: string) => void;
+  onCloseAllTabs: () => void;
   onSplitTerminalRight: () => void;
   onSplitTerminalDown: () => void;
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
   onDetachAgent: (tabId: string) => void;
-  onRenamePanel?: (tabId: string, title: string | undefined) => void;
-  onUpdatePanel?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  onRenameTab?: (tabId: string, title: string | undefined) => void;
+  onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onRenameFile?: (tabId: string, newName: string) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatus?: GitStatusSnapshot | null;
@@ -66,8 +66,8 @@ function DraggableTab({
   tabsCount,
   onActivate,
   onClose,
-  onCloseOtherPanels,
-  onCloseAllPanels,
+  onCloseOtherTabs,
+  onCloseAllTabs,
   onNewTerminal,
   onSplitTerminalRight,
   onSplitTerminalDown,
@@ -76,8 +76,8 @@ function DraggableTab({
   onSplitBrowserDown,
   onDetachAgent,
   shortcutLabels,
-  onRenamePanel,
-  onUpdatePanel,
+  onRenameTab,
+  onUpdateTab,
   onFocusOnExplorer,
   gitStatusMap,
   gitStatus,
@@ -93,8 +93,8 @@ function DraggableTab({
   tabsCount: number;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
-  onCloseOtherPanels: (tabId: string) => void;
-  onCloseAllPanels: () => void;
+  onCloseOtherTabs: (tabId: string) => void;
+  onCloseAllTabs: () => void;
   onNewTerminal: () => void;
   onSplitTerminalRight: () => void;
   onSplitTerminalDown: () => void;
@@ -103,8 +103,8 @@ function DraggableTab({
   onSplitBrowserDown: () => void;
   onDetachAgent: (tabId: string) => void;
   shortcutLabels: Record<string, string | null>;
-  onRenamePanel?: (tabId: string, title: string | undefined) => void;
-  onUpdatePanel?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  onRenameTab?: (tabId: string, title: string | undefined) => void;
+  onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatusMap?: Map<string, GitStatusCode> | null;
   gitStatus?: GitStatusSnapshot | null;
@@ -182,7 +182,7 @@ function DraggableTab({
     if (handledRef.current) return;
     handledRef.current = true;
     const value = inputRef.current?.value.trim() ?? "";
-    onRenamePanel?.(tab.id, value || undefined);
+    onRenameTab?.(tab.id, value || undefined);
     clearRename();
   }
 
@@ -209,7 +209,7 @@ function DraggableTab({
     <div
       ref={setNodeRef}
       {...attributes}
-      data-panel-id={tab.id}
+      data-tab-id={tab.id}
       title={nativeTooltip}
       onClick={() => onActivate(tab.id)}
       onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
@@ -300,7 +300,7 @@ function DraggableTab({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            onUpdatePanel?.(tab.id, (p) => ({ ...p, locked: false }));
+            onUpdateTab?.(tab.id, (p) => ({ ...p, locked: false }));
           }}
           title="Unlock tab"
         >
@@ -336,7 +336,7 @@ function DraggableTab({
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
-            {onRenamePanel && (
+            {onRenameTab && (
               <>
                 <ContextMenuItem onSelect={() => startRename(tab.id)}>
                   <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
@@ -346,7 +346,7 @@ function DraggableTab({
                   )}
                 </ContextMenuItem>
                 {tab.title && (
-                  <ContextMenuItem onSelect={() => onRenamePanel(tab.id, undefined)}>
+                  <ContextMenuItem onSelect={() => onRenameTab(tab.id, undefined)}>
                     <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} strokeWidth={2} />
                     Reset Tab Name
                   </ContextMenuItem>
@@ -373,7 +373,7 @@ function DraggableTab({
                 {isAutofocusTab(tab) && (
                   <ContextMenuItem
                     onSelect={() =>
-                      onUpdatePanel?.(tab.id, (p) =>
+                      onUpdateTab?.(tab.id, (p) =>
                         isAutofocusTab(p)
                           ? { ...p, autofocus: !p.autofocus }
                           : p,
@@ -398,7 +398,7 @@ function DraggableTab({
               </>
             )}
             <ContextMenuItem
-              onSelect={() => onUpdatePanel?.(tab.id, (p) => {
+              onSelect={() => onUpdateTab?.(tab.id, (p) => {
                 const newLocked = !isLocked;
                 return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
               })}
@@ -418,12 +418,12 @@ function DraggableTab({
             </ContextMenuItem>
             <ContextMenuItem
               disabled={tabsCount <= 1}
-              onSelect={() => onCloseOtherPanels(tab.id)}
+              onSelect={() => onCloseOtherTabs(tab.id)}
             >
               <HugeiconsIcon icon={CancelCircleIcon} size={14} strokeWidth={2} />
               Close Other Tabs
             </ContextMenuItem>
-            <ContextMenuItem disabled={isLocked} onSelect={onCloseAllPanels}>
+            <ContextMenuItem disabled={isLocked} onSelect={onCloseAllTabs}>
               <HugeiconsIcon icon={CancelSquareIcon} size={14} strokeWidth={2} />
               Close All Tabs
             </ContextMenuItem>
@@ -505,7 +505,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
+export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenameTab, onUpdateTab, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -535,10 +535,10 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
 
   useEffect(() => { activeTabIdRef.current = activeTabId; });
 
-  const scrollPanelIntoView = (tabId: string, behavior: ScrollBehavior = 'smooth') => {
+  const scrollTabIntoView = (tabId: string, behavior: ScrollBehavior = 'smooth') => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const tab = container.querySelector<HTMLElement>(`[data-panel-id="${tabId}"]`);
+    const tab = container.querySelector<HTMLElement>(`[data-tab-id="${tabId}"]`);
     if (!tab) return;
     const cr = container.getBoundingClientRect();
     const tr = tab.getBoundingClientRect();
@@ -552,7 +552,7 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
   const scrollActiveIntoView = (behavior: ScrollBehavior = 'auto') => {
     const id = activeTabIdRef.current;
     if (!id) return;
-    scrollPanelIntoView(id, behavior);
+    scrollTabIntoView(id, behavior);
   };
 
   // Scroll active tab into view when it changes (unless user is browsing with wheel)
@@ -670,9 +670,9 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
         if (!start || start.id !== e.pointerId) return;
         pointerStartRef.current = null;
         if ((e.target as HTMLElement).closest("button")) return;
-        const tabEl = (e.target as HTMLElement).closest("[data-panel-id]");
+        const tabEl = (e.target as HTMLElement).closest("[data-tab-id]");
         if (!tabEl) return;
-        const tabId = tabEl.getAttribute("data-panel-id");
+        const tabId = tabEl.getAttribute("data-tab-id");
         if (!tabId) return;
         const dx = Math.abs(e.clientX - start.x);
         const dy = Math.abs(e.clientY - start.y);
@@ -692,8 +692,8 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           tabsCount={tabs.length}
           onActivate={onActivate}
           onClose={onClose}
-          onCloseOtherPanels={onCloseOtherPanels}
-          onCloseAllPanels={onCloseAllPanels}
+          onCloseOtherTabs={onCloseOtherTabs}
+          onCloseAllTabs={onCloseAllTabs}
           onNewTerminal={onNewTerminal}
           onSplitTerminalRight={onSplitTerminalRight}
           onSplitTerminalDown={onSplitTerminalDown}
@@ -702,8 +702,8 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           onSplitBrowserDown={onSplitBrowserDown}
           onDetachAgent={onDetachAgent}
           shortcutLabels={shortcutLabels}
-          onRenamePanel={onRenamePanel}
-          onUpdatePanel={onUpdatePanel}
+          onRenameTab={onRenameTab}
+          onUpdateTab={onUpdateTab}
           onFocusOnExplorer={onFocusOnExplorer}
           gitStatusMap={gitStatusMap}
           gitStatus={gitStatus}

@@ -6,23 +6,23 @@ describe("tabRenameStore", () => {
     useTabRenameStore.setState({ renamingTabId: null });
   });
 
-  test("initial state has no panel being renamed", () => {
+  test("initial state has no tab being renamed", () => {
     expect(useTabRenameStore.getState().renamingTabId).toBeNull();
   });
 
-  test("startRename sets the renaming panel id", () => {
-    useTabRenameStore.getState().startRename("panel-abc");
-    expect(useTabRenameStore.getState().renamingTabId).toBe("panel-abc");
+  test("startRename sets the renaming tab id", () => {
+    useTabRenameStore.getState().startRename("tab-abc");
+    expect(useTabRenameStore.getState().renamingTabId).toBe("tab-abc");
   });
 
   test("startRename replaces a previous rename in progress", () => {
-    useTabRenameStore.getState().startRename("panel-abc");
-    useTabRenameStore.getState().startRename("panel-xyz");
-    expect(useTabRenameStore.getState().renamingTabId).toBe("panel-xyz");
+    useTabRenameStore.getState().startRename("tab-abc");
+    useTabRenameStore.getState().startRename("tab-xyz");
+    expect(useTabRenameStore.getState().renamingTabId).toBe("tab-xyz");
   });
 
   test("clearRename resets to null", () => {
-    useTabRenameStore.getState().startRename("panel-abc");
+    useTabRenameStore.getState().startRename("tab-abc");
     useTabRenameStore.getState().clearRename();
     expect(useTabRenameStore.getState().renamingTabId).toBeNull();
   });

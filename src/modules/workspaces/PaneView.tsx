@@ -36,10 +36,10 @@ type Props = {
   callbacks: TabCallbacks;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
-  onFloatBrowserPanel?: (tabId: string) => void;
-  onDockBrowserPanel?: (tabId: string) => void;
-  onFocusFloatBrowserPanel?: (tabId: string) => void;
-  onNavigateFloatBrowserPanel?: (tabId: string, url: string) => void;
+  onFloatBrowserTab?: (tabId: string) => void;
+  onDockBrowserTab?: (tabId: string) => void;
+  onFocusFloatBrowserTab?: (tabId: string) => void;
+  onNavigateFloatBrowserTab?: (tabId: string, url: string) => void;
   welcomeActions?: WelcomeActions;
 };
 
@@ -148,7 +148,7 @@ function PaneDropOverlay({ paneId, tooNarrow, tooShort }: {
 
 // Subscribes to the tab-flash store in isolation so the memoized PaneView is not
 // re-rendered on every flash. Outlines the whole pane (border only) when the
-// flashed panel is the one this pane is showing.
+// flashed tab is the one this pane is showing.
 function PaneFlashBorder({ tabId }: { tabId: string | null }) {
   const token = useTabFlash(tabId ?? "");
   return <FlashOverlay token={token} variant="ring" className="z-50" />;
@@ -173,10 +173,10 @@ export const PaneView = memo(function PaneView({
   callbacks,
   gitStatus,
   gitColorScheme,
-  onFloatBrowserPanel,
-  onDockBrowserPanel,
-  onFocusFloatBrowserPanel,
-  onNavigateFloatBrowserPanel,
+  onFloatBrowserTab,
+  onDockBrowserTab,
+  onFocusFloatBrowserTab,
+  onNavigateFloatBrowserTab,
   welcomeActions,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
@@ -228,13 +228,13 @@ export const PaneView = memo(function PaneView({
   const handleActivate = useCallback((tabId: string) => onActivateTab(workspaceId, tabId), [onActivateTab, workspaceId]);
   const handleClose = useCallback((tabId: string) => onCloseTab(workspaceId, tabId), [onCloseTab, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
-  const handleCloseOtherPanels = useCallback((tabId: string) => {
+  const handleCloseOtherTabs = useCallback((tabId: string) => {
     const ids = pane.tabs
       .filter((p) => p.id !== tabId && isBulkClosable(p))
       .map((p) => p.id);
     onCloseManyTabs(workspaceId, ids);
   }, [pane.tabs, onCloseManyTabs, workspaceId]);
-  const handleCloseAllPanels = useCallback(() => {
+  const handleCloseAllTabs = useCallback(() => {
     const ids = pane.tabs.filter(isBulkClosable).map((p) => p.id);
     onCloseManyTabs(workspaceId, ids);
   }, [pane.tabs, onCloseManyTabs, workspaceId]);
@@ -267,16 +267,16 @@ export const PaneView = memo(function PaneView({
           onActivate={handleActivate}
           onClose={handleClose}
           onNewTerminal={handleNewTerminal}
-          onCloseOtherPanels={handleCloseOtherPanels}
-          onCloseAllPanels={handleCloseAllPanels}
+          onCloseOtherTabs={handleCloseOtherTabs}
+          onCloseAllTabs={handleCloseAllTabs}
           onSplitTerminalRight={handleSplitTerminalRight}
           onSplitTerminalDown={handleSplitTerminalDown}
           onNewBrowser={handleNewBrowser}
           onSplitBrowserRight={handleSplitBrowserRight}
           onSplitBrowserDown={handleSplitBrowserDown}
           onDetachAgent={handleDetachAgent}
-          onRenamePanel={callbacks.onRenamePanel}
-          onUpdatePanel={callbacks.onUpdatePanel}
+          onRenameTab={callbacks.onRenameTab}
+          onUpdateTab={callbacks.onUpdateTab}
           onRenameFile={callbacks.onRenameFile}
           onFocusOnExplorer={callbacks.onFocusOnExplorer}
           gitStatus={gitStatus}
@@ -303,10 +303,10 @@ export const PaneView = memo(function PaneView({
               visible={tab.id === pane.activeTabId && isWorkspaceActive}
               focused={focused && tab.id === pane.activeTabId}
               callbacks={callbacks}
-              onFloatBrowserPanel={onFloatBrowserPanel}
-              onDockBrowserPanel={onDockBrowserPanel}
-              onFocusFloatBrowserPanel={onFocusFloatBrowserPanel}
-              onNavigateFloatBrowserPanel={onNavigateFloatBrowserPanel}
+              onFloatBrowserTab={onFloatBrowserTab}
+              onDockBrowserTab={onDockBrowserTab}
+              onFocusFloatBrowserTab={onFocusFloatBrowserTab}
+              onNavigateFloatBrowserTab={onNavigateFloatBrowserTab}
             />
           </div>
         ))}

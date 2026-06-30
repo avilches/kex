@@ -47,7 +47,7 @@ export function EditorPathBreadcrumb({
 
   // Inline rename of the filename leaf, mirroring the explorer sidebar. The
   // shared store is the single source of truth: F2 (file.rename) and the leaf
-  // context-menu "Rename" both target this panel; the input commits via
+  // context-menu "Rename" both target this tab; the input commits via
   // onRenameFile (same path as renaming from the tab).
   const renameEnabled = !!tabId && !!onRenameFile;
   const editing = useFileRenameStore((s) => s.triggerTabId === tabId);
