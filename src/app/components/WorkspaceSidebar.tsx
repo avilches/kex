@@ -132,10 +132,10 @@ function SortableWorkspaceItem({
         onClick={() => onSelect(ws.id)}
         onDoubleClick={() => onOpenSettings(ws.id)}
         className={cn(
-          "flex w-full items-center justify-center rounded-lg font-semibold transition-all select-none",
+          "flex w-full items-center rounded-lg font-semibold transition-all select-none",
           compact
-            ? "h-9 text-[11px]"
-            : "h-9 px-2 text-[11px]",
+            ? "h-9 justify-center text-[11px]"
+            : "h-9 gap-2 px-2.5 text-[11px]",
           active
             ? "text-white"
             : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -159,15 +159,16 @@ function SortableWorkspaceItem({
       >
         {compact ? (
           ws.icon && getWorkspaceIcon(ws.icon)
-            ? <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={15} strokeWidth={1.5} />
+            ? <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={18} strokeWidth={1.5} />
             : <span className="text-[11px]">{abbrev(ws.title, ws.kind)}</span>
         ) : (
-          <span className="flex max-w-full items-center gap-1.5 truncate text-center text-[11px]">
-            {ws.icon && getWorkspaceIcon(ws.icon) && (
-              <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={12} strokeWidth={1.5} className="shrink-0" />
-            )}
+          <>
+            {ws.icon && getWorkspaceIcon(ws.icon)
+              ? <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={15} strokeWidth={1.5} className="shrink-0" />
+              : <span className="shrink-0 text-[11px]">{abbrev(ws.title, ws.kind)}</span>
+            }
             <span className="truncate">{ws.title || ws.kind}</span>
-          </span>
+          </>
         )}
       </button>
       {!active && displayColor && (
