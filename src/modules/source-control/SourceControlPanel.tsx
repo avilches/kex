@@ -876,6 +876,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               <span className="text-[11px] text-muted-foreground">
                 Initialize or clone a repository to start tracking changes.
               </span>
+              {workspaceCwd && (
+                <span
+                  title={workspaceCwd}
+                  className="mt-1 inline-block max-w-full truncate rounded bg-muted/55 px-1.5 py-0.5 font-mono text-[10.5px] text-muted-foreground"
+                >
+                  {workspaceCwd}
+                </span>
+              )}
             </div>
             <div className="flex w-full flex-col gap-2">
               {workspaceCwd && (
