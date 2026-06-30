@@ -624,9 +624,16 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const [cloneUrl, setCloneUrl] = useState("");
   const [cloneRunning, setCloneRunning] = useState(false);
   const [cloneError, setCloneError] = useState<string | null>(null);
+  const [cloneElapsed, setCloneElapsed] = useState(0);
   const [initRunning, setInitRunning] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const cloneInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!cloneRunning) { setCloneElapsed(0); return; }
+    const t = window.setInterval(() => setCloneElapsed((s) => s + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [cloneRunning]);
 
   const handleGitInit = useCallback(async () => {
     if (!workspaceCwd) return;
@@ -655,6 +662,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       await invoke("shell_run_command", {
         command: `git clone ${url} .`,
         cwd: workspaceCwd,
+        timeout_secs: 300,
         workspace: currentWorkspaceEnv(),
       });
       setCloneOpen(false);
@@ -866,11 +874,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   <div className="flex gap-1.5">
                     <Button
                       size="sm"
-                      className="flex-1 text-[12px]"
+                      className="flex-1 gap-1.5 text-[12px]"
                       disabled={!cloneUrl.trim() || cloneRunning}
                       onClick={() => void handleGitClone()}
                     >
-                      {cloneRunning ? "Cloning..." : "Clone"}
+                      {cloneRunning && <Spinner className="size-3" />}
+                      {cloneRunning
+                        ? `Cloning... ${cloneElapsed > 0 ? `(${cloneElapsed}s)` : ""}`
+                        : "Clone"}
                     </Button>
                     <Button
                       size="sm"
