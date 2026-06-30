@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "re
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import {
   Cancel01Icon,
-  ArrowRight01Icon,
   DragDropVerticalIcon,
   FolderOpenIcon,
   PlusSignIcon,
@@ -261,8 +260,8 @@ function IconPicker({
       {/* Divider */}
       <div className="w-px self-stretch bg-border/60" />
 
-      {/* Right: paginated palette (32 icons + next-page button) */}
-      <div className="flex flex-wrap gap-0.5">
+      {/* Right: paginated palette */}
+      <div className="relative flex flex-wrap gap-0.5 pb-5">
         {/* No-icon button */}
         <button
           type="button"
@@ -294,14 +293,13 @@ function IconPicker({
             <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
           </button>
         ))}
-        {/* Next-page button occupies the 33rd slot */}
+        {/* Page indicator + next button, bottom-right */}
         <button
           type="button"
-          title={`Page ${((page + 1) % PALETTE_PAGES) + 1} of ${PALETTE_PAGES}`}
           onClick={() => setPage((p) => (p + 1) % PALETTE_PAGES)}
-          className="size-8 flex items-center justify-center rounded border-2 border-transparent text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/60 hover:text-foreground"
+          className="absolute bottom-0 right-0 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
         >
-          <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
+          More {page + 1}/{PALETTE_PAGES}
         </button>
       </div>
     </div>
