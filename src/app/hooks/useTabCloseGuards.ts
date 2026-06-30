@@ -13,7 +13,7 @@ type PanelInfo = { id: string; title: string; kind: string; path?: string; proce
 
 type FoundPanel = {
   workspace: { id: string };
-  panel: { kind: string; dirty?: boolean; locked?: boolean; path?: string; title?: string };
+  tab: { kind: string; dirty?: boolean; locked?: boolean; path?: string; title?: string };
 };
 
 type Params = {
@@ -54,7 +54,7 @@ export function useTabCloseGuards({
     (panelId: string) =>
       new Promise<EditorCloseDecision>((resolve) => {
         const found = findPanel(panelId);
-        const panel = found?.panel;
+        const panel = found?.tab;
         setPendingClosePanel({
           id: panelId,
           title: panel?.title ?? panel?.path ?? "file",
@@ -72,7 +72,7 @@ export function useTabCloseGuards({
         const found = findPanel(panelId);
         setPendingTerminalClosePanel({
           id: panelId,
-          title: found?.panel.title ?? "terminal",
+          title: found?.tab.title ?? "terminal",
           kind: "terminal",
           processName,
           command: getRunningCommandsSnapshot().get(panelId),
@@ -104,9 +104,9 @@ export function useTabCloseGuards({
             const found = findPanel(id);
             if (!found) return null;
             return {
-              kind: found.panel.kind,
-              locked: found.panel.locked,
-              dirty: found.panel.dirty,
+              kind: found.tab.kind,
+              locked: found.tab.locked,
+              dirty: found.tab.dirty,
             };
           },
           hasForegroundProcess: (id) => leafHasForegroundProcess(id),
@@ -116,7 +116,7 @@ export function useTabCloseGuards({
           askTerminalClose,
           askEditorClose,
           savePanel,
-          closePanel: (id) => {
+          closeTab: (id) => {
             const found = findPanel(id);
             if (found) disposePanel(found.workspace.id, id);
           },
@@ -157,14 +157,14 @@ export function useTabCloseGuards({
       const dirty: PanelInfo[] = [];
       for (const ws of workspaces) {
         for (const pane of allPanes(ws.paneTree)) {
-          for (const panel of pane.panels) {
-            if (panel.kind !== "editor") continue;
-            const p = (panel as { path?: string }).path ?? "";
+          for (const tab of pane.tabs) {
+            if (tab.kind !== "editor") continue;
+            const p = (tab as { path?: string }).path ?? "";
             if (p !== path && !p.startsWith(`${path}/`)) continue;
-            if ((panel as { dirty?: boolean }).dirty) {
-              dirty.push({ id: panel.id, title: panel.title ?? p, kind: panel.kind, path: p });
+            if ((tab as { dirty?: boolean }).dirty) {
+              dirty.push({ id: tab.id, title: tab.title ?? p, kind: tab.kind, path: p });
             } else {
-              disposePanel(ws.id, panel.id);
+              disposePanel(ws.id, tab.id);
             }
           }
         }

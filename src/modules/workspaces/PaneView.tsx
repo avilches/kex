@@ -3,12 +3,12 @@ import { cn } from "@/lib/utils";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { EmptyPaneWelcome, type WelcomeActions } from "./EmptyPaneWelcome";
 import { PaneTabBar } from "./PaneTabBar";
-import { PanelContent } from "./PanelContent";
-import type { PanelCallbacks } from "./PanelContent";
+import { TabContent } from "./TabContent";
+import type { TabCallbacks } from "./TabContent";
 import type { PaneNode } from "./lib/types";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
-import { isBulkClosable } from "./lib/panelClose";
+import { isBulkClosable } from "./lib/tabClose";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import { detachAgentSession } from "@/modules/agents/lib/agentSessionRestore";
@@ -23,9 +23,9 @@ type Props = {
   workspaceCwd?: string;
   focused: boolean;
   isWorkspaceActive: boolean;
-  onActivatePanel: (workspaceId: string, panelId: string) => void;
-  onClosePanel: (workspaceId: string, panelId: string) => void;
-  onCloseManyPanels: (workspaceId: string, panelIds: string[]) => void;
+  onActivateTab: (workspaceId: string, panelId: string) => void;
+  onCloseTab: (workspaceId: string, panelId: string) => void;
+  onCloseManyTabs: (workspaceId: string, panelIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
   onSplitTerminalRight: (workspaceId: string, paneId: string) => void;
@@ -33,7 +33,7 @@ type Props = {
   onNewBrowser: (workspaceId: string, paneId: string) => void;
   onSplitBrowserRight: (workspaceId: string, paneId: string) => void;
   onSplitBrowserDown: (workspaceId: string, paneId: string) => void;
-  callbacks: PanelCallbacks;
+  callbacks: TabCallbacks;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
   onFloatBrowserPanel?: (panelId: string) => void;
@@ -160,9 +160,9 @@ export const PaneView = memo(function PaneView({
   workspaceCwd: _workspaceCwd,
   focused,
   isWorkspaceActive,
-  onActivatePanel,
-  onClosePanel,
-  onCloseManyPanels,
+  onActivateTab,
+  onCloseTab,
+  onCloseManyTabs,
   onFocusPane,
   onNewTerminal,
   onSplitTerminalRight,
@@ -199,7 +199,7 @@ export const PaneView = memo(function PaneView({
   const tooNarrow = paneSize.w < splitLimit.width;
   const tooShort = paneSize.h < splitLimit.height;
 
-  const activePanel = pane.panels.find((p) => p.id === pane.activePanelId);
+  const activeTab = pane.tabs.find((p) => p.id === pane.activeTabId);
 
 
   useDndMonitor({
@@ -213,31 +213,31 @@ export const PaneView = memo(function PaneView({
 
   const isDraggingOwnOnlyTab =
     draggedPanelId !== null &&
-    pane.panels.length === 1 &&
-    pane.panels[0].id === draggedPanelId;
+    pane.tabs.length === 1 &&
+    pane.tabs[0].id === draggedPanelId;
 
   const { resolvedTheme, resolvedMode } = useTheme();
-  const dimOpacity = focused || !activePanel
+  const dimOpacity = focused || !activeTab
     ? 0
-    : (resolvedTheme.variants[resolvedMode]?.inactivePaneDim?.[activePanel.kind] ?? 0);
+    : (resolvedTheme.variants[resolvedMode]?.inactivePaneDim?.[activeTab.kind] ?? 0);
 
   const handleFocus = useCallback(() => {
     if (!focused) onFocusPane(workspaceId, pane.id);
   }, [focused, workspaceId, pane.id, onFocusPane]);
 
-  const handleActivate = useCallback((panelId: string) => onActivatePanel(workspaceId, panelId), [onActivatePanel, workspaceId]);
-  const handleClose = useCallback((panelId: string) => onClosePanel(workspaceId, panelId), [onClosePanel, workspaceId]);
+  const handleActivate = useCallback((panelId: string) => onActivateTab(workspaceId, panelId), [onActivateTab, workspaceId]);
+  const handleClose = useCallback((panelId: string) => onCloseTab(workspaceId, panelId), [onCloseTab, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
   const handleCloseOtherPanels = useCallback((panelId: string) => {
-    const ids = pane.panels
+    const ids = pane.tabs
       .filter((p) => p.id !== panelId && isBulkClosable(p))
       .map((p) => p.id);
-    onCloseManyPanels(workspaceId, ids);
-  }, [pane.panels, onCloseManyPanels, workspaceId]);
+    onCloseManyTabs(workspaceId, ids);
+  }, [pane.tabs, onCloseManyTabs, workspaceId]);
   const handleCloseAllPanels = useCallback(() => {
-    const ids = pane.panels.filter(isBulkClosable).map((p) => p.id);
-    onCloseManyPanels(workspaceId, ids);
-  }, [pane.panels, onCloseManyPanels, workspaceId]);
+    const ids = pane.tabs.filter(isBulkClosable).map((p) => p.id);
+    onCloseManyTabs(workspaceId, ids);
+  }, [pane.tabs, onCloseManyTabs, workspaceId]);
   const handleSplitTerminalRight = useCallback(() => onSplitTerminalRight(workspaceId, pane.id), [onSplitTerminalRight, workspaceId, pane.id]);
   const handleSplitTerminalDown = useCallback(() => onSplitTerminalDown(workspaceId, pane.id), [onSplitTerminalDown, workspaceId, pane.id]);
   const handleNewBrowser = useCallback(() => onNewBrowser(workspaceId, pane.id), [onNewBrowser, workspaceId, pane.id]);
@@ -256,11 +256,11 @@ export const PaneView = memo(function PaneView({
       onMouseDownCapture={handleFocus}
       onFocus={handleFocus}
     >
-      <PaneFlashBorder panelId={pane.activePanelId} />
+      <PaneFlashBorder panelId={pane.activeTabId} />
       <div className="relative shrink-0">
         <PaneTabBar
-          panels={pane.panels}
-          activePanelId={pane.activePanelId}
+          tabs={pane.tabs}
+          activeTabId={pane.activeTabId}
           paneFocused={focused}
           workspaceId={workspaceId}
           isWorkspaceActive={isWorkspaceActive}
@@ -290,18 +290,18 @@ export const PaneView = memo(function PaneView({
         )}
       </div>
       <div className="relative min-h-0 flex-1">
-        {pane.panels.map((panel) => (
+        {pane.tabs.map((tab) => (
           <div
-            key={panel.id}
+            key={tab.id}
             className={cn(
               "absolute inset-0",
-              panel.id !== pane.activePanelId && "invisible pointer-events-none",
+              tab.id !== pane.activeTabId && "invisible pointer-events-none",
             )}
           >
-            <PanelContent
-              panel={panel}
-              visible={panel.id === pane.activePanelId && isWorkspaceActive}
-              focused={focused && panel.id === pane.activePanelId}
+            <TabContent
+              tab={tab}
+              visible={tab.id === pane.activeTabId && isWorkspaceActive}
+              focused={focused && tab.id === pane.activeTabId}
               callbacks={callbacks}
               onFloatBrowserPanel={onFloatBrowserPanel}
               onDockBrowserPanel={onDockBrowserPanel}
@@ -310,7 +310,7 @@ export const PaneView = memo(function PaneView({
             />
           </div>
         ))}
-        {pane.panels.length === 0 &&
+        {pane.tabs.length === 0 &&
           (welcomeActions ? (
             <EmptyPaneWelcome actions={welcomeActions} />
           ) : (

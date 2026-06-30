@@ -3,12 +3,12 @@ import {
   allPaneIds,
   findPane,
   findPaneInDirection,
-  findPanelPane,
+  findTabPane,
   firstPaneId,
-  movePanelBetweenPanes,
+  moveTabBetweenPanes,
   removePaneFromTree,
   siblingPane,
-  splitPaneAndInsertPanel,
+  splitPaneAndInsertTab,
   splitPaneInTree,
   updateDivider,
   updatePane,
@@ -17,7 +17,7 @@ import {
 import type { PaneNode, SplitNode } from "./types";
 
 function makePane(id: string): PaneNode {
-  return { kind: "pane", id, panels: [], activePanelId: null };
+  return { kind: "pane", id, tabs: [], activeTabId: null };
 }
 
 describe("splitPaneInTree", () => {
@@ -97,26 +97,26 @@ describe("findPane", () => {
   });
 });
 
-describe("findPanelPane", () => {
-  test("finds panel in a pane", () => {
-    const panel = { id: "panel1", kind: "terminal" as const, title: "shell" };
-    const pane: PaneNode = { kind: "pane", id: "p1", panels: [panel], activePanelId: "panel1" };
-    const result = findPanelPane(pane, "panel1");
-    expect(result?.panel).toBe(panel);
+describe("findTabPane", () => {
+  test("finds tab in a pane", () => {
+    const tab = { id: "tab1", kind: "terminal" as const, title: "shell" };
+    const pane: PaneNode = { kind: "pane", id: "p1", tabs: [tab], activeTabId: "tab1" };
+    const result = findTabPane(pane, "tab1");
+    expect(result?.tab).toBe(tab);
     expect(result?.pane).toBe(pane);
   });
 
-  test("finds panel nested inside a split tree", () => {
-    const panel = { id: "panel1", kind: "terminal" as const };
-    const pane: PaneNode = { kind: "pane", id: "p2", panels: [panel], activePanelId: "panel1" };
+  test("finds tab nested inside a split tree", () => {
+    const tab = { id: "tab1", kind: "terminal" as const };
+    const pane: PaneNode = { kind: "pane", id: "p2", tabs: [tab], activeTabId: "tab1" };
     const tree: SplitNode = { kind: "split", id: "s0", orientation: "horizontal", first: makePane("p1"), second: pane, dividerPosition: 0.5 };
-    const result = findPanelPane(tree, "panel1");
+    const result = findTabPane(tree, "tab1");
     expect(result?.pane).toBe(pane);
-    expect(result?.panel).toBe(panel);
+    expect(result?.tab).toBe(tab);
   });
 
-  test("returns null for unknown panel id", () => {
-    expect(findPanelPane(makePane("p1"), "unknown")).toBeNull();
+  test("returns null for unknown tab id", () => {
+    expect(findTabPane(makePane("p1"), "unknown")).toBeNull();
   });
 });
 
@@ -147,11 +147,11 @@ describe("allPaneIds", () => {
 
 describe("updatePane", () => {
   test("updates target pane", () => {
-    const panel = { id: "panel1", kind: "terminal" as const, title: "shell" };
-    const pane: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
-    const result = updatePane(pane, "p1", (p) => ({ ...p, panels: [panel] }));
+    const tab = { id: "tab1", kind: "terminal" as const, title: "shell" };
+    const pane: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
+    const result = updatePane(pane, "p1", (p) => ({ ...p, tabs: [tab] }));
     if (result.kind === "pane") {
-      expect(result.panels).toEqual([panel]);
+      expect(result.tabs).toEqual([tab]);
     }
   });
 
@@ -231,81 +231,81 @@ describe("splitPaneInTree with newPanePosition", () => {
   });
 });
 
-describe("movePanelBetweenPanes", () => {
-  test("moves panel from source pane to target pane, collapses empty source", () => {
-    const panel1 = { id: "panel1", kind: "terminal" as const };
-    const panel2 = { id: "panel2", kind: "terminal" as const };
-    const pane1: PaneNode = { kind: "pane", id: "p1", panels: [panel1], activePanelId: "panel1" };
-    const pane2: PaneNode = { kind: "pane", id: "p2", panels: [panel2], activePanelId: "panel2" };
+describe("moveTabBetweenPanes", () => {
+  test("moves tab from source pane to target pane, collapses empty source", () => {
+    const tab1 = { id: "tab1", kind: "terminal" as const };
+    const tab2 = { id: "tab2", kind: "terminal" as const };
+    const pane1: PaneNode = { kind: "pane", id: "p1", tabs: [tab1], activeTabId: "tab1" };
+    const pane2: PaneNode = { kind: "pane", id: "p2", tabs: [tab2], activeTabId: "tab2" };
     const tree: SplitNode = { kind: "split", id: "s0", orientation: "horizontal", first: pane1, second: pane2, dividerPosition: 0.5 };
 
-    const result = movePanelBetweenPanes(tree, "panel1", "p2");
-    // Source pane (p1) had only 1 panel — it should be collapsed
+    const result = moveTabBetweenPanes(tree, "tab1", "p2");
+    // Source pane (p1) had only 1 tab -- it should be collapsed
     expect(result.kind).toBe("pane");
     if (result.kind === "pane") {
       expect(result.id).toBe("p2");
-      expect(result.panels).toHaveLength(2);
-      expect(result.panels[1]?.id).toBe("panel1");
-      expect(result.activePanelId).toBe("panel1");
+      expect(result.tabs).toHaveLength(2);
+      expect(result.tabs[1]?.id).toBe("tab1");
+      expect(result.activeTabId).toBe("tab1");
     }
   });
 
-  test("source pane stays when it has remaining panels", () => {
-    const panel1 = { id: "panel1", kind: "terminal" as const };
-    const panel2 = { id: "panel2", kind: "terminal" as const };
-    const panel3 = { id: "panel3", kind: "terminal" as const };
-    const pane1: PaneNode = { kind: "pane", id: "p1", panels: [panel1, panel2], activePanelId: "panel1" };
-    const pane2: PaneNode = { kind: "pane", id: "p2", panels: [panel3], activePanelId: "panel3" };
+  test("source pane stays when it has remaining tabs", () => {
+    const tab1 = { id: "tab1", kind: "terminal" as const };
+    const tab2 = { id: "tab2", kind: "terminal" as const };
+    const tab3 = { id: "tab3", kind: "terminal" as const };
+    const pane1: PaneNode = { kind: "pane", id: "p1", tabs: [tab1, tab2], activeTabId: "tab1" };
+    const pane2: PaneNode = { kind: "pane", id: "p2", tabs: [tab3], activeTabId: "tab3" };
     const tree: SplitNode = { kind: "split", id: "s0", orientation: "horizontal", first: pane1, second: pane2, dividerPosition: 0.5 };
 
-    const result = movePanelBetweenPanes(tree, "panel2", "p2");
+    const result = moveTabBetweenPanes(tree, "tab2", "p2");
     expect(result.kind).toBe("split");
     if (result.kind === "split") {
       const newP1 = result.first as PaneNode;
       const newP2 = result.second as PaneNode;
-      expect(newP1.panels).toHaveLength(1);
-      expect(newP2.panels).toHaveLength(2);
+      expect(newP1.tabs).toHaveLength(1);
+      expect(newP2.tabs).toHaveLength(2);
     }
   });
 
   test("inserts at specified index", () => {
-    const panel1 = { id: "panel1", kind: "terminal" as const };
-    const panel2 = { id: "panel2", kind: "terminal" as const };
-    const panel3 = { id: "panel3", kind: "terminal" as const };
-    const pane1: PaneNode = { kind: "pane", id: "p1", panels: [panel1, panel2], activePanelId: "panel1" };
-    const pane2: PaneNode = { kind: "pane", id: "p2", panels: [panel3], activePanelId: "panel3" };
+    const tab1 = { id: "tab1", kind: "terminal" as const };
+    const tab2 = { id: "tab2", kind: "terminal" as const };
+    const tab3 = { id: "tab3", kind: "terminal" as const };
+    const pane1: PaneNode = { kind: "pane", id: "p1", tabs: [tab1, tab2], activeTabId: "tab1" };
+    const pane2: PaneNode = { kind: "pane", id: "p2", tabs: [tab3], activeTabId: "tab3" };
     const tree: SplitNode = { kind: "split", id: "s0", orientation: "horizontal", first: pane1, second: pane2, dividerPosition: 0.5 };
 
-    const result = movePanelBetweenPanes(tree, "panel1", "p2", 0);
+    const result = moveTabBetweenPanes(tree, "tab1", "p2", 0);
     if (result.kind === "split") {
       const newP2 = result.second as PaneNode;
-      expect(newP2.panels[0]?.id).toBe("panel1");
+      expect(newP2.tabs[0]?.id).toBe("tab1");
     }
   });
 
   test("returns same tree if source and target pane are the same", () => {
-    const panel1 = { id: "panel1", kind: "terminal" as const };
-    const pane: PaneNode = { kind: "pane", id: "p1", panels: [panel1], activePanelId: "panel1" };
-    expect(movePanelBetweenPanes(pane, "panel1", "p1")).toBe(pane);
+    const tab1 = { id: "tab1", kind: "terminal" as const };
+    const pane: PaneNode = { kind: "pane", id: "p1", tabs: [tab1], activeTabId: "tab1" };
+    expect(moveTabBetweenPanes(pane, "tab1", "p1")).toBe(pane);
   });
 
-  test("returns same tree if panel not found", () => {
-    const pane: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
-    expect(movePanelBetweenPanes(pane, "unknown", "p1")).toBe(pane);
+  test("returns same tree if tab not found", () => {
+    const pane: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
+    expect(moveTabBetweenPanes(pane, "unknown", "p1")).toBe(pane);
   });
 });
 
-describe("movePanelBetweenPanes with targetIndex", () => {
-  function makeFilledPane(id: string, panelIds: string[]): PaneNode {
+describe("moveTabBetweenPanes with targetIndex", () => {
+  function makeFilledPane(id: string, tabIds: string[]): PaneNode {
     return {
       kind: "pane",
       id,
-      panels: panelIds.map((pid) => ({ id: pid, kind: "terminal" as const })),
-      activePanelId: panelIds[0] ?? null,
+      tabs: tabIds.map((tid) => ({ id: tid, kind: "terminal" as const })),
+      activeTabId: tabIds[0] ?? null,
     };
   }
 
-  test("inserts panel at index 0 (beginning of target pane)", () => {
+  test("inserts tab at index 0 (beginning of target pane)", () => {
     const p1 = makeFilledPane("p1", ["a", "b"]);
     const p2 = makeFilledPane("p2", ["c", "d"]);
     const tree: SplitNode = {
@@ -316,15 +316,15 @@ describe("movePanelBetweenPanes with targetIndex", () => {
       second: p2,
       dividerPosition: 0.5,
     };
-    const result = movePanelBetweenPanes(tree, "a", "p2", 0);
+    const result = moveTabBetweenPanes(tree, "a", "p2", 0);
     expect(result.kind).toBe("split");
     if (result.kind === "split") {
       const target = result.second as PaneNode;
-      expect(target.panels.map((p) => p.id)).toEqual(["a", "c", "d"]);
+      expect(target.tabs.map((p) => p.id)).toEqual(["a", "c", "d"]);
     }
   });
 
-  test("inserts panel at index 1 (middle of target pane)", () => {
+  test("inserts tab at index 1 (middle of target pane)", () => {
     const p1 = makeFilledPane("p1", ["a", "b"]);
     const p2 = makeFilledPane("p2", ["c", "d"]);
     const tree: SplitNode = {
@@ -335,15 +335,15 @@ describe("movePanelBetweenPanes with targetIndex", () => {
       second: p2,
       dividerPosition: 0.5,
     };
-    const result = movePanelBetweenPanes(tree, "a", "p2", 1);
+    const result = moveTabBetweenPanes(tree, "a", "p2", 1);
     expect(result.kind).toBe("split");
     if (result.kind === "split") {
       const target = result.second as PaneNode;
-      expect(target.panels.map((p) => p.id)).toEqual(["c", "a", "d"]);
+      expect(target.tabs.map((p) => p.id)).toEqual(["c", "a", "d"]);
     }
   });
 
-  test("inserts panel at end when targetIndex equals target panel count", () => {
+  test("inserts tab at end when targetIndex equals target tab count", () => {
     const p1 = makeFilledPane("p1", ["a", "b"]);
     const p2 = makeFilledPane("p2", ["c", "d"]);
     const tree: SplitNode = {
@@ -354,15 +354,15 @@ describe("movePanelBetweenPanes with targetIndex", () => {
       second: p2,
       dividerPosition: 0.5,
     };
-    const result = movePanelBetweenPanes(tree, "a", "p2", 2);
+    const result = moveTabBetweenPanes(tree, "a", "p2", 2);
     expect(result.kind).toBe("split");
     if (result.kind === "split") {
       const target = result.second as PaneNode;
-      expect(target.panels.map((p) => p.id)).toEqual(["c", "d", "a"]);
+      expect(target.tabs.map((p) => p.id)).toEqual(["c", "d", "a"]);
     }
   });
 
-  test("activates moved panel in target pane", () => {
+  test("activates moved tab in target pane", () => {
     const p1 = makeFilledPane("p1", ["a", "b"]);
     const p2 = makeFilledPane("p2", ["c", "d"]);
     const tree: SplitNode = {
@@ -373,10 +373,10 @@ describe("movePanelBetweenPanes with targetIndex", () => {
       second: p2,
       dividerPosition: 0.5,
     };
-    const result = movePanelBetweenPanes(tree, "a", "p2", 1);
+    const result = moveTabBetweenPanes(tree, "a", "p2", 1);
     if (result.kind === "split") {
       const target = result.second as PaneNode;
-      expect(target.activePanelId).toBe("a");
+      expect(target.activeTabId).toBe("a");
     }
   });
 });
@@ -433,16 +433,16 @@ describe("findPaneInDirection", () => {
     const result = findPaneInDirection("p1", "right", threePane);
     expect(["p2", "p3"]).toContain(result);
   });
-  test("three panes: left from p2 → p1", () => {
+  test("three panes: left from p2 -> p1", () => {
     expect(findPaneInDirection("p2", "left", threePane)).toBe("p1");
   });
-  test("three panes: left from p3 → p1", () => {
+  test("three panes: left from p3 -> p1", () => {
     expect(findPaneInDirection("p3", "left", threePane)).toBe("p1");
   });
-  test("three panes: down from p2 → p3", () => {
+  test("three panes: down from p2 -> p3", () => {
     expect(findPaneInDirection("p2", "down", threePane)).toBe("p3");
   });
-  test("three panes: up from p3 → p2", () => {
+  test("three panes: up from p3 -> p2", () => {
     expect(findPaneInDirection("p3", "up", threePane)).toBe("p2");
   });
 
@@ -452,52 +452,52 @@ describe("findPaneInDirection", () => {
   });
 });
 
-describe("splitPaneAndInsertPanel", () => {
-  test("splits a pane and places the new panel in the new sub-pane", () => {
-    const p1: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
-    const panel = { id: "pan1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
-    const result = splitPaneAndInsertPanel(p1, "p1", "s1", "p2", "horizontal", "second", panel);
+describe("splitPaneAndInsertTab", () => {
+  test("splits a pane and places the new tab in the new sub-pane", () => {
+    const p1: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
+    const tab = { id: "tab1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
+    const result = splitPaneAndInsertTab(p1, "p1", "s1", "p2", "horizontal", "second", tab);
     expect(result.kind).toBe("split");
     if (result.kind === "split") {
       expect(result.first).toBe(p1);
       expect(result.second.kind).toBe("pane");
       if (result.second.kind === "pane") {
-        expect(result.second.panels).toEqual([panel]);
-        expect(result.second.activePanelId).toBe("pan1");
+        expect(result.second.tabs).toEqual([tab]);
+        expect(result.second.activeTabId).toBe("tab1");
       }
     }
   });
 
   test("new pane appears as first when position is 'first'", () => {
-    const p1: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
-    const panel = { id: "pan1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
-    const result = splitPaneAndInsertPanel(p1, "p1", "s1", "p2", "vertical", "first", panel);
+    const p1: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
+    const tab = { id: "tab1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
+    const result = splitPaneAndInsertTab(p1, "p1", "s1", "p2", "vertical", "first", tab);
     expect(result.kind).toBe("split");
     if (result.kind === "split") {
       expect(result.first.kind).toBe("pane");
       if (result.first.kind === "pane") {
-        expect(result.first.panels).toEqual([panel]);
+        expect(result.first.tabs).toEqual([tab]);
       }
       expect(result.second).toBe(p1);
     }
   });
 
   test("returns original tree if targetPaneId not found", () => {
-    const p1: PaneNode = { kind: "pane", id: "p1", panels: [], activePanelId: null };
-    const panel = { id: "pan1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
-    const result = splitPaneAndInsertPanel(p1, "unknown", "s1", "p2", "horizontal", "second", panel);
+    const p1: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
+    const tab = { id: "tab1", kind: "editor" as const, path: "/foo.ts", preview: false, dirty: false };
+    const result = splitPaneAndInsertTab(p1, "unknown", "s1", "p2", "horizontal", "second", tab);
     expect(result).toBe(p1);
   });
 });
 
-test("terminal panel locked field round-trips through the type", () => {
-  const panel = {
+test("terminal tab locked field round-trips through the type", () => {
+  const tab = {
     id: "p1",
     kind: "terminal" as const,
     locked: true,
     restoreOnRestart: false,
     persistentCommand: "lazygit",
   };
-  expect(panel.locked).toBe(true);
-  expect(panel.persistentCommand).toBe("lazygit");
+  expect(tab.locked).toBe(true);
+  expect(tab.persistentCommand).toBe("lazygit");
 });

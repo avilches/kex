@@ -151,7 +151,7 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
   );
   const key = cacheKey(source);
   const originalPath = source.originalPath;
-  // source is created inline in PanelContent and gets a new object identity on every parent render.
+  // source is created inline in TabContent and gets a new object identity on every parent render.
   // Stabilize it so the fetch effect only re-runs when the diff content actually changes.
   const stableSource = useMemo(() => source, [key, originalPath]);
 

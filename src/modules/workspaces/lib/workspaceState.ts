@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { migrateExplorerRootMode } from "./explorerRoot";
-import type { Panel, RunConfig, SplitNode, Workspace } from "./types";
+import type { Tab, RunConfig, SplitNode, Workspace } from "./types";
 import {
   setSavedSidebarState,
   type SidebarUiState,
@@ -22,11 +22,11 @@ type WindowEntry = {
 
 let cached: SavedState | null = null;
 
-export function sanitizePanel(p: Panel): Panel {
-  // Migrate the legacy "preview" panel kind (renamed to "browser") so sessions
+export function sanitizeTab(p: Tab): Tab {
+  // Migrate the legacy "preview" tab kind (renamed to "browser") so sessions
   // saved before the rename still restore.
   if ((p as { kind: string }).kind === "preview") {
-    return { ...(p as object), kind: "browser" } as Panel;
+    return { ...(p as object), kind: "browser" } as Tab;
   }
   if (p.kind === "editor") return { ...p, dirty: false };
   return p;
@@ -34,7 +34,7 @@ export function sanitizePanel(p: Panel): Panel {
 
 function sanitizeTree(node: SplitNode): SplitNode {
   if (node.kind === "pane") {
-    return { ...node, panels: node.panels.map(sanitizePanel) };
+    return { ...node, tabs: node.tabs.map(sanitizeTab) };
   }
   return { ...node, first: sanitizeTree(node.first), second: sanitizeTree(node.second) };
 }

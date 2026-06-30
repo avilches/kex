@@ -74,11 +74,11 @@ import {
   collectRunningTerminals,
   findPane,
   findPaneInDirection,
-  findPanelPane,
-  panelTitle,
+  findTabPane,
+  tabTitle,
   siblingPane,
-  type Panel,
-  type PanelCallbacks,
+  type Tab,
+  type TabCallbacks,
   type Rect,
   useWorkspaces,
   WorkspaceView,
@@ -137,9 +137,9 @@ import {
 } from "@/modules/workspaces/lib/explorerRoot";
 import type { RevealRequest } from "@/modules/explorer";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
-import { panelFilePath } from "@/modules/workspaces/lib/panelPath";
+import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
-import { isAutofocusPanel } from "@/modules/workspaces/lib/types";
+import { isAutofocusTab } from "@/modules/workspaces/lib/types";
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -182,16 +182,16 @@ export default function App() {
     splitPane,
     focusPane,
     setPaneDivider,
-    movePanel,
-    reorderPanel,
+    moveTab,
+    reorderTab,
     splitPaneAndPlace,
     splitPaneAndOpenPanel,
     openPanel,
-    activatePanel,
-    closePanel,
+    activateTab,
+    closeTab,
     reopenClosed,
-    updatePanelData,
-    replacePanel,
+    updateTabData,
+    replaceTab,
     setTerminalPanelCwd,
     setWorkspaceCwd,
     setExplorerRootMode,
@@ -212,10 +212,10 @@ export default function App() {
     validateRunConfigPanels,
     setScriptPaneId,
     setTerminalRunningCommand,
-    setPanelView,
+    setTabView,
     toggleOverlayPreview,
     toggleSplitPreview,
-    findPanelGlobal,
+    findTabGlobal,
     resetWorkspaces,
   } = useWorkspaces(initialOpts);
 
@@ -230,7 +230,7 @@ export default function App() {
     navigateFloatWindow,
     restoreFloatingPanels,
     destroyWorkspaceFloats,
-  } = useFloatBrowser({ updatePanelData, findPanelGlobal });
+  } = useFloatBrowser({ updateTabData, findTabGlobal });
 
   const activeCwdRef = useRef<string | null>(null);
   const contextCwdRef = useRef<string | null>(null);
@@ -244,44 +244,44 @@ export default function App() {
 
   useTerminalMetricsSampler(activeWorkspace?.paneTree ?? null);
 
-  const activePanelId = activePane?.activePanelId ?? null;
-  const activePanel = activePanelId
-    ? (activePane?.panels.find((p) => p.id === activePanelId) ?? null)
+  const activeTabId = activePane?.activeTabId ?? null;
+  const activeTab = activeTabId
+    ? (activePane?.tabs.find((p) => p.id === activeTabId) ?? null)
     : null;
 
-  const isTerminalPanel = activePanel?.kind === "terminal";
-  const isEditorPanel = activePanel?.kind === "editor";
-  const isGitHistoryPanel = activePanel?.kind === "git-history";
+  const isTerminalPanel = activeTab?.kind === "terminal";
+  const isEditorPanel = activeTab?.kind === "editor";
+  const isGitHistoryPanel = activeTab?.kind === "git-history";
   const activeCwd = isTerminalPanel
-    ? ((activePanel as { cwd?: string }).cwd ?? null)
+    ? ((activeTab as { cwd?: string }).cwd ?? null)
     : null;
   activeCwdRef.current = activeCwd;
 
   const openInEditorTarget = useMemo<OpenInEditorTarget | null>(() => {
-    if (!activePanel) return null;
-    switch (activePanel.kind) {
+    if (!activeTab) return null;
+    switch (activeTab.kind) {
       case "terminal":
-        return activePanel.cwd ? { path: activePanel.cwd, kind: "dir" } : null;
+        return activeTab.cwd ? { path: activeTab.cwd, kind: "dir" } : null;
       case "editor":
-        return { path: activePanel.path, kind: "file" };
+        return { path: activeTab.path, kind: "file" };
       case "markdown":
-        return { path: activePanel.path, kind: "file" };
+        return { path: activeTab.path, kind: "file" };
       case "git-diff":
       case "git-commit-file":
-        return { path: activePanel.repoRoot, kind: "dir" };
+        return { path: activeTab.repoRoot, kind: "dir" };
       case "git-history":
-        return { path: activePanel.repoRoot, kind: "dir" };
+        return { path: activeTab.repoRoot, kind: "dir" };
       case "browser":
         return activeWorkspace?.cwd ? { path: activeWorkspace.cwd, kind: "dir" } : null;
       default:
         return null;
     }
-  }, [activePanel, activeWorkspace]);
+  }, [activeTab, activeWorkspace]);
 
-  const contextCwdFilePath = activePanel ? panelFilePath(activePanel) : null;
+  const contextCwdFilePath = activeTab ? tabFilePath(activeTab) : null;
   const contextCwd =
-    activePanel?.kind === "terminal"
-      ? (activePanel.cwd ?? null)
+    activeTab?.kind === "terminal"
+      ? (activeTab.cwd ?? null)
       : contextCwdFilePath
         ? (contextCwdFilePath.split(/[\\/]/).slice(0, -1).join("/") || null)
         : null;
@@ -332,8 +332,8 @@ export default function App() {
       const knownIds = new Set<string>();
       for (const ws of workspacesRef.current) {
         for (const pane of allPanes(ws.paneTree)) {
-          for (const panel of pane.panels) {
-            if (panel.kind === "terminal") knownIds.add(panel.id);
+          for (const tab of pane.tabs) {
+            if (tab.kind === "terminal") knownIds.add(tab.id);
           }
         }
       }
@@ -345,7 +345,7 @@ export default function App() {
     for (const ws of workspacesRef.current) {
       const livingPanelIds = new Set<string>();
       for (const pane of allPanes(ws.paneTree)) {
-        for (const panel of pane.panels) livingPanelIds.add(panel.id);
+        for (const tab of pane.tabs) livingPanelIds.add(tab.id);
       }
       validateRunConfigPanels(ws.id, livingPanelIds);
     }
@@ -365,8 +365,8 @@ export default function App() {
     const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
     if (!ws) return;
     const pane = findPane(ws.paneTree, ws.activePaneId);
-    if (!pane?.activePanelId) return;
-    const panelId = pane.activePanelId;
+    if (!pane?.activeTabId) return;
+    const panelId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
       terminalHandles.current.get(panelId)?.focus();
     });
@@ -389,9 +389,9 @@ export default function App() {
         );
         if (!ws) return;
         const pane = findPane(ws.paneTree, ws.activePaneId);
-        if (!pane?.activePanelId) return;
+        if (!pane?.activeTabId) return;
         requestAnimationFrame(() => {
-          terminalHandles.current.get(pane.activePanelId!)?.focus();
+          terminalHandles.current.get(pane.activeTabId!)?.focus();
         });
       })
       .then((u) => {
@@ -411,8 +411,8 @@ export default function App() {
     if (!justClosed) return;
     const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
     const pane = ws ? findPane(ws.paneTree, ws.activePaneId) : null;
-    if (!pane?.activePanelId) return;
-    const panelId = pane.activePanelId;
+    if (!pane?.activeTabId) return;
+    const panelId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
       terminalHandles.current.get(panelId)?.focus();
     });
@@ -493,8 +493,8 @@ export default function App() {
     const live = new Set<string>();
     for (const ws of workspaces) {
       for (const pane of allPanes(ws.paneTree)) {
-        for (const panel of pane.panels) {
-          if (panel.kind === "terminal") live.add(panel.id);
+        for (const tab of pane.tabs) {
+          if (tab.kind === "terminal") live.add(tab.id);
         }
       }
     }
@@ -511,30 +511,30 @@ export default function App() {
     }
     livePanelIdsRef.current = live;
     for (const k of [...editorHandles.current.keys()]) {
-      const found = findPanelGlobal(k);
+      const found = findTabGlobal(k);
       if (!found) editorHandles.current.delete(k);
     }
     for (const k of [...browserHandles.current.keys()]) {
-      const found = findPanelGlobal(k);
+      const found = findTabGlobal(k);
       if (!found) browserHandles.current.delete(k);
     }
-  }, [workspaces, findPanelGlobal]);
+  }, [workspaces, findTabGlobal]);
 
   // Update active search addon / editor handle when active panel changes.
   // Switching tab or workspace flushes any dirty editor we just left.
   useEffect(() => {
     void flushDirtyEditorsRef.current();
     setActiveSearchAddon(
-      activePanelId !== null
-        ? (searchAddons.current.get(activePanelId) ?? null)
+      activeTabId !== null
+        ? (searchAddons.current.get(activeTabId) ?? null)
         : null,
     );
     setActiveEditorHandle(
-      activePanelId !== null
-        ? (editorHandles.current.get(activePanelId) ?? null)
+      activeTabId !== null
+        ? (editorHandles.current.get(activeTabId) ?? null)
         : null,
     );
-  }, [activePanelId]);
+  }, [activeTabId]);
 
   // ── Workspace state management ────────────────────────────────────────────
 
@@ -560,10 +560,10 @@ export default function App() {
 
       // Case 1: panel already exists -- focus it and re-run if idle
       if (config.panelId) {
-        const found = findPanelGlobal(config.panelId);
+        const found = findTabGlobal(config.panelId);
         if (found) {
           setActiveWorkspaceId(found.workspace.id);
-          activatePanel(found.workspace.id, config.panelId);
+          activateTab(found.workspace.id, config.panelId);
           if (!getRunConfigRunningSnapshot().get(config.panelId)) {
             const panelId = config.panelId;
             const tryWrite = (attempts = 0) => {
@@ -583,7 +583,7 @@ export default function App() {
 
       const freshPanelId = newTabId();
       const panelCwd = config.cwd ?? activeWorkspace.pinnedRoot ?? activeWorkspace.cwd;
-      const panel: Panel = { id: freshPanelId, kind: "terminal", cwd: panelCwd, title: config.name || undefined };
+      const tab: Tab = { id: freshPanelId, kind: "terminal", cwd: panelCwd, title: config.name || undefined };
 
       // Case 2: existing script pane -- add panel to it without splitting
       const existingScriptPane = activeWorkspace.scriptPaneId
@@ -591,22 +591,22 @@ export default function App() {
         : null;
 
       if (existingScriptPane) {
-        openPanel(activeWorkspace.id, activeWorkspace.scriptPaneId!, panel);
+        openPanel(activeWorkspace.id, activeWorkspace.scriptPaneId!, tab);
         setActiveWorkspaceId(activeWorkspace.id);
-        activatePanel(activeWorkspace.id, freshPanelId);
+        activateTab(activeWorkspace.id, freshPanelId);
       } else {
         // Case 3: no script pane yet -- split and record the new pane
         const { workspacePaneLimit } = usePreferencesStore.getState();
         const atLimit = allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit;
         if (atLimit) {
-          openPanel(activeWorkspace.id, activeWorkspace.activePaneId, panel);
+          openPanel(activeWorkspace.id, activeWorkspace.activePaneId, tab);
           setScriptPaneId(activeWorkspace.id, activeWorkspace.activePaneId);
         } else {
           const freshPaneId = splitPaneAndOpenPanel(
             activeWorkspace.id,
             activeWorkspace.activePaneId,
             "bottom",
-            panel,
+            tab,
           );
           setScriptPaneId(activeWorkspace.id, freshPaneId);
         }
@@ -625,19 +625,19 @@ export default function App() {
       };
       setTimeout(tryWrite, 150);
     },
-    [activeWorkspace, findPanelGlobal, setActiveWorkspaceId, activatePanel, splitPaneAndOpenPanel, updateRunConfig, openPanel, setScriptPaneId],
+    [activeWorkspace, findTabGlobal, setActiveWorkspaceId, activateTab, splitPaneAndOpenPanel, updateRunConfig, openPanel, setScriptPaneId],
   );
 
   const stopWorkspaceConfig = useCallback(
     (config: RunConfig) => {
       if (!config.panelId) return;
       // Focus the terminal so OSC 133;D can be received and update the waiting state
-      activatePanel(activeWorkspace?.id ?? "", config.panelId);
+      activateTab(activeWorkspace?.id ?? "", config.panelId);
       setRunConfigRunning(config.panelId, "waiting");
       const handle = terminalHandles.current.get(config.panelId);
       handle?.write("\x03");
     },
-    [activatePanel, activeWorkspace?.id],
+    [activateTab, activeWorkspace?.id],
   );
 
   const handleCloseWorkspace = useCallback(
@@ -879,20 +879,20 @@ export default function App() {
   // mount is skipped so restoring a session never auto-fires.
   const prevAutofocusSignalRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    const ap = activePanel;
+    const ap = activeTab;
     const target =
-      ap && isAutofocusPanel(ap) && ap.autofocus
-        ? (panelFilePath(ap) ??
+      ap && isAutofocusTab(ap) && ap.autofocus
+        ? (tabFilePath(ap) ??
           (ap.kind === "terminal" ? (ap.cwd ?? null) : null))
         : null;
-    const signal = target ? activePanelId : null;
+    const signal = target ? activeTabId : null;
     const prev = prevAutofocusSignalRef.current;
     prevAutofocusSignalRef.current = signal;
     if (prev === undefined) return; // skip initial mount
     if (signal && signal !== prev && target) {
       focusSidebar(target, { fromShortcut: false });
     }
-  }, [activePanelId, activePanel, focusSidebar]);
+  }, [activeTabId, activeTab, focusSidebar]);
 
   // Whether the saved workspace root still exists on disk, so the selector can
   // disable the option when it is unset or missing.
@@ -963,10 +963,10 @@ export default function App() {
 
   useEffect(() => {
     const project = explorerRoot ? basename(explorerRoot) : "";
-    const label = activePanel
+    const label = activeTab
       ? activeCwd
         ? basename(activeCwd)
-        : panelTitle(activePanel)
+        : tabTitle(activeTab)
       : "";
     let title: string;
     if (project && label && label !== project) title = `${project} — ${label}`;
@@ -975,7 +975,7 @@ export default function App() {
     void getCurrentWindow()
       .setTitle(title)
       .catch(() => {});
-  }, [explorerRoot, activeCwd, activePanel]);
+  }, [explorerRoot, activeCwd, activeTab]);
 
   // ── Dialogs ───────────────────────────────────────────────────────────────
 
@@ -1000,18 +1000,18 @@ export default function App() {
       const markdown = isMarkdownPath(path);
       // Check if already open (as editor or rendered markdown); activate it.
       for (const pane of allPanes(activeWorkspace.paneTree)) {
-        const existing = pane.panels.find(
+        const existing = pane.tabs.find(
           (p) =>
             (p.kind === "editor" || p.kind === "markdown") &&
             (p as { path: string }).path === path,
         );
         if (existing) {
           if (pin && existing.kind === "editor" && existing.preview) {
-            updatePanelData(activeWorkspace.id, existing.id, (p) =>
+            updateTabData(activeWorkspace.id, existing.id, (p) =>
               p.kind === "editor" ? { ...p, preview: false } : p,
             );
           }
-          activatePanel(activeWorkspace.id, existing.id);
+          activateTab(activeWorkspace.id, existing.id);
           flashTab(existing.id);
           return existing.id;
         }
@@ -1023,11 +1023,11 @@ export default function App() {
         const activePane = allPanes(activeWorkspace.paneTree).find(
           (p) => p.id === activeWorkspace.activePaneId,
         );
-        const existingPreview = activePane?.panels.find(
+        const existingPreview = activePane?.tabs.find(
           (p) => p.kind === "editor" && p.preview,
         );
         if (existingPreview) {
-          replacePanel(
+          replaceTab(
             activeWorkspace.id,
             activeWorkspace.activePaneId,
             existingPreview.id,
@@ -1058,7 +1058,7 @@ export default function App() {
       );
       return panelId;
     },
-    [activeWorkspace, activatePanel, openPanel, replacePanel],
+    [activeWorkspace, activateTab, openPanel, replaceTab],
   );
 
   const openFileInRightSplit = useCallback(
@@ -1066,13 +1066,13 @@ export default function App() {
       if (!activeWorkspace) return undefined;
       const markdown = isMarkdownPath(path);
       for (const pane of allPanes(activeWorkspace.paneTree)) {
-        const existing = pane.panels.find(
+        const existing = pane.tabs.find(
           (p) =>
             (p.kind === "editor" || p.kind === "markdown") &&
             (p as { path: string }).path === path,
         );
         if (existing) {
-          activatePanel(activeWorkspace.id, existing.id);
+          activateTab(activeWorkspace.id, existing.id);
           flashTab(existing.id);
           return existing.id;
         }
@@ -1082,7 +1082,7 @@ export default function App() {
         ? ({ id: panelId, kind: "markdown" as const, path } as const)
         : ({ id: panelId, kind: "editor" as const, path, dirty: false, preview: false } as const);
       const sourcePaneId = sourcePanelId
-        ? findPanelPane(activeWorkspace.paneTree, sourcePanelId)?.pane.id
+        ? findTabPane(activeWorkspace.paneTree, sourcePanelId)?.pane.id
         : undefined;
       if (sourcePaneId) {
         const sibling = siblingPane(activeWorkspace.paneTree, sourcePaneId);
@@ -1096,7 +1096,7 @@ export default function App() {
       }
       return panelId;
     },
-    [activeWorkspace, activatePanel, openPanel, splitPaneAndOpenPanel],
+    [activeWorkspace, activateTab, openPanel, splitPaneAndOpenPanel],
   );
 
   const openGitDiffInPanel = useCallback(
@@ -1173,9 +1173,9 @@ export default function App() {
   };
 
   cwdResolverRef.current = (leafId) => {
-    const found = findPanelGlobal(leafId);
+    const found = findTabGlobal(leafId);
     if (!found) return null;
-    const p = found.panel;
+    const p = found.tab;
     return p.kind === "terminal" ? (p.cwd ?? null) : null;
   };
 
@@ -1190,11 +1190,11 @@ export default function App() {
 
   const onFloatBrowserPanel = useCallback(
     (panelId: string) => {
-      const found = findPanelGlobal(panelId);
-      if (!found || found.panel.kind !== "browser") return;
-      void floatPanel(found.panel, found.workspace.id);
+      const found = findTabGlobal(panelId);
+      if (!found || found.tab.kind !== "browser") return;
+      void floatPanel(found.tab, found.workspace.id);
     },
-    [findPanelGlobal, floatPanel],
+    [findTabGlobal, floatPanel],
   );
 
   const onDockBrowserPanel = useCallback(
@@ -1220,16 +1220,16 @@ export default function App() {
 
   // ── WorkspaceView stable callbacks (use refs to avoid recreating on cd) ──
 
-  const onActivatePanelStable = useCallback(
-    (wsId: string, panelId: string) => activatePanel(wsId, panelId),
-    [activatePanel],
+  const onActivateTabStable = useCallback(
+    (wsId: string, panelId: string) => activateTab(wsId, panelId),
+    [activateTab],
   );
 
-  const onClosePanelStable = useCallback((_wsId: string, panelId: string) => {
+  const onCloseTabStable = useCallback((_wsId: string, panelId: string) => {
     closePanelsRef.current([panelId]);
   }, []);
 
-  const onCloseManyPanelsStable = useCallback((_wsId: string, panelIds: string[]) => {
+  const onCloseManyTabsStable = useCallback((_wsId: string, panelIds: string[]) => {
     closePanelsRef.current(panelIds);
   }, []);
 
@@ -1408,18 +1408,18 @@ export default function App() {
     [activeWorkspaceId, openPanel],
   );
 
-  // ── PanelCallbacks ────────────────────────────────────────────────────────
+  // ── TabCallbacks ─────────────────────────────────────────────────────────
 
   const handlePathRenamed = useCallback(
     (from: string, to: string) => {
       for (const ws of workspacesRef.current) {
         for (const pane of allPanes(ws.paneTree)) {
-          for (const panel of pane.panels) {
-            if (panel.kind !== "editor") continue;
-            const ep = panel as { path: string };
+          for (const tab of pane.tabs) {
+            if (tab.kind !== "editor") continue;
+            const ep = tab as { path: string };
             if (ep.path === from) {
               const i = to.lastIndexOf("/");
-              updatePanelData(ws.id, panel.id, (p) =>
+              updateTabData(ws.id, tab.id, (p) =>
                 p.kind === "editor"
                   ? { ...p, path: to, title: i === -1 ? to : to.slice(i + 1) }
                   : p,
@@ -1427,7 +1427,7 @@ export default function App() {
             } else if (ep.path.startsWith(`${from}/`)) {
               const newPath = `${to}${ep.path.slice(from.length)}`;
               const i = newPath.lastIndexOf("/");
-              updatePanelData(ws.id, panel.id, (p) =>
+              updateTabData(ws.id, tab.id, (p) =>
                 p.kind === "editor"
                   ? {
                       ...p,
@@ -1441,14 +1441,14 @@ export default function App() {
         }
       }
     },
-    [updatePanelData],
+    [updateTabData],
   );
 
   const handleRenameFileFromTab = useCallback(
     async (panelId: string, newName: string) => {
-      const found = findPanelGlobal(panelId);
+      const found = findTabGlobal(panelId);
       if (!found) return;
-      const panel = found.panel;
+      const panel = found.tab;
       if (panel.kind !== "editor" && panel.kind !== "markdown") return;
       const oldPath = panel.path;
       const lastSlash = oldPath.lastIndexOf("/");
@@ -1464,7 +1464,7 @@ export default function App() {
         });
       }
     },
-    [findPanelGlobal, handlePathRenamed],
+    [findTabGlobal, handlePathRenamed],
   );
 
   // ── Close guards ──────────────────────────────────────────────────────────
@@ -1495,14 +1495,14 @@ export default function App() {
     );
     if (!ws) return;
     const pane = findPane(ws.paneTree, ws.activePaneId);
-    const panelId = pane?.activePanelId;
+    const panelId = pane?.activeTabId;
     if (!panelId) return;
-    const kind = findPanelGlobal(panelId)?.panel.kind;
+    const kind = findTabGlobal(panelId)?.tab.kind;
     requestAnimationFrame(() => {
       if (kind === "editor") editorHandles.current.get(panelId)?.focus();
       else terminalHandles.current.get(panelId)?.focus();
     });
-  }, [findPanelGlobal]);
+  }, [findTabGlobal]);
 
   const {
     pendingClosePanel,
@@ -1517,13 +1517,13 @@ export default function App() {
   } = useTabCloseGuards({
     workspaces,
     disposePanel: (workspaceId, panelId) => {
-      const found = findPanelGlobal(panelId);
-      if (found?.panel.kind === "browser" && found.panel.floating) {
+      const found = findTabGlobal(panelId);
+      if (found?.tab.kind === "browser" && found.tab.floating) {
         void closeFloatWindow(panelId);
       }
-      closePanel(workspaceId, panelId);
+      closeTab(workspaceId, panelId);
     },
-    findPanel: findPanelGlobal,
+    findPanel: findTabGlobal,
     savePanel,
     focusActivePanel,
     isWarnEnabled: () =>
@@ -1550,9 +1550,9 @@ export default function App() {
     const acc: EditorShim[] = [];
     for (const ws of workspaces) {
       for (const pane of allPanes(ws.paneTree)) {
-        for (const panel of pane.panels) {
-          if (panel.kind === "editor") {
-            const ep = panel as EditorShim;
+        for (const tab of pane.tabs) {
+          if (tab.kind === "editor") {
+            const ep = tab as EditorShim;
             acc.push({
               kind: "editor",
               id: ep.id,
@@ -1730,38 +1730,38 @@ export default function App() {
         const ws = workspacesRef.current.find((w) => w.id === wsId);
         if (!ws) return;
         const pane = allPanes(ws.paneTree)[0];
-        const panel = pane?.activePanelId
-          ? pane.panels.find((p) => p.id === pane.activePanelId)
-          : pane?.panels[0];
+        const panel = pane?.activeTabId
+          ? pane.tabs.find((p) => p.id === pane.activeTabId)
+          : pane?.tabs[0];
         if (panel) terminalHandles.current.get(panel.id)?.focus();
       }, 80);
     },
     [addWorkspace, setPinnedRoot],
   );
 
-  const panelCallbacks = useMemo<PanelCallbacks>(
+  const panelCallbacks = useMemo<TabCallbacks>(
     () => ({
       onSearchReady: (panelId, addon) => {
         searchAddons.current.set(panelId, addon);
-        if (panelId === activePanelId) setActiveSearchAddon(addon);
+        if (panelId === activeTabId) setActiveSearchAddon(addon);
       },
       onExit: (panelId, _code) => {
-        const found = findPanelGlobal(panelId);
-        if (found) closePanel(found.workspace.id, panelId);
+        const found = findTabGlobal(panelId);
+        if (found) closeTab(found.workspace.id, panelId);
       },
       onCwd: (panelId, cwd) => {
-        const found = findPanelGlobal(panelId);
+        const found = findTabGlobal(panelId);
         if (found) {
           setTerminalPanelCwd(found.workspace.id, panelId, cwd);
           const isFocused =
             found.workspace.activePaneId === found.pane.id &&
-            found.pane.activePanelId === panelId;
+            found.pane.activeTabId === panelId;
           if (isFocused) {
             setWorkspaceCwd(found.workspace.id, cwd);
             if (
               found.workspace.id === activeWorkspace?.id &&
-              found.panel.kind === "terminal" &&
-              found.panel.autofocus
+              found.tab.kind === "terminal" &&
+              found.tab.autofocus
             ) {
               focusSidebar(cwd, { fromShortcut: false });
             }
@@ -1769,7 +1769,7 @@ export default function App() {
         }
       },
       onRunningCommand: (panelId, cmd) => {
-        const found = findPanelGlobal(panelId);
+        const found = findTabGlobal(panelId);
         if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
         if (cmd !== null) {
           runConfigCommandSeen.current.add(panelId);
@@ -1782,9 +1782,9 @@ export default function App() {
         }
       },
       onScratchpadState: (panelId, state) => {
-        const found = findPanelGlobal(panelId);
+        const found = findTabGlobal(panelId);
         if (found)
-          updatePanelData(found.workspace.id, panelId, (p) =>
+          updateTabData(found.workspace.id, panelId, (p) =>
             p.kind === "terminal" ? { ...p, scratchpad: state } : p,
           );
       },
@@ -1793,28 +1793,28 @@ export default function App() {
         else terminalHandles.current.delete(panelId);
       },
       onEditorDirtyChange: (panelId, dirty) => {
-        const found = findPanelGlobal(panelId);
+        const found = findTabGlobal(panelId);
         if (found)
-          updatePanelData(found.workspace.id, panelId, (p) =>
+          updateTabData(found.workspace.id, panelId, (p) =>
             p.kind === "editor"
               ? { ...p, dirty, ...(dirty ? { preview: false } : {}) }
               : p,
           );
       },
       onEditorClose: (panelId) => {
-        const found = findPanelGlobal(panelId);
-        if (found) closePanel(found.workspace.id, panelId);
+        const found = findTabGlobal(panelId);
+        if (found) closeTab(found.workspace.id, panelId);
       },
       onSetMarkdownView: (panelId, mode) => {
-        const found = findPanelGlobal(panelId);
-        if (found) setPanelView(found.workspace.id, panelId, mode);
+        const found = findTabGlobal(panelId);
+        if (found) setTabView(found.workspace.id, panelId, mode);
       },
       onToggleOverlayPreview: (panelId) => {
-        const found = findPanelGlobal(panelId);
+        const found = findTabGlobal(panelId);
         if (found) toggleOverlayPreview(found.workspace.id, panelId);
       },
       onToggleSplitPreview: (panelId) => {
-        const found = findPanelGlobal(panelId);
+        const found = findTabGlobal(panelId);
         if (found) toggleSplitPreview(found.workspace.id, panelId);
       },
       registerEditorHandle: (panelId, h) => {
@@ -1828,12 +1828,12 @@ export default function App() {
         } else {
           editorHandles.current.delete(panelId);
         }
-        if (panelId === activePanelId) setActiveEditorHandle(h);
+        if (panelId === activeTabId) setActiveEditorHandle(h);
       },
       onBrowserUrlChange: (panelId, url) => {
-        const found = findPanelGlobal(panelId);
+        const found = findTabGlobal(panelId);
         if (found)
-          updatePanelData(found.workspace.id, panelId, (p) =>
+          updateTabData(found.workspace.id, panelId, (p) =>
             p.kind === "browser" ? { ...p, url } : p,
           );
       },
@@ -1856,16 +1856,16 @@ export default function App() {
         setGitHistoryHandle(handle);
       },
       onRenamePanel: (panelId, title) => {
-        const found = findPanelGlobal(panelId);
+        const found = findTabGlobal(panelId);
         if (found)
-          updatePanelData(found.workspace.id, panelId, (p) => ({
+          updateTabData(found.workspace.id, panelId, (p) => ({
             ...p,
             title,
           }));
       },
       onUpdatePanel: (panelId, updater) => {
-        const found = findPanelGlobal(panelId);
-        if (found) updatePanelData(found.workspace.id, panelId, updater);
+        const found = findTabGlobal(panelId);
+        if (found) updateTabData(found.workspace.id, panelId, updater);
       },
       onRenameFile: (panelId, newName) => {
         void handleRenameFileFromTab(panelId, newName);
@@ -1877,16 +1877,16 @@ export default function App() {
       onAddToGitignore: handleAddToGitignore,
     }),
     [
-      activePanelId,
-      findPanelGlobal,
-      closePanel,
+      activeTabId,
+      findTabGlobal,
+      closeTab,
       setTerminalPanelCwd,
       setWorkspaceCwd,
       setTerminalRunningCommand,
-      setPanelView,
+      setTabView,
       toggleOverlayPreview,
       toggleSplitPreview,
-      updatePanelData,
+      updateTabData,
       activeWorkspace,
       openPanel,
       handleRenameFileFromTab,
@@ -1911,23 +1911,23 @@ export default function App() {
 
   const insertHistoryCommand = useMemo(
     () =>
-      isTerminalPanel && activePanelId !== null
+      isTerminalPanel && activeTabId !== null
         ? (cmd: string) => {
-            writeToSession(activePanelId, cmd);
-            terminalHandles.current.get(activePanelId)?.focus();
+            writeToSession(activeTabId, cmd);
+            terminalHandles.current.get(activeTabId)?.focus();
           }
         : null,
-    [isTerminalPanel, activePanelId],
+    [isTerminalPanel, activeTabId],
   );
 
   // ── Search ────────────────────────────────────────────────────────────────
 
   const searchTarget = useMemo<SearchTarget>(() => {
-    if (isTerminalPanel && activePanelId !== null && activeSearchAddon)
+    if (isTerminalPanel && activeTabId !== null && activeSearchAddon)
       return {
         kind: "terminal",
         addon: activeSearchAddon,
-        focus: () => terminalHandles.current.get(activePanelId)?.focus(),
+        focus: () => terminalHandles.current.get(activeTabId)?.focus(),
       };
     if (isEditorPanel && activeEditorHandle)
       return {
@@ -1946,7 +1946,7 @@ export default function App() {
     isTerminalPanel,
     isEditorPanel,
     isGitHistoryPanel,
-    activePanelId,
+    activeTabId,
     activeSearchAddon,
     activeEditorHandle,
     gitHistoryHandle,
@@ -1972,34 +1972,34 @@ export default function App() {
 
   const handleCloseActivePanel = useCallback(() => {
     if (!activeWorkspace) return;
-    if (!activePanelId) {
+    if (!activeTabId) {
       // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
       void requestCloseWorkspace(activeWorkspace.id);
       return;
     }
     if (
-      (activePanel?.kind === "terminal" || activePanel?.kind === "editor") &&
-      activePanel.locked
+      (activeTab?.kind === "terminal" || activeTab?.kind === "editor") &&
+      activeTab.locked
     ) {
-      flashLockIcon(activePanelId);
+      flashLockIcon(activeTabId);
       return;
     }
-    closePanelsRef.current([activePanelId]);
-  }, [activeWorkspace, activePanelId, activePanel, requestCloseWorkspace]);
+    closePanelsRef.current([activeTabId]);
+  }, [activeWorkspace, activeTabId, activeTab, requestCloseWorkspace]);
 
   const handleCloseOtherPanels = useCallback(() => {
-    if (!activePane || !activePanelId) return;
-    const ids = activePane.panels
+    if (!activePane || !activeTabId) return;
+    const ids = activePane.tabs
       .filter(
-        (p) => p.id !== activePanelId && !(p as { locked?: boolean }).locked,
+        (p) => p.id !== activeTabId && !(p as { locked?: boolean }).locked,
       )
       .map((p) => p.id);
     if (ids.length) closePanelsRef.current(ids);
-  }, [activePane, activePanelId]);
+  }, [activePane, activeTabId]);
 
   const handleCloseAllPanels = useCallback(() => {
     if (!activePane) return;
-    const ids = activePane.panels
+    const ids = activePane.tabs
       .filter((p) => !(p as { locked?: boolean }).locked)
       .map((p) => p.id);
     if (ids.length) closePanelsRef.current(ids);
@@ -2128,8 +2128,8 @@ export default function App() {
           !active?.classList.contains("xterm-helper-textarea")
         )
           return;
-        if (!activePanelId) return;
-        useTabRenameStore.getState().startRename(activePanelId);
+        if (!activeTabId) return;
+        useTabRenameStore.getState().startRename(activeTabId);
       },
       "file.rename": () => {
         const active = document.activeElement;
@@ -2139,64 +2139,64 @@ export default function App() {
           !active?.classList.contains("xterm-helper-textarea")
         )
           return;
-        if (!activePanelId) return;
-        const panel = findPanelGlobal(activePanelId)?.panel;
+        if (!activeTabId) return;
+        const panel = findTabGlobal(activeTabId)?.tab;
         if (panel?.kind === "editor" || panel?.kind === "markdown") {
-          useFileRenameStore.getState().trigger(activePanelId);
+          useFileRenameStore.getState().trigger(activeTabId);
         }
       },
       "editor.markdown.toggleView": () => {
-        if (!activePanel || !activePanelId || !activeWorkspaceId) return;
-        if (activePanel.kind === "editor" && isMarkdownPath(activePanel.path)) {
-          toggleOverlayPreview(activeWorkspaceId, activePanelId);
-        } else if (activePanel.kind === "markdown") {
-          setPanelView(activeWorkspaceId, activePanelId, "raw");
+        if (!activeTab || !activeTabId || !activeWorkspaceId) return;
+        if (activeTab.kind === "editor" && isMarkdownPath(activeTab.path)) {
+          toggleOverlayPreview(activeWorkspaceId, activeTabId);
+        } else if (activeTab.kind === "markdown") {
+          setTabView(activeWorkspaceId, activeTabId, "raw");
         }
       },
       "editor.html.toggleView": () => {
-        if (!activePanel || !activePanelId || !activeWorkspaceId) return;
-        if (activePanel.kind === "editor" && isHtmlPath(activePanel.path)) {
-          toggleOverlayPreview(activeWorkspaceId, activePanelId);
+        if (!activeTab || !activeTabId || !activeWorkspaceId) return;
+        if (activeTab.kind === "editor" && isHtmlPath(activeTab.path)) {
+          toggleOverlayPreview(activeWorkspaceId, activeTabId);
         }
       },
       "editor.preview.toggleSplit": () => {
-        if (!activePanel || !activePanelId || !activeWorkspaceId) return;
+        if (!activeTab || !activeTabId || !activeWorkspaceId) return;
         if (
-          activePanel.kind === "editor" &&
-          (isMarkdownPath(activePanel.path) || isHtmlPath(activePanel.path))
+          activeTab.kind === "editor" &&
+          (isMarkdownPath(activeTab.path) || isHtmlPath(activeTab.path))
         ) {
-          toggleSplitPreview(activeWorkspaceId, activePanelId);
+          toggleSplitPreview(activeWorkspaceId, activeTabId);
         }
       },
       "editor.save": () => {
-        if (!activePanelId) return;
-        const handle = editorHandles.current.get(activePanelId);
+        if (!activeTabId) return;
+        const handle = editorHandles.current.get(activeTabId);
         if (handle) void handle.save();
       },
       "tab.next": () => {
         if (!activeWorkspace || !activePane) return;
-        const panels = activePane.panels;
+        const panels = activePane.tabs;
         if (panels.length < 2) return;
-        const idx = panels.findIndex((p) => p.id === activePane.activePanelId);
+        const idx = panels.findIndex((p) => p.id === activePane.activeTabId);
         const next = panels[(idx + 1) % panels.length];
-        activatePanel(activeWorkspace.id, next.id);
+        activateTab(activeWorkspace.id, next.id);
       },
       "tab.prev": () => {
         if (!activeWorkspace || !activePane) return;
-        const panels = activePane.panels;
+        const panels = activePane.tabs;
         if (panels.length < 2) return;
-        const idx = panels.findIndex((p) => p.id === activePane.activePanelId);
+        const idx = panels.findIndex((p) => p.id === activePane.activeTabId);
         const prev = panels[(idx - 1 + panels.length) % panels.length];
-        activatePanel(activeWorkspace.id, prev.id);
+        activateTab(activeWorkspace.id, prev.id);
       },
       "tab.selectByIndex": (e) => {
         if (!activeWorkspace || !activePane) return;
-        const panels = activePane.panels;
+        const panels = activePane.tabs;
         if (panels.length === 0) return;
         const digit = parseInt(e.key, 10);
         const idx = digit === 0 ? panels.length - 1 : digit - 1;
         if (idx >= 0 && idx < panels.length)
-          activatePanel(activeWorkspace.id, panels[idx].id);
+          activateTab(activeWorkspace.id, panels[idx].id);
       },
       "pane.splitRight": doSplitRight,
       "pane.splitDown": doSplitDown,
@@ -2216,8 +2216,8 @@ export default function App() {
         clearFocusedTerminal();
       },
       "terminal.scratchpad": () => {
-        if (activePanelId && activePanel?.kind === "terminal") {
-          cycleScratchpad(activePanelId);
+        if (activeTabId && activeTab?.kind === "terminal") {
+          cycleScratchpad(activeTabId);
         }
       },
       "search.focus": () => searchInlineRef.current?.focus(),
@@ -2242,26 +2242,26 @@ export default function App() {
         );
       },
       "editor.undo": () => {
-        if (activePanelId) editorHandles.current.get(activePanelId)?.undo();
+        if (activeTabId) editorHandles.current.get(activeTabId)?.undo();
       },
       "editor.redo": () => {
-        if (activePanelId) editorHandles.current.get(activePanelId)?.redo();
+        if (activeTabId) editorHandles.current.get(activeTabId)?.redo();
       },
       "notifications.jumpToLast": () => {
         const first = useAgentStore.getState().notifications[0];
         if (!first) return;
         setActiveWorkspaceId(first.workspaceId);
-        activatePanel(first.workspaceId, first.panelId);
+        activateTab(first.workspaceId, first.panelId);
         setTimeout(
           () => terminalHandles.current.get(first.panelId)?.focus(),
           50,
         );
       },
       "tab.lock": () => {
-        if (!activePanelId || !activePanel) return;
-        const found = findPanelGlobal(activePanelId);
+        if (!activeTabId || !activeTab) return;
+        const found = findTabGlobal(activeTabId);
         if (found)
-          updatePanelData(found.workspace.id, activePanelId, (p) => {
+          updateTabData(found.workspace.id, activeTabId, (p) => {
             const newLocked = !p.locked;
             if (p.kind === "editor") {
               return {
@@ -2274,33 +2274,33 @@ export default function App() {
           });
       },
       "tab.focusOnExplorer": () => {
-        if (!activePanel) return;
+        if (!activeTab) return;
         const target =
-          panelFilePath(activePanel) ??
-          (activePanel.kind === "terminal" ? (activePanel.cwd ?? null) : null);
+          tabFilePath(activeTab) ??
+          (activeTab.kind === "terminal" ? (activeTab.cwd ?? null) : null);
         if (target) focusSidebar(target, { fromShortcut: true });
       },
       "tab.toggleAutofocus": () => {
-        if (!activePanelId || !activePanel || !isAutofocusPanel(activePanel))
+        if (!activeTabId || !activeTab || !isAutofocusTab(activeTab))
           return;
-        const found = findPanelGlobal(activePanelId);
+        const found = findTabGlobal(activeTabId);
         if (found)
-          updatePanelData(found.workspace.id, activePanelId, (p) =>
-            isAutofocusPanel(p) ? { ...p, autofocus: !p.autofocus } : p,
+          updateTabData(found.workspace.id, activeTabId, (p) =>
+            isAutofocusTab(p) ? { ...p, autofocus: !p.autofocus } : p,
           );
       },
       "path.copy": () => {
-        if (!activePanel) return;
+        if (!activeTab) return;
         let value: string | undefined;
         let label: string;
-        if (activePanel.kind === "editor" || activePanel.kind === "markdown") {
-          value = activePanel.path;
+        if (activeTab.kind === "editor" || activeTab.kind === "markdown") {
+          value = activeTab.path;
           label = "Copied current Editor file path";
-        } else if (activePanel.kind === "terminal") {
-          value = activePanel.cwd;
+        } else if (activeTab.kind === "terminal") {
+          value = activeTab.cwd;
           label = "Copied current Terminal folder";
-        } else if (activePanel.kind === "browser") {
-          value = activePanel.url;
+        } else if (activeTab.kind === "browser") {
+          value = activeTab.url;
           label = "Copied current Browser url";
         } else {
           return;
@@ -2313,15 +2313,15 @@ export default function App() {
       activeWorkspace,
       activeWorkspaceId,
       activePane,
-      activePanelId,
-      activePanel,
+      activeTabId,
+      activeTab,
       activeCwd,
       workspaces,
-      findPanelGlobal,
-      updatePanelData,
+      findTabGlobal,
+      updateTabData,
       openCommandPalette,
       cycleWorkspace,
-      activatePanel,
+      activateTab,
       handleCloseActivePanel,
       reopenClosed,
       requestCloseWorkspace,
@@ -2353,28 +2353,28 @@ export default function App() {
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
       if (id === "editor.undo" || id === "editor.redo") {
-        return activePanel?.kind !== "editor";
+        return activeTab?.kind !== "editor";
       }
       if (id === "editor.markdown.toggleView") {
         return !(
-          activePanel?.kind === "markdown" ||
-          (activePanel?.kind === "editor" && isMarkdownPath(activePanel.path))
+          activeTab?.kind === "markdown" ||
+          (activeTab?.kind === "editor" && isMarkdownPath(activeTab.path))
         );
       }
       if (id === "editor.html.toggleView") {
         return !(
-          activePanel?.kind === "editor" &&
-          isHtmlPath(activePanel.path)
+          activeTab?.kind === "editor" &&
+          isHtmlPath(activeTab.path)
         );
       }
       if (id === "editor.preview.toggleSplit") {
         return !(
-          activePanel?.kind === "editor" &&
-          (isMarkdownPath(activePanel.path) || isHtmlPath(activePanel.path))
+          activeTab?.kind === "editor" &&
+          (isMarkdownPath(activeTab.path) || isHtmlPath(activeTab.path))
         );
       }
       if (id === "editor.save") {
-        return activePanel?.kind !== "editor";
+        return activeTab?.kind !== "editor";
       }
       if (id === "terminal.clear") {
         const target =
@@ -2386,13 +2386,13 @@ export default function App() {
       }
       if (id === "tab.lock") {
         return (
-          activePanel?.kind !== "terminal" && activePanel?.kind !== "editor"
+          activeTab?.kind !== "terminal" && activeTab?.kind !== "editor"
         );
       }
 
       return false;
     },
-    [activePanel],
+    [activeTab],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
@@ -2402,10 +2402,10 @@ export default function App() {
   const onActivateAgent = useCallback(
     (workspaceId: string, panelId: string) => {
       setActiveWorkspaceId(workspaceId);
-      activatePanel(workspaceId, panelId);
+      activateTab(workspaceId, panelId);
       setTimeout(() => terminalHandles.current.get(panelId)?.focus(), 50);
     },
-    [setActiveWorkspaceId, activatePanel],
+    [setActiveWorkspaceId, activateTab],
   );
 
   useEffect(() => {
@@ -2543,7 +2543,7 @@ export default function App() {
               if (allPanes(activeWorkspace.paneTree).length <= 1) return;
               setZenPaneId((prev) => prev !== null ? null : activeWorkspace.activePaneId);
             },
-            hasActiveTerminal: activePanel?.kind === "terminal",
+            hasActiveTerminal: activeTab?.kind === "terminal",
             openWorkspaceProperties: () =>
               useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId),
             openRunScriptConfiguration: () =>
@@ -2570,7 +2570,7 @@ export default function App() {
       reopenClosed,
       clearFocusedTerminal,
       setZenPaneId,
-      activePanel,
+      activeTab,
     ],
   );
 
@@ -2610,7 +2610,7 @@ export default function App() {
               useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "run-configurations")
             }
             activeWorkspace={activeWorkspace ?? null}
-            activePanel={activePanel}
+            activeTab={activeTab}
           />
 
           {/* 3-column layout */}
@@ -2645,8 +2645,8 @@ export default function App() {
             <WorkspaceDndProvider
               workspaces={workspaces}
               activeWorkspaceId={activeWorkspaceId}
-              onMovePanel={movePanel}
-              onReorderPanel={reorderPanel}
+              onMoveTab={moveTab}
+              onReorderTab={reorderTab}
               onSplitPaneAndPlace={splitPaneAndPlace}
               onSplitPaneAndOpenPanel={splitPaneAndOpenPanel}
               onOpenPanel={openPanel}
@@ -2724,9 +2724,9 @@ export default function App() {
                         workspaces={workspaces}
                         activeWorkspaceId={activeWorkspaceId}
                         expandedPaneId={zenPaneId}
-                        onActivatePanel={onActivatePanelStable}
-                        onClosePanel={onClosePanelStable}
-                        onCloseManyPanels={onCloseManyPanelsStable}
+                        onActivateTab={onActivateTabStable}
+                        onCloseTab={onCloseTabStable}
+                        onCloseManyTabs={onCloseManyTabsStable}
                         onFocusPane={onFocusPaneStable}
                         onNewTerminal={onNewTerminalStable}
                         onSplitTerminalRight={onSplitTerminalRightStable}
@@ -2749,7 +2749,7 @@ export default function App() {
 
                     <WorkspaceInputBar
                       isBlockTab={false}
-                      activeLeafId={activePanelId}
+                      activeLeafId={activeTabId}
                     />
                   </div>
                 </ResizablePanel>

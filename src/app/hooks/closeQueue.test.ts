@@ -27,7 +27,7 @@ function makeDeps(
     savePanel: async (id) => {
       saved.push(id);
     },
-    closePanel: (id) => {
+    closeTab: (id) => {
       closed.push(id);
     },
     ...overrides,

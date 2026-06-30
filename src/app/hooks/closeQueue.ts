@@ -25,7 +25,7 @@ export type CloseQueueDeps = {
   ) => Promise<TerminalCloseDecision>;
   askEditorClose: (panelId: string) => Promise<EditorCloseDecision>;
   savePanel: (panelId: string) => Promise<void>;
-  closePanel: (panelId: string) => void;
+  closeTab: (panelId: string) => void;
 };
 
 /**
@@ -71,6 +71,6 @@ export async function runCloseQueue(
       }
     }
 
-    deps.closePanel(panelId);
+    deps.closeTab(panelId);
   }
 }

@@ -75,7 +75,7 @@ There are two separate WebView windows: the main window (`index.html`) and the s
 
 ### 3.1 Terminal
 
-**Workspace/Pane/Panel model.** The center area uses a three-level hierarchy: Workspaces (listed in a 52px vertical sidebar on the left) contain a binary pane tree; each pane holds a tab strip of panels. Panels are never unmounted when you switch between them — each PTY keeps receiving output in the background. Switching to a panel that has been running a command shows you the complete, up-to-date buffer instantly.
+**Workspace/Pane/Tab model.** The center area uses a three-level hierarchy: Workspaces (listed in a 52px vertical sidebar on the left) contain a binary pane tree; each pane holds a tab strip of tabs. Tabs are never unmounted when you switch between them — each PTY keeps receiving output in the background. Switching to a tab that has been running a command shows you the complete, up-to-date buffer instantly.
 
 A workspace can exist with no open tabs. Closing the last tab in the sole pane of a workspace empties that pane instead of destroying the workspace; the empty pane renders a welcome screen with quick actions (new terminal, open file). A workspace is removed only by an explicit close action (the dedicated `workspace.close` shortcut, the `tab.close` shortcut on an empty workspace, or the sidebar close button), routed through `requestCloseWorkspace`. The `tab.close` shortcut is contextual (it closes the focused tab or pane first, falling back to the workspace only when the pane is empty), whereas `workspace.close` always targets the active workspace. That action picks at most one dialog by running this cascade in order:
 
@@ -99,7 +99,7 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **Link detection.** URLs in terminal output are clickable and open in the system browser.
 
-**Scratchpad bar.** A per-terminal input bar (`terminal.scratchpad`, default `Cmd+U`) to compose multi-line text and send it to the shell without typing at the prompt. It supports drag-and-drop of explorer paths (inserted as `@`-prefixed references) and an Enter / Shift+Enter send-mode preference (`scratchpadEnterSends`). Its visibility is one of three states (`hidden | visible | focused`) persisted per terminal panel (`Panel.scratchpad`) and restored on launch; new terminals open it by default when `scratchpadInNewTerminals` is on. The bar can also be toggled from the tab context menu.
+**Scratchpad bar.** A per-terminal input bar (`terminal.scratchpad`, default `Cmd+U`) to compose multi-line text and send it to the shell without typing at the prompt. It supports drag-and-drop of explorer paths (inserted as `@`-prefixed references) and an Enter / Shift+Enter send-mode preference (`scratchpadEnterSends`). Its visibility is one of three states (`hidden | visible | focused`) persisted per terminal panel (`Tab.scratchpad`) and restored on launch; new terminals open it by default when `scratchpadInNewTerminals` is on. The bar can also be toggled from the tab context menu.
 
 **True color and 256-color.** The xterm.js WebGL renderer supports the full color space. The terminal color palette is driven by the active app theme, not hardcoded.
 
@@ -137,7 +137,7 @@ The selection logic is the pure `resolveExplorerRoot` (`modules/workspaces/lib/e
 - **F4** (`tab.focusOnExplorer`) always anchors: it applies the cascade (see below), opens the sidebar if closed, and switches away from Git History to Explorer if needed (it stays on Explorer or Source Control otherwise).
 - **Per-panel autofocus flag** -- toggled from the tab right-click context menu (crosshair icon shown on the tab when active). When an autofocus panel gains focus (or, for a terminal, its cwd changes while focused), it anchors silently: the same cascade runs, but the panel is never opened and the active sidebar tab is never changed.
 
-Autofocus is **data-driven**, not an enumerated kind list: `isAutofocusPanel` (`lib/types.ts`) is true for any panel that resolves to a filesystem location -- the terminal cwd, or any kind carrying a `path` (editor, markdown, git-diff, git-commit-file). Only `browser` (a web URL) and `git-history` (a commit list, no single file) lack it, so a future path-bearing panel kind opts in automatically with no code change. **Lock** (prevent close) is independent and applies to **every** panel kind with no exception. Both flags live on a shared `PanelCommon` base, and the markdown/editor view toggle preserves them across the conversion.
+Autofocus is **data-driven**, not an enumerated kind list: `isAutofocusTab` (`lib/types.ts`) is true for any panel that resolves to a filesystem location -- the terminal cwd, or any kind carrying a `path` (editor, markdown, git-diff, git-commit-file). Only `browser` (a web URL) and `git-history` (a commit list, no single file) lack it, so a future path-bearing panel kind opts in automatically with no code change. **Lock** (prevent close) is independent and applies to **every** panel kind with no exception. Both flags live on a shared `TabCommon` base, and the markdown/editor view toggle preserves them across the conversion.
 
 The shared cascade (`resolveSidebarTarget`, tested): given the panel's reference path (a terminal's folder or an editor / git-diff file), if the workspace root **itself belongs to a git repo** (`workspaceGitRoot`) and a *different* git repo nested strictly inside the workspace root owns that path, it sets File System rooted at the nested repo (so a worktree or sub-repo under a project workspace is shown, not the parent). This re-root is gated on the workspace root being a repo on purpose: a non-repo container workspace (e.g. `~/Work` holding several independent project repos) stays in Workspace Root mode when you focus a file inside one of its projects, so navigating never drops the wider view. Otherwise: if the path is under the workspace root it sets Workspace Root mode; else if it is under a git repo it sets File System rooted at the git root; else it sets File System rooted at the common ancestor of the current fs root and the path (falling back to `dirname`). The nested git repo is resolved from the focused path via `git_resolve_repo` (which accepts a file path, resolving from its parent directory, so editor tabs anchor too); the workspace root's own repo is resolved once per root in `App.tsx` and passed in as `workspaceGitRoot`, not recomputed on every focus. Source Control and Git History resolve their repo from the resulting explorer root (`useSourceControl`); that resolution is keyed on the exact context path (`canReuseResolvedRepo`, tested), never on a path prefix, so anchoring into a nested repo/worktree re-resolves to it instead of reusing the parent. The `autofocus` flag is persisted per panel in `workspace-state.json`. New-workspace terminals default to no autofocus; when no autofocus panel exists the sidebar root and git repo stay wherever they were last anchored.
 
@@ -267,17 +267,17 @@ The button label shows the filename for file-type editors and the workspace root
 
 ## 4. Technical decisions with user-visible effects
 
-### 4.1 Panels are never unmounted
+### 4.1 Tabs are never unmounted
 
-When you switch panels or panes, the outgoing panel is hidden with CSS classes. It is never unmounted from the React tree. This means:
+When you switch tabs or panes, the outgoing tab is hidden with CSS classes. It is never unmounted from the React tree. This means:
 
 - PTY sessions keep streaming in the background. A running `npm run dev` in one panel continues while you work in another.
-- Panel state (scroll position, xterm buffer, editor content, unsaved changes) is preserved exactly as you left it.
-- Memory usage is proportional to the total number of open panels across all workspaces and panes. Each terminal panel holds a live xterm instance; each editor panel holds CodeMirror state. There is no sleep mechanism for idle panels.
+- Tab state (scroll position, xterm buffer, editor content, unsaved changes) is preserved exactly as you left it.
+- Memory usage is proportional to the total number of open tabs across all workspaces and panes. Each terminal tab holds a live xterm instance; each editor tab holds CodeMirror state. There is no sleep mechanism for idle tabs.
 
 ### 4.2 Tab close confirmation
 
-Every close path (tab close button, the close shortcut, and Close All / Close Other Tabs) runs through one sequential queue, `closePanels(panelIds)` in `useTabCloseGuards`. The pure core (`hooks/closeQueue.ts`) closes panels one at a time: a terminal with a live foreground process or a dirty editor pauses the queue on a confirmation dialog, and a cancel stops the whole run before closing the current panel. Terminals only prompt when the `warnOnCloseTabWithRunningProcess` preference is on (default on); the terminal dialog's "Don't ask me again" checkbox flips that preference off. The editor dialog offers Save / Don't save / Cancel; Save writes through the editor handle before closing, and a failed write stops the queue without losing the buffer. After any run, focus returns to the active tab's terminal or editor.
+Every close path (tab close button, the close shortcut, and Close All / Close Other Tabs) runs through one sequential queue, `closePanels(panelIds)` in `useTabCloseGuards`. The pure core (`hooks/closeQueue.ts`) closes tabs one at a time: a terminal with a live foreground process or a dirty editor pauses the queue on a confirmation dialog, and a cancel stops the whole run before closing the current tab. Terminals only prompt when the `warnOnCloseTabWithRunningProcess` preference is on (default on); the terminal dialog's "Don't ask me again" checkbox flips that preference off. The editor dialog offers Save / Don't save / Cancel; Save writes through the editor handle before closing, and a failed write stops the queue without losing the buffer. After any run, focus returns to the active tab's terminal or editor.
 
 ### 4.3 Workspace authorization
 
@@ -343,7 +343,7 @@ SSH is on the roadmap but not yet implemented. Kex does not manage SSH connectio
 
 ### 5.2 No persistent terminal layout restore
 
-Terminal sessions are not persisted across restarts. When you close and reopen Kex, terminal panels restart with a fresh PTY in their saved `cwd`. Shell history within the terminal is whatever your shell persists natively (`.zsh_history`, `.bash_history`, etc.).
+Terminal sessions are not persisted across restarts. When you close and reopen Kex, terminal tabs restart with a fresh PTY in their saved `cwd`. Shell history within the terminal is whatever your shell persists natively (`.zsh_history`, `.bash_history`, etc.).
 
 **Exception: agent sessions.** If Claude Code hooks are installed (`agent_enable_claude_hooks`), Kex records the active session id and cwd at Claude Code exit and restores it automatically on next launch by running `claude --resume '<id>'` in the terminal. See section 3.7a and `docs/AGENT_SESSION_RESTORE.md`.
 
@@ -468,8 +468,8 @@ src/
     │                                running state from `terminalEphemeralStore.runConfigRunning`
     │                                (`useSyncExternalStore`) and renders as a muted "Run" placeholder (0 configs),
     │                                a simple toggle (1 config), or a split selector+play/stop button (2+ configs).
-    ├── workspaces/                — Workspace/Pane/Panel model; useWorkspaces (source of truth),
-    │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/PanelContent,
+    ├── workspaces/                — Workspace/Pane/Tab model; useWorkspaces (source of truth),
+    │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/TabContent,
     │                                WorkspaceDndProvider (DndContext + file/tab drag handlers).
     │                                Workspace carries: color (accent color, hex or null), runConfigs (array of
     │                                run configurations with command, name, optional cwd/panelId),
@@ -477,7 +477,7 @@ src/
     │                                to a WorkspaceStatus id in the preferences store). See WORKSPACES.md for render
     │                                tree details.
     │                                `terminalEphemeralStore` has a second section, `runConfigRunning` (Map<panelId,
-    │                                boolean>), tracking which terminal panels are running a run-config command.
+    │                                boolean>), tracking which terminal tabs are running a run-config command.
     │                                Set to true by `runWorkspaceConfig` in App.tsx; cleared by OSC 133;D
     │                                (`onRunningCommand` with cmd=null). Never persisted.
     ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts
@@ -487,20 +487,20 @@ src/
     │                                (the global ordered status list, key `workspaceStatuses` in
     │                                `settings-general.json`, synced cross-window via `GENERAL_PREF_KEY_MAP`).
     │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
-    ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser panels can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the panel stays as a placeholder in its pane and docks back on close.
+    ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  — Markdown renderer pane
     ├── workspace/                 — Local + WSL environment switching
     ├── updater/                   — Auto-updater dialog
     └── command-palette/           — Fuzzy command/file/search palette
 ```
 
-### Panel kinds (tagged union)
+### Tab kinds (tagged union)
 
 `terminal` | `editor` | `browser` | `markdown` | `git-diff` | `git-history` | `git-commit-file`
 
-All panel kinds follow the same never-unmount rule. Panels live inside panes; panes are nodes of a binary split tree inside a workspace. The workspace bar (left, 52px) lists workspaces; the `Sidebar` holds Explorer, Source Control, and Git History and can dock left or right.
+All tab kinds follow the same never-unmount rule. Tabs live inside panes; panes are nodes of a binary split tree inside a workspace. The workspace bar (left, 52px) lists workspaces; the `Sidebar` holds Explorer, Source Control, and Git History and can dock left or right.
 
-Every editor (and `markdown`) panel renders a thin top bar (`EditorPathBar`) as the first row of its layout: the open file's full path as a navigable breadcrumb on the left, and the editor controls on the right. The breadcrumb (`EditorPathBreadcrumb`, modeled by the pure `buildEditorPathBreadcrumb`) renders every directory segment as a clickable button that reveals that folder in the explorer; the filename is the non-clickable leaf. Each segment is tagged relative to the workspace root (`workspaceRoot`/`home` reach the bar via `EditorChromeContext`): the root segment carries a pin icon, its ancestors are dimmed, and descendants render normally; marking is suppressed when there is no pinned root or the file lives outside it. The full path is always shown (no segment collapsing) and the breadcrumb scrolls horizontally when it overflows, while the right-side controls stay fixed. Markdown files open in their rendered view (`kind: "markdown"`) by default; a `Rendered | Edit` toggle in that bar flips a single panel in place between `markdown` and `editor` via `setPanelView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty). The bar also hosts a `[...]` dropdown that surfaces the per-extension view settings (wrap, line numbers, whitespace, fold gutter) for the currently open file extension; the header label reads "Applies to .<ext> files" and changes persist to `editorViewByExt` in the preferences store. Word wrap is a per-extension setting, not a global per-panel override. The file-name leaf has a right-click context menu (`FileLeafContextMenu` / `fileLeafMenuItems` in `modules/workspaces/pathbar/`): Reveal in Finder, Rename, Duplicate, Copy Absolute/Relative Path, Add to .gitignore, Delete. Mutations (rename/duplicate/delete) route through `RevealRequest.pendingAction` (an optional field added to `RevealRequest` in `src/modules/explorer/lib/pendingAction.ts`); `onFocusOnExplorer(path, action?)` in `App.tsx` sets the action when building the reveal request, and `FileExplorer.applyRevealTarget` performs it after revealing the path in the tree (nonce-guarded, fires once). Directory segments share the same `DirSegmentContextMenu` used by `TerminalPathBar`.
+Every editor (and `markdown`) panel renders a thin top bar (`EditorPathBar`) as the first row of its layout: the open file's full path as a navigable breadcrumb on the left, and the editor controls on the right. The breadcrumb (`EditorPathBreadcrumb`, modeled by the pure `buildEditorPathBreadcrumb`) renders every directory segment as a clickable button that reveals that folder in the explorer; the filename is the non-clickable leaf. Each segment is tagged relative to the workspace root (`workspaceRoot`/`home` reach the bar via `EditorChromeContext`): the root segment carries a pin icon, its ancestors are dimmed, and descendants render normally; marking is suppressed when there is no pinned root or the file lives outside it. The full path is always shown (no segment collapsing) and the breadcrumb scrolls horizontally when it overflows, while the right-side controls stay fixed. Markdown files open in their rendered view (`kind: "markdown"`) by default; a `Rendered | Edit` toggle in that bar flips a single panel in place between `markdown` and `editor` via `setTabView` in `useWorkspaces` (id/path/title preserved; switching to rendered is a no-op while the editor is dirty). The bar also hosts a `[...]` dropdown that surfaces the per-extension view settings (wrap, line numbers, whitespace, fold gutter) for the currently open file extension; the header label reads "Applies to .<ext> files" and changes persist to `editorViewByExt` in the preferences store. Word wrap is a per-extension setting, not a global per-panel override. The file-name leaf has a right-click context menu (`FileLeafContextMenu` / `fileLeafMenuItems` in `modules/workspaces/pathbar/`): Reveal in Finder, Rename, Duplicate, Copy Absolute/Relative Path, Add to .gitignore, Delete. Mutations (rename/duplicate/delete) route through `RevealRequest.pendingAction` (an optional field added to `RevealRequest` in `src/modules/explorer/lib/pendingAction.ts`); `onFocusOnExplorer(path, action?)` in `App.tsx` sets the action when building the reveal request, and `FileExplorer.applyRevealTarget` performs it after revealing the path in the tree (nonce-guarded, fires once). Directory segments share the same `DirSegmentContextMenu` used by `TerminalPathBar`.
 
 A `browser` panel carries an optional `floating` flag. When set, the panel is shown in a native `WebviewUrl::External` window (managed Rust-side by `FloatBrowserState`) and its in-pane slot renders a placeholder with an editable address bar instead of the iframe. See `docs/FORK.md` (Floating browser windows) for the full lifecycle.
 

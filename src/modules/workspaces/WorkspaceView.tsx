@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { allPanes } from "./lib/splitNode";
 import type { Workspace } from "./lib/types";
 import { SplitNodeView } from "./SplitNodeView";
-import type { PanelCallbacks } from "./PanelContent";
+import type { TabCallbacks } from "./TabContent";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
@@ -14,9 +14,9 @@ type Props = {
   workspaces: Workspace[];
   activeWorkspaceId: string;
   expandedPaneId?: string | null;
-  onActivatePanel: (workspaceId: string, panelId: string) => void;
-  onClosePanel: (workspaceId: string, panelId: string) => void;
-  onCloseManyPanels: (workspaceId: string, panelIds: string[]) => void;
+  onActivateTab: (workspaceId: string, panelId: string) => void;
+  onCloseTab: (workspaceId: string, panelId: string) => void;
+  onCloseManyTabs: (workspaceId: string, panelIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
   onDividerChange?: (workspaceId: string, splitId: string, position: number) => void;
@@ -25,7 +25,7 @@ type Props = {
   onNewBrowser: (workspaceId: string, paneId: string) => void;
   onSplitBrowserRight: (workspaceId: string, paneId: string) => void;
   onSplitBrowserDown: (workspaceId: string, paneId: string) => void;
-  callbacks: PanelCallbacks;
+  callbacks: TabCallbacks;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
   onFloatBrowserPanel?: (panelId: string) => void;
@@ -51,7 +51,7 @@ export function WorkspaceView({
     if (!ws) return;
     const raf = requestAnimationFrame(() => {
       for (const pane of allPanes(ws.paneTree)) {
-        if (pane.activePanelId) refreshTerminalLeaf(pane.activePanelId);
+        if (pane.activeTabId) refreshTerminalLeaf(pane.activeTabId);
       }
     });
     return () => cancelAnimationFrame(raf);
@@ -74,9 +74,9 @@ export function WorkspaceView({
             activePaneId={ws.activePaneId}
             isWorkspaceActive={ws.id === activeWorkspaceId}
             expandedPaneId={ws.id === activeWorkspaceId ? expandedPaneId : null}
-            onActivatePanel={rest.onActivatePanel}
-            onClosePanel={rest.onClosePanel}
-            onCloseManyPanels={rest.onCloseManyPanels}
+            onActivateTab={rest.onActivateTab}
+            onCloseTab={rest.onCloseTab}
+            onCloseManyTabs={rest.onCloseManyTabs}
             onFocusPane={rest.onFocusPane}
             onNewTerminal={rest.onNewTerminal}
             onDividerChange={rest.onDividerChange}

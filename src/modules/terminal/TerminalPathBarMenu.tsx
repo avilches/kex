@@ -21,7 +21,7 @@ import { copyToClipboard, revealInFinder, REVEAL_LABEL } from "@/modules/explore
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import type { AgentSession } from "@/modules/agents/lib/types";
-import type { Panel } from "@/modules/workspaces/lib/types";
+import type { Tab } from "@/modules/workspaces/lib/types";
 import { leafScratchpadOpen, toggleScratchpad } from "./lib/useTerminalSession";
 
 function formatElapsed(ms: number): string {
@@ -37,7 +37,7 @@ type Props = {
   leafId: string;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
-  onUpdatePanel: (updater: (p: Panel) => Panel) => void;
+  onUpdatePanel: (updater: (p: Tab) => Tab) => void;
   agentSession: AgentSession | null;
   runningCommand: string | null;
 };

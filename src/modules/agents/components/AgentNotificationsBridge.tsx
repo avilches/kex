@@ -1,5 +1,5 @@
 import type { Workspace } from "@/modules/workspaces";
-import { findPanelPane, focusedPanelId } from "@/modules/workspaces";
+import { findTabPane, focusedTabId } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
 import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { invoke } from "@tauri-apps/api/core";
@@ -31,10 +31,10 @@ function panelInfo(
   panelId: string,
 ): { workspaceId: string; title: string } | null {
   for (const ws of workspaces) {
-    const result = findPanelPane(ws.paneTree, panelId);
+    const result = findTabPane(ws.paneTree, panelId);
     if (result) {
       const cwd =
-        result.panel.kind === "terminal" ? result.panel.cwd : undefined;
+        result.tab.kind === "terminal" ? result.tab.cwd : undefined;
       const cwdParts = cwd ? cwd.split(/[\\/]/).filter(Boolean) : [];
       const title = cwd ? (cwdParts[cwdParts.length - 1] ?? cwd) : ws.title;
       return { workspaceId: ws.id, title };
@@ -48,7 +48,7 @@ function isPanelVisible(ctx: Ctx, workspaceId: string, panelId: string): boolean
   if (ctx.activeWorkspaceId !== workspaceId) return false;
   const ws = ctx.workspaces.find((w) => w.id === workspaceId);
   if (!ws) return false;
-  return focusedPanelId(ws.paneTree, ws.activePaneId) === panelId;
+  return focusedTabId(ws.paneTree, ws.activePaneId) === panelId;
 }
 
 /** The user is both focused on the window and looking at this panel: no attention is pending. */
@@ -203,7 +203,7 @@ export function AgentNotificationsBridge({
     if (!focused) return;
     const ws = workspaces.find((w) => w.id === activeWorkspaceId);
     if (!ws) return;
-    const panelId = focusedPanelId(ws.paneTree, ws.activePaneId);
+    const panelId = focusedTabId(ws.paneTree, ws.activePaneId);
     if (panelId) useAgentStore.getState().markPanelSeen(panelId);
   }, [workspaces, activeWorkspaceId, focused]);
 

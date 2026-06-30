@@ -1,26 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { panelFilePath } from "./panelPath";
-import type { Panel } from "./types";
+import { tabFilePath } from "./tabPath";
+import type { Tab } from "./types";
 
-describe("panelFilePath", () => {
+describe("tabFilePath", () => {
   it("returns the editor path", () => {
-    const p: Panel = {
+    const p: Tab = {
       id: "1",
       kind: "editor",
       path: "/a/b.ts",
       dirty: false,
       preview: false,
     };
-    expect(panelFilePath(p)).toBe("/a/b.ts");
+    expect(tabFilePath(p)).toBe("/a/b.ts");
   });
 
   it("returns the markdown path", () => {
-    const p: Panel = { id: "1", kind: "markdown", path: "/a/README.md" };
-    expect(panelFilePath(p)).toBe("/a/README.md");
+    const p: Tab = { id: "1", kind: "markdown", path: "/a/README.md" };
+    expect(tabFilePath(p)).toBe("/a/README.md");
   });
 
   it("joins repoRoot for a relative git-diff path", () => {
-    const p: Panel = {
+    const p: Tab = {
       id: "1",
       kind: "git-diff",
       path: "src/x.ts",
@@ -28,11 +28,11 @@ describe("panelFilePath", () => {
       mode: "+",
       originalPath: null,
     };
-    expect(panelFilePath(p)).toBe("/repo/src/x.ts");
+    expect(tabFilePath(p)).toBe("/repo/src/x.ts");
   });
 
   it("keeps an absolute git-diff path", () => {
-    const p: Panel = {
+    const p: Tab = {
       id: "1",
       kind: "git-diff",
       path: "/repo/src/x.ts",
@@ -40,11 +40,11 @@ describe("panelFilePath", () => {
       mode: "+",
       originalPath: null,
     };
-    expect(panelFilePath(p)).toBe("/repo/src/x.ts");
+    expect(tabFilePath(p)).toBe("/repo/src/x.ts");
   });
 
   it("joins repoRoot for a git-commit-file path", () => {
-    const p: Panel = {
+    const p: Tab = {
       id: "1",
       kind: "git-commit-file",
       path: "src/x.ts",
@@ -52,18 +52,18 @@ describe("panelFilePath", () => {
       sha: "abc",
       originalPath: null,
     };
-    expect(panelFilePath(p)).toBe("/repo/src/x.ts");
+    expect(tabFilePath(p)).toBe("/repo/src/x.ts");
   });
 
-  it("returns null for terminal panels", () => {
-    const p: Panel = { id: "1", kind: "terminal" };
-    expect(panelFilePath(p)).toBeNull();
+  it("returns null for terminal tabs", () => {
+    const p: Tab = { id: "1", kind: "terminal" };
+    expect(tabFilePath(p)).toBeNull();
   });
 
-  it("returns null for browser and git-history panels", () => {
-    expect(panelFilePath({ id: "1", kind: "browser", url: "x" })).toBeNull();
+  it("returns null for browser and git-history tabs", () => {
+    expect(tabFilePath({ id: "1", kind: "browser", url: "x" })).toBeNull();
     expect(
-      panelFilePath({ id: "1", kind: "git-history", repoRoot: "/r" }),
+      tabFilePath({ id: "1", kind: "git-history", repoRoot: "/r" }),
     ).toBeNull();
   });
 });

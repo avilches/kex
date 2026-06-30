@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { PaneNode, SplitNode } from "@/modules/workspaces/lib/types";
 import { visibleTerminalPanels } from "./visibleTerminals";
 
-function pane(id: string, panels: PaneNode["panels"], activePanelId: string | null): PaneNode {
-  return { kind: "pane", id, panels, activePanelId };
+function pane(id: string, tabs: PaneNode["tabs"], activeTabId: string | null): PaneNode {
+  return { kind: "pane", id, tabs, activeTabId };
 }
 
 describe("visibleTerminalPanels", () => {

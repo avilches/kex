@@ -10,7 +10,7 @@ import {
 import { useMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { AgentSession } from "@/modules/agents/lib/types";
-import type { Panel } from "@/modules/workspaces/lib/types";
+import type { Tab } from "@/modules/workspaces/lib/types";
 import { ComputerTerminal01Icon, ReloadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
@@ -36,7 +36,7 @@ type Props = {
   gitRootPath: string | null;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
-  onUpdatePanel?: (updater: (p: Panel) => Panel) => void;
+  onUpdatePanel?: (updater: (p: Tab) => Tab) => void;
   onReveal?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;

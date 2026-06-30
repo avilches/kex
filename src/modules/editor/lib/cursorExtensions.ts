@@ -1,4 +1,4 @@
-import { type Extension } from "@codemirror/state";
+import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { CursorStyle } from "@/modules/settings/store";
 

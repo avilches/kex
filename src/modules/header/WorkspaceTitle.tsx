@@ -7,27 +7,27 @@ import {
   subscribe as subscribeOscTitles,
   getSnapshot as getOscTitlesSnapshot,
 } from "@/modules/terminal/lib/oscTitleStore";
-import { panelTitle } from "@/modules/workspaces/lib/panelTitle";
+import { tabTitle } from "@/modules/workspaces/lib/tabTitle";
 import {
   getRunningCommandsSnapshot,
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import type { Panel, Workspace } from "@/modules/workspaces/lib/types";
+import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 
 type Props = {
   workspace: Pick<Workspace, "id" | "title" | "icon" | "color" | "statusId"> | null;
-  panel: Panel | null;
+  tab: Tab | null;
 };
 
-export function WorkspaceTitle({ workspace, panel }: Props) {
+export function WorkspaceTitle({ workspace, tab }: Props) {
   const runningCommandMap = useSyncExternalStore(
     subscribeToRunningCommands,
     getRunningCommandsSnapshot,
   );
   const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
-  const agentSession = useAgentStore((s) => (panel ? s.sessions[panel.id] : undefined));
+  const agentSession = useAgentStore((s) => (tab ? s.sessions[tab.id] : undefined));
   const workspaceStatuses = usePreferencesStore((s) => s.workspaceStatuses);
 
   if (!workspace) return null;
@@ -39,11 +39,11 @@ export function WorkspaceTitle({ workspace, panel }: Props) {
     : null;
 
   const runningCommand =
-    panel?.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
-  const oscTitle = panel?.kind === "terminal" ? oscTitleMap.get(panel.id) : undefined;
+    tab?.kind === "terminal" ? (runningCommandMap.get(tab.id) ?? null) : null;
+  const oscTitle = tab?.kind === "terminal" ? oscTitleMap.get(tab.id) : undefined;
 
-  const hasAgent = !!agentSession && panel?.kind === "terminal";
-  const subtitle = panel ? panelTitle(panel, runningCommand, oscTitle) : null;
+  const hasAgent = !!agentSession && tab?.kind === "terminal";
+  const subtitle = tab ? tabTitle(tab, runningCommand, oscTitle) : null;
 
   return (
     <div className="flex min-w-0 max-w-[340px] items-center gap-2">

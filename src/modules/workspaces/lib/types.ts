@@ -9,10 +9,10 @@ export type RunConfig = {
   panelId?: string;
 };
 
-// Common to every panel. `locked` (prevent close) applies to all kinds with no
+// Common to every tab. `locked` (prevent close) applies to all kinds with no
 // exception. `autofocus` lives here too so any new path-bearing kind opts in
-// automatically; it is only *effective* where isAutofocusPanel is true.
-type PanelCommon = {
+// automatically; it is only *effective* where isAutofocusTab is true.
+type TabCommon = {
   id: string;
   title?: string;
   locked?: boolean;
@@ -27,28 +27,28 @@ export function scratchpadStateOf(open: boolean, active: boolean): ScratchpadSta
   return active ? "focused" : "visible";
 }
 
-export type Panel =
-  | (PanelCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; scratchpad?: ScratchpadState })
-  | (PanelCommon & { kind: "editor"; path: string; dirty: boolean; preview: boolean; previewMode?: "overlay" | "split"; overrideLanguage?: string | null })
-  | (PanelCommon & { kind: "browser"; url: string; floating?: boolean })
-  | (PanelCommon & { kind: "markdown"; path: string })
-  | (PanelCommon & { kind: "git-diff"; path: string; repoRoot: string; mode: "-" | "+"; originalPath: string | null })
-  | (PanelCommon & { kind: "git-history"; repoRoot: string })
-  | (PanelCommon & { kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null });
+export type Tab =
+  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; scratchpad?: ScratchpadState })
+  | (TabCommon & { kind: "editor"; path: string; dirty: boolean; preview: boolean; previewMode?: "overlay" | "split"; overrideLanguage?: string | null })
+  | (TabCommon & { kind: "browser"; url: string; floating?: boolean })
+  | (TabCommon & { kind: "markdown"; path: string })
+  | (TabCommon & { kind: "git-diff"; path: string; repoRoot: string; mode: "-" | "+"; originalPath: string | null })
+  | (TabCommon & { kind: "git-history"; repoRoot: string })
+  | (TabCommon & { kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null });
 
-// A panel can drive the sidebar (autofocus) when it resolves to a filesystem
+// A tab can drive the sidebar (autofocus) when it resolves to a filesystem
 // location: the terminal cwd, or any kind that carries a `path` (with a file or
 // not). New path-bearing kinds get autofocus automatically, no list to update.
 // Only browser (web URL) and git-history (no single file) lack it.
-export function isAutofocusPanel(p: Panel): boolean {
+export function isAutofocusTab(p: Tab): boolean {
   return p.kind === "terminal" || "path" in p;
 }
 
 export type PaneNode = {
   kind: "pane";
   id: string;
-  panels: Panel[];
-  activePanelId: string | null;
+  tabs: Tab[];
+  activeTabId: string | null;
 };
 
 export type SplitNode =
@@ -87,7 +87,7 @@ export type Workspace = {
 };
 
 export type ClosedEntry = {
-  panel: Panel;
+  tab: Tab;
   paneId: string;
   workspaceId: string;
 };

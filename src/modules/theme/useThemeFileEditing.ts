@@ -13,10 +13,10 @@ import {
   writeThemeFile,
 } from "./themeFiles";
 
-type PanelItem = { kind: string; path?: string };
+type TabItem = { kind: string; path?: string };
 
 type Params = {
-  tabsRef: RefObject<PanelItem[]>;
+  tabsRef: RefObject<TabItem[]>;
   openFileTab: (path: string) => void;
 };
 

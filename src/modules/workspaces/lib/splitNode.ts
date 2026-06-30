@@ -1,4 +1,4 @@
-import type { Panel, PaneNode, SplitNode } from "./types";
+import type { Tab, PaneNode, SplitNode } from "./types";
 
 export function allPanes(tree: SplitNode): PaneNode[] {
   if (tree.kind === "pane") return [tree];
@@ -14,23 +14,23 @@ export function findPane(tree: SplitNode, paneId: string): PaneNode | null {
   return findPane(tree.first, paneId) ?? findPane(tree.second, paneId);
 }
 
-/** The panel the user is currently focused on within a workspace (active pane's active panel). */
-export function focusedPanelId(
+/** The tab the user is currently focused on within a workspace (active pane's active tab). */
+export function focusedTabId(
   tree: SplitNode,
   activePaneId: string,
 ): string | null {
-  return findPane(tree, activePaneId)?.activePanelId ?? null;
+  return findPane(tree, activePaneId)?.activeTabId ?? null;
 }
 
-export function findPanelPane(
+export function findTabPane(
   tree: SplitNode,
   panelId: string,
-): { pane: PaneNode; panel: Panel } | null {
+): { pane: PaneNode; tab: Tab } | null {
   if (tree.kind === "pane") {
-    const panel = tree.panels.find((p) => p.id === panelId);
-    return panel ? { pane: tree, panel } : null;
+    const tab = tree.tabs.find((p) => p.id === panelId);
+    return tab ? { pane: tree, tab } : null;
   }
-  return findPanelPane(tree.first, panelId) ?? findPanelPane(tree.second, panelId);
+  return findTabPane(tree.first, panelId) ?? findTabPane(tree.second, panelId);
 }
 
 export function firstPaneId(tree: SplitNode): string {
@@ -59,7 +59,7 @@ export function splitPaneInTree(
 ): SplitNode {
   if (tree.kind === "pane") {
     if (tree.id !== targetPaneId) return tree;
-    const newPane: PaneNode = { kind: "pane", id: newPaneId, panels: [], activePanelId: null };
+    const newPane: PaneNode = { kind: "pane", id: newPaneId, tabs: [], activeTabId: null };
     const [first, second] = newPanePosition === "first" ? [newPane, tree] : [tree, newPane];
     return { kind: "split", id: newSplitId, orientation, first, second, dividerPosition: 0.5 };
   }
@@ -69,39 +69,39 @@ export function splitPaneInTree(
   return { ...tree, first, second };
 }
 
-export function movePanelBetweenPanes(
+export function moveTabBetweenPanes(
   tree: SplitNode,
   panelId: string,
   targetPaneId: string,
   targetIndex?: number,
 ): SplitNode {
-  const sourceResult = findPanelPane(tree, panelId);
+  const sourceResult = findTabPane(tree, panelId);
   if (!sourceResult) return tree;
   if (sourceResult.pane.id === targetPaneId) return tree;
 
-  const { pane: sourcePane, panel } = sourceResult;
+  const { pane: sourcePane, tab } = sourceResult;
 
   // Remove from source pane
   let result = updatePane(tree, sourcePane.id, (p) => {
-    const remaining = p.panels.filter((x) => x.id !== panelId);
+    const remaining = p.tabs.filter((x) => x.id !== panelId);
     const newActive =
-      p.activePanelId === panelId
+      p.activeTabId === panelId
         ? (remaining[remaining.length - 1]?.id ?? null)
-        : p.activePanelId;
-    return { ...p, panels: remaining, activePanelId: newActive };
+        : p.activeTabId;
+    return { ...p, tabs: remaining, activeTabId: newActive };
   });
 
   // Insert into target pane
   result = updatePane(result, targetPaneId, (p) => {
-    const idx = targetIndex !== undefined ? Math.min(targetIndex, p.panels.length) : p.panels.length;
-    const newPanels = [...p.panels];
-    newPanels.splice(idx, 0, panel);
-    return { ...p, panels: newPanels, activePanelId: panel.id };
+    const idx = targetIndex !== undefined ? Math.min(targetIndex, p.tabs.length) : p.tabs.length;
+    const newTabs = [...p.tabs];
+    newTabs.splice(idx, 0, tab);
+    return { ...p, tabs: newTabs, activeTabId: tab.id };
   });
 
   // Auto-collapse source pane if now empty (never removes the last pane)
   const updatedSource = findPane(result, sourcePane.id);
-  if (updatedSource && updatedSource.panels.length === 0) {
+  if (updatedSource && updatedSource.tabs.length === 0) {
     const collapsed = removePaneFromTree(result, sourcePane.id);
     if (collapsed) return collapsed;
   }
@@ -202,20 +202,20 @@ export function findPaneInDirection(
   return best?.paneId ?? null;
 }
 
-export function splitPaneAndInsertPanel(
+export function splitPaneAndInsertTab(
   tree: SplitNode,
   targetPaneId: string,
   newSplitId: string,
   newPaneId: string,
   orientation: "horizontal" | "vertical",
   newPanePosition: "first" | "second",
-  panel: Panel,
+  tab: Tab,
 ): SplitNode {
   const treeAfterSplit = splitPaneInTree(tree, targetPaneId, newSplitId, newPaneId, orientation, newPanePosition);
   if (treeAfterSplit === tree) return tree;
   return updatePane(treeAfterSplit, newPaneId, (p) => ({
     ...p,
-    panels: [panel],
-    activePanelId: panel.id,
+    tabs: [tab],
+    activeTabId: tab.id,
   }));
 }

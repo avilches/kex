@@ -1,7 +1,7 @@
 # Workspaces — rendering, terminal pool, and lifecycle
 
-This document covers the internal mechanics of the Workspace/Pane/Panel model: how the render tree
-is structured, how terminal slots are managed, and what happens when panels are shown or hidden.
+This document covers the internal mechanics of the Workspace/Pane/Tab model: how the render tree
+is structured, how terminal slots are managed, and what happens when tabs are shown or hidden.
 
 For bugs and gotchas discovered in production, see [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md).
 For the high-level user-facing overview, see [ARCHITECTURE.md](ARCHITECTURE.md) sections 3.1 and 4.1.
@@ -19,8 +19,8 @@ Workspace           — a named environment (local or WSL distro)
         │     ├── first: SplitNode
         │     └── second: SplitNode
         └── SplitNode (kind: "pane") — leaf; holds a tab strip
-              ├── panels: Panel[]    — the tabs
-              └── activePanelId      — which tab is shown
+              ├── tabs: Tab[]    — the tabs
+              └── activeTabId      — which tab is shown
 ```
 
 **Workspace fields.** A `Workspace` carries additional configuration:
@@ -30,10 +30,10 @@ Workspace           — a named environment (local or WSL distro)
 - `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. The legacy `"pinned"` mode is migrated via `migrateWorkspace` in `workspaceState.ts` for backward compatibility. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
 **Run-config ephemeral state.** `terminalEphemeralStore` (`src/modules/workspaces/lib/terminalEphemeralStore.ts`) has two independent sections:
-- `runningCommands` (`Map<panelId, string>`) — foreground command name from OSC 133 C, for all terminal panels. Set and cleared by every `onRunningCommand` callback regardless of whether a run config is involved.
-- `runConfigRunning` (`Map<panelId, boolean>`) — tracks which terminal panels are currently executing a run-config command. Set to `true` by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared to `false` when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the panel id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
+- `runningCommands` (`Map<panelId, string>`) — foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a run config is involved.
+- `runConfigRunning` (`Map<panelId, boolean>`) — tracks which terminal tabs are currently executing a run-config command. Set to `true` by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared to `false` when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
 
-A `Panel` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
+A `Tab` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
 its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`). A `terminal` panel also persists
 `scratchpad` (`hidden | visible | focused`): the runtime open/active state of its scratchpad bar
@@ -41,9 +41,9 @@ its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`). A `terminal` pane
 `initialScratchpad`. When unset (a fresh terminal) the `scratchpadInNewTerminals` preference decides
 the initial visibility.
 
-A pane may have an empty `panels` array with `activePanelId: null`. This state is valid only for
+A pane may have an empty `tabs` array with `activeTabId: null`. This state is valid only for
 the sole pane of a workspace (when the workspace has no split). When the last tab is closed in a
-split pane, `applyClosePanel` (the pure entry point for tab close in `useWorkspaces.ts`) collapses
+split pane, `applyCloseTab` (the pure entry point for tab close in `useWorkspaces.ts`) collapses
 the empty half and promotes the sibling - only the root pane of a single-pane workspace is left
 empty, where it renders a welcome screen. This invariant is locked by a unit test in
 `workspaceState.test.ts`: `sanitizeWorkspace` must round-trip an empty pane without dropping it.
@@ -53,27 +53,27 @@ focus returns to the most-recently-used surviving tab, not the positional neighb
 keeps an MRU list of `panelId`s (most recent first) in `paneActivationHistoryRef`, an in-memory ref
 in `useWorkspaces` that is never persisted (capped at `MRU_HISTORY_LIMIT = 50`, though the live list
 is already bounded by the pane's open-tab count). `recordActivation` pushes onto it from the three
-points that move the active tab to a real panel: `activatePanel`, `openPanel`, `replacePanel`.
-`closePanel` reads the closing pane's history and passes it to `applyClosePanel`, which picks the
+points that move the active tab to a real tab: `activateTab`, `openPanel`, `replaceTab`.
+`closeTab` reads the closing pane's history and passes it to `applyCloseTab`, which picks the
 first history id that still exists in the remaining tabs, falling back to the positional neighbour
 (`remaining[idx] ?? remaining[idx - 1]`) when the history is empty. The `history` argument is
 optional, so the pure function keeps its legacy neighbour behaviour when called without it.
 
 A single reconciliation effect (`useEffect` on `workspaces`) prunes the map against live
-panes/panels: it drops dead panes and dead `panelId`s, so a stale id is never selected and the map
+panes/tabs: it drops dead panes and dead `panelId`s, so a stale id is never selected and the map
 stays bounded. This covers every removal path (close, drag between panes, split collapse, workspace
 close) without per-callback cleanup; cross-pane moves need no special handling because a moved tab's
 id no longer appears in its old pane's remaining tabs. This is independent from reopen-closed (undo,
-`closedPanelsRef`): that stores dead `Panel` snapshots to resurrect; this orders live tabs to choose
+`closedPanelsRef`): that stores dead `Tab` snapshots to resurrect; this orders live tabs to choose
 focus. The selection logic is locked by unit tests in `useWorkspaces.test.ts`.
 
-`editor` and `markdown` panels also carry an optional `explorerRoot`: the folder the explorer and
+`editor` and `markdown` tabs also carry an optional `explorerRoot`: the folder the explorer and
 git context jump to while that tab is active. It is captured when the file is opened
 (`resolveOpenRoot` in `lib/explorerRoot.ts`: the current explorer root if the file is inside it,
 otherwise the file's parent dir) and consumed by `resolveActiveExplorerRoot`, which the App's
 `explorerRoot` memo uses to override the terminal-derived ambient root. Optional for backward
 compatibility: a panel without it falls back to the file's parent dir (or the ambient root for
-non-file panels).
+non-file tabs).
 
 State is persisted per-window via the `window_save_workspace_state` IPC command, debounced 800ms on
 every mutation. Each window reads its own saved state on mount via `window_get_state`. The on-disk
@@ -104,31 +104,31 @@ WorkspaceDndProvider    — DndContext wrapper; owns all drag state, handlers, a
         └── SplitNodeView     — recursive: renders split groups as ResizablePanelGroup, leaves as PaneView
               └── PaneView    — one pane: tab bar + panel content area + drag drop zones
                     ├── PaneTabBar        — tab strip with DraggableTab per panel
-                    └── PanelContent      — switches on panel.kind; mounts terminal, editor, etc.
+                    └── TabContent      — switches on tab.kind; mounts terminal, editor, etc.
 ```
 
-A `browser` panel with `floating: true` is a special case: `PanelContent` renders a placeholder
+A `browser` panel with `floating: true` is a special case: `TabContent` renders a placeholder
 (address bar plus "Dock here" / "Focus window" buttons) instead of the iframe, because the page
 lives in a native `WebviewUrl::External` window. The float/dock/navigate callbacks are threaded
-from `App.tsx` down through `WorkspaceView` → `SplitNodeView` → `PaneView` → `PanelContent` to
+from `App.tsx` down through `WorkspaceView` → `SplitNodeView` → `PaneView` → `TabContent` to
 `BrowserPane`; see `docs/FORK.md` (Floating browser windows).
 
 **All workspaces are always mounted.** Inactive workspaces are hidden with `opacity-0 invisible`
 CSS — they are never removed from the React tree. This is required to keep PTYs streaming and
 editor state alive.
 
-**All panels within a pane are always mounted.** Inactive tabs within a pane are hidden with
+**All tabs within a pane are always mounted.** Inactive tabs within a pane are hidden with
 `invisible pointer-events-none`. Same reason: the xterm instance and its PTY must survive tab
 switches.
 
-The `visible` prop passed to `PanelContent` (and ultimately to `useTerminalSession`) is:
+The `visible` prop passed to `TabContent` (and ultimately to `useTerminalSession`) is:
 
 ```tsx
-visible={panel.id === pane.activePanelId && isWorkspaceActive}
+visible={tab.id === pane.activeTabId && isWorkspaceActive}
 ```
 
 Both conditions must be true. This drives whether the terminal session holds a renderer slot
-(see below). `isWorkspaceActive` was added to prevent inactive workspace panels from keeping
+(see below). `isWorkspaceActive` was added to prevent inactive workspace tabs from keeping
 their WebGL contexts permanently — see [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md).
 
 ---
@@ -179,7 +179,7 @@ only the rendering is deferred.
 ## Renderer slot pool (`rendererPool.ts`)
 
 xterm.js instances are expensive to create and each carries a WebGL context. The pool manages a
-fixed set of reusable `Slot` objects so that switching panels does not destroy and recreate
+fixed set of reusable `Slot` objects so that switching tabs does not destroy and recreate
 renderers.
 
 ### Slot lifecycle
@@ -227,7 +227,7 @@ Each slot optionally has a `WebglAddon` (one WebGL context). WebGL is attached i
 when the slot is stale (`> SLOT_STALE_MS = 10s` since last use) or newly created.
 
 WebGL is disposed:
-- Immediately: via `parkLeafSlot` (visibility change for alt-screen/blocks panels)
+- Immediately: via `parkLeafSlot` (visibility change for alt-screen/blocks tabs)
 - After grace: via `scheduleWebglReap` at WEBGL_REAP_GRACE_MS = 30s after a slot becomes idle
 
 **Context limit.** WKWebView (Tauri/macOS) allows roughly 8-16 concurrent WebGL contexts. Exceeding
@@ -242,7 +242,7 @@ Context recovery: `onContextLoss` disposes the addon and schedules a retry at
 
 ### Context count in practice
 
-With the `visible = … && isWorkspaceActive` fix, only the active workspace's active panels hold
+With the `visible = … && isWorkspaceActive` fix, only the active workspace's active tabs hold
 live WebGL contexts. Within a pane, only the active tab is visible. So:
 
 ```
@@ -257,10 +257,10 @@ re-shown terminal after a workspace switch may reuse the still-warm slot.
 
 ## Tab bar overflow scroll
 
-When a pane has many panels and is narrow, tabs overflow the `PaneTabBar`. Two scroll behaviors keep
+When a pane has many tabs and is narrow, tabs overflow the `PaneTabBar`. Two scroll behaviors keep
 the active tab visible:
 
-- **Active tab auto-scroll**: whenever `activePanelId` changes, the container scrolls the minimum
+- **Active tab auto-scroll**: whenever `activeTabId` changes, the container scrolls the minimum
   amount to bring the active tab into view (`scrollBy` with `behavior: 'auto'`). Skipped if the
   user is currently browsing with the wheel (see below).
 - **Wheel scroll with snap-back**: the container registers a native (non-React) `wheel` listener
@@ -282,7 +282,7 @@ that file drags from the explorer can target pane drop zones.
 
 ```typescript
 type DraggingItem =
-  | { kind: 'panel'; panel: Panel; workspaceId: string }
+  | { kind: 'tab'; tab: Tab; workspaceId: string }
   | { kind: 'file'; path: string };
 ```
 
@@ -333,7 +333,7 @@ type DraggingItem =
 The handler first classifies the drag by the `active.id` prefix: `file:` (file), `dir:` (folder),
 and `dir-pane:` (the synthetic root / ".." rows, treated as a folder) are explorer drags routed to
 `handleFileDragEnd`; any other ID is a panel (tab) drag. The panel opened for an explorer drag comes
-from `panelForDroppedPath(path, isDir)` (pure, in `dropPanel.ts`): a folder yields a `terminal`
+from `tabForDroppedPath(path, isDir)` (pure, in `dropPanel.ts`): a folder yields a `terminal`
 panel rooted at that cwd (matching the explorer's "Open in Terminal"), a file yields an `editor`
 panel. `dir-pane:` drags set `draggingItem.paneOnly`, which excludes them from the internal explorer
 move targets (`explorer-dir:` / `explorer-file:`) so the root and ".." rows can only open a terminal
@@ -349,18 +349,18 @@ sits on top of the bar, the `DndContext` uses a custom `collisionDetection` that
 `pointerWithin` and promotes any `scratchpad:` collision to the front, so a path drop inserts a
 reference instead of opening a pane.
 
-**Panel drag** — two zone ID formats:
+**Tab drag** — two zone ID formats:
 
 `tab-insert:<panelId>:before|after` - tab border drop zones for positional insertion:
 - `before`: insert at `indexOf(panelId)` in the target pane
 - `after`: insert at `indexOf(panelId) + 1`
-- Same pane: `reorderPanel(workspaceId, panelId, insertionIndex)` — reorders tabs using
+- Same pane: `reorderTab(workspaceId, panelId, insertionIndex)` — reorders tabs using
   `arrayMove`; dropping before or after the dragged tab itself is a noop
-- Different pane: `movePanel(workspaceId, panelId, targetPaneId, insertionIndex)` — moves tab to
+- Different pane: `moveTab(workspaceId, panelId, targetPaneId, insertionIndex)` — moves tab to
   the target pane at the given position; source pane auto-collapses if it becomes empty
 
 `zone:<paneId>:<direction>` - pane-level drop zones:
-- `center`: `movePanel(sourceWorkspaceId, panelId, targetPaneId)` — moves tab to end of another pane
+- `center`: `moveTab(sourceWorkspaceId, panelId, targetPaneId)` — moves tab to end of another pane
 - directional zones: `splitPaneAndPlace(sourceWorkspaceId, targetPaneId, direction, panelId)` —
   splits the target pane and places the dragged panel in the new half
 
@@ -375,9 +375,9 @@ is reused:
 | `tab-insert:<panelId>:before\|after` | `openPanel(wsId, paneId, panel, index)` — inserts at position |
 | `zone:<paneId>:top\|bottom\|left\|right` | `splitPaneAndOpenPanel(wsId, paneId, dir, panel)` — splits pane, opens panel in new sub-pane |
 
-`panel` is the editor or terminal produced by `panelForDroppedPath`. Editor panels have
+`panel` is the editor or terminal produced by `tabForDroppedPath`. Editor tabs have
 `preview: false` (permanent tab) because the drag is an explicit intent. `splitPaneAndOpenPanel`
-uses `splitPaneAndInsertPanel` (pure function in `splitNode.ts`) to perform the split and new-panel
+uses `splitPaneAndInsertTab` (pure function in `splitNode.ts`) to perform the split and new-panel
 insertion atomically in a single state update.
 
 Both zone types coexist. Tab-border zones take priority when the pointer is over a tab bar (they are

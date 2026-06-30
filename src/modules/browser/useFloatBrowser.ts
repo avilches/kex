@@ -2,20 +2,20 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect } from "react";
-import type { Panel, Workspace } from "@/modules/workspaces/lib/types";
+import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 
 type DockEvent = { panelId: string; currentUrl: string };
 type NavigatedEvent = { panelId: string; url: string };
 
 type Deps = {
-  updatePanelData: (wsId: string, panelId: string, updater: (p: Panel) => Panel) => void;
-  findPanelGlobal: (panelId: string) => { workspace: { id: string }; panel: Panel } | null;
+  updateTabData: (wsId: string, panelId: string, updater: (p: Tab) => Tab) => void;
+  findTabGlobal: (panelId: string) => { workspace: { id: string }; tab: Tab } | null;
 };
 
 export function useFloatBrowser({
-  updatePanelData,
-  findPanelGlobal,
+  updateTabData,
+  findTabGlobal,
 }: Deps) {
   const originWindowLabel = getCurrentWebviewWindow().label;
 
@@ -24,9 +24,9 @@ export function useFloatBrowser({
     let unlisten: (() => void) | undefined;
     listen<DockEvent>("kex:float-dock", (e) => {
       const { panelId, currentUrl } = e.payload;
-      const found = findPanelGlobal(panelId);
+      const found = findTabGlobal(panelId);
       if (!found) return;
-      updatePanelData(found.workspace.id, panelId, (p) => ({
+      updateTabData(found.workspace.id, panelId, (p) => ({
         ...p,
         floating: false,
         url: currentUrl || (p.kind === "browser" ? p.url : ""),
@@ -43,9 +43,9 @@ export function useFloatBrowser({
     let unlisten: (() => void) | undefined;
     listen<NavigatedEvent>("kex:float-navigated", (e) => {
       const { panelId, url } = e.payload;
-      const found = findPanelGlobal(panelId);
+      const found = findTabGlobal(panelId);
       if (!found) return;
-      updatePanelData(found.workspace.id, panelId, (p) => ({
+      updateTabData(found.workspace.id, panelId, (p) => ({
         ...p,
         url: url || (p.kind === "browser" ? p.url : ""),
       }));
@@ -57,12 +57,12 @@ export function useFloatBrowser({
   }, []);
 
   async function floatPanel(
-    panel: Panel & { kind: "browser" },
+    panel: Tab & { kind: "browser" },
     workspaceId: string,
   ): Promise<void> {
     if (!panel.url) return;
     // Mark as floating in state first so the placeholder renders immediately
-    updatePanelData(workspaceId, panel.id, (p) => ({ ...p, floating: true }));
+    updateTabData(workspaceId, panel.id, (p) => ({ ...p, floating: true }));
     try {
       await invoke("float_browser_open", {
         panelId: panel.id,
@@ -72,7 +72,7 @@ export function useFloatBrowser({
       });
     } catch (err) {
       // Rollback on failure
-      updatePanelData(workspaceId, panel.id, (p) => ({ ...p, floating: false }));
+      updateTabData(workspaceId, panel.id, (p) => ({ ...p, floating: false }));
       console.error("[float-browser] open failed:", err);
     }
   }
@@ -111,15 +111,15 @@ export function useFloatBrowser({
   }
 
   // Called once on startup with the restored workspace list.
-  // Re-opens floating windows for any panel with floating: true.
+  // Re-opens floating windows for any tab with floating: true.
   async function restoreFloatingPanels(wss: Workspace[]): Promise<void> {
     for (const ws of wss) {
       for (const pane of allPanes(ws.paneTree)) {
-        for (const panel of pane.panels) {
-          if (panel.kind === "browser" && panel.floating && panel.url) {
+        for (const tab of pane.tabs) {
+          if (tab.kind === "browser" && tab.floating && tab.url) {
             await invoke("float_browser_open", {
-              panelId: panel.id,
-              url: panel.url,
+              panelId: tab.id,
+              url: tab.url,
               originWindowLabel,
               workspaceId: ws.id,
             }).catch((err) =>
@@ -139,9 +139,9 @@ export function useFloatBrowser({
     const ws = wss.find((w) => w.id === closingWorkspaceId);
     if (!ws) return;
     for (const pane of allPanes(ws.paneTree)) {
-      for (const panel of pane.panels) {
-        if (panel.kind === "browser" && panel.floating) {
-          await invoke("float_browser_close", { panelId: panel.id }).catch(
+      for (const tab of pane.tabs) {
+        if (tab.kind === "browser" && tab.floating) {
+          await invoke("float_browser_close", { panelId: tab.id }).catch(
             () => {},
           );
         }

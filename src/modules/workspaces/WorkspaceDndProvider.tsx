@@ -13,8 +13,8 @@ import {
 import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { panelForDroppedPath } from "./lib/dropPanel";
-import { allPanes, findPanelPane } from "./lib/splitNode";
+import { tabForDroppedPath } from "./lib/dropPanel";
+import { allPanes, findTabPane } from "./lib/splitNode";
 import {
   insertIntoLeafScratchpad,
   leafCwd,
@@ -24,12 +24,12 @@ import {
   SCRATCHPAD_DROP_PREFIX,
 } from "@/modules/terminal/lib/scratchpadPath";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { basename, panelIcon, panelTitle } from "./lib/panelTitle";
-import type { Panel, Workspace } from "./lib/types";
+import { basename, tabIcon, tabTitle } from "./lib/tabTitle";
+import type { Tab, Workspace } from "./lib/types";
 import type { UseWorkspacesReturn } from "./lib/useWorkspaces";
 
 type DraggingItem =
-  | { kind: "panel"; panel: Panel; workspaceId: string }
+  | { kind: "tab"; tab: Tab; workspaceId: string }
   // paneOnly: drags that may only open a terminal in a pane (the explorer's
   // synthetic root and ".." rows), never participate in internal explorer moves.
   | { kind: "file"; path: string; isDir: boolean; paneOnly?: boolean };
@@ -69,8 +69,8 @@ const collisionDetection: CollisionDetection = (args) => {
 type Props = {
   workspaces: Workspace[];
   activeWorkspaceId: string;
-  onMovePanel: UseWorkspacesReturn["movePanel"];
-  onReorderPanel: UseWorkspacesReturn["reorderPanel"];
+  onMoveTab: UseWorkspacesReturn["moveTab"];
+  onReorderTab: UseWorkspacesReturn["reorderTab"];
   onSplitPaneAndPlace: UseWorkspacesReturn["splitPaneAndPlace"];
   onSplitPaneAndOpenPanel: UseWorkspacesReturn["splitPaneAndOpenPanel"];
   onOpenPanel: UseWorkspacesReturn["openPanel"];
@@ -80,8 +80,8 @@ type Props = {
 export function WorkspaceDndProvider({
   workspaces,
   activeWorkspaceId,
-  onMovePanel,
-  onReorderPanel,
+  onMoveTab,
+  onReorderTab,
   onSplitPaneAndPlace,
   onSplitPaneAndOpenPanel,
   onOpenPanel,
@@ -100,8 +100,8 @@ export function WorkspaceDndProvider({
     const idx = new Map<string, { paneId: string; wsId: string }>();
     for (const ws of workspaces) {
       for (const pane of allPanes(ws.paneTree)) {
-        for (const panel of pane.panels) {
-          idx.set(panel.id, { paneId: pane.id, wsId: ws.id });
+        for (const tab of pane.tabs) {
+          idx.set(tab.id, { paneId: pane.id, wsId: ws.id });
         }
       }
     }
@@ -132,8 +132,8 @@ export function WorkspaceDndProvider({
     if (entry) {
       const ws = workspaces.find((w) => w.id === entry.wsId);
       if (ws) {
-        const result = findPanelPane(ws.paneTree, activeId);
-        if (result) setDraggingItem({ kind: "panel", panel: result.panel, workspaceId: ws.id });
+        const result = findTabPane(ws.paneTree, activeId);
+        if (result) setDraggingItem({ kind: "tab", tab: result.tab, workspaceId: ws.id });
       }
     }
   }
@@ -208,7 +208,7 @@ export function WorkspaceDndProvider({
       return;
     }
 
-    handlePanelDragEnd(activeId, overId, idx);
+    handleTabDragEnd(activeId, overId, idx);
   }
 
   // A file/folder dropped on a terminal's scratchpad bar inserts its path,
@@ -228,12 +228,12 @@ export function WorkspaceDndProvider({
     const panes = allPanes(activeWs.paneTree);
 
     // Folders open a fresh terminal at that cwd; files reuse an already-open editor.
-    const makePanel = (): Panel => panelForDroppedPath(filePath, isDir);
+    const makePanel = (): Tab => tabForDroppedPath(filePath, isDir);
 
     let existingPanelId: string | null = null;
     if (!isDir) {
       for (const pane of panes) {
-        const found = pane.panels.find((p) => p.kind === "editor" && p.path === filePath);
+        const found = pane.tabs.find((p) => p.kind === "editor" && p.path === filePath);
         if (found) { existingPanelId = found.id; break; }
       }
     }
@@ -249,7 +249,7 @@ export function WorkspaceDndProvider({
       const targetPaneId = targetEntry.paneId;
       const targetPane = panes.find((p) => p.id === targetPaneId);
       if (!targetPane) return;
-      const refPanelIndex = targetPane.panels.findIndex((p) => p.id === refPanelId);
+      const refPanelIndex = targetPane.tabs.findIndex((p) => p.id === refPanelId);
       if (refPanelIndex === -1) return;
 
       const insertionIndex = refPanelIndex + (side === "after" ? 1 : 0);
@@ -258,9 +258,9 @@ export function WorkspaceDndProvider({
         const sourcePaneId = idx.get(existingPanelId)?.paneId ?? null;
         if (!sourcePaneId) return;
         if (sourcePaneId === targetPaneId) {
-          onReorderPanel(activeWorkspaceIdRef.current, existingPanelId, insertionIndex);
+          onReorderTab(activeWorkspaceIdRef.current, existingPanelId, insertionIndex);
         } else {
-          onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId, insertionIndex);
+          onMoveTab(activeWorkspaceIdRef.current, existingPanelId, targetPaneId, insertionIndex);
         }
       } else {
         onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, makePanel(), insertionIndex);
@@ -280,7 +280,7 @@ export function WorkspaceDndProvider({
       if (existingPanelId) {
         const sourcePaneId = idx.get(existingPanelId)?.paneId ?? null;
         if (sourcePaneId === targetPaneId) return;
-        onMovePanel(activeWorkspaceIdRef.current, existingPanelId, targetPaneId);
+        onMoveTab(activeWorkspaceIdRef.current, existingPanelId, targetPaneId);
       } else {
         onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, makePanel());
       }
@@ -295,7 +295,7 @@ export function WorkspaceDndProvider({
     }
   }
 
-  function handlePanelDragEnd(panelId: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>) {
+  function handleTabDragEnd(panelId: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>) {
     const sourceEntry = idx.get(panelId);
     if (!sourceEntry) return;
     const { paneId: sourcePaneId, wsId: sourceWorkspaceId } = sourceEntry;
@@ -314,14 +314,14 @@ export function WorkspaceDndProvider({
       const targetPaneId = targetEntry.paneId;
       const targetPane = allPanes(sourceWs.paneTree).find((p) => p.id === targetPaneId);
       if (!targetPane) return;
-      const refPanelIndex = targetPane.panels.findIndex((p) => p.id === refPanelId);
+      const refPanelIndex = targetPane.tabs.findIndex((p) => p.id === refPanelId);
       if (refPanelIndex === -1) return;
 
       const insertionIndex = refPanelIndex + (side === "after" ? 1 : 0);
       if (sourcePaneId === targetPaneId) {
-        onReorderPanel(sourceWorkspaceId, panelId, insertionIndex);
+        onReorderTab(sourceWorkspaceId, panelId, insertionIndex);
       } else {
-        onMovePanel(sourceWorkspaceId, panelId, targetPaneId, insertionIndex);
+        onMoveTab(sourceWorkspaceId, panelId, targetPaneId, insertionIndex);
       }
       return;
     }
@@ -336,7 +336,7 @@ export function WorkspaceDndProvider({
 
     if (zone === "center") {
       if (sourcePaneId === targetPaneId) return;
-      onMovePanel(sourceWorkspaceId, panelId, targetPaneId);
+      onMoveTab(sourceWorkspaceId, panelId, targetPaneId);
     } else {
       const { workspacePaneLimit } = usePreferencesStore.getState();
       if (sourcePanes.length >= workspacePaneLimit) return;
@@ -363,10 +363,10 @@ export function WorkspaceDndProvider({
         </WorkspaceDndInsertContext.Provider>
       </WorkspaceDndContext.Provider>
       <DragOverlay dropAnimation={null}>
-        {draggingItem?.kind === "panel" && (
+        {draggingItem?.kind === "tab" && (
           <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
-            <span className="shrink-0 opacity-70">{panelIcon(draggingItem.panel, draggingItem.workspaceId)}</span>
-            <span className="max-w-[120px] truncate">{panelTitle(draggingItem.panel)}</span>
+            <span className="shrink-0 opacity-70">{tabIcon(draggingItem.tab, draggingItem.workspaceId)}</span>
+            <span className="max-w-[120px] truncate">{tabTitle(draggingItem.tab)}</span>
           </div>
         )}
         {draggingItem?.kind === "file" && (

@@ -1,8 +1,8 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
-import { panelIcon, panelTitle } from "./lib/panelTitle";
-import { type Panel, isAutofocusPanel } from "./lib/types";
+import { tabIcon, tabTitle } from "./lib/tabTitle";
+import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -28,11 +28,11 @@ import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
-import { panelFilePath } from "./lib/panelPath";
+import { tabFilePath } from "./lib/tabPath";
 
 type Props = {
-  panels: Panel[];
-  activePanelId: string | null;
+  tabs: Tab[];
+  activeTabId: string | null;
   paneFocused: boolean;
   workspaceId: string;
   isWorkspaceActive: boolean;
@@ -48,7 +48,7 @@ type Props = {
   onSplitBrowserDown: () => void;
   onDetachAgent: (panelId: string) => void;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
-  onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
+  onUpdatePanel?: (panelId: string, updater: (p: Tab) => Tab) => void;
   onRenameFile?: (panelId: string, newName: string) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatus?: GitStatusSnapshot | null;
@@ -56,14 +56,14 @@ type Props = {
 };
 
 function DraggableTab({
-  panel,
-  activePanelId,
+  tab,
+  activeTabId,
   paneFocused,
   workspaceId,
   isWorkspaceActive,
   insertionBefore,
   insertionAfter,
-  panelsCount,
+  tabsCount,
   onActivate,
   onClose,
   onCloseOtherPanels,
@@ -83,14 +83,14 @@ function DraggableTab({
   gitStatus,
   gitColorScheme,
 }: {
-  panel: Panel;
-  activePanelId: string | null;
+  tab: Tab;
+  activeTabId: string | null;
   paneFocused: boolean;
   workspaceId: string;
   isWorkspaceActive: boolean;
   insertionBefore: boolean;
   insertionAfter: boolean;
-  panelsCount: number;
+  tabsCount: number;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
   onCloseOtherPanels: (panelId: string) => void;
@@ -104,13 +104,13 @@ function DraggableTab({
   onDetachAgent: (panelId: string) => void;
   shortcutLabels: Record<string, string | null>;
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
-  onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
+  onUpdatePanel?: (panelId: string, updater: (p: Tab) => Tab) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatusMap?: Map<string, GitStatusCode> | null;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: panel.id });
+  const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: tab.id });
   const wrappedListeners = useMemo(() => ({
     ...listeners,
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
@@ -119,52 +119,52 @@ function DraggableTab({
       listeners?.onPointerDown?.(e as React.PointerEvent);
     },
   }), [listeners]);
-  const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${panel.id}:before`, disabled: !isWorkspaceActive });
-  const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${panel.id}:after`, disabled: !isWorkspaceActive });
-  const active = panel.id === activePanelId;
-  // Every panel can be locked, no exception.
-  const isLocked = panel.locked ?? false;
-  const focusFilePath = panelFilePath(panel);
+  const { setNodeRef: setBeforeRef } = useDroppable({ id: `tab-insert:${tab.id}:before`, disabled: !isWorkspaceActive });
+  const { setNodeRef: setAfterRef } = useDroppable({ id: `tab-insert:${tab.id}:after`, disabled: !isWorkspaceActive });
+  const active = tab.id === activeTabId;
+  // Every tab can be locked, no exception.
+  const isLocked = tab.locked ?? false;
+  const focusFilePath = tabFilePath(tab);
   const focusTarget =
-    focusFilePath ?? (panel.kind === "terminal" ? (panel.cwd ?? null) : null);
+    focusFilePath ?? (tab.kind === "terminal" ? (tab.cwd ?? null) : null);
   const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
-  const runningCommand = panel.kind === "terminal" ? (runningCommandMap.get(panel.id) ?? null) : null;
+  const runningCommand = tab.kind === "terminal" ? (runningCommandMap.get(tab.id) ?? null) : null;
   const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
-  const oscTitle = panel.kind === "terminal" ? oscTitleMap.get(panel.id) : undefined;
-  const title = panelTitle(panel, runningCommand, oscTitle);
+  const oscTitle = tab.kind === "terminal" ? oscTitleMap.get(tab.id) : undefined;
+  const title = tabTitle(tab, runningCommand, oscTitle);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
-  const agentSession = useAgentStore((s) => s.sessions[panel.id]);
+  const agentSession = useAgentStore((s) => s.sessions[tab.id]);
   const hasAgent = agentSession !== undefined;
   const isRestoreError = agentSession?.restoreError ?? false;
 
   const tabColor = useMemo(() => {
-    if (panel.kind !== "editor" || !gitStatusMap || !gitStatus) return null;
-    const code = lookupGitStatus(gitStatusMap, gitStatus.repoRoot, panel.path);
+    if (tab.kind !== "editor" || !gitStatusMap || !gitStatus) return null;
+    const code = lookupGitStatus(gitStatusMap, gitStatus.repoRoot, tab.path);
     return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode") : null;
-  }, [panel, gitStatusMap, gitStatus, gitColorScheme]);
+  }, [tab, gitStatusMap, gitStatus, gitColorScheme]);
 
   const agentTitle = (() => {
-    if (!hasAgent || panel.kind !== "terminal") return title;
-    if (panel.title) return panel.title;
+    if (!hasAgent || tab.kind !== "terminal") return title;
+    if (tab.title) return tab.title;
     if (oscTitle) return oscTitle;
     const agentName = agentSession!.agent;
-    const cwd = panel.cwd ?? "";
+    const cwd = tab.cwd ?? "";
     const dirname = cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd;
     return `${agentName} · ${dirname || title}`;
   })();
 
   // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
   // Paths (cwd segments): truncate from the left so the deepest directory stays visible.
-  const isDescription = !!(panel.title || oscTitle);
+  const isDescription = !!(tab.title || oscTitle);
   const displayTitle = isDescription
     ? agentTitle
     : agentTitle.length > 28
-      ? '…' + agentTitle.slice(-27)
+      ? '...' + agentTitle.slice(-27)
       : agentTitle;
 
-  const isRenaming = useTabRenameStore((s) => s.renamingPanelId === panel.id);
+  const isRenaming = useTabRenameStore((s) => s.renamingPanelId === tab.id);
   const anyRenaming = useTabRenameStore((s) => s.renamingPanelId !== null);
   const clearRename = useTabRenameStore((s) => s.clearRename);
   const startRename = useTabRenameStore((s) => s.startRename);
@@ -172,7 +172,7 @@ function DraggableTab({
   const handledRef = useRef(false);
   const lockFlashSnap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
   const lockFlashToken =
-    lockFlashSnap.panelId === panel.id ? lockFlashSnap.seq : 0;
+    lockFlashSnap.panelId === tab.id ? lockFlashSnap.seq : 0;
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
@@ -182,7 +182,7 @@ function DraggableTab({
     if (handledRef.current) return;
     handledRef.current = true;
     const value = inputRef.current?.value.trim() ?? "";
-    onRenamePanel?.(panel.id, value || undefined);
+    onRenamePanel?.(tab.id, value || undefined);
     clearRename();
   }
 
@@ -193,7 +193,7 @@ function DraggableTab({
   }
 
   const nativeTooltip = (() => {
-    const cwd = panel.kind === "terminal" ? panel.cwd : undefined;
+    const cwd = tab.kind === "terminal" ? tab.cwd : undefined;
     const parts: string[] = [];
     if (cwd) parts.push(cwd);
     if (agentSession) {
@@ -209,11 +209,11 @@ function DraggableTab({
     <div
       ref={setNodeRef}
       {...attributes}
-      data-panel-id={panel.id}
+      data-panel-id={tab.id}
       title={nativeTooltip}
-      onClick={() => onActivate(panel.id)}
+      onClick={() => onActivate(tab.id)}
       onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
-      onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(panel.id); } }}
+      onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(tab.id); } }}
       onContextMenu={(e) => { if (anyRenaming) e.preventDefault(); }}
       {...wrappedListeners}
       className={cn(
@@ -258,22 +258,22 @@ function DraggableTab({
                 <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />
               </span>
             : <AgentIcon agent={agentSession!.agent} size={12} />
-          : panel.kind === "browser" && panel.floating
+          : tab.kind === "browser" && tab.floating
             ? <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
-            : panelIcon(panel, workspaceId)}
+            : tabIcon(tab, workspaceId)}
       </span>
       <span
         className={cn(
           "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
-          !isDescription && panel.kind === "terminal" && !!runningCommand && "text-center",
+          !isDescription && tab.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
-          panel.kind === "editor" && panel.preview && "italic",
+          tab.kind === "editor" && tab.preview && "italic",
         )}
         style={tabColor && !isRestoreError ? { color: tabColor } : undefined}
       >
         {displayTitle}
       </span>
-      {panel.kind === "editor" && panel.dirty && !editorAutoSave && (
+      {tab.kind === "editor" && tab.dirty && !editorAutoSave && (
         <span className="shrink-0 text-[8px] text-primary">●</span>
       )}
       {hasAgent && (
@@ -285,7 +285,7 @@ function DraggableTab({
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null
       )}
-      {isAutofocusPanel(panel) && panel.autofocus && (
+      {isAutofocusTab(tab) && tab.autofocus && (
         <span
           className="ml-0.5 shrink-0 text-muted-foreground"
           title="Autofocus: this tab drives the sidebar"
@@ -300,7 +300,7 @@ function DraggableTab({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            onUpdatePanel?.(panel.id, (p) => ({ ...p, locked: false }));
+            onUpdatePanel?.(tab.id, (p) => ({ ...p, locked: false }));
           }}
           title="Unlock tab"
         >
@@ -314,9 +314,9 @@ function DraggableTab({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            onClose(panel.id);
+            onClose(tab.id);
           }}
-          title="Close panel"
+          title="Close tab"
         >
           <span className="text-[13px] leading-none">×</span>
         </button>
@@ -338,15 +338,15 @@ function DraggableTab({
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
             {onRenamePanel && (
               <>
-                <ContextMenuItem onSelect={() => startRename(panel.id)}>
+                <ContextMenuItem onSelect={() => startRename(tab.id)}>
                   <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
                   Rename Tab
                   {shortcutLabels["tab.rename"] && (
                     <ContextMenuShortcut>{shortcutLabels["tab.rename"]}</ContextMenuShortcut>
                   )}
                 </ContextMenuItem>
-                {panel.title && (
-                  <ContextMenuItem onSelect={() => onRenamePanel(panel.id, undefined)}>
+                {tab.title && (
+                  <ContextMenuItem onSelect={() => onRenamePanel(tab.id, undefined)}>
                     <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} strokeWidth={2} />
                     Reset Tab Name
                   </ContextMenuItem>
@@ -354,11 +354,11 @@ function DraggableTab({
                 <ContextMenuSeparator />
               </>
             )}
-            {((onFocusOnExplorer && focusTarget) || isAutofocusPanel(panel)) && (
+            {((onFocusOnExplorer && focusTarget) || isAutofocusTab(tab)) && (
               <>
                 {onFocusOnExplorer && focusTarget && (
                   <ContextMenuItem
-                    disabled={isAutofocusPanel(panel) && (panel.autofocus ?? false)}
+                    disabled={isAutofocusTab(tab) && (tab.autofocus ?? false)}
                     onSelect={() => onFocusOnExplorer(focusTarget)}
                   >
                     <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
@@ -370,11 +370,11 @@ function DraggableTab({
                     )}
                   </ContextMenuItem>
                 )}
-                {isAutofocusPanel(panel) && (
+                {isAutofocusTab(tab) && (
                   <ContextMenuItem
                     onSelect={() =>
-                      onUpdatePanel?.(panel.id, (p) =>
-                        isAutofocusPanel(p)
+                      onUpdatePanel?.(tab.id, (p) =>
+                        isAutofocusTab(p)
                           ? { ...p, autofocus: !p.autofocus }
                           : p,
                       )
@@ -384,7 +384,7 @@ function DraggableTab({
                       icon={CrosshairIcon}
                       size={14}
                       strokeWidth={2}
-                      className={panel.autofocus ? "text-primary" : undefined}
+                      className={tab.autofocus ? "text-primary" : undefined}
                     />
                     Autofocus Sidebar
                     {shortcutLabels["tab.toggleAutofocus"] && (
@@ -398,7 +398,7 @@ function DraggableTab({
               </>
             )}
             <ContextMenuItem
-              onSelect={() => onUpdatePanel?.(panel.id, (p) => {
+              onSelect={() => onUpdatePanel?.(tab.id, (p) => {
                 const newLocked = !isLocked;
                 return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
               })}
@@ -409,7 +409,7 @@ function DraggableTab({
                 <ContextMenuShortcut>{shortcutLabels["tab.lock"]}</ContextMenuShortcut>
               )}
             </ContextMenuItem>
-            <ContextMenuItem disabled={isLocked} onSelect={() => onClose(panel.id)}>
+            <ContextMenuItem disabled={isLocked} onSelect={() => onClose(tab.id)}>
               <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
               Close Tab
               {!isLocked && shortcutLabels["tab.close"] && (
@@ -417,8 +417,8 @@ function DraggableTab({
               )}
             </ContextMenuItem>
             <ContextMenuItem
-              disabled={panelsCount <= 1}
-              onSelect={() => onCloseOtherPanels(panel.id)}
+              disabled={tabsCount <= 1}
+              onSelect={() => onCloseOtherPanels(tab.id)}
             >
               <HugeiconsIcon icon={CancelCircleIcon} size={14} strokeWidth={2} />
               Close Other Tabs
@@ -430,7 +430,7 @@ function DraggableTab({
             {hasAgent && (
               <>
                 <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => onDetachAgent(panel.id)}>
+                <ContextMenuItem onSelect={() => onDetachAgent(tab.id)}>
                   <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={2} />
                   Detach Claude
                 </ContextMenuItem>
@@ -492,7 +492,7 @@ function DraggableTab({
           autoFocus
           onFocus={(e) => { e.stopPropagation(); e.currentTarget.select(); }}
           onBlur={handleSave}
-          defaultValue={panel.title ?? ""}
+          defaultValue={tab.title ?? ""}
           placeholder={title}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); handleSave(); }
@@ -505,7 +505,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
+export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherPanels, onCloseAllPanels, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenamePanel, onUpdatePanel, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -523,7 +523,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const activePanelIdRef = useRef(activePanelId);
+  const activeTabIdRef = useRef(activeTabId);
   const userScrolledRef = useRef(false);
   const mouseLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mouseInsideRef = useRef(true);
@@ -533,7 +533,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     isRenamingRef.current = renamingPanelId !== null;
   }, [renamingPanelId]);
 
-  useEffect(() => { activePanelIdRef.current = activePanelId; });
+  useEffect(() => { activeTabIdRef.current = activeTabId; });
 
   const scrollPanelIntoView = (panelId: string, behavior: ScrollBehavior = 'smooth') => {
     const container = scrollContainerRef.current;
@@ -550,7 +550,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   };
 
   const scrollActiveIntoView = (behavior: ScrollBehavior = 'auto') => {
-    const id = activePanelIdRef.current;
+    const id = activeTabIdRef.current;
     if (!id) return;
     scrollPanelIntoView(id, behavior);
   };
@@ -559,7 +559,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
   useEffect(() => {
     if (userScrolledRef.current) return;
     scrollActiveIntoView('auto');
-  }, [activePanelId]);
+  }, [activeTabId]);
 
   // Wheel scroll: translate vertical delta to horizontal; snap-back managed by focus/mouse-leave logic
   useEffect(() => {
@@ -596,7 +596,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
     return () => observer.disconnect();
   }, []);
 
-  // Snap back when the panel list changes (tab opened or closed)
+  // Snap back when the tab list changes (tab opened or closed)
   useEffect(() => {
     userScrolledRef.current = false;
     if (mouseLeaveTimerRef.current) {
@@ -604,7 +604,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
       mouseLeaveTimerRef.current = null;
     }
     scrollActiveIntoView('auto');
-  }, [panels.length]);
+  }, [tabs.length]);
 
   useDndMonitor({
     onDragStart() {},
@@ -618,7 +618,7 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
       const refPanelId = parts[1];
       const side = parts[2];
       if (!refPanelId || !side) { setInsertionIndex(null); return; }
-      const idx = panels.findIndex((p) => p.id === refPanelId);
+      const idx = tabs.findIndex((p) => p.id === refPanelId);
       if (idx === -1) { setInsertionIndex(null); return; }
       const insertionIdx = side === "before" ? idx : idx + 1;
       setInsertionIndex(insertionIdx);
@@ -679,17 +679,17 @@ export function PaneTabBar({ panels, activePanelId, paneFocused, workspaceId, is
         if (dx < 6 && dy < 6) onActivate(panelId);
       }}
     >
-      {panels.map((p, i) => (
+      {tabs.map((p, i) => (
         <DraggableTab
           key={p.id}
-          panel={p}
-          activePanelId={activePanelId}
+          tab={p}
+          activeTabId={activeTabId}
           paneFocused={paneFocused}
           workspaceId={workspaceId}
           isWorkspaceActive={isWorkspaceActive}
           insertionBefore={insertionIndex === 0 && i === 0}
           insertionAfter={insertionIndex !== null && insertionIndex > 0 && i === insertionIndex - 1}
-          panelsCount={panels.length}
+          tabsCount={tabs.length}
           onActivate={onActivate}
           onClose={onClose}
           onCloseOtherPanels={onCloseOtherPanels}

@@ -20,11 +20,11 @@ import {
 } from "@/modules/settings/store";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { openFileTypesSettings } from "@/modules/settings/openSettingsWindow";
-import type { Panel, ScratchpadState } from "./lib/types";
+import type { Tab, ScratchpadState } from "./lib/types";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 
 // TerminalPane is intentionally eager (terminal-first app).
-// All other heavy panel types are lazy-loaded to keep the startup bundle lean.
+// All other heavy tab types are lazy-loaded to keep the startup bundle lean.
 const EditorPane = lazy(() =>
   import("@/modules/editor/EditorPane").then((m) => ({ default: m.EditorPane as ComponentType<any> })),
 );
@@ -64,7 +64,7 @@ type CommitFileDiffOpenInput = {
   originalPath: string | null;
 };
 
-export type PanelCallbacks = {
+export type TabCallbacks = {
   // Terminal callbacks
   onSearchReady?: (panelId: string, addon: SearchAddon) => void;
   onExit?: (panelId: string, code: number) => void;
@@ -89,8 +89,8 @@ export type PanelCallbacks = {
   onGitHistorySearchHandle?: (panelId: string, handle: GitHistorySearchHandle | null) => void;
   // Tab rename
   onRenamePanel?: (panelId: string, title: string | undefined) => void;
-  // Panel data update (used by tab bar lock/restore toggles)
-  onUpdatePanel?: (panelId: string, updater: (p: Panel) => Panel) => void;
+  // Tab data update (used by tab bar lock/restore toggles)
+  onUpdatePanel?: (panelId: string, updater: (p: Tab) => Tab) => void;
   // File rename (editor/markdown tabs - renames the file on disk)
   onRenameFile?: (panelId: string, newName: string) => void;
   // Reveal an editor/markdown/git file in the explorer tree
@@ -103,17 +103,17 @@ export type PanelCallbacks = {
 };
 
 type Props = {
-  panel: Panel;
+  tab: Tab;
   visible: boolean;
   focused: boolean;
-  callbacks: PanelCallbacks;
+  callbacks: TabCallbacks;
   onFloatBrowserPanel?: (panelId: string) => void;
   onDockBrowserPanel?: (panelId: string) => void;
   onFocusFloatBrowserPanel?: (panelId: string) => void;
   onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
 };
 
-export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowserPanel, onDockBrowserPanel, onFocusFloatBrowserPanel, onNavigateFloatBrowserPanel }: Props) {
+export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPanel, onDockBrowserPanel, onFocusFloatBrowserPanel, onNavigateFloatBrowserPanel }: Props) {
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
   const browserRef = useRef<BrowserPaneHandle>(null);
@@ -129,7 +129,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
   );
 
   const [currentLanguageName, setCurrentLanguageName] = useState<string>(() =>
-    panel.kind === "editor" ? resolveDisplayName(panel.path) : "",
+    tab.kind === "editor" ? resolveDisplayName(tab.path) : "",
   );
 
   // Live content state for preview panes - updated via debounced onContentChange
@@ -168,9 +168,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
 
   // Derive effectivePreviewMode above the switch so hooks can use it unconditionally.
   // Coerces legacy boolean true (old saved workspace state) to "overlay".
-  const rawPM = panel.kind === "editor"
-    ? (panel.previewMode as "overlay" | "split" | boolean | undefined)
-    : panel.kind === "markdown"
+  const rawPM = tab.kind === "editor"
+    ? (tab.previewMode as "overlay" | "split" | boolean | undefined)
+    : tab.kind === "markdown"
       ? "overlay"
       : undefined;
   const effectivePreviewMode: "overlay" | "split" | undefined =
@@ -186,19 +186,19 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
     prevEffectivePreviewModeRef.current = effectivePreviewMode;
   }, [effectivePreviewMode]);
 
-  switch (panel.kind) {
+  switch (tab.kind) {
     case "terminal":
       return (
         <div className="flex h-full w-full flex-col">
           <TerminalPathBar
-            panelId={panel.id}
-            cwd={panel.cwd ?? ""}
+            panelId={tab.id}
+            cwd={tab.cwd ?? ""}
             home={home}
             workspaceRoot={workspaceRoot}
             gitRootPath={gitRootPath}
-            restoreOnRestart={panel.restoreOnRestart}
-            persistentCommand={panel.persistentCommand}
-            onUpdatePanel={(updater) => callbacks.onUpdatePanel?.(panel.id, updater)}
+            restoreOnRestart={tab.restoreOnRestart}
+            persistentCommand={tab.persistentCommand}
+            onUpdatePanel={(updater) => callbacks.onUpdatePanel?.(tab.id, updater)}
             onReveal={(p) => callbacks.onFocusOnExplorer?.(p)}
             onSetAsRoot={callbacks.onSetAsRoot}
             onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
@@ -209,17 +209,17 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
             <TerminalPane
               ref={(h) => {
                 (terminalRef as React.MutableRefObject<TerminalPaneHandle | null>).current = h;
-                callbacks.registerTerminalHandle?.(panel.id, h);
+                callbacks.registerTerminalHandle?.(tab.id, h);
               }}
-              panelId={panel.id}
+              panelId={tab.id}
               visible={visible}
               focused={focused}
-              initialCwd={panel.cwd}
-              blocks={panel.blocks}
-              restoreOnRestart={panel.restoreOnRestart}
-              persistentCommand={panel.persistentCommand}
+              initialCwd={tab.cwd}
+              blocks={tab.blocks}
+              restoreOnRestart={tab.restoreOnRestart}
+              persistentCommand={tab.persistentCommand}
               initialScratchpad={
-                panel.scratchpad ??
+                tab.scratchpad ??
                 (scratchpadInNewTerminals ? "focused" : "hidden")
               }
               onSearchReady={callbacks.onSearchReady}
@@ -233,15 +233,15 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       );
 
     case "editor": {
-      const overrideLang = panel.overrideLanguage ?? null;
-      const ismd = overrideLang ? isMarkdownPath(`x.${overrideLang}`) : isMarkdownPath(panel.path);
-      const ishtml = overrideLang ? isHtmlPath(`x.${overrideLang}`) : isHtmlPath(panel.path);
+      const overrideLang = tab.overrideLanguage ?? null;
+      const ismd = overrideLang ? isMarkdownPath(`x.${overrideLang}`) : isMarkdownPath(tab.path);
+      const ishtml = overrideLang ? isHtmlPath(`x.${overrideLang}`) : isHtmlPath(tab.path);
       const showPreviewToggle = ismd || ishtml;
 
-      const ext = extOf(panel.path);
+      const ext = extOf(tab.path);
       const viewToggles = {
         ext,
-        value: resolveEditorView(panel.path, editorViewByExt),
+        value: resolveEditorView(tab.path, editorViewByExt),
         onChange: (next: EditorViewSettings) =>
           void setEditorViewForExt(ext, next),
         onViewInSettings: () => void openFileTypesSettings(ext || undefined),
@@ -251,8 +251,8 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
         <Suspense fallback={null}>
           <div className="flex h-full w-full flex-col">
             <EditorPathBar
-              path={panel.path}
-              panelId={panel.id}
+              path={tab.path}
+              panelId={tab.id}
               workspaceRoot={workspaceRoot}
               home={home}
               gitRootPath={gitRootPath}
@@ -265,19 +265,19 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               onAddToGitignore={callbacks.onAddToGitignore}
               view={showPreviewToggle ? {
                 mode: effectivePreviewMode ?? "raw",
-                onToggleOverlay: () => callbacks.onToggleOverlayPreview?.(panel.id),
-                onToggleSplit: () => callbacks.onToggleSplitPreview?.(panel.id),
+                onToggleOverlay: () => callbacks.onToggleOverlayPreview?.(tab.id),
+                onToggleSplit: () => callbacks.onToggleSplitPreview?.(tab.id),
                 isHtml: ishtml,
               } : undefined}
               viewToggles={effectivePreviewMode == null ? viewToggles : undefined}
               globalToggles={effectivePreviewMode == null ? globalToggles : undefined}
-              overrideLanguage={panel.overrideLanguage}
+              overrideLanguage={tab.overrideLanguage}
               currentLanguageName={currentLanguageName}
               onLanguageChange={(lang) => {
                 const willShowPreview = lang
                   ? isMarkdownPath(`x.${lang}`) || isHtmlPath(`x.${lang}`)
-                  : isMarkdownPath(panel.path) || isHtmlPath(panel.path);
-                callbacks.onUpdatePanel?.(panel.id, (p) => {
+                  : isMarkdownPath(tab.path) || isHtmlPath(tab.path);
+                callbacks.onUpdatePanel?.(tab.id, (p) => {
                   if (p.kind !== "editor") return p;
                   return {
                     ...p,
@@ -303,15 +303,15 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                 <EditorPane
                   ref={(h: EditorPaneHandle | null) => {
                     (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
-                    callbacks.registerEditorHandle?.(panel.id, h);
+                    callbacks.registerEditorHandle?.(tab.id, h);
                   }}
-                  path={panel.path}
+                  path={tab.path}
                   onDirtyChange={(dirty: boolean) =>
-                    callbacks.onEditorDirtyChange?.(panel.id, dirty)
+                    callbacks.onEditorDirtyChange?.(tab.id, dirty)
                   }
-                  onClose={() => callbacks.onEditorClose?.(panel.id)}
+                  onClose={() => callbacks.onEditorClose?.(tab.id)}
                   onContentChange={handleContentChange}
-                  overrideLanguage={panel.overrideLanguage}
+                  overrideLanguage={tab.overrideLanguage}
                   onLanguageResolved={setCurrentLanguageName}
                 />
               </div>
@@ -331,7 +331,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                   style={effectivePreviewMode === "split" ? { left: "calc(50% + 1px)" } : undefined}
                 >
                   {ismd && <MarkdownPreviewPane content={liveContent} />}
-                  {ishtml && <HtmlPreviewPane content={liveContent} path={panel.path} />}
+                  {ishtml && <HtmlPreviewPane content={liveContent} path={tab.path} />}
                 </div>
               )}
             </div>
@@ -346,16 +346,16 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
           <BrowserPane
             ref={(h: BrowserPaneHandle | null) => {
               (browserRef as React.MutableRefObject<BrowserPaneHandle | null>).current = h;
-              callbacks.registerBrowserHandle?.(panel.id, h);
+              callbacks.registerBrowserHandle?.(tab.id, h);
             }}
-            url={panel.url}
-            floating={panel.floating ?? false}
+            url={tab.url}
+            floating={tab.floating ?? false}
             visible={visible}
-            onUrlChange={(url: string) => callbacks.onBrowserUrlChange?.(panel.id, url)}
-            onFloat={() => onFloatBrowserPanel?.(panel.id)}
-            onDock={() => onDockBrowserPanel?.(panel.id)}
-            onFocusFloat={() => onFocusFloatBrowserPanel?.(panel.id)}
-            onNavigateFloat={(url: string) => onNavigateFloatBrowserPanel?.(panel.id, url)}
+            onUrlChange={(url: string) => callbacks.onBrowserUrlChange?.(tab.id, url)}
+            onFloat={() => onFloatBrowserPanel?.(tab.id)}
+            onDock={() => onDockBrowserPanel?.(tab.id)}
+            onFocusFloat={() => onFocusFloatBrowserPanel?.(tab.id)}
+            onNavigateFloat={(url: string) => onNavigateFloatBrowserPanel?.(tab.id, url)}
           />
         </Suspense>
       );
@@ -365,8 +365,8 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
         <Suspense fallback={null}>
           <div className="flex h-full w-full flex-col">
             <EditorPathBar
-              path={panel.path}
-              panelId={panel.id}
+              path={tab.path}
+              panelId={tab.id}
               workspaceRoot={workspaceRoot}
               home={home}
               gitRootPath={gitRootPath}
@@ -379,8 +379,8 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
               onAddToGitignore={callbacks.onAddToGitignore}
               view={{
                 mode: "overlay",
-                onToggleOverlay: () => callbacks.onSetMarkdownView?.(panel.id, "raw"),
-                onToggleSplit: () => callbacks.onUpdatePanel?.(panel.id, (p) => {
+                onToggleOverlay: () => callbacks.onSetMarkdownView?.(tab.id, "raw"),
+                onToggleSplit: () => callbacks.onUpdatePanel?.(tab.id, (p) => {
                   if (p.kind !== "markdown") return p;
                   return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus };
                 }),
@@ -392,7 +392,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
                   ref={(h: EditorPaneHandle | null) => {
                     (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
                   }}
-                  path={panel.path}
+                  path={tab.path}
                   onContentChange={handleContentChange}
                   onReady={handleReady}
                 />
@@ -409,7 +409,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       return (
         <Suspense fallback={null}>
           <GitDiffPane
-            source={{ kind: "working", repoRoot: panel.repoRoot, path: panel.path, mode: panel.mode, originalPath: panel.originalPath }}
+            source={{ kind: "working", repoRoot: tab.repoRoot, path: tab.path, mode: tab.mode, originalPath: tab.originalPath }}
             active={visible}
             workspaceRoot={workspaceRoot}
             home={home}
@@ -423,7 +423,7 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       return (
         <Suspense fallback={null}>
           <GitDiffPane
-            source={{ kind: "commit", repoRoot: panel.repoRoot, sha: panel.sha, path: panel.path, originalPath: panel.originalPath }}
+            source={{ kind: "commit", repoRoot: tab.repoRoot, sha: tab.sha, path: tab.path, originalPath: tab.originalPath }}
             active={visible}
             workspaceRoot={workspaceRoot}
             home={home}
@@ -437,9 +437,9 @@ export function PanelContent({ panel, visible, focused, callbacks, onFloatBrowse
       return (
         <Suspense fallback={null}>
           <GitHistoryPane
-            repoRoot={panel.repoRoot}
+            repoRoot={tab.repoRoot}
             onOpenCommitFile={(input: CommitFileDiffOpenInput) => callbacks.onOpenCommitFile?.(input)}
-            onSearchHandle={(handle: GitHistorySearchHandle | null) => callbacks.onGitHistorySearchHandle?.(panel.id, handle)}
+            onSearchHandle={(handle: GitHistorySearchHandle | null) => callbacks.onGitHistorySearchHandle?.(tab.id, handle)}
           />
         </Suspense>
       );

@@ -100,7 +100,7 @@ state (geometry + Workspaces + active index) is persisted by Rust in `{app_data_
 `{app_data_dir}/workspaces/<id>.json` (bodies), keyed by window label, and restored on startup. Path alias `@/*` →
 `src/*`. The layout is a 3-column shell: a narrow (52px) `WorkspaceBar`
 on the left, a resizable center content area, and a collapsible `Sidebar` (Explorer / Source Control / Git History).
-Content is organized as Workspaces → Panes → Panels. Panels are a tagged union (`kind`: `terminal` | `editor` |
+Content is organized as Workspaces → Panes → Tabs. Tabs are a tagged union (`kind`: `terminal` | `editor` |
 `browser` | `markdown` | `git-diff` | `git-history` | `git-commit-file`) and **not** unmounted on switch — they're
 hidden via `invisible pointer-events-none` so PTYs and dev servers keep streaming in the background.
 
@@ -110,7 +110,7 @@ hidden via `invisible pointer-events-none` so PTYs and dev servers keep streamin
 
 Each module is self-contained, exports a thin barrel via `index.ts`, and owns its hooks under `lib/`.
 
-- **terminal/** — `useTerminalSession` + `pty-bridge` keep one mounted xterm per panel (panels are never unmounted).
+- **terminal/** — `useTerminalSession` + `pty-bridge` keep one mounted xterm per tab (tabs are never unmounted).
   `osc-handlers.ts` parses OSC 7 (with Windows drive-letter normalization: `/C:/Users/foo` → `C:/Users/foo`) and OSC 133
   markers. The xterm color palette is driven by the central theme engine (`modules/theme`), not a local table.
 - **editor/** — CodeMirror 6 stack (`EditorStack` mirrors `TerminalStack`). `extensions.ts` configures language modes;
@@ -125,9 +125,9 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **shortcuts/** — keymap registry (`shortcuts.ts`) + `useGlobalShortcuts`. Handlers live in `App.tsx` and are passed in
   by id (`tab.new`, …). `metaKey || ctrlKey` for cross-platform Cmd/Ctrl.
 - **settings/** — settings store (`store.ts` via `tauri-plugin-store`), preferences hook, settings window opener.
-- **workspaces/** — source of truth for the Workspace/Pane/Panel model. `useWorkspaces` owns state; `splitNode.ts` is
+- **workspaces/** — source of truth for the Workspace/Pane/Tab model. `useWorkspaces` owns state; `splitNode.ts` is
   the pure tree-operation library (split, remove, find, flatten). Rendering: `WorkspaceView` → `SplitNodeView` (
-  recursive binary tree) → `PaneView` → `PanelContent` (switches on `panel.kind`). State persisted to
+  recursive binary tree) → `PaneView` → `TabContent` (switches on `tab.kind`). State persisted to
   `workspace-state.json` via `tauri-plugin-store`, debounced 300ms on every change.
 - **source-control/** — git status / stage / commit panel and diff workflow.
 - **git-history/** — commit graph rail, refs, per-commit file diffs.
@@ -209,7 +209,7 @@ a follow-up.
 
 Three complementary files — read the one that matches your task:
 
-- **`docs/ARCHITECTURE.md`** — design overview, Workspace/Pane/Panel model, technical decisions with user-visible
+- **`docs/ARCHITECTURE.md`** — design overview, Workspace/Pane/Tab model, technical decisions with user-visible
   effects, known limitations, tech stack, frontend module map, security model. Read this first whenever you touch any
   subsystem.
 - **`docs/IPC.md`** — full Tauri command surface (`pty::*`, `fs::*`, `git::*`, `shell::*`, `workspace::*`, `history::*`,
@@ -220,7 +220,7 @@ Three complementary files — read the one that matches your task:
 Update the relevant file(s) whenever:
 
 - A module is added, removed, or significantly restructured.
-- The Workspace/Pane/Panel data model changes.
+- The Workspace/Pane/Tab data model changes.
 - A new Tauri command is registered or an existing one is removed.
 - A technical decision with user-visible effects changes (rendering strategy, persistence, path handling, etc.).
 - A known limitation is resolved or a new one is discovered.
@@ -231,7 +231,7 @@ Do not restate what the code already makes obvious. The doc covers the *why* and
 
 Deep-dive into the workspace rendering stack and terminal slot pool:
 
-- **`docs/WORKSPACES.md`** — Workspace/Pane/Panel data model, render tree (WorkspaceView → PaneView → PanelContent),
+- **`docs/WORKSPACES.md`** — Workspace/Pane/Tab data model, render tree (WorkspaceView → PaneView → TabContent),
   terminal session lifecycle, renderer slot pool (slot acquire/bind/unbind/reap, WebGL context management, dormant ring
   buffer), drag-and-drop architecture, resize handle constraints. Update whenever the rendering strategy, pool
   constants, visibility semantics, or drag-and-drop wiring changes.
@@ -260,6 +260,6 @@ exist."
   Descendants (e.g. `npm run dev` started inside pwsh) survive unless something else takes them down. The Job Object in
   `pty/job.rs` handles this for the Kex-process-death case; an explicit `pty_close` from JS also kills only the
   immediate child + relies on the Job to take the rest. Don't disable the Job without a replacement.
-- **Panel `cwd` storage**: comes from OSC 7 with forward slashes (after `parseOsc7` strips `/C:` → `C:`). Anything that
-  consumes `panel.cwd` and passes it to a Rust fs command on Windows must normalize separators or accept both forms —
+- **Tab `cwd` storage**: comes from OSC 7 with forward slashes (after `parseOsc7` strips `/C:` → `C:`). Anything that
+  consumes `tab.cwd` and passes it to a Rust fs command on Windows must normalize separators or accept both forms —
   `apply_common` in `pty::shell_init` handles this for PTY spawn; other call sites must do their own.

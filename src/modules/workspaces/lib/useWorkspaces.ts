@@ -10,17 +10,17 @@ import {
   allPaneIds,
   allPanes,
   findPane,
-  findPanelPane,
+  findTabPane,
   firstPaneId,
-  movePanelBetweenPanes,
+  moveTabBetweenPanes,
   removePaneFromTree,
   siblingPane,
-  splitPaneAndInsertPanel,
+  splitPaneAndInsertTab,
   splitPaneInTree,
   updateDivider,
   updatePane,
 } from "./splitNode";
-import { type ClosedEntry, type Panel, type PaneNode, type RunConfig, type Workspace, type WorkspaceGitConfig, isAutofocusPanel } from "./types";
+import { type ClosedEntry, type Tab, type PaneNode, type RunConfig, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
 
@@ -51,11 +51,11 @@ export function findReopenTarget(
 // New autofocus-capable tabs inherit the "autofocus in new tabs" preference,
 // unless they already carry an explicit flag. Restored tabs never pass through
 // here, so their persisted flag is preserved.
-function withNewTabAutofocus(panel: Panel): Panel {
-  if (!isAutofocusPanel(panel) || panel.autofocus !== undefined) return panel;
+function withNewTabAutofocus(tab: Tab): Tab {
+  if (!isAutofocusTab(tab) || tab.autofocus !== undefined) return tab;
   return usePreferencesStore.getState().autofocusNewTabs
-    ? { ...panel, autofocus: true }
-    : panel;
+    ? { ...tab, autofocus: true }
+    : tab;
 }
 
 export function applyExplorerRootMode(
@@ -138,7 +138,7 @@ export function pushMru(history: string[], panelId: string, limit = MRU_HISTORY_
   return [panelId, ...history.filter((id) => id !== panelId)].slice(0, limit);
 }
 
-export function applyClosePanel(
+export function applyCloseTab(
   workspaces: Workspace[],
   workspaceId: string,
   panelId: string,
@@ -146,10 +146,10 @@ export function applyClosePanel(
 ): Workspace[] {
   return workspaces.map((w): Workspace => {
     if (w.id !== workspaceId) return w;
-    const result = findPanelPane(w.paneTree, panelId);
+    const result = findTabPane(w.paneTree, panelId);
     if (!result) return w;
     const { pane } = result;
-    const remaining = pane.panels.filter((p) => p.id !== panelId);
+    const remaining = pane.tabs.filter((p) => p.id !== panelId);
     if (remaining.length === 0) {
       const newTree = removePaneFromTree(w.paneTree, pane.id);
       if (!newTree) {
@@ -157,8 +157,8 @@ export function applyClosePanel(
           ...w,
           paneTree: updatePane(w.paneTree, pane.id, (p) => ({
             ...p,
-            panels: [],
-            activePanelId: null,
+            tabs: [],
+            activeTabId: null,
           })),
         };
       }
@@ -172,19 +172,19 @@ export function applyClosePanel(
             : w.activePaneId,
       };
     }
-    const idx = pane.panels.findIndex((p) => p.id === panelId);
+    const idx = pane.tabs.findIndex((p) => p.id === panelId);
     const remainingIds = new Set(remaining.map((p) => p.id));
     const mruTarget = history?.find((id) => id !== panelId && remainingIds.has(id)) ?? null;
     const newActiveId =
-      pane.activePanelId === panelId
+      pane.activeTabId === panelId
         ? (mruTarget ?? (remaining[idx] ?? remaining[idx - 1])?.id ?? null)
-        : pane.activePanelId;
+        : pane.activeTabId;
     return {
       ...w,
       paneTree: updatePane(w.paneTree, pane.id, (p) => ({
         ...p,
-        panels: remaining,
-        activePanelId: newActiveId,
+        tabs: remaining,
+        activeTabId: newActiveId,
       })),
     };
   });
@@ -196,14 +196,14 @@ export async function collectRunningTerminals(
   getCommand: (panelId: string) => string | undefined,
 ): Promise<{ panelId: string; label: string }[]> {
   const terminals = allPanes(ws.paneTree)
-    .flatMap((p) => p.panels)
-    .filter((panel): panel is Extract<Panel, { kind: "terminal" }> => panel.kind === "terminal");
+    .flatMap((p) => p.tabs)
+    .filter((tab): tab is Extract<Tab, { kind: "terminal" }> => tab.kind === "terminal");
   const checked = await Promise.all(
-    terminals.map(async (panel) => {
-      const processName = await getForegroundProcess(panel.id);
+    terminals.map(async (tab) => {
+      const processName = await getForegroundProcess(tab.id);
       if (processName === null) return null;
-      const label = getCommand(panel.id) ?? (processName || panel.title || "shell");
-      return { panelId: panel.id, label };
+      const label = getCommand(tab.id) ?? (processName || tab.title || "shell");
+      return { panelId: tab.id, label };
     }),
   );
   return checked.filter(
@@ -216,8 +216,8 @@ function newPaneNode(cwd?: string): PaneNode {
   return {
     kind: "pane",
     id: newPaneId(),
-    panels: [{ id: panelId, kind: "terminal", cwd }],
-    activePanelId: panelId,
+    tabs: [{ id: panelId, kind: "terminal", cwd }],
+    activeTabId: panelId,
   };
 }
 
@@ -263,7 +263,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     map.set(paneId, pushMru(map.get(paneId) ?? [], panelId));
   }, []);
 
-  // Reconcile the history against live panes/panels: drop dead panes and panels
+  // Reconcile the history against live panes/tabs: drop dead panes and tabs
   // (closed, moved between panes, collapsed splits). Keeps the map bounded and
   // ensures a stale id is never selected as the next active tab.
   useEffect(() => {
@@ -271,7 +271,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const live = new Map<string, Set<string>>();
     for (const w of workspaces) {
       for (const pane of allPanes(w.paneTree)) {
-        live.set(pane.id, new Set(pane.panels.map((p) => p.id)));
+        live.set(pane.id, new Set(pane.tabs.map((p) => p.id)));
       }
     }
     for (const paneId of [...map.keys()]) {
@@ -382,35 +382,35 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const movePanel = useCallback((workspaceId: string, panelId: string, targetPaneId: string, targetIndex?: number) => {
+  const moveTab = useCallback((workspaceId: string, panelId: string, targetPaneId: string, targetIndex?: number) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const sourceResult = findPanelPane(w.paneTree, panelId);
+        const sourceResult = findTabPane(w.paneTree, panelId);
         if (!sourceResult || sourceResult.pane.id === targetPaneId) return w;
-        const newTree = movePanelBetweenPanes(w.paneTree, panelId, targetPaneId, targetIndex);
+        const newTree = moveTabBetweenPanes(w.paneTree, panelId, targetPaneId, targetIndex);
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: targetPaneId };
       }),
     );
   }, []);
 
-  const reorderPanel = useCallback((workspaceId: string, panelId: string, insertionIndex: number) => {
+  const reorderTab = useCallback((workspaceId: string, panelId: string, insertionIndex: number) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const result = findPanelPane(w.paneTree, panelId);
+        const result = findTabPane(w.paneTree, panelId);
         if (!result) return w;
         const { pane } = result;
-        const from = pane.panels.findIndex((p) => p.id === panelId);
+        const from = pane.tabs.findIndex((p) => p.id === panelId);
         if (from === -1) return w;
         // insertionIndex is the gap index in the original array (0 = before first tab).
         // Inserting before or after the dragged tab itself is a noop.
         if (insertionIndex === from || insertionIndex === from + 1) return w;
         // Convert gap index to arrayMove destination index (which operates after removal).
         const to = insertionIndex <= from ? insertionIndex : insertionIndex - 1;
-        const newPanels = arrayMove(pane.panels, from, to);
-        return { ...w, paneTree: updatePane(w.paneTree, pane.id, (p) => ({ ...p, panels: newPanels })) };
+        const newTabs = arrayMove(pane.tabs, from, to);
+        return { ...w, paneTree: updatePane(w.paneTree, pane.id, (p) => ({ ...p, tabs: newTabs })) };
       }),
     );
   }, []);
@@ -436,7 +436,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           orientation,
           newPanePosition,
         );
-        const treeAfterMove = movePanelBetweenPanes(treeAfterSplit, panelId, freshPaneId);
+        const treeAfterMove = moveTabBetweenPanes(treeAfterSplit, panelId, freshPaneId);
         if (treeAfterMove === w.paneTree) return w;
         return { ...w, paneTree: treeAfterMove, activePaneId: freshPaneId };
       }),
@@ -447,7 +447,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     workspaceId: string,
     targetPaneId: string,
     direction: "left" | "right" | "top" | "bottom",
-    panel: Panel,
+    panel: Tab,
   ): string => {
     const freshPaneId = newPaneId();
     const freshSplitId = newSplitId();
@@ -458,7 +458,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
-        const newTree = splitPaneAndInsertPanel(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, withNewTabAutofocus(panel));
+        const newTree = splitPaneAndInsertTab(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, withNewTabAutofocus(panel));
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };
       }),
@@ -466,9 +466,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     return freshPaneId;
   }, []);
 
-  // ── Panel operations ──────────────────────────────────────────────────────
+  // ── Tab operations ────────────────────────────────────────────────────────
 
-  const openPanel = useCallback((workspaceId: string, paneId: string, panel: Panel, insertionIndex?: number) => {
+  const openPanel = useCallback((workspaceId: string, paneId: string, panel: Tab, insertionIndex?: number) => {
     const newPanel = withNewTabAutofocus(panel);
     recordActivation(paneId, newPanel.id);
     setWorkspaces((prev) =>
@@ -478,53 +478,53 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           ...w,
           paneTree: updatePane(w.paneTree, paneId, (p) => {
             const idx = insertionIndex !== undefined
-              ? Math.min(insertionIndex, p.panels.length)
-              : p.panels.length;
-            const newPanels = [...p.panels];
-            newPanels.splice(idx, 0, newPanel);
-            return { ...p, panels: newPanels, activePanelId: newPanel.id };
+              ? Math.min(insertionIndex, p.tabs.length)
+              : p.tabs.length;
+            const newTabs = [...p.tabs];
+            newTabs.splice(idx, 0, newPanel);
+            return { ...p, tabs: newTabs, activeTabId: newPanel.id };
           }),
         };
       }),
     );
   }, [recordActivation]);
 
-  const activatePanel = useCallback((workspaceId: string, panelId: string) => {
+  const activateTab = useCallback((workspaceId: string, panelId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
-    const pane = ws ? findPanelPane(ws.paneTree, panelId)?.pane : undefined;
+    const pane = ws ? findTabPane(ws.paneTree, panelId)?.pane : undefined;
     if (pane) recordActivation(pane.id, panelId);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const result = findPanelPane(w.paneTree, panelId);
+        const result = findTabPane(w.paneTree, panelId);
         if (!result) return w;
         return {
           ...w,
           activePaneId: result.pane.id,
           paneTree: updatePane(w.paneTree, result.pane.id, (p) => ({
             ...p,
-            activePanelId: panelId,
+            activeTabId: panelId,
           })),
         };
       }),
     );
   }, [recordActivation]);
 
-  const closePanel = useCallback((workspaceId: string, panelId: string) => {
+  const closeTab = useCallback((workspaceId: string, panelId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     let history: string[] | undefined;
     if (ws) {
-      const found = findPanelPane(ws.paneTree, panelId);
+      const found = findTabPane(ws.paneTree, panelId);
       if (found) {
         history = paneActivationHistoryRef.current.get(found.pane.id);
         closedPanelsRef.current = captureClosedEntry(closedPanelsRef.current, {
-          panel: found.panel,
+          tab: found.tab,
           paneId: found.pane.id,
           workspaceId,
         });
       }
     }
-    setWorkspaces((prev) => applyClosePanel(prev, workspaceId, panelId, history));
+    setWorkspaces((prev) => applyCloseTab(prev, workspaceId, panelId, history));
   }, []);
 
   const reopenClosed = useCallback(() => {
@@ -533,8 +533,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const target = findReopenTarget(workspacesRef.current, activeWorkspaceId, entry);
     if (!target) return;
     closedPanelsRef.current = rest;
-    const newPanel: Panel = (() => {
-      const base = { ...entry.panel, id: newTabId() };
+    const newPanel: Tab = (() => {
+      const base = { ...entry.tab, id: newTabId() };
       if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
       if (base.kind === "terminal" || base.kind === "git-diff") return { ...base, locked: false };
       return base;
@@ -542,7 +542,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     openPanel(target.workspaceId, target.paneId, newPanel);
   }, [openPanel, activeWorkspaceId]);
 
-  const replacePanel = useCallback((workspaceId: string, paneId: string, oldPanelId: string, newPanel: Panel) => {
+  const replaceTab = useCallback((workspaceId: string, paneId: string, oldPanelId: string, newPanel: Tab) => {
     recordActivation(paneId, newPanel.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -550,28 +550,28 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         return {
           ...w,
           paneTree: updatePane(w.paneTree, paneId, (p) => {
-            const idx = p.panels.findIndex((panel) => panel.id === oldPanelId);
+            const idx = p.tabs.findIndex((tab) => tab.id === oldPanelId);
             if (idx === -1) return p;
-            const newPanels = [...p.panels];
-            newPanels[idx] = newPanel;
-            return { ...p, panels: newPanels, activePanelId: newPanel.id };
+            const newTabs = [...p.tabs];
+            newTabs[idx] = newPanel;
+            return { ...p, tabs: newTabs, activeTabId: newPanel.id };
           }),
         };
       }),
     );
   }, [recordActivation]);
 
-  const updatePanelData = useCallback((workspaceId: string, panelId: string, updater: (p: Panel) => Panel) => {
+  const updateTabData = useCallback((workspaceId: string, panelId: string, updater: (p: Tab) => Tab) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const result = findPanelPane(w.paneTree, panelId);
+        const result = findTabPane(w.paneTree, panelId);
         if (!result) return w;
         return {
           ...w,
           paneTree: updatePane(w.paneTree, result.pane.id, (p) => ({
             ...p,
-            panels: p.panels.map((panel) => panel.id === panelId ? updater(panel) : panel),
+            tabs: p.tabs.map((tab) => tab.id === panelId ? updater(tab) : tab),
           })),
         };
       }),
@@ -580,18 +580,18 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const setTerminalPanelCwd = useCallback((workspaceId: string, panelId: string, cwd: string) => {
     const normalized = cwd.length > 1 ? cwd.replace(/\/$/, "") : cwd;
-    updatePanelData(workspaceId, panelId, (p) => p.kind === "terminal" ? { ...p, cwd: normalized } : p);
-  }, [updatePanelData]);
+    updateTabData(workspaceId, panelId, (p) => p.kind === "terminal" ? { ...p, cwd: normalized } : p);
+  }, [updateTabData]);
 
   const setTerminalRunningCommand = useCallback((_workspaceId: string, panelId: string, cmd: string | null) => {
     setRunningCommand(panelId, cmd);
   }, []);
 
-  // Flip a markdown file panel between its rendered view (kind "markdown") and
+  // Flip a markdown file tab between its rendered view (kind "markdown") and
   // the raw editor (kind "editor"), preserving id/path/title. Switching to
   // rendered is a no-op while the editor has unsaved changes.
-  const setPanelView = useCallback((workspaceId: string, panelId: string, mode: "rendered" | "raw") => {
-    updatePanelData(workspaceId, panelId, (p) => {
+  const setTabView = useCallback((workspaceId: string, panelId: string, mode: "rendered" | "raw") => {
+    updateTabData(workspaceId, panelId, (p) => {
       if (mode === "raw" && p.kind === "markdown" && isMarkdownPath(p.path)) {
         return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, locked: p.locked, autofocus: p.autofocus };
       }
@@ -601,21 +601,21 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       }
       return p;
     });
-  }, [updatePanelData]);
+  }, [updateTabData]);
 
   const toggleOverlayPreview = useCallback((workspaceId: string, panelId: string) => {
-    updatePanelData(workspaceId, panelId, (p) => {
+    updateTabData(workspaceId, panelId, (p) => {
       if (p.kind !== "editor") return p;
       return { ...p, previewMode: p.previewMode === "overlay" ? undefined : "overlay" };
     });
-  }, [updatePanelData]);
+  }, [updateTabData]);
 
   const toggleSplitPreview = useCallback((workspaceId: string, panelId: string) => {
-    updatePanelData(workspaceId, panelId, (p) => {
+    updateTabData(workspaceId, panelId, (p) => {
       if (p.kind !== "editor") return p;
       return { ...p, previewMode: p.previewMode === "split" ? undefined : "split" };
     });
-  }, [updatePanelData]);
+  }, [updateTabData]);
 
   const setWorkspaceCwd = useCallback((workspaceId: string, cwd: string) => {
     const normalized = cwd.length > 1 ? cwd.replace(/\/$/, "") : cwd;
@@ -761,13 +761,13 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, []);
 
   const validateRunConfigPanels = useCallback(
-    (workspaceId: string, livingPanelIds: Set<string>) => {
+    (workspaceId: string, livingTabIds: Set<string>) => {
       setWorkspaces((prev) =>
         prev.map((w) => {
           if (w.id !== workspaceId) return w;
           const configs = w.scripts ?? [];
           const cleaned = configs.map((c) =>
-            c.panelId && !livingPanelIds.has(c.panelId)
+            c.panelId && !livingTabIds.has(c.panelId)
               ? { ...c, panelId: undefined }
               : c,
           );
@@ -785,9 +785,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
-  const findPanelGlobal = useCallback((panelId: string) => {
+  const findTabGlobal = useCallback((panelId: string) => {
     for (const w of workspacesRef.current) {
-      const result = findPanelPane(w.paneTree, panelId);
+      const result = findTabPane(w.paneTree, panelId);
       if (result) return { workspace: w, ...result };
     }
     return null;
@@ -819,16 +819,16 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     closePane,
     focusPane,
     setPaneDivider,
-    movePanel,
-    reorderPanel,
+    moveTab,
+    reorderTab,
     splitPaneAndPlace,
     splitPaneAndOpenPanel,
     openPanel,
-    activatePanel,
-    closePanel,
+    activateTab,
+    closeTab,
     reopenClosed,
-    updatePanelData,
-    replacePanel,
+    updateTabData,
+    replaceTab,
     setTerminalPanelCwd,
     setWorkspaceCwd,
     setExplorerRootMode,
@@ -849,10 +849,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setScriptPaneId,
     validateRunConfigPanels,
     setTerminalRunningCommand,
-    setPanelView,
+    setTabView,
     toggleOverlayPreview,
     toggleSplitPreview,
-    findPanelGlobal,
+    findTabGlobal,
     findPaneGlobal,
     resetWorkspaces,
     allPaneIds,

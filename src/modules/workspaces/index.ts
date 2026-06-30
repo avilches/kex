@@ -1,9 +1,9 @@
-export type { Panel, PaneNode, SplitNode, Workspace } from "./lib/types";
+export type { Tab, PaneNode, SplitNode, Workspace } from "./lib/types";
 export { PaneTabBar } from "./PaneTabBar";
-export { PanelContent, type PanelCallbacks } from "./PanelContent";
+export { TabContent, type TabCallbacks } from "./TabContent";
 export { PaneView } from "./PaneView";
 export { collectRunningTerminals, useWorkspaces, type UseWorkspacesReturn } from "./lib/useWorkspaces";
-export { panelTitle, panelIcon } from "./lib/panelTitle";
+export { tabTitle, tabIcon } from "./lib/tabTitle";
 export { SplitNodeView } from "./SplitNodeView";
 export { WorkspaceView } from "./WorkspaceView";
 export { useWorkspaceDnd } from "./WorkspaceDndProvider";
@@ -12,8 +12,8 @@ export {
   allPanes,
   findPane,
   findPaneInDirection,
-  findPanelPane,
-  focusedPanelId,
+  findTabPane,
+  focusedTabId,
   firstPaneId,
   siblingPane,
   splitPaneInTree,
