@@ -476,6 +476,7 @@ export function WorkspaceSidebar({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
+        <div className="thin-scrollbar flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto overflow-x-hidden">
         {groups.map((group) => {
           const isCollapsible = group.label !== null;
           const isCollapsed = isCollapsible && collapsedGroups.has(group.id);
@@ -575,6 +576,7 @@ export function WorkspaceSidebar({
             compact={compact}
           />
         )}
+        </div>
 
         <DragOverlay dropAnimation={null}>
           {dragActiveWs ? (() => {
@@ -601,12 +603,11 @@ export function WorkspaceSidebar({
         </DragOverlay>
       </DndContext>
 
-      <div className="flex-1" />
       <button
         type="button"
         title="New workspace (Cmd+N)"
         onClick={onNew}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-border/60 text-lg text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-border/60 text-lg text-muted-foreground transition-colors hover:border-border hover:text-foreground"
       >
         +
       </button>
