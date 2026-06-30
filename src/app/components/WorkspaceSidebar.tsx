@@ -134,8 +134,8 @@ function SortableWorkspaceItem({
         className={cn(
           "flex w-full items-center rounded-lg font-semibold transition-all select-none",
           compact
-            ? "h-9 justify-center text-[11px]"
-            : "h-9 gap-2 px-2.5 text-[11px]",
+            ? "h-9 justify-center text-[12px]"
+            : "h-9 gap-2 px-2.5 text-[12px]",
           active
             ? "text-white"
             : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -159,12 +159,12 @@ function SortableWorkspaceItem({
       >
         {compact ? (
           ws.icon && getWorkspaceIcon(ws.icon)
-            ? <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={18} strokeWidth={1.5} />
-            : <span className="text-[11px]">{abbrev(ws.title, ws.kind)}</span>
+            ? <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={22} strokeWidth={1.5} />
+            : <span className="text-[12px]">{abbrev(ws.title, ws.kind)}</span>
         ) : (
           <>
             {ws.icon && getWorkspaceIcon(ws.icon) && (
-              <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={15} strokeWidth={1.5} className="shrink-0" />
+              <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={18} strokeWidth={1.5} className="shrink-0" />
             )}
             <span className="truncate">{ws.title || ws.kind}</span>
           </>

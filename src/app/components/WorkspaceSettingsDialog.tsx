@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "re
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import {
   Cancel01Icon,
+  ArrowRight01Icon,
   DragDropVerticalIcon,
   FolderOpenIcon,
   PlusSignIcon,
@@ -37,7 +38,7 @@ import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
-import { WORKSPACE_ICON_PALETTE } from "@/modules/workspaces/lib/workspaceIcon";
+import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, loadAllIcons, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
 import type { Workspace, RunConfig } from "@/modules/workspaces/lib/types";
 
 type Props = {
@@ -165,6 +166,8 @@ function ColorPicker({
   );
 }
 
+const PALETTE_PAGES = Math.ceil(WORKSPACE_ICON_PALETTE.length / PALETTE_PAGE_SIZE);
+
 function IconPicker({
   wsId,
   wsIcon,
@@ -174,37 +177,133 @@ function IconPicker({
   wsIcon: string | undefined;
   onSetIcon: (id: string, icon: string | null) => void;
 }) {
+  const currentEntry = WORKSPACE_ICON_PALETTE.find((e) => e.name === wsIcon);
+  const [query, setQuery] = useState(currentEntry?.label ?? "");
+  const [allIcons, setAllIcons] = useState<Record<string, unknown> | null>(null);
+  const [filtered, setFiltered] = useState<IconSearchResult[]>([]);
+  const [page, setPage] = useState(() => {
+    if (!wsIcon) return 0;
+    const idx = WORKSPACE_ICON_PALETTE.findIndex((e) => e.name === wsIcon);
+    return idx === -1 ? 0 : Math.floor(idx / PALETTE_PAGE_SIZE);
+  });
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) { setFiltered([]); return; }
+    if (!allIcons) {
+      loadAllIcons().then((icons) => {
+        setAllIcons(icons);
+        setFiltered(searchIcons(q, icons));
+      });
+    } else {
+      setFiltered(searchIcons(q, allIcons));
+    }
+  }, [query, allIcons]);
+
+  function selectIcon(name: string | null) {
+    onSetIcon(wsId, name);
+    const paletteLabel = WORKSPACE_ICON_PALETTE.find((e) => e.name === name)?.label;
+    const searchLabel = filtered.find((e) => e.name === name)?.label;
+    setQuery(paletteLabel ?? searchLabel ?? "");
+  }
+
+  const pageIcons = WORKSPACE_ICON_PALETTE.slice(
+    page * PALETTE_PAGE_SIZE,
+    page * PALETTE_PAGE_SIZE + PALETTE_PAGE_SIZE,
+  );
+
   return (
-    <div className="flex flex-wrap gap-0.5">
-      <button
-        type="button"
-        title="No icon"
-        onClick={() => onSetIcon(wsId, null)}
-        className={cn(
-          "size-6 flex items-center justify-center rounded border-2 bg-muted text-muted-foreground transition-colors",
-          wsIcon == null
-            ? "border-foreground"
-            : "border-transparent hover:border-muted-foreground/50",
-        )}
-      >
-        <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-      </button>
-      {WORKSPACE_ICON_PALETTE.map((entry) => (
+    <div className="flex gap-3">
+      {/* Left: search input + results below */}
+      <div className="flex flex-col gap-1.5">
+        <div className="relative flex items-center">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search icon..."
+            className="h-8 w-28 rounded border border-border bg-transparent py-0 pl-2.5 pr-6 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          {wsIcon != null && (
+            <button
+              type="button"
+              title="Remove icon"
+              onClick={() => { onSetIcon(wsId, null); setQuery(""); }}
+              className="absolute right-1.5 flex size-4 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-0.5">
+          {filtered.map((entry) => (
+            <button
+              key={entry.name}
+              type="button"
+              title={entry.label}
+              onClick={() => selectIcon(entry.name)}
+              className={cn(
+                "size-8 flex items-center justify-center rounded border-2 text-foreground transition-colors",
+                wsIcon === entry.name
+                  ? "border-foreground bg-muted"
+                  : "border-transparent hover:border-muted-foreground/40 hover:bg-muted/60",
+              )}
+            >
+              <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
+            </button>
+          ))}
+          {query.trim() && filtered.length === 0 && (
+            <span className="text-[11px] text-muted-foreground">No icons found</span>
+          )}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="w-px self-stretch bg-border/60" />
+
+      {/* Right: paginated palette (32 icons + next-page button) */}
+      <div className="flex flex-wrap gap-0.5">
+        {/* No-icon button */}
         <button
-          key={entry.name}
           type="button"
-          title={entry.label}
-          onClick={() => onSetIcon(wsId, entry.name)}
+          title="No icon"
+          onClick={() => { onSetIcon(wsId, null); setQuery(""); }}
           className={cn(
-            "size-6 flex items-center justify-center rounded border-2 text-foreground transition-colors",
-            wsIcon === entry.name
-              ? "border-foreground bg-muted"
-              : "border-transparent hover:border-muted-foreground/40 hover:bg-muted/60",
+            "size-8 flex items-center justify-center rounded border-2 bg-muted text-muted-foreground transition-colors",
+            wsIcon == null
+              ? "border-foreground"
+              : "border-transparent hover:border-muted-foreground/50",
           )}
         >
-          <HugeiconsIcon icon={entry.icon} size={13} strokeWidth={1.5} />
+          <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
         </button>
-      ))}
+        {/* 32 icons for the current page */}
+        {pageIcons.map((entry) => (
+          <button
+            key={entry.name}
+            type="button"
+            title={entry.label}
+            onClick={() => selectIcon(entry.name)}
+            className={cn(
+              "size-8 flex items-center justify-center rounded border-2 text-foreground transition-colors",
+              wsIcon === entry.name
+                ? "border-foreground bg-muted"
+                : "border-transparent hover:border-muted-foreground/40 hover:bg-muted/60",
+            )}
+          >
+            <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
+          </button>
+        ))}
+        {/* Next-page button occupies the 33rd slot */}
+        <button
+          type="button"
+          title={`Page ${((page + 1) % PALETTE_PAGES) + 1} of ${PALETTE_PAGES}`}
+          onClick={() => setPage((p) => (p + 1) % PALETTE_PAGES)}
+          className="size-8 flex items-center justify-center rounded border-2 border-transparent text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-muted/60 hover:text-foreground"
+        >
+          <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -290,26 +389,6 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
               }}
             />
           </div>
-          {/* Color: below name */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium">Color</label>
-            <ColorPicker
-              wsId={ws.id}
-              wsColor={ws.color}
-              displayColor={displayColor}
-              onSetColor={props.onSetColor}
-            />
-          </div>
-
-          {/* Icon */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium">Icon</label>
-            <IconPicker
-              wsId={ws.id}
-              wsIcon={ws.icon}
-              onSetIcon={props.onSetIcon}
-            />
-          </div>
 
           {/* Working Directory */}
           <div className="flex flex-col gap-1.5">
@@ -375,6 +454,27 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
             <p className="text-[11px] text-muted-foreground/60">
               Tip: right-click any folder in the explorer and choose &quot;Set as Workspace Root&quot;
             </p>
+          </div>
+
+          {/* Color */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium">Color</label>
+            <ColorPicker
+              wsId={ws.id}
+              wsColor={ws.color}
+              displayColor={displayColor}
+              onSetColor={props.onSetColor}
+            />
+          </div>
+
+          {/* Icon */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium">Icon</label>
+            <IconPicker
+              wsId={ws.id}
+              wsIcon={ws.icon}
+              onSetIcon={props.onSetIcon}
+            />
           </div>
         </div>
       )}
