@@ -25,13 +25,13 @@ Workspace           — a named environment (local or WSL distro)
 
 **Workspace fields.** A `Workspace` carries additional configuration:
 - `color?: string | null` — optional workspace accent color (hex string or null)
-- `runConfigs?: RunConfig[]` — list of saved run configurations (command, name, optional cwd, optional panelId)
-- `activeRunConfigId?: string` — id of the currently selected run config in the Run button
+- `scripts?: Script[]` — list of saved scripts (command, name, optional cwd, optional tabId)
+- `activeScript?: string` — id of the currently selected script in the Run button
 - `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. The legacy `"pinned"` mode is migrated via `migrateWorkspace` in `workspaceState.ts` for backward compatibility. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
-**Run-config ephemeral state.** `terminalEphemeralStore` (`src/modules/workspaces/lib/terminalEphemeralStore.ts`) has two independent sections:
-- `runningCommands` (`Map<panelId, string>`) — foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a run config is involved.
-- `runConfigRunning` (`Map<panelId, boolean>`) — tracks which terminal tabs are currently executing a run-config command. Set to `true` by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared to `false` when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
+**Script running state.** `terminalEphemeralStore` (`src/modules/workspaces/lib/terminalEphemeralStore.ts`) has two independent sections:
+- `runningCommands` (`Map<panelId, string>`) — foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a script is involved.
+- `scriptRunning` (`Map<tabId, ScriptState>`) — tracks which terminal tabs are currently executing a script command. Set by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
 
 A `Tab` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { migrateExplorerRootMode } from "./explorerRoot";
-import type { Tab, RunConfig, SplitNode, Workspace } from "./types";
+import type { Tab, SplitNode, Workspace } from "./types";
 import {
   setSavedSidebarState,
   type SidebarUiState,
@@ -56,18 +56,7 @@ export function migrateWorkspace(raw: Workspace): Workspace {
     }
   }
 
-  // Migrate runConfigs -> scripts, activeRunConfigId -> activeScript
-  const withOld = ws as Workspace & { runConfigs?: RunConfig[]; activeRunConfigId?: string };
-  const migrated: Workspace = { ...ws };
-  if ("runConfigs" in withOld && withOld.runConfigs !== undefined && !withOld.scripts) {
-    migrated.scripts = withOld.runConfigs;
-    delete (migrated as Record<string, unknown>).runConfigs;
-  }
-  if ("activeRunConfigId" in withOld && withOld.activeRunConfigId !== undefined && !withOld.activeScript) {
-    migrated.activeScript = withOld.activeRunConfigId;
-    delete (migrated as Record<string, unknown>).activeRunConfigId;
-  }
-  return migrated;
+  return ws;
 }
 
 export function sanitizeWorkspace(w: Workspace): Workspace {

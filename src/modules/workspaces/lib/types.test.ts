@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { scratchpadStateOf } from "./types";
-import type { ExplorerRootMode, RunConfig } from "./types";
+import type { ExplorerRootMode, Script } from "./types";
 
 describe("scratchpadStateOf", () => {
   it("is hidden when closed regardless of active side", () => {
@@ -24,19 +24,19 @@ describe("ExplorerRootMode", () => {
   });
 });
 
-describe("RunConfig", () => {
+describe("Script", () => {
   it("tabId is optional", () => {
-    const cfg: RunConfig = { id: "1", name: "Dev", command: "pnpm dev" };
+    const cfg: Script = { id: "1", name: "Dev", command: "pnpm dev" };
     expect(cfg.tabId).toBeUndefined();
   });
 
   it("cwd is optional", () => {
-    const cfg: RunConfig = { id: "2", name: "Test", command: "pnpm test" };
+    const cfg: Script = { id: "2", name: "Test", command: "pnpm test" };
     expect(cfg.cwd).toBeUndefined();
   });
 
   it("accepts all fields", () => {
-    const cfg: RunConfig = {
+    const cfg: Script = {
       id: "3",
       name: "Build",
       command: "pnpm build",

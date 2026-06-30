@@ -39,44 +39,44 @@ export function clearRunningCommandEntry(tabId: string): void {
   notify();
 }
 
-// ── Run config running state ───────────────────────────────────────────────
+// ── Script running state ──────────────────────────────────────────────────
 // "running": command is executing (set by Run button, cleared by OSC 133;D)
 // "waiting": stop was requested; waiting for OSC 133;D to confirm termination
 // Manual commands typed by the user do NOT touch this map.
 
-export type RunConfigState = "running" | "waiting";
+export type ScriptState = "running" | "waiting";
 
-const runConfigRunning = new Map<string, RunConfigState>();
-const rcListeners = new Set<Listener>();
-let rcSnapshot: ReadonlyMap<string, RunConfigState> = new Map();
+const scriptRunning = new Map<string, ScriptState>();
+const scriptListeners = new Set<Listener>();
+let scriptSnapshot: ReadonlyMap<string, ScriptState> = new Map();
 
-function notifyRc(): void {
-  rcSnapshot = new Map(runConfigRunning);
-  for (const l of rcListeners) l();
+function notifyScript(): void {
+  scriptSnapshot = new Map(scriptRunning);
+  for (const l of scriptListeners) l();
 }
 
-export function subscribeToRunConfigRunning(listener: Listener): () => void {
-  rcListeners.add(listener);
-  return () => { rcListeners.delete(listener); };
+export function subscribeToScriptRunning(listener: Listener): () => void {
+  scriptListeners.add(listener);
+  return () => { scriptListeners.delete(listener); };
 }
 
-export function getRunConfigRunningSnapshot(): ReadonlyMap<string, RunConfigState> {
-  return rcSnapshot;
+export function getScriptRunningSnapshot(): ReadonlyMap<string, ScriptState> {
+  return scriptSnapshot;
 }
 
-export function setRunConfigRunning(tabId: string, state: RunConfigState | false): void {
+export function setScriptRunning(tabId: string, state: ScriptState | false): void {
   if (state) {
-    if (runConfigRunning.get(tabId) === state) return;
-    runConfigRunning.set(tabId, state);
+    if (scriptRunning.get(tabId) === state) return;
+    scriptRunning.set(tabId, state);
   } else {
-    if (!runConfigRunning.has(tabId)) return;
-    runConfigRunning.delete(tabId);
+    if (!scriptRunning.has(tabId)) return;
+    scriptRunning.delete(tabId);
   }
-  notifyRc();
+  notifyScript();
 }
 
-export function clearRunConfigRunningEntry(tabId: string): void {
-  if (!runConfigRunning.has(tabId)) return;
-  runConfigRunning.delete(tabId);
-  notifyRc();
+export function clearScriptRunningEntry(tabId: string): void {
+  if (!scriptRunning.has(tabId)) return;
+  scriptRunning.delete(tabId);
+  notifyScript();
 }

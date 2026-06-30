@@ -1,7 +1,7 @@
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type { ExplorerRootMode };
 
-export type RunConfig = {
+export type Script = {
   id: string;
   name: string;
   command: string;
@@ -81,7 +81,7 @@ export type Workspace = {
   color?: string | null;
   icon?: string;
   statusId?: string;
-  scripts?: RunConfig[];
+  scripts?: Script[];
   activeScript?: string;
   scriptPaneId?: string;
 };

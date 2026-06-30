@@ -83,7 +83,7 @@ import {
   useWorkspaces,
   WorkspaceView,
 } from "@/modules/workspaces";
-import type { RunConfig } from "@/modules/workspaces/lib/types";
+import type { Script } from "@/modules/workspaces/lib/types";
 import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
@@ -122,10 +122,10 @@ import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSet
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
   clearRunningCommandEntry,
-  clearRunConfigRunningEntry,
+  clearScriptRunningEntry,
   getRunningCommandsSnapshot,
-  setRunConfigRunning,
-  getRunConfigRunningSnapshot,
+  setScriptRunning,
+  getScriptRunningSnapshot,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { clearMetricsEntry } from "@/modules/workspaces/lib/terminalMetricsStore";
 import {
@@ -204,12 +204,12 @@ export default function App() {
     setWorkspaceIcon,
     setWorkspaceStatus,
     setWorkspaceGitConfig,
-    addRunConfig,
-    updateRunConfig,
-    removeRunConfig,
-    reorderRunConfigs,
-    setActiveRunConfig,
-    validateRunConfigPanels,
+    addScript,
+    updateScript,
+    removeScript,
+    reorderScripts,
+    setActiveScript,
+    validateScriptPanels,
     setScriptPaneId,
     setTerminalRunningCommand,
     setTabView,
@@ -294,7 +294,7 @@ export default function App() {
     useState<SearchAddon | null>(null);
   const searchInlineRef = useRef<SearchInlineHandle | null>(null);
   const terminalHandles = useRef<Map<string, TerminalPaneHandle>>(new Map());
-  const runConfigCommandSeen = useRef<Set<string>>(new Set());
+  const scriptCommandSeen = useRef<Set<string>>(new Set());
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
@@ -347,7 +347,7 @@ export default function App() {
       for (const pane of allPanes(ws.paneTree)) {
         for (const tab of pane.tabs) livingPanelIds.add(tab.id);
       }
-      validateRunConfigPanels(ws.id, livingPanelIds);
+      validateScriptPanels(ws.id, livingPanelIds);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -503,9 +503,9 @@ export default function App() {
         disposeSession(id);
         searchAddons.current.delete(id);
         terminalHandles.current.delete(id);
-        runConfigCommandSeen.current.delete(id);
+        scriptCommandSeen.current.delete(id);
         clearRunningCommandEntry(id);
-        clearRunConfigRunningEntry(id);
+        clearScriptRunningEntry(id);
         clearMetricsEntry(id);
       }
     }
@@ -552,10 +552,10 @@ export default function App() {
     setActiveEditorHandle(null);
   }, []);
 
-  // ── Run config execution ──────────────────────────────────────────────────
+  // ── Script execution ──────────────────────────────────────────────────────
 
   const runWorkspaceConfig = useCallback(
-    (config: RunConfig) => {
+    (config: Script) => {
       if (!activeWorkspace) return;
 
       // Case 1: panel already exists -- focus it and re-run if idle
@@ -564,13 +564,13 @@ export default function App() {
         if (found) {
           setActiveWorkspaceId(found.workspace.id);
           activateTab(found.workspace.id, config.tabId);
-          if (!getRunConfigRunningSnapshot().get(config.tabId)) {
+          if (!getScriptRunningSnapshot().get(config.tabId)) {
             const tabId = config.tabId;
             const tryWrite = (attempts = 0) => {
               const handle = terminalHandles.current.get(tabId);
               if (handle) {
                 handle.write(config.command + "\r");
-                setRunConfigRunning(tabId, "running");
+                setScriptRunning(tabId, "running");
               } else if (attempts < 20) {
                 setTimeout(() => tryWrite(attempts + 1), 100);
               }
@@ -612,28 +612,28 @@ export default function App() {
         }
       }
 
-      updateRunConfig(activeWorkspace.id, config.id, { tabId: freshPanelId });
+      updateScript(activeWorkspace.id, config.id, { tabId: freshPanelId });
 
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(freshPanelId);
         if (handle) {
           handle.write(config.command + "\r");
-          setRunConfigRunning(freshPanelId, "running");
+          setScriptRunning(freshPanelId, "running");
         } else if (attempts < 20) {
           setTimeout(() => tryWrite(attempts + 1), 100);
         }
       };
       setTimeout(tryWrite, 150);
     },
-    [activeWorkspace, findTabGlobal, setActiveWorkspaceId, activateTab, splitPaneAndOpenPanel, updateRunConfig, openPanel, setScriptPaneId],
+    [activeWorkspace, findTabGlobal, setActiveWorkspaceId, activateTab, splitPaneAndOpenPanel, updateScript, openPanel, setScriptPaneId],
   );
 
   const stopWorkspaceConfig = useCallback(
-    (config: RunConfig) => {
+    (config: Script) => {
       if (!config.tabId) return;
       // Focus the terminal so OSC 133;D can be received and update the waiting state
       activateTab(activeWorkspace?.id ?? "", config.tabId);
-      setRunConfigRunning(config.tabId, "waiting");
+      setScriptRunning(config.tabId, "waiting");
       const handle = terminalHandles.current.get(config.tabId);
       handle?.write("\x03");
     },
@@ -1772,13 +1772,13 @@ export default function App() {
         const found = findTabGlobal(tabId);
         if (found) setTerminalRunningCommand(found.workspace.id, tabId, cmd);
         if (cmd !== null) {
-          runConfigCommandSeen.current.add(tabId);
+          scriptCommandSeen.current.add(tabId);
         } else if (
-          runConfigCommandSeen.current.has(tabId) &&
-          getRunConfigRunningSnapshot().has(tabId)
+          scriptCommandSeen.current.has(tabId) &&
+          getScriptRunningSnapshot().has(tabId)
         ) {
-          setRunConfigRunning(tabId, false);
-          runConfigCommandSeen.current.delete(tabId);
+          setScriptRunning(tabId, false);
+          scriptCommandSeen.current.delete(tabId);
         }
       },
       onScratchpadState: (tabId, state) => {
@@ -2106,7 +2106,7 @@ export default function App() {
           configs[0];
         if (!active) return;
         const isRunning = !!(
-          active.tabId && getRunConfigRunningSnapshot().get(active.tabId)
+          active.tabId && getScriptRunningSnapshot().get(active.tabId)
         );
         if (isRunning) {
           stopWorkspaceConfig(active);
@@ -2547,7 +2547,7 @@ export default function App() {
             openWorkspaceProperties: () =>
               useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId),
             openRunScriptConfiguration: () =>
-              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "run-configurations"),
+              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "scripts"),
           })
         : [],
     [
@@ -2603,11 +2603,11 @@ export default function App() {
             }
             scripts={activeWorkspace?.scripts ?? []}
             activeScript={activeWorkspace?.activeScript}
-            onSelectRunConfig={(id) => setActiveRunConfig(activeWorkspaceId, id)}
-            onRunConfig={runWorkspaceConfig}
+            onSelectScript={(id) => setActiveScript(activeWorkspaceId, id)}
+            onRunScript={runWorkspaceConfig}
             onStopConfig={stopWorkspaceConfig}
             onOpenRunSettings={() =>
-              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "run-configurations")
+              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "scripts")
             }
             activeWorkspace={activeWorkspace ?? null}
             activeTab={activeTab}
@@ -2858,10 +2858,10 @@ export default function App() {
               if (path !== undefined) setPinnedRoot(id, path);
               else clearPinnedRoot(id);
             }}
-            onAddRunConfig={addRunConfig}
-            onUpdateRunConfig={updateRunConfig}
-            onRemoveRunConfig={removeRunConfig}
-            onReorderRunConfigs={reorderRunConfigs}
+            onAddScript={addScript}
+            onUpdateScript={updateScript}
+            onRemoveScript={removeScript}
+            onReorderScripts={reorderScripts}
           />
 
           <CloseDialogs

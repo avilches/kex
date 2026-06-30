@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ClosedEntry, Tab, RunConfig, SplitNode, Workspace } from "./types";
+import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
 import { applyCloseTab, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, applyShowHidden, applyWorkspaceStatus, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 import { migrateWorkspace } from "./workspaceState";
 
@@ -362,23 +362,10 @@ describe("migrateWorkspace", () => {
     expect(migrated.pinnedRoot).toBe("/foo");
   });
 
-  it("migrates runConfigs to scripts", () => {
-    const raw = { runConfigs: [{ id: "r1", name: "dev", command: "pnpm dev" }] } as unknown as Workspace;
-    const result = migrateWorkspace(raw);
-    expect(result.scripts).toEqual([{ id: "r1", name: "dev", command: "pnpm dev" }]);
-    expect((result as Record<string, unknown>).runConfigs).toBeUndefined();
-  });
-
-  it("migrates activeRunConfigId to activeScript", () => {
-    const raw = { activeRunConfigId: "r1" } as unknown as Workspace;
-    const result = migrateWorkspace(raw);
-    expect(result.activeScript).toBe("r1");
-    expect((result as Record<string, unknown>).activeRunConfigId).toBeUndefined();
-  });
 });
 
-describe("RunConfig actions (pure helpers via applyPinnedRoot pattern)", () => {
-  const cfg = (id: string): RunConfig => ({ id, name: `Config ${id}`, command: `cmd-${id}` });
+describe("Script actions (pure helpers via applyPinnedRoot pattern)", () => {
+  const cfg = (id: string): Script => ({ id, name: `Config ${id}`, command: `cmd-${id}` });
 
   it("applyPinnedRoot sets mode to workspace (not pinned)", () => {
     const out = applyPinnedRoot([ws()], "w1", "/proj");
@@ -397,8 +384,8 @@ describe("RunConfig actions (pure helpers via applyPinnedRoot pattern)", () => {
     expect(w.activeScript).toBe("r1");
   });
 
-  it("RunConfig tabId is optional", () => {
-    const c: RunConfig = { id: "1", name: "Dev", command: "pnpm dev" };
+  it("Script tabId is optional", () => {
+    const c: Script = { id: "1", name: "Dev", command: "pnpm dev" };
     expect(c.tabId).toBeUndefined();
   });
 });

@@ -3,7 +3,7 @@ import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
 import { OpenInEditorButton, type OpenInEditorTarget } from "@/modules/external-editors";
-import type { Tab, RunConfig, Workspace } from "@/modules/workspaces/lib/types";
+import type { Tab, Script, Workspace } from "@/modules/workspaces/lib/types";
 import { WorkspaceTitle } from "./WorkspaceTitle";
 import { RunButton } from "@/app/components/RunButton";
 import {
@@ -32,11 +32,11 @@ type Props = {
   workspaceRoot: string | null;
   onOpenExternalEditorSettings: () => void;
   onSetWorkspaceRoot: () => void;
-  scripts: RunConfig[];
+  scripts: Script[];
   activeScript: string | undefined;
-  onSelectRunConfig: (configId: string) => void;
-  onRunConfig: (config: RunConfig) => void;
-  onStopConfig: (config: RunConfig) => void;
+  onSelectScript: (configId: string) => void;
+  onRunScript: (config: Script) => void;
+  onStopConfig: (config: Script) => void;
   onOpenRunSettings: () => void;
   activeWorkspace: Workspace | null;
   activeTab: Tab | null;
@@ -58,8 +58,8 @@ export function Header({
   onSetWorkspaceRoot,
   scripts,
   activeScript,
-  onSelectRunConfig,
-  onRunConfig,
+  onSelectScript,
+  onRunScript,
   onStopConfig,
   onOpenRunSettings,
   activeWorkspace,
@@ -146,10 +146,10 @@ export function Header({
       <RunButton
         scripts={scripts}
         activeScript={activeScript}
-        onSelectConfig={onSelectRunConfig}
-        onRun={onRunConfig}
+        onSelectConfig={onSelectScript}
+        onRun={onRunScript}
         onStop={onStopConfig}
-        onOpenRunConfigurations={onOpenRunSettings}
+        onOpenScripts={onOpenRunSettings}
       />
 
       <OpenInEditorButton

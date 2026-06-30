@@ -360,16 +360,16 @@ A global ordered list of named statuses that can be assigned to workspaces. Not 
 - **Sidebar grouping**: the workspace sidebar groups workspaces by status. Unassigned workspaces appear at the top; each non-empty status group appears below with a text label (expanded mode) or a thin divider (compact mode). Drag-and-drop is multi-container: dropping a workspace into a different group both reassigns its status and repositions it in the new group.
 - **Orphan normalization**: on preferences hydration, any workspace whose `statusId` no longer matches a valid status is silently cleared to no-status.
 
-### Run configurations and Run button (F12)
+### Scripts and Run button (F12)
 
-Per-workspace run configurations (`RunConfig[]` on `Workspace`) let users save named shell commands (with optional cwd override) and execute them from the header bar with one click or F12. Not present in upstream Terax.
+Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell commands (with optional cwd override) and execute them from the header bar with one click or F12. Not present in upstream Terax.
 
-- **Header Run button** (`src/app/components/RunButton.tsx`): renders in three modes based on the number of saved run configs in the active workspace. Zero configs: a muted placeholder that opens Workspace Settings on the run-configs tab. One config: a simple play/stop toggle. Two or more configs: a split button with a dropdown config selector on the left and a play/stop icon on the right.
-- **Run execution** (`runWorkspaceConfig` in `App.tsx`): if the config's saved `panelId` still refers to a live terminal panel, navigates to it; otherwise splits the active pane downward, creates a new terminal panel in the config's cwd, saves the new panel id on the config, and writes the command followed by CR. Uses a 150ms + retry loop to wait for the terminal handle to register.
+- **Header Run button** (`src/app/components/RunButton.tsx`): renders in three modes based on the number of saved scripts in the active workspace. Zero scripts: a muted placeholder that opens Workspace Settings on the scripts tab. One script: a simple play/stop toggle. Two or more scripts: a split button with a dropdown script selector on the left and a play/stop icon on the right.
+- **Run execution** (`runWorkspaceConfig` in `App.tsx`): if the script's saved `tabId` still refers to a live terminal tab, navigates to it; otherwise splits the active pane downward, creates a new terminal tab in the script's cwd, saves the new tab id on the script, and writes the command followed by CR. Uses a 150ms + retry loop to wait for the terminal handle to register.
 - **Stop** (`stopWorkspaceConfig` in `App.tsx`): sends Ctrl+C (`\x03`) to the terminal handle.
-- **isRunning state** (`runConfigRunning` in `terminalEphemeralStore`): a `Map<panelId, boolean>` (outside the workspaces React tree, `useSyncExternalStore`) set to `true` on run and cleared to `false` when OSC 133;D fires for that panel. Manual commands typed by the user do not touch this map.
-- **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active run config of the current workspace, toggling based on the current isRunning state.
-- **Startup validation** (`validateRunConfigPanels`): on mount, App.tsx collects all living panel ids and calls `validateRunConfigPanels` for each workspace, clearing `panelId` references that no longer exist (stale from a previous session).
+- **isRunning state** (`scriptRunning` in `terminalEphemeralStore`): a `Map<tabId, ScriptState>` (outside the workspaces React tree, `useSyncExternalStore`) set on run and cleared when OSC 133;D fires for that tab. Manual commands typed by the user do not touch this map.
+- **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active script of the current workspace, toggling based on the current isRunning state.
+- **Startup validation** (`validateScriptPanels`): on mount, App.tsx collects all living tab ids and calls `validateScriptPanels` for each workspace, clearing `tabId` references that no longer exist (stale from a previous session).
 
 ---
 

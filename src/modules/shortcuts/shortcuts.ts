@@ -124,7 +124,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "workspace.run",
-    label: "Run / Stop Active Run Config",
+    label: "Run / Stop Active Script",
     group: "General",
     defaultBindings: [{ key: "F12" }],
   },

@@ -20,7 +20,7 @@ import {
   updateDivider,
   updatePane,
 } from "./splitNode";
-import { type ClosedEntry, type Tab, type PaneNode, type RunConfig, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
+import { type ClosedEntry, type Tab, type PaneNode, type Script, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
 
@@ -685,7 +685,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyWorkspaceStatus(prev, workspaceId, statusId));
   }, []);
 
-  const addRunConfig = useCallback((workspaceId: string, config: RunConfig) => {
+  const addScript = useCallback((workspaceId: string, config: Script) => {
     setWorkspaces((prev) =>
       prev.map((w) =>
         w.id === workspaceId
@@ -695,8 +695,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const updateRunConfig = useCallback(
-    (workspaceId: string, configId: string, patch: Partial<Omit<RunConfig, "id">>) => {
+  const updateScript = useCallback(
+    (workspaceId: string, configId: string, patch: Partial<Omit<Script, "id">>) => {
       setWorkspaces((prev) =>
         prev.map((w) =>
           w.id !== workspaceId
@@ -713,7 +713,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
-  const removeRunConfig = useCallback((workspaceId: string, configId: string) => {
+  const removeScript = useCallback((workspaceId: string, configId: string) => {
     setWorkspaces((prev) =>
       prev.map((w) =>
         w.id !== workspaceId
@@ -728,7 +728,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const reorderRunConfigs = useCallback((workspaceId: string, fromId: string, toId: string) => {
+  const reorderScripts = useCallback((workspaceId: string, fromId: string, toId: string) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -744,7 +744,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const setActiveRunConfig = useCallback((workspaceId: string, configId: string | null) => {
+  const setActiveScript = useCallback((workspaceId: string, configId: string | null) => {
     setWorkspaces((prev) =>
       prev.map((w) =>
         w.id === workspaceId
@@ -760,7 +760,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const validateRunConfigPanels = useCallback(
+  const validateScriptPanels = useCallback(
     (workspaceId: string, livingTabIds: Set<string>) => {
       setWorkspaces((prev) =>
         prev.map((w) => {
@@ -841,13 +841,13 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceColor,
     setWorkspaceIcon,
     setWorkspaceStatus,
-    addRunConfig,
-    updateRunConfig,
-    removeRunConfig,
-    reorderRunConfigs,
-    setActiveRunConfig,
+    addScript,
+    updateScript,
+    removeScript,
+    reorderScripts,
+    setActiveScript,
     setScriptPaneId,
-    validateRunConfigPanels,
+    validateScriptPanels,
     setTerminalRunningCommand,
     setTabView,
     toggleOverlayPreview,

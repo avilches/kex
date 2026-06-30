@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type WorkspaceSettingsSection = "properties" | "run-configurations";
+export type WorkspaceSettingsSection = "properties" | "scripts";
 export type WorkspaceSettingsFocus = "name" | "workspaceRoot";
 
 type WorkspaceSettingsStore = {

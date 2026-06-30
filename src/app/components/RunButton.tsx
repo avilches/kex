@@ -13,24 +13,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { RunConfig } from "@/modules/workspaces/lib/types";
+import type { Script } from "@/modules/workspaces/lib/types";
 import { cn } from "@/lib/utils";
 import { useSyncExternalStore } from "react";
 import {
-  subscribeToRunConfigRunning,
-  getRunConfigRunningSnapshot,
+  subscribeToScriptRunning,
+  getScriptRunningSnapshot,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 
 type Props = {
-  scripts: RunConfig[];
+  scripts: Script[];
   activeScript: string | undefined;
   onSelectConfig: (configId: string) => void;
-  onRun: (config: RunConfig) => void;
-  onStop: (config: RunConfig) => void;
-  onOpenRunConfigurations: () => void;
+  onRun: (config: Script) => void;
+  onStop: (config: Script) => void;
+  onOpenScripts: () => void;
 };
 
-function isComplete(c: RunConfig): boolean {
+function isComplete(c: Script): boolean {
   return c.command.trim() !== "";
 }
 
@@ -40,11 +40,11 @@ export function RunButton({
   onSelectConfig,
   onRun,
   onStop,
-  onOpenRunConfigurations,
+  onOpenScripts,
 }: Props) {
   const runningMap = useSyncExternalStore(
-    subscribeToRunConfigRunning,
-    getRunConfigRunningSnapshot,
+    subscribeToScriptRunning,
+    getScriptRunningSnapshot,
   );
 
   const completeConfigs = scripts.filter(isComplete);
@@ -55,7 +55,7 @@ export function RunButton({
   const isWaiting = activeState === "waiting";
   const isActive_ = isRunning || isWaiting;
 
-  function cfgState(cfg: RunConfig) {
+  function cfgState(cfg: Script) {
     return cfg.tabId ? runningMap.get(cfg.tabId) : undefined;
   }
 
@@ -115,7 +115,7 @@ export function RunButton({
         );
       })}
       {completeConfigs.length > 0 && <DropdownMenuSeparator />}
-      <DropdownMenuItem onSelect={onOpenRunConfigurations} className="text-muted-foreground">
+      <DropdownMenuItem onSelect={onOpenScripts} className="text-muted-foreground">
         {completeConfigs.length === 0 ? "+ Add run script" : "Configure Scripts"}
       </DropdownMenuItem>
     </DropdownMenuContent>

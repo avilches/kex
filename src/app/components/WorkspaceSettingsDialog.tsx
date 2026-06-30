@@ -38,7 +38,7 @@ import {
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
-import type { Workspace, RunConfig } from "@/modules/workspaces/lib/types";
+import type { Workspace, Script } from "@/modules/workspaces/lib/types";
 import type { WorkspaceStatus } from "@/modules/settings/store";
 
 type Props = {
@@ -49,10 +49,10 @@ type Props = {
   onSetIcon: (id: string, icon: string | null) => void;
   onSetStatus: (id: string, statusId: string | null) => void;
   onSetPinnedRoot: (id: string, path: string | undefined) => void;
-  onAddRunConfig: (id: string, config: RunConfig) => void;
-  onUpdateRunConfig: (id: string, configId: string, patch: Partial<RunConfig>) => void;
-  onRemoveRunConfig: (id: string, configId: string) => void;
-  onReorderRunConfigs: (id: string, fromId: string, toId: string) => void;
+  onAddScript: (id: string, config: Script) => void;
+  onUpdateScript: (id: string, configId: string, patch: Partial<Script>) => void;
+  onRemoveScript: (id: string, configId: string) => void;
+  onReorderScripts: (id: string, fromId: string, toId: string) => void;
 };
 
 export function WorkspaceSettingsDialog(props: Props) {
@@ -63,7 +63,7 @@ export function WorkspaceSettingsDialog(props: Props) {
     if (ws) {
       for (const sc of ws.scripts ?? []) {
         if (!sc.command.trim()) {
-          props.onRemoveRunConfig(ws.id, sc.id);
+          props.onRemoveScript(ws.id, sc.id);
         }
       }
     }
@@ -363,7 +363,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
     <div className="flex min-h-[380px] flex-col gap-0 py-1">
       {/* Tab bar */}
       <div className="mb-4 flex gap-0 border-b border-border">
-        {(["properties", "run-configurations"] as const).map((tab) => (
+        {(["properties", "scripts"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -375,7 +375,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {tab === "properties" ? "Properties" : "Run Scripts"}
+            {tab === "properties" ? "Properties" : "Scripts"}
           </button>
         ))}
       </div>
@@ -541,29 +541,29 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
         </div>
       )}
 
-      {activeSection === "run-configurations" && (
-        <RunConfigSection
+      {activeSection === "scripts" && (
+        <ScriptSection
           ws={ws}
-          onAddRunConfig={props.onAddRunConfig}
-          onUpdateRunConfig={props.onUpdateRunConfig}
-          onRemoveRunConfig={props.onRemoveRunConfig}
-          onReorderRunConfigs={props.onReorderRunConfigs}
+          onAddScript={props.onAddScript}
+          onUpdateScript={props.onUpdateScript}
+          onRemoveScript={props.onRemoveScript}
+          onReorderScripts={props.onReorderScripts}
         />
       )}
     </div>
   );
 }
 
-type RunConfigRowHandle = { focusCommand: () => void };
+type ScriptRowHandle = { focusCommand: () => void };
 
-const RunConfigRow = forwardRef<
-  RunConfigRowHandle,
+const ScriptRow = forwardRef<
+  ScriptRowHandle,
   {
-    config: RunConfig;
-    onUpdate: (patch: Partial<Omit<RunConfig, "id">>) => void;
+    config: Script;
+    onUpdate: (patch: Partial<Omit<Script, "id">>) => void;
     onRemove: () => void;
   }
->(function RunConfigRow({ config, onUpdate, onRemove }, ref) {
+>(function ScriptRow({ config, onUpdate, onRemove }, ref) {
   const [commandDirty, setCommandDirty] = useState(false);
   const [commandValue, setCommandValue] = useState(config.command);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
@@ -639,24 +639,24 @@ const RunConfigRow = forwardRef<
   );
 });
 
-function RunConfigSection({
+function ScriptSection({
   ws,
-  onAddRunConfig,
-  onUpdateRunConfig,
-  onRemoveRunConfig,
-  onReorderRunConfigs,
+  onAddScript,
+  onUpdateScript,
+  onRemoveScript,
+  onReorderScripts,
 }: {
   ws: Workspace;
-  onAddRunConfig: Props["onAddRunConfig"];
-  onUpdateRunConfig: Props["onUpdateRunConfig"];
-  onRemoveRunConfig: Props["onRemoveRunConfig"];
-  onReorderRunConfigs: Props["onReorderRunConfigs"];
+  onAddScript: Props["onAddScript"];
+  onUpdateScript: Props["onUpdateScript"];
+  onRemoveScript: Props["onRemoveScript"];
+  onReorderScripts: Props["onReorderScripts"];
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
   const configs = ws.scripts ?? [];
-  const configRefs = useRef<Map<string, RunConfigRowHandle>>(new Map());
+  const configRefs = useRef<Map<string, ScriptRowHandle>>(new Map());
 
   function handleAdd() {
     const firstMissingCommand = configs.find((c) => !c.command.trim());
@@ -664,13 +664,13 @@ function RunConfigSection({
       configRefs.current.get(firstMissingCommand.id)?.focusCommand();
       return;
     }
-    onAddRunConfig(ws.id, { id: newScriptId(), name: "", command: "" });
+    onAddScript(ws.id, { id: newScriptId(), name: "", command: "" });
   }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      onReorderRunConfigs(ws.id, String(active.id), String(over.id));
+      onReorderScripts(ws.id, String(active.id), String(over.id));
     }
   }
 
@@ -687,15 +687,15 @@ function RunConfigSection({
         <SortableContext items={configs.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           <div className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto pr-0.5">
             {configs.map((cfg) => (
-              <RunConfigRow
+              <ScriptRow
                 key={cfg.id}
                 ref={(handle) => {
                   if (handle) configRefs.current.set(cfg.id, handle);
                   else configRefs.current.delete(cfg.id);
                 }}
                 config={cfg}
-                onUpdate={(patch) => onUpdateRunConfig(ws.id, cfg.id, patch)}
-                onRemove={() => onRemoveRunConfig(ws.id, cfg.id)}
+                onUpdate={(patch) => onUpdateScript(ws.id, cfg.id, patch)}
+                onRemove={() => onRemoveScript(ws.id, cfg.id)}
               />
             ))}
           </div>
@@ -703,7 +703,7 @@ function RunConfigSection({
       </DndContext>
 
       {configs.length === 0 && (
-        <p className="text-[11px] text-muted-foreground">No run configurations yet.</p>
+        <p className="text-[11px] text-muted-foreground">No scripts yet.</p>
       )}
     </div>
   );
