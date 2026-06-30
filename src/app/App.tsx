@@ -2654,6 +2654,7 @@ export default function App() {
                             .openSettings(activeWorkspaceId, "properties", "workspaceRoot")
                         }
                         onExplorerSearchClose={onExplorerSearchClose}
+                        workspaceCwd={activeWorkspace?.cwd ?? null}
                         sourceControl={sourceControl}
                         pushOnCommit={pushOnCommit}
                         onPushOnCommitChange={handlePushOnCommitChange}
@@ -2753,6 +2754,7 @@ export default function App() {
                             .openSettings(activeWorkspaceId, "properties", "workspaceRoot")
                         }
                         onExplorerSearchClose={onExplorerSearchClose}
+                        workspaceCwd={activeWorkspace?.cwd ?? null}
                         sourceControl={sourceControl}
                         pushOnCommit={pushOnCommit}
                         onPushOnCommitChange={handlePushOnCommitChange}

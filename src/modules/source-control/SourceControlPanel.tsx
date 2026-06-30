@@ -53,6 +53,7 @@ import {
   FileDiffIcon,
   FolderOpenIcon,
   FolderTreeIcon,
+  GitBranchIcon,
   Link01Icon,
   ListViewIcon,
   MinusSignIcon,
@@ -64,6 +65,8 @@ import {
   UnfoldLessIcon,
   UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
+import { invoke } from "@tauri-apps/api/core";
+import { currentWorkspaceEnv } from "@/modules/workspace";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -109,6 +112,7 @@ type Props = {
   }) => void;
   onOpenFile?: (absolutePath: string, pin?: boolean) => void;
   onNavigateToWorktree?: (path: string) => void;
+  workspaceCwd?: string | null;
 };
 
 const ROW_HEIGHTS = {
@@ -180,6 +184,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   onOpenDiff,
   onOpenFile,
   onNavigateToWorktree,
+  workspaceCwd,
 }: Props) {
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff, {
     workspaceId: gitWorkspaceId,
@@ -615,6 +620,47 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     [focusedEntry, focusedRowKey, handleRefresh, moveFocus, rowKeyToIndex, rows, scm, treeCollapsed, toggleTreeDir],
   );
 
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneUrl, setCloneUrl] = useState("");
+  const [cloneRunning, setCloneRunning] = useState(false);
+  const [cloneError, setCloneError] = useState<string | null>(null);
+  const cloneInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGitInit = useCallback(async () => {
+    if (!workspaceCwd) return;
+    try {
+      await invoke("shell_run_command", {
+        command: "git init .",
+        cwd: workspaceCwd,
+        workspace: currentWorkspaceEnv(),
+      });
+      await scm.refresh();
+    } catch (e) {
+      // refresh will surface the error state
+    }
+  }, [workspaceCwd, scm]);
+
+  const handleGitClone = useCallback(async () => {
+    const url = cloneUrl.trim();
+    if (!url || !workspaceCwd) return;
+    setCloneRunning(true);
+    setCloneError(null);
+    try {
+      await invoke("shell_run_command", {
+        command: `git clone ${url}`,
+        cwd: workspaceCwd,
+        workspace: currentWorkspaceEnv(),
+      });
+      setCloneOpen(false);
+      setCloneUrl("");
+      await scm.refresh();
+    } catch (e) {
+      setCloneError(typeof e === "string" ? e : "Clone failed");
+    } finally {
+      setCloneRunning(false);
+    }
+  }, [cloneUrl, workspaceCwd, scm]);
+
   if (!open) return null;
 
   const fetchBusy = sourceControl.busyAction === "fetch";
@@ -643,83 +689,83 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     <TooltipProvider delayDuration={800} skipDelayDuration={300}>
       <aside className="flex h-full min-w-0 flex-col bg-sidebar [contain:layout_style]">
         <header className="flex shrink-0 items-start gap-1 border-b border-border/60 px-1.5 py-1">
-          <div className="flex flex-1 min-w-0 flex-col gap-1">
-            <div className="flex h-6 min-w-0 items-center gap-1.5">
-              <BranchPicker
-                currentBranch={repoLabel}
-                isDetached={scm.status?.isDetached ?? false}
-                disabled={!scm.repo || !!scm.actionBusy}
-                onFetchBranches={scm.fetchBranches}
-                onCheckout={scm.checkout}
-                onCreateBranch={scm.createBranch}
-              />
-              <div className="flex shrink-0 items-center gap-0.5">
-                <RemoteActionButton
-                  label={fetchLabel}
-                  disabled={!canFetch}
-                  onClick={handleFetch}
-                >
-                  {fetchBusy ? (
-                    <Spinner className="size-3" />
-                  ) : (
-                    <HugeiconsIcon icon={SquareArrowDown03Icon} size={17} strokeWidth={1.85} />
-                  )}
-                </RemoteActionButton>
-                <RemoteActionButton
-                  label={pullLabel}
-                  disabled={!canPull}
-                  onClick={handlePull}
-                >
-                  {pullBusy ? (
-                    <Spinner className="size-3" />
-                  ) : (
-                    <span className={cn(
-                      "inline-flex items-center gap-1",
-                      (scm.status?.behind ?? 0) > 0 && "text-blue-600 dark:text-blue-400",
-                    )}>
-                      <HugeiconsIcon icon={SquareArrowDown02Icon} size={17} strokeWidth={1.9} />
-                      {(scm.status?.behind ?? 0) > 0 && (
-                        <span className="text-[10px] font-semibold tabular-nums">
-                          {scm.status?.behind}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </RemoteActionButton>
-                <RemoteActionButton
-                  label={pushLabel}
-                  disabled={!scm.canPush || !!scm.actionBusy}
-                  onClick={() => void scm.push()}
-                >
-                  {pushBusy ? (
-                    <Spinner className="size-3" />
-                  ) : (
-                    <span className={cn(
-                      "inline-flex items-center gap-1",
-                      (scm.status?.ahead ?? 0) > 0 && "text-emerald-600 dark:text-emerald-400",
-                    )}>
-                      <HugeiconsIcon icon={SquareArrowUp02Icon} size={17} strokeWidth={1.9} />
-                      {(scm.status?.ahead ?? 0) > 0 && (
-                        <span className="text-[10px] font-semibold tabular-nums">
-                          {scm.status?.ahead}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </RemoteActionButton>
-              </div>
-              <div className="ml-auto shrink-0">
-                <RemoteSection
-                  remotes={scm.remotes}
-                  selectedRemote={scm.selectedRemote}
-                  busy={!!scm.actionBusy || !!sourceControl.busyAction}
-                  onSelectRemote={scm.setSelectedRemote}
-                  onAddRemote={scm.addRemote}
+          {scm.repo ? (
+            <div className="flex flex-1 min-w-0 flex-col gap-1">
+              <div className="flex h-6 min-w-0 items-center gap-1.5">
+                <BranchPicker
+                  currentBranch={repoLabel}
+                  isDetached={scm.status?.isDetached ?? false}
+                  disabled={!scm.repo || !!scm.actionBusy}
+                  onFetchBranches={scm.fetchBranches}
+                  onCheckout={scm.checkout}
+                  onCreateBranch={scm.createBranch}
                 />
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <RemoteActionButton
+                    label={fetchLabel}
+                    disabled={!canFetch}
+                    onClick={handleFetch}
+                  >
+                    {fetchBusy ? (
+                      <Spinner className="size-3" />
+                    ) : (
+                      <HugeiconsIcon icon={SquareArrowDown03Icon} size={17} strokeWidth={1.85} />
+                    )}
+                  </RemoteActionButton>
+                  <RemoteActionButton
+                    label={pullLabel}
+                    disabled={!canPull}
+                    onClick={handlePull}
+                  >
+                    {pullBusy ? (
+                      <Spinner className="size-3" />
+                    ) : (
+                      <span className={cn(
+                        "inline-flex items-center gap-1",
+                        (scm.status?.behind ?? 0) > 0 && "text-blue-600 dark:text-blue-400",
+                      )}>
+                        <HugeiconsIcon icon={SquareArrowDown02Icon} size={17} strokeWidth={1.9} />
+                        {(scm.status?.behind ?? 0) > 0 && (
+                          <span className="text-[10px] font-semibold tabular-nums">
+                            {scm.status?.behind}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </RemoteActionButton>
+                  <RemoteActionButton
+                    label={pushLabel}
+                    disabled={!scm.canPush || !!scm.actionBusy}
+                    onClick={() => void scm.push()}
+                  >
+                    {pushBusy ? (
+                      <Spinner className="size-3" />
+                    ) : (
+                      <span className={cn(
+                        "inline-flex items-center gap-1",
+                        (scm.status?.ahead ?? 0) > 0 && "text-emerald-600 dark:text-emerald-400",
+                      )}>
+                        <HugeiconsIcon icon={SquareArrowUp02Icon} size={17} strokeWidth={1.9} />
+                        {(scm.status?.ahead ?? 0) > 0 && (
+                          <span className="text-[10px] font-semibold tabular-nums">
+                            {scm.status?.ahead}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </RemoteActionButton>
+                </div>
+                <div className="ml-auto shrink-0">
+                  <RemoteSection
+                    remotes={scm.remotes}
+                    selectedRemote={scm.selectedRemote}
+                    busy={!!scm.actionBusy || !!sourceControl.busyAction}
+                    onSelectRemote={scm.setSelectedRemote}
+                    onAddRemote={scm.addRemote}
+                  />
+                </div>
               </div>
-            </div>
-            {scm.repo ? (
-              scm.worktreeCount > 1 && onNavigateToWorktree ? (
+              {scm.worktreeCount > 1 && onNavigateToWorktree ? (
                 <div className="w-fit">
                   <WorktreePicker
                     label={
@@ -738,9 +784,13 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 >
                   <span className="truncate">{pathBasename(scm.repo.repoRoot)}</span>
                 </span>
-              )
-            ) : null}
-          </div>
+              )}
+            </div>
+          ) : (
+            <span className="flex h-6 items-center px-1 text-[12px] font-medium text-muted-foreground">
+              Source Control
+            </span>
+          )}
         </header>
 
         {scm.panelState === "loading" ? (
@@ -748,10 +798,81 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         ) : null}
 
         {scm.panelState === "no-repo" ? (
-          <PanelCenter
-            title="No repository"
-            body="The active workspace is not inside a Git repository."
-          />
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="flex size-10 items-center justify-center rounded-full border border-border/55 text-muted-foreground">
+              <HugeiconsIcon icon={GitBranchIcon} size={18} strokeWidth={1.6} />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[12px] font-medium">No repository</span>
+              <span className="text-[11px] text-muted-foreground">
+                Initialize or clone a repository to start tracking changes.
+              </span>
+            </div>
+            <div className="flex w-full flex-col gap-2">
+              {workspaceCwd && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full gap-1.5 text-[12px]"
+                  onClick={() => void handleGitInit()}
+                >
+                  <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />
+                  Git init
+                </Button>
+              )}
+              {!cloneOpen ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-[12px]"
+                  onClick={() => {
+                    setCloneOpen(true);
+                    setCloneError(null);
+                    window.setTimeout(() => cloneInputRef.current?.focus(), 0);
+                  }}
+                >
+                  Clone
+                </Button>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <input
+                    ref={cloneInputRef}
+                    type="text"
+                    value={cloneUrl}
+                    onChange={(e) => setCloneUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleGitClone();
+                      if (e.key === "Escape") { setCloneOpen(false); setCloneUrl(""); setCloneError(null); }
+                    }}
+                    placeholder="https://github.com/user/repo.git"
+                    className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    spellCheck={false}
+                  />
+                  {cloneError && (
+                    <p className="text-[11px] text-destructive">{cloneError}</p>
+                  )}
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="sm"
+                      className="flex-1 text-[12px]"
+                      disabled={!cloneUrl.trim() || cloneRunning}
+                      onClick={() => void handleGitClone()}
+                    >
+                      {cloneRunning ? "Cloning..." : "Clone"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-[12px]"
+                      onClick={() => { setCloneOpen(false); setCloneUrl(""); setCloneError(null); }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         ) : null}
 
         {scm.panelState === "error" ? (

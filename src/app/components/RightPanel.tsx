@@ -63,6 +63,7 @@ export type RightPanelProps = {
   onOpenWorkspaceProperties?: () => void;
   onExplorerSearchClose?: () => void;
   // SourceControlPanel props
+  workspaceCwd: string | null;
   sourceControl: SourceControlSummary;
   pushOnCommit: boolean;
   onPushOnCommitChange: (enabled: boolean) => void;
@@ -181,6 +182,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               onOpenDiff={props.onOpenDiff}
               onOpenFile={props.onOpenFile}
               onNavigateToWorktree={props.onNavigateToWorktree}
+              workspaceCwd={props.workspaceCwd}
             />
           </div>
           <div
