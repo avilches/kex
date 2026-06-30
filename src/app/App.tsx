@@ -622,7 +622,7 @@ export default function App() {
   handleCloseWorkspaceRef.current = handleCloseWorkspace;
 
   const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState<
-    { id: string } | null
+    { id: string; scriptCount: number } | null
   >(null);
   const [pendingWorkspaceProcesses, setPendingWorkspaceProcesses] = useState<
     { id: string; processes: { panelId: string; label: string }[] } | null
@@ -643,7 +643,8 @@ export default function App() {
       }
     }
     if (prefs.warnOnCloseWorkspace) {
-      setPendingCloseWorkspace({ id: wsId });
+      const scriptCount = ws?.scripts?.filter((s) => s.command.trim()).length ?? 0;
+      setPendingCloseWorkspace({ id: wsId, scriptCount });
       return;
     }
     void handleCloseWorkspaceRef.current(wsId);

@@ -26,7 +26,7 @@ type Props = {
   pendingDeletePanels: PanelInfo[] | null;
   onCancelDeleteClose: () => void;
   onConfirmDeleteClose: () => void;
-  pendingCloseWorkspace: { id: string } | null;
+  pendingCloseWorkspace: { id: string; scriptCount: number } | null;
   onCancelCloseWorkspace: () => void;
   onConfirmCloseWorkspace: (dontAskAgain: boolean) => void;
   pendingWorkspaceProcesses: { id: string; processes: { panelId: string; label: string }[] } | null;
@@ -153,7 +153,9 @@ export function CloseDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Workspace</AlertDialogTitle>
             <AlertDialogDescription>
-              The workspace and all its tabs will be closed.
+              {pendingCloseWorkspace?.scriptCount
+                ? `The workspace and all its tabs will be closed. ${pendingCloseWorkspace.scriptCount === 1 ? "1 run script" : `${pendingCloseWorkspace.scriptCount} run scripts`} will also be deleted.`
+                : "The workspace and all its tabs will be closed."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
