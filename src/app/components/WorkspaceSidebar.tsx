@@ -163,10 +163,9 @@ function SortableWorkspaceItem({
             : <span className="text-[11px]">{abbrev(ws.title, ws.kind)}</span>
         ) : (
           <>
-            {ws.icon && getWorkspaceIcon(ws.icon)
-              ? <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={15} strokeWidth={1.5} className="shrink-0" />
-              : <span className="shrink-0 text-[11px]">{abbrev(ws.title, ws.kind)}</span>
-            }
+            {ws.icon && getWorkspaceIcon(ws.icon) && (
+              <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={15} strokeWidth={1.5} className="shrink-0" />
+            )}
             <span className="truncate">{ws.title || ws.kind}</span>
           </>
         )}
