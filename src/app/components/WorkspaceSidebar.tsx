@@ -410,11 +410,15 @@ export function WorkspaceSidebar({
                     type="button"
                     title={isCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
                     onClick={() => onToggleGroup(group.id)}
-                    className={cn(
-                      "mx-1.5 my-1 h-px w-[calc(100%-12px)] rounded-full border-0 bg-border/40 transition-colors hover:bg-border/80",
-                      isCollapsed && "bg-border/70",
-                    )}
-                  />
+                    className="mx-1.5 flex w-[calc(100%-12px)] items-center border-0 py-1.5 outline-none"
+                  >
+                    <span
+                      className={cn(
+                        "h-px w-full rounded-full bg-border/40 transition-colors hover:bg-border/80",
+                        isCollapsed && "bg-border/70",
+                      )}
+                    />
+                  </button>
                 ) : (
                   <button
                     type="button"
