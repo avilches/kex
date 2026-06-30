@@ -161,7 +161,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   disabled when unset or missing. The mode is the single source of truth for the root, so focusing an editor no
   longer reroots the explorer (the upstream per-editor root override was removed). Pure logic in
   `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspace-state.json` (`explorerRootMode`,
-  `pinnedRoot`).
+  `workspaceRoot`).
 - **Per-terminal autofocus (sidebar-driving terminal)** -- replaces the removed "Follow Terminal" / "Follow Git Root"
   modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab right-click
   context menu) drives both the Explorer root and the Source Control / Git History repo when it gains focus or its cwd

@@ -35,13 +35,13 @@ export function buildAgentEntries(
     if (!notifByPanel.has(n.tabId)) notifByPanel.set(n.tabId, n);
   }
 
-  const panelIds = new Set<string>([
+  const tabIds = new Set<string>([
     ...Object.keys(sessions),
     ...notifByPanel.keys(),
   ]);
 
   const entries: AgentEntry[] = [];
-  for (const tabId of panelIds) {
+  for (const tabId of tabIds) {
     const session = sessions[tabId];
     const notif = notifByPanel.get(tabId);
     const agent = session?.agent ?? notif?.agent ?? "claude";

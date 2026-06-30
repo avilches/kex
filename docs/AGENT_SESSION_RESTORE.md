@@ -243,8 +243,8 @@ Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an
 
 Actions:
 
-- `startRestored(tabId, agent)` — creates a session record with `restored: true`, `status: "working"`.
-- `setRestoreError(tabId, agent)` — sets `restoreError: true`.
+- `startRestored(tabId, workspaceId, agent)` — creates a session record with `restored: true`, `status: "working"`.
+- `setRestoreError(tabId, workspaceId, agent, reason?)` — sets `restoreError: true`.
 - `setStatus` (existing) — clears `restored` on the first real state transition.
 
 ---

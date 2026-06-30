@@ -3,7 +3,7 @@ type FileLinkHandler = (
   cwd: string | null,
   line?: number,
   col?: number,
-  sourcePanelId?: string,
+  sourceTabId?: string,
 ) => void;
 
 let _handler: FileLinkHandler | null = null;
@@ -22,9 +22,9 @@ export function dispatchFileLink(
   cwd: string | null,
   line?: number,
   col?: number,
-  sourcePanelId?: string,
+  sourceTabId?: string,
 ): void {
-  _handler?.(path, cwd, line, col, sourcePanelId);
+  _handler?.(path, cwd, line, col, sourceTabId);
 }
 
 export function getLeafCwd(leafId: string | null): string | null {

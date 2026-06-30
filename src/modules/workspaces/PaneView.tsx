@@ -25,7 +25,7 @@ type Props = {
   isWorkspaceActive: boolean;
   onActivateTab: (workspaceId: string, tabId: string) => void;
   onCloseTab: (workspaceId: string, tabId: string) => void;
-  onCloseManyTabs: (workspaceId: string, panelIds: string[]) => void;
+  onCloseManyTabs: (workspaceId: string, tabIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
   onSplitTerminalRight: (workspaceId: string, paneId: string) => void;
@@ -180,7 +180,7 @@ export const PaneView = memo(function PaneView({
   welcomeActions,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
-  const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [paneSize, setPaneSize] = useState({ w: Infinity, h: Infinity });
 
@@ -205,16 +205,16 @@ export const PaneView = memo(function PaneView({
   useDndMonitor({
     onDragStart: (event) => {
       setIsDragging(true);
-      setDraggedPanelId(String(event.active.id));
+      setDraggedTabId(String(event.active.id));
     },
-    onDragEnd: () => { setIsDragging(false); setDraggedPanelId(null); },
-    onDragCancel: () => { setIsDragging(false); setDraggedPanelId(null); },
+    onDragEnd: () => { setIsDragging(false); setDraggedTabId(null); },
+    onDragCancel: () => { setIsDragging(false); setDraggedTabId(null); },
   });
 
   const isDraggingOwnOnlyTab =
-    draggedPanelId !== null &&
+    draggedTabId !== null &&
     pane.tabs.length === 1 &&
-    pane.tabs[0].id === draggedPanelId;
+    pane.tabs[0].id === draggedTabId;
 
   const { resolvedTheme, resolvedMode } = useTheme();
   const dimOpacity = focused || !activeTab

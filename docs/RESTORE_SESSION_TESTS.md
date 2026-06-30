@@ -88,7 +88,7 @@ export async function loadRestorePlans(): Promise<void> {
   try {
     const plans = await invoke<RestorePlan[]>("agent_session_restore_plan");
     console.log("[restore] plans recibidos:", plans);   // <-- temporal
-    restorePlans = new Map(plans.map((p) => [p.panelId, p]));
+    restorePlans = new Map(plans.map((p) => [p.tabId, p]));
   } catch (e) {
     console.error("[restore] error IPC:", e);           // <-- temporal
     restorePlans = new Map();
@@ -96,7 +96,7 @@ export async function loadRestorePlans(): Promise<void> {
 }
 ```
 
-Esperado: array con un objeto `{ panelId, agent, resumeCmd, cwd }`.
+Esperado: array con un objeto `{ tabId, agent, resumeCmd, cwdLaunch }`.
 
 Si `plans` es `[]`: el Rust planner no construyo ningun plan. Causas posibles:
 - `state: "exited"` en el store (ver D5)
@@ -119,17 +119,17 @@ Esperado: una ruta como `~/.claude/projects/somethinghashed/SESSION_ID.jsonl`.
 Si no aparece: claude no escribio el transcript todavia (puede pasar si la sesion era muy corta)
 o `CLAUDE_CONFIG_DIR` esta configurado a otra ruta.
 
-### D8 — El panelId del store coincide con el del panel nuevo
+### D8 — El tabId del store coincide con el del tab nuevo
 
-El problema mas sutil: al reabrir Kex, los paneles obtienen IDs nuevos (UUIDs frescos) porque
-el estado de workspace se restaura desde `workspace-state.json`. Ese archivo persiste el `panel.id`.
+El problema mas sutil: al reabrir Kex, los tabs obtienen IDs nuevos (UUIDs frescos) porque
+el estado de workspace se restaura desde `workspace-state.json`. Ese archivo persiste el `tab.id`.
 
 El store guarda el `KEX_PANEL_ID` de la sesion anterior. Si ese ID coincide con el ID que
-tiene el panel al restaurarse (que viene de `workspace-state.json`), funciona. Si no coincide,
+tiene el tab al restaurarse (que viene de `workspace-state.json`), funciona. Si no coincide,
 `consumeRestorePlan` no encuentra el plan.
 
-Verificar: el `panelId` en `~/.config/kex/agent-sessions.json` debe ser el mismo que el
-`id` del panel en `workspace-state.json` (via `tauri-plugin-store`, ver comando abajo).
+Verificar: el `tabId` en `~/.config/kex/agent-sessions.json` debe ser el mismo que el
+`id` del tab en `workspace-state.json` (via `tauri-plugin-store`, ver comando abajo).
 
 ```bash
 # panel IDs en el workspace guardado
@@ -362,9 +362,9 @@ Este es un bug pendiente de corregir (ver `PaneTabBar.tsx:105-112` y `165-174`).
 [ ] cat ~/.claude/settings.json | grep kex-session-hook  →  aparece
 [ ] cat ~/.config/kex/agent-sessions.json  →  existe, state: "idle", session_id relleno
 [ ] find ~/.claude/projects -name "<session_id>.jsonl"  →  archivo encontrado
-[ ] panelId en agent-sessions.json == id del panel en workspace-state.json
+[ ] tabId en agent-sessions.json == id del tab en workspace-state.json
 ```
 
-El ultimo punto (panelId == panel.id) es el mas critico. Si los IDs no coinciden,
+El ultimo punto (tabId == tab.id) es el mas critico. Si los IDs no coinciden,
 el restore plan existe pero `consumeRestorePlan` no lo encuentra porque busca por el
-nuevo panel ID, que es diferente al guardado en el store.
+nuevo tab ID, que es diferente al guardado en el store.

@@ -187,7 +187,7 @@ The Unix socket (`/tmp/kex-ipc-{pty_id}.sock`, path in `KEX_IPC`) is created bef
 
 **Notification bell scoping.** Each main window runs its own React runtime with its own Zustand store. `kex:agent-signal` is broadcast globally, but `leafIdForPty()` is window-local, so each window's `AgentNotificationsBridge` only processes signals from PTYs that belong to it. The bell in each window shows only that window's agents.
 
-**OS notification deep-link.** When the app is unfocused and the frontend decides to send an OS notification, it first calls `agent_queue_nav` to register `{ windowLabel, workspaceId, panelId }` in `PendingNavState` (Rust, TTL 5 s). On any subsequent `WindowEvent::Focused(true)` for a main window, Rust consumes the pending target, focuses the correct window, and emits `kex:activate-panel` to it. Each window listens for that event and calls `onActivateAgent`, which switches the workspace, activates the panel, and focuses the terminal (50 ms delay for React state to settle). See IPC.md for the full protocol detail.
+**OS notification deep-link.** When the app is unfocused and the frontend decides to send an OS notification, it first calls `agent_queue_nav` to register `{ windowLabel, workspaceId, tabId }` in `PendingNavState` (Rust, TTL 5 s). On any subsequent `WindowEvent::Focused(true)` for a main window, Rust consumes the pending target, focuses the correct window, and emits `kex:activate-tab` to it. Each window listens for that event and calls `onActivateAgent`, which switches the workspace, activates the tab, and focuses the terminal (50 ms delay for React state to settle). See IPC.md for the full protocol detail.
 
 ### 3.7a Agent session restore
 
@@ -277,7 +277,7 @@ When you switch tabs or panes, the outgoing tab is hidden with CSS classes. It i
 
 ### 4.2 Tab close confirmation
 
-Every close path (tab close button, the close shortcut, and Close All / Close Other Tabs) runs through one sequential queue, `closePanels(panelIds)` in `useTabCloseGuards`. The pure core (`hooks/closeQueue.ts`) closes tabs one at a time: a terminal with a live foreground process or a dirty editor pauses the queue on a confirmation dialog, and a cancel stops the whole run before closing the current tab. Terminals only prompt when the `warnOnCloseTabWithRunningProcess` preference is on (default on); the terminal dialog's "Don't ask me again" checkbox flips that preference off. The editor dialog offers Save / Don't save / Cancel; Save writes through the editor handle before closing, and a failed write stops the queue without losing the buffer. After any run, focus returns to the active tab's terminal or editor.
+Every close path (tab close button, the close shortcut, and Close All / Close Other Tabs) runs through one sequential queue, `closeTabs(tabIds)` in `useTabCloseGuards`. The pure core (`hooks/closeQueue.ts`) closes tabs one at a time: a terminal with a live foreground process or a dirty editor pauses the queue on a confirmation dialog, and a cancel stops the whole run before closing the current tab. Terminals only prompt when the `warnOnCloseTabWithRunningProcess` preference is on (default on); the terminal dialog's "Don't ask me again" checkbox flips that preference off. The editor dialog offers Save / Don't save / Cancel; Save writes through the editor handle before closing, and a failed write stops the queue without losing the buffer. After any run, focus returns to the active tab's terminal or editor.
 
 ### 4.3 Workspace authorization
 
@@ -313,7 +313,7 @@ Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command bo
 4. `runningCommand` — basename of the foreground command from OSC 133 C (e.g., `cargo`, `git`). Not shown when `oscTitle` is set.
 5. cwd-derived — last two path segments, truncated from the left so the deepest directory stays visible.
 
-`oscTitleStore` (`src/modules/terminal/lib/oscTitleStore.ts`) is a module-level singleton with `useSyncExternalStore`-compatible API. It is keyed by `panelId`, is never persisted, and is cleared on session dispose and respawn. OSC 0 and OSC 2 are both handled (both set the window title per the terminal spec); the handler is registered via `registerTitleHandler` in `osc-handlers.ts` and wired in `useTerminalSession.ts` alongside the existing OSC 7 and OSC 133 handlers.
+`oscTitleStore` (`src/modules/terminal/lib/oscTitleStore.ts`) is a module-level singleton with `useSyncExternalStore`-compatible API. It is keyed by `tabId`, is never persisted, and is cleared on session dispose and respawn. OSC 0 and OSC 2 are both handled (both set the window title per the terminal spec); the handler is registered via `registerTitleHandler` in `osc-handlers.ts` and wired in `useTerminalSession.ts` alongside the existing OSC 7 and OSC 133 handlers.
 
 ### 4.6 Forward-slash canonical paths
 

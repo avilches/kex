@@ -21,7 +21,7 @@ type Props = {
   expandedPaneId?: string | null;
   onActivateTab: (workspaceId: string, tabId: string) => void;
   onCloseTab: (workspaceId: string, tabId: string) => void;
-  onCloseManyTabs: (workspaceId: string, panelIds: string[]) => void;
+  onCloseManyTabs: (workspaceId: string, tabIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
   onDividerChange?: (

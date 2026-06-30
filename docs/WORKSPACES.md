@@ -30,7 +30,7 @@ Workspace           — a named environment (local or WSL distro)
 - `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. The legacy `"pinned"` mode is migrated via `migrateWorkspace` in `workspaceState.ts` for backward compatibility. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
 **Script running state.** `terminalEphemeralStore` (`src/modules/workspaces/lib/terminalEphemeralStore.ts`) has two independent sections:
-- `runningCommands` (`Map<panelId, string>`) — foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a script is involved.
+- `runningCommands` (`Map<tabId, string>`) — foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a script is involved.
 - `scriptRunning` (`Map<tabId, ScriptState>`) — tracks which terminal tabs are currently executing a script command. Set by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
 
 A `Tab` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
@@ -50,7 +50,7 @@ empty, where it renders a welcome screen. This invariant is locked by a unit tes
 
 **Focus on close (per-pane MRU).** When the *active* tab of a pane with more than one tab closes,
 focus returns to the most-recently-used surviving tab, not the positional neighbour. Each pane
-keeps an MRU list of `panelId`s (most recent first) in `paneActivationHistoryRef`, an in-memory ref
+keeps an MRU list of `tabId`s (most recent first) in `paneActivationHistoryRef`, an in-memory ref
 in `useWorkspaces` that is never persisted (capped at `MRU_HISTORY_LIMIT = 50`, though the live list
 is already bounded by the pane's open-tab count). `recordActivation` pushes onto it from the three
 points that move the active tab to a real tab: `activateTab`, `openPanel`, `replaceTab`.
@@ -60,7 +60,7 @@ first history id that still exists in the remaining tabs, falling back to the po
 optional, so the pure function keeps its legacy neighbour behaviour when called without it.
 
 A single reconciliation effect (`useEffect` on `workspaces`) prunes the map against live
-panes/tabs: it drops dead panes and dead `panelId`s, so a stale id is never selected and the map
+panes/tabs: it drops dead panes and dead `tabId`s, so a stale id is never selected and the map
 stays bounded. This covers every removal path (close, drag between panes, split collapse, workspace
 close) without per-callback cleanup; cross-pane moves need no special handling because a moved tab's
 id no longer appears in its old pane's remaining tabs. This is independent from reopen-closed (undo,
@@ -296,7 +296,7 @@ type DraggingItem =
   prevent WebKit from claiming the initial pointer movement as a scroll gesture and issuing
   `pointercancel` before the 6px threshold is reached.
   Each `DraggableTab` also registers two `useDroppable` zones on its left and right halves:
-  `tab-insert:<panelId>:before` and `tab-insert:<panelId>:after`. Both are `disabled` when no
+  `tab-insert:<tabId>:before` and `tab-insert:<tabId>:after`. Both are `disabled` when no
   drag is active (`disabled: !isDragging`) to avoid idle collision overhead.
 - `InsertionGap` (`PaneTabBar.tsx`): a `w-0 -mx-[1px] shrink-0` flex item rendered between every
   pair of tabs (and before the first / after the last). When the drag pointer is over a
@@ -351,18 +351,18 @@ reference instead of opening a pane.
 
 **Tab drag** — two zone ID formats:
 
-`tab-insert:<panelId>:before|after` - tab border drop zones for positional insertion:
-- `before`: insert at `indexOf(panelId)` in the target pane
-- `after`: insert at `indexOf(panelId) + 1`
-- Same pane: `reorderTab(workspaceId, panelId, insertionIndex)` — reorders tabs using
+`tab-insert:<tabId>:before|after` - tab border drop zones for positional insertion:
+- `before`: insert at `indexOf(tabId)` in the target pane
+- `after`: insert at `indexOf(tabId) + 1`
+- Same pane: `reorderTab(workspaceId, tabId, insertionIndex)` — reorders tabs using
   `arrayMove`; dropping before or after the dragged tab itself is a noop
-- Different pane: `moveTab(workspaceId, panelId, targetPaneId, insertionIndex)` — moves tab to
+- Different pane: `moveTab(workspaceId, tabId, targetPaneId, insertionIndex)` — moves tab to
   the target pane at the given position; source pane auto-collapses if it becomes empty
 
 `zone:<paneId>:<direction>` - pane-level drop zones:
-- `center`: `moveTab(sourceWorkspaceId, panelId, targetPaneId)` — moves tab to end of another pane
-- directional zones: `splitPaneAndPlace(sourceWorkspaceId, targetPaneId, direction, panelId)` —
-  splits the target pane and places the dragged panel in the new half
+- `center`: `moveTab(sourceWorkspaceId, tabId, targetPaneId)` — moves tab to end of another pane
+- directional zones: `splitPaneAndPlace(sourceWorkspaceId, targetPaneId, direction, tabId)` —
+  splits the target pane and places the dragged tab in the new half
 
 **File drag** — for a file, the handler checks whether an editor with that path is already open in
 the active workspace. If it is, the existing panel is treated as a panel drag (move/reorder) so the
@@ -372,7 +372,7 @@ is reused:
 | Drop target | Action |
 |---|---|
 | `zone:<paneId>:center` | `openPanel(wsId, paneId, panel)` — appends permanent tab |
-| `tab-insert:<panelId>:before\|after` | `openPanel(wsId, paneId, panel, index)` — inserts at position |
+| `tab-insert:<tabId>:before\|after` | `openPanel(wsId, paneId, panel, index)` — inserts at position |
 | `zone:<paneId>:top\|bottom\|left\|right` | `splitPaneAndOpenPanel(wsId, paneId, dir, panel)` — splits pane, opens panel in new sub-pane |
 
 `panel` is the editor or terminal produced by `tabForDroppedPath`. Editor tabs have

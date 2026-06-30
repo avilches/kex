@@ -96,10 +96,10 @@ export function useTabCloseGuards({
     resolve?.(decision);
   }, []);
 
-  const closePanels = useCallback(
-    async (panelIds: string[]) => {
+  const closeTabs = useCallback(
+    async (tabIds: string[]) => {
       try {
-        await runCloseQueue(panelIds, {
+        await runCloseQueue(tabIds, {
           getPanel: (id) => {
             const found = findTab(id);
             if (!found) return null;
@@ -178,7 +178,7 @@ export function useTabCloseGuards({
     pendingCloseTab,
     pendingTerminalCloseTab,
     pendingDeleteTabs,
-    closePanels,
+    closeTabs,
     resolveEditor,
     resolveTerminal,
     confirmDeleteClose,

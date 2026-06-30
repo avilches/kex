@@ -209,7 +209,7 @@ export default function App() {
     removeScript,
     reorderScripts,
     setActiveScript,
-    validateScriptPanels,
+    validateScriptTabs,
     setScriptPaneId,
     setTerminalRunningCommand,
     setTabView,
@@ -298,14 +298,14 @@ export default function App() {
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
-  const closePanelsRef = useRef<(panelIds: string[]) => void>(() => {});
+  const closeTabsRef = useRef<(tabIds: string[]) => void>(() => {});
   const browserHandles = useRef<Map<string, BrowserPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] =
     useState<EditorPaneHandle | null>(null);
   const [gitHistoryHandle, setGitHistoryHandle] =
     useState<GitHistorySearchHandle | null>(null);
   const pendingGotoLine = useRef<Map<string, number>>(new Map());
-  const fileLinkHandlerRef = useRef<(path: string, cwd: string | null, line?: number, col?: number, sourcePanelId?: string) => void>(
+  const fileLinkHandlerRef = useRef<(path: string, cwd: string | null, line?: number, col?: number, sourceTabId?: string) => void>(
     () => {},
   );
   const cwdResolverRef = useRef<(leafId: string) => string | null>(() => null);
@@ -343,11 +343,11 @@ export default function App() {
 
   useEffect(() => {
     for (const ws of workspacesRef.current) {
-      const livingPanelIds = new Set<string>();
+      const livingTabIds = new Set<string>();
       for (const pane of allPanes(ws.paneTree)) {
-        for (const tab of pane.tabs) livingPanelIds.add(tab.id);
+        for (const tab of pane.tabs) livingTabIds.add(tab.id);
       }
-      validateScriptPanels(ws.id, livingPanelIds);
+      validateScriptTabs(ws.id, livingTabIds);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -487,7 +487,7 @@ export default function App() {
 
   // ── Live terminal panel tracking for session disposal ─────────────────────
 
-  const livePanelIdsRef = useRef<Set<string>>(new Set());
+  const liveTabIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const live = new Set<string>();
@@ -498,7 +498,7 @@ export default function App() {
         }
       }
     }
-    for (const id of livePanelIdsRef.current) {
+    for (const id of liveTabIdsRef.current) {
       if (!live.has(id)) {
         disposeSession(id);
         searchAddons.current.delete(id);
@@ -509,7 +509,7 @@ export default function App() {
         clearMetricsEntry(id);
       }
     }
-    livePanelIdsRef.current = live;
+    liveTabIdsRef.current = live;
     for (const k of [...editorHandles.current.keys()]) {
       const found = findTabGlobal(k);
       if (!found) editorHandles.current.delete(k);
@@ -539,7 +539,7 @@ export default function App() {
   // ── Workspace state management ────────────────────────────────────────────
 
   const clearWorkspaceState = useCallback(() => {
-    for (const id of livePanelIdsRef.current) {
+    for (const id of liveTabIdsRef.current) {
       disposeSession(id);
       clearRunningCommandEntry(id);
       clearMetricsEntry(id);
@@ -581,9 +581,9 @@ export default function App() {
         }
       }
 
-      const freshPanelId = newTabId();
+      const freshTabId = newTabId();
       const panelCwd = config.cwd ?? activeWorkspace.workspaceRoot ?? activeWorkspace.cwd;
-      const tab: Tab = { id: freshPanelId, kind: "terminal", cwd: panelCwd, title: config.name || undefined };
+      const tab: Tab = { id: freshTabId, kind: "terminal", cwd: panelCwd, title: config.name || undefined };
 
       // Case 2: existing script pane -- add panel to it without splitting
       const existingScriptPane = activeWorkspace.scriptPaneId
@@ -593,7 +593,7 @@ export default function App() {
       if (existingScriptPane) {
         openPanel(activeWorkspace.id, activeWorkspace.scriptPaneId!, tab);
         setActiveWorkspaceId(activeWorkspace.id);
-        activateTab(activeWorkspace.id, freshPanelId);
+        activateTab(activeWorkspace.id, freshTabId);
       } else {
         // Case 3: no script pane yet -- split and record the new pane
         const { workspacePaneLimit } = usePreferencesStore.getState();
@@ -612,13 +612,13 @@ export default function App() {
         }
       }
 
-      updateScript(activeWorkspace.id, config.id, { tabId: freshPanelId });
+      updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
 
       const tryWrite = (attempts = 0) => {
-        const handle = terminalHandles.current.get(freshPanelId);
+        const handle = terminalHandles.current.get(freshTabId);
         if (handle) {
           handle.write(config.command + "\r");
-          setScriptRunning(freshPanelId, "running");
+          setScriptRunning(freshTabId, "running");
         } else if (attempts < 20) {
           setTimeout(() => tryWrite(attempts + 1), 100);
         }
@@ -1062,7 +1062,7 @@ export default function App() {
   );
 
   const openFileInRightSplit = useCallback(
-    (path: string, sourcePanelId?: string) => {
+    (path: string, sourceTabId?: string) => {
       if (!activeWorkspace) return undefined;
       const markdown = isMarkdownPath(path);
       for (const pane of allPanes(activeWorkspace.paneTree)) {
@@ -1081,8 +1081,8 @@ export default function App() {
       const panel = markdown
         ? ({ id: tabId, kind: "markdown" as const, path } as const)
         : ({ id: tabId, kind: "editor" as const, path, dirty: false, preview: false } as const);
-      const sourcePaneId = sourcePanelId
-        ? findTabPane(activeWorkspace.paneTree, sourcePanelId)?.pane.id
+      const sourcePaneId = sourceTabId
+        ? findTabPane(activeWorkspace.paneTree, sourceTabId)?.pane.id
         : undefined;
       if (sourcePaneId) {
         const sibling = siblingPane(activeWorkspace.paneTree, sourcePaneId);
@@ -1148,7 +1148,7 @@ export default function App() {
     [activeWorkspace, openPanel],
   );
 
-  fileLinkHandlerRef.current = (path, cwd, line, _col, sourcePanelId) => {
+  fileLinkHandlerRef.current = (path, cwd, line, _col, sourceTabId) => {
     let absPath = path;
     if (path.startsWith("~/")) {
       absPath = home ? `${home}/${path.slice(2)}` : path;
@@ -1161,14 +1161,14 @@ export default function App() {
           focusSidebar(absPath, { fromShortcut: true });
           return;
         }
-        const id = openFileInRightSplit(absPath, sourcePanelId);
+        const id = openFileInRightSplit(absPath, sourceTabId);
         if (id == null || line == null) return;
         const h = editorHandles.current.get(id);
         if (h) h.gotoLine(line);
         else pendingGotoLine.current.set(id, line);
       })
       .catch(() => {
-        openFileInRightSplit(absPath, sourcePanelId);
+        openFileInRightSplit(absPath, sourceTabId);
       });
   };
 
@@ -1181,7 +1181,7 @@ export default function App() {
 
   useEffect(() => {
     configureTerminalLinkBridge({
-      onFileLink: (path, cwd, line, col, sourcePanelId) => fileLinkHandlerRef.current(path, cwd, line, col, sourcePanelId),
+      onFileLink: (path, cwd, line, col, sourceTabId) => fileLinkHandlerRef.current(path, cwd, line, col, sourceTabId),
       resolveLeafCwd: (leafId) => cwdResolverRef.current(leafId),
     });
   }, []);
@@ -1226,11 +1226,11 @@ export default function App() {
   );
 
   const onCloseTabStable = useCallback((_wsId: string, tabId: string) => {
-    closePanelsRef.current([tabId]);
+    closeTabsRef.current([tabId]);
   }, []);
 
   const onCloseManyTabsStable = useCallback((_wsId: string, tabIds: string[]) => {
-    closePanelsRef.current(tabIds);
+    closeTabsRef.current(tabIds);
   }, []);
 
   const onFocusPaneStable = useCallback(
@@ -1508,7 +1508,7 @@ export default function App() {
     pendingCloseTab,
     pendingTerminalCloseTab,
     pendingDeleteTabs,
-    closePanels,
+    closeTabs,
     resolveEditor,
     resolveTerminal,
     confirmDeleteClose,
@@ -1532,7 +1532,7 @@ export default function App() {
     isAutoSaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
   });
 
-  closePanelsRef.current = closePanels;
+  closeTabsRef.current = closeTabs;
 
   // ── Path rename ───────────────────────────────────────────────────────────
 
@@ -1984,7 +1984,7 @@ export default function App() {
       flashLockIcon(activeTabId);
       return;
     }
-    closePanelsRef.current([activeTabId]);
+    closeTabsRef.current([activeTabId]);
   }, [activeWorkspace, activeTabId, activeTab, requestCloseWorkspace]);
 
   const handleCloseOtherPanels = useCallback(() => {
@@ -1994,7 +1994,7 @@ export default function App() {
         (p) => p.id !== activeTabId && !(p as { locked?: boolean }).locked,
       )
       .map((p) => p.id);
-    if (ids.length) closePanelsRef.current(ids);
+    if (ids.length) closeTabsRef.current(ids);
   }, [activePane, activeTabId]);
 
   const handleCloseAllPanels = useCallback(() => {
@@ -2002,7 +2002,7 @@ export default function App() {
     const ids = activePane.tabs
       .filter((p) => !(p as { locked?: boolean }).locked)
       .map((p) => p.id);
-    if (ids.length) closePanelsRef.current(ids);
+    if (ids.length) closeTabsRef.current(ids);
   }, [activePane]);
 
   const cycleWorkspace = useCallback(

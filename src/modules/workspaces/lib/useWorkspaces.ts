@@ -129,7 +129,7 @@ export function applyWorkspaceStatus(
   );
 }
 
-// Per-pane most-recently-used activation history (panelIds, most recent first).
+// Per-pane most-recently-used activation history (tabIds, most recent first).
 // In memory only, never persisted. Bounds defensively; the live list is already
 // capped by the number of open tabs in the pane (see paneActivationHistoryRef).
 export const MRU_HISTORY_LIMIT = 50;
@@ -255,7 +255,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const previousWorkspaceIdRef = useRef<string | null>(null);
   const closedPanelsRef = useRef<ClosedEntry[]>([]);
 
-  // paneId -> MRU activation history (panelIds, most recent first). Drives which
+  // paneId -> MRU activation history (tabIds, most recent first). Drives which
   // tab gets focus when the active one closes. In memory only, never persisted.
   const paneActivationHistoryRef = useRef<Map<string, string[]>>(new Map());
   const recordActivation = useCallback((paneId: string, tabId: string) => {
@@ -542,7 +542,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     openPanel(target.workspaceId, target.paneId, newPanel);
   }, [openPanel, activeWorkspaceId]);
 
-  const replaceTab = useCallback((workspaceId: string, paneId: string, oldPanelId: string, newPanel: Tab) => {
+  const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newPanel: Tab) => {
     recordActivation(paneId, newPanel.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -550,7 +550,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         return {
           ...w,
           paneTree: updatePane(w.paneTree, paneId, (p) => {
-            const idx = p.tabs.findIndex((tab) => tab.id === oldPanelId);
+            const idx = p.tabs.findIndex((tab) => tab.id === oldTabId);
             if (idx === -1) return p;
             const newTabs = [...p.tabs];
             newTabs[idx] = newPanel;
@@ -760,7 +760,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const validateScriptPanels = useCallback(
+  const validateScriptTabs = useCallback(
     (workspaceId: string, livingTabIds: Set<string>) => {
       setWorkspaces((prev) =>
         prev.map((w) => {
@@ -847,7 +847,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     reorderScripts,
     setActiveScript,
     setScriptPaneId,
-    validateScriptPanels,
+    validateScriptTabs,
     setTerminalRunningCommand,
     setTabView,
     toggleOverlayPreview,

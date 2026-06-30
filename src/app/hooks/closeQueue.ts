@@ -35,11 +35,11 @@ export type CloseQueueDeps = {
  * the rest of the run closes without re-asking.
  */
 export async function runCloseQueue(
-  panelIds: string[],
+  tabIds: string[],
   deps: CloseQueueDeps,
 ): Promise<void> {
   let suppressTerminalWarn = false;
-  for (const tabId of panelIds) {
+  for (const tabId of tabIds) {
     const panel = deps.getPanel(tabId);
     if (!panel) continue;
 
