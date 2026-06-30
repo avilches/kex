@@ -86,7 +86,7 @@ export function WorkspacesSection() {
 
   useEffect(() => {
     return () => {
-      const cleaned = statusesRef.current.filter((s) => s.label.trim());
+      const cleaned = statusesRef.current.filter((s) => s.label?.trim());
       if (cleaned.length !== statusesRef.current.length) {
         void setWorkspaceStatuses(cleaned);
       }
@@ -95,7 +95,7 @@ export function WorkspacesSection() {
 
   function persist(next: WorkspaceStatus[]) {
     setStatuses(next);
-    void setWorkspaceStatuses(next.filter((s) => s.label.trim()));
+    void setWorkspaceStatuses(next.filter((s) => s.label?.trim()));
   }
 
   function handleUpdate(id: string, label: string) {
@@ -107,7 +107,7 @@ export function WorkspacesSection() {
   }
 
   function handleAdd() {
-    const empty = statuses.find((s) => !s.label.trim());
+    const empty = statuses.find((s) => !s.label?.trim());
     if (empty) {
       inputRefs.current.get(empty.id)?.focus();
       return;
@@ -115,7 +115,7 @@ export function WorkspacesSection() {
     const next: WorkspaceStatus = { id: newStatusId(), label: "" };
     const updated = [...statuses, next];
     setStatuses(updated);
-    void setWorkspaceStatuses(updated.filter((s) => s.label.trim()));
+    void setWorkspaceStatuses(updated.filter((s) => s.label?.trim()));
     requestAnimationFrame(() => {
       inputRefs.current.get(next.id)?.focus();
     });
