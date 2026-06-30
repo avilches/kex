@@ -48,7 +48,7 @@ pub struct SessionRecord {
 #[derive(Debug, Deserialize, Serialize)]
 struct SessionStore {
     version: u32,
-    panels: HashMap<String, SessionRecord>,
+    tabs: HashMap<String, SessionRecord>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -227,9 +227,9 @@ fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
-fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&PathBuf>) -> Vec<RestorePlan> {
+fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&PathBuf>) -> Vec<RestorePlan> {
     let mut plans = Vec::new();
-    for (tab_id, record) in panels {
+    for (tab_id, record) in tabs {
         let agent = record.agent.unwrap_or_else(|| "claude".to_string());
 
         // Prefer the cwd recorded in the transcript (more accurate than cwd_launch when
@@ -293,7 +293,7 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
 fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
     let Ok(content) = std::fs::read_to_string(path) else { return };
     let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return };
-    store.panels.remove(tab_id);
+    store.tabs.remove(tab_id);
     let Ok(out) = serde_json::to_string_pretty(&store) else { return };
     let tmp = path.with_extension("json.kex-tmp");
     if std::fs::write(&tmp, out).is_ok() {
@@ -336,14 +336,14 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
         std::fs::read_to_string(&path)
             .ok()
             .and_then(|s| serde_json::from_str::<SessionStore>(&s).ok())
-            .unwrap_or_else(|| SessionStore { version: 1, panels: HashMap::new() })
+            .unwrap_or_else(|| SessionStore { version: 1, tabs: HashMap::new() })
     } else {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        SessionStore { version: 1, panels: HashMap::new() }
+        SessionStore { version: 1, tabs: HashMap::new() }
     };
-    store.panels.insert(tab_id.to_string(), record);
+    store.tabs.insert(tab_id.to_string(), record);
     if let Ok(out) = serde_json::to_string_pretty(&store) {
         let tmp = path.with_extension("json.kex-tmp");
         if std::fs::write(&tmp, out).is_ok() {
@@ -359,7 +359,7 @@ pub fn detach_session(tab_id: &str) -> Result<(), String> {
     if let Some(path) = store_path() {
         if let Ok(content) = std::fs::read_to_string(&path) {
             if let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) {
-                store.panels.remove(tab_id);
+                store.tabs.remove(tab_id);
                 if let Ok(out) = serde_json::to_string_pretty(&store) {
                     let tmp = path.with_extension("json.kex-tmp");
                     if std::fs::write(&tmp, out).is_ok() {
@@ -391,8 +391,8 @@ pub fn load_restore_plan() -> Vec<RestorePlan> {
             return vec![];
         }
     };
-    log::info!("[agent-session] restore: {} session(s) in store", store.panels.len());
-    build_plans_from(store.panels, Some(&path))
+    log::info!("[agent-session] restore: {} session(s) in store", store.tabs.len());
+    build_plans_from(store.tabs, Some(&path))
 }
 
 #[cfg(test)]

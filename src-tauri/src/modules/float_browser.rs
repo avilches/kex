@@ -11,7 +11,7 @@ pub struct FloatMeta {
 
 pub struct FloatBrowserState {
     // tab_id -> meta
-    pub panels: Mutex<HashMap<String, FloatMeta>>,
+    pub tabs: Mutex<HashMap<String, FloatMeta>>,
     // tab_id of the float window that currently holds OS focus, or None when a
     // non-float window is focused. Drives the "Dock Browser" menu item.
     pub focused_float_tab_id: Mutex<Option<String>>,
@@ -20,7 +20,7 @@ pub struct FloatBrowserState {
 impl Default for FloatBrowserState {
     fn default() -> Self {
         Self {
-            panels: Mutex::new(HashMap::new()),
+            tabs: Mutex::new(HashMap::new()),
             focused_float_tab_id: Mutex::new(None),
         }
     }
@@ -123,7 +123,7 @@ pub fn float_browser_open(
     });
 
     {
-        let mut map = state.panels.lock().unwrap();
+        let mut map = state.tabs.lock().unwrap();
         map.insert(
             tab_id,
             FloatMeta {
@@ -147,7 +147,7 @@ pub fn do_dock_and_destroy(
 ) {
     {
         let st = app.state::<FloatBrowserState>();
-        let mut map = st.panels.lock().unwrap();
+        let mut map = st.tabs.lock().unwrap();
         if map.remove(tab_id).is_none() {
             return;
         }
@@ -182,7 +182,7 @@ pub fn dock_focused(app: &AppHandle) {
     let tab_id = st.focused_float_tab_id.lock().unwrap().clone();
     let Some(tid) = tab_id else { return };
     let origin = {
-        let map = st.panels.lock().unwrap();
+        let map = st.tabs.lock().unwrap();
         map.get(&tid).map(|m| m.origin_window_label.clone())
     };
     if let Some(origin_label) = origin {
@@ -195,7 +195,7 @@ pub fn dock_focused(app: &AppHandle) {
 pub fn dock_all(app: &AppHandle) {
     let st = app.state::<FloatBrowserState>();
     let entries: Vec<(String, String)> = {
-        let map = st.panels.lock().unwrap();
+        let map = st.tabs.lock().unwrap();
         map.iter()
             .map(|(tid, m)| (tid.clone(), m.origin_window_label.clone()))
             .collect()
@@ -214,7 +214,7 @@ pub fn float_browser_close(
 ) -> Result<(), String> {
     let label = window_label(&tab_id);
     {
-        let mut map = state.panels.lock().unwrap();
+        let mut map = state.tabs.lock().unwrap();
         map.remove(&tab_id);
         let mut focused = state.focused_float_tab_id.lock().unwrap();
         if focused.as_deref() == Some(&tab_id) {
@@ -262,7 +262,7 @@ pub fn float_browser_dock(
 ) -> Result<(), String> {
     let label = window_label(&tab_id);
     let origin_label = {
-        let map = state.panels.lock().unwrap();
+        let map = state.tabs.lock().unwrap();
         map.get(&tab_id).map(|m| m.origin_window_label.clone())
     }
     .ok_or_else(|| format!("no float window for tab {}", tab_id))?;

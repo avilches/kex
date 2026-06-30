@@ -89,7 +89,7 @@ If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcri
 ```json
 {
   "version": 1,
-  "panels": {
+  "tabs": {
     "<tabId>": {
       "agent": "claude",
       "session_id": "<claude-session-id>",

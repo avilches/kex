@@ -53,7 +53,7 @@ Luego en otro terminal:
 cat ~/.config/kex/agent-sessions.json | python3 -m json.tool
 ```
 
-Esperado: objeto con `panels` que tiene una clave igual al UUID de D1, con `state: "idle"`.
+Esperado: objeto con `tabs` que tiene una clave igual al UUID de D1, con `state: "idle"`.
 
 Si el archivo no existe o esta vacio: los hooks `SessionStart` no se estan ejecutando.
 Causa mas probable: `jq` no instalado y el fallback falla. Verificar:
@@ -137,7 +137,7 @@ cat ~/Library/Application\ Support/app.betauer.kex/workspaces.json \
   | python3 -m json.tool | grep '"id"' | head -20
 
 # panel IDs en el session store
-cat ~/.config/kex/agent-sessions.json | python3 -m json.tool | grep -E '"panels"|{' | head -10
+cat ~/.config/kex/agent-sessions.json | python3 -m json.tool | grep -E '"tabs"|{' | head -10
 ```
 
 Si los IDs no coinciden: este es el bug raiz. El UUID del panel cambia entre sesiones.

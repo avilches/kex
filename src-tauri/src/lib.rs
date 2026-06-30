@@ -141,7 +141,7 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
 pub fn refresh_dock_menu(app: &tauri::AppHandle) {
     let st = app.state::<float_browser::FloatBrowserState>();
     let has_focused = st.focused_float_tab_id.lock().unwrap().is_some();
-    let has_any = !st.panels.lock().unwrap().is_empty();
+    let has_any = !st.tabs.lock().unwrap().is_empty();
     let handles = app.state::<MenuHandles>();
     let guard = handles.0.lock().expect("MenuHandles mutex poisoned");
     if let Some(items) = guard.as_ref() {
@@ -236,7 +236,7 @@ fn create_app_window(
                     if let Some(nav) = nav_state.take_if_fresh() {
                         if let Some(target) = app_handle.get_webview_window(&nav.window_label) {
                             let _ = target.set_focus();
-                            let _ = target.emit("kex:activate-panel", serde_json::json!({
+                            let _ = target.emit("kex:activate-tab", serde_json::json!({
                                 "workspaceId": nav.workspace_id,
                                 "tabId": nav.tab_id,
                             }));

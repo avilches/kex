@@ -2412,7 +2412,7 @@ export default function App() {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen<{ workspaceId: string; tabId: string }>(
-        "kex:activate-panel",
+        "kex:activate-tab",
         (e) => {
           onActivateAgent(e.payload.workspaceId, e.payload.tabId);
         },
@@ -2421,7 +2421,7 @@ export default function App() {
         unlisten = u;
       })
       .catch((e) =>
-        console.error("[kex] kex:activate-panel listen failed:", e),
+        console.error("[kex] kex:activate-tab listen failed:", e),
       );
     return () => {
       unlisten?.();

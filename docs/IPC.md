@@ -143,7 +143,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
 | `agent_session_restore_plan` | Return `Vec<RestorePlan>` — one entry per tab that had a running agent session at last close |
-| `agent_queue_nav` | Store a pending OS-notification navigation target `{ window_label, workspace_id, tab_id }` with a 5-second TTL. Called by the frontend before sending an OS notification so that when the user clicks the notification and any main window gains focus, Rust can redirect to the correct window and emit `kex:activate-panel` to it. |
+| `agent_queue_nav` | Store a pending OS-notification navigation target `{ window_label, workspace_id, tab_id }` with a 5-second TTL. Called by the frontend before sending an OS notification so that when the user clicks the notification and any main window gains focus, Rust can redirect to the correct window and emit `kex:activate-tab` to it. |
 | `float_browser_open(tabId, url, originWindowLabel, workspaceId)` | Open a floating `WebviewUrl::External` window for the given browser tab. If the window already exists, focuses it instead of opening a second one. State is inserted only after successful window build. |
 | `float_browser_close(tabId)` | Destroy the floating window without docking (no `kex:float-dock` event emitted). Removes from state unconditionally. |
 | `float_browser_focus(tabId)` | Bring the floating window to front via `set_focus`. |
@@ -191,9 +191,9 @@ When the app is not focused and an agent event requires an OS notification, the 
 On every `WindowEvent::Focused(true)` for a main window (`w-*` label), Rust checks for a fresh pending nav. If found, it:
 
 1. Focuses the target window via `WebviewWindow::set_focus()`.
-2. Emits `kex:activate-panel` to that window with payload `{ workspaceId, tabId }`.
+2. Emits `kex:activate-tab` to that window with payload `{ workspaceId, tabId }`.
 3. Clears the pending nav.
 
-Each main window's `App.tsx` listens for `kex:activate-panel` on startup (via `getCurrentWindow().listen(...)`) and calls `onActivateAgent(workspaceId, tabId)`, which switches the active workspace, activates the tab, and focuses the terminal with a 50 ms delay.
+Each main window's `App.tsx` listens for `kex:activate-tab` on startup (via `getCurrentWindow().listen(...)`) and calls `onActivateAgent(workspaceId, tabId)`, which switches the active workspace, activates the tab, and focuses the terminal with a 50 ms delay.
 
 **Limitation:** only the most recent navigation target is kept. If two agents finish while the app is unfocused, clicking either OS notification navigates to the panel of whichever agent finished last.
