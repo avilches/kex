@@ -53,6 +53,7 @@ import {
   FileDiffIcon,
   FolderOpenIcon,
   FolderTreeIcon,
+  Cancel01Icon,
   GitBranchIcon,
   Link01Icon,
   ListViewIcon,
@@ -936,19 +937,31 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  <input
-                    ref={cloneInputRef}
-                    type="text"
-                    value={cloneUrl}
-                    disabled={cloneRunning}
-                    onChange={(e) => setCloneUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !cloneRunning) void handleGitClone();
-                    }}
-                    placeholder="https://github.com/user/repo.git"
-                    className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-                    spellCheck={false}
-                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      ref={cloneInputRef}
+                      type="text"
+                      value={cloneUrl}
+                      disabled={cloneRunning}
+                      onChange={(e) => setCloneUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !cloneRunning) void handleGitClone();
+                      }}
+                      placeholder="https://github.com/user/repo.git"
+                      className="h-8 flex-1 rounded border border-border bg-transparent px-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                      spellCheck={false}
+                    />
+                    {!cloneRunning && (
+                      <button
+                        type="button"
+                        title="Clear"
+                        className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                        onClick={() => void handleCancelClone()}
+                      >
+                        <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                      </button>
+                    )}
+                  </div>
                   {cloneError && (
                     <p className="text-[11px] text-destructive">{cloneError}</p>
                   )}
