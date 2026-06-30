@@ -2724,7 +2724,7 @@ export default function App() {
                         onSearchHandle={setGitHistoryHandle}
                       />
                     </ResizablePanel>
-                    <ResizableHandle withHandle />
+                    <ResizableHandle />
                   </>
                 )}
 
@@ -2769,7 +2769,7 @@ export default function App() {
                 {/* Tool sidebar on RIGHT when sidebarSide === "right" (default) */}
                 {sidebarOpen && sidebarSide === "right" && (
                   <>
-                    <ResizableHandle withHandle />
+                    <ResizableHandle />
                     <ResizablePanel
                       id="tool-sidebar"
                       defaultSize={`${sidebarWidth}%`}

@@ -112,7 +112,7 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, e
       >
         <SplitNodeView node={node.first} activePaneId={activePaneId} expandedPaneId={expandedPaneId} {...rest} />
       </ResizablePanel>
-      <ResizableHandle withHandle />
+      <ResizableHandle />
       <ResizablePanel
         id={`split-${node.id}-second`}
         defaultSize={`${(1 - node.dividerPosition) * 100}%`}

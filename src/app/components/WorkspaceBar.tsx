@@ -624,7 +624,7 @@ export function WorkspaceBar({
       </button>
 
       <div
-        className="absolute inset-y-0 right-0 flex w-1 cursor-ew-resize items-center justify-center outline-none hover:bg-primary/20 active:bg-primary/30"
+        className="absolute inset-y-0 right-0 flex w-1 cursor-col-resize items-center justify-center outline-none"
         onPointerDown={(e) => {
           const startX = e.clientX;
           const startWidth = width;
@@ -641,7 +641,6 @@ export function WorkspaceBar({
           document.addEventListener("pointerup", onUp);
         }}
       >
-        <div className="pointer-events-none h-6 w-0.5 rounded-full bg-border" />
       </div>
     </nav>
   );
