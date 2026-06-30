@@ -2616,6 +2616,8 @@ export default function App() {
             onOpenRunSettings={() =>
               useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "run-configurations")
             }
+            activeWorkspace={activeWorkspace ?? null}
+            activePanel={activePanel}
           />
 
           {/* 3-column layout */}

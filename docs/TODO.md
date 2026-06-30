@@ -105,25 +105,24 @@ Total estimado: ~2h. Riesgo principal: comportamiento en Linux.
 
 ## Workspace: label de texto + barra superior con contexto
 
-Estado: PARCIAL (auditado 2026-06-30). El modelo `Workspace` tiene `title: string` editable y persistido. El titulo es editable desde la barra lateral (inline rename) y desde `WorkspaceSettingsDialog`. Lo que FALTA es mostrarlo en la barra superior (`Header.tsx`): hoy `Header.tsx` no recibe ni muestra el titulo del workspace activo. Las otras dos piezas (ultima notificacion del tab, PR de la rama) siguen pendientes.
+Estado: PARCIAL (actualizado 2026-06-30). La pieza 1 (nombre del workspace en la barra superior) esta IMPLEMENTADA: `Header.tsx` recibe `activeWorkspace` y `activePanel` y renderiza `WorkspaceTitle.tsx` (modulo `header/`), que muestra el icono del workspace (mas grande, coloreado con `resolveWorkspaceColor`), su `title`, el badge de status (si tiene `statusId`) y, debajo, el titulo completo de la tab activa (con `AgentIcon` cuando el panel tiene agente). Quedan pendientes las piezas 2 y 3.
 
 ### Motivacion
 
 La barra de titulo superior esta practicamente vacia. Se podria aprovechar para mostrar:
 
-1. **Nombre/label del workspace**: texto libre que el usuario puede poner a cada workspace ("backend API", "cliente web", "infra", ...), visible en la barra superior y en la pestaña de la barra lateral.
-2. **Ultima notificacion del tab activo**: el ultimo mensaje de agente (Claude Code, Codex) en el tab activo, sin tener que ir al panel de notificaciones.
-3. **PR de la rama actual**: rama git del panel activo y, si hay remote configurado, el PR asociado (consultar via `gh pr view --json number,title,url` o la API de GitHub). Spec + plan accionable en [F14](pending/features/F14-pr-de-la-rama-actual.md) (IPC `git_current_pr`, gh con fallback a REST via ureq; base tecnica de F13).
+1. **Nombre/label del workspace**: HECHO (2026-06-30). Icono coloreado + `title` + badge de status en la barra superior, y debajo el titulo de la tab activa. Editable desde la barra lateral (inline rename) y `WorkspaceSettingsDialog`.
+2. **Ultima notificacion del tab activo**: PENDIENTE. Hoy la segunda linea muestra el titulo/descripcion de la tab (para un agente, el `panel.title`/`oscTitle`, que suele ser la descripcion ai-title), no el ultimo mensaje de notificacion del agente. Mostrar el ultimo mensaje literal (Claude Code, Codex) sin ir al panel de notificaciones sigue sin hacerse.
+3. **PR de la rama actual**: PENDIENTE. Rama git del panel activo y, si hay remote configurado, el PR asociado (consultar via `gh pr view --json number,title,url` o la API de GitHub). Spec + plan accionable en [F14](pending/features/F14-pr-de-la-rama-actual.md) (IPC `git_current_pr`, gh con fallback a REST via ureq; base tecnica de F13).
 
 ### Dependencias
 
-- El label del workspace es una adicion pura al modelo `Workspace` (`name?: string`) y no bloquea nada.
-- Notificacion del tab: ya existe `agentStore` con sessions y notifications. Solo falta leer la ultima notif para el panel activo.
+- Notificacion del tab: ya existe `agentStore` con sessions y notifications. Solo falta leer la ultima notif para el panel activo (`WorkspaceTitle.tsx` ya esta suscrito a `agentStore`, seria el sitio natural).
 - PR de rama: requiere una nueva IPC (`git_current_pr` o similar) o llamar a la GitHub API desde el frontend (con token del usuario).
 
 ### Prioridad
 
-Bajo. El label del workspace es lo mas sencillo y util de lo tres; empezar por ahi si se implementa.
+Bajo. El nombre del workspace ya esta. La notificacion del tab es el siguiente paso mas barato; el PR de rama es el mas costoso.
 
 ---
 
@@ -146,11 +145,13 @@ Estado: PARCIAL (auditado 2026-06-30). La infraestructura basica esta implementa
 - `WorkspaceSettingsDialog` permite asignar status a un workspace con un selector
 - `workspace.statusId` en el modelo `Workspace` y persistido
 
+El status del workspace activo YA se MUESTRA en la barra superior (badge en `WorkspaceTitle.tsx`, implementado 2026-06-30).
+
 Lo que FALTA de la propuesta original:
 - Color por status (el tipo es solo `{ id, label }`, sin `color`)
 - Icono/emoji por status
 - Filtrar (hoy solo agrupa, no filtra para ocultar grupos)
-- Cambiar el status desde la barra superior (solo desde el dialog y el selector del sidebar)
+- Cambiar el status desde la barra superior (el badge solo muestra; asignar/cambiar sigue siendo solo desde el dialog y el selector del sidebar)
 
 ### Prioridad
 
