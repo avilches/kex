@@ -12,6 +12,7 @@ import {
   File02Icon,
   InformationCircleIcon,
   KeyboardIcon,
+  Layers01Icon,
   PaintBoardIcon,
   Settings01Icon,
   SourceCodeIcon,
@@ -30,6 +31,7 @@ import { GeneralSection } from "./sections/GeneralSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemesSection } from "./sections/ThemesSection";
+import { WorkspacesSection } from "./sections/WorkspacesSection";
 
 const SECTIONS: {
   id: SettingsTab;
@@ -38,6 +40,7 @@ const SECTIONS: {
   component: () => JSX.Element;
 }[] = [
   { id: "general", label: "General", icon: Settings01Icon, component: GeneralSection },
+  { id: "workspaces", label: "Workspaces", icon: Layers01Icon, component: WorkspacesSection },
   { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon, component: TerminalSection },
   { id: "editor", label: "Editor", icon: SourceCodeIcon, component: EditorSection },
   { id: "filetypes", label: "File Types", icon: File02Icon, component: FileTypesSection },
