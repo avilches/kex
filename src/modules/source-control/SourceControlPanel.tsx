@@ -666,8 +666,23 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const handleGitClone = useCallback(async () => {
     const url = cloneUrl.trim();
     if (!url || !workspaceCwd) return;
-    setCloneRunning(true);
     setCloneError(null);
+
+    try {
+      const entries = await invoke<{ name: string }[]>("fs_read_dir", {
+        path: workspaceCwd,
+        showHidden: true,
+        workspace: currentWorkspaceEnv(),
+      });
+      if (entries.length > 0) {
+        setCloneError("The directory is not empty. Remove all files before cloning.");
+        return;
+      }
+    } catch {
+      // if we can't check, let git report the error
+    }
+
+    setCloneRunning(true);
     cloneCancelledRef.current = false;
 
     let handle: number;
