@@ -116,7 +116,7 @@ export function RunButton({
       })}
       {completeConfigs.length > 0 && <DropdownMenuSeparator />}
       <DropdownMenuItem onSelect={onOpenRunConfigurations} className="text-muted-foreground">
-        + Add Script
+        {completeConfigs.length === 0 ? "+ Add Script" : "Configure Scripts"}
       </DropdownMenuItem>
     </DropdownMenuContent>
   );

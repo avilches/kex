@@ -20,8 +20,8 @@ export function panelTitle(panel: Panel, runningCommand?: string | null, oscTitl
   if (panel.kind !== "terminal" && panel.title) return panel.title;
   switch (panel.kind) {
     case "terminal": {
-      if (runningCommand) return basename(runningCommand.trim().split(/\s+/)[0] ?? "");
       if (panel.title) return panel.title;
+      if (runningCommand) return basename(runningCommand.trim().split(/\s+/)[0] ?? "");
       if (oscTitle) return oscTitle;
       if (!panel.cwd) return "shell";
       const cwd = panel.cwd.replace(/\/$/, "");

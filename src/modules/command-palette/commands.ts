@@ -11,6 +11,7 @@ import {
   LayoutTwoColumnIcon,
   LayoutTwoRowIcon,
   PaintBoardIcon,
+  PlayIcon,
   Refresh01Icon,
   Search01Icon,
   Settings01Icon,
@@ -58,6 +59,8 @@ export type CommandPaletteActionContext = {
   clearTerminal: () => void;
   toggleZenMode: () => void;
   hasActiveTerminal: boolean;
+  openWorkspaceProperties: () => void;
+  openRunScriptConfiguration: () => void;
 };
 
 const noop = () => {};
@@ -268,6 +271,22 @@ export function createCommandItems(
       icon: SidebarLeftIcon,
       shortcutId: "sidebar.toggle",
       run: ctx.toggleSidebar,
+    },
+    {
+      id: "workspace.properties",
+      title: "Workspace properties",
+      group: "General",
+      keywords: ["workspace", "settings", "name", "root", "properties", "configure"],
+      icon: Settings01Icon,
+      run: ctx.openWorkspaceProperties,
+    },
+    {
+      id: "workspace.runScripts",
+      title: "Run script configuration",
+      group: "General",
+      keywords: ["run", "script", "scripts", "configure", "configuration", "commands"],
+      icon: PlayIcon,
+      run: ctx.openRunScriptConfiguration,
     },
   ];
 }

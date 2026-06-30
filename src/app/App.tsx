@@ -2508,6 +2508,10 @@ export default function App() {
               setZenPaneId((prev) => prev !== null ? null : activeWorkspace.activePaneId);
             },
             hasActiveTerminal: activePanel?.kind === "terminal",
+            openWorkspaceProperties: () =>
+              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId),
+            openRunScriptConfiguration: () =>
+              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "run-configurations"),
           })
         : [],
     [
