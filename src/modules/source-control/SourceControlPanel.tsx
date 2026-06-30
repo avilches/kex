@@ -962,9 +962,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       </button>
                     )}
                   </div>
-                  {cloneError && (
-                    <p className="text-[11px] text-destructive">{cloneError}</p>
-                  )}
                   {!cloneRunning ? (
                     <div className="flex justify-end">
                       <Button
@@ -992,6 +989,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                         Cancel
                       </Button>
                     </div>
+                  )}
+                  {cloneError && (
+                    <p className="text-[11px] text-destructive">{cloneError}</p>
                   )}
                 </div>
               )}
