@@ -624,10 +624,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const [cloneUrl, setCloneUrl] = useState("");
   const [cloneRunning, setCloneRunning] = useState(false);
   const [cloneError, setCloneError] = useState<string | null>(null);
+  const [initRunning, setInitRunning] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
   const cloneInputRef = useRef<HTMLInputElement>(null);
 
   const handleGitInit = useCallback(async () => {
     if (!workspaceCwd) return;
+    setInitRunning(true);
+    setInitError(null);
     try {
       await invoke("shell_run_command", {
         command: "git init .",
@@ -636,7 +640,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       });
       await scm.refresh();
     } catch (e) {
-      // refresh will surface the error state
+      setInitError(typeof e === "string" ? e : "git init failed");
+    } finally {
+      setInitRunning(false);
     }
   }, [workspaceCwd, scm]);
 
@@ -647,7 +653,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     setCloneError(null);
     try {
       await invoke("shell_run_command", {
-        command: `git clone ${url}`,
+        command: `git clone ${url} .`,
         cwd: workspaceCwd,
         workspace: currentWorkspaceEnv(),
       });
@@ -810,15 +816,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             </div>
             <div className="flex w-full flex-col gap-2">
               {workspaceCwd && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full gap-1.5 text-[12px]"
-                  onClick={() => void handleGitInit()}
-                >
-                  <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />
-                  Git init
-                </Button>
+                <div className="flex flex-col gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-1.5 text-[12px]"
+                    disabled={initRunning}
+                    onClick={() => void handleGitInit()}
+                  >
+                    <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />
+                    {initRunning ? "Initializing..." : "Git init"}
+                  </Button>
+                  {initError && (
+                    <p className="text-[11px] text-destructive">{initError}</p>
+                  )}
+                </div>
               )}
               {!cloneOpen ? (
                 <Button
