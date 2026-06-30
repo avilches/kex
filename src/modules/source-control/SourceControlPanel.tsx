@@ -937,7 +937,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-1">
+                  <div className="relative">
                     <input
                       ref={cloneInputRef}
                       type="text"
@@ -948,14 +948,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                         if (e.key === "Enter" && !cloneRunning) void handleGitClone();
                       }}
                       placeholder="https://github.com/user/repo.git"
-                      className="h-8 flex-1 rounded border border-border bg-transparent px-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                      className="h-8 w-full rounded border border-border bg-transparent px-2.5 pr-7 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                       spellCheck={false}
                     />
                     {!cloneRunning && (
                       <button
                         type="button"
                         title="Clear"
-                        className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+                        className="absolute right-1 top-1/2 flex size-[22px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
                         onClick={() => void handleCancelClone()}
                       >
                         <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
