@@ -263,3 +263,22 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       return { sessions, notifications: [] };
     }),
 }));
+
+if (import.meta.env?.DEV && typeof window !== "undefined") {
+  (
+    window as unknown as {
+      __kexAgents?: {
+        fakeNotification: (
+          panelId: string,
+          tabId: string,
+          kind?: "attention" | "finished" | "error",
+          agent?: string,
+        ) => void;
+      };
+    }
+  ).__kexAgents = {
+    fakeNotification(panelId, tabId, kind = "attention", agent = "claude-code") {
+      useAgentStore.getState().pushNotification({ source: "terminal", panelId, tabId, agent, kind });
+    },
+  };
+}
