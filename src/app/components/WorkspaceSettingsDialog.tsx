@@ -37,12 +37,14 @@ import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
+import { WORKSPACE_ICON_PALETTE } from "@/modules/workspaces/lib/workspaceIcon";
 import type { Workspace, RunConfig } from "@/modules/workspaces/lib/types";
 
 type Props = {
   workspaces: Workspace[];
   onSetTitle: (id: string, title: string) => void;
   onSetColor: (id: string, color: string | null) => void;
+  onSetIcon: (id: string, icon: string | null) => void;
   onSetPinnedRoot: (id: string, path: string | undefined) => void;
   onAddRunConfig: (id: string, config: RunConfig) => void;
   onUpdateRunConfig: (id: string, configId: string, patch: Partial<RunConfig>) => void;
@@ -163,6 +165,50 @@ function ColorPicker({
   );
 }
 
+function IconPicker({
+  wsId,
+  wsIcon,
+  onSetIcon,
+}: {
+  wsId: string;
+  wsIcon: string | undefined;
+  onSetIcon: (id: string, icon: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      <button
+        type="button"
+        title="No icon"
+        onClick={() => onSetIcon(wsId, null)}
+        className={cn(
+          "size-6 flex items-center justify-center rounded border-2 bg-muted text-muted-foreground transition-colors",
+          wsIcon == null
+            ? "border-foreground"
+            : "border-transparent hover:border-muted-foreground/50",
+        )}
+      >
+        <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+      </button>
+      {WORKSPACE_ICON_PALETTE.map((entry) => (
+        <button
+          key={entry.name}
+          type="button"
+          title={entry.label}
+          onClick={() => onSetIcon(wsId, entry.name)}
+          className={cn(
+            "size-6 flex items-center justify-center rounded border-2 text-foreground transition-colors",
+            wsIcon === entry.name
+              ? "border-foreground bg-muted"
+              : "border-transparent hover:border-muted-foreground/40 hover:bg-muted/60",
+          )}
+        >
+          <HugeiconsIcon icon={entry.icon} size={13} strokeWidth={1.5} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 type FormProps = { ws: Workspace; initialTab: WorkspaceSettingsTab; initialFocus: WorkspaceSettingsFocus; onRequestClose: () => void } & Omit<Props, "workspaces">;
 
 function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, ...props }: FormProps) {
@@ -252,6 +298,16 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
               wsColor={ws.color}
               displayColor={displayColor}
               onSetColor={props.onSetColor}
+            />
+          </div>
+
+          {/* Icon */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium">Icon</label>
+            <IconPicker
+              wsId={ws.id}
+              wsIcon={ws.icon}
+              onSetIcon={props.onSetIcon}
             />
           </div>
 

@@ -19,6 +19,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
+import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -32,7 +33,7 @@ import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenam
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 
-type WorkspaceItem = { id: string; title: string; kind: string; cwd?: string; color?: string | null };
+type WorkspaceItem = { id: string; title: string; kind: string; cwd?: string; color?: string | null; icon?: string };
 
 export type WorkspaceSidebarProps = {
   workspaces: WorkspaceItem[];
@@ -157,10 +158,15 @@ function SortableWorkspaceItem({
         aria-pressed={active}
       >
         {compact ? (
-          <span className="text-[11px]">{abbrev(ws.title, ws.kind)}</span>
+          ws.icon && getWorkspaceIcon(ws.icon)
+            ? <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={15} strokeWidth={1.5} />
+            : <span className="text-[11px]">{abbrev(ws.title, ws.kind)}</span>
         ) : (
-          <span className="max-w-full truncate text-center text-[11px]">
-            {ws.title || ws.kind}
+          <span className="flex max-w-full items-center gap-1.5 truncate text-center text-[11px]">
+            {ws.icon && getWorkspaceIcon(ws.icon) && (
+              <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={12} strokeWidth={1.5} className="shrink-0" />
+            )}
+            <span className="truncate">{ws.title || ws.kind}</span>
           </span>
         )}
       </button>

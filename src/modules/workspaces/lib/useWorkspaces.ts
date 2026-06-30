@@ -665,6 +665,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
+  const setWorkspaceIcon = useCallback((workspaceId: string, icon: string | null) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => w.id === workspaceId ? { ...w, icon: icon ?? undefined } : w),
+    );
+  }, []);
+
   const addRunConfig = useCallback((workspaceId: string, config: RunConfig) => {
     setWorkspaces((prev) =>
       prev.map((w) =>
@@ -819,6 +825,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceGitConfig,
     setWorkspaceTitle,
     setWorkspaceColor,
+    setWorkspaceIcon,
     addRunConfig,
     updateRunConfig,
     removeRunConfig,

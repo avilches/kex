@@ -201,6 +201,7 @@ export default function App() {
     setFsRoot,
     setWorkspaceTitle,
     setWorkspaceColor,
+    setWorkspaceIcon,
     setWorkspaceGitConfig,
     addRunConfig,
     updateRunConfig,
@@ -2586,6 +2587,7 @@ export default function App() {
                 kind: "terminal",
                 cwd: w.cwd,
                 color: w.color,
+                icon: w.icon,
               }))}
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}
@@ -2808,6 +2810,7 @@ export default function App() {
             workspaces={workspaces}
             onSetTitle={setWorkspaceTitle}
             onSetColor={setWorkspaceColor}
+            onSetIcon={setWorkspaceIcon}
             onSetPinnedRoot={(id, path) => {
               if (path !== undefined) setPinnedRoot(id, path);
               else clearPinnedRoot(id);

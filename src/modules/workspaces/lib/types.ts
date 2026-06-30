@@ -79,6 +79,7 @@ export type Workspace = {
   fsRoot?: string;
   git?: WorkspaceGitConfig;
   color?: string | null;
+  icon?: string;
   scripts?: RunConfig[];
   activeScript?: string;
   scriptPaneId?: string;
