@@ -129,6 +129,36 @@ export function applyWorkspaceStatus(
   );
 }
 
+// Where a freshly opened tab lands. An explicit index (drag/reorder) wins;
+// otherwise it sits right after the active tab, falling back to the end when
+// there is no active tab (empty or freshly split pane).
+export function tabInsertionIndex(
+  tabs: Tab[],
+  activeTabId: string | null,
+  insertionIndex?: number,
+): number {
+  if (insertionIndex !== undefined) return Math.min(insertionIndex, tabs.length);
+  const activeIdx = tabs.findIndex((p) => p.id === activeTabId);
+  return activeIdx >= 0 ? activeIdx + 1 : tabs.length;
+}
+
+// A new workspace is inserted right after the active one and inherits its
+// status, so it lands in the same sidebar group (groupWorkspaces filters by
+// status preserving array order, so array adjacency == in-group adjacency).
+export function insertWorkspaceAfterActive(
+  workspaces: Workspace[],
+  activeWorkspaceId: string,
+  newWorkspace: Workspace,
+): Workspace[] {
+  const activeIdx = workspaces.findIndex((w) => w.id === activeWorkspaceId);
+  if (activeIdx === -1) return [...workspaces, newWorkspace];
+  const active = workspaces[activeIdx]!;
+  const placed = active.statusId ? { ...newWorkspace, statusId: active.statusId } : newWorkspace;
+  const next = [...workspaces];
+  next.splice(activeIdx + 1, 0, placed);
+  return next;
+}
+
 // Per-pane most-recently-used activation history (tabIds, most recent first).
 // In memory only, never persisted. Bounds defensively; the live list is already
 // capped by the number of open tabs in the pane (see paneActivationHistoryRef).
@@ -307,10 +337,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const addWorkspace = useCallback((cwd?: string): string => {
     const ws = newWorkspace(cwd);
-    setWorkspaces((prev) => [...prev, ws]);
+    setWorkspaces((prev) => insertWorkspaceAfterActive(prev, activeWorkspaceId, ws));
     selectWorkspace(ws.id);
     return ws.id;
-  }, [selectWorkspace]);
+  }, [selectWorkspace, activeWorkspaceId]);
 
   const reorderWorkspaces = useCallback((fromId: string, toId: string) => {
     setWorkspaces((prev) => {
@@ -477,9 +507,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         return {
           ...w,
           paneTree: updatePane(w.paneTree, paneId, (p) => {
-            const idx = insertionIndex !== undefined
-              ? Math.min(insertionIndex, p.tabs.length)
-              : p.tabs.length;
+            const idx = tabInsertionIndex(p.tabs, p.activeTabId, insertionIndex);
             const newTabs = [...p.tabs];
             newTabs.splice(idx, 0, newPanel);
             return { ...p, tabs: newTabs, activeTabId: newPanel.id };

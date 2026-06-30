@@ -71,7 +71,7 @@ export function GitDiffPathBar({
         variant="outline"
         className="shrink-0 text-[10px] uppercase tracking-wide"
       >
-        {chipLabel ?? mode}
+        {chipLabel ?? (mode === "+" ? "Staged Changes" : "Changes")}
       </Badge>
       {renameFrom ? (
         <span

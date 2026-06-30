@@ -81,7 +81,7 @@ elementos en contenedores scrollables.
 
 ### Notas de diagnóstico
 
-- Añadir `onDragCancel` al `DndContext` era necesario: sin él, el estado de `draggingPanel`
+- Añadir `onDragCancel` al `DndContext` era necesario: sin él, el estado de `draggingItem`
   quedaba colgado si el drag se cancelaba con Escape.
 - El linter (Biome) eliminó `cursor-grab` del className en varias ocasiones durante el diagnóstico.
   La clase debe estar presente junto con `active:cursor-grabbing` y `touch-none`.
@@ -100,7 +100,7 @@ will be lost.` El terminal más antiguo cae silenciosamente al renderer DOM (má
 
 ### Causa raíz
 
-En `PaneView.tsx`, `visible={panel.id === pane.activePanelId}` no consideraba si el workspace
+En `PaneView.tsx`, `visible={tab.id === pane.activeTabId}` no consideraba si el workspace
 estaba activo. Todos los workspaces (activos e inactivos) mantenían sus paneles activos con
 `visible=true`, conservando cada uno su contexto WebGL indefinidamente. WKWebView en macOS permite
 ~8-16 contextos simultáneos. Con varios workspaces con varios panes se llegaba al límite con
@@ -116,7 +116,7 @@ primaria.
 
 ### Fix
 
-1. `PaneView.tsx`: `visible={panel.id === pane.activePanelId && isWorkspaceActive}`. Workspaces
+1. `PaneView.tsx`: `visible={tab.id === pane.activeTabId && isWorkspaceActive}`. Workspaces
    inactivos liberan sus slots; el estado se serializa como snapshot y se restaura al volver.
 
 2. `rendererPool.ts`: constante `WEBGL_MAX_CONTEXTS = 7`. Antes de crear un nuevo contexto WebGL,
@@ -259,7 +259,7 @@ verificar que el permiso correspondiente (`core:window:allow-*`) este en `capabi
 | `src/modules/workspaces/WorkspaceView.tsx` | `onDragCancel` en `DndContext`; `document.body.style.cursor` sincrónico durante drag |
 | `src/modules/terminal/lib/rendererPool.ts` | `WEBGL_MAX_CONTEXTS = 7`; `retryMissingWebgl()`; `subscribeToPool()`/`notifyPool()` |
 | `src/main.tsx` | `setTimeout(retryMissingWebgl, 350)` tras `showWindow`; `onCloseRequested` usa `await destroy()` con reset de flushing en error |
-| `src/modules/workspaces/lib/useWorkspaces.ts` | `useEffect` cierre por workspaces vacios + navegacion adyacente en closeWorkspace/closePanel |
+| `src/modules/workspaces/lib/useWorkspaces.ts` | `useEffect` cierre por workspaces vacios + navegacion adyacente en closeWorkspace/closeTab |
 | `src-tauri/capabilities/default.json` | `core:window:allow-destroy` agregado |
 
 ---
@@ -304,3 +304,36 @@ que mostraba `---` siempre y sugeria (en falso) que el scratchpad no se abria.
 
 `scratchpadActive` ("focused" persistido) es una **preferencia de lado**, no el foco global: "si este
 pane gana el foco, ponlo en el scratchpad". Solo el tab activo toma el foco.
+
+## Bug 8: la navegacion por teclado entre workspaces no sigue el orden visual (RESUELTO)
+
+### Sintoma
+
+Tras introducir los grupos de status (y permitir colapsarlos), `workspace.next`/`workspace.prev`
+(Cmd+Alt+abajo/arriba) saltaban entre workspaces en un orden que no coincidia con el de la barra
+lateral. `workspace.selectByIndex` (Cmd+1..9) podia ademas saltar a un workspace oculto dentro de un
+grupo colapsado.
+
+### Causa raiz
+
+El array de estado `workspaces` conserva el orden de creacion/drag: `applyWorkspaceStatus` solo
+cambia el campo `statusId` en su sitio, nunca reordena. La sidebar, en cambio, **reagrupa** ese array
+para pintar (primero el grupo sin status, luego cada status en el orden de `workspaceStatuses`). Con
+grupos, esos dos ordenes dejan de coincidir. La navegacion recorria el array crudo en vez del orden
+visual derivado, y `selectByIndex` indexaba el array global sin filtrar colapsados.
+
+Antes de los grupos, array y orden visual coincidian 1:1, por eso nunca habia fallado.
+
+### Fix
+
+`modules/workspaces/lib/workspaceOrder.ts` concentra el calculo del orden:
+
+- `groupWorkspaces(workspaces, statuses)`: agrupacion visual (la usa la sidebar para pintar).
+- `visibleWorkspaceOrder(workspaces, statuses, collapsedGroups, activeId)`: el orden visual aplanado
+  de lo que realmente se ve. Un grupo colapsado aporta solo su miembro activo (la unica fila que
+  renderiza), el resto aporta todas sus filas.
+
+`cycleWorkspace` y `workspace.selectByIndex` (`App.tsx`) navegan sobre `visibleWorkspaceOrder`, asi
+que el orden de teclado es identico al visual y los miembros ocultos de un grupo colapsado se omiten.
+La sidebar usa `groupWorkspaces`, de modo que la agrupacion vive en un unico sitio y no puede volver
+a desincronizarse.

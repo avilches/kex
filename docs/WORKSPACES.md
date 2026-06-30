@@ -371,8 +371,11 @@ is reused:
 
 | Drop target | Action |
 |---|---|
-| `zone:<paneId>:center` | `openPanel(wsId, paneId, panel)` — appends permanent tab |
+| `zone:<paneId>:center` | `openPanel(wsId, paneId, panel)` — opens permanent tab right after the active one |
 | `tab-insert:<tabId>:before\|after` | `openPanel(wsId, paneId, panel, index)` — inserts at position |
+
+`openPanel` without an explicit `index` (the common case: Cmd+T, opening an editor, reopening a closed
+tab) inserts the new tab right after the pane's active tab, not at the end (`tabInsertionIndex`).
 | `zone:<paneId>:top\|bottom\|left\|right` | `splitPaneAndOpenPanel(wsId, paneId, dir, panel)` — splits pane, opens panel in new sub-pane |
 
 `panel` is the editor or terminal produced by `tabForDroppedPath`. Editor tabs have
