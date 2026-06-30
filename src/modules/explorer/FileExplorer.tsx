@@ -423,6 +423,11 @@ export const FileExplorer = memo(
     );
     const containerRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    // When a reveal target is a dotfile (or under a hidden dir) and showHidden
+    // is off, we toggle it and wait for the tree to reload. We track which path
+    // triggered the toggle so we keep returning "pending" during the async
+    // refetch window (nodes stay "loaded" with old entries until Rust responds).
+    const showHiddenToggledForRef = useRef<string | null>(null);
 
     const { rows, entryIndexByPath } = useMemo(() => {
       if (!rootPath)
@@ -670,22 +675,40 @@ export const FileExplorer = memo(
         if (isDirAt(file) === true && !tree.expanded.has(file)) {
           tree.expand(file);
         }
-        // Ancestors are settled: the request is handled regardless of whether the
-        // target is representable. A hidden file (showHidden off) or a file under a
-        // hidden folder never enters entryIndexByPath, so only select when present.
-        if (entryIndexByPath.has(file)) {
-          // Skip the flash when the target is already selected: opening a file
-          // from the sidebar selects it on click, and the autofocus tab would
-          // otherwise re-reveal that same file in a circular flash.
-          const alreadySelected = selectedPath === file;
-          setSelectedPath(file);
-          requestAnimationFrame(() => {
-            scrollEntryIntoView(file, { topRatio: 0.2 });
-            if (!alreadySelected) {
-              setFlash((f) => ({ path: file, token: f.token + 1 }));
+        // Ancestors are settled. If the target is not in the visible tree and
+        // showHidden is off, it might be a dotfile or under a hidden directory.
+        // Enable hidden files and wait for the tree to reload with them visible.
+        if (!entryIndexByPath.has(file)) {
+          if (!showHidden && showHiddenToggledForRef.current !== file) {
+            const rel = file.slice(rootPath.length);
+            const hasDotSegment = rel
+              .split(/[\\/]/)
+              .some((s) => s.startsWith(".") && s !== "." && s !== "..");
+            if (hasDotSegment) {
+              showHiddenToggledForRef.current = file;
+              onToggleShowHidden();
+              return "pending";
             }
-          });
+          }
+          // Either showHidden is already on (tree is still reloading after the
+          // toggle above) or the file genuinely isn't representable. Keep
+          // returning "pending" while the reload is in flight; once entryIndexByPath
+          // stabilises without the file we stay pending but no new trigger fires.
+          if (showHiddenToggledForRef.current === file) return "pending";
+          return "done";
         }
+        showHiddenToggledForRef.current = null;
+        // Skip the flash when the target is already selected: opening a file
+        // from the sidebar selects it on click, and the autofocus tab would
+        // otherwise re-reveal that same file in a circular flash.
+        const alreadySelected = selectedPath === file;
+        setSelectedPath(file);
+        requestAnimationFrame(() => {
+          scrollEntryIntoView(file, { topRatio: 0.2 });
+          if (!alreadySelected) {
+            setFlash((f) => ({ path: file, token: f.token + 1 }));
+          }
+        });
         return "done";
       },
       [
@@ -698,6 +721,8 @@ export const FileExplorer = memo(
         isDirAt,
         scrollEntryIntoView,
         selectedPath,
+        showHidden,
+        onToggleShowHidden,
       ],
     );
 
