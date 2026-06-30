@@ -35,7 +35,7 @@ export function setOscTitle(tabId: string, title: string): void {
   if (titles.get(tabId) === cleaned) return;
   titles.set(tabId, cleaned);
   notify();
-  void info(`[oscTitle] panel=${tabId} title=${JSON.stringify(cleaned)} listeners=${listeners.size}`);
+  void info(`[oscTitle] tab=${tabId} title=${JSON.stringify(cleaned)} listeners=${listeners.size}`);
 }
 
 export function clearOscTitle(tabId: string): void {

@@ -773,7 +773,7 @@ function attachSession(
               console.error(`[kex] session restore failed for panel ${leafId} (${plan.agent}): ${plan.errorReason}`);
               useAgentStore.getState().setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
             }
-            // else: no command, no error — PTY just opened at plan.cwd, nothing to do
+            // else: no command, no error - PTY just opened at plan.cwdLaunch, nothing to do
           } else if (s.persistentCommand) {
             const cmd = s.persistentCommand;
             setTimeout(() => {

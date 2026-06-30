@@ -7,7 +7,7 @@ PAYLOAD="$(cat)"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
 # Append full payload to /tmp (does not overwrite).
-# Two files: per-event (all panels) and per-panel (all events for this panel).
+# Two files: per-event (all tabs) and per-tab (all events for this tab).
 # Header shows the event and the IPC socket where the payload will be sent.
 log_payload() {
     local ipc_dest="${KEX_IPC:-(not set)}"

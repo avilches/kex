@@ -43,9 +43,9 @@ export function useTabCloseGuards({
   setWarnEnabled,
   isAutoSaveEnabled,
 }: Params) {
-  const [pendingCloseTab, setPendingClosePanel] = useState<TabInfo | null>(null);
-  const [pendingTerminalCloseTab, setPendingTerminalClosePanel] = useState<TabInfo | null>(null);
-  const [pendingDeleteTabs, setPendingDeletePanels] = useState<TabInfo[] | null>(null);
+  const [pendingCloseTab, setPendingCloseTab] = useState<TabInfo | null>(null);
+  const [pendingTerminalCloseTab, setPendingTerminalCloseTab] = useState<TabInfo | null>(null);
+  const [pendingDeleteTabs, setPendingDeleteTabs] = useState<TabInfo[] | null>(null);
 
   const editorResolverRef = useRef<((d: EditorCloseDecision) => void) | null>(null);
   const terminalResolverRef = useRef<((d: TerminalCloseDecision) => void) | null>(null);
@@ -55,7 +55,7 @@ export function useTabCloseGuards({
       new Promise<EditorCloseDecision>((resolve) => {
         const found = findTab(tabId);
         const panel = found?.tab;
-        setPendingClosePanel({
+        setPendingCloseTab({
           id: tabId,
           title: panel?.title ?? panel?.path ?? "file",
           kind: "editor",
@@ -70,7 +70,7 @@ export function useTabCloseGuards({
     (tabId: string, processName: string) =>
       new Promise<TerminalCloseDecision>((resolve) => {
         const found = findTab(tabId);
-        setPendingTerminalClosePanel({
+        setPendingTerminalCloseTab({
           id: tabId,
           title: found?.tab.title ?? "terminal",
           kind: "terminal",
@@ -83,14 +83,14 @@ export function useTabCloseGuards({
   );
 
   const resolveEditor = useCallback((decision: EditorCloseDecision) => {
-    setPendingClosePanel(null);
+    setPendingCloseTab(null);
     const resolve = editorResolverRef.current;
     editorResolverRef.current = null;
     resolve?.(decision);
   }, []);
 
   const resolveTerminal = useCallback((decision: TerminalCloseDecision) => {
-    setPendingTerminalClosePanel(null);
+    setPendingTerminalCloseTab(null);
     const resolve = terminalResolverRef.current;
     terminalResolverRef.current = null;
     resolve?.(decision);
@@ -146,11 +146,11 @@ export function useTabCloseGuards({
         const found = findTab(p.id);
         if (found) disposeTab(found.workspace.id, p.id);
       }
-      setPendingDeletePanels(null);
+      setPendingDeleteTabs(null);
     }
   }, [pendingDeleteTabs, findTab, disposeTab]);
 
-  const cancelDeleteClose = useCallback(() => setPendingDeletePanels(null), []);
+  const cancelDeleteClose = useCallback(() => setPendingDeleteTabs(null), []);
 
   const handlePathDeleted = useCallback(
     (path: string) => {
@@ -169,7 +169,7 @@ export function useTabCloseGuards({
           }
         }
       }
-      if (dirty.length > 0) setPendingDeletePanels(dirty);
+      if (dirty.length > 0) setPendingDeleteTabs(dirty);
     },
     [workspaces, disposeTab],
   );

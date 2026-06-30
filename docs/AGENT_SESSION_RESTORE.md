@@ -204,10 +204,10 @@ In `attachSession`, after the PTY is open:
 ```
 if plan = consumeRestorePlan(leafId):
   if plan.resumeCmd is non-empty:
-    startRestored(leafId, plan.agent)
+    startRestored(leafId, workspaceId, plan.agent)
     setTimeout(() => pty.write(plan.resumeCmd + "\r"), 200)
   else:
-    setRestoreError(leafId, plan.errorReason)
+    setRestoreError(leafId, workspaceId, plan.agent, plan.errorReason)
 ```
 
 The 200ms delay lets the shell finish its init sequence before the command is injected.

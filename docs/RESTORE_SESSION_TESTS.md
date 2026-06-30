@@ -219,7 +219,7 @@ rm -f ~/.config/kex/hooks/session.sh
 Partiendo del estado de C1 (sesion restaurada, dot verde):
 
 - [ ] Escribir un prompt a claude (ej: "di hola"): dot verde mientras trabaja
-- [ ] Claude responde: dot pasa a **amarillo pulsando** (estado "waiting")
+- [ ] Claude responde: dot pasa a **amarillo pulsando** (estado "attention")
 - [ ] Escribir otro prompt: dot vuelve a **verde pulsando**
 - [ ] Salir de claude (`/exit`): dot desaparece, tab vuelve a titulo normal
 

@@ -50,7 +50,7 @@ export function EditorPathBreadcrumb({
   // context-menu "Rename" both target this panel; the input commits via
   // onRenameFile (same path as renaming from the tab).
   const renameEnabled = !!tabId && !!onRenameFile;
-  const editing = useFileRenameStore((s) => s.triggerPanelId === tabId);
+  const editing = useFileRenameStore((s) => s.triggerTabId === tabId);
   const clearTrigger = useFileRenameStore((s) => s.clearTrigger);
   const startRename = useFileRenameStore((s) => s.trigger);
   const isEditing = renameEnabled && editing;

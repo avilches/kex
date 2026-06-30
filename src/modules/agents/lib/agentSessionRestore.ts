@@ -42,7 +42,7 @@ export function consumeRestorePlan(tabId: string): RestorePlan | null {
   const plan = restorePlans.get(tabId) ?? null;
   restorePlans.delete(tabId);
   if (plan) {
-    console.debug(`[agent-session] consuming restore plan for panel=${tabId} agent=${plan.agent} cwdLaunch=${plan.cwdLaunch}${plan.errorReason ? ` ERROR: ${plan.errorReason}` : ""}`);
+    console.debug(`[agent-session] consuming restore plan for tab=${tabId} agent=${plan.agent} cwdLaunch=${plan.cwdLaunch}${plan.errorReason ? ` ERROR: ${plan.errorReason}` : ""}`);
   }
   return plan;
 }
@@ -52,11 +52,11 @@ export async function detachAgentSession(tabId: string): Promise<void> {
   await invoke("agent_detach_session", { tabId });
 }
 
-export function pruneOrphanedPlans(knownPanelIds: Set<string>): void {
+export function pruneOrphanedPlans(knownTabIds: Set<string>): void {
   if (!restorePlans) return;
   for (const tabId of restorePlans.keys()) {
-    if (!knownPanelIds.has(tabId)) {
-      console.debug(`[agent-session] pruning orphaned plan panel=${tabId} (panel no longer in workspace)`);
+    if (!knownTabIds.has(tabId)) {
+      console.debug(`[agent-session] pruning orphaned plan tab=${tabId} (tab no longer in workspace)`);
       void detachAgentSession(tabId);
     }
   }

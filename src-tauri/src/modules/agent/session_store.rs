@@ -6,7 +6,7 @@ use std::sync::{Mutex, OnceLock};
 
 static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-// Per-panel pending launch command, stashed by the PTY reader when OSC 133;C fires
+// Per-tab pending launch command, stashed by the PTY reader when OSC 133;C fires
 // and consumed by record_session when SessionStart arrives via the IPC socket.
 static PENDING_CMDS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
@@ -15,7 +15,7 @@ fn pending_cmds() -> &'static Mutex<HashMap<String, String>> {
 }
 
 /// Called by the PTY reader when OSC 133;C fires for an agent command.
-/// The stashed string is consumed by the next `record_session` call for this panel.
+/// The stashed string is consumed by the next `record_session` call for this tab.
 pub fn stash_cmd(tab_id: &str, cmd: String) {
     if let Ok(mut map) = pending_cmds().lock() {
         map.insert(tab_id.to_string(), cmd);
@@ -301,7 +301,7 @@ fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
     }
 }
 
-/// Write or update a panel entry in agent-sessions.json.
+/// Write or update a tab entry in agent-sessions.json.
 /// Called from the PTY reader (OSC 777 path) or the IPC socket (v5 path) on SessionStart/UserPromptSubmit.
 ///
 /// Consumes the pending launch command stashed by `stash_cmd`. If the stashed command
@@ -313,11 +313,11 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
     };
     let launch_cmd = take_stashed_cmd(tab_id);
     if launch_cmd.as_deref().is_some_and(is_print_mode_cmd) {
-        log::info!("[agent-session] skip record: print-mode session panel={tab_id}");
+        log::info!("[agent-session] skip record: print-mode session tab={tab_id}");
         return;
     }
     log::info!(
-        "[agent-session] record panel={tab_id} agent={agent} session={session_id} cwd_launch={cwd_launch} \
+        "[agent-session] record tab={tab_id} agent={agent} session={session_id} cwd_launch={cwd_launch} \
          launch_cmd={launch_cmd:?}"
     );
     let now = std::time::SystemTime::now()
@@ -352,10 +352,10 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
     }
 }
 
-/// Remove a panel entry from agent-sessions.json.
+/// Remove a tab entry from agent-sessions.json.
 /// Called when the agent exits (exited signal) or the user detaches manually.
 pub fn detach_session(tab_id: &str) -> Result<(), String> {
-    log::info!("[agent-session] detach panel={tab_id}");
+    log::info!("[agent-session] detach tab={tab_id}");
     if let Some(path) = store_path() {
         if let Ok(content) = std::fs::read_to_string(&path) {
             if let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) {

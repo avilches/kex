@@ -361,21 +361,21 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
 
   return (
     <div className="flex min-h-[380px] flex-col gap-0 py-1">
-      {/* Tab bar */}
+      {/* Section bar */}
       <div className="mb-4 flex gap-0 border-b border-border">
-        {(["properties", "scripts"] as const).map((tab) => (
+        {(["properties", "scripts"] as const).map((section) => (
           <button
-            key={tab}
+            key={section}
             type="button"
-            onClick={() => setActiveSection(tab)}
+            onClick={() => setActiveSection(section)}
             className={cn(
               "-mb-px px-3 py-1.5 text-[12px] font-medium outline-none transition-colors focus-visible:outline-none",
-              activeSection === tab
+              activeSection === section
                 ? "border-b-2 border-primary text-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {tab === "properties" ? "Properties" : "Scripts"}
+            {section === "properties" ? "Properties" : "Scripts"}
           </button>
         ))}
       </div>

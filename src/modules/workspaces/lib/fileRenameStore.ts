@@ -1,13 +1,13 @@
 import { create } from "zustand";
 
 type FileRenameState = {
-  triggerPanelId: string | null;
+  triggerTabId: string | null;
   trigger: (tabId: string) => void;
   clearTrigger: () => void;
 };
 
 export const useFileRenameStore = create<FileRenameState>((set) => ({
-  triggerPanelId: null,
-  trigger: (tabId) => set({ triggerPanelId: tabId }),
-  clearTrigger: () => set({ triggerPanelId: null }),
+  triggerTabId: null,
+  trigger: (tabId) => set({ triggerTabId: tabId }),
+  clearTrigger: () => set({ triggerTabId: null }),
 }));
