@@ -103,7 +103,7 @@ export function NotificationBell({ onActivate }: Props) {
     [sessions, notifications],
   );
   const activeCount = entries.filter(
-    (e) => e.visual === "waiting" || e.visual === "working",
+    (e) => e.visual === "attention" || e.visual === "working",
   ).length;
   // One entry per agent, so each pending entry counts once (no double-counting).
   const badge = entries.filter((e) => e.pending).length;

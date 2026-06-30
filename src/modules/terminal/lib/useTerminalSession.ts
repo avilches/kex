@@ -464,7 +464,7 @@ configureRendererPool({
         // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) clear it —
         // these are explicit user interrupts. Multi-byte ESC sequences (xterm protocol
         // auto-responses like "\x1b[?1;2c") must NOT clear the spinner.
-        // The attention dot ("waiting") is cleared by focusing the panel, not by typing.
+        // The attention dot ("attention") is cleared by focusing the panel, not by typing.
         // The session is kept alive; only the visual indicator is cleared.
         const session = useAgentStore.getState().sessions[leafId];
         if (session && (data === "\x03" || data === "\x1b")) {

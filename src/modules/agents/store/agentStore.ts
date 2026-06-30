@@ -95,7 +95,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             ...prev,
             status,
             lastActivityAt: now,
-            attentionSince: status === "waiting" ? now : null,
+            attentionSince: status === "attention" ? now : null,
             restored: false,
           },
         },
@@ -203,7 +203,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   markPanelSeen: (tabId) =>
     set((s) => {
       const prev = s.sessions[tabId];
-      const clearsDot = prev?.status === "waiting";
+      const clearsDot = prev?.status === "attention";
       const notif = s.notifications.find((n) => n.tabId === tabId);
       const marksRead = notif ? !notif.read : false;
       if (!clearsDot && !marksRead) return s;
@@ -239,7 +239,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
 
   clearNotifications: () => set({ notifications: [] }),
 
-  // "Clear all": drop every notification and clear every attention dot (waiting
+  // "Clear all": drop every notification and clear every attention dot (attention
   // sessions go idle). Working sessions are left running.
   clearAll: () =>
     set((s) => {
@@ -247,7 +247,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       const sessions: Record<string, AgentSession> = {};
       const now = Date.now();
       for (const [id, sess] of Object.entries(s.sessions)) {
-        if (sess.status === "waiting") {
+        if (sess.status === "attention") {
           sessions[id] = {
             ...sess,
             status: "idle",

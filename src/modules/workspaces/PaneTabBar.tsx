@@ -281,7 +281,7 @@ function DraggableTab({
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-destructive" />
         ) : agentSession?.status === "working" ? (
           <span className="ml-0.5 size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
-        ) : agentSession?.status === "waiting" ? (
+        ) : agentSession?.status === "attention" ? (
           <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
         ) : null
       )}

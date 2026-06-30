@@ -126,7 +126,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       ensureSession(tabId, ctx, sig.agent ?? "claude");
       const session = store.sessions[tabId];
       if (session && !isTabSeen(ctx, session.workspaceId, tabId)) {
-        store.setStatus(tabId, "waiting");
+        store.setStatus(tabId, "attention");
         route(session, "attention", ctx);
       }
       return;
@@ -138,7 +138,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       ensureSession(tabId, ctx, sig.agent ?? "claude");
       const session = store.sessions[tabId];
       if (session && !isTabSeen(ctx, session.workspaceId, tabId)) {
-        store.setStatus(tabId, "waiting");
+        store.setStatus(tabId, "attention");
         route(session, "attention", ctx);
       } else {
         store.setStatus(tabId, "idle");
@@ -149,7 +149,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       ensureSession(tabId, ctx, sig.agent ?? "claude");
       const permSession = store.sessions[tabId];
       if (permSession && !isTabSeen(ctx, permSession.workspaceId, tabId)) {
-        store.setStatus(tabId, "waiting");
+        store.setStatus(tabId, "attention");
         route(permSession, "attention", ctx);
       }
       return;

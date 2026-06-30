@@ -110,10 +110,10 @@ describe("agentStore.markPanelSeen", () => {
     useAgentStore.setState({ sessions: {}, notifications: [] });
   });
 
-  test("limpia el dot naranja (waiting -> idle)", () => {
+  test("limpia el dot naranja (attention -> idle)", () => {
     const st = useAgentStore.getState();
     st.start("p1", "t", "claude");
-    st.setStatus("p1", "waiting");
+    st.setStatus("p1", "attention");
     st.markPanelSeen("p1");
     const session = useAgentStore.getState().sessions.p1;
     expect(session.status).toBe("idle");
@@ -163,7 +163,7 @@ describe("agentStore.clearAll", () => {
   test("borra notificaciones y apaga todos los dots naranja", () => {
     const st = useAgentStore.getState();
     st.start("p1", "t", "claude");
-    st.setStatus("p1", "waiting");
+    st.setStatus("p1", "attention");
     st.start("p2", "t", "claude");
     st.setStatus("p2", "working");
     st.pushNotification({

@@ -1,6 +1,6 @@
 import type { AgentNotification, AgentSession } from "./types";
 
-export type AgentEntryVisual = "waiting" | "working" | "error";
+export type AgentEntryVisual = "attention" | "working" | "error";
 
 export type AgentEntry = {
   tabId: string;
@@ -13,7 +13,7 @@ export type AgentEntry = {
 };
 
 const RANK: Record<AgentEntryVisual, number> = {
-  waiting: 0,
+  attention: 0,
   working: 1,
   error: 2,
 };
@@ -21,9 +21,9 @@ const RANK: Record<AgentEntryVisual, number> = {
 /**
  * Collapse live sessions and the notification log into a single entry per agent
  * (keyed by tabId), showing only what is actionable: agents that need
- * attention (waiting/error) or are still working. An idle agent has already been
+ * attention (attention/error) or are still working. An idle agent has already been
  * seen, so it is dropped. The orange dot is derived from the live session, so a
- * bell row stays in sync with its tab. Order: waiting, then working, then error;
+ * bell row stays in sync with its tab. Order: attention, then working, then error;
  * newest first within each group.
  */
 export function buildAgentEntries(
@@ -55,8 +55,8 @@ export function buildAgentEntries(
       visual = "error";
       at = session.lastActivityAt;
       pending = true;
-    } else if (session?.status === "waiting") {
-      visual = "waiting";
+    } else if (session?.status === "attention") {
+      visual = "attention";
       at = session.attentionSince ?? session.lastActivityAt;
       pending = true;
     } else if (session?.status === "working") {
