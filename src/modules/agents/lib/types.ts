@@ -31,7 +31,7 @@ export type AgentSessionMeta = {
 };
 
 export type AgentSession = {
-  panelId: string;
+  tabId: string;
   workspaceId: string;
   agent: string;
   status: AgentStatus;
@@ -47,7 +47,7 @@ export type AgentSession = {
 export type AgentNotification = {
   id: string;
   source: AgentSource;
-  panelId: string;
+  tabId: string;
   workspaceId: string;
   agent: string;
   kind: NotificationKind;

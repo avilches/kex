@@ -451,8 +451,8 @@ export function leafIdForPty(ptyId: number): string | null {
   return null;
 }
 
-export function ptyIdForPanel(panelId: string): number | null {
-  return sessions.get(panelId)?.pty?.id ?? null;
+export function ptyIdForPanel(tabId: string): number | null {
+  return sessions.get(tabId)?.pty?.id ?? null;
 }
 
 configureRendererPool({

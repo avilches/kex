@@ -24,7 +24,7 @@ function makeDeps(
     isAutoSaveEnabled: () => false,
     askTerminalClose: async () => ({ type: "close", dontAskAgain: false }),
     askEditorClose: async () => ({ type: "save" }),
-    savePanel: async (id) => {
+    saveTab: async (id) => {
       saved.push(id);
     },
     closeTab: (id) => {
@@ -140,7 +140,7 @@ describe("runCloseQueue", () => {
       { a: { kind: "editor", dirty: true } },
       {
         isAutoSaveEnabled: () => true,
-        savePanel: async () => {
+        saveTab: async () => {
           throw new Error("write failed");
         },
       },
@@ -174,7 +174,7 @@ describe("runCloseQueue", () => {
       { a: { kind: "editor", dirty: true } },
       {
         askEditorClose: async () => ({ type: "save" }),
-        savePanel: async () => {
+        saveTab: async () => {
           throw new Error("write failed");
         },
       },

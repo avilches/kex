@@ -6,7 +6,7 @@ const NAV_TTL: Duration = Duration::from_secs(5);
 pub struct PendingNav {
     pub window_label: String,
     pub workspace_id: String,
-    pub panel_id: String,
+    pub tab_id: String,
     queued_at: Instant,
 }
 
@@ -14,11 +14,11 @@ pub struct PendingNav {
 pub struct PendingNavState(Mutex<Option<PendingNav>>);
 
 impl PendingNavState {
-    pub fn store(&self, window_label: String, workspace_id: String, panel_id: String) {
+    pub fn store(&self, window_label: String, workspace_id: String, tab_id: String) {
         *self.0.lock().unwrap() = Some(PendingNav {
             window_label,
             workspace_id,
-            panel_id,
+            tab_id,
             queued_at: Instant::now(),
         });
     }
@@ -42,9 +42,9 @@ pub fn agent_queue_nav(
     state: tauri::State<'_, PendingNavState>,
     window_label: String,
     workspace_id: String,
-    panel_id: String,
+    tab_id: String,
 ) {
-    state.store(window_label, workspace_id, panel_id);
+    state.store(window_label, workspace_id, tab_id);
 }
 
 #[cfg(test)]
@@ -58,7 +58,7 @@ mod tests {
         let nav = state.take_if_fresh().expect("should be Some");
         assert_eq!(nav.window_label, "w-1");
         assert_eq!(nav.workspace_id, "ws-a");
-        assert_eq!(nav.panel_id, "p-b");
+        assert_eq!(nav.tab_id, "p-b");
     }
 
     #[test]

@@ -5,12 +5,12 @@ import { useEffect } from "react";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 
-type DockEvent = { panelId: string; currentUrl: string };
-type NavigatedEvent = { panelId: string; url: string };
+type DockEvent = { tabId: string; currentUrl: string };
+type NavigatedEvent = { tabId: string; url: string };
 
 type Deps = {
-  updateTabData: (wsId: string, panelId: string, updater: (p: Tab) => Tab) => void;
-  findTabGlobal: (panelId: string) => { workspace: { id: string }; tab: Tab } | null;
+  updateTabData: (wsId: string, tabId: string, updater: (p: Tab) => Tab) => void;
+  findTabGlobal: (tabId: string) => { workspace: { id: string }; tab: Tab } | null;
 };
 
 export function useFloatBrowser({
@@ -23,10 +23,10 @@ export function useFloatBrowser({
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     listen<DockEvent>("kex:float-dock", (e) => {
-      const { panelId, currentUrl } = e.payload;
-      const found = findTabGlobal(panelId);
+      const { tabId, currentUrl } = e.payload;
+      const found = findTabGlobal(tabId);
       if (!found) return;
-      updateTabData(found.workspace.id, panelId, (p) => ({
+      updateTabData(found.workspace.id, tabId, (p) => ({
         ...p,
         floating: false,
         url: currentUrl || (p.kind === "browser" ? p.url : ""),
@@ -42,10 +42,10 @@ export function useFloatBrowser({
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     listen<NavigatedEvent>("kex:float-navigated", (e) => {
-      const { panelId, url } = e.payload;
-      const found = findTabGlobal(panelId);
+      const { tabId, url } = e.payload;
+      const found = findTabGlobal(tabId);
       if (!found) return;
-      updateTabData(found.workspace.id, panelId, (p) => ({
+      updateTabData(found.workspace.id, tabId, (p) => ({
         ...p,
         url: url || (p.kind === "browser" ? p.url : ""),
       }));
@@ -65,7 +65,7 @@ export function useFloatBrowser({
     updateTabData(workspaceId, panel.id, (p) => ({ ...p, floating: true }));
     try {
       await invoke("float_browser_open", {
-        panelId: panel.id,
+        tabId: panel.id,
         url: panel.url,
         originWindowLabel,
         workspaceId,
@@ -77,34 +77,34 @@ export function useFloatBrowser({
     }
   }
 
-  async function closeFloatWindow(panelId: string): Promise<void> {
+  async function closeFloatWindow(tabId: string): Promise<void> {
     try {
-      await invoke("float_browser_close", { panelId });
+      await invoke("float_browser_close", { tabId });
     } catch (err) {
       console.error("[float-browser] close failed:", err);
     }
   }
 
-  async function focusFloatWindow(panelId: string): Promise<void> {
+  async function focusFloatWindow(tabId: string): Promise<void> {
     try {
-      await invoke("float_browser_focus", { panelId });
+      await invoke("float_browser_focus", { tabId });
     } catch (err) {
       console.error("[float-browser] focus failed:", err);
     }
   }
 
-  async function dockViaCommand(panelId: string): Promise<void> {
+  async function dockViaCommand(tabId: string): Promise<void> {
     try {
-      await invoke("float_browser_dock", { panelId });
+      await invoke("float_browser_dock", { tabId });
     } catch (err) {
       console.error("[float-browser] dock failed:", err);
     }
   }
 
-  async function navigateFloatWindow(panelId: string, url: string): Promise<void> {
+  async function navigateFloatWindow(tabId: string, url: string): Promise<void> {
     if (!url) return;
     try {
-      await invoke("float_browser_navigate", { panelId, url });
+      await invoke("float_browser_navigate", { tabId, url });
     } catch (err) {
       console.error("[float-browser] navigate failed:", err);
     }
@@ -118,7 +118,7 @@ export function useFloatBrowser({
         for (const tab of pane.tabs) {
           if (tab.kind === "browser" && tab.floating && tab.url) {
             await invoke("float_browser_open", {
-              panelId: tab.id,
+              tabId: tab.id,
               url: tab.url,
               originWindowLabel,
               workspaceId: ws.id,
@@ -141,7 +141,7 @@ export function useFloatBrowser({
     for (const pane of allPanes(ws.paneTree)) {
       for (const tab of pane.tabs) {
         if (tab.kind === "browser" && tab.floating) {
-          await invoke("float_browser_close", { panelId: tab.id }).catch(
+          await invoke("float_browser_close", { tabId: tab.id }).catch(
             () => {},
           );
         }

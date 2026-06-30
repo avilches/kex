@@ -9,19 +9,19 @@ import {
   type TerminalCloseDecision,
 } from "./closeQueue";
 
-type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string };
+type TabInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string };
 
-type FoundPanel = {
+type FoundTab = {
   workspace: { id: string };
   tab: { kind: string; dirty?: boolean; locked?: boolean; path?: string; title?: string };
 };
 
 type Params = {
   workspaces: Workspace[];
-  disposePanel: (workspaceId: string, panelId: string) => void;
-  findPanel: (panelId: string) => FoundPanel | null;
-  savePanel: (panelId: string) => Promise<void>;
-  focusActivePanel: () => void;
+  disposeTab: (workspaceId: string, tabId: string) => void;
+  findTab: (tabId: string) => FoundTab | null;
+  saveTab: (tabId: string) => Promise<void>;
+  focusActiveTab: () => void;
   isWarnEnabled: () => boolean;
   setWarnEnabled: (value: boolean) => Promise<void>;
   isAutoSaveEnabled: () => boolean;
@@ -35,51 +35,51 @@ type Params = {
  */
 export function useTabCloseGuards({
   workspaces,
-  disposePanel,
-  findPanel,
-  savePanel,
-  focusActivePanel,
+  disposeTab,
+  findTab,
+  saveTab,
+  focusActiveTab,
   isWarnEnabled,
   setWarnEnabled,
   isAutoSaveEnabled,
 }: Params) {
-  const [pendingClosePanel, setPendingClosePanel] = useState<PanelInfo | null>(null);
-  const [pendingTerminalClosePanel, setPendingTerminalClosePanel] = useState<PanelInfo | null>(null);
-  const [pendingDeletePanels, setPendingDeletePanels] = useState<PanelInfo[] | null>(null);
+  const [pendingCloseTab, setPendingClosePanel] = useState<TabInfo | null>(null);
+  const [pendingTerminalCloseTab, setPendingTerminalClosePanel] = useState<TabInfo | null>(null);
+  const [pendingDeleteTabs, setPendingDeletePanels] = useState<TabInfo[] | null>(null);
 
   const editorResolverRef = useRef<((d: EditorCloseDecision) => void) | null>(null);
   const terminalResolverRef = useRef<((d: TerminalCloseDecision) => void) | null>(null);
 
   const askEditorClose = useCallback(
-    (panelId: string) =>
+    (tabId: string) =>
       new Promise<EditorCloseDecision>((resolve) => {
-        const found = findPanel(panelId);
+        const found = findTab(tabId);
         const panel = found?.tab;
         setPendingClosePanel({
-          id: panelId,
+          id: tabId,
           title: panel?.title ?? panel?.path ?? "file",
           kind: "editor",
           path: panel?.path,
         });
         editorResolverRef.current = resolve;
       }),
-    [findPanel],
+    [findTab],
   );
 
   const askTerminalClose = useCallback(
-    (panelId: string, processName: string) =>
+    (tabId: string, processName: string) =>
       new Promise<TerminalCloseDecision>((resolve) => {
-        const found = findPanel(panelId);
+        const found = findTab(tabId);
         setPendingTerminalClosePanel({
-          id: panelId,
+          id: tabId,
           title: found?.tab.title ?? "terminal",
           kind: "terminal",
           processName,
-          command: getRunningCommandsSnapshot().get(panelId),
+          command: getRunningCommandsSnapshot().get(tabId),
         });
         terminalResolverRef.current = resolve;
       }),
-    [findPanel],
+    [findTab],
   );
 
   const resolveEditor = useCallback((decision: EditorCloseDecision) => {
@@ -101,7 +101,7 @@ export function useTabCloseGuards({
       try {
         await runCloseQueue(panelIds, {
           getPanel: (id) => {
-            const found = findPanel(id);
+            const found = findTab(id);
             if (!found) return null;
             return {
               kind: found.tab.kind,
@@ -115,23 +115,23 @@ export function useTabCloseGuards({
           isAutoSaveEnabled,
           askTerminalClose,
           askEditorClose,
-          savePanel,
+          saveTab,
           closeTab: (id) => {
-            const found = findPanel(id);
-            if (found) disposePanel(found.workspace.id, id);
+            const found = findTab(id);
+            if (found) disposeTab(found.workspace.id, id);
           },
         });
       } catch (e) {
         console.error("[kex] close queue failed", e);
       } finally {
-        focusActivePanel();
+        focusActiveTab();
       }
     },
     [
-      findPanel,
-      disposePanel,
-      savePanel,
-      focusActivePanel,
+      findTab,
+      disposeTab,
+      saveTab,
+      focusActiveTab,
       isWarnEnabled,
       setWarnEnabled,
       isAutoSaveEnabled,
@@ -141,20 +141,20 @@ export function useTabCloseGuards({
   );
 
   const confirmDeleteClose = useCallback(() => {
-    if (pendingDeletePanels !== null) {
-      for (const p of pendingDeletePanels) {
-        const found = findPanel(p.id);
-        if (found) disposePanel(found.workspace.id, p.id);
+    if (pendingDeleteTabs !== null) {
+      for (const p of pendingDeleteTabs) {
+        const found = findTab(p.id);
+        if (found) disposeTab(found.workspace.id, p.id);
       }
       setPendingDeletePanels(null);
     }
-  }, [pendingDeletePanels, findPanel, disposePanel]);
+  }, [pendingDeleteTabs, findTab, disposeTab]);
 
   const cancelDeleteClose = useCallback(() => setPendingDeletePanels(null), []);
 
   const handlePathDeleted = useCallback(
     (path: string) => {
-      const dirty: PanelInfo[] = [];
+      const dirty: TabInfo[] = [];
       for (const ws of workspaces) {
         for (const pane of allPanes(ws.paneTree)) {
           for (const tab of pane.tabs) {
@@ -164,20 +164,20 @@ export function useTabCloseGuards({
             if ((tab as { dirty?: boolean }).dirty) {
               dirty.push({ id: tab.id, title: tab.title ?? p, kind: tab.kind, path: p });
             } else {
-              disposePanel(ws.id, tab.id);
+              disposeTab(ws.id, tab.id);
             }
           }
         }
       }
       if (dirty.length > 0) setPendingDeletePanels(dirty);
     },
-    [workspaces, disposePanel],
+    [workspaces, disposeTab],
   );
 
   return {
-    pendingClosePanel,
-    pendingTerminalClosePanel,
-    pendingDeletePanels,
+    pendingCloseTab,
+    pendingTerminalCloseTab,
+    pendingDeleteTabs,
     closePanels,
     resolveEditor,
     resolveTerminal,

@@ -36,7 +36,7 @@ export type TerminalPaneHandle = {
 
 type Props = {
   /** Stable identifier for this panel (passed back through callbacks). */
-  panelId: string;
+  tabId: string;
   /** Tab containing this pane is on screen. */
   visible: boolean;
   /** This panel is the active pane within its tab — receives auto-focus. */
@@ -49,17 +49,17 @@ type Props = {
   persistentCommand?: string;
   /** Persisted scratchpad visibility, seeded on first mount. */
   initialScratchpad?: ScratchpadState;
-  onSearchReady?: (panelId: string, addon: SearchAddon) => void;
-  onExit?: (panelId: string, code: number) => void;
-  onCwd?: (panelId: string, cwd: string) => void;
-  onRunningCommand?: (panelId: string, cmd: string | null) => void;
-  onScratchpadState?: (panelId: string, state: ScratchpadState) => void;
+  onSearchReady?: (tabId: string, addon: SearchAddon) => void;
+  onExit?: (tabId: string, code: number) => void;
+  onCwd?: (tabId: string, cwd: string) => void;
+  onRunningCommand?: (tabId: string, cmd: string | null) => void;
+  onScratchpadState?: (tabId: string, state: ScratchpadState) => void;
 };
 
 export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
   function TerminalPane(
     {
-      panelId,
+      tabId,
       visible,
       focused = true,
       initialCwd,
@@ -80,7 +80,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const { resolvedMode, themeId, customThemes } = useTheme();
 
     const session = useTerminalSession({
-      leafId: panelId,
+      leafId: tabId,
       container: containerRef,
       visible,
       focused,
@@ -89,11 +89,11 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       restoreOnRestart,
       persistentCommand,
       initialScratchpad,
-      onSearchReady: (a) => onSearchReady?.(panelId, a),
-      onExit: (c) => onExit?.(panelId, c),
-      onCwd: (c) => onCwd?.(panelId, c),
-      onRunningCommand: (cmd) => onRunningCommand?.(panelId, cmd),
-      onScratchpadState: (st) => onScratchpadState?.(panelId, st),
+      onSearchReady: (a) => onSearchReady?.(tabId, a),
+      onExit: (c) => onExit?.(tabId, c),
+      onCwd: (c) => onCwd?.(tabId, c),
+      onRunningCommand: (cmd) => onRunningCommand?.(tabId, cmd),
+      onScratchpadState: (st) => onScratchpadState?.(tabId, st),
     });
 
     useEffect(() => {
@@ -140,7 +140,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
                 downYRef.current = e.clientY;
                 // Only switch sides on a click inside an already-focused tab; a
                 // click that re-activates the tab should restore the prior side.
-                if (focused) setLeafScratchpadActive(panelId, false);
+                if (focused) setLeafScratchpadActive(tabId, false);
               }}
               onMouseUp={(e) => {
                 const moved =
@@ -148,10 +148,10 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
                   Math.abs(e.clientY - downYRef.current) > 4;
                 downYRef.current = null;
                 if (!moved) session.selectBlockAt(e.clientY);
-                if (session.blockMode === "prompt") focusLeafInput(panelId);
+                if (session.blockMode === "prompt") focusLeafInput(tabId);
               }}
             />
-            <BlockWatermark leafId={panelId} subscribe={session.subscribeBlocks} />
+            <BlockWatermark leafId={tabId} subscribe={session.subscribeBlocks} />
             <BlockOverlay
               subscribe={session.subscribeBlocks}
               getVisible={session.visibleBlocks}
@@ -160,25 +160,25 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
               revealMatch={session.revealMatch}
               clearSearch={session.clearSearch}
               promptReady={session.blockMode === "prompt"}
-              onRunAgain={(cmd) => submitToLeaf(panelId, cmd)}
-              onRestoreFocus={() => focusLeafInput(panelId)}
+              onRunAgain={(cmd) => submitToLeaf(tabId, cmd)}
+              onRestoreFocus={() => focusLeafInput(tabId)}
             />
           </div>
           <div className="shrink-0 border-t border-border/40 px-3 py-2">
             <Suspense fallback={null}>
               <ShellInput
-                leafId={panelId}
+                leafId={tabId}
                 mode={session.blockMode}
                 focused={focused}
                 themeKey={`${themeId}:${resolvedMode}`}
-                onSubmit={(text) => submitToLeaf(panelId, text)}
-                onInterrupt={() => interruptLeaf(panelId)}
-                getCwd={() => leafCwd(panelId)}
+                onSubmit={(text) => submitToLeaf(tabId, text)}
+                onInterrupt={() => interruptLeaf(tabId)}
+                getCwd={() => leafCwd(tabId)}
               />
             </Suspense>
           </div>
           {session.scratchpadOpen && (
-            <ScratchpadBar leafId={panelId} paneFocused={focused} />
+            <ScratchpadBar leafId={tabId} paneFocused={focused} />
           )}
         </div>
       );
@@ -194,11 +194,11 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           )}
           onMouseDownCapture={() => {
             // See blocks branch: only switch sides inside an already-focused tab.
-            if (focused) setLeafScratchpadActive(panelId, false);
+            if (focused) setLeafScratchpadActive(tabId, false);
           }}
         />
         {session.scratchpadOpen && (
-          <ScratchpadBar leafId={panelId} paneFocused={focused} />
+          <ScratchpadBar leafId={tabId} paneFocused={focused} />
         )}
       </div>
     );

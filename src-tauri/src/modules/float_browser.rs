@@ -10,18 +10,18 @@ pub struct FloatMeta {
 }
 
 pub struct FloatBrowserState {
-    // panel_id -> meta
+    // tab_id -> meta
     pub panels: Mutex<HashMap<String, FloatMeta>>,
-    // panel_id of the float window that currently holds OS focus, or None when a
+    // tab_id of the float window that currently holds OS focus, or None when a
     // non-float window is focused. Drives the "Dock Browser" menu item.
-    pub focused_float_panel_id: Mutex<Option<String>>,
+    pub focused_float_tab_id: Mutex<Option<String>>,
 }
 
 impl Default for FloatBrowserState {
     fn default() -> Self {
         Self {
             panels: Mutex::new(HashMap::new()),
-            focused_float_panel_id: Mutex::new(None),
+            focused_float_tab_id: Mutex::new(None),
         }
     }
 }
@@ -32,20 +32,20 @@ impl FloatBrowserState {
     }
 }
 
-pub fn window_label(panel_id: &str) -> String {
-    format!("float-{}", panel_id)
+pub fn window_label(tab_id: &str) -> String {
+    format!("float-{}", tab_id)
 }
 
 #[tauri::command]
 pub fn float_browser_open(
     app: AppHandle,
     state: State<'_, FloatBrowserState>,
-    panel_id: String,
+    tab_id: String,
     url: String,
     origin_window_label: String,
     workspace_id: String,
 ) -> Result<(), String> {
-    let label = window_label(&panel_id);
+    let label = window_label(&tab_id);
 
     // If already open, focus it and return
     if let Some(existing) = app.get_webview_window(&label) {
@@ -55,16 +55,16 @@ pub fn float_browser_open(
 
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
 
-    let panel_id_nav = panel_id.clone();
+    let tab_id_nav = tab_id.clone();
     let origin_nav = origin_window_label.clone();
     let app_nav = app.clone();
 
-    let panel_id_close = panel_id.clone();
+    let tab_id_close = tab_id.clone();
     let origin_close = origin_window_label.clone();
     let app_close = app.clone();
     let label_close = label.clone();
 
-    let panel_id_focus = panel_id.clone();
+    let tab_id_focus = tab_id.clone();
     let app_focus = app.clone();
 
     let window = WebviewWindowBuilder::new(
@@ -83,7 +83,7 @@ pub fn float_browser_open(
                 let _ = origin_win.emit(
                     "kex:float-navigated",
                     json!({
-                        "panelId": panel_id_nav,
+                        "tabId": tab_id_nav,
                         "url": payload.url().to_string(),
                     }),
                 );
@@ -97,15 +97,15 @@ pub fn float_browser_open(
     // reflects the active float and greys out when focus leaves it.
     window.on_window_event({
         let app_f = app_focus.clone();
-        let pid = panel_id_focus.clone();
+        let tid = tab_id_focus.clone();
         move |event| {
             if let WindowEvent::Focused(focused) = event {
                 let st = app_f.state::<FloatBrowserState>();
                 {
-                    let mut cur = st.focused_float_panel_id.lock().unwrap();
+                    let mut cur = st.focused_float_tab_id.lock().unwrap();
                     if *focused {
-                        *cur = Some(pid.clone());
-                    } else if cur.as_deref() == Some(pid.as_str()) {
+                        *cur = Some(tid.clone());
+                    } else if cur.as_deref() == Some(tid.as_str()) {
                         *cur = None;
                     }
                 }
@@ -118,14 +118,14 @@ pub fn float_browser_open(
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
             api.prevent_close();
-            do_dock_and_destroy(&app_close, &panel_id_close, &origin_close, &label_close);
+            do_dock_and_destroy(&app_close, &tab_id_close, &origin_close, &label_close);
         }
     });
 
     {
         let mut map = state.panels.lock().unwrap();
         map.insert(
-            panel_id,
+            tab_id,
             FloatMeta {
                 origin_window_label,
                 workspace_id,
@@ -138,21 +138,21 @@ pub fn float_browser_open(
 }
 
 /// Shared logic: remove from state, emit kex:float-dock to origin, destroy window.
-/// Idempotent: if the panel is already gone from state (concurrent call), returns early.
+/// Idempotent: if the tab is already gone from state (concurrent call), returns early.
 pub fn do_dock_and_destroy(
     app: &AppHandle,
-    panel_id: &str,
+    tab_id: &str,
     origin_label: &str,
     win_label: &str,
 ) {
     {
         let st = app.state::<FloatBrowserState>();
         let mut map = st.panels.lock().unwrap();
-        if map.remove(panel_id).is_none() {
+        if map.remove(tab_id).is_none() {
             return;
         }
-        let mut focused = st.focused_float_panel_id.lock().unwrap();
-        if focused.as_deref() == Some(panel_id) {
+        let mut focused = st.focused_float_tab_id.lock().unwrap();
+        if focused.as_deref() == Some(tab_id) {
             *focused = None;
         }
     }
@@ -167,7 +167,7 @@ pub fn do_dock_and_destroy(
     if let Some(origin_win) = app.get_webview_window(origin_label) {
         let _ = origin_win.emit(
             "kex:float-dock",
-            json!({ "panelId": panel_id, "currentUrl": current_url }),
+            json!({ "tabId": tab_id, "currentUrl": current_url }),
         );
     }
 
@@ -179,15 +179,15 @@ pub fn do_dock_and_destroy(
 /// Dock the float window that currently holds OS focus, if any.
 pub fn dock_focused(app: &AppHandle) {
     let st = app.state::<FloatBrowserState>();
-    let panel_id = st.focused_float_panel_id.lock().unwrap().clone();
-    let Some(pid) = panel_id else { return };
+    let tab_id = st.focused_float_tab_id.lock().unwrap().clone();
+    let Some(tid) = tab_id else { return };
     let origin = {
         let map = st.panels.lock().unwrap();
-        map.get(&pid).map(|m| m.origin_window_label.clone())
+        map.get(&tid).map(|m| m.origin_window_label.clone())
     };
     if let Some(origin_label) = origin {
-        let label = window_label(&pid);
-        do_dock_and_destroy(app, &pid, &origin_label, &label);
+        let label = window_label(&tid);
+        do_dock_and_destroy(app, &tid, &origin_label, &label);
     }
 }
 
@@ -197,12 +197,12 @@ pub fn dock_all(app: &AppHandle) {
     let entries: Vec<(String, String)> = {
         let map = st.panels.lock().unwrap();
         map.iter()
-            .map(|(pid, m)| (pid.clone(), m.origin_window_label.clone()))
+            .map(|(tid, m)| (tid.clone(), m.origin_window_label.clone()))
             .collect()
     };
-    for (pid, origin) in entries {
-        let label = window_label(&pid);
-        do_dock_and_destroy(app, &pid, &origin, &label);
+    for (tid, origin) in entries {
+        let label = window_label(&tid);
+        do_dock_and_destroy(app, &tid, &origin, &label);
     }
 }
 
@@ -210,14 +210,14 @@ pub fn dock_all(app: &AppHandle) {
 pub fn float_browser_close(
     app: AppHandle,
     state: State<'_, FloatBrowserState>,
-    panel_id: String,
+    tab_id: String,
 ) -> Result<(), String> {
-    let label = window_label(&panel_id);
+    let label = window_label(&tab_id);
     {
         let mut map = state.panels.lock().unwrap();
-        map.remove(&panel_id);
-        let mut focused = state.focused_float_panel_id.lock().unwrap();
-        if focused.as_deref() == Some(&panel_id) {
+        map.remove(&tab_id);
+        let mut focused = state.focused_float_tab_id.lock().unwrap();
+        if focused.as_deref() == Some(&tab_id) {
             *focused = None;
         }
     }
@@ -231,9 +231,9 @@ pub fn float_browser_close(
 #[tauri::command]
 pub fn float_browser_focus(
     app: AppHandle,
-    panel_id: String,
+    tab_id: String,
 ) -> Result<(), String> {
-    let label = window_label(&panel_id);
+    let label = window_label(&tab_id);
     if let Some(window) = app.get_webview_window(&label) {
         window.set_focus().map_err(|e| e.to_string())?;
     }
@@ -243,11 +243,11 @@ pub fn float_browser_focus(
 #[tauri::command]
 pub fn float_browser_navigate(
     app: AppHandle,
-    panel_id: String,
+    tab_id: String,
     url: String,
 ) -> Result<(), String> {
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
-    let label = window_label(&panel_id);
+    let label = window_label(&tab_id);
     if let Some(window) = app.get_webview_window(&label) {
         window.navigate(parsed_url).map_err(|e| e.to_string())?;
     }
@@ -258,15 +258,15 @@ pub fn float_browser_navigate(
 pub fn float_browser_dock(
     app: AppHandle,
     state: State<'_, FloatBrowserState>,
-    panel_id: String,
+    tab_id: String,
 ) -> Result<(), String> {
-    let label = window_label(&panel_id);
+    let label = window_label(&tab_id);
     let origin_label = {
         let map = state.panels.lock().unwrap();
-        map.get(&panel_id).map(|m| m.origin_window_label.clone())
+        map.get(&tab_id).map(|m| m.origin_window_label.clone())
     }
-    .ok_or_else(|| format!("no float window for panel {}", panel_id))?;
+    .ok_or_else(|| format!("no float window for tab {}", tab_id))?;
 
-    do_dock_and_destroy(&app, &panel_id, &origin_label, &label);
+    do_dock_and_destroy(&app, &tab_id, &origin_label, &label);
     Ok(())
 }

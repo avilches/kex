@@ -16,14 +16,14 @@ fn pending_cmds() -> &'static Mutex<HashMap<String, String>> {
 
 /// Called by the PTY reader when OSC 133;C fires for an agent command.
 /// The stashed string is consumed by the next `record_session` call for this panel.
-pub fn stash_cmd(panel_id: &str, cmd: String) {
+pub fn stash_cmd(tab_id: &str, cmd: String) {
     if let Ok(mut map) = pending_cmds().lock() {
-        map.insert(panel_id.to_string(), cmd);
+        map.insert(tab_id.to_string(), cmd);
     }
 }
 
-fn take_stashed_cmd(panel_id: &str) -> Option<String> {
-    pending_cmds().lock().ok()?.remove(panel_id)
+fn take_stashed_cmd(tab_id: &str) -> Option<String> {
+    pending_cmds().lock().ok()?.remove(tab_id)
 }
 
 /// Must be called once in setup() before any session store operation.
@@ -54,7 +54,7 @@ struct SessionStore {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestorePlan {
-    pub panel_id: String,
+    pub tab_id: String,
     pub agent: String,
     pub resume_cmd: String,
     pub cwd: String,
@@ -229,7 +229,7 @@ fn shell_quote(s: &str) -> String {
 
 fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&PathBuf>) -> Vec<RestorePlan> {
     let mut plans = Vec::new();
-    for (panel_id, record) in panels {
+    for (tab_id, record) in panels {
         let agent = record.agent.unwrap_or_else(|| "claude".to_string());
 
         // Prefer the cwd recorded in the transcript (more accurate than cwd_launch when
@@ -252,12 +252,12 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
             (cwd, cmd)
         } else {
             log::info!(
-                "[agent-session] restore plan: panel={panel_id} agent={agent} session={} \
+                "[agent-session] restore plan: tab={tab_id} agent={agent} session={} \
                  JSONL not found, reattaching with --session-id",
                 record.session_id
             );
             if let Some(path) = store_path {
-                remove_panel_from_store(&panel_id, path);
+                remove_panel_from_store(&tab_id, path);
             }
             let cwd = record.cwd_launch.clone();
             let cmd = match record.launch_cmd.as_deref() {
@@ -271,12 +271,12 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
         };
 
         if !PathBuf::from(&cwd).exists() {
-            log::warn!("[agent-session] restore plan: panel={panel_id} agent={agent} cwd not found: {cwd}");
+            log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent} cwd not found: {cwd}");
             if let Some(path) = store_path {
-                remove_panel_from_store(&panel_id, path);
+                remove_panel_from_store(&tab_id, path);
             }
             plans.push(RestorePlan {
-                panel_id, agent,
+                tab_id, agent,
                 resume_cmd: String::new(),
                 cwd: cwd.clone(),
                 error_reason: format!("Directory not found: {cwd}"),
@@ -284,16 +284,16 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
             continue;
         }
 
-        log::info!("[agent-session] restore plan: panel={panel_id} agent={agent} session={} cwd={cwd} cmd={cmd:?}", record.session_id);
-        plans.push(RestorePlan { panel_id, agent, resume_cmd: cmd, cwd, error_reason: String::new() });
+        log::info!("[agent-session] restore plan: tab={tab_id} agent={agent} session={} cwd={cwd} cmd={cmd:?}", record.session_id);
+        plans.push(RestorePlan { tab_id, agent, resume_cmd: cmd, cwd, error_reason: String::new() });
     }
     plans
 }
 
-fn remove_panel_from_store(panel_id: &str, path: &PathBuf) {
+fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
     let Ok(content) = std::fs::read_to_string(path) else { return };
     let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return };
-    store.panels.remove(panel_id);
+    store.panels.remove(tab_id);
     let Ok(out) = serde_json::to_string_pretty(&store) else { return };
     let tmp = path.with_extension("json.kex-tmp");
     if std::fs::write(&tmp, out).is_ok() {
@@ -306,18 +306,18 @@ fn remove_panel_from_store(panel_id: &str, path: &PathBuf) {
 ///
 /// Consumes the pending launch command stashed by `stash_cmd`. If the stashed command
 /// is print-mode (`-p` / `--print`), the session is not persisted.
-pub fn record_session(panel_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd: &str) {
+pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd: &str) {
     let path = match store_path() {
         Some(p) => p,
         None => return,
     };
-    let launch_cmd = take_stashed_cmd(panel_id);
+    let launch_cmd = take_stashed_cmd(tab_id);
     if launch_cmd.as_deref().is_some_and(is_print_mode_cmd) {
-        log::info!("[agent-session] skip record: print-mode session panel={panel_id}");
+        log::info!("[agent-session] skip record: print-mode session panel={tab_id}");
         return;
     }
     log::info!(
-        "[agent-session] record panel={panel_id} agent={agent} session={session_id} cwd={cwd} \
+        "[agent-session] record panel={tab_id} agent={agent} session={session_id} cwd={cwd} \
          launch_cmd={launch_cmd:?}"
     );
     let now = std::time::SystemTime::now()
@@ -343,7 +343,7 @@ pub fn record_session(panel_id: &str, agent: &str, session_id: &str, transcript_
         }
         SessionStore { version: 1, panels: HashMap::new() }
     };
-    store.panels.insert(panel_id.to_string(), record);
+    store.panels.insert(tab_id.to_string(), record);
     if let Ok(out) = serde_json::to_string_pretty(&store) {
         let tmp = path.with_extension("json.kex-tmp");
         if std::fs::write(&tmp, out).is_ok() {
@@ -354,12 +354,12 @@ pub fn record_session(panel_id: &str, agent: &str, session_id: &str, transcript_
 
 /// Remove a panel entry from agent-sessions.json.
 /// Called when the agent exits (exited signal) or the user detaches manually.
-pub fn detach_session(panel_id: &str) -> Result<(), String> {
-    log::info!("[agent-session] detach panel={panel_id}");
+pub fn detach_session(tab_id: &str) -> Result<(), String> {
+    log::info!("[agent-session] detach panel={tab_id}");
     if let Some(path) = store_path() {
         if let Ok(content) = std::fs::read_to_string(&path) {
             if let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) {
-                store.panels.remove(panel_id);
+                store.panels.remove(tab_id);
                 if let Ok(out) = serde_json::to_string_pretty(&store) {
                     let tmp = path.with_extension("json.kex-tmp");
                     if std::fs::write(&tmp, out).is_ok() {

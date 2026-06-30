@@ -42,19 +42,19 @@ function sameMetrics(a: TabMetrics | undefined, b: TabMetrics): boolean {
   );
 }
 
-export function setMetrics(panelId: string, m: TabMetrics): void {
-  if (sameMetrics(metrics.get(panelId), m)) return;
-  metrics.set(panelId, m);
+export function setMetrics(tabId: string, m: TabMetrics): void {
+  if (sameMetrics(metrics.get(tabId), m)) return;
+  metrics.set(tabId, m);
   notify();
 }
 
-export function clearMetricsEntry(panelId: string): void {
-  if (!metrics.has(panelId)) return;
-  metrics.delete(panelId);
+export function clearMetricsEntry(tabId: string): void {
+  if (!metrics.has(tabId)) return;
+  metrics.delete(tabId);
   notify();
 }
 
-export function useMetrics(panelId: string): TabMetrics | undefined {
+export function useMetrics(tabId: string): TabMetrics | undefined {
   const snap = useSyncExternalStore(subscribe, getSnapshot);
-  return snap.get(panelId);
+  return snap.get(tabId);
 }

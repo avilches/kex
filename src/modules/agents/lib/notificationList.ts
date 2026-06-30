@@ -3,7 +3,7 @@ import type { AgentNotification, AgentSession } from "./types";
 export type AgentEntryVisual = "waiting" | "working" | "error";
 
 export type AgentEntry = {
-  panelId: string;
+  tabId: string;
   workspaceId: string;
   agent: string;
   visual: AgentEntryVisual;
@@ -20,7 +20,7 @@ const RANK: Record<AgentEntryVisual, number> = {
 
 /**
  * Collapse live sessions and the notification log into a single entry per agent
- * (keyed by panelId), showing only what is actionable: agents that need
+ * (keyed by tabId), showing only what is actionable: agents that need
  * attention (waiting/error) or are still working. An idle agent has already been
  * seen, so it is dropped. The orange dot is derived from the live session, so a
  * bell row stays in sync with its tab. Order: waiting, then working, then error;
@@ -32,7 +32,7 @@ export function buildAgentEntries(
 ): AgentEntry[] {
   const notifByPanel = new Map<string, AgentNotification>();
   for (const n of notifications) {
-    if (!notifByPanel.has(n.panelId)) notifByPanel.set(n.panelId, n);
+    if (!notifByPanel.has(n.tabId)) notifByPanel.set(n.tabId, n);
   }
 
   const panelIds = new Set<string>([
@@ -41,9 +41,9 @@ export function buildAgentEntries(
   ]);
 
   const entries: AgentEntry[] = [];
-  for (const panelId of panelIds) {
-    const session = sessions[panelId];
-    const notif = notifByPanel.get(panelId);
+  for (const tabId of panelIds) {
+    const session = sessions[tabId];
+    const notif = notifByPanel.get(tabId);
     const agent = session?.agent ?? notif?.agent ?? "claude";
     const workspaceId = session?.workspaceId ?? notif?.workspaceId ?? "";
 
@@ -73,7 +73,7 @@ export function buildAgentEntries(
       continue;
     }
 
-    entries.push({ panelId, workspaceId, agent, visual, at, pending });
+    entries.push({ tabId, workspaceId, agent, visual, at, pending });
   }
 
   entries.sort((a, b) =>

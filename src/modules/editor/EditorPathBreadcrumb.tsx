@@ -9,7 +9,7 @@ import { buildEditorPathBreadcrumb } from "./lib/editorPathBreadcrumb";
 
 type Props = {
   path: string;
-  panelId?: string;
+  tabId?: string;
   workspaceRoot: string | null;
   home: string | null;
   gitRootPath?: string | null;
@@ -18,7 +18,7 @@ type Props = {
     path: string,
     action?: "rename" | "duplicate" | "delete",
   ) => void;
-  onRenameFile?: (panelId: string, newName: string) => void;
+  onRenameFile?: (tabId: string, newName: string) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -27,7 +27,7 @@ type Props = {
 
 export function EditorPathBreadcrumb({
   path,
-  panelId,
+  tabId,
   workspaceRoot,
   home,
   gitRootPath,
@@ -49,8 +49,8 @@ export function EditorPathBreadcrumb({
   // shared store is the single source of truth: F2 (file.rename) and the leaf
   // context-menu "Rename" both target this panel; the input commits via
   // onRenameFile (same path as renaming from the tab).
-  const renameEnabled = !!panelId && !!onRenameFile;
-  const editing = useFileRenameStore((s) => s.triggerPanelId === panelId);
+  const renameEnabled = !!tabId && !!onRenameFile;
+  const editing = useFileRenameStore((s) => s.triggerPanelId === tabId);
   const clearTrigger = useFileRenameStore((s) => s.clearTrigger);
   const startRename = useFileRenameStore((s) => s.trigger);
   const isEditing = renameEnabled && editing;
@@ -59,7 +59,7 @@ export function EditorPathBreadcrumb({
     clearTrigger();
     const trimmed = value.trim();
     if (!trimmed || trimmed === fileName) return;
-    if (panelId && onRenameFile) onRenameFile(panelId, trimmed);
+    if (tabId && onRenameFile) onRenameFile(tabId, trimmed);
   };
 
   const fileIcon = fileIconUrl(fileName);
@@ -127,8 +127,8 @@ export function EditorPathBreadcrumb({
             gitRootPath={gitRootPath ?? null}
             onFocusOnExplorer={onFocusOnExplorer}
             onRename={
-              renameEnabled && panelId
-                ? () => startRename(panelId)
+              renameEnabled && tabId
+                ? () => startRename(tabId)
                 : undefined
             }
             onAddToGitignore={onAddToGitignore}

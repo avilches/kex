@@ -22,20 +22,20 @@ export function getRunningCommandsSnapshot(): ReadonlyMap<string, string> {
   return snapshot;
 }
 
-export function setRunningCommand(panelId: string, cmd: string | null): void {
+export function setRunningCommand(tabId: string, cmd: string | null): void {
   if (cmd === null) {
-    if (!runningCommands.has(panelId)) return;
-    runningCommands.delete(panelId);
+    if (!runningCommands.has(tabId)) return;
+    runningCommands.delete(tabId);
   } else {
-    if (runningCommands.get(panelId) === cmd) return;
-    runningCommands.set(panelId, cmd);
+    if (runningCommands.get(tabId) === cmd) return;
+    runningCommands.set(tabId, cmd);
   }
   notify();
 }
 
-export function clearRunningCommandEntry(panelId: string): void {
-  if (!runningCommands.has(panelId)) return;
-  runningCommands.delete(panelId);
+export function clearRunningCommandEntry(tabId: string): void {
+  if (!runningCommands.has(tabId)) return;
+  runningCommands.delete(tabId);
   notify();
 }
 
@@ -64,19 +64,19 @@ export function getRunConfigRunningSnapshot(): ReadonlyMap<string, RunConfigStat
   return rcSnapshot;
 }
 
-export function setRunConfigRunning(panelId: string, state: RunConfigState | false): void {
+export function setRunConfigRunning(tabId: string, state: RunConfigState | false): void {
   if (state) {
-    if (runConfigRunning.get(panelId) === state) return;
-    runConfigRunning.set(panelId, state);
+    if (runConfigRunning.get(tabId) === state) return;
+    runConfigRunning.set(tabId, state);
   } else {
-    if (!runConfigRunning.has(panelId)) return;
-    runConfigRunning.delete(panelId);
+    if (!runConfigRunning.has(tabId)) return;
+    runConfigRunning.delete(tabId);
   }
   notifyRc();
 }
 
-export function clearRunConfigRunningEntry(panelId: string): void {
-  if (!runConfigRunning.has(panelId)) return;
-  runConfigRunning.delete(panelId);
+export function clearRunConfigRunningEntry(tabId: string): void {
+  if (!runConfigRunning.has(tabId)) return;
+  runConfigRunning.delete(tabId);
   notifyRc();
 }

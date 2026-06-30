@@ -6,7 +6,7 @@ export type RunConfig = {
   name: string;
   command: string;
   cwd?: string;
-  panelId?: string;
+  tabId?: string;
 };
 
 // Common to every tab. `locked` (prevent close) applies to all kinds with no

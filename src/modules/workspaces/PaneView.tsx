@@ -23,8 +23,8 @@ type Props = {
   workspaceCwd?: string;
   focused: boolean;
   isWorkspaceActive: boolean;
-  onActivateTab: (workspaceId: string, panelId: string) => void;
-  onCloseTab: (workspaceId: string, panelId: string) => void;
+  onActivateTab: (workspaceId: string, tabId: string) => void;
+  onCloseTab: (workspaceId: string, tabId: string) => void;
   onCloseManyTabs: (workspaceId: string, panelIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
@@ -36,10 +36,10 @@ type Props = {
   callbacks: TabCallbacks;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
-  onFloatBrowserPanel?: (panelId: string) => void;
-  onDockBrowserPanel?: (panelId: string) => void;
-  onFocusFloatBrowserPanel?: (panelId: string) => void;
-  onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
+  onFloatBrowserPanel?: (tabId: string) => void;
+  onDockBrowserPanel?: (tabId: string) => void;
+  onFocusFloatBrowserPanel?: (tabId: string) => void;
+  onNavigateFloatBrowserPanel?: (tabId: string, url: string) => void;
   welcomeActions?: WelcomeActions;
 };
 
@@ -149,8 +149,8 @@ function PaneDropOverlay({ paneId, tooNarrow, tooShort }: {
 // Subscribes to the tab-flash store in isolation so the memoized PaneView is not
 // re-rendered on every flash. Outlines the whole pane (border only) when the
 // flashed panel is the one this pane is showing.
-function PaneFlashBorder({ panelId }: { panelId: string | null }) {
-  const token = useTabFlash(panelId ?? "");
+function PaneFlashBorder({ tabId }: { tabId: string | null }) {
+  const token = useTabFlash(tabId ?? "");
   return <FlashOverlay token={token} variant="ring" className="z-50" />;
 }
 
@@ -225,12 +225,12 @@ export const PaneView = memo(function PaneView({
     if (!focused) onFocusPane(workspaceId, pane.id);
   }, [focused, workspaceId, pane.id, onFocusPane]);
 
-  const handleActivate = useCallback((panelId: string) => onActivateTab(workspaceId, panelId), [onActivateTab, workspaceId]);
-  const handleClose = useCallback((panelId: string) => onCloseTab(workspaceId, panelId), [onCloseTab, workspaceId]);
+  const handleActivate = useCallback((tabId: string) => onActivateTab(workspaceId, tabId), [onActivateTab, workspaceId]);
+  const handleClose = useCallback((tabId: string) => onCloseTab(workspaceId, tabId), [onCloseTab, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
-  const handleCloseOtherPanels = useCallback((panelId: string) => {
+  const handleCloseOtherPanels = useCallback((tabId: string) => {
     const ids = pane.tabs
-      .filter((p) => p.id !== panelId && isBulkClosable(p))
+      .filter((p) => p.id !== tabId && isBulkClosable(p))
       .map((p) => p.id);
     onCloseManyTabs(workspaceId, ids);
   }, [pane.tabs, onCloseManyTabs, workspaceId]);
@@ -243,9 +243,9 @@ export const PaneView = memo(function PaneView({
   const handleNewBrowser = useCallback(() => onNewBrowser(workspaceId, pane.id), [onNewBrowser, workspaceId, pane.id]);
   const handleSplitBrowserRight = useCallback(() => onSplitBrowserRight(workspaceId, pane.id), [onSplitBrowserRight, workspaceId, pane.id]);
   const handleSplitBrowserDown = useCallback(() => onSplitBrowserDown(workspaceId, pane.id), [onSplitBrowserDown, workspaceId, pane.id]);
-  const handleDetachAgent = useCallback((panelId: string) => {
-    useAgentStore.getState().finish(panelId);
-    void detachAgentSession(panelId);
+  const handleDetachAgent = useCallback((tabId: string) => {
+    useAgentStore.getState().finish(tabId);
+    void detachAgentSession(tabId);
   }, []);
 
   return (
@@ -256,7 +256,7 @@ export const PaneView = memo(function PaneView({
       onMouseDownCapture={handleFocus}
       onFocus={handleFocus}
     >
-      <PaneFlashBorder panelId={pane.activeTabId} />
+      <PaneFlashBorder tabId={pane.activeTabId} />
       <div className="relative shrink-0">
         <PaneTabBar
           tabs={pane.tabs}

@@ -19,8 +19,8 @@ type Props = {
   activePaneId: string;
   isWorkspaceActive: boolean;
   expandedPaneId?: string | null;
-  onActivateTab: (workspaceId: string, panelId: string) => void;
-  onCloseTab: (workspaceId: string, panelId: string) => void;
+  onActivateTab: (workspaceId: string, tabId: string) => void;
+  onCloseTab: (workspaceId: string, tabId: string) => void;
   onCloseManyTabs: (workspaceId: string, panelIds: string[]) => void;
   onFocusPane: (workspaceId: string, paneId: string) => void;
   onNewTerminal: (workspaceId: string, paneId: string) => void;
@@ -37,10 +37,10 @@ type Props = {
   callbacks: TabCallbacks;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
-  onFloatBrowserPanel?: (panelId: string) => void;
-  onDockBrowserPanel?: (panelId: string) => void;
-  onFocusFloatBrowserPanel?: (panelId: string) => void;
-  onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
+  onFloatBrowserPanel?: (tabId: string) => void;
+  onDockBrowserPanel?: (tabId: string) => void;
+  onFocusFloatBrowserPanel?: (tabId: string) => void;
+  onNavigateFloatBrowserPanel?: (tabId: string, url: string) => void;
   welcomeActions?: WelcomeActions;
 };
 

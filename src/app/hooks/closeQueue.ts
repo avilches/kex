@@ -14,18 +14,18 @@ export type CloseQueuePanel = {
 };
 
 export type CloseQueueDeps = {
-  getPanel: (panelId: string) => CloseQueuePanel | null;
-  hasForegroundProcess: (panelId: string) => Promise<string | null>;
+  getPanel: (tabId: string) => CloseQueuePanel | null;
+  hasForegroundProcess: (tabId: string) => Promise<string | null>;
   isWarnEnabled: () => boolean;
   setWarnEnabled: (value: boolean) => Promise<void>;
   isAutoSaveEnabled: () => boolean;
   askTerminalClose: (
-    panelId: string,
+    tabId: string,
     processName: string,
   ) => Promise<TerminalCloseDecision>;
-  askEditorClose: (panelId: string) => Promise<EditorCloseDecision>;
-  savePanel: (panelId: string) => Promise<void>;
-  closeTab: (panelId: string) => void;
+  askEditorClose: (tabId: string) => Promise<EditorCloseDecision>;
+  saveTab: (tabId: string) => Promise<void>;
+  closeTab: (tabId: string) => void;
 };
 
 /**
@@ -39,18 +39,18 @@ export async function runCloseQueue(
   deps: CloseQueueDeps,
 ): Promise<void> {
   let suppressTerminalWarn = false;
-  for (const panelId of panelIds) {
-    const panel = deps.getPanel(panelId);
+  for (const tabId of panelIds) {
+    const panel = deps.getPanel(tabId);
     if (!panel) continue;
 
     if (panel.kind === "terminal") {
       if (panel.locked) continue;
       if (deps.isWarnEnabled() && !suppressTerminalWarn) {
         const processName = await deps
-          .hasForegroundProcess(panelId)
+          .hasForegroundProcess(tabId)
           .catch(() => null);
         if (processName !== null) {
-          const decision = await deps.askTerminalClose(panelId, processName);
+          const decision = await deps.askTerminalClose(tabId, processName);
           if (decision.type === "cancel") return;
           if (decision.dontAskAgain) {
             await deps.setWarnEnabled(false);
@@ -62,15 +62,15 @@ export async function runCloseQueue(
       if (panel.locked) continue;
       if (panel.dirty) {
         if (deps.isAutoSaveEnabled()) {
-          await deps.savePanel(panelId);
+          await deps.saveTab(tabId);
         } else {
-          const decision = await deps.askEditorClose(panelId);
+          const decision = await deps.askEditorClose(tabId);
           if (decision.type === "cancel") return;
-          if (decision.type === "save") await deps.savePanel(panelId);
+          if (decision.type === "save") await deps.saveTab(tabId);
         }
       }
     }
 
-    deps.closeTab(panelId);
+    deps.closeTab(tabId);
   }
 }

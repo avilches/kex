@@ -6,7 +6,7 @@ describe("agentStore.setMeta", () => {
     useAgentStore.setState({ sessions: {} });
   });
 
-  test("no-op cuando el panelId no existe", () => {
+  test("no-op cuando el tabId no existe", () => {
     useAgentStore.getState().setMeta("unknown", { sessionId: "abc" });
     expect(useAgentStore.getState().sessions).toEqual({});
   });
@@ -62,18 +62,18 @@ describe("agentStore.pushNotification (una por agente)", () => {
       agent: "claude",
       kind: "attention",
       workspaceId: "t",
-      panelId: "p1",
+      tabId: "p1",
     });
     push({
       source: "terminal",
       agent: "claude",
       kind: "finished",
       workspaceId: "t",
-      panelId: "p1",
+      tabId: "p1",
     });
     const notifs = useAgentStore.getState().notifications;
     expect(notifs).toHaveLength(1);
-    expect(notifs[0].panelId).toBe("p1");
+    expect(notifs[0].tabId).toBe("p1");
     expect(notifs[0].kind).toBe("finished");
   });
 
@@ -84,24 +84,24 @@ describe("agentStore.pushNotification (una por agente)", () => {
       agent: "claude",
       kind: "finished",
       workspaceId: "t",
-      panelId: "p1",
+      tabId: "p1",
     });
     push({
       source: "terminal",
       agent: "claude",
       kind: "finished",
       workspaceId: "t",
-      panelId: "p2",
+      tabId: "p2",
     });
     push({
       source: "terminal",
       agent: "claude",
       kind: "attention",
       workspaceId: "t",
-      panelId: "p1",
+      tabId: "p1",
     });
     const notifs = useAgentStore.getState().notifications;
-    expect(notifs.map((n) => n.panelId)).toEqual(["p1", "p2"]);
+    expect(notifs.map((n) => n.tabId)).toEqual(["p1", "p2"]);
   });
 });
 
@@ -135,7 +135,7 @@ describe("agentStore.markPanelSeen", () => {
       agent: "claude",
       kind: "finished",
       workspaceId: "t",
-      panelId: "p1",
+      tabId: "p1",
     });
     st.markPanelSeen("p1");
     expect(useAgentStore.getState().notifications[0].read).toBe(true);
@@ -171,7 +171,7 @@ describe("agentStore.clearAll", () => {
       agent: "claude",
       kind: "error",
       workspaceId: "t",
-      panelId: "p3",
+      tabId: "p3",
     });
 
     st.clearAll();

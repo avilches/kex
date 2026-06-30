@@ -16,7 +16,7 @@ describe("visibleTerminalPanels", () => {
       first: pane("p1", [{ id: "t1", kind: "terminal" }], "t1"),
       second: pane("p2", [{ id: "e1", kind: "editor", path: "/a.ts", dirty: false, preview: false }], "e1"),
     };
-    expect(visibleTerminalPanels(tree)).toEqual([{ panelId: "t1" }]);
+    expect(visibleTerminalPanels(tree)).toEqual([{ tabId: "t1" }]);
   });
 
   it("ignores non-active terminals and panes with no active panel", () => {
@@ -28,7 +28,7 @@ describe("visibleTerminalPanels", () => {
       ],
       "t2",
     );
-    expect(visibleTerminalPanels(tree)).toEqual([{ panelId: "t2" }]);
+    expect(visibleTerminalPanels(tree)).toEqual([{ tabId: "t2" }]);
 
     const empty: SplitNode = pane("p2", [{ id: "t9", kind: "terminal" }], null);
     expect(visibleTerminalPanels(empty)).toEqual([]);

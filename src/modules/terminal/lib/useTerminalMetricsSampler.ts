@@ -27,19 +27,19 @@ export function useTerminalMetricsSampler(paneTree: SplitNode | null): void {
       const tree = treeRef.current;
       if (!tree) return;
       const pairs = visibleTerminalPanels(tree)
-        .map((p) => ({ panelId: p.panelId, ptyId: ptyIdForPanel(p.panelId) }))
-        .filter((x): x is { panelId: string; ptyId: number } => x.ptyId != null);
+        .map((p) => ({ tabId: p.tabId, ptyId: ptyIdForPanel(p.tabId) }))
+        .filter((x): x is { tabId: string; ptyId: number } => x.ptyId != null);
       if (pairs.length === 0) return;
-      const byPty = new Map(pairs.map((x) => [x.ptyId, x.panelId]));
+      const byPty = new Map(pairs.map((x) => [x.ptyId, x.tabId]));
       try {
         const res = await invoke<RawMetrics[]>("pty_metrics", {
           ptyIds: pairs.map((x) => x.ptyId),
         });
         if (cancelled) return;
         for (const m of res) {
-          const panelId = byPty.get(m.pty_id);
-          if (!panelId) continue;
-          setMetrics(panelId, {
+          const tabId = byPty.get(m.pty_id);
+          if (!tabId) continue;
+          setMetrics(tabId, {
             pid: m.pid,
             cpuPercent: m.cpu_percent,
             memBytes: m.mem_bytes,

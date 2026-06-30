@@ -16,7 +16,7 @@ type RouteArgs = {
   /** Allow an in-app toast when focused but not looking at the agent. */
   allowToast: boolean;
   workspaceId?: string;
-  panelId?: string;
+  tabId?: string;
   onActivate: () => void;
 };
 
@@ -30,16 +30,16 @@ export function routeAgentNotification({
   visible,
   allowToast,
   workspaceId = "",
-  panelId = "",
+  tabId = "",
   onActivate,
 }: RouteArgs): void {
   if (!usePreferencesStore.getState().agentNotifications) return;
   if (focused && visible) return;
 
-  useAgentStore.getState().pushNotification({ source, agent, kind, workspaceId, panelId });
+  useAgentStore.getState().pushNotification({ source, agent, kind, workspaceId, tabId });
 
   if (!focused) {
-    void queueNavAndNotify({ workspaceId, panelId, title, body: body ?? agent });
+    void queueNavAndNotify({ workspaceId, tabId, title, body: body ?? agent });
     return;
   }
   if (allowToast) {

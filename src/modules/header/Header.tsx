@@ -24,7 +24,7 @@ type Props = {
   onToggleSidebar: () => void;
   sidebarSide: "left" | "right";
   onOpenCommandPalette: () => void;
-  onActivateAgent: (workspaceId: string, panelId: string) => void;
+  onActivateAgent: (workspaceId: string, tabId: string) => void;
   onOpenSettings: () => void;
   searchTarget: SearchTarget;
   searchRef: RefObject<SearchInlineHandle | null>;

@@ -36,20 +36,20 @@ type Props = {
   paneFocused: boolean;
   workspaceId: string;
   isWorkspaceActive: boolean;
-  onActivate: (panelId: string) => void;
-  onClose: (panelId: string) => void;
+  onActivate: (tabId: string) => void;
+  onClose: (tabId: string) => void;
   onNewTerminal: () => void;
-  onCloseOtherPanels: (panelId: string) => void;
+  onCloseOtherPanels: (tabId: string) => void;
   onCloseAllPanels: () => void;
   onSplitTerminalRight: () => void;
   onSplitTerminalDown: () => void;
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
-  onDetachAgent: (panelId: string) => void;
-  onRenamePanel?: (panelId: string, title: string | undefined) => void;
-  onUpdatePanel?: (panelId: string, updater: (p: Tab) => Tab) => void;
-  onRenameFile?: (panelId: string, newName: string) => void;
+  onDetachAgent: (tabId: string) => void;
+  onRenamePanel?: (tabId: string, title: string | undefined) => void;
+  onUpdatePanel?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  onRenameFile?: (tabId: string, newName: string) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
@@ -93,7 +93,7 @@ function DraggableTab({
   tabsCount: number;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
-  onCloseOtherPanels: (panelId: string) => void;
+  onCloseOtherPanels: (tabId: string) => void;
   onCloseAllPanels: () => void;
   onNewTerminal: () => void;
   onSplitTerminalRight: () => void;
@@ -101,10 +101,10 @@ function DraggableTab({
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
-  onDetachAgent: (panelId: string) => void;
+  onDetachAgent: (tabId: string) => void;
   shortcutLabels: Record<string, string | null>;
-  onRenamePanel?: (panelId: string, title: string | undefined) => void;
-  onUpdatePanel?: (panelId: string, updater: (p: Tab) => Tab) => void;
+  onRenamePanel?: (tabId: string, title: string | undefined) => void;
+  onUpdatePanel?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatusMap?: Map<string, GitStatusCode> | null;
   gitStatus?: GitStatusSnapshot | null;
@@ -164,15 +164,15 @@ function DraggableTab({
       ? '...' + agentTitle.slice(-27)
       : agentTitle;
 
-  const isRenaming = useTabRenameStore((s) => s.renamingPanelId === tab.id);
-  const anyRenaming = useTabRenameStore((s) => s.renamingPanelId !== null);
+  const isRenaming = useTabRenameStore((s) => s.renamingTabId === tab.id);
+  const anyRenaming = useTabRenameStore((s) => s.renamingTabId !== null);
   const clearRename = useTabRenameStore((s) => s.clearRename);
   const startRename = useTabRenameStore((s) => s.startRename);
   const inputRef = useRef<HTMLInputElement>(null);
   const handledRef = useRef(false);
   const lockFlashSnap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
   const lockFlashToken =
-    lockFlashSnap.panelId === tab.id ? lockFlashSnap.seq : 0;
+    lockFlashSnap.tabId === tab.id ? lockFlashSnap.seq : 0;
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
@@ -527,18 +527,18 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
   const userScrolledRef = useRef(false);
   const mouseLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mouseInsideRef = useRef(true);
-  const renamingPanelId = useTabRenameStore((s) => s.renamingPanelId);
+  const renamingTabId = useTabRenameStore((s) => s.renamingTabId);
   const isRenamingRef = useRef(false);
   useEffect(() => {
-    isRenamingRef.current = renamingPanelId !== null;
-  }, [renamingPanelId]);
+    isRenamingRef.current = renamingTabId !== null;
+  }, [renamingTabId]);
 
   useEffect(() => { activeTabIdRef.current = activeTabId; });
 
-  const scrollPanelIntoView = (panelId: string, behavior: ScrollBehavior = 'smooth') => {
+  const scrollPanelIntoView = (tabId: string, behavior: ScrollBehavior = 'smooth') => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const tab = container.querySelector<HTMLElement>(`[data-panel-id="${panelId}"]`);
+    const tab = container.querySelector<HTMLElement>(`[data-panel-id="${tabId}"]`);
     if (!tab) return;
     const cr = container.getBoundingClientRect();
     const tr = tab.getBoundingClientRect();
@@ -615,10 +615,10 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
         return;
       }
       const parts = overId.split(":");
-      const refPanelId = parts[1];
+      const refTabId = parts[1];
       const side = parts[2];
-      if (!refPanelId || !side) { setInsertionIndex(null); return; }
-      const idx = tabs.findIndex((p) => p.id === refPanelId);
+      if (!refTabId || !side) { setInsertionIndex(null); return; }
+      const idx = tabs.findIndex((p) => p.id === refTabId);
       if (idx === -1) { setInsertionIndex(null); return; }
       const insertionIdx = side === "before" ? idx : idx + 1;
       setInsertionIndex(insertionIdx);
@@ -672,11 +672,11 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
         if ((e.target as HTMLElement).closest("button")) return;
         const tabEl = (e.target as HTMLElement).closest("[data-panel-id]");
         if (!tabEl) return;
-        const panelId = tabEl.getAttribute("data-panel-id");
-        if (!panelId) return;
+        const tabId = tabEl.getAttribute("data-panel-id");
+        if (!tabId) return;
         const dx = Math.abs(e.clientX - start.x);
         const dy = Math.abs(e.clientY - start.y);
-        if (dx < 6 && dy < 6) onActivate(panelId);
+        if (dx < 6 && dy < 6) onActivate(tabId);
       }}
     >
       {tabs.map((p, i) => (

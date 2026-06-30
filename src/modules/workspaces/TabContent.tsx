@@ -66,33 +66,33 @@ type CommitFileDiffOpenInput = {
 
 export type TabCallbacks = {
   // Terminal callbacks
-  onSearchReady?: (panelId: string, addon: SearchAddon) => void;
-  onExit?: (panelId: string, code: number) => void;
-  onCwd?: (panelId: string, cwd: string) => void;
-  onRunningCommand?: (panelId: string, cmd: string | null) => void;
-  onScratchpadState?: (panelId: string, state: ScratchpadState) => void;
-  registerTerminalHandle?: (panelId: string, handle: TerminalPaneHandle | null) => void;
+  onSearchReady?: (tabId: string, addon: SearchAddon) => void;
+  onExit?: (tabId: string, code: number) => void;
+  onCwd?: (tabId: string, cwd: string) => void;
+  onRunningCommand?: (tabId: string, cmd: string | null) => void;
+  onScratchpadState?: (tabId: string, state: ScratchpadState) => void;
+  registerTerminalHandle?: (tabId: string, handle: TerminalPaneHandle | null) => void;
   // Editor callbacks
-  onEditorDirtyChange?: (panelId: string, dirty: boolean) => void;
-  onEditorClose?: (panelId: string) => void;
-  registerEditorHandle?: (panelId: string, handle: EditorPaneHandle | null) => void;
+  onEditorDirtyChange?: (tabId: string, dirty: boolean) => void;
+  onEditorClose?: (tabId: string) => void;
+  registerEditorHandle?: (tabId: string, handle: EditorPaneHandle | null) => void;
   // Preview callbacks
-  onToggleOverlayPreview?: (panelId: string) => void;
-  onToggleSplitPreview?: (panelId: string) => void;
+  onToggleOverlayPreview?: (tabId: string) => void;
+  onToggleSplitPreview?: (tabId: string) => void;
   // Markdown callbacks
-  onSetMarkdownView?: (panelId: string, mode: "rendered" | "raw") => void;
+  onSetMarkdownView?: (tabId: string, mode: "rendered" | "raw") => void;
   // Browser callbacks
-  onBrowserUrlChange?: (panelId: string, url: string) => void;
-  registerBrowserHandle?: (panelId: string, handle: BrowserPaneHandle | null) => void;
+  onBrowserUrlChange?: (tabId: string, url: string) => void;
+  registerBrowserHandle?: (tabId: string, handle: BrowserPaneHandle | null) => void;
   // Git history callbacks
   onOpenCommitFile?: (input: CommitFileDiffOpenInput) => void;
-  onGitHistorySearchHandle?: (panelId: string, handle: GitHistorySearchHandle | null) => void;
+  onGitHistorySearchHandle?: (tabId: string, handle: GitHistorySearchHandle | null) => void;
   // Tab rename
-  onRenamePanel?: (panelId: string, title: string | undefined) => void;
+  onRenamePanel?: (tabId: string, title: string | undefined) => void;
   // Tab data update (used by tab bar lock/restore toggles)
-  onUpdatePanel?: (panelId: string, updater: (p: Tab) => Tab) => void;
+  onUpdatePanel?: (tabId: string, updater: (p: Tab) => Tab) => void;
   // File rename (editor/markdown tabs - renames the file on disk)
-  onRenameFile?: (panelId: string, newName: string) => void;
+  onRenameFile?: (tabId: string, newName: string) => void;
   // Reveal an editor/markdown/git file in the explorer tree
   onFocusOnExplorer?: (filePath: string, pendingAction?: RevealAction) => void;
   // Dir-segment context menu actions (editor/markdown path bar)
@@ -107,10 +107,10 @@ type Props = {
   visible: boolean;
   focused: boolean;
   callbacks: TabCallbacks;
-  onFloatBrowserPanel?: (panelId: string) => void;
-  onDockBrowserPanel?: (panelId: string) => void;
-  onFocusFloatBrowserPanel?: (panelId: string) => void;
-  onNavigateFloatBrowserPanel?: (panelId: string, url: string) => void;
+  onFloatBrowserPanel?: (tabId: string) => void;
+  onDockBrowserPanel?: (tabId: string) => void;
+  onFocusFloatBrowserPanel?: (tabId: string) => void;
+  onNavigateFloatBrowserPanel?: (tabId: string, url: string) => void;
 };
 
 export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPanel, onDockBrowserPanel, onFocusFloatBrowserPanel, onNavigateFloatBrowserPanel }: Props) {
@@ -191,7 +191,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPan
       return (
         <div className="flex h-full w-full flex-col">
           <TerminalPathBar
-            panelId={tab.id}
+            tabId={tab.id}
             cwd={tab.cwd ?? ""}
             home={home}
             workspaceRoot={workspaceRoot}
@@ -211,7 +211,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPan
                 (terminalRef as React.MutableRefObject<TerminalPaneHandle | null>).current = h;
                 callbacks.registerTerminalHandle?.(tab.id, h);
               }}
-              panelId={tab.id}
+              tabId={tab.id}
               visible={visible}
               focused={focused}
               initialCwd={tab.cwd}
@@ -252,7 +252,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPan
           <div className="flex h-full w-full flex-col">
             <EditorPathBar
               path={tab.path}
-              panelId={tab.id}
+              tabId={tab.id}
               workspaceRoot={workspaceRoot}
               home={home}
               gitRootPath={gitRootPath}
@@ -366,7 +366,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserPan
           <div className="flex h-full w-full flex-col">
             <EditorPathBar
               path={tab.path}
-              panelId={tab.id}
+              tabId={tab.id}
               workspaceRoot={workspaceRoot}
               home={home}
               gitRootPath={gitRootPath}

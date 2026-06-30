@@ -209,7 +209,7 @@ describe("collectRunningTerminals", () => {
       async (id) => (running.has(id) ? "node" : null),
       () => undefined,
     );
-    expect(out.map((r) => r.panelId)).toEqual(["t1", "t3"]);
+    expect(out.map((r) => r.tabId)).toEqual(["t1", "t3"]);
   });
 
   it("labels with command, then process name, then title, then 'shell'", async () => {
@@ -227,10 +227,10 @@ describe("collectRunningTerminals", () => {
       (id) => commands.get(id),
     );
     expect(out).toEqual([
-      { panelId: "t1", label: "pnpm dev" },
-      { panelId: "t2", label: "Build" },
-      { panelId: "t3", label: "vim" },
-      { panelId: "t4", label: "shell" },
+      { tabId: "t1", label: "pnpm dev" },
+      { tabId: "t2", label: "Build" },
+      { tabId: "t3", label: "vim" },
+      { tabId: "t4", label: "shell" },
     ]);
   });
 
@@ -397,9 +397,9 @@ describe("RunConfig actions (pure helpers via applyPinnedRoot pattern)", () => {
     expect(w.activeScript).toBe("r1");
   });
 
-  it("RunConfig panelId is optional", () => {
+  it("RunConfig tabId is optional", () => {
     const c: RunConfig = { id: "1", name: "Dev", command: "pnpm dev" };
-    expect(c.panelId).toBeUndefined();
+    expect(c.tabId).toBeUndefined();
   });
 });
 

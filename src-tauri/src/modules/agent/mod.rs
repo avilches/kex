@@ -244,8 +244,8 @@ pub fn agent_disable_claude_hooks() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn agent_detach_session(panel_id: String) -> Result<(), String> {
-    session_store::detach_session(&panel_id)
+pub fn agent_detach_session(tab_id: String) -> Result<(), String> {
+    session_store::detach_session(&tab_id)
 }
 
 #[tauri::command]

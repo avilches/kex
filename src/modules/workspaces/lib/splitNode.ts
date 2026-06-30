@@ -24,13 +24,13 @@ export function focusedTabId(
 
 export function findTabPane(
   tree: SplitNode,
-  panelId: string,
+  tabId: string,
 ): { pane: PaneNode; tab: Tab } | null {
   if (tree.kind === "pane") {
-    const tab = tree.tabs.find((p) => p.id === panelId);
+    const tab = tree.tabs.find((p) => p.id === tabId);
     return tab ? { pane: tree, tab } : null;
   }
-  return findTabPane(tree.first, panelId) ?? findTabPane(tree.second, panelId);
+  return findTabPane(tree.first, tabId) ?? findTabPane(tree.second, tabId);
 }
 
 export function firstPaneId(tree: SplitNode): string {
@@ -71,11 +71,11 @@ export function splitPaneInTree(
 
 export function moveTabBetweenPanes(
   tree: SplitNode,
-  panelId: string,
+  tabId: string,
   targetPaneId: string,
   targetIndex?: number,
 ): SplitNode {
-  const sourceResult = findTabPane(tree, panelId);
+  const sourceResult = findTabPane(tree, tabId);
   if (!sourceResult) return tree;
   if (sourceResult.pane.id === targetPaneId) return tree;
 
@@ -83,9 +83,9 @@ export function moveTabBetweenPanes(
 
   // Remove from source pane
   let result = updatePane(tree, sourcePane.id, (p) => {
-    const remaining = p.tabs.filter((x) => x.id !== panelId);
+    const remaining = p.tabs.filter((x) => x.id !== tabId);
     const newActive =
-      p.activeTabId === panelId
+      p.activeTabId === tabId
         ? (remaining[remaining.length - 1]?.id ?? null)
         : p.activeTabId;
     return { ...p, tabs: remaining, activeTabId: newActive };

@@ -50,13 +50,13 @@ export function RunButton({
   const completeConfigs = scripts.filter(isComplete);
   const activeConfig =
     completeConfigs.find((c) => c.id === activeScript) ?? completeConfigs[0];
-  const activeState = activeConfig?.panelId ? runningMap.get(activeConfig.panelId) : undefined;
+  const activeState = activeConfig?.tabId ? runningMap.get(activeConfig.tabId) : undefined;
   const isRunning = activeState === "running";
   const isWaiting = activeState === "waiting";
   const isActive_ = isRunning || isWaiting;
 
   function cfgState(cfg: RunConfig) {
-    return cfg.panelId ? runningMap.get(cfg.panelId) : undefined;
+    return cfg.tabId ? runningMap.get(cfg.tabId) : undefined;
   }
 
   const dropdownContent = (

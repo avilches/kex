@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type RestorePlan = {
-  panelId: string;
+  tabId: string;
   agent: string;
   resumeCmd: string;
   cwd: string;
@@ -21,10 +21,10 @@ export function restorePlansReady(): Promise<void> {
 export async function loadRestorePlans(): Promise<void> {
   try {
     const plans = await invoke<RestorePlan[]>("agent_session_restore_plan");
-    restorePlans = new Map(plans.map((p) => [p.panelId, p]));
+    restorePlans = new Map(plans.map((p) => [p.tabId, p]));
     if (plans.length > 0) {
       console.debug(`[agent-session] loaded ${plans.length} restore plan(s):`, plans.map((p) =>
-        `${p.panelId} agent=${p.agent} cwd=${p.cwd}${p.errorReason ? ` ERROR: ${p.errorReason}` : ""}`,
+        `${p.tabId} agent=${p.agent} cwd=${p.cwd}${p.errorReason ? ` ERROR: ${p.errorReason}` : ""}`,
       ));
     } else {
       console.debug("[agent-session] no restore plans");
@@ -37,27 +37,27 @@ export async function loadRestorePlans(): Promise<void> {
   }
 }
 
-export function consumeRestorePlan(panelId: string): RestorePlan | null {
+export function consumeRestorePlan(tabId: string): RestorePlan | null {
   if (!restorePlans) return null;
-  const plan = restorePlans.get(panelId) ?? null;
-  restorePlans.delete(panelId);
+  const plan = restorePlans.get(tabId) ?? null;
+  restorePlans.delete(tabId);
   if (plan) {
-    console.debug(`[agent-session] consuming restore plan for panel=${panelId} agent=${plan.agent} cwd=${plan.cwd}${plan.errorReason ? ` ERROR: ${plan.errorReason}` : ""}`);
+    console.debug(`[agent-session] consuming restore plan for panel=${tabId} agent=${plan.agent} cwd=${plan.cwd}${plan.errorReason ? ` ERROR: ${plan.errorReason}` : ""}`);
   }
   return plan;
 }
 
-export async function detachAgentSession(panelId: string): Promise<void> {
-  restorePlans?.delete(panelId);
-  await invoke("agent_detach_session", { panelId });
+export async function detachAgentSession(tabId: string): Promise<void> {
+  restorePlans?.delete(tabId);
+  await invoke("agent_detach_session", { tabId });
 }
 
 export function pruneOrphanedPlans(knownPanelIds: Set<string>): void {
   if (!restorePlans) return;
-  for (const panelId of restorePlans.keys()) {
-    if (!knownPanelIds.has(panelId)) {
-      console.debug(`[agent-session] pruning orphaned plan panel=${panelId} (panel no longer in workspace)`);
-      void detachAgentSession(panelId);
+  for (const tabId of restorePlans.keys()) {
+    if (!knownPanelIds.has(tabId)) {
+      console.debug(`[agent-session] pruning orphaned plan panel=${tabId} (panel no longer in workspace)`);
+      void detachAgentSession(tabId);
     }
   }
 }

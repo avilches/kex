@@ -366,9 +366,9 @@ export default function App() {
     if (!ws) return;
     const pane = findPane(ws.paneTree, ws.activePaneId);
     if (!pane?.activeTabId) return;
-    const panelId = pane.activeTabId;
+    const tabId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
-      terminalHandles.current.get(panelId)?.focus();
+      terminalHandles.current.get(tabId)?.focus();
     });
     return () => cancelAnimationFrame(raf);
   }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -412,9 +412,9 @@ export default function App() {
     const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
     const pane = ws ? findPane(ws.paneTree, ws.activePaneId) : null;
     if (!pane?.activeTabId) return;
-    const panelId = pane.activeTabId;
+    const tabId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
-      terminalHandles.current.get(panelId)?.focus();
+      terminalHandles.current.get(tabId)?.focus();
     });
     return () => cancelAnimationFrame(raf);
   }, [bellOpen, activeWorkspaceId]);
@@ -559,18 +559,18 @@ export default function App() {
       if (!activeWorkspace) return;
 
       // Case 1: panel already exists -- focus it and re-run if idle
-      if (config.panelId) {
-        const found = findTabGlobal(config.panelId);
+      if (config.tabId) {
+        const found = findTabGlobal(config.tabId);
         if (found) {
           setActiveWorkspaceId(found.workspace.id);
-          activateTab(found.workspace.id, config.panelId);
-          if (!getRunConfigRunningSnapshot().get(config.panelId)) {
-            const panelId = config.panelId;
+          activateTab(found.workspace.id, config.tabId);
+          if (!getRunConfigRunningSnapshot().get(config.tabId)) {
+            const tabId = config.tabId;
             const tryWrite = (attempts = 0) => {
-              const handle = terminalHandles.current.get(panelId);
+              const handle = terminalHandles.current.get(tabId);
               if (handle) {
                 handle.write(config.command + "\r");
-                setRunConfigRunning(panelId, "running");
+                setRunConfigRunning(tabId, "running");
               } else if (attempts < 20) {
                 setTimeout(() => tryWrite(attempts + 1), 100);
               }
@@ -612,7 +612,7 @@ export default function App() {
         }
       }
 
-      updateRunConfig(activeWorkspace.id, config.id, { panelId: freshPanelId });
+      updateRunConfig(activeWorkspace.id, config.id, { tabId: freshPanelId });
 
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(freshPanelId);
@@ -630,11 +630,11 @@ export default function App() {
 
   const stopWorkspaceConfig = useCallback(
     (config: RunConfig) => {
-      if (!config.panelId) return;
+      if (!config.tabId) return;
       // Focus the terminal so OSC 133;D can be received and update the waiting state
-      activateTab(activeWorkspace?.id ?? "", config.panelId);
-      setRunConfigRunning(config.panelId, "waiting");
-      const handle = terminalHandles.current.get(config.panelId);
+      activateTab(activeWorkspace?.id ?? "", config.tabId);
+      setRunConfigRunning(config.tabId, "waiting");
+      const handle = terminalHandles.current.get(config.tabId);
       handle?.write("\x03");
     },
     [activateTab, activeWorkspace?.id],
@@ -656,7 +656,7 @@ export default function App() {
     { id: string; scriptCount: number } | null
   >(null);
   const [pendingWorkspaceProcesses, setPendingWorkspaceProcesses] = useState<
-    { id: string; processes: { panelId: string; label: string }[] } | null
+    { id: string; processes: { tabId: string; label: string }[] } | null
   >(null);
 
   const requestCloseWorkspace = useCallback(async (wsId: string) => {
@@ -1016,7 +1016,7 @@ export default function App() {
           return existing.id;
         }
       }
-      const panelId = newTabId();
+      const tabId = newTabId();
       const isPreview = !(pin ?? false);
 
       if (!markdown && isPreview) {
@@ -1032,14 +1032,14 @@ export default function App() {
             activeWorkspace.activePaneId,
             existingPreview.id,
             {
-              id: panelId,
+              id: tabId,
               kind: "editor",
               path,
               dirty: false,
               preview: true,
             },
           );
-          return panelId;
+          return tabId;
         }
       }
 
@@ -1047,16 +1047,16 @@ export default function App() {
         activeWorkspace.id,
         activeWorkspace.activePaneId,
         markdown
-          ? { id: panelId, kind: "markdown", path }
+          ? { id: tabId, kind: "markdown", path }
           : {
-              id: panelId,
+              id: tabId,
               kind: "editor",
               path,
               dirty: false,
               preview: isPreview,
             },
       );
-      return panelId;
+      return tabId;
     },
     [activeWorkspace, activateTab, openPanel, replaceTab],
   );
@@ -1077,10 +1077,10 @@ export default function App() {
           return existing.id;
         }
       }
-      const panelId = newTabId();
+      const tabId = newTabId();
       const panel = markdown
-        ? ({ id: panelId, kind: "markdown" as const, path } as const)
-        : ({ id: panelId, kind: "editor" as const, path, dirty: false, preview: false } as const);
+        ? ({ id: tabId, kind: "markdown" as const, path } as const)
+        : ({ id: tabId, kind: "editor" as const, path, dirty: false, preview: false } as const);
       const sourcePaneId = sourcePanelId
         ? findTabPane(activeWorkspace.paneTree, sourcePanelId)?.pane.id
         : undefined;
@@ -1094,7 +1094,7 @@ export default function App() {
       } else {
         openPanel(activeWorkspace.id, activeWorkspace.activePaneId, panel);
       }
-      return panelId;
+      return tabId;
     },
     [activeWorkspace, activateTab, openPanel, splitPaneAndOpenPanel],
   );
@@ -1131,19 +1131,19 @@ export default function App() {
   const openBrowserInPanel = useCallback(
     (url: string) => {
       if (!activeWorkspace) return undefined;
-      const panelId = newTabId();
+      const tabId = newTabId();
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: panelId,
+        id: tabId,
         kind: "browser",
         url,
       });
       if (!url) {
         setTimeout(
-          () => browserHandles.current.get(panelId)?.focusAddressBar(),
+          () => browserHandles.current.get(tabId)?.focusAddressBar(),
           0,
         );
       }
-      return panelId;
+      return tabId;
     },
     [activeWorkspace, openPanel],
   );
@@ -1189,8 +1189,8 @@ export default function App() {
   // ── Float browser callbacks ───────────────────────────────────────────────
 
   const onFloatBrowserPanel = useCallback(
-    (panelId: string) => {
-      const found = findTabGlobal(panelId);
+    (tabId: string) => {
+      const found = findTabGlobal(tabId);
       if (!found || found.tab.kind !== "browser") return;
       void floatPanel(found.tab, found.workspace.id);
     },
@@ -1198,22 +1198,22 @@ export default function App() {
   );
 
   const onDockBrowserPanel = useCallback(
-    (panelId: string) => {
-      void dockViaCommand(panelId);
+    (tabId: string) => {
+      void dockViaCommand(tabId);
     },
     [dockViaCommand],
   );
 
   const onFocusFloatBrowserPanel = useCallback(
-    (panelId: string) => {
-      void focusFloatWindow(panelId);
+    (tabId: string) => {
+      void focusFloatWindow(tabId);
     },
     [focusFloatWindow],
   );
 
   const onNavigateFloatBrowserPanel = useCallback(
-    (panelId: string, url: string) => {
-      void navigateFloatWindow(panelId, url);
+    (tabId: string, url: string) => {
+      void navigateFloatWindow(tabId, url);
     },
     [navigateFloatWindow],
   );
@@ -1221,16 +1221,16 @@ export default function App() {
   // ── WorkspaceView stable callbacks (use refs to avoid recreating on cd) ──
 
   const onActivateTabStable = useCallback(
-    (wsId: string, panelId: string) => activateTab(wsId, panelId),
+    (wsId: string, tabId: string) => activateTab(wsId, tabId),
     [activateTab],
   );
 
-  const onCloseTabStable = useCallback((_wsId: string, panelId: string) => {
-    closePanelsRef.current([panelId]);
+  const onCloseTabStable = useCallback((_wsId: string, tabId: string) => {
+    closePanelsRef.current([tabId]);
   }, []);
 
-  const onCloseManyTabsStable = useCallback((_wsId: string, panelIds: string[]) => {
-    closePanelsRef.current(panelIds);
+  const onCloseManyTabsStable = useCallback((_wsId: string, tabIds: string[]) => {
+    closePanelsRef.current(tabIds);
   }, []);
 
   const onFocusPaneStable = useCallback(
@@ -1313,10 +1313,10 @@ export default function App() {
 
   const onNewBrowserStable = useCallback(
     (wsId: string, paneId: string) => {
-      const panelId = newTabId();
-      openPanel(wsId, paneId, { id: panelId, kind: "browser", url: "" });
+      const tabId = newTabId();
+      openPanel(wsId, paneId, { id: tabId, kind: "browser", url: "" });
       setTimeout(
-        () => browserHandles.current.get(panelId)?.focusAddressBar(),
+        () => browserHandles.current.get(tabId)?.focusAddressBar(),
         0,
       );
     },
@@ -1342,10 +1342,10 @@ export default function App() {
       }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
       setZenPaneId(null);
-      const panelId = newTabId();
-      openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
+      const tabId = newTabId();
+      openPanel(wsId, newPaneId, { id: tabId, kind: "browser", url: "" });
       setTimeout(
-        () => browserHandles.current.get(panelId)?.focusAddressBar(),
+        () => browserHandles.current.get(tabId)?.focusAddressBar(),
         0,
       );
     },
@@ -1371,10 +1371,10 @@ export default function App() {
       }
       const newPaneId = splitPane(wsId, paneId, "vertical");
       setZenPaneId(null);
-      const panelId = newTabId();
-      openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
+      const tabId = newTabId();
+      openPanel(wsId, newPaneId, { id: tabId, kind: "browser", url: "" });
       setTimeout(
-        () => browserHandles.current.get(panelId)?.focusAddressBar(),
+        () => browserHandles.current.get(tabId)?.focusAddressBar(),
         0,
       );
     },
@@ -1445,8 +1445,8 @@ export default function App() {
   );
 
   const handleRenameFileFromTab = useCallback(
-    async (panelId: string, newName: string) => {
-      const found = findTabGlobal(panelId);
+    async (tabId: string, newName: string) => {
+      const found = findTabGlobal(tabId);
       if (!found) return;
       const panel = found.tab;
       if (panel.kind !== "editor" && panel.kind !== "markdown") return;
@@ -1469,8 +1469,8 @@ export default function App() {
 
   // ── Close guards ──────────────────────────────────────────────────────────
 
-  const savePanel = useCallback(async (panelId: string) => {
-    await editorHandles.current.get(panelId)?.save();
+  const saveTab = useCallback(async (tabId: string) => {
+    await editorHandles.current.get(tabId)?.save();
   }, []);
 
   // Autosave-on-focus-loss: save every dirty editor (save() no-ops when clean).
@@ -1489,25 +1489,25 @@ export default function App() {
     return () => setEditorFlush(null);
   }, []);
 
-  const focusActivePanel = useCallback(() => {
+  const focusActiveTab = useCallback(() => {
     const ws = workspacesRef.current.find(
       (w) => w.id === activeWorkspaceIdRef.current,
     );
     if (!ws) return;
     const pane = findPane(ws.paneTree, ws.activePaneId);
-    const panelId = pane?.activeTabId;
-    if (!panelId) return;
-    const kind = findTabGlobal(panelId)?.tab.kind;
+    const tabId = pane?.activeTabId;
+    if (!tabId) return;
+    const kind = findTabGlobal(tabId)?.tab.kind;
     requestAnimationFrame(() => {
-      if (kind === "editor") editorHandles.current.get(panelId)?.focus();
-      else terminalHandles.current.get(panelId)?.focus();
+      if (kind === "editor") editorHandles.current.get(tabId)?.focus();
+      else terminalHandles.current.get(tabId)?.focus();
     });
   }, [findTabGlobal]);
 
   const {
-    pendingClosePanel,
-    pendingTerminalClosePanel,
-    pendingDeletePanels,
+    pendingCloseTab,
+    pendingTerminalCloseTab,
+    pendingDeleteTabs,
     closePanels,
     resolveEditor,
     resolveTerminal,
@@ -1516,16 +1516,16 @@ export default function App() {
     handlePathDeleted,
   } = useTabCloseGuards({
     workspaces,
-    disposePanel: (workspaceId, panelId) => {
-      const found = findTabGlobal(panelId);
+    disposeTab: (workspaceId, tabId) => {
+      const found = findTabGlobal(tabId);
       if (found?.tab.kind === "browser" && found.tab.floating) {
-        void closeFloatWindow(panelId);
+        void closeFloatWindow(tabId);
       }
-      closeTab(workspaceId, panelId);
+      closeTab(workspaceId, tabId);
     },
-    findPanel: findTabGlobal,
-    savePanel,
-    focusActivePanel,
+    findTab: findTabGlobal,
+    saveTab,
+    focusActiveTab,
     isWarnEnabled: () =>
       usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
     setWarnEnabled: setWarnOnCloseTabWithRunningProcess,
@@ -1711,13 +1711,13 @@ export default function App() {
   const openFolderInTerminal = useCallback(
     (path: string) => {
       if (!activeWorkspace) return;
-      const panelId = newTabId();
+      const tabId = newTabId();
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: panelId,
+        id: tabId,
         kind: "terminal",
         cwd: path,
       });
-      setTimeout(() => terminalHandles.current.get(panelId)?.focus(), 80);
+      setTimeout(() => terminalHandles.current.get(tabId)?.focus(), 80);
     },
     [activeWorkspace, openPanel],
   );
@@ -1741,21 +1741,21 @@ export default function App() {
 
   const panelCallbacks = useMemo<TabCallbacks>(
     () => ({
-      onSearchReady: (panelId, addon) => {
-        searchAddons.current.set(panelId, addon);
-        if (panelId === activeTabId) setActiveSearchAddon(addon);
+      onSearchReady: (tabId, addon) => {
+        searchAddons.current.set(tabId, addon);
+        if (tabId === activeTabId) setActiveSearchAddon(addon);
       },
-      onExit: (panelId, _code) => {
-        const found = findTabGlobal(panelId);
-        if (found) closeTab(found.workspace.id, panelId);
+      onExit: (tabId, _code) => {
+        const found = findTabGlobal(tabId);
+        if (found) closeTab(found.workspace.id, tabId);
       },
-      onCwd: (panelId, cwd) => {
-        const found = findTabGlobal(panelId);
+      onCwd: (tabId, cwd) => {
+        const found = findTabGlobal(tabId);
         if (found) {
-          setTerminalPanelCwd(found.workspace.id, panelId, cwd);
+          setTerminalPanelCwd(found.workspace.id, tabId, cwd);
           const isFocused =
             found.workspace.activePaneId === found.pane.id &&
-            found.pane.activeTabId === panelId;
+            found.pane.activeTabId === tabId;
           if (isFocused) {
             setWorkspaceCwd(found.workspace.id, cwd);
             if (
@@ -1768,78 +1768,78 @@ export default function App() {
           }
         }
       },
-      onRunningCommand: (panelId, cmd) => {
-        const found = findTabGlobal(panelId);
-        if (found) setTerminalRunningCommand(found.workspace.id, panelId, cmd);
+      onRunningCommand: (tabId, cmd) => {
+        const found = findTabGlobal(tabId);
+        if (found) setTerminalRunningCommand(found.workspace.id, tabId, cmd);
         if (cmd !== null) {
-          runConfigCommandSeen.current.add(panelId);
+          runConfigCommandSeen.current.add(tabId);
         } else if (
-          runConfigCommandSeen.current.has(panelId) &&
-          getRunConfigRunningSnapshot().has(panelId)
+          runConfigCommandSeen.current.has(tabId) &&
+          getRunConfigRunningSnapshot().has(tabId)
         ) {
-          setRunConfigRunning(panelId, false);
-          runConfigCommandSeen.current.delete(panelId);
+          setRunConfigRunning(tabId, false);
+          runConfigCommandSeen.current.delete(tabId);
         }
       },
-      onScratchpadState: (panelId, state) => {
-        const found = findTabGlobal(panelId);
+      onScratchpadState: (tabId, state) => {
+        const found = findTabGlobal(tabId);
         if (found)
-          updateTabData(found.workspace.id, panelId, (p) =>
+          updateTabData(found.workspace.id, tabId, (p) =>
             p.kind === "terminal" ? { ...p, scratchpad: state } : p,
           );
       },
-      registerTerminalHandle: (panelId, h) => {
-        if (h) terminalHandles.current.set(panelId, h);
-        else terminalHandles.current.delete(panelId);
+      registerTerminalHandle: (tabId, h) => {
+        if (h) terminalHandles.current.set(tabId, h);
+        else terminalHandles.current.delete(tabId);
       },
-      onEditorDirtyChange: (panelId, dirty) => {
-        const found = findTabGlobal(panelId);
+      onEditorDirtyChange: (tabId, dirty) => {
+        const found = findTabGlobal(tabId);
         if (found)
-          updateTabData(found.workspace.id, panelId, (p) =>
+          updateTabData(found.workspace.id, tabId, (p) =>
             p.kind === "editor"
               ? { ...p, dirty, ...(dirty ? { preview: false } : {}) }
               : p,
           );
       },
-      onEditorClose: (panelId) => {
-        const found = findTabGlobal(panelId);
-        if (found) closeTab(found.workspace.id, panelId);
+      onEditorClose: (tabId) => {
+        const found = findTabGlobal(tabId);
+        if (found) closeTab(found.workspace.id, tabId);
       },
-      onSetMarkdownView: (panelId, mode) => {
-        const found = findTabGlobal(panelId);
-        if (found) setTabView(found.workspace.id, panelId, mode);
+      onSetMarkdownView: (tabId, mode) => {
+        const found = findTabGlobal(tabId);
+        if (found) setTabView(found.workspace.id, tabId, mode);
       },
-      onToggleOverlayPreview: (panelId) => {
-        const found = findTabGlobal(panelId);
-        if (found) toggleOverlayPreview(found.workspace.id, panelId);
+      onToggleOverlayPreview: (tabId) => {
+        const found = findTabGlobal(tabId);
+        if (found) toggleOverlayPreview(found.workspace.id, tabId);
       },
-      onToggleSplitPreview: (panelId) => {
-        const found = findTabGlobal(panelId);
-        if (found) toggleSplitPreview(found.workspace.id, panelId);
+      onToggleSplitPreview: (tabId) => {
+        const found = findTabGlobal(tabId);
+        if (found) toggleSplitPreview(found.workspace.id, tabId);
       },
-      registerEditorHandle: (panelId, h) => {
+      registerEditorHandle: (tabId, h) => {
         if (h) {
-          editorHandles.current.set(panelId, h);
-          const line = pendingGotoLine.current.get(panelId);
+          editorHandles.current.set(tabId, h);
+          const line = pendingGotoLine.current.get(tabId);
           if (line != null) {
-            pendingGotoLine.current.delete(panelId);
+            pendingGotoLine.current.delete(tabId);
             h.gotoLine(line);
           }
         } else {
-          editorHandles.current.delete(panelId);
+          editorHandles.current.delete(tabId);
         }
-        if (panelId === activeTabId) setActiveEditorHandle(h);
+        if (tabId === activeTabId) setActiveEditorHandle(h);
       },
-      onBrowserUrlChange: (panelId, url) => {
-        const found = findTabGlobal(panelId);
+      onBrowserUrlChange: (tabId, url) => {
+        const found = findTabGlobal(tabId);
         if (found)
-          updateTabData(found.workspace.id, panelId, (p) =>
+          updateTabData(found.workspace.id, tabId, (p) =>
             p.kind === "browser" ? { ...p, url } : p,
           );
       },
-      registerBrowserHandle: (panelId, h) => {
-        if (h) browserHandles.current.set(panelId, h);
-        else browserHandles.current.delete(panelId);
+      registerBrowserHandle: (tabId, h) => {
+        if (h) browserHandles.current.set(tabId, h);
+        else browserHandles.current.delete(tabId);
       },
       onOpenCommitFile: (input) => {
         if (!activeWorkspace) return;
@@ -1852,23 +1852,23 @@ export default function App() {
           originalPath: input.originalPath,
         });
       },
-      onGitHistorySearchHandle: (_panelId, handle) => {
+      onGitHistorySearchHandle: (_tabId, handle) => {
         setGitHistoryHandle(handle);
       },
-      onRenamePanel: (panelId, title) => {
-        const found = findTabGlobal(panelId);
+      onRenamePanel: (tabId, title) => {
+        const found = findTabGlobal(tabId);
         if (found)
-          updateTabData(found.workspace.id, panelId, (p) => ({
+          updateTabData(found.workspace.id, tabId, (p) => ({
             ...p,
             title,
           }));
       },
-      onUpdatePanel: (panelId, updater) => {
-        const found = findTabGlobal(panelId);
-        if (found) updateTabData(found.workspace.id, panelId, updater);
+      onUpdatePanel: (tabId, updater) => {
+        const found = findTabGlobal(tabId);
+        if (found) updateTabData(found.workspace.id, tabId, updater);
       },
-      onRenameFile: (panelId, newName) => {
-        void handleRenameFileFromTab(panelId, newName);
+      onRenameFile: (tabId, newName) => {
+        void handleRenameFileFromTab(tabId, newName);
       },
       onFocusOnExplorer: (filePath, pendingAction) => focusSidebar(filePath, { fromShortcut: true, pendingAction }),
       onSetAsRoot: handleSetAsRoot,
@@ -2106,7 +2106,7 @@ export default function App() {
           configs[0];
         if (!active) return;
         const isRunning = !!(
-          active.panelId && getRunConfigRunningSnapshot().get(active.panelId)
+          active.tabId && getRunConfigRunningSnapshot().get(active.tabId)
         );
         if (isRunning) {
           stopWorkspaceConfig(active);
@@ -2251,9 +2251,9 @@ export default function App() {
         const first = useAgentStore.getState().notifications[0];
         if (!first) return;
         setActiveWorkspaceId(first.workspaceId);
-        activateTab(first.workspaceId, first.panelId);
+        activateTab(first.workspaceId, first.tabId);
         setTimeout(
-          () => terminalHandles.current.get(first.panelId)?.focus(),
+          () => terminalHandles.current.get(first.tabId)?.focus(),
           50,
         );
       },
@@ -2400,10 +2400,10 @@ export default function App() {
   // ── Agent activation ──────────────────────────────────────────────────────
 
   const onActivateAgent = useCallback(
-    (workspaceId: string, panelId: string) => {
+    (workspaceId: string, tabId: string) => {
       setActiveWorkspaceId(workspaceId);
-      activateTab(workspaceId, panelId);
-      setTimeout(() => terminalHandles.current.get(panelId)?.focus(), 50);
+      activateTab(workspaceId, tabId);
+      setTimeout(() => terminalHandles.current.get(tabId)?.focus(), 50);
     },
     [setActiveWorkspaceId, activateTab],
   );
@@ -2411,10 +2411,10 @@ export default function App() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
-      .listen<{ workspaceId: string; panelId: string }>(
+      .listen<{ workspaceId: string; tabId: string }>(
         "kex:activate-panel",
         (e) => {
-          onActivateAgent(e.payload.workspaceId, e.payload.panelId);
+          onActivateAgent(e.payload.workspaceId, e.payload.tabId);
         },
       )
       .then((u) => {
@@ -2865,16 +2865,16 @@ export default function App() {
           />
 
           <CloseDialogs
-            pendingClosePanel={pendingClosePanel}
+            pendingCloseTab={pendingCloseTab}
             onCancelClose={() => resolveEditor({ type: "cancel" })}
             onSaveClose={() => resolveEditor({ type: "save" })}
             onDontSaveClose={() => resolveEditor({ type: "dont-save" })}
-            pendingTerminalClosePanel={pendingTerminalClosePanel}
+            pendingTerminalCloseTab={pendingTerminalCloseTab}
             onCancelTerminalClose={() => resolveTerminal({ type: "cancel" })}
             onConfirmTerminalClose={(dontAskAgain) =>
               resolveTerminal({ type: "close", dontAskAgain })
             }
-            pendingDeletePanels={pendingDeletePanels}
+            pendingDeleteTabs={pendingDeleteTabs}
             onCancelDeleteClose={cancelDeleteClose}
             onConfirmDeleteClose={confirmDeleteClose}
             pendingCloseWorkspace={pendingCloseWorkspace}

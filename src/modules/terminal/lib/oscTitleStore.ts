@@ -19,8 +19,8 @@ export function getSnapshot(): ReadonlyMap<string, string> {
   return snapshot;
 }
 
-export function getOscTitle(panelId: string): string | undefined {
-  return snapshot.get(panelId);
+export function getOscTitle(tabId: string): string | undefined {
+  return snapshot.get(tabId);
 }
 
 // Strip a leading status indicator (a single non-alphanumeric character followed
@@ -30,17 +30,17 @@ export function cleanOscTitle(title: string): string {
   return title.replace(/^[^\p{L}\p{N}\s]\s+/u, "");
 }
 
-export function setOscTitle(panelId: string, title: string): void {
+export function setOscTitle(tabId: string, title: string): void {
   const cleaned = cleanOscTitle(title);
-  if (titles.get(panelId) === cleaned) return;
-  titles.set(panelId, cleaned);
+  if (titles.get(tabId) === cleaned) return;
+  titles.set(tabId, cleaned);
   notify();
-  void info(`[oscTitle] panel=${panelId} title=${JSON.stringify(cleaned)} listeners=${listeners.size}`);
+  void info(`[oscTitle] panel=${tabId} title=${JSON.stringify(cleaned)} listeners=${listeners.size}`);
 }
 
-export function clearOscTitle(panelId: string): void {
-  if (!titles.has(panelId)) return;
-  titles.delete(panelId);
+export function clearOscTitle(tabId: string): void {
+  if (!titles.has(tabId)) return;
+  titles.delete(tabId);
   notify();
 }
 
@@ -50,7 +50,7 @@ export function _clearAll(): void {
   notify();
 }
 
-export function useOscTitle(panelId: string): string | undefined {
+export function useOscTitle(tabId: string): string | undefined {
   const snap = useSyncExternalStore(subscribe, getSnapshot);
-  return snap.get(panelId);
+  return snap.get(tabId);
 }

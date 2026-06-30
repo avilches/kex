@@ -13,37 +13,37 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { pathBasename } from "@/lib/pathUtils";
 
-type PanelInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string };
+type TabInfo = { id: string; title: string; kind: string; path?: string; processName?: string; command?: string };
 
 type Props = {
-  pendingClosePanel: PanelInfo | null;
+  pendingCloseTab: TabInfo | null;
   onCancelClose: () => void;
   onSaveClose: () => void;
   onDontSaveClose: () => void;
-  pendingTerminalClosePanel: PanelInfo | null;
+  pendingTerminalCloseTab: TabInfo | null;
   onCancelTerminalClose: () => void;
   onConfirmTerminalClose: (dontAskAgain: boolean) => void;
-  pendingDeletePanels: PanelInfo[] | null;
+  pendingDeleteTabs: TabInfo[] | null;
   onCancelDeleteClose: () => void;
   onConfirmDeleteClose: () => void;
   pendingCloseWorkspace: { id: string; scriptCount: number } | null;
   onCancelCloseWorkspace: () => void;
   onConfirmCloseWorkspace: (dontAskAgain: boolean) => void;
-  pendingWorkspaceProcesses: { id: string; processes: { panelId: string; label: string }[] } | null;
+  pendingWorkspaceProcesses: { id: string; processes: { tabId: string; label: string }[] } | null;
   onCancelWorkspaceProcesses: () => void;
   onConfirmWorkspaceProcesses: (dontAskAgain: boolean) => void;
 };
 
 /** Confirmation dialogs for closing dirty editors and terminals with live processes. */
 export function CloseDialogs({
-  pendingClosePanel,
+  pendingCloseTab,
   onCancelClose,
   onSaveClose,
   onDontSaveClose,
-  pendingTerminalClosePanel,
+  pendingTerminalCloseTab,
   onCancelTerminalClose,
   onConfirmTerminalClose,
-  pendingDeletePanels,
+  pendingDeleteTabs,
   onCancelDeleteClose,
   onConfirmDeleteClose,
   pendingCloseWorkspace,
@@ -56,8 +56,8 @@ export function CloseDialogs({
   const [dontAskAgain, setDontAskAgain] = useState(false);
 
   useEffect(() => {
-    if (pendingTerminalClosePanel) setDontAskAgain(false);
-  }, [pendingTerminalClosePanel]);
+    if (pendingTerminalCloseTab) setDontAskAgain(false);
+  }, [pendingTerminalCloseTab]);
 
   useEffect(() => {
     if (pendingCloseWorkspace) setDontAskAgain(false);
@@ -70,16 +70,16 @@ export function CloseDialogs({
   return (
     <>
       <AlertDialog
-        open={pendingClosePanel !== null}
+        open={pendingCloseTab !== null}
         onOpenChange={(open) => !open && onCancelClose()}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {(() => {
-                const name = pendingClosePanel?.path
-                  ? pathBasename(pendingClosePanel.path)
-                  : pendingClosePanel?.title;
+                const name = pendingCloseTab?.path
+                  ? pathBasename(pendingCloseTab.path)
+                  : pendingCloseTab?.title;
                 return name ? `Close file ${name}?` : "Close file?";
               })()}
             </AlertDialogTitle>
@@ -87,9 +87,9 @@ export function CloseDialogs({
               You are about to close a file with unsaved changes
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {pendingClosePanel?.path && (
+          {pendingCloseTab?.path && (
             <p className="text-[12px] text-muted-foreground break-all">
-              Path: {pendingClosePanel.path}
+              Path: {pendingCloseTab.path}
             </p>
           )}
           <AlertDialogFooter>
@@ -107,21 +107,21 @@ export function CloseDialogs({
       </AlertDialog>
 
       <AlertDialog
-        open={pendingTerminalClosePanel !== null}
+        open={pendingTerminalCloseTab !== null}
         onOpenChange={(open) => !open && onCancelTerminalClose()}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Close terminal {pendingTerminalClosePanel?.processName || "process"}?
+              Close terminal {pendingTerminalCloseTab?.processName || "process"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
               The running process will be killed
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {pendingTerminalClosePanel?.command && (
+          {pendingTerminalCloseTab?.command && (
             <p className="text-[12px] text-muted-foreground break-all">
-              Command: {pendingTerminalClosePanel.command}
+              Command: {pendingTerminalCloseTab.command}
             </p>
           )}
           <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
@@ -201,7 +201,7 @@ export function CloseDialogs({
           <ul className="flex flex-col gap-1">
             {pendingWorkspaceProcesses?.processes.map((p) => (
               <li
-                key={p.panelId}
+                key={p.tabId}
                 className="text-[12px] text-muted-foreground break-all"
               >
                 {p.label}
@@ -230,21 +230,21 @@ export function CloseDialogs({
       </AlertDialog>
 
       <AlertDialog
-        open={pendingDeletePanels !== null}
+        open={pendingDeleteTabs !== null}
         onOpenChange={(open) => !open && onCancelDeleteClose()}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingDeletePanels?.length === 1
+              {pendingDeleteTabs?.length === 1
                 ? (() => {
-                    const title = pendingDeletePanels[0]?.title;
+                    const title = pendingDeleteTabs[0]?.title;
                     return title
                       ? `"${title}" has unsaved changes. The file has been deleted. Close anyway?`
                       : "This file has unsaved changes. The file has been deleted. Close anyway?";
                   })()
-                : `${pendingDeletePanels?.length ?? 0} files have unsaved changes. They have been deleted. Close all anyway?`}
+                : `${pendingDeleteTabs?.length ?? 0} files have unsaved changes. They have been deleted. Close all anyway?`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

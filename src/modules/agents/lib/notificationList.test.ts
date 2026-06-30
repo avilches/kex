@@ -2,9 +2,9 @@ import { describe, expect, test } from "vitest";
 import { buildAgentEntries } from "./notificationList";
 import type { AgentNotification, AgentSession } from "./types";
 
-function session(p: Partial<AgentSession> & { panelId: string }): AgentSession {
+function session(p: Partial<AgentSession> & { tabId: string }): AgentSession {
   return {
-    panelId: p.panelId,
+    tabId: p.tabId,
     workspaceId: p.workspaceId ?? "tab",
     agent: p.agent ?? "claude",
     status: p.status ?? "idle",
@@ -20,14 +20,14 @@ function session(p: Partial<AgentSession> & { panelId: string }): AgentSession {
 
 function notif(
   p: Partial<AgentNotification> & {
-    panelId: string;
+    tabId: string;
     kind: AgentNotification["kind"];
   },
 ): AgentNotification {
   return {
-    id: p.id ?? `n-${p.panelId}`,
+    id: p.id ?? `n-${p.tabId}`,
     source: p.source ?? "terminal",
-    panelId: p.panelId,
+    tabId: p.tabId,
     workspaceId: p.workspaceId ?? "tab",
     agent: p.agent ?? "claude",
     kind: p.kind,
@@ -39,22 +39,22 @@ function notif(
 describe("buildAgentEntries", () => {
   test("una sola entrada por agente aunque haya varias notificaciones del mismo panel", () => {
     const notifs = [
-      notif({ panelId: "p1", kind: "error", at: 30 }),
-      notif({ panelId: "p1", kind: "error", at: 20, id: "old1" }),
-      notif({ panelId: "p1", kind: "error", at: 10, id: "old2" }),
+      notif({ tabId: "p1", kind: "error", at: 30 }),
+      notif({ tabId: "p1", kind: "error", at: 20, id: "old1" }),
+      notif({ tabId: "p1", kind: "error", at: 10, id: "old2" }),
     ];
     const entries = buildAgentEntries({}, notifs);
     expect(entries).toHaveLength(1);
-    expect(entries[0].panelId).toBe("p1");
+    expect(entries[0].tabId).toBe("p1");
     // se queda con la primera (la mas reciente, ya esta al frente del array)
     expect(entries[0].at).toBe(30);
   });
 
   test("el dot naranja (waiting) se deriva de la sesion viva, no de la notificacion", () => {
     const sessions = {
-      p1: session({ panelId: "p1", status: "waiting", attentionSince: 100 }),
+      p1: session({ tabId: "p1", status: "waiting", attentionSince: 100 }),
     };
-    const notifs = [notif({ panelId: "p1", kind: "error", at: 50 })];
+    const notifs = [notif({ tabId: "p1", kind: "error", at: 50 })];
     const entries = buildAgentEntries(sessions, notifs);
     expect(entries).toHaveLength(1);
     expect(entries[0].visual).toBe("waiting");
@@ -63,18 +63,18 @@ describe("buildAgentEntries", () => {
 
   test("orden: waiting primero, luego working, luego error; por tiempo desc dentro del grupo", () => {
     const sessions = {
-      w1: session({ panelId: "w1", status: "waiting", attentionSince: 10 }),
-      w2: session({ panelId: "w2", status: "waiting", attentionSince: 20 }),
-      run: session({ panelId: "run", status: "working", lastActivityAt: 5 }),
+      w1: session({ tabId: "w1", status: "waiting", attentionSince: 10 }),
+      w2: session({ tabId: "w2", status: "waiting", attentionSince: 20 }),
+      run: session({ tabId: "run", status: "working", lastActivityAt: 5 }),
       fail: session({
-        panelId: "fail",
+        tabId: "fail",
         status: "working",
         restoreError: true,
         lastActivityAt: 99,
       }),
     };
     const entries = buildAgentEntries(sessions, []);
-    expect(entries.map((e) => e.panelId)).toEqual(["w2", "w1", "run", "fail"]);
+    expect(entries.map((e) => e.tabId)).toEqual(["w2", "w1", "run", "fail"]);
     expect(entries.map((e) => e.visual)).toEqual([
       "waiting",
       "waiting",
@@ -85,26 +85,26 @@ describe("buildAgentEntries", () => {
 
   test("una sesion idle (ya vista) no se muestra", () => {
     const sessions = {
-      p1: session({ panelId: "p1", status: "idle", lastActivityAt: 5 }),
+      p1: session({ tabId: "p1", status: "idle", lastActivityAt: 5 }),
     };
-    const notifs = [notif({ panelId: "p1", kind: "attention", at: 50 })];
+    const notifs = [notif({ tabId: "p1", kind: "attention", at: 50 })];
     const entries = buildAgentEntries(sessions, notifs);
     expect(entries).toHaveLength(0);
   });
 
   test("attention sin sesion (ya vista, sesion cerrada) se omite", () => {
-    const notifs = [notif({ panelId: "p1", kind: "attention", at: 50 })];
+    const notifs = [notif({ tabId: "p1", kind: "attention", at: 50 })];
     const entries = buildAgentEntries({}, notifs);
     expect(entries).toHaveLength(0);
   });
 
   test("una notif error cuenta como pending solo si no esta leida", () => {
     const notifs = [
-      notif({ panelId: "a", kind: "error", at: 30, read: false }),
-      notif({ panelId: "b", kind: "error", at: 20, read: true }),
+      notif({ tabId: "a", kind: "error", at: 30, read: false }),
+      notif({ tabId: "b", kind: "error", at: 20, read: true }),
     ];
     const entries = buildAgentEntries({}, notifs);
-    const byPanel = Object.fromEntries(entries.map((e) => [e.panelId, e]));
+    const byPanel = Object.fromEntries(entries.map((e) => [e.tabId, e]));
     expect(byPanel.a.pending).toBe(true);
     expect(byPanel.b.pending).toBe(false);
   });
@@ -112,7 +112,7 @@ describe("buildAgentEntries", () => {
   test("restoreError se muestra como error pendiente", () => {
     const sessions = {
       p1: session({
-        panelId: "p1",
+        tabId: "p1",
         status: "working",
         restoreError: true,
         lastActivityAt: 7,

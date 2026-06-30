@@ -18,18 +18,18 @@ async function ensurePermission(): Promise<boolean> {
 
 export async function queueNavAndNotify({
   workspaceId,
-  panelId,
+  tabId,
   title,
   body,
 }: {
   workspaceId: string;
-  panelId: string;
+  tabId: string;
   title: string;
   body: string;
 }): Promise<void> {
   const windowLabel = getCurrentWindow().label;
   try {
-    await invoke("agent_queue_nav", { windowLabel, workspaceId, panelId });
+    await invoke("agent_queue_nav", { windowLabel, workspaceId, tabId });
   } catch (e) {
     console.warn("[kex] agent_queue_nav failed:", e);
   }

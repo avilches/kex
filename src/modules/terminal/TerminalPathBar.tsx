@@ -29,7 +29,7 @@ function AgentChipIndicator({ session }: { session: AgentSession }) {
 }
 
 type Props = {
-  panelId: string;
+  tabId: string;
   cwd: string;
   home: string | null;
   workspaceRoot: string | null;
@@ -45,7 +45,7 @@ type Props = {
 };
 
 export function TerminalPathBar({
-  panelId,
+  tabId,
   cwd,
   home,
   workspaceRoot,
@@ -59,11 +59,11 @@ export function TerminalPathBar({
   onRevealInTerminal,
   onAddToGitignore,
 }: Props) {
-  const metrics = useMetrics(panelId);
+  const metrics = useMetrics(tabId);
   const running =
-    useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(panelId) ??
+    useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(tabId) ??
     null;
-  const agentSession = useAgentStore((s) => s.sessions[panelId] ?? null);
+  const agentSession = useAgentStore((s) => s.sessions[tabId] ?? null);
   const { segments } = buildCwdBreadcrumb(cwd, workspaceRoot, home);
   const process = running ?? metrics?.shellName ?? null;
   return (
@@ -129,7 +129,7 @@ export function TerminalPathBar({
         )}
         {agentSession && <AgentChipIndicator session={agentSession} />}
         <TerminalPathBarMenu
-          leafId={panelId}
+          leafId={tabId}
           restoreOnRestart={restoreOnRestart}
           persistentCommand={persistentCommand}
           onUpdatePanel={onUpdatePanel ?? (() => {})}

@@ -140,7 +140,7 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
 #[cfg(target_os = "macos")]
 pub fn refresh_dock_menu(app: &tauri::AppHandle) {
     let st = app.state::<float_browser::FloatBrowserState>();
-    let has_focused = st.focused_float_panel_id.lock().unwrap().is_some();
+    let has_focused = st.focused_float_tab_id.lock().unwrap().is_some();
     let has_any = !st.panels.lock().unwrap().is_empty();
     let handles = app.state::<MenuHandles>();
     let guard = handles.0.lock().expect("MenuHandles mutex poisoned");
@@ -238,7 +238,7 @@ fn create_app_window(
                             let _ = target.set_focus();
                             let _ = target.emit("kex:activate-panel", serde_json::json!({
                                 "workspaceId": nav.workspace_id,
-                                "panelId": nav.panel_id,
+                                "tabId": nav.tab_id,
                             }));
                         }
                     }

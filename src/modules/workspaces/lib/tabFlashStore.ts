@@ -1,19 +1,19 @@
 import { useSyncExternalStore } from "react";
 
-type Snapshot = { panelId: string | null; seq: number };
+type Snapshot = { tabId: string | null; seq: number };
 
-let panelId: string | null = null;
+let tabId: string | null = null;
 let seq = 0;
-let snapshot: Snapshot = { panelId, seq };
+let snapshot: Snapshot = { tabId, seq };
 const listeners = new Set<() => void>();
 
 function notify(): void {
-  snapshot = { panelId, seq };
+  snapshot = { tabId, seq };
   for (const l of listeners) l();
 }
 
 export function flashTab(id: string): void {
-  panelId = id;
+  tabId = id;
   seq++;
   notify();
 }
@@ -29,5 +29,5 @@ export function getTabFlashSnapshot(): Snapshot {
 
 export function useTabFlash(id: string): number {
   const snap = useSyncExternalStore(subscribeTabFlash, getTabFlashSnapshot);
-  return snap.panelId === id ? snap.seq : 0;
+  return snap.tabId === id ? snap.seq : 0;
 }

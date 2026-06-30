@@ -15,22 +15,22 @@ type AgentStoreState = {
   sessions: Record<string, AgentSession>;
   localAgent: LocalAgentState;
   notifications: AgentNotification[];
-  start: (panelId: string, workspaceId: string, agent: string) => void;
-  startIdle: (panelId: string, workspaceId: string, agent: string) => void;
-  setStatus: (panelId: string, status: AgentStatus) => void;
-  finish: (panelId: string) => void;
-  startRestored: (panelId: string, workspaceId: string, agent: string) => void;
+  start: (tabId: string, workspaceId: string, agent: string) => void;
+  startIdle: (tabId: string, workspaceId: string, agent: string) => void;
+  setStatus: (tabId: string, status: AgentStatus) => void;
+  finish: (tabId: string) => void;
+  startRestored: (tabId: string, workspaceId: string, agent: string) => void;
   setRestoreError: (
-    panelId: string,
+    tabId: string,
     workspaceId: string,
     agent: string,
     reason?: string,
   ) => void;
-  clearRestored: (panelId: string) => void;
-  setMeta: (panelId: string, meta: Partial<AgentSessionMeta>) => void;
+  clearRestored: (tabId: string) => void;
+  setMeta: (tabId: string, meta: Partial<AgentSessionMeta>) => void;
   setLocalAgent: (state: LocalAgentState) => void;
   pushNotification: (n: Omit<AgentNotification, "id" | "at" | "read">) => void;
-  markPanelSeen: (panelId: string) => void;
+  markPanelSeen: (tabId: string) => void;
   markAllRead: () => void;
   clearNotifications: () => void;
   clearAll: () => void;
@@ -41,14 +41,14 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   localAgent: null,
   notifications: [],
 
-  start: (panelId, workspaceId, agent) =>
+  start: (tabId, workspaceId, agent) =>
     set((s) => {
       const now = Date.now();
       return {
         sessions: {
           ...s.sessions,
-          [panelId]: {
-            panelId,
+          [tabId]: {
+            tabId,
             workspaceId,
             agent,
             status: "working",
@@ -62,14 +62,14 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  startIdle: (panelId, workspaceId, agent) =>
+  startIdle: (tabId, workspaceId, agent) =>
     set((s) => {
       const now = Date.now();
       return {
         sessions: {
           ...s.sessions,
-          [panelId]: {
-            panelId,
+          [tabId]: {
+            tabId,
             workspaceId,
             agent,
             status: "idle",
@@ -83,15 +83,15 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  setStatus: (panelId, status) =>
+  setStatus: (tabId, status) =>
     set((s) => {
-      const prev = s.sessions[panelId];
+      const prev = s.sessions[tabId];
       if (!prev || prev.status === status) return s;
       const now = Date.now();
       return {
         sessions: {
           ...s.sessions,
-          [panelId]: {
+          [tabId]: {
             ...prev,
             status,
             lastActivityAt: now,
@@ -102,22 +102,22 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  finish: (panelId) =>
+  finish: (tabId) =>
     set((s) => {
-      if (!s.sessions[panelId]) return s;
+      if (!s.sessions[tabId]) return s;
       const next = { ...s.sessions };
-      delete next[panelId];
+      delete next[tabId];
       return { sessions: next };
     }),
 
-  startRestored: (panelId, workspaceId, agent) =>
+  startRestored: (tabId, workspaceId, agent) =>
     set((s) => {
       const now = Date.now();
       return {
         sessions: {
           ...s.sessions,
-          [panelId]: {
-            panelId,
+          [tabId]: {
+            tabId,
             workspaceId,
             agent,
             status: "working",
@@ -131,14 +131,14 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  setRestoreError: (panelId, workspaceId, agent, reason) =>
+  setRestoreError: (tabId, workspaceId, agent, reason) =>
     set((s) => {
       const now = Date.now();
       return {
         sessions: {
           ...s.sessions,
-          [panelId]: {
-            panelId,
+          [tabId]: {
+            tabId,
             workspaceId,
             agent,
             status: "working",
@@ -153,26 +153,26 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  clearRestored: (panelId) =>
+  clearRestored: (tabId) =>
     set((s) => {
-      const prev = s.sessions[panelId];
+      const prev = s.sessions[tabId];
       if (!prev?.restored) return s;
       return {
         sessions: {
           ...s.sessions,
-          [panelId]: { ...prev, restored: false },
+          [tabId]: { ...prev, restored: false },
         },
       };
     }),
 
-  setMeta: (panelId, meta) =>
+  setMeta: (tabId, meta) =>
     set((s) => {
-      const prev = s.sessions[panelId];
+      const prev = s.sessions[tabId];
       if (!prev) return s;
       return {
         sessions: {
           ...s.sessions,
-          [panelId]: { ...prev, meta: { ...prev.meta, ...meta } },
+          [tabId]: { ...prev, meta: { ...prev.meta, ...meta } },
         },
       };
     }),
@@ -189,9 +189,9 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
 
   pushNotification: (n) =>
     set((s) => {
-      // One notification per agent (panelId): drop any previous entry for the
+      // One notification per agent (tabId): drop any previous entry for the
       // same panel and reinsert at the front so it bubbles to the top.
-      const rest = s.notifications.filter((x) => x.panelId !== n.panelId);
+      const rest = s.notifications.filter((x) => x.tabId !== n.tabId);
       return {
         notifications: [
           { ...n, id: `n${++notifSeq}`, at: Date.now(), read: false },
@@ -200,11 +200,11 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  markPanelSeen: (panelId) =>
+  markPanelSeen: (tabId) =>
     set((s) => {
-      const prev = s.sessions[panelId];
+      const prev = s.sessions[tabId];
       const clearsDot = prev?.status === "waiting";
-      const notif = s.notifications.find((n) => n.panelId === panelId);
+      const notif = s.notifications.find((n) => n.tabId === tabId);
       const marksRead = notif ? !notif.read : false;
       if (!clearsDot && !marksRead) return s;
       const now = Date.now();
@@ -213,7 +213,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
           prev && clearsDot
             ? {
                 ...s.sessions,
-                [panelId]: {
+                [tabId]: {
                   ...prev,
                   status: "idle",
                   attentionSince: null,
@@ -223,7 +223,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             : s.sessions,
         notifications: marksRead
           ? s.notifications.map((n) =>
-              n.panelId === panelId ? { ...n, read: true } : n,
+              n.tabId === tabId ? { ...n, read: true } : n,
             )
           : s.notifications,
       };
@@ -270,7 +270,7 @@ if (import.meta.env?.DEV && typeof window !== "undefined") {
       __kexAgents?: {
         sessions: () => AgentSession[];
         fakeNotification: (
-          panelId: string,
+          tabId: string,
           kind?: "attention" | "finished" | "error",
           agent?: string,
         ) => void;
@@ -280,10 +280,10 @@ if (import.meta.env?.DEV && typeof window !== "undefined") {
     sessions() {
       return Object.values(useAgentStore.getState().sessions);
     },
-    fakeNotification(panelId, kind = "attention", agent = "claude-code") {
-      const session = useAgentStore.getState().sessions[panelId];
-      const workspaceId = session?.workspaceId ?? panelId;
-      useAgentStore.getState().pushNotification({ source: "terminal", panelId, workspaceId, agent, kind });
+    fakeNotification(tabId, kind = "attention", agent = "claude-code") {
+      const session = useAgentStore.getState().sessions[tabId];
+      const workspaceId = session?.workspaceId ?? tabId;
+      useAgentStore.getState().pushNotification({ source: "terminal", tabId, workspaceId, agent, kind });
     },
   };
 }

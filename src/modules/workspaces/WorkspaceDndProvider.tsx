@@ -93,7 +93,7 @@ export function WorkspaceDndProvider({
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
 
-  // panelId → { paneId, wsId } — built once at dragStart, used by handleDragOver (hot path).
+  // tabId → { paneId, wsId } — built once at dragStart, used by handleDragOver (hot path).
   const dragIndexRef = useRef<Map<string, { paneId: string; wsId: string }>>(new Map());
 
   const buildDragIndex = useCallback(() => {
@@ -152,8 +152,8 @@ export function WorkspaceDndProvider({
       return;
     }
     const parts = overId.split(":");
-    const refPanelId = parts[1];
-    if (!refPanelId) { setTabInsertPaneId(null); return; }
+    const refTabId = parts[1];
+    if (!refTabId) { setTabInsertPaneId(null); return; }
 
     const idx = dragIndexRef.current;
     const activeId = String(event.active.id);
@@ -162,7 +162,7 @@ export function WorkspaceDndProvider({
       activeId.startsWith("dir:") ||
       activeId.startsWith("dir-pane:");
 
-    const targetEntry = idx.get(refPanelId);
+    const targetEntry = idx.get(refTabId);
     if (!targetEntry) { setTabInsertPaneId(null); return; }
 
     if (isFileDrag) {
@@ -230,37 +230,37 @@ export function WorkspaceDndProvider({
     // Folders open a fresh terminal at that cwd; files reuse an already-open editor.
     const makePanel = (): Tab => tabForDroppedPath(filePath, isDir);
 
-    let existingPanelId: string | null = null;
+    let existingTabId: string | null = null;
     if (!isDir) {
       for (const pane of panes) {
         const found = pane.tabs.find((p) => p.kind === "editor" && p.path === filePath);
-        if (found) { existingPanelId = found.id; break; }
+        if (found) { existingTabId = found.id; break; }
       }
     }
 
     if (overId.startsWith("tab-insert:")) {
       const parts = overId.split(":");
-      const refPanelId = parts[1];
+      const refTabId = parts[1];
       const side = parts[2];
-      if (!refPanelId || (side !== "before" && side !== "after")) return;
+      if (!refTabId || (side !== "before" && side !== "after")) return;
 
-      const targetEntry = idx.get(refPanelId);
+      const targetEntry = idx.get(refTabId);
       if (!targetEntry) return;
       const targetPaneId = targetEntry.paneId;
       const targetPane = panes.find((p) => p.id === targetPaneId);
       if (!targetPane) return;
-      const refPanelIndex = targetPane.tabs.findIndex((p) => p.id === refPanelId);
+      const refPanelIndex = targetPane.tabs.findIndex((p) => p.id === refTabId);
       if (refPanelIndex === -1) return;
 
       const insertionIndex = refPanelIndex + (side === "after" ? 1 : 0);
 
-      if (existingPanelId) {
-        const sourcePaneId = idx.get(existingPanelId)?.paneId ?? null;
+      if (existingTabId) {
+        const sourcePaneId = idx.get(existingTabId)?.paneId ?? null;
         if (!sourcePaneId) return;
         if (sourcePaneId === targetPaneId) {
-          onReorderTab(activeWorkspaceIdRef.current, existingPanelId, insertionIndex);
+          onReorderTab(activeWorkspaceIdRef.current, existingTabId, insertionIndex);
         } else {
-          onMoveTab(activeWorkspaceIdRef.current, existingPanelId, targetPaneId, insertionIndex);
+          onMoveTab(activeWorkspaceIdRef.current, existingTabId, targetPaneId, insertionIndex);
         }
       } else {
         onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, makePanel(), insertionIndex);
@@ -277,26 +277,26 @@ export function WorkspaceDndProvider({
     if (!targetPaneExists) return;
 
     if (zone === "center") {
-      if (existingPanelId) {
-        const sourcePaneId = idx.get(existingPanelId)?.paneId ?? null;
+      if (existingTabId) {
+        const sourcePaneId = idx.get(existingTabId)?.paneId ?? null;
         if (sourcePaneId === targetPaneId) return;
-        onMoveTab(activeWorkspaceIdRef.current, existingPanelId, targetPaneId);
+        onMoveTab(activeWorkspaceIdRef.current, existingTabId, targetPaneId);
       } else {
         onOpenPanel(activeWorkspaceIdRef.current, targetPaneId, makePanel());
       }
     } else {
       const { workspacePaneLimit } = usePreferencesStore.getState();
       if (panes.length >= workspacePaneLimit) return;
-      if (existingPanelId) {
-        onSplitPaneAndPlace(activeWorkspaceIdRef.current, targetPaneId, zone, existingPanelId);
+      if (existingTabId) {
+        onSplitPaneAndPlace(activeWorkspaceIdRef.current, targetPaneId, zone, existingTabId);
       } else {
         onSplitPaneAndOpenPanel(activeWorkspaceIdRef.current, targetPaneId, zone, makePanel());
       }
     }
   }
 
-  function handleTabDragEnd(panelId: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>) {
-    const sourceEntry = idx.get(panelId);
+  function handleTabDragEnd(tabId: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>) {
+    const sourceEntry = idx.get(tabId);
     if (!sourceEntry) return;
     const { paneId: sourcePaneId, wsId: sourceWorkspaceId } = sourceEntry;
     const sourceWs = workspaces.find((ws) => ws.id === sourceWorkspaceId);
@@ -304,24 +304,24 @@ export function WorkspaceDndProvider({
 
     if (overId.startsWith("tab-insert:")) {
       const parts = overId.split(":");
-      const refPanelId = parts[1];
+      const refTabId = parts[1];
       const side = parts[2];
-      if (!refPanelId || !side) return;
+      if (!refTabId || !side) return;
       if (side !== "before" && side !== "after") return;
 
-      const targetEntry = idx.get(refPanelId);
+      const targetEntry = idx.get(refTabId);
       if (!targetEntry) return;
       const targetPaneId = targetEntry.paneId;
       const targetPane = allPanes(sourceWs.paneTree).find((p) => p.id === targetPaneId);
       if (!targetPane) return;
-      const refPanelIndex = targetPane.tabs.findIndex((p) => p.id === refPanelId);
+      const refPanelIndex = targetPane.tabs.findIndex((p) => p.id === refTabId);
       if (refPanelIndex === -1) return;
 
       const insertionIndex = refPanelIndex + (side === "after" ? 1 : 0);
       if (sourcePaneId === targetPaneId) {
-        onReorderTab(sourceWorkspaceId, panelId, insertionIndex);
+        onReorderTab(sourceWorkspaceId, tabId, insertionIndex);
       } else {
-        onMoveTab(sourceWorkspaceId, panelId, targetPaneId, insertionIndex);
+        onMoveTab(sourceWorkspaceId, tabId, targetPaneId, insertionIndex);
       }
       return;
     }
@@ -336,11 +336,11 @@ export function WorkspaceDndProvider({
 
     if (zone === "center") {
       if (sourcePaneId === targetPaneId) return;
-      onMoveTab(sourceWorkspaceId, panelId, targetPaneId);
+      onMoveTab(sourceWorkspaceId, tabId, targetPaneId);
     } else {
       const { workspacePaneLimit } = usePreferencesStore.getState();
       if (sourcePanes.length >= workspacePaneLimit) return;
-      onSplitPaneAndPlace(sourceWorkspaceId, targetPaneId, zone, panelId);
+      onSplitPaneAndPlace(sourceWorkspaceId, targetPaneId, zone, tabId);
     }
   }
 

@@ -25,9 +25,9 @@ describe("ExplorerRootMode", () => {
 });
 
 describe("RunConfig", () => {
-  it("panelId is optional", () => {
+  it("tabId is optional", () => {
     const cfg: RunConfig = { id: "1", name: "Dev", command: "pnpm dev" };
-    expect(cfg.panelId).toBeUndefined();
+    expect(cfg.tabId).toBeUndefined();
   });
 
   it("cwd is optional", () => {
@@ -41,9 +41,9 @@ describe("RunConfig", () => {
       name: "Build",
       command: "pnpm build",
       cwd: "/home/user/proj",
-      panelId: "panel-1",
+      tabId: "panel-1",
     };
     expect(cfg.id).toBe("3");
-    expect(cfg.panelId).toBe("panel-1");
+    expect(cfg.tabId).toBe("panel-1");
   });
 });

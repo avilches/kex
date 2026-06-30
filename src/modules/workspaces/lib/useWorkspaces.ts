@@ -134,22 +134,22 @@ export function applyWorkspaceStatus(
 // capped by the number of open tabs in the pane (see paneActivationHistoryRef).
 export const MRU_HISTORY_LIMIT = 50;
 
-export function pushMru(history: string[], panelId: string, limit = MRU_HISTORY_LIMIT): string[] {
-  return [panelId, ...history.filter((id) => id !== panelId)].slice(0, limit);
+export function pushMru(history: string[], tabId: string, limit = MRU_HISTORY_LIMIT): string[] {
+  return [tabId, ...history.filter((id) => id !== tabId)].slice(0, limit);
 }
 
 export function applyCloseTab(
   workspaces: Workspace[],
   workspaceId: string,
-  panelId: string,
+  tabId: string,
   history?: string[],
 ): Workspace[] {
   return workspaces.map((w): Workspace => {
     if (w.id !== workspaceId) return w;
-    const result = findTabPane(w.paneTree, panelId);
+    const result = findTabPane(w.paneTree, tabId);
     if (!result) return w;
     const { pane } = result;
-    const remaining = pane.tabs.filter((p) => p.id !== panelId);
+    const remaining = pane.tabs.filter((p) => p.id !== tabId);
     if (remaining.length === 0) {
       const newTree = removePaneFromTree(w.paneTree, pane.id);
       if (!newTree) {
@@ -172,11 +172,11 @@ export function applyCloseTab(
             : w.activePaneId,
       };
     }
-    const idx = pane.tabs.findIndex((p) => p.id === panelId);
+    const idx = pane.tabs.findIndex((p) => p.id === tabId);
     const remainingIds = new Set(remaining.map((p) => p.id));
-    const mruTarget = history?.find((id) => id !== panelId && remainingIds.has(id)) ?? null;
+    const mruTarget = history?.find((id) => id !== tabId && remainingIds.has(id)) ?? null;
     const newActiveId =
-      pane.activeTabId === panelId
+      pane.activeTabId === tabId
         ? (mruTarget ?? (remaining[idx] ?? remaining[idx - 1])?.id ?? null)
         : pane.activeTabId;
     return {
@@ -192,9 +192,9 @@ export function applyCloseTab(
 
 export async function collectRunningTerminals(
   ws: Workspace,
-  getForegroundProcess: (panelId: string) => Promise<string | null>,
-  getCommand: (panelId: string) => string | undefined,
-): Promise<{ panelId: string; label: string }[]> {
+  getForegroundProcess: (tabId: string) => Promise<string | null>,
+  getCommand: (tabId: string) => string | undefined,
+): Promise<{ tabId: string; label: string }[]> {
   const terminals = allPanes(ws.paneTree)
     .flatMap((p) => p.tabs)
     .filter((tab): tab is Extract<Tab, { kind: "terminal" }> => tab.kind === "terminal");
@@ -203,21 +203,21 @@ export async function collectRunningTerminals(
       const processName = await getForegroundProcess(tab.id);
       if (processName === null) return null;
       const label = getCommand(tab.id) ?? (processName || tab.title || "shell");
-      return { panelId: tab.id, label };
+      return { tabId: tab.id, label };
     }),
   );
   return checked.filter(
-    (x): x is { panelId: string; label: string } => x !== null,
+    (x): x is { tabId: string; label: string } => x !== null,
   );
 }
 
 function newPaneNode(cwd?: string): PaneNode {
-  const panelId = newTabId();
+  const tabId = newTabId();
   return {
     kind: "pane",
     id: newPaneId(),
-    tabs: [{ id: panelId, kind: "terminal", cwd }],
-    activeTabId: panelId,
+    tabs: [{ id: tabId, kind: "terminal", cwd }],
+    activeTabId: tabId,
   };
 }
 
@@ -258,9 +258,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // paneId -> MRU activation history (panelIds, most recent first). Drives which
   // tab gets focus when the active one closes. In memory only, never persisted.
   const paneActivationHistoryRef = useRef<Map<string, string[]>>(new Map());
-  const recordActivation = useCallback((paneId: string, panelId: string) => {
+  const recordActivation = useCallback((paneId: string, tabId: string) => {
     const map = paneActivationHistoryRef.current;
-    map.set(paneId, pushMru(map.get(paneId) ?? [], panelId));
+    map.set(paneId, pushMru(map.get(paneId) ?? [], tabId));
   }, []);
 
   // Reconcile the history against live panes/tabs: drop dead panes and tabs
@@ -382,27 +382,27 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const moveTab = useCallback((workspaceId: string, panelId: string, targetPaneId: string, targetIndex?: number) => {
+  const moveTab = useCallback((workspaceId: string, tabId: string, targetPaneId: string, targetIndex?: number) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const sourceResult = findTabPane(w.paneTree, panelId);
+        const sourceResult = findTabPane(w.paneTree, tabId);
         if (!sourceResult || sourceResult.pane.id === targetPaneId) return w;
-        const newTree = moveTabBetweenPanes(w.paneTree, panelId, targetPaneId, targetIndex);
+        const newTree = moveTabBetweenPanes(w.paneTree, tabId, targetPaneId, targetIndex);
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: targetPaneId };
       }),
     );
   }, []);
 
-  const reorderTab = useCallback((workspaceId: string, panelId: string, insertionIndex: number) => {
+  const reorderTab = useCallback((workspaceId: string, tabId: string, insertionIndex: number) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const result = findTabPane(w.paneTree, panelId);
+        const result = findTabPane(w.paneTree, tabId);
         if (!result) return w;
         const { pane } = result;
-        const from = pane.tabs.findIndex((p) => p.id === panelId);
+        const from = pane.tabs.findIndex((p) => p.id === tabId);
         if (from === -1) return w;
         // insertionIndex is the gap index in the original array (0 = before first tab).
         // Inserting before or after the dragged tab itself is a noop.
@@ -419,7 +419,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     workspaceId: string,
     targetPaneId: string,
     direction: "left" | "right" | "top" | "bottom",
-    panelId: string,
+    tabId: string,
   ) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -436,7 +436,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           orientation,
           newPanePosition,
         );
-        const treeAfterMove = moveTabBetweenPanes(treeAfterSplit, panelId, freshPaneId);
+        const treeAfterMove = moveTabBetweenPanes(treeAfterSplit, tabId, freshPaneId);
         if (treeAfterMove === w.paneTree) return w;
         return { ...w, paneTree: treeAfterMove, activePaneId: freshPaneId };
       }),
@@ -489,32 +489,32 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, [recordActivation]);
 
-  const activateTab = useCallback((workspaceId: string, panelId: string) => {
+  const activateTab = useCallback((workspaceId: string, tabId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
-    const pane = ws ? findTabPane(ws.paneTree, panelId)?.pane : undefined;
-    if (pane) recordActivation(pane.id, panelId);
+    const pane = ws ? findTabPane(ws.paneTree, tabId)?.pane : undefined;
+    if (pane) recordActivation(pane.id, tabId);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const result = findTabPane(w.paneTree, panelId);
+        const result = findTabPane(w.paneTree, tabId);
         if (!result) return w;
         return {
           ...w,
           activePaneId: result.pane.id,
           paneTree: updatePane(w.paneTree, result.pane.id, (p) => ({
             ...p,
-            activeTabId: panelId,
+            activeTabId: tabId,
           })),
         };
       }),
     );
   }, [recordActivation]);
 
-  const closeTab = useCallback((workspaceId: string, panelId: string) => {
+  const closeTab = useCallback((workspaceId: string, tabId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     let history: string[] | undefined;
     if (ws) {
-      const found = findTabPane(ws.paneTree, panelId);
+      const found = findTabPane(ws.paneTree, tabId);
       if (found) {
         history = paneActivationHistoryRef.current.get(found.pane.id);
         closedPanelsRef.current = captureClosedEntry(closedPanelsRef.current, {
@@ -524,7 +524,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         });
       }
     }
-    setWorkspaces((prev) => applyCloseTab(prev, workspaceId, panelId, history));
+    setWorkspaces((prev) => applyCloseTab(prev, workspaceId, tabId, history));
   }, []);
 
   const reopenClosed = useCallback(() => {
@@ -561,37 +561,37 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, [recordActivation]);
 
-  const updateTabData = useCallback((workspaceId: string, panelId: string, updater: (p: Tab) => Tab) => {
+  const updateTabData = useCallback((workspaceId: string, tabId: string, updater: (p: Tab) => Tab) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
-        const result = findTabPane(w.paneTree, panelId);
+        const result = findTabPane(w.paneTree, tabId);
         if (!result) return w;
         return {
           ...w,
           paneTree: updatePane(w.paneTree, result.pane.id, (p) => ({
             ...p,
-            tabs: p.tabs.map((tab) => tab.id === panelId ? updater(tab) : tab),
+            tabs: p.tabs.map((tab) => tab.id === tabId ? updater(tab) : tab),
           })),
         };
       }),
     );
   }, []);
 
-  const setTerminalPanelCwd = useCallback((workspaceId: string, panelId: string, cwd: string) => {
+  const setTerminalPanelCwd = useCallback((workspaceId: string, tabId: string, cwd: string) => {
     const normalized = cwd.length > 1 ? cwd.replace(/\/$/, "") : cwd;
-    updateTabData(workspaceId, panelId, (p) => p.kind === "terminal" ? { ...p, cwd: normalized } : p);
+    updateTabData(workspaceId, tabId, (p) => p.kind === "terminal" ? { ...p, cwd: normalized } : p);
   }, [updateTabData]);
 
-  const setTerminalRunningCommand = useCallback((_workspaceId: string, panelId: string, cmd: string | null) => {
-    setRunningCommand(panelId, cmd);
+  const setTerminalRunningCommand = useCallback((_workspaceId: string, tabId: string, cmd: string | null) => {
+    setRunningCommand(tabId, cmd);
   }, []);
 
   // Flip a markdown file tab between its rendered view (kind "markdown") and
   // the raw editor (kind "editor"), preserving id/path/title. Switching to
   // rendered is a no-op while the editor has unsaved changes.
-  const setTabView = useCallback((workspaceId: string, panelId: string, mode: "rendered" | "raw") => {
-    updateTabData(workspaceId, panelId, (p) => {
+  const setTabView = useCallback((workspaceId: string, tabId: string, mode: "rendered" | "raw") => {
+    updateTabData(workspaceId, tabId, (p) => {
       if (mode === "raw" && p.kind === "markdown" && isMarkdownPath(p.path)) {
         return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, locked: p.locked, autofocus: p.autofocus };
       }
@@ -603,15 +603,15 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, [updateTabData]);
 
-  const toggleOverlayPreview = useCallback((workspaceId: string, panelId: string) => {
-    updateTabData(workspaceId, panelId, (p) => {
+  const toggleOverlayPreview = useCallback((workspaceId: string, tabId: string) => {
+    updateTabData(workspaceId, tabId, (p) => {
       if (p.kind !== "editor") return p;
       return { ...p, previewMode: p.previewMode === "overlay" ? undefined : "overlay" };
     });
   }, [updateTabData]);
 
-  const toggleSplitPreview = useCallback((workspaceId: string, panelId: string) => {
-    updateTabData(workspaceId, panelId, (p) => {
+  const toggleSplitPreview = useCallback((workspaceId: string, tabId: string) => {
+    updateTabData(workspaceId, tabId, (p) => {
       if (p.kind !== "editor") return p;
       return { ...p, previewMode: p.previewMode === "split" ? undefined : "split" };
     });
@@ -767,8 +767,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
           if (w.id !== workspaceId) return w;
           const configs = w.scripts ?? [];
           const cleaned = configs.map((c) =>
-            c.panelId && !livingTabIds.has(c.panelId)
-              ? { ...c, panelId: undefined }
+            c.tabId && !livingTabIds.has(c.tabId)
+              ? { ...c, tabId: undefined }
               : c,
           );
           const paneStillLive = w.scriptPaneId ? allPanes(w.paneTree).some((p) => p.id === w.scriptPaneId) : true;
@@ -785,9 +785,9 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
-  const findTabGlobal = useCallback((panelId: string) => {
+  const findTabGlobal = useCallback((tabId: string) => {
     for (const w of workspacesRef.current) {
-      const result = findTabPane(w.paneTree, panelId);
+      const result = findTabPane(w.paneTree, tabId);
       if (result) return { workspace: w, ...result };
     }
     return null;
