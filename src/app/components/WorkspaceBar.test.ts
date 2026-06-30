@@ -14,7 +14,7 @@ function idHue(id: string): number {
   return (h >>> 0) % 360;
 }
 
-describe("WorkspaceSidebar helpers", () => {
+describe("WorkspaceBar helpers", () => {
   describe("abbrev", () => {
     test("two-word title gives initials", () => {
       expect(abbrev("my-repo", "terminal")).toBe("MR");

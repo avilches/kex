@@ -51,7 +51,7 @@ type WorkspaceItem = {
   statusId?: string;
 };
 
-export type WorkspaceSidebarProps = {
+export type WorkspaceBarProps = {
   workspaces: WorkspaceItem[];
   activeId: string | null;
   workspaceStatuses: WorkspaceStatus[];
@@ -78,7 +78,7 @@ function abbrev(title: string, kind: string): string {
 function SortableWorkspaceItem({
   ws,
   active,
-  sidebarWidth,
+  barWidth,
   workspaceStatuses,
   onSelect,
   onClose,
@@ -88,7 +88,7 @@ function SortableWorkspaceItem({
 }: {
   ws: WorkspaceItem;
   active: boolean;
-  sidebarWidth: number;
+  barWidth: number;
   workspaceStatuses: WorkspaceStatus[];
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
@@ -146,7 +146,7 @@ function SortableWorkspaceItem({
     clearRename();
   }
 
-  const compact = sidebarWidth <= 80;
+  const compact = barWidth <= 80;
 
   const button = (
     <div ref={setNodeRef} className="group relative w-full px-1.5" style={style}>
@@ -293,7 +293,7 @@ function SortableWorkspaceItem({
   );
 }
 
-export function WorkspaceSidebar({
+export function WorkspaceBar({
   workspaces,
   activeId,
   workspaceStatuses,
@@ -308,7 +308,7 @@ export function WorkspaceSidebar({
   onWidthChange,
   collapsedGroups,
   onToggleGroup,
-}: WorkspaceSidebarProps) {
+}: WorkspaceBarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [isDragging, setIsDragging] = useState(false);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
@@ -452,7 +452,7 @@ export function WorkspaceSidebar({
                       <SortableWorkspaceItem
                         ws={activeWs}
                         active={true}
-                        sidebarWidth={width}
+                        barWidth={width}
                         workspaceStatuses={workspaceStatuses}
                         onSelect={onSelect}
                         onClose={onClose}
@@ -473,7 +473,7 @@ export function WorkspaceSidebar({
                         key={ws.id}
                         ws={ws}
                         active={ws.id === activeId}
-                        sidebarWidth={width}
+                        barWidth={width}
                         workspaceStatuses={workspaceStatuses}
                         onSelect={onSelect}
                         onClose={onClose}

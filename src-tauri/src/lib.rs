@@ -433,9 +433,9 @@ fn window_save_right_panel(
 }
 
 #[tauri::command]
-fn window_save_workspace_sidebar(app: tauri::AppHandle, label: String, width: u32) {
+fn window_save_workspace_bar(app: tauri::AppHandle, label: String, width: u32) {
     let mgr = app.state::<window_state::WindowStateManager>();
-    mgr.update_workspace_sidebar_width(&label, width);
+    mgr.update_workspace_bar_width(&label, width);
     mgr.save();
 }
 
@@ -862,7 +862,7 @@ pub fn run() {
             window_get_state,
             window_save_workspace_state,
             window_save_right_panel,
-            window_save_workspace_sidebar,
+            window_save_workspace_bar,
             window_save_explorer_sidebar,
             window_save_collapsed_groups,
             restore_window_geometry,

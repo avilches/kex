@@ -45,7 +45,7 @@ pub struct WindowEntry {
     #[serde(default)]
     pub right_panel: Option<RightPanelState>,
     #[serde(default)]
-    pub workspace_sidebar_width: Option<u32>,
+    pub workspace_bar_width: Option<u32>,
     #[serde(default)]
     pub explorer_sidebar_width: Option<u32>,
     #[serde(default)]
@@ -59,7 +59,7 @@ impl Default for WindowEntry {
             workspaces: Value::Array(vec![]),
             active_index: 0,
             right_panel: None,
-            workspace_sidebar_width: None,
+            workspace_bar_width: None,
             explorer_sidebar_width: None,
             collapsed_status_groups: Vec::new(),
         }
@@ -89,7 +89,7 @@ struct IndexEntry {
     #[serde(default)]
     right_panel: Option<RightPanelState>,
     #[serde(default)]
-    workspace_sidebar_width: Option<u32>,
+    workspace_bar_width: Option<u32>,
     #[serde(default)]
     explorer_sidebar_width: Option<u32>,
     #[serde(default)]
@@ -230,7 +230,7 @@ impl WindowStateManager {
                     workspaces: Value::Array(bodies),
                     active_index: ie.active_index,
                     right_panel: ie.right_panel.clone(),
-                    workspace_sidebar_width: ie.workspace_sidebar_width,
+                    workspace_bar_width: ie.workspace_bar_width,
                     explorer_sidebar_width: ie.explorer_sidebar_width,
                     collapsed_status_groups: ie.collapsed_status_groups.clone(),
                 },
@@ -300,7 +300,7 @@ impl WindowStateManager {
                     workspace_ids: ids,
                     active_index: entry.active_index,
                     right_panel: entry.right_panel.clone(),
-                    workspace_sidebar_width: entry.workspace_sidebar_width,
+                    workspace_bar_width: entry.workspace_bar_width,
                     explorer_sidebar_width: entry.explorer_sidebar_width,
                     collapsed_status_groups: entry.collapsed_status_groups.clone(),
                 },
@@ -406,10 +406,10 @@ impl WindowStateManager {
         }
     }
 
-    pub fn update_workspace_sidebar_width(&self, label: &str, width: u32) {
+    pub fn update_workspace_bar_width(&self, label: &str, width: u32) {
         let mut inner = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = inner.windows.get_mut(label) {
-            entry.workspace_sidebar_width = Some(width);
+            entry.workspace_bar_width = Some(width);
         }
     }
 

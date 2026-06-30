@@ -99,7 +99,7 @@ import { CloseDialogs } from "./components/CloseDialogs";
 import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
 import { RightPanel, type RightPanelHandle } from "./components/RightPanel";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
-import { WorkspaceSidebar } from "./components/WorkspaceSidebar";
+import { WorkspaceBar } from "./components/WorkspaceBar";
 import { setEditorFlush } from "./lib/editorFlush";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
@@ -108,9 +108,9 @@ import {
   saveWorkspaceState,
 } from "@/modules/workspaces/lib/workspaceState";
 import {
-  getSavedWorkspaceSidebarWidth,
-  saveWorkspaceSidebarWidth,
-} from "@/modules/workspaces/lib/workspaceSidebarState";
+  getSavedWorkspaceBarWidth,
+  saveWorkspaceBarWidth,
+} from "@/modules/workspaces/lib/workspaceBarState";
 import {
   getSavedCollapsedGroups,
   saveCollapsedGroups,
@@ -453,10 +453,10 @@ export default function App() {
     null,
   );
   const windowLabel = useMemo(() => getCurrentWebviewWindow().label, []);
-  const [workspaceSidebarWidth, setWorkspaceSidebarWidth] = useState(getSavedWorkspaceSidebarWidth);
-  const handleSidebarWidthChange = useCallback((w: number) => {
-    setWorkspaceSidebarWidth(w);
-    saveWorkspaceSidebarWidth(windowLabel, w);
+  const [workspaceBarWidth, setWorkspaceBarWidth] = useState(getSavedWorkspaceBarWidth);
+  const handleBarWidthChange = useCallback((w: number) => {
+    setWorkspaceBarWidth(w);
+    saveWorkspaceBarWidth(windowLabel, w);
   }, [windowLabel]);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(getSavedCollapsedGroups()),
@@ -654,7 +654,7 @@ export default function App() {
     },
     [closeWorkspace, destroyWorkspaceFloats],
   );
-  // Stored in a ref so Task 5 (WorkspaceSidebar close button) can consume it
+  // Stored in a ref so Task 5 (WorkspaceBar close button) can consume it
   // without re-triggering effects that depend on the callback identity.
   const handleCloseWorkspaceRef = useRef(handleCloseWorkspace);
   handleCloseWorkspaceRef.current = handleCloseWorkspace;
@@ -2622,8 +2622,8 @@ export default function App() {
 
           {/* 3-column layout */}
           <div className="flex min-h-0 flex-1">
-            {/* LEFT: 52px workspace sidebar */}
-            <WorkspaceSidebar
+            {/* LEFT: workspace bar */}
+            <WorkspaceBar
               workspaces={workspaces.map((w) => ({
                 id: w.id,
                 title: w.title,
@@ -2640,8 +2640,8 @@ export default function App() {
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
               onOpenSettings={(id) => useWorkspaceSettingsStore.getState().openSettings(id)}
-              width={workspaceSidebarWidth}
-              onWidthChange={handleSidebarWidthChange}
+              width={workspaceBarWidth}
+              onWidthChange={handleBarWidthChange}
               workspaceStatuses={workspaceStatuses}
               onSetStatus={setWorkspaceStatus}
               collapsedGroups={collapsedGroups}

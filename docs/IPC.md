@@ -137,7 +137,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `window_get_state` | Return the saved `WindowEntry` (workspaces + geometry + optional `rightPanel` chrome) for a given window label, reconstructed from the `workspaces.json` index plus the per-workspace `workspaces/<id>.json` bodies |
 | `window_save_workspace_state` | Persist workspace list and active index for a window label; writes the lean `workspaces.json` index plus one `workspaces/<id>.json` per changed workspace |
 | `window_save_right_panel(label, open, activeTab, width, side)` | Persist the per-window right-panel chrome (open, active tab, width percentage, dock side) into the `workspaces.json` index only, without rewriting the workspace bodies. Lightweight so it can fire on every tab switch or resize (the frontend debounces it ~250ms) |
-| `window_save_workspace_sidebar(label, width)` | Persist the workspace sidebar pixel width for a given window label into the `workspaces.json` index. Called on every drag resize (debounced in the frontend); separate from the right-panel width so the two can change independently. |
+| `window_save_workspace_bar(label, width)` | Persist the workspace bar pixel width for a given window label into the `workspaces.json` index. Called on every drag resize (debounced in the frontend); separate from the right-panel width so the two can change independently. |
 | `get_launch_dir` | Return the CLI launch directory (drained on first call) |
 | `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |

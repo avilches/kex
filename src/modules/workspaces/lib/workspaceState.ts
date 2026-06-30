@@ -6,7 +6,7 @@ import {
   setSavedRightPanelState,
   type RightPanelUiState,
 } from "./windowUiState";
-import { setSavedWorkspaceSidebarWidth } from "./workspaceSidebarState";
+import { setSavedWorkspaceBarWidth } from "./workspaceBarState";
 import { setSavedExplorerSidebarWidth } from "./explorerSidebarState";
 import { setSavedCollapsedGroups } from "./collapsedGroupsState";
 
@@ -17,7 +17,7 @@ type WindowEntry = {
   workspaces: Workspace[];
   activeIndex: number;
   rightPanel?: RightPanelUiState;
-  workspaceSidebarWidth?: number;
+  workspaceBarWidth?: number;
   explorerSidebarWidth?: number;
   collapsedStatusGroups?: string[];
 };
@@ -93,7 +93,7 @@ export async function initWorkspaceState(): Promise<void> {
       cached = { workspaces: entry.workspaces.map(sanitizeWorkspace), activeIndex: entry.activeIndex };
     }
     setSavedRightPanelState(entry?.rightPanel);
-    setSavedWorkspaceSidebarWidth(entry?.workspaceSidebarWidth);
+    setSavedWorkspaceBarWidth(entry?.workspaceBarWidth);
     setSavedExplorerSidebarWidth(entry?.explorerSidebarWidth);
     setSavedCollapsedGroups(entry?.collapsedStatusGroups);
   } catch (err) {
