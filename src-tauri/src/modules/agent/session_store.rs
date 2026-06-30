@@ -57,7 +57,7 @@ pub struct RestorePlan {
     pub tab_id: String,
     pub agent: String,
     pub resume_cmd: String,
-    pub cwd: String,
+    pub cwd_launch: String,
     pub error_reason: String,
 }
 
@@ -202,7 +202,7 @@ fn strip_for_resume_base(cmd: &str) -> String {
     result.join(" ")
 }
 
-// Returns only the agent command. The frontend spawns the PTY with plan.cwd as the
+// Returns only the agent command. The frontend spawns the PTY with plan.cwdLaunch as the
 // initial working directory, so no `cd` prefix is needed here.
 fn resume_cmd_for_agent(agent: &str, session_id: &str) -> String {
     match agent {
@@ -240,8 +240,8 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
         // Use --session-id to start a new session that reuses the same UUID instead of
         // dropping it silently. Remove the stale entry now; hooks will re-record if the
         // new session produces messages.
-        let (cwd, cmd) = if let Some(ref j) = jsonl {
-            let cwd = read_launch_cwd_from_jsonl(j).unwrap_or_else(|| record.cwd_launch.clone());
+        let (cwd_launch, cmd) = if let Some(ref j) = jsonl {
+            let cwd_launch = read_launch_cwd_from_jsonl(j).unwrap_or_else(|| record.cwd_launch.clone());
             let cmd = match record.launch_cmd.as_deref() {
                 Some(lc) => {
                     let base = strip_for_resume_base(lc);
@@ -249,7 +249,7 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
                 }
                 None => resume_cmd_for_agent(&agent, &record.session_id),
             };
-            (cwd, cmd)
+            (cwd_launch, cmd)
         } else {
             log::info!(
                 "[agent-session] restore plan: tab={tab_id} agent={agent} session={} \
@@ -259,7 +259,7 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
             if let Some(path) = store_path {
                 remove_panel_from_store(&tab_id, path);
             }
-            let cwd = record.cwd_launch.clone();
+            let cwd_launch = record.cwd_launch.clone();
             let cmd = match record.launch_cmd.as_deref() {
                 Some(lc) => {
                     let base = strip_for_resume_base(lc);
@@ -267,25 +267,25 @@ fn build_plans_from(panels: HashMap<String, SessionRecord>, store_path: Option<&
                 }
                 None => reattach_cmd_for_agent(&agent, &record.session_id),
             };
-            (cwd, cmd)
+            (cwd_launch, cmd)
         };
 
-        if !PathBuf::from(&cwd).exists() {
-            log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent} cwd not found: {cwd}");
+        if !PathBuf::from(&cwd_launch).exists() {
+            log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent} cwd not found: {cwd_launch}");
             if let Some(path) = store_path {
                 remove_panel_from_store(&tab_id, path);
             }
             plans.push(RestorePlan {
                 tab_id, agent,
                 resume_cmd: String::new(),
-                cwd: cwd.clone(),
-                error_reason: format!("Directory not found: {cwd}"),
+                cwd_launch: cwd_launch.clone(),
+                error_reason: format!("Directory not found: {cwd_launch}"),
             });
             continue;
         }
 
-        log::info!("[agent-session] restore plan: tab={tab_id} agent={agent} session={} cwd={cwd} cmd={cmd:?}", record.session_id);
-        plans.push(RestorePlan { tab_id, agent, resume_cmd: cmd, cwd, error_reason: String::new() });
+        log::info!("[agent-session] restore plan: tab={tab_id} agent={agent} session={} cwd_launch={cwd_launch} cmd={cmd:?}", record.session_id);
+        plans.push(RestorePlan { tab_id, agent, resume_cmd: cmd, cwd_launch, error_reason: String::new() });
     }
     plans
 }
@@ -306,7 +306,7 @@ fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
 ///
 /// Consumes the pending launch command stashed by `stash_cmd`. If the stashed command
 /// is print-mode (`-p` / `--print`), the session is not persisted.
-pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd: &str) {
+pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd_launch: &str) {
     let path = match store_path() {
         Some(p) => p,
         None => return,
@@ -317,7 +317,7 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
         return;
     }
     log::info!(
-        "[agent-session] record panel={tab_id} agent={agent} session={session_id} cwd={cwd} \
+        "[agent-session] record panel={tab_id} agent={agent} session={session_id} cwd_launch={cwd_launch} \
          launch_cmd={launch_cmd:?}"
     );
     let now = std::time::SystemTime::now()
@@ -327,7 +327,7 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
     let record = SessionRecord {
         agent: Some(agent.to_string()),
         session_id: session_id.to_string(),
-        cwd_launch: cwd.to_string(),
+        cwd_launch: cwd_launch.to_string(),
         transcript_path: transcript_path.to_string(),
         launch_cmd,
         updated_at: now,

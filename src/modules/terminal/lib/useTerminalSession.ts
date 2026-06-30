@@ -748,7 +748,7 @@ function attachSession(
       // directly, without needing a `cd` shell command.
       const plan = consumeRestorePlan(leafId);
       const runOnStart = s.restoreOnRestart !== false;
-      const ptyCwd = runOnStart && plan?.resumeCmd ? plan.cwd : s.initialCwd;
+      const ptyCwd = runOnStart && plan?.resumeCmd ? plan.cwdLaunch : s.initialCwd;
 
       openPtyForSession(leafId, s, ptyCwd)
         .then((pty) => {

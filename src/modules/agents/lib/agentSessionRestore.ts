@@ -4,7 +4,7 @@ export type RestorePlan = {
   tabId: string;
   agent: string;
   resumeCmd: string;
-  cwd: string;
+  cwdLaunch: string;
   errorReason: string;
 };
 
@@ -24,7 +24,7 @@ export async function loadRestorePlans(): Promise<void> {
     restorePlans = new Map(plans.map((p) => [p.tabId, p]));
     if (plans.length > 0) {
       console.debug(`[agent-session] loaded ${plans.length} restore plan(s):`, plans.map((p) =>
-        `${p.tabId} agent=${p.agent} cwd=${p.cwd}${p.errorReason ? ` ERROR: ${p.errorReason}` : ""}`,
+        `${p.tabId} agent=${p.agent} cwdLaunch=${p.cwdLaunch}${p.errorReason ? ` ERROR: ${p.errorReason}` : ""}`,
       ));
     } else {
       console.debug("[agent-session] no restore plans");
@@ -42,7 +42,7 @@ export function consumeRestorePlan(tabId: string): RestorePlan | null {
   const plan = restorePlans.get(tabId) ?? null;
   restorePlans.delete(tabId);
   if (plan) {
-    console.debug(`[agent-session] consuming restore plan for panel=${tabId} agent=${plan.agent} cwd=${plan.cwd}${plan.errorReason ? ` ERROR: ${plan.errorReason}` : ""}`);
+    console.debug(`[agent-session] consuming restore plan for panel=${tabId} agent=${plan.agent} cwdLaunch=${plan.cwdLaunch}${plan.errorReason ? ` ERROR: ${plan.errorReason}` : ""}`);
   }
   return plan;
 }

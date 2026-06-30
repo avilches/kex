@@ -139,7 +139,7 @@ For each session in the store:
      otherwise `claude --session-id '<id>'`
    - others/unknown: empty string (tab shows restore error)
 
-The PTY is spawned with `plan.cwd` as the initial working directory, so no `cd` prefix is needed in the command.
+The PTY is spawned with `plan.cwdLaunch` as the initial working directory, so no `cd` prefix is needed in the command.
 
 ### Command stripping
 
@@ -176,8 +176,8 @@ in `agent_detect.rs` at the `OSC 133;C` stage — `is_print_mode` returns early 
 pub struct RestorePlan {
     pub tab_id: String,      // → "tabId" on the wire
     pub agent: String,
-    pub resume_cmd: String,  // → "resumeCmd" on the wire; empty signals error
-    pub cwd: String,
+    pub resume_cmd: String,    // → "resumeCmd" on the wire; empty signals error
+    pub cwd_launch: String,    // → "cwdLaunch" on the wire
     pub error_reason: String,
 }
 ```
