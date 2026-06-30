@@ -153,17 +153,16 @@ export function CloseDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Workspace</AlertDialogTitle>
             <AlertDialogDescription>
-              The workspace and all its tabs will be closed.
-              {pendingCloseWorkspace?.scriptCount ? (
-                <>
-                  <br />
-                  {pendingCloseWorkspace.scriptCount === 1
-                    ? "1 run script"
-                    : `${pendingCloseWorkspace.scriptCount} run scripts`}{" "}
-                  will also be deleted.
-                </>
-              ) : null}
+              All tabs will be closed.
             </AlertDialogDescription>
+            {pendingCloseWorkspace?.scriptCount ? (
+              <p className="text-sm text-muted-foreground">
+                {pendingCloseWorkspace.scriptCount === 1
+                  ? "1 run script"
+                  : `${pendingCloseWorkspace.scriptCount} run scripts`}{" "}
+                will also be deleted.
+              </p>
+            ) : null}
           </AlertDialogHeader>
           <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
             <Checkbox
