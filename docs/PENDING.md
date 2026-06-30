@@ -3,6 +3,7 @@
 Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `docs/pending/`.
 
 > Auditoria 2026-06-23 contra el codigo: ver [AUDIT-2026-06-23.md](pending/AUDIT-2026-06-23.md) para el detalle de que se elimino (ya corregido), que cambio de estado y que sigue vigente.
+> Auditoria 2026-06-30: F1 (diff side-by-side) COMPLETADO y eliminado. Ver notas de cada item para estado actualizado.
 
 ---
 
@@ -23,7 +24,6 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 
 ## Features (`docs/pending/features/`)
 
-- [F1](pending/features/F1-diff-side-by-side.md) — Diff side-by-side
 - [F2](pending/features/F2-stage-unstage-por-hunk.md) — Stage/unstage por hunk
 - [F3](pending/features/F3-navegacion-hunks.md) — Navegacion entre hunks
 - [F6](pending/features/F6-scrollback-persistente.md) — Scrollback persistente

@@ -22,7 +22,7 @@ Ficheros implicados: `src-tauri/src/modules/agent/session_store.rs` (lectura del
 
 ## Popup de informacion para todos los tipos de tab
 
-Estado: PARCIAL (auditado 2026-06-23, anotado 2026-06-16). El HoverCard generico YA cubre todos los `kind` en `PaneTabBar.tsx` (`hoverBody`): terminal/agente y editor/markdown estan ricos; git-diff y git-commit-file usan `GitFileHoverContent`. Lo que FALTA es completar la metadata de `git-history` (hoy solo repo root: anadir rama activa) y `browser` (hoy solo URL: anadir estado de conexion al dev server). Texto original conservado abajo como referencia de que mostrar por kind:
+Estado: PENDIENTE (auditado 2026-06-30; la nota anterior era incorrecta). No existe ningun HoverCard ni popup rico en `PaneTabBar.tsx`: `hoverBody` y `GitFileHoverContent` no existen en el codigo. Solo hay un `title` nativo (tooltip del SO) con cwd y sessionId del agente. El popup rico de informacion por tipo de tab esta completamente sin implementar. Lo que hay que hacer:
 
 - **terminal**: cwd actual, pty id (util para debug).
 - **editor**: ruta completa del fichero, estado dirty, ultima modificacion.
@@ -105,7 +105,7 @@ Total estimado: ~2h. Riesgo principal: comportamiento en Linux.
 
 ## Workspace: label de texto + barra superior con contexto
 
-Estado: PARCIAL (auditado 2026-06-23). El modelo `Workspace` YA tiene `title: string` editable y persistido (`types.ts:48`). Lo que FALTA es la presentacion en la barra superior. El label es lo mas sencillo y ya tiene datos; las otras dos piezas (ultima notificacion del tab, PR de la rama) siguen pendientes y tienen dependencias (agentStore notifs, GitHub API) que merecen items separados.
+Estado: PARCIAL (auditado 2026-06-30). El modelo `Workspace` tiene `title: string` editable y persistido. El titulo es editable desde la barra lateral (inline rename) y desde `WorkspaceSettingsDialog`. Lo que FALTA es mostrarlo en la barra superior (`Header.tsx`): hoy `Header.tsx` no recibe ni muestra el titulo del workspace activo. Las otras dos piezas (ultima notificacion del tab, PR de la rama) siguen pendientes.
 
 ### Motivacion
 
@@ -137,27 +137,24 @@ Permitir arrastrar un tab (panel) o un fichero desde el explorer y soltarlo en o
 
 ## Workspace: estados configurables (WIP, On Hold, Archived...)
 
-Estado: idea anotada.
+Estado: PARCIAL (auditado 2026-06-30). La infraestructura basica esta implementada:
 
-### Motivacion
+- `WorkspaceStatus = { id: string; label: string }` en `src/modules/settings/store.ts:17`
+- Definicion de statuses en Settings (`WorkspacesSection.tsx`): anadir, renombrar, reordenar (DnD), eliminar
+- `workspaceStatuses` en `Preferences` y persistido en `kex-settings.json`
+- Sidebar agrupa workspaces por status con cabecera colapsable, drag entre grupos cambia el status
+- `WorkspaceSettingsDialog` permite asignar status a un workspace con un selector
+- `workspace.statusId` en el modelo `Workspace` y persistido
 
-Los workspaces no tienen estado. A medida que acumulan mas workspaces es util poder marcar y filtrar: en progreso, pausado, archivado, etc. Inspiracion: Nimbalyst/Linear tienen estados en tarjetas de kanban. Aqui no se quiere un tablero, solo el concepto de estado aplicado a los workspaces.
-
-### Propuesta
-
-- El usuario define sus propios estados en Settings: nombre, icono (emoji o hugeicons), color. Estado predeterminado vacio.
-- Cada workspace tiene un estado opcional (`workspaceStatus?: string`).
-- En la barra lateral de workspaces, cada workspace muestra un indicador de color/icono del estado.
-- El estado se puede cambiar desde la barra superior (menu o badge clickable).
-- Los workspaces se pueden filtrar o agrupar por estado en la barra lateral.
-
-### Dependencias
-
-Requiere que el modelo `Workspace` soporte campos custom adicionales y que la serializacion los persista. El feature de label de workspace (arriba) es un precursor natural, ya que ambos extienden el modelo `Workspace`.
+Lo que FALTA de la propuesta original:
+- Color por status (el tipo es solo `{ id, label }`, sin `color`)
+- Icono/emoji por status
+- Filtrar (hoy solo agrupa, no filtra para ocultar grupos)
+- Cambiar el status desde la barra superior (solo desde el dialog y el selector del sidebar)
 
 ### Prioridad
 
-Bajo. El lock del explorer y el label de workspace son mas urgentes.
+Bajo. Lo basico ya funciona. El color/icono anadaria valor visual pero no es urgente.
 
 ---
 
@@ -229,22 +226,16 @@ Continuacion de la tanda de ajustes de terminal (cursor style, inactive style, c
 
 ## Terminal: clic en enlaces a ficheros generados por un agente
 
-Estado: idea anotada (2026-06-23), por investigar.
+Estado: PARCIAL con bug conocido (auditado 2026-06-30). La infraestructura esta implementada en `src/modules/terminal/lib/terminalLinks.ts`:
 
-Cuando Claude Code (u otro agente) imprime en el terminal una ruta a un fichero de texto (por ejemplo un markdown de superpowers como `docs/superpowers/plans/2026-06-23-foo.md`), probar que pasa al hacer clic sobre ese enlace:
+- `PATH_PATTERNS` (4 regex) detectan rutas absolutas, `~/`, relativas y bare-relative en cada linea del buffer.
+- `provideLinks` verifica que el fichero exista via `fs_stat` antes de mostrar el enlace (evita falsos positivos).
+- Cmd+clic abre el fichero en el editor de Kex via `dispatchFileLink`.
+- Los links OSC 8 `file://` del agente son interceptados por un `OscHandler` custom y redirigidos al mismo flujo (en vez de abrir Finder).
 
-- Verificar si xterm lo detecta como enlace y si el clic lo abre.
-- Comprobar si abre el fichero en un panel `editor`/`markdown` de Kex o si lo delega al SO (que podria abrir otra app).
-- Decidir el comportamiento deseado: un clic (o Cmd+clic) sobre una ruta de fichero del repo deberia abrirla dentro de Kex en el editor o en el visor markdown, no salir a una app externa.
-
-Si no funciona hoy, anotar el coste de cablear un link handler (xterm `registerLinkProvider` / web-links addon) que reconozca rutas de fichero y las abra via el flujo de apertura de paneles existente.
-
----
-
-## Editor preview
-
-- Split view (editor + preview side by side): the overlay architecture keeps the editor mounted,
-  so this is a layout-only change - replace the hidden/shown divs with a flex-row split.
+Bug activo documentado en `HANDOFF-2026-06-25-21-00-terminal-links-debug.md`:
+- `provideLinks` nunca se invoca (el link provider se registra en `createSlot` mientras el slot esta en el recycler; posible problema de timing o de lifecycle del ILinkProvider cuando el terminal se mueve al DOM visible).
+- Diagnostico y proximos pasos documentados en el handoff.
 
 ---
 
