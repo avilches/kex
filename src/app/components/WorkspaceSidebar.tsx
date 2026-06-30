@@ -15,7 +15,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Cancel01Icon, CheckmarkCircle01Icon, Delete02Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, CheckmarkCircle01Icon, ChevronRightIcon, Delete02Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -64,6 +64,8 @@ export type WorkspaceSidebarProps = {
   onOpenSettings: (id: string) => void;
   width: number;
   onWidthChange: (w: number) => void;
+  collapsedGroups: Set<string>;
+  onToggleGroup: (statusId: string) => void;
 };
 
 function abbrev(title: string, kind: string): string {
@@ -304,6 +306,8 @@ export function WorkspaceSidebar({
   onOpenSettings,
   width,
   onWidthChange,
+  collapsedGroups,
+  onToggleGroup,
 }: WorkspaceSidebarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [isDragging, setIsDragging] = useState(false);
@@ -395,38 +399,70 @@ export function WorkspaceSidebar({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        {groups.map((group) => (
-          <div key={group.id} className="w-full">
-            {group.label !== null && (
-              compact ? (
-                <div className="mx-1.5 my-1 h-px bg-border/40" />
-              ) : (
-                <div className="px-2.5 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 truncate">
-                  {group.label}
-                </div>
-              )
-            )}
-            <SortableContext
-              items={group.items.map((w) => w.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {group.items.map((ws) => (
-                <SortableWorkspaceItem
-                  key={ws.id}
-                  ws={ws}
-                  active={ws.id === activeId}
-                  sidebarWidth={width}
-                  workspaceStatuses={workspaceStatuses}
-                  onSelect={onSelect}
-                  onClose={onClose}
-                  onRename={onRename}
-                  onOpenSettings={onOpenSettings}
-                  onSetStatus={onSetStatus}
-                />
-              ))}
-            </SortableContext>
-          </div>
-        ))}
+        {groups.map((group) => {
+          const isCollapsible = group.label !== null;
+          const isCollapsed = isCollapsible && collapsedGroups.has(group.id);
+          return (
+            <div key={group.id} className="w-full">
+              {isCollapsible && (
+                compact ? (
+                  <button
+                    type="button"
+                    title={isCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+                    onClick={() => onToggleGroup(group.id)}
+                    className={cn(
+                      "mx-1.5 my-1 h-px w-[calc(100%-12px)] rounded-full border-0 bg-border/40 transition-colors hover:bg-border/80",
+                      isCollapsed && "bg-border/70",
+                    )}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onToggleGroup(group.id)}
+                    className="flex w-full items-center gap-1 px-1.5 pt-2 pb-0.5 text-left transition-colors hover:text-foreground/80"
+                  >
+                    <HugeiconsIcon
+                      icon={ChevronRightIcon}
+                      size={10}
+                      strokeWidth={2}
+                      className={cn(
+                        "shrink-0 text-muted-foreground/60 transition-transform duration-150",
+                        !isCollapsed && "rotate-90",
+                      )}
+                    />
+                    <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                      {group.label}
+                    </span>
+                    <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
+                      {group.items.length}
+                    </span>
+                  </button>
+                )
+              )}
+              {!isCollapsed && (
+                <SortableContext
+                  items={group.items.map((w) => w.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {group.items.map((ws) => (
+                    <SortableWorkspaceItem
+                      key={ws.id}
+                      ws={ws}
+                      active={ws.id === activeId}
+                      sidebarWidth={width}
+                      workspaceStatuses={workspaceStatuses}
+                      onSelect={onSelect}
+                      onClose={onClose}
+                      onRename={onRename}
+                      onOpenSettings={onOpenSettings}
+                      onSetStatus={onSetStatus}
+                    />
+                  ))}
+                </SortableContext>
+              )}
+            </div>
+          );
+        })}
 
         <DragOverlay dropAnimation={null}>
           {dragActiveWs ? (() => {
