@@ -31,7 +31,7 @@ export function useSourceControlContext({
   const workspaceFallbackPath = launchCwdResolved
     ? (launchCwd ?? home ?? null)
     : null;
-  // explorerRootMode is always pinned|filesystem; the displayed folder is the
+  // explorerRootMode is always workspace|filesystem; the displayed folder is the
   // git context so SC and explorer decorations reflect the explorer root's repo.
   const sourceControlContextPath = explorerRoot ?? workspaceFallbackPath;
   const sourceControlPath = sourceControlContextPath;

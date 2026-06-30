@@ -196,8 +196,8 @@ export default function App() {
     setWorkspaceCwd,
     setExplorerRootMode,
     setShowHidden,
-    setPinnedRoot,
-    clearPinnedRoot,
+    setWorkspaceRoot,
+    clearWorkspaceRoot,
     setFsRoot,
     setWorkspaceTitle,
     setWorkspaceColor,
@@ -582,7 +582,7 @@ export default function App() {
       }
 
       const freshPanelId = newTabId();
-      const panelCwd = config.cwd ?? activeWorkspace.pinnedRoot ?? activeWorkspace.cwd;
+      const panelCwd = config.cwd ?? activeWorkspace.workspaceRoot ?? activeWorkspace.cwd;
       const tab: Tab = { id: freshPanelId, kind: "terminal", cwd: panelCwd, title: config.name || undefined };
 
       // Case 2: existing script pane -- add panel to it without splitting
@@ -715,7 +715,7 @@ export default function App() {
 
   const activeShowHidden = activeWorkspace?.showHidden ?? false;
 
-  const workspaceRootPath = activeWorkspace?.pinnedRoot ?? null;
+  const workspaceRootPath = activeWorkspace?.workspaceRoot ?? null;
   const fsFolderRoot = activeWorkspace?.fsRoot ?? null;
 
   // Git repo the workspace root belongs to, or null when the workspace root is a
@@ -727,7 +727,7 @@ export default function App() {
     () =>
       resolveExplorerRoot({
         mode: activeRootMode,
-        pinnedRoot: workspaceRootPath,
+        workspaceRoot: workspaceRootPath,
         fsRoot: fsFolderRoot,
         home,
       }),
@@ -778,9 +778,9 @@ export default function App() {
 
   const handleSetAsRoot = useCallback(
     (path: string) => {
-      if (activeWorkspace) setPinnedRoot(activeWorkspace.id, path);
+      if (activeWorkspace) setWorkspaceRoot(activeWorkspace.id, path);
     },
-    [activeWorkspace, setPinnedRoot],
+    [activeWorkspace, setWorkspaceRoot],
   );
 
   const handleNavigateUp = useCallback(() => {
@@ -952,7 +952,7 @@ export default function App() {
           mode: terminalNewFolderMode,
           home: homeRef.current,
           lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
-          workspaceRoot: ws.pinnedRoot ?? ws.fsRoot ?? null,
+          workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
         }),
       });
     },
@@ -1270,7 +1270,7 @@ export default function App() {
           mode: terminalNewFolderMode,
           home: homeRef.current,
           lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
-          workspaceRoot: ws.pinnedRoot ?? ws.fsRoot ?? null,
+          workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
         }),
       });
     },
@@ -1304,7 +1304,7 @@ export default function App() {
           mode: terminalNewFolderMode,
           home: homeRef.current,
           lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
-          workspaceRoot: ws.pinnedRoot ?? ws.fsRoot ?? null,
+          workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
         }),
       });
     },
@@ -1636,7 +1636,7 @@ export default function App() {
     }
     const mode = activeWorkspace?.explorerRootMode ?? "filesystem";
     if (mode === "filesystem") {
-      if (activeWorkspace?.pinnedRoot) handleChangeRootMode("workspace");
+      if (activeWorkspace?.workspaceRoot) handleChangeRootMode("workspace");
     } else {
       handleChangeRootMode("filesystem");
     }
@@ -1725,7 +1725,7 @@ export default function App() {
   const newWorkspaceFromFolder = useCallback(
     (path: string) => {
       const wsId = addWorkspace(path);
-      setPinnedRoot(wsId, path);
+      setWorkspaceRoot(wsId, path);
       setTimeout(() => {
         const ws = workspacesRef.current.find((w) => w.id === wsId);
         if (!ws) return;
@@ -1736,7 +1736,7 @@ export default function App() {
         if (panel) terminalHandles.current.get(panel.id)?.focus();
       }, 80);
     },
-    [addWorkspace, setPinnedRoot],
+    [addWorkspace, setWorkspaceRoot],
   );
 
   const panelCallbacks = useMemo<TabCallbacks>(
@@ -2854,9 +2854,9 @@ export default function App() {
             onSetTitle={setWorkspaceTitle}
             onSetColor={setWorkspaceColor}
             onSetIcon={setWorkspaceIcon}
-            onSetPinnedRoot={(id, path) => {
-              if (path !== undefined) setPinnedRoot(id, path);
-              else clearPinnedRoot(id);
+            onSetWorkspaceRoot={(id, path) => {
+              if (path !== undefined) setWorkspaceRoot(id, path);
+              else clearWorkspaceRoot(id);
             }}
             onAddScript={addScript}
             onUpdateScript={updateScript}

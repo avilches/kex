@@ -75,7 +75,7 @@ export type Workspace = {
   activePaneId: string;
   explorerRootMode?: ExplorerRootMode;
   showHidden?: boolean;
-  pinnedRoot?: string;
+  workspaceRoot?: string;
   fsRoot?: string;
   git?: WorkspaceGitConfig;
   color?: string | null;

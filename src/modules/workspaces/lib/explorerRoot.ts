@@ -4,7 +4,7 @@ export type ExplorerRootMode = "workspace" | "filesystem";
 
 export type ResolveExplorerRootInput = {
   mode: ExplorerRootMode;
-  pinnedRoot: string | null;
+  workspaceRoot: string | null;
   fsRoot: string | null;
   home: string | null;
 };
@@ -12,7 +12,7 @@ export type ResolveExplorerRootInput = {
 export function resolveExplorerRoot(r: ResolveExplorerRootInput): string | null {
   switch (r.mode) {
     case "workspace":
-      return r.pinnedRoot;
+      return r.workspaceRoot;
     case "filesystem":
     default:
       return r.fsRoot ?? r.home;
@@ -116,7 +116,6 @@ export function migrateExplorerRootMode(
   mode: string | undefined,
 ): ExplorerRootMode | undefined {
   if (mode === "terminal" || mode === "git") return "filesystem";
-  if (mode === "pinned") return "workspace";
   if (mode === "filesystem" || mode === "workspace") return mode;
   return undefined;
 }

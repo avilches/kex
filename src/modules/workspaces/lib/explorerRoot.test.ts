@@ -12,7 +12,7 @@ import {
 
 describe("resolveExplorerRoot", () => {
   const base = {
-    pinnedRoot: "/pinned",
+    workspaceRoot: "/pinned",
     fsRoot: null as string | null,
     home: "/home/u",
   };
@@ -35,7 +35,7 @@ describe("resolveExplorerRoot", () => {
 
   it("workspace mode returns null when nothing is pinned", () => {
     expect(
-      resolveExplorerRoot({ ...base, mode: "workspace", pinnedRoot: null }),
+      resolveExplorerRoot({ ...base, mode: "workspace", workspaceRoot: null }),
     ).toBeNull();
   });
 });
@@ -249,9 +249,6 @@ describe("migrateExplorerRootMode", () => {
     expect(migrateExplorerRootMode("workspace")).toBe("workspace");
   });
 
-  it("migrates legacy pinned mode to workspace", () => {
-    expect(migrateExplorerRootMode("pinned")).toBe("workspace");
-  });
   it("returns undefined for missing/unknown", () => {
     expect(migrateExplorerRootMode(undefined)).toBeUndefined();
     expect(migrateExplorerRootMode("bogus")).toBeUndefined();

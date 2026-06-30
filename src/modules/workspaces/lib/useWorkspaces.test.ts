@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
-import { applyCloseTab, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, applyShowHidden, applyWorkspaceStatus, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
-import { migrateWorkspace } from "./workspaceState";
+import { applyCloseTab, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceStatus, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -32,16 +31,16 @@ describe("applyShowHidden", () => {
   });
 });
 
-describe("applyPinnedRoot", () => {
-  it("sets pinnedRoot and switches mode to workspace", () => {
-    const out = applyPinnedRoot([ws()], "w1", "/some/dir");
-    expect(out[0].pinnedRoot).toBe("/some/dir");
+describe("applyWorkspaceRoot", () => {
+  it("sets workspaceRoot and switches mode to workspace", () => {
+    const out = applyWorkspaceRoot([ws()], "w1", "/some/dir");
+    expect(out[0].workspaceRoot).toBe("/some/dir");
     expect(out[0].explorerRootMode).toBe("workspace");
   });
 
-  it("strips a trailing slash from the pinned path", () => {
-    const out = applyPinnedRoot([ws()], "w1", "/some/dir/");
-    expect(out[0].pinnedRoot).toBe("/some/dir");
+  it("strips a trailing slash from the workspace root path", () => {
+    const out = applyWorkspaceRoot([ws()], "w1", "/some/dir/");
+    expect(out[0].workspaceRoot).toBe("/some/dir");
   });
 });
 
@@ -327,48 +326,11 @@ describe("findReopenTarget", () => {
   });
 });
 
-describe("migrateWorkspace", () => {
-  it("migrates pinned mode to workspace", () => {
-    const raw = ws({ explorerRootMode: "pinned" as unknown as "workspace", pinnedRoot: "/foo" });
-    const migrated = migrateWorkspace(raw);
-    expect(migrated.explorerRootMode).toBe("workspace");
-    expect(migrated.pinnedRoot).toBe("/foo");
-  });
-
-  it("workspace mode with no pinnedRoot copies cwd", () => {
-    const raw = ws({ explorerRootMode: "workspace", cwd: "/home/user/proj" });
-    const migrated = migrateWorkspace(raw);
-    expect(migrated.pinnedRoot).toBe("/home/user/proj");
-    expect(migrated.explorerRootMode).toBe("workspace");
-  });
-
-  it("workspace mode with no pinnedRoot and no cwd falls back to filesystem", () => {
-    const raw = ws({ explorerRootMode: "workspace" });
-    const migrated = migrateWorkspace(raw);
-    expect(migrated.explorerRootMode).toBe("filesystem");
-  });
-
-  it("leaves filesystem mode and pinnedRoot unchanged", () => {
-    const raw = ws({ explorerRootMode: "filesystem", pinnedRoot: "/foo" });
-    const migrated = migrateWorkspace(raw);
-    expect(migrated.explorerRootMode).toBe("filesystem");
-    expect(migrated.pinnedRoot).toBe("/foo");
-  });
-
-  it("is a no-op when already correct", () => {
-    const raw = ws({ explorerRootMode: "workspace", pinnedRoot: "/foo" });
-    const migrated = migrateWorkspace(raw);
-    expect(migrated.explorerRootMode).toBe("workspace");
-    expect(migrated.pinnedRoot).toBe("/foo");
-  });
-
-});
-
-describe("Script actions (pure helpers via applyPinnedRoot pattern)", () => {
+describe("Script actions", () => {
   const cfg = (id: string): Script => ({ id, name: `Config ${id}`, command: `cmd-${id}` });
 
-  it("applyPinnedRoot sets mode to workspace (not pinned)", () => {
-    const out = applyPinnedRoot([ws()], "w1", "/proj");
+  it("applyWorkspaceRoot sets mode to workspace", () => {
+    const out = applyWorkspaceRoot([ws()], "w1", "/proj");
     expect(out[0].explorerRootMode).toBe("workspace");
   });
 

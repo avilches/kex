@@ -48,7 +48,7 @@ type Props = {
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
   onSetStatus: (id: string, statusId: string | null) => void;
-  onSetPinnedRoot: (id: string, path: string | undefined) => void;
+  onSetWorkspaceRoot: (id: string, path: string | undefined) => void;
   onAddScript: (id: string, config: Script) => void;
   onUpdateScript: (id: string, configId: string, patch: Partial<Script>) => void;
   onRemoveScript: (id: string, configId: string) => void;
@@ -306,7 +306,7 @@ type FormProps = { ws: Workspace; initialSection: WorkspaceSettingsSection; init
 
 function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClose, ...props }: FormProps) {
   const [activeSection, setActiveSection] = useState<WorkspaceSettingsSection>(initialSection);
-  const [cwdValue, setCwdValue] = useState(ws.pinnedRoot ?? "");
+  const [cwdValue, setCwdValue] = useState(ws.workspaceRoot ?? "");
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
   const [titleValue, setTitleValue] = useState(ws.title ?? "");
   const [statusExpanded, setStatusExpanded] = useState(false);
@@ -467,9 +467,9 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                 onChange={(e) => setCwdValue(e.target.value)}
                 onBlur={() => {
                   if (!cwdValue) {
-                    props.onSetPinnedRoot(ws.id, undefined);
+                    props.onSetWorkspaceRoot(ws.id, undefined);
                   } else if (cwdValid !== false) {
-                    props.onSetPinnedRoot(ws.id, cwdValue);
+                    props.onSetWorkspaceRoot(ws.id, cwdValue);
                   }
                 }}
                 onKeyDown={(e) => {
@@ -484,7 +484,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                   onClick={() => {
                     setCwdValue("");
                     setCwdValid(null);
-                    props.onSetPinnedRoot(ws.id, undefined);
+                    props.onSetWorkspaceRoot(ws.id, undefined);
                   }}
                   className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
                 >
@@ -502,7 +502,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                   if (typeof selected === "string") {
                     setCwdValue(selected);
                     setCwdValid(null);
-                    props.onSetPinnedRoot(ws.id, selected);
+                    props.onSetWorkspaceRoot(ws.id, selected);
                   }
                 }}
                 className="size-[22px] flex items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"

@@ -78,7 +78,7 @@ export function applyShowHidden(
   );
 }
 
-export function applyPinnedRoot(
+export function applyWorkspaceRoot(
   workspaces: Workspace[],
   workspaceId: string,
   path: string,
@@ -86,7 +86,7 @@ export function applyPinnedRoot(
   const normalized = path.length > 1 ? path.replace(/\/$/, "") : path;
   return workspaces.map((w) =>
     w.id === workspaceId
-      ? { ...w, pinnedRoot: normalized, explorerRootMode: "workspace" }
+      ? { ...w, workspaceRoot: normalized, explorerRootMode: "workspace" }
       : w,
   );
 }
@@ -638,15 +638,15 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
-  const setPinnedRoot = useCallback((workspaceId: string, path: string) => {
-    setWorkspaces((prev) => applyPinnedRoot(prev, workspaceId, path));
+  const setWorkspaceRoot = useCallback((workspaceId: string, path: string) => {
+    setWorkspaces((prev) => applyWorkspaceRoot(prev, workspaceId, path));
   }, []);
 
-  const clearPinnedRoot = useCallback((workspaceId: string) => {
+  const clearWorkspaceRoot = useCallback((workspaceId: string) => {
     setWorkspaces((prev) =>
       prev.map((w) =>
         w.id === workspaceId
-          ? { ...w, pinnedRoot: undefined, explorerRootMode: "filesystem" }
+          ? { ...w, workspaceRoot: undefined, explorerRootMode: "filesystem" }
           : w,
       ),
     );
@@ -833,8 +833,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceCwd,
     setExplorerRootMode,
     setShowHidden,
-    setPinnedRoot,
-    clearPinnedRoot,
+    setWorkspaceRoot,
+    clearWorkspaceRoot,
     setFsRoot,
     setWorkspaceGitConfig,
     setWorkspaceTitle,
