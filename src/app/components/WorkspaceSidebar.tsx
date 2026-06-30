@@ -15,7 +15,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Cancel01Icon, Delete02Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, CheckmarkCircle01Icon, Delete02Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -26,8 +26,13 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
@@ -72,18 +77,22 @@ function SortableWorkspaceItem({
   ws,
   active,
   sidebarWidth,
+  workspaceStatuses,
   onSelect,
   onClose,
   onRename,
   onOpenSettings,
+  onSetStatus,
 }: {
   ws: WorkspaceItem;
   active: boolean;
   sidebarWidth: number;
+  workspaceStatuses: WorkspaceStatus[];
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onOpenSettings: (id: string) => void;
+  onSetStatus: (id: string, statusId: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ws.id });
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
@@ -219,6 +228,30 @@ function SortableWorkspaceItem({
             Rename
             {renameLabel && <ContextMenuShortcut>{renameLabel}</ContextMenuShortcut>}
           </ContextMenuItem>
+          {workspaceStatuses.length > 0 && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={2} />
+                Set status
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent>
+                <ContextMenuRadioGroup
+                  value={ws.statusId ?? ""}
+                  onValueChange={(value) => onSetStatus(ws.id, value === "" ? null : value)}
+                >
+                  <ContextMenuRadioItem value="">
+                    No status
+                  </ContextMenuRadioItem>
+                  <ContextMenuSeparator />
+                  {workspaceStatuses.map((s) => (
+                    <ContextMenuRadioItem key={s.id} value={s.id}>
+                      {s.label}
+                    </ContextMenuRadioItem>
+                  ))}
+                </ContextMenuRadioGroup>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
           {onClose && (
             <ContextMenuItem onSelect={() => onClose(ws.id)} className="text-destructive focus:text-destructive">
               <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
@@ -383,10 +416,12 @@ export function WorkspaceSidebar({
                   ws={ws}
                   active={ws.id === activeId}
                   sidebarWidth={width}
+                  workspaceStatuses={workspaceStatuses}
                   onSelect={onSelect}
                   onClose={onClose}
                   onRename={onRename}
                   onOpenSettings={onOpenSettings}
+                  onSetStatus={onSetStatus}
                 />
               ))}
             </SortableContext>
