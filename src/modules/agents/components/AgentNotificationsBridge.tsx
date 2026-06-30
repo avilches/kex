@@ -44,16 +44,16 @@ function panelInfo(
 }
 
 /** True when this panel is the one the user is actively looking at (active workspace, active pane, active panel). */
-function isPanelVisible(ctx: Ctx, tabId: string, panelId: string): boolean {
-  if (ctx.activeWorkspaceId !== tabId) return false;
-  const ws = ctx.workspaces.find((w) => w.id === tabId);
+function isPanelVisible(ctx: Ctx, workspaceId: string, panelId: string): boolean {
+  if (ctx.activeWorkspaceId !== workspaceId) return false;
+  const ws = ctx.workspaces.find((w) => w.id === workspaceId);
   if (!ws) return false;
   return focusedPanelId(ws.paneTree, ws.activePaneId) === panelId;
 }
 
 /** The user is both focused on the window and looking at this panel: no attention is pending. */
-function isPanelSeen(ctx: Ctx, tabId: string, panelId: string): boolean {
-  return ctx.focused && isPanelVisible(ctx, tabId, panelId);
+function isPanelSeen(ctx: Ctx, workspaceId: string, panelId: string): boolean {
+  return ctx.focused && isPanelVisible(ctx, workspaceId, panelId);
 }
 
 function route(
@@ -73,7 +73,7 @@ function route(
         ? `${name} stopped with an error`
         : `${name} finished`;
 
-  const panelVisible = isPanelVisible(ctx, session.tabId, session.panelId);
+  const panelVisible = isPanelVisible(ctx, session.workspaceId, session.panelId);
 
   routeAgentNotification({
     source: "terminal",
@@ -84,9 +84,9 @@ function route(
     focused: ctx.focused,
     visible: panelVisible,
     allowToast: kind === "attention",
-    tabId: session.tabId,
+    workspaceId: session.workspaceId,
     panelId: session.panelId,
-    onActivate: () => ctx.onActivate(session.tabId, session.panelId),
+    onActivate: () => ctx.onActivate(session.workspaceId, session.panelId),
   });
 }
 
@@ -125,7 +125,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     case "Notification": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       const session = store.sessions[panelId];
-      if (session && !isPanelSeen(ctx, session.tabId, panelId)) {
+      if (session && !isPanelSeen(ctx, session.workspaceId, panelId)) {
         store.setStatus(panelId, "waiting");
         route(session, "attention", ctx);
       }
@@ -137,7 +137,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       // is what raises the attention dot.
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       const session = store.sessions[panelId];
-      if (session && !isPanelSeen(ctx, session.tabId, panelId)) {
+      if (session && !isPanelSeen(ctx, session.workspaceId, panelId)) {
         store.setStatus(panelId, "waiting");
         route(session, "attention", ctx);
       } else {
@@ -148,7 +148,7 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     case "PermissionRequest": {
       ensureSession(panelId, ctx, sig.agent ?? "claude");
       const permSession = store.sessions[panelId];
-      if (permSession && !isPanelSeen(ctx, permSession.tabId, panelId)) {
+      if (permSession && !isPanelSeen(ctx, permSession.workspaceId, panelId)) {
         store.setStatus(panelId, "waiting");
         route(permSession, "attention", ctx);
       }

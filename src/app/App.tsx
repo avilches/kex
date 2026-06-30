@@ -2257,8 +2257,8 @@ export default function App() {
       "notifications.jumpToLast": () => {
         const first = useAgentStore.getState().notifications[0];
         if (!first) return;
-        setActiveWorkspaceId(first.tabId);
-        activatePanel(first.tabId, first.panelId);
+        setActiveWorkspaceId(first.workspaceId);
+        activatePanel(first.workspaceId, first.panelId);
         setTimeout(
           () => terminalHandles.current.get(first.panelId)?.focus(),
           50,

@@ -30,7 +30,7 @@ import { useAgentStore } from "../store/agentStore";
 import { useBellStore } from "../store/bellStore";
 
 type Props = {
-  onActivate: (tabId: string, panelId: string) => void;
+  onActivate: (workspaceId: string, panelId: string) => void;
 };
 
 function relativeTime(ts: number): string {
@@ -141,8 +141,8 @@ export function NotificationBell({ onActivate }: Props) {
     }
   };
 
-  const activate = (tabId: string, panelId: string) => {
-    onActivate(tabId, panelId);
+  const activate = (workspaceId: string, panelId: string) => {
+    onActivate(workspaceId, panelId);
     setOpen(false);
   };
 
@@ -197,7 +197,7 @@ export function NotificationBell({ onActivate }: Props) {
                 key={entry.panelId}
                 entry={entry}
                 name={oscTitles.get(entry.panelId) ?? entry.agent}
-                onClick={() => activate(entry.tabId, entry.panelId)}
+                onClick={() => activate(entry.workspaceId, entry.panelId)}
               />
             ))}
           </div>

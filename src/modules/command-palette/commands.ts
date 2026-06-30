@@ -71,12 +71,12 @@ export function createCommandItems(
   const activePaneCount = ctx.activeWorkspacePaneTree
     ? allPaneIds(ctx.activeWorkspacePaneTree).length
     : 0;
-  const onlyOneTab = ctx.workspaceCount < 2;
+  const onlyOneWorkspace = ctx.workspaceCount < 2;
   const noWorkspaceRoot = !ctx.explorerRoot && !ctx.home;
   const splitDisabled =
     activePaneCount >= MAX_PANES_PER_WORKSPACE ? "Pane limit" : undefined;
   const closeDisabled =
-    onlyOneTab && activePaneCount < 2 ? "Last tab" : undefined;
+    onlyOneWorkspace && activePaneCount < 2 ? "Last workspace" : undefined;
 
   return [
     {

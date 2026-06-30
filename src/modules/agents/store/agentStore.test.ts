@@ -61,14 +61,14 @@ describe("agentStore.pushNotification (una por agente)", () => {
       source: "terminal",
       agent: "claude",
       kind: "attention",
-      tabId: "t",
+      workspaceId: "t",
       panelId: "p1",
     });
     push({
       source: "terminal",
       agent: "claude",
       kind: "finished",
-      tabId: "t",
+      workspaceId: "t",
       panelId: "p1",
     });
     const notifs = useAgentStore.getState().notifications;
@@ -83,21 +83,21 @@ describe("agentStore.pushNotification (una por agente)", () => {
       source: "terminal",
       agent: "claude",
       kind: "finished",
-      tabId: "t",
+      workspaceId: "t",
       panelId: "p1",
     });
     push({
       source: "terminal",
       agent: "claude",
       kind: "finished",
-      tabId: "t",
+      workspaceId: "t",
       panelId: "p2",
     });
     push({
       source: "terminal",
       agent: "claude",
       kind: "attention",
-      tabId: "t",
+      workspaceId: "t",
       panelId: "p1",
     });
     const notifs = useAgentStore.getState().notifications;
@@ -134,7 +134,7 @@ describe("agentStore.markPanelSeen", () => {
       source: "terminal",
       agent: "claude",
       kind: "finished",
-      tabId: "t",
+      workspaceId: "t",
       panelId: "p1",
     });
     st.markPanelSeen("p1");
@@ -170,7 +170,7 @@ describe("agentStore.clearAll", () => {
       source: "terminal",
       agent: "claude",
       kind: "error",
-      tabId: "t",
+      workspaceId: "t",
       panelId: "p3",
     });
 

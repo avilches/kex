@@ -15,14 +15,14 @@ type AgentStoreState = {
   sessions: Record<string, AgentSession>;
   localAgent: LocalAgentState;
   notifications: AgentNotification[];
-  start: (panelId: string, tabId: string, agent: string) => void;
-  startIdle: (panelId: string, tabId: string, agent: string) => void;
+  start: (panelId: string, workspaceId: string, agent: string) => void;
+  startIdle: (panelId: string, workspaceId: string, agent: string) => void;
   setStatus: (panelId: string, status: AgentStatus) => void;
   finish: (panelId: string) => void;
-  startRestored: (panelId: string, tabId: string, agent: string) => void;
+  startRestored: (panelId: string, workspaceId: string, agent: string) => void;
   setRestoreError: (
     panelId: string,
-    tabId: string,
+    workspaceId: string,
     agent: string,
     reason?: string,
   ) => void;
@@ -41,7 +41,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   localAgent: null,
   notifications: [],
 
-  start: (panelId, tabId, agent) =>
+  start: (panelId, workspaceId, agent) =>
     set((s) => {
       const now = Date.now();
       return {
@@ -49,7 +49,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
           ...s.sessions,
           [panelId]: {
             panelId,
-            tabId,
+            workspaceId,
             agent,
             status: "working",
             startedAt: now,
@@ -62,7 +62,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  startIdle: (panelId, tabId, agent) =>
+  startIdle: (panelId, workspaceId, agent) =>
     set((s) => {
       const now = Date.now();
       return {
@@ -70,7 +70,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
           ...s.sessions,
           [panelId]: {
             panelId,
-            tabId,
+            workspaceId,
             agent,
             status: "idle",
             startedAt: now,
@@ -110,7 +110,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       return { sessions: next };
     }),
 
-  startRestored: (panelId, tabId, agent) =>
+  startRestored: (panelId, workspaceId, agent) =>
     set((s) => {
       const now = Date.now();
       return {
@@ -118,7 +118,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
           ...s.sessions,
           [panelId]: {
             panelId,
-            tabId,
+            workspaceId,
             agent,
             status: "working",
             startedAt: now,
@@ -131,7 +131,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       };
     }),
 
-  setRestoreError: (panelId, tabId, agent, reason) =>
+  setRestoreError: (panelId, workspaceId, agent, reason) =>
     set((s) => {
       const now = Date.now();
       return {
@@ -139,7 +139,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
           ...s.sessions,
           [panelId]: {
             panelId,
-            tabId,
+            workspaceId,
             agent,
             status: "working",
             startedAt: now,
@@ -282,8 +282,8 @@ if (import.meta.env?.DEV && typeof window !== "undefined") {
     },
     fakeNotification(panelId, kind = "attention", agent = "claude-code") {
       const session = useAgentStore.getState().sessions[panelId];
-      const tabId = session?.tabId ?? panelId;
-      useAgentStore.getState().pushNotification({ source: "terminal", panelId, tabId, agent, kind });
+      const workspaceId = session?.workspaceId ?? panelId;
+      useAgentStore.getState().pushNotification({ source: "terminal", panelId, workspaceId, agent, kind });
     },
   };
 }

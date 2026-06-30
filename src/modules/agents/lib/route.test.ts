@@ -48,7 +48,7 @@ describe("routeAgentNotification", () => {
       focused: false,
       visible: false,
       allowToast: false,
-      tabId: "ws-abc",
+      workspaceId: "ws-abc",
       panelId: "panel-xyz",
       onActivate: vi.fn(),
     });
@@ -65,7 +65,7 @@ describe("routeAgentNotification", () => {
       body: "my-project",
     });
     expect(pushNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "finished", tabId: "ws-abc", panelId: "panel-xyz" }),
+      expect.objectContaining({ kind: "finished", workspaceId: "ws-abc", panelId: "panel-xyz" }),
     );
   });
 

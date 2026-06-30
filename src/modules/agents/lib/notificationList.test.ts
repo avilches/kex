@@ -5,7 +5,7 @@ import type { AgentNotification, AgentSession } from "./types";
 function session(p: Partial<AgentSession> & { panelId: string }): AgentSession {
   return {
     panelId: p.panelId,
-    tabId: p.tabId ?? "tab",
+    workspaceId: p.workspaceId ?? "tab",
     agent: p.agent ?? "claude",
     status: p.status ?? "idle",
     startedAt: p.startedAt ?? 0,
@@ -28,7 +28,7 @@ function notif(
     id: p.id ?? `n-${p.panelId}`,
     source: p.source ?? "terminal",
     panelId: p.panelId,
-    tabId: p.tabId ?? "tab",
+    workspaceId: p.workspaceId ?? "tab",
     agent: p.agent ?? "claude",
     kind: p.kind,
     at: p.at ?? 0,

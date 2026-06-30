@@ -4,7 +4,7 @@ export type AgentEntryVisual = "waiting" | "working" | "error";
 
 export type AgentEntry = {
   panelId: string;
-  tabId: string;
+  workspaceId: string;
   agent: string;
   visual: AgentEntryVisual;
   at: number;
@@ -45,7 +45,7 @@ export function buildAgentEntries(
     const session = sessions[panelId];
     const notif = notifByPanel.get(panelId);
     const agent = session?.agent ?? notif?.agent ?? "claude";
-    const tabId = session?.tabId ?? notif?.tabId ?? "";
+    const workspaceId = session?.workspaceId ?? notif?.workspaceId ?? "";
 
     let visual: AgentEntryVisual;
     let at: number;
@@ -73,7 +73,7 @@ export function buildAgentEntries(
       continue;
     }
 
-    entries.push({ panelId, tabId, agent, visual, at, pending });
+    entries.push({ panelId, workspaceId, agent, visual, at, pending });
   }
 
   entries.sort((a, b) =>
