@@ -89,6 +89,7 @@ import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider"
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
+import { visibleWorkspaceOrder } from "@/modules/workspaces/lib/workspaceOrder";
 import type { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -2014,16 +2015,19 @@ export default function App() {
 
   const cycleWorkspace = useCallback(
     (delta: 1 | -1) => {
-      const navigable = workspaces.filter(
-        (w) => !w.statusId || !collapsedGroups.has(w.statusId),
+      const visible = visibleWorkspaceOrder(
+        workspaces,
+        workspaceStatuses,
+        collapsedGroups,
+        activeWorkspaceId,
       );
-      if (navigable.length < 2) return;
-      const idx = navigable.findIndex((w) => w.id === activeWorkspaceId);
+      if (visible.length < 2) return;
+      const idx = visible.findIndex((w) => w.id === activeWorkspaceId);
       const baseIdx = idx === -1 ? 0 : idx;
-      const nextIdx = (baseIdx + delta + navigable.length) % navigable.length;
-      setActiveWorkspaceId(navigable[nextIdx].id);
+      const nextIdx = (baseIdx + delta + visible.length) % visible.length;
+      setActiveWorkspaceId(visible[nextIdx].id);
     },
-    [workspaces, collapsedGroups, activeWorkspaceId, setActiveWorkspaceId],
+    [workspaces, workspaceStatuses, collapsedGroups, activeWorkspaceId, setActiveWorkspaceId],
   );
 
   function focusPaneInDirection(dir: "up" | "down" | "left" | "right") {
@@ -2235,8 +2239,14 @@ export default function App() {
       "workspace.next": () => cycleWorkspace(1),
       "workspace.selectByIndex": (e) => {
         const idx = parseInt(e.key, 10) - 1;
-        if (idx >= 0 && idx < workspaces.length)
-          setActiveWorkspaceId(workspaces[idx].id);
+        const visible = visibleWorkspaceOrder(
+          workspaces,
+          workspaceStatuses,
+          collapsedGroups,
+          activeWorkspaceId,
+        );
+        if (idx >= 0 && idx < visible.length)
+          setActiveWorkspaceId(visible[idx].id);
       },
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
@@ -2324,6 +2334,8 @@ export default function App() {
       activePanel,
       activeCwd,
       workspaces,
+      workspaceStatuses,
+      collapsedGroups,
       findPanelGlobal,
       updatePanelData,
       openCommandPalette,

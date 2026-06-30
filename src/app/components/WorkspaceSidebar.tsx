@@ -39,6 +39,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { groupWorkspaces, NO_STATUS_GROUP_ID } from "@/modules/workspaces/lib/workspaceOrder";
 import type { WorkspaceStatus } from "@/modules/settings/store";
 
 type WorkspaceItem = {
@@ -316,17 +317,10 @@ export function WorkspaceSidebar({
   const [dragStartStatus, setDragStartStatus] = useState<string | null | undefined>(undefined);
   const compact = width <= 80;
 
-  const groups = useMemo(() => {
-    const validIds = new Set(workspaceStatuses.map((s) => s.id));
-    const noStatus = workspaces.filter((w) => !w.statusId || !validIds.has(w.statusId));
-    const result: Array<{ id: string; label: string | null; items: WorkspaceItem[] }> = [];
-    if (noStatus.length > 0) result.push({ id: "__none__", label: null, items: noStatus });
-    for (const status of workspaceStatuses) {
-      const members = workspaces.filter((w) => w.statusId === status.id);
-      if (members.length > 0) result.push({ id: status.id, label: status.label, items: members });
-    }
-    return result;
-  }, [workspaces, workspaceStatuses]);
+  const groups = useMemo(
+    () => groupWorkspaces(workspaces, workspaceStatuses),
+    [workspaces, workspaceStatuses],
+  );
 
   function findGroupId(itemId: string): string | null {
     for (const g of groups) {
@@ -349,7 +343,7 @@ export function WorkspaceSidebar({
     const activeGroupId = findGroupId(String(active.id));
     const overGroupId = findGroupId(String(over.id));
     if (overGroupId === null || activeGroupId === overGroupId) return;
-    onSetStatus(String(active.id), overGroupId === "__none__" ? null : overGroupId);
+    onSetStatus(String(active.id), overGroupId === NO_STATUS_GROUP_ID ? null : overGroupId);
   }
 
   function handleDragCancel() {
