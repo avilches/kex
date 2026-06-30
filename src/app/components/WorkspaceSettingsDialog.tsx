@@ -297,7 +297,7 @@ function IconPicker({
         <button
           type="button"
           onClick={() => setPage((p) => (p + 1) % PALETTE_PAGES)}
-          className="absolute bottom-0 right-0 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+          className="absolute bottom-0 right-8 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
         >
           More {page + 1}/{PALETTE_PAGES}
         </button>
