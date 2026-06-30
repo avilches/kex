@@ -5,6 +5,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
   DragOverlay,
 } from "@dnd-kit/core";
@@ -274,6 +275,8 @@ export function WorkspaceSidebar({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [isDragging, setIsDragging] = useState(false);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+  // null = "had no status"; undefined = "no drag in progress"
+  const [dragStartStatus, setDragStartStatus] = useState<string | null | undefined>(undefined);
   const compact = width <= 80;
 
   const groups = useMemo(() => {
@@ -297,28 +300,47 @@ export function WorkspaceSidebar({
 
   function handleDragStart(event: DragStartEvent) {
     setIsDragging(true);
-    setDragActiveId(String(event.active.id));
+    const id = String(event.active.id);
+    setDragActiveId(id);
+    const ws = workspaces.find((w) => w.id === id);
+    setDragStartStatus(ws?.statusId ?? null);
   }
 
-  function handleDragCancel() {
-    setIsDragging(false);
-    setDragActiveId(null);
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    setIsDragging(false);
-    setDragActiveId(null);
+  function handleDragOver(event: DragOverEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const activeGroupId = findGroupId(String(active.id));
     const overGroupId = findGroupId(String(over.id));
-    if (activeGroupId === null || overGroupId === null) return;
-    if (activeGroupId !== overGroupId) {
-      onSetStatus(String(active.id), overGroupId === "__none__" ? null : overGroupId);
-      onReorder(String(active.id), String(over.id));
-    } else {
-      onReorder(String(active.id), String(over.id));
+    if (overGroupId === null || activeGroupId === overGroupId) return;
+    onSetStatus(String(active.id), overGroupId === "__none__" ? null : overGroupId);
+  }
+
+  function handleDragCancel() {
+    const id = dragActiveId;
+    const saved = dragStartStatus;
+    setIsDragging(false);
+    setDragActiveId(null);
+    setDragStartStatus(undefined);
+    if (id !== null && saved !== undefined) {
+      onSetStatus(id, saved);
     }
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setIsDragging(false);
+    const id = dragActiveId;
+    const saved = dragStartStatus;
+    setDragActiveId(null);
+    setDragStartStatus(undefined);
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      // Dropped in empty space: revert any status change made during drag
+      if (id !== null && saved !== undefined) {
+        onSetStatus(id, saved);
+      }
+      return;
+    }
+    onReorder(String(active.id), String(over.id));
   }
 
   const dragActiveWs = dragActiveId ? workspaces.find((w) => w.id === dragActiveId) : null;
@@ -336,6 +358,7 @@ export function WorkspaceSidebar({
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
