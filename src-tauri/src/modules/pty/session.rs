@@ -20,7 +20,7 @@ const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AgentSessionMetaPayload<'a> {
-    panel_id: &'a str,
+    tab_id: &'a str,
     session_id: &'a str,
     cwd_launch: &'a str,
     session_title: &'a str,
@@ -122,7 +122,7 @@ pub fn spawn(
     cwd: Option<String>,
     workspace: WorkspaceEnv,
     blocks: bool,
-    panel_id: Option<String>,
+    tab_id: Option<String>,
     shell: Option<String>,
     on_data: Channel<Response>,
     on_exit: Channel<i32>,
@@ -146,12 +146,12 @@ pub fn spawn(
     #[cfg(not(unix))]
     let ipc_path_opt: Option<&str> = None;
 
-    let cmd = shell_init::build_command(id, cwd, workspace, blocks, panel_id.clone(), ipc_path_opt, shell)?;
+    let cmd = shell_init::build_command(id, cwd, workspace, blocks, tab_id.clone(), ipc_path_opt, shell)?;
 
     #[cfg(unix)]
     let ipc_guard = super::ipc::spawn_listener(
         ipc_socket_path,
-        panel_id.clone().unwrap_or_default(),
+        tab_id.clone().unwrap_or_default(),
         id,
         app.clone(),
     );
@@ -206,7 +206,7 @@ pub fn spawn(
     let pending_r = pending.clone();
     let writer_for_da = writer.clone();
     let app_reader = app.clone();
-    let panel_id_for_reader = panel_id.clone().unwrap_or_default();
+    let tab_id_for_reader = tab_id.clone().unwrap_or_default();
     let reader_thread = thread::Builder::new()
         .name("kex-pty-reader".into())
         .spawn(move || {
@@ -227,18 +227,18 @@ pub fn spawn(
                         agent_detect.process(&buf[..n], |t| {
                             // Events that carry session data - update store + emit meta to frontend
                             let session_data = match &t {
-                                Transition::SessionStart { panel_id, agent, session_id, transcript_path, cwd, session_title, model, .. } => {
-                                    Some((panel_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone(), session_title.clone(), model.clone()))
+                                Transition::SessionStart { tab_id, agent, session_id, transcript_path, cwd, session_title, model, .. } => {
+                                    Some((tab_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone(), session_title.clone(), model.clone()))
                                 }
-                                Transition::UserPromptSubmit { panel_id, agent, session_id, transcript_path, cwd, .. } => {
-                                    Some((panel_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone(), String::new(), String::new()))
+                                Transition::UserPromptSubmit { tab_id, agent, session_id, transcript_path, cwd, .. } => {
+                                    Some((tab_id.clone(), agent.clone(), session_id.clone(), transcript_path.clone(), cwd.clone(), String::new(), String::new()))
                                 }
                                 _ => None,
                             };
-                            if let Some((panel_id, agent, session_id, transcript_path, cwd, session_title, model)) = session_data {
-                                session_store::record_session(&panel_id, &agent, &session_id, &transcript_path, &cwd);
+                            if let Some((tab_id, agent, session_id, transcript_path, cwd, session_title, model)) = session_data {
+                                session_store::record_session(&tab_id, &agent, &session_id, &transcript_path, &cwd);
                                 let _ = app_reader.emit(AGENT_SESSION_META_EVENT, AgentSessionMetaPayload {
-                                    panel_id: &panel_id,
+                                    tab_id: &tab_id,
                                     session_id: &session_id,
                                     cwd_launch: &cwd,
                                     session_title: &session_title,
@@ -253,7 +253,7 @@ pub fn spawn(
                             // Stash launch command for record_session (called on SessionStart IPC).
                             if let Transition::Started { ref cmd_string, .. } = t {
                                 if !cmd_string.is_empty() {
-                                    session_store::stash_cmd(&panel_id_for_reader, cmd_string.clone());
+                                    session_store::stash_cmd(&tab_id_for_reader, cmd_string.clone());
                                 }
                             }
                             let _ = app_reader.emit(AGENT_EVENT, t.into_signal(id));

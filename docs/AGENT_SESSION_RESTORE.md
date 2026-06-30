@@ -27,9 +27,9 @@ Claude Code hooks are installed by `agent_enable_claude_hooks`. The `agentNotifi
 it calls `agent_disable_claude_hooks`. Both commands are idempotent. On every startup, if `agentNotifications` is
 true, `agent_enable_claude_hooks` is called silently to repair any missing or outdated hooks.
 
-### KEX_PANEL_ID
+### KEX_TAB_ID
 
-Every PTY session receives a `KEX_PANEL_ID` environment variable (a UUID matching the panel's id in the workspace
+Every PTY session receives a `KEX_TAB_ID` environment variable (a UUID matching the tab's id in the workspace
 state). This is injected in `pty/shell_init.rs` → `apply_common` and is available to all processes running inside the
 terminal, including hook scripts.
 
@@ -38,17 +38,17 @@ terminal, including hook scripts.
 Triggered by Claude Code at session start. The hook command:
 
 ```
-[ -n "$KEX_PANEL_ID" ] && "$HOME/.config/kex/hooks/session.sh" || true  # kex-session-hook
+[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/session.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/session.sh`, marker: `kex-session-v4`) handles multiple Claude Code hook events:
+The script (`~/.config/kex/hooks/session.sh`, marker: `kex-session-v5`) handles multiple Claude Code hook events:
 
-1. Reads `KEX_PANEL_ID` from the environment. If unset, exits silently (panel is not managed by Kex).
+1. Reads `KEX_TAB_ID` from the environment. If unset, exits silently (tab is not managed by Kex).
 2. Reads the JSON event from stdin and extracts `hook_event_name`, `session_id`, `transcript_path`, and `cwd` via `jq`.
 3. For `SessionStart` and `UserPromptSubmit`: records the session via `session_store::record_session` (necessary
    for `--resume` to work across restarts).
 4. For all events (SessionStart, UserPromptSubmit, Notification, Stop, StopFailure, SessionEnd, PermissionRequest):
-   builds a unified OSC sequence: `OSC 777;kex;<event>;<panel_id>;<session_id>;<transcript_path>;<cwd>[;<extra>]`
+   builds a unified OSC sequence: `OSC 777;kex;<event>;<tab_id>;<session_id>;<transcript_path>;<cwd>[;<extra>]`
    where `<extra>` fields (e.g., error type, message) are only present for certain events and are percent-encoded.
 5. Emits the OSC sequence through `terminalSequence`.
 6. Rust `agent_detect.rs` intercepts and processes the OSC, calling `session_store::record_session` for recording
@@ -69,11 +69,11 @@ Because `OSC 133;C` fires in the PTY reader thread while `SessionStart` arrives 
 the command is bridged through a thread-safe stash:
 
 1. **Reader thread** (`session.rs`): `Transition::Started { cmd_string }` is emitted. If `cmd_string` is non-empty,
-   `session_store::stash_cmd(panel_id, cmd_string)` stores it in a `Mutex<HashMap<panel_id, cmd>>`.
-2. **IPC handler** (`agent_detect.rs` → `record_session`): `take_stashed_cmd(panel_id)` consumes and removes the
+   `session_store::stash_cmd(tab_id, cmd_string)` stores it in a `Mutex<HashMap<tab_id, cmd>>`.
+2. **IPC handler** (`agent_detect.rs` → `record_session`): `take_stashed_cmd(tab_id)` consumes and removes the
    entry. The value becomes `SessionRecord::launch_cmd`.
 
-The stash is keyed by `panel_id`; entries are consumed exactly once and are not visible across panels.
+The stash is keyed by `tab_id`; entries are consumed exactly once and are not visible across tabs.
 
 ### CLAUDE_CONFIG_DIR support
 
@@ -90,7 +90,7 @@ If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcri
 {
   "version": 1,
   "panels": {
-    "<panelId>": {
+    "<tabId>": {
       "agent": "claude",
       "session_id": "<claude-session-id>",
       "cwd_launch": "/home/user/project",
@@ -174,7 +174,7 @@ in `agent_detect.rs` at the `OSC 133;C` stage — `is_print_mode` returns early 
 ```rust
 #[serde(rename_all = "camelCase")]
 pub struct RestorePlan {
-    pub panel_id: String,    // → "panelId" on the wire
+    pub tab_id: String,      // → "tabId" on the wire
     pub agent: String,
     pub resume_cmd: String,  // → "resumeCmd" on the wire; empty signals error
     pub cwd: String,
@@ -182,8 +182,8 @@ pub struct RestorePlan {
 }
 ```
 
-`rename_all = "camelCase"` is required — the frontend Map is keyed by `panelId` and would silently miss all sessions
-if it received `panel_id` instead.
+`rename_all = "camelCase"` is required — the frontend Map is keyed by `tabId` and would silently miss all sessions
+if it received `tab_id` instead.
 
 ---
 
@@ -194,8 +194,8 @@ if it received `panel_id` instead.
 `src/modules/agents/lib/agentSessionRestore.ts`
 
 Loaded once at app start (`App.tsx`) via `loadRestorePlans()`, which calls `agent_session_restore_plan` and stores the
-result in a module-level `Map<panelId, RestorePlan>`. `consumeRestorePlan(panelId)` returns and deletes the plan for a
-given panel — consume-once semantics prevent double injection.
+result in a module-level `Map<tabId, RestorePlan>`. `consumeRestorePlan(tabId)` returns and deletes the plan for a
+given tab — consume-once semantics prevent double injection.
 
 ### useTerminalSession.ts
 
@@ -243,8 +243,8 @@ Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an
 
 Actions:
 
-- `startRestored(panelId, tabId, agent)` — creates a session record with `restored: true`, `status: "working"`.
-- `setRestoreError(panelId, tabId, agent)` — sets `restoreError: true`.
+- `startRestored(tabId, agent)` — creates a session record with `restored: true`, `status: "working"`.
+- `setRestoreError(tabId, agent)` — sets `restoreError: true`.
 - `setStatus` (existing) — clears `restored` on the first real state transition.
 
 ---

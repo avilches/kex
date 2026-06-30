@@ -57,7 +57,7 @@ fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
 
 fn session_hook_cmd() -> String {
     format!(
-        r#"[ -n "$KEX_PANEL_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # {SESSION_HOOK_MARKER}"#
+        r#"[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # {SESSION_HOOK_MARKER}"#
     )
 }
 

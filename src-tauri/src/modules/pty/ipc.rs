@@ -83,7 +83,7 @@ fn parse_payload(json: &str) -> Option<Payload> {
 /// that removes the socket file when dropped (which causes the thread to exit).
 pub fn spawn_listener(
     socket_path: PathBuf,
-    panel_id: String,
+    tab_id: String,
     pty_id: u32,
     app: AppHandle,
 ) -> IpcGuard {
@@ -96,25 +96,25 @@ pub fn spawn_listener(
             return IpcGuard(socket_path);
         }
     };
-    log::debug!("[ipc] listening panel={panel_id} path={:?}", socket_path);
+    log::debug!("[ipc] listening tab={tab_id} path={:?}", socket_path);
 
     if let Err(e) = thread::Builder::new()
-        .name(format!("kex-ipc-{panel_id}"))
-        .spawn(move || run_listener(listener, panel_id, pty_id, app))
+        .name(format!("kex-ipc-{tab_id}"))
+        .spawn(move || run_listener(listener, tab_id, pty_id, app))
     {
         log::warn!("[ipc] failed to spawn listener thread: {e}");
     }
     IpcGuard(socket_path)
 }
 
-fn run_listener(listener: UnixListener, panel_id: String, pty_id: u32, app: AppHandle) {
+fn run_listener(listener: UnixListener, tab_id: String, pty_id: u32, app: AppHandle) {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
                 let mut line = String::new();
                 let _ = BufReader::new(stream).read_line(&mut line);
                 if !line.trim().is_empty() {
-                    dispatch(line.trim(), &panel_id, pty_id, &app);
+                    dispatch(line.trim(), &tab_id, pty_id, &app);
                 }
             }
             Err(e) => {
@@ -123,10 +123,10 @@ fn run_listener(listener: UnixListener, panel_id: String, pty_id: u32, app: AppH
             }
         }
     }
-    log::debug!("[ipc] thread exiting panel={panel_id}");
+    log::debug!("[ipc] thread exiting tab={tab_id}");
 }
 
-fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
+fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     let Some(p) = parse_payload(json) else {
         log::debug!("[ipc] invalid JSON: {json}");
         return;
@@ -137,15 +137,15 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
             let session_title = p.session_title.as_deref().unwrap_or("");
             let model         = p.model.as_deref().unwrap_or("");
             log::debug!(
-                "[ipc] SessionStart panel={panel_id} session={} \
+                "[ipc] SessionStart tab={tab_id} session={} \
                  source={source} title={session_title:?} model={model:?}",
                 p.session_id
             );
             // Agent name is not available in the SessionStart payload. "claude" is the default;
             // TODO: infer agent from the transcript path or a future payload field.
-            session_store::record_session(panel_id, "claude", &p.session_id, &p.transcript_path, &p.cwd);
+            session_store::record_session(tab_id, "claude", &p.session_id, &p.transcript_path, &p.cwd);
             let _ = app.emit(AGENT_SESSION_META_EVENT, serde_json::json!({
-                "panelId":        panel_id,
+                "tabId":          tab_id,
                 "sessionId":      p.session_id,
                 "cwdLaunch":      p.cwd,
                 "sessionTitle":   session_title,
@@ -155,7 +155,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "SessionEnd" => {
             let reason = p.reason.as_deref().unwrap_or("");
-            log::debug!("[ipc] SessionEnd panel={panel_id} reason={reason}");
+            log::debug!("[ipc] SessionEnd tab={tab_id} reason={reason}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":      pty_id,
                 "kind":    "SessionEnd",
@@ -167,7 +167,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "UserPromptSubmit" => {
             let prompt = p.prompt.as_deref().unwrap_or("");
-            log::debug!("[ipc] UserPromptSubmit panel={panel_id} session={} prompt={prompt:?}", p.session_id);
+            log::debug!("[ipc] UserPromptSubmit tab={tab_id} session={} prompt={prompt:?}", p.session_id);
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "UserPromptSubmit",
@@ -184,11 +184,11 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
             // can resend it (sometimes twice). Drop it to avoid a duplicate
             // attention signal right after the turn ends.
             if notif_type == "idle_prompt" {
-                log::debug!("[ipc] Notification(idle_prompt) panel={panel_id} ignored");
+                log::debug!("[ipc] Notification(idle_prompt) tab={tab_id} ignored");
                 return;
             }
             let msg = p.notif_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] Notification panel={panel_id} type={notif_type:?} msg={msg:?}");
+            log::debug!("[ipc] Notification tab={tab_id} type={notif_type:?} msg={msg:?}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "Notification",
@@ -201,7 +201,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         "Stop" => {
             let reason = p.stop_reason.as_deref().unwrap_or("");
             let last   = p.last_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] Stop panel={panel_id} reason={reason} last={last:?}");
+            log::debug!("[ipc] Stop tab={tab_id} reason={reason} last={last:?}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "Stop",
@@ -213,7 +213,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "StopFailure" => {
             let err = p.error_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] StopFailure panel={panel_id} err={err:?}");
+            log::debug!("[ipc] StopFailure tab={tab_id} err={err:?}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "StopFailure",
@@ -225,7 +225,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "PermissionRequest" => {
             let tool = p.tool_name.as_deref().unwrap_or("");
-            log::debug!("[ipc] PermissionRequest panel={panel_id} tool={tool}");
+            log::debug!("[ipc] PermissionRequest tab={tab_id} tool={tool}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "PermissionRequest",
@@ -241,7 +241,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
             }
             let delta   = p.delta.as_deref().unwrap_or("");
             let turn_id = p.turn_id.as_deref().unwrap_or("");
-            log::debug!("[ipc] MessageDisplay panel={panel_id} turn={turn_id} delta={delta:?}");
+            log::debug!("[ipc] MessageDisplay tab={tab_id} turn={turn_id} delta={delta:?}");
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "MessageDisplay",
@@ -252,7 +252,7 @@ fn dispatch(json: &str, panel_id: &str, pty_id: u32, app: &AppHandle) {
             }));
         }
         other => {
-            log::debug!("[ipc] unhandled event {other} from panel={panel_id}");
+            log::debug!("[ipc] unhandled event {other} from tab={tab_id}");
         }
     }
 }

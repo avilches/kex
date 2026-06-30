@@ -7,7 +7,7 @@ const OSC_MAX: usize = 4096;
 
 const DEFAULT_AGENTS: &[&str] = &["claude", "codex"];
 
-// OSC 777;kex;<event>;<panel_id>;<session_id>;<transcript_path>;<cwd>[;<extra...>]
+// OSC 777;kex;<event>;<tab_id>;<session_id>;<transcript_path>;<cwd>[;<extra...>]
 const KEX_UNIFIED_MARKER: &[u8] = b"kex;";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -50,7 +50,7 @@ pub enum Transition {
     Started { agent: String, cmd_string: String },
     // Llevan session data - Rust los usa para record_session + emit meta
     SessionStart {
-        panel_id: String,
+        tab_id: String,
         agent: String,
         session_id: String,
         transcript_path: String,
@@ -60,7 +60,7 @@ pub enum Transition {
         model: String,
     },
     UserPromptSubmit {
-        panel_id: String,
+        tab_id: String,
         agent: String,
         session_id: String,
         transcript_path: String,
@@ -262,7 +262,7 @@ impl AgentDetector {
         }
 
         let event = &fields[0];
-        let panel_id = &fields[1];
+        let tab_id = &fields[1];
         let session_id = &fields[2];
         let transcript_path = &fields[3];
         let cwd = &fields[4];
@@ -280,19 +280,19 @@ impl AgentDetector {
 
         match event.as_str() {
             "SessionStart" => {
-                if panel_id.is_empty() || session_id.is_empty() {
-                    log::debug!("[osc777] kex: SessionStart missing panel_id or session_id");
+                if tab_id.is_empty() || session_id.is_empty() {
+                    log::debug!("[osc777] kex: SessionStart missing tab_id or session_id");
                     return;
                 }
                 let source = fields.get(5).cloned().unwrap_or_default();
                 let session_title = fields.get(6).cloned().unwrap_or_default();
                 let model = fields.get(7).cloned().unwrap_or_default();
                 log::debug!(
-                    "[osc777] kex: SessionStart panel={panel_id} session={session_id} \
+                    "[osc777] kex: SessionStart tab={tab_id} session={session_id} \
                      cwd={cwd} source={source} title={session_title:?} model={model:?}"
                 );
                 emit(Transition::SessionStart {
-                    panel_id: panel_id.clone(),
+                    tab_id: tab_id.clone(),
                     agent: self.current_agent.clone(),
                     session_id: session_id.clone(),
                     transcript_path: transcript_path.clone(),
@@ -305,12 +305,12 @@ impl AgentDetector {
             "UserPromptSubmit" => {
                 let prompt = fields.get(5).cloned().unwrap_or_default();
                 log::debug!(
-                    "[osc777] kex: UserPromptSubmit panel={panel_id} session={session_id} \
+                    "[osc777] kex: UserPromptSubmit tab={tab_id} session={session_id} \
                      cwd={cwd} prompt={prompt:?}"
                 );
                 self.status = Status::Working;
                 emit(Transition::UserPromptSubmit {
-                    panel_id: panel_id.clone(),
+                    tab_id: tab_id.clone(),
                     agent: self.current_agent.clone(),
                     session_id: session_id.clone(),
                     transcript_path: transcript_path.clone(),
@@ -322,7 +322,7 @@ impl AgentDetector {
                 let notif_type = fields.get(5).cloned().unwrap_or_default();
                 let message = fields.get(6).cloned().unwrap_or_default();
                 log::debug!(
-                    "[osc777] kex: Notification panel={panel_id} type={notif_type} msg={message:?}"
+                    "[osc777] kex: Notification tab={tab_id} type={notif_type} msg={message:?}"
                 );
                 // "idle_prompt" is the end-of-turn wait, already covered by "Stop"
                 // (and Claude may resend it). Ignore it so it does not re-raise the
@@ -337,7 +337,7 @@ impl AgentDetector {
                 let reason = fields.get(5).cloned().unwrap_or_default();
                 let last_message = fields.get(6).cloned().unwrap_or_default();
                 log::debug!(
-                    "[osc777] kex: Stop panel={panel_id} reason={reason} \
+                    "[osc777] kex: Stop tab={tab_id} reason={reason} \
                      last_msg={last_message:?}"
                 );
                 emit(Transition::Stop { last_message });
@@ -347,20 +347,20 @@ impl AgentDetector {
                 let error_type = fields.get(5).cloned().unwrap_or_default();
                 let error_message = fields.get(6).cloned().unwrap_or_default();
                 log::debug!(
-                    "[osc777] kex: StopFailure panel={panel_id} type={error_type} msg={error_message:?}"
+                    "[osc777] kex: StopFailure tab={tab_id} type={error_type} msg={error_message:?}"
                 );
                 self.disarm();
                 emit(Transition::StopFailure { error_message });
             }
             "SessionEnd" => {
                 let reason = fields.get(5).cloned().unwrap_or_default();
-                log::debug!("[osc777] kex: SessionEnd panel={panel_id} reason={reason}");
+                log::debug!("[osc777] kex: SessionEnd tab={tab_id} reason={reason}");
                 self.disarm();
                 emit(Transition::SessionEnd { reason });
             }
             "PermissionRequest" => {
                 let tool_name = fields.get(5).cloned().unwrap_or_default();
-                log::debug!("[osc777] kex: PermissionRequest panel={panel_id} tool={tool_name}");
+                log::debug!("[osc777] kex: PermissionRequest tab={tab_id} tool={tool_name}");
                 self.status = Status::Waiting;
                 emit(Transition::PermissionRequest { tool_name });
             }
@@ -368,7 +368,7 @@ impl AgentDetector {
                 let turn_id = fields.get(5).cloned().unwrap_or_default();
                 let message = fields.get(6).cloned().unwrap_or_default();
                 log::debug!(
-                    "[osc777] kex: MessageDisplay panel={panel_id} turn={turn_id} \
+                    "[osc777] kex: MessageDisplay tab={tab_id} turn={turn_id} \
                      msg={message:?}"
                 );
                 emit(Transition::MessageDisplay { turn_id, message });
@@ -482,7 +482,7 @@ mod tests {
 
     fn user_prompt_submit() -> Transition {
         Transition::UserPromptSubmit {
-            panel_id: "panel1".into(),
+            tab_id: "panel1".into(),
             agent: "claude".into(),
             session_id: "sess1".into(),
             transcript_path: "/tmp/transcript".into(),
@@ -694,7 +694,7 @@ mod tests {
         assert_eq!(
             transitions[1],
             Transition::SessionStart {
-                panel_id: "panel1".into(),
+                tab_id: "panel1".into(),
                 agent: "claude".into(),
                 session_id: "sess1".into(),
                 transcript_path: "/tmp/transcript".into(),

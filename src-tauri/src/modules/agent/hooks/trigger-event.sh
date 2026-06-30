@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kex-session-v5
 [ -n "$KEX_TERMINAL" ] || exit 0
-[ -n "$KEX_PANEL_ID" ] || exit 0
+[ -n "$KEX_TAB_ID" ] || exit 0
 
 PAYLOAD="$(cat)"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
@@ -16,7 +16,7 @@ log_payload() {
              printf '%s' "$PAYLOAD" | jq '.'
              printf '\n')"
     printf '%s\n' "$entry" >> "/tmp/kex-hook-${EVENT}.log"        2>/dev/null
-    printf '%s\n' "$entry" >> "/tmp/kex-panel-${KEX_PANEL_ID}.log" 2>/dev/null
+    printf '%s\n' "$entry" >> "/tmp/kex-tab-${KEX_TAB_ID}.log" 2>/dev/null
 }
 
 # Send raw payload to KEX_IPC Unix socket.

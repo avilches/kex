@@ -49,7 +49,7 @@ export async function openPty(
     cwd: cwd ?? null,
     workspace: currentWorkspaceEnv(),
     blocks: blocks ?? false,
-    panelId: tabId ?? null,
+    tabId: tabId ?? null,
     shell: shell ?? null,
     onData,
     onExit,

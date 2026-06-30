@@ -11,10 +11,8 @@ import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
 
 type Activate = (workspaceId: string, tabId: string) => void;
-// panelId field name is intentional: matches the wire format from pty/ipc.rs (kex:agent-session-meta event).
-// Renaming to tabId here would break runtime deserialization until pty/ipc.rs is updated (out of scope).
 type AgentSessionMetaPayload = {
-  panelId: string;
+  tabId: string;
   sessionId: string;
   cwdLaunch: string;
   sessionTitle: string;
@@ -230,8 +228,7 @@ export function AgentNotificationsBridge({
     let alive = true;
     let unlisten: (() => void) | undefined;
     listen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) => {
-      // Alias panelId from the wire payload to tabId locally.
-      const { panelId: tabId, sessionId, cwdLaunch, sessionTitle, model, transcriptPath } = e.payload;
+      const { tabId, sessionId, cwdLaunch, sessionTitle, model, transcriptPath } = e.payload;
       useAgentStore
         .getState()
         .setMeta(tabId, { sessionId, cwdLaunch, sessionTitle, model, transcriptPath: transcriptPath || undefined });

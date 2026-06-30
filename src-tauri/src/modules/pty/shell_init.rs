@@ -91,7 +91,7 @@ pub fn build_command(
     cwd: Option<String>,
     workspace: WorkspaceEnv,
     blocks: bool,
-    panel_id: Option<String>,
+    tab_id: Option<String>,
     ipc_path: Option<&str>,
     shell: Option<String>,
 ) -> Result<CommandBuilder, String> {
@@ -99,13 +99,13 @@ pub fn build_command(
     #[cfg(unix)]
     {
         let _ = workspace;
-        let mut cmd = unix::build(cwd, blocks, panel_id.as_deref(), ipc_path, shell)?;
+        let mut cmd = unix::build(cwd, blocks, tab_id.as_deref(), ipc_path, shell)?;
         cmd.env("TERMINAL_ID", id.to_string());
         Ok(cmd)
     }
     #[cfg(windows)]
     {
-        let mut cmd = windows::build(cwd, workspace, blocks, panel_id.as_deref(), ipc_path, shell)?;
+        let mut cmd = windows::build(cwd, workspace, blocks, tab_id.as_deref(), ipc_path, shell)?;
         cmd.env("TERMINAL_ID", id.to_string());
         Ok(cmd)
     }
@@ -151,7 +151,7 @@ fn apply_common(
     cmd: &mut CommandBuilder,
     cwd: Option<String>,
     blocks: bool,
-    panel_id: Option<&str>,
+    tab_id: Option<&str>,
     ipc_path: Option<&str>,
 ) {
     cmd.env("TERM", "xterm-256color");
@@ -160,8 +160,8 @@ fn apply_common(
     if blocks {
         cmd.env("KEX_BLOCKS", "1");
     }
-    if let Some(pid) = panel_id {
-        cmd.env("KEX_PANEL_ID", pid);
+    if let Some(tid) = tab_id {
+        cmd.env("KEX_TAB_ID", tid);
     }
     if let Some(path) = ipc_path {
         cmd.env("KEX_IPC", path);
@@ -295,10 +295,10 @@ mod unix {
         out
     }
 
-    pub fn build(cwd: Option<String>, blocks: bool, panel_id: Option<&str>, ipc_path: Option<&str>, shell_override: Option<String>) -> Result<CommandBuilder, String> {
+    pub fn build(cwd: Option<String>, blocks: bool, tab_id: Option<&str>, ipc_path: Option<&str>, shell_override: Option<String>) -> Result<CommandBuilder, String> {
         let (shell, shell_path) = Shell::resolve(shell_override);
         let mut cmd = CommandBuilder::new(&shell_path);
-        super::apply_common(&mut cmd, cwd, blocks, panel_id, ipc_path);
+        super::apply_common(&mut cmd, cwd, blocks, tab_id, ipc_path);
 
         match shell {
             Shell::Zsh => {
@@ -559,7 +559,7 @@ mod windows {
         cwd: Option<String>,
         workspace: WorkspaceEnv,
         blocks: bool,
-        panel_id: Option<&str>,
+        tab_id: Option<&str>,
         ipc_path: Option<&str>,
         shell: Option<String>,
     ) -> Result<CommandBuilder, String> {
@@ -583,7 +583,7 @@ mod windows {
         let is_bash = shell_name == "bash.exe";
 
         let mut cmd = CommandBuilder::new(&shell_path);
-        super::apply_common(&mut cmd, cwd, blocks, panel_id, ipc_path);
+        super::apply_common(&mut cmd, cwd, blocks, tab_id, ipc_path);
 
         if is_powershell {
             match prepare_ps_profile() {
