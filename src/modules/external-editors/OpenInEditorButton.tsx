@@ -122,6 +122,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
   })();
 
   const leftDisabled = !anyAvailable || !primaryTarget;
+  const noTools = !anyAvailable && !isScanning;
 
   const handleDirectClick = useCallback(async () => {
     if (!primaryEditor || !primaryTarget) return;
@@ -146,6 +147,36 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textEditorMode, hasFile]);
+
+  if (noTools) {
+    return (
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <HugeiconsIcon icon={DocumentCodeIcon} size={16} strokeWidth={1.75} />
+            <span>Open in</span>
+            <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52 text-[12px]">
+          <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+            {!hasFile && !workspaceRoot ? "Please set a Workspace Root" : "No tools selected"}
+          </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => onOpenSettings?.()}
+            className="gap-2 text-muted-foreground"
+          >
+            <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={1.75} />
+            Configure Tools
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <div className="flex items-center rounded-md">
@@ -182,10 +213,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className={cn(
-              "flex h-7 items-center rounded-r-md px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-              leftDisabled && !onOpenSettings && "cursor-default opacity-40",
-            )}
+            className="flex h-7 items-center rounded-r-md px-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
           </button>
