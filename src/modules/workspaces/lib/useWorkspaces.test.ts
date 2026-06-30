@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Panel, RunConfig, SplitNode, Workspace } from "./types";
-import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, applyShowHidden, applyWorkspaceStatus, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, applyShowHidden, applyWorkspaceStatus, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, panelInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 import { migrateWorkspace } from "./workspaceState";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
@@ -400,6 +400,57 @@ describe("RunConfig actions (pure helpers via applyPinnedRoot pattern)", () => {
   it("RunConfig panelId is optional", () => {
     const c: RunConfig = { id: "1", name: "Dev", command: "pnpm dev" };
     expect(c.panelId).toBeUndefined();
+  });
+});
+
+describe("panelInsertionIndex", () => {
+  const term = (id: string): Panel => ({ id, kind: "terminal" });
+  const panels = [term("t1"), term("t2"), term("t3")];
+
+  it("inserts right after the active tab", () => {
+    expect(panelInsertionIndex(panels, "t1")).toBe(1);
+    expect(panelInsertionIndex(panels, "t2")).toBe(2);
+  });
+
+  it("inserts at the end when the active tab is the last one", () => {
+    expect(panelInsertionIndex(panels, "t3")).toBe(3);
+  });
+
+  it("appends when there is no active tab", () => {
+    expect(panelInsertionIndex(panels, null)).toBe(3);
+    expect(panelInsertionIndex([], null)).toBe(0);
+  });
+
+  it("appends when the active id is not in the pane", () => {
+    expect(panelInsertionIndex(panels, "ghost")).toBe(3);
+  });
+
+  it("honours an explicit insertion index, clamped to length", () => {
+    expect(panelInsertionIndex(panels, "t1", 0)).toBe(0);
+    expect(panelInsertionIndex(panels, "t1", 99)).toBe(3);
+  });
+});
+
+describe("insertWorkspaceAfterActive", () => {
+  it("inserts right after the active workspace", () => {
+    const out = insertWorkspaceAfterActive([ws({ id: "w1" }), ws({ id: "w2" })], "w1", ws({ id: "new" }));
+    expect(out.map((w) => w.id)).toEqual(["w1", "new", "w2"]);
+  });
+
+  it("inherits the status of the active workspace", () => {
+    const out = insertWorkspaceAfterActive([ws({ id: "w1", statusId: "wip" })], "w1", ws({ id: "new" }));
+    expect(out[1].statusId).toBe("wip");
+  });
+
+  it("leaves the new workspace status-less when the active one has none", () => {
+    const out = insertWorkspaceAfterActive([ws({ id: "w1" })], "w1", ws({ id: "new" }));
+    expect(out[1].statusId).toBeUndefined();
+  });
+
+  it("appends to the end when the active workspace is missing", () => {
+    const out = insertWorkspaceAfterActive([ws({ id: "w1" })], "ghost", ws({ id: "new" }));
+    expect(out.map((w) => w.id)).toEqual(["w1", "new"]);
+    expect(out[1].statusId).toBeUndefined();
   });
 });
 
