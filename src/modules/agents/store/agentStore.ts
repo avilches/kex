@@ -268,16 +268,21 @@ if (import.meta.env?.DEV && typeof window !== "undefined") {
   (
     window as unknown as {
       __kexAgents?: {
+        sessions: () => AgentSession[];
         fakeNotification: (
           panelId: string,
-          tabId: string,
           kind?: "attention" | "finished" | "error",
           agent?: string,
         ) => void;
       };
     }
   ).__kexAgents = {
-    fakeNotification(panelId, tabId, kind = "attention", agent = "claude-code") {
+    sessions() {
+      return Object.values(useAgentStore.getState().sessions);
+    },
+    fakeNotification(panelId, kind = "attention", agent = "claude-code") {
+      const session = useAgentStore.getState().sessions[panelId];
+      const tabId = session?.tabId ?? panelId;
       useAgentStore.getState().pushNotification({ source: "terminal", panelId, tabId, agent, kind });
     },
   };
