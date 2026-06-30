@@ -163,7 +163,7 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings, onSe
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52 text-[12px]">
-          {!hasFile && !workspaceRoot ? (
+          {!workspaceRoot ? (
             <DropdownMenuItem
               onSelect={() => onSetWorkspaceRoot?.()}
               className="gap-2 text-muted-foreground"
