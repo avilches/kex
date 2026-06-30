@@ -117,6 +117,7 @@ type Props = {
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
+  onOpenWorkspaceProperties?: () => void;
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
   active?: boolean;
@@ -352,6 +353,7 @@ export const FileExplorer = memo(
       onRevealInTerminal,
       onNewWorkspaceFromFolder,
       onAddToGitignore,
+      onOpenWorkspaceProperties,
       gitStatus,
       onSearchClose,
       active = true,
@@ -1068,11 +1070,19 @@ export const FileExplorer = memo(
                   workspaceRootPath,
                   workspaceRootExists,
                 });
+                const isSetWorkspaceRoot =
+                  m.id === "workspace" && workspaceRootPath === null;
                 return (
                   <DropdownMenuItem
                     key={m.id}
-                    disabled={info.disabled}
-                    onSelect={() => onChangeRootMode(m.id)}
+                    disabled={info.disabled && !isSetWorkspaceRoot}
+                    onSelect={() => {
+                      if (isSetWorkspaceRoot) {
+                        onOpenWorkspaceProperties?.();
+                      } else {
+                        onChangeRootMode(m.id);
+                      }
+                    }}
                     className="flex items-start gap-2.5"
                   >
                     <HugeiconsIcon
@@ -1082,14 +1092,16 @@ export const FileExplorer = memo(
                       className="mt-0.5 shrink-0 text-primary"
                     />
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="text-xs font-medium">{m.label}</span>
-                      {info.subtitle && (
+                      <span className="text-xs font-medium">
+                        {isSetWorkspaceRoot ? "Set Workspace root" : m.label}
+                      </span>
+                      {!isSetWorkspaceRoot && info.subtitle && (
                         <span className="break-all text-[11px] text-muted-foreground">
                           {info.subtitle}
                         </span>
                       )}
                     </span>
-                    {rootMode === m.id && (
+                    {rootMode === m.id && !isSetWorkspaceRoot && (
                       <HugeiconsIcon
                         icon={Tick02Icon}
                         size={13}
@@ -1097,7 +1109,7 @@ export const FileExplorer = memo(
                         className="mt-0.5 ml-auto shrink-0 text-primary"
                       />
                     )}
-                    {(() => {
+                    {!isSetWorkspaceRoot && (() => {
                       const scId = MODE_SHORTCUT[m.id];
                       const sc = scId
                         ? (userShortcuts[scId] ??

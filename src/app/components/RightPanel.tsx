@@ -60,6 +60,7 @@ export type RightPanelProps = {
   onRevealInTerminal?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
+  onOpenWorkspaceProperties?: () => void;
   onExplorerSearchClose?: () => void;
   // SourceControlPanel props
   sourceControl: SourceControlSummary;
@@ -158,6 +159,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
               onRevealInTerminal={props.onRevealInTerminal}
               onNewWorkspaceFromFolder={props.onNewWorkspaceFromFolder}
               onAddToGitignore={props.onAddToGitignore}
+              onOpenWorkspaceProperties={props.onOpenWorkspaceProperties}
               gitStatus={props.sourceControl.status}
               onSearchClose={props.onExplorerSearchClose}
             />

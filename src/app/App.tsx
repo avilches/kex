@@ -552,7 +552,7 @@ export default function App() {
 
       const freshPanelId = newPanelId();
       const panelCwd = config.cwd ?? activeWorkspace.pinnedRoot ?? activeWorkspace.cwd;
-      const panel: Panel = { id: freshPanelId, kind: "terminal", cwd: panelCwd };
+      const panel: Panel = { id: freshPanelId, kind: "terminal", cwd: panelCwd, title: config.name || undefined };
 
       // Case 2: existing script pane -- add panel to it without splitting
       const existingScriptPane = activeWorkspace.scriptPaneId
@@ -2640,6 +2640,11 @@ export default function App() {
                         onRevealInTerminal={openFolderInTerminal}
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onAddToGitignore={handleAddToGitignore}
+                        onOpenWorkspaceProperties={() =>
+                          useWorkspaceSettingsStore
+                            .getState()
+                            .openSettings(activeWorkspaceId, "properties", "workspaceRoot")
+                        }
                         onExplorerSearchClose={onExplorerSearchClose}
                         sourceControl={sourceControl}
                         pushOnCommit={pushOnCommit}
@@ -2734,6 +2739,11 @@ export default function App() {
                         onRevealInTerminal={openFolderInTerminal}
                         onNewWorkspaceFromFolder={newWorkspaceFromFolder}
                         onAddToGitignore={handleAddToGitignore}
+                        onOpenWorkspaceProperties={() =>
+                          useWorkspaceSettingsStore
+                            .getState()
+                            .openSettings(activeWorkspaceId, "properties", "workspaceRoot")
+                        }
                         onExplorerSearchClose={onExplorerSearchClose}
                         sourceControl={sourceControl}
                         pushOnCommit={pushOnCommit}

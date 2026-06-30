@@ -32,7 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
-import type { WorkspaceSettingsTab } from "@/modules/workspaces/lib/workspaceSettingsStore";
+import type { WorkspaceSettingsFocus, WorkspaceSettingsTab } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
@@ -51,7 +51,7 @@ type Props = {
 };
 
 export function WorkspaceSettingsDialog(props: Props) {
-  const { open, workspaceId, initialTab, closeSettings } = useWorkspaceSettingsStore();
+  const { open, workspaceId, initialTab, initialFocus, closeSettings } = useWorkspaceSettingsStore();
   const ws = props.workspaces.find((w) => w.id === workspaceId);
 
   function handleClose() {
@@ -73,9 +73,10 @@ export function WorkspaceSettingsDialog(props: Props) {
         </DialogHeader>
         {ws && (
           <WorkspaceSettingsForm
-            key={`${ws.id}-${initialTab}`}
+            key={`${ws.id}-${initialTab}-${initialFocus}`}
             ws={ws}
             initialTab={initialTab}
+            initialFocus={initialFocus}
             onRequestClose={handleClose}
             {...props}
           />
@@ -182,9 +183,9 @@ function ColorPicker({
   );
 }
 
-type FormProps = { ws: Workspace; initialTab: WorkspaceSettingsTab; onRequestClose: () => void } & Omit<Props, "workspaces">;
+type FormProps = { ws: Workspace; initialTab: WorkspaceSettingsTab; initialFocus: WorkspaceSettingsFocus; onRequestClose: () => void } & Omit<Props, "workspaces">;
 
-function WorkspaceSettingsForm({ ws, initialTab, onRequestClose, ...props }: FormProps) {
+function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, ...props }: FormProps) {
   const [activeTab, setActiveTab] = useState<WorkspaceSettingsTab>(initialTab);
   const [cwdValue, setCwdValue] = useState(ws.pinnedRoot ?? "");
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
@@ -194,9 +195,15 @@ function WorkspaceSettingsForm({ ws, initialTab, onRequestClose, ...props }: For
 
   useEffect(() => {
     if (activeTab === "properties") {
-      setTimeout(() => nameInputRef.current?.focus(), 0);
+      setTimeout(() => {
+        if (initialFocus === "workspaceRoot") {
+          cwdInputRef.current?.focus();
+        } else {
+          nameInputRef.current?.focus();
+        }
+      }, 0);
     }
-  }, [activeTab]);
+  }, [activeTab, initialFocus]);
 
   useEffect(() => {
     if (!cwdValue) {
