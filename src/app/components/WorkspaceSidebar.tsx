@@ -230,7 +230,7 @@ function SortableWorkspaceItem({
           </ContextMenuItem>
           {workspaceStatuses.length > 0 && (
             <ContextMenuSub>
-              <ContextMenuSubTrigger>
+              <ContextMenuSubTrigger className="gap-2">
                 <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={2} />
                 Set status
               </ContextMenuSubTrigger>
