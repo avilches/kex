@@ -179,7 +179,7 @@ function IconPicker({
 }) {
   const currentEntry = WORKSPACE_ICON_PALETTE.find((e) => e.name === wsIcon);
   const [query, setQuery] = useState(currentEntry?.label ?? "");
-  const [allIcons, setAllIcons] = useState<Record<string, unknown> | null>(null);
+  const [allIcons, setAllIcons] = useState<Awaited<ReturnType<typeof loadAllIcons>> | null>(null);
   const [filtered, setFiltered] = useState<IconSearchResult[]>([]);
   const [page, setPage] = useState(() => {
     if (!wsIcon) return 0;

@@ -35,6 +35,7 @@ import {
   CodeIcon,
   CommandLineIcon,
   ComputerIcon,
+  CpuIcon,
   ComputerTerminal01Icon,
   CoffeeIcon,
   CrownIcon,
@@ -64,6 +65,7 @@ import {
   InfinityIcon,
   KeyboardIcon,
   KeyIcon,
+  LaptopIcon,
   LayersIcon,
   LeafIcon,
   LockIcon,
@@ -94,6 +96,7 @@ import {
   WebhookIcon,
   WifiIcon,
 } from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@hugeicons/react";
 
 // 96 icons organized in 3 pages of 32 each.
 // Page 0: Dev & Code | Page 1: Infra & Hardware | Page 2: AI, Science & Design
@@ -206,11 +209,11 @@ export const PALETTE_PAGE_SIZE = 32;
 export type WorkspaceIconName = (typeof WORKSPACE_ICON_PALETTE)[number]["name"];
 
 // Cache for the full icon library, loaded on demand
-let allIconsCache: Record<string, unknown> | null = null;
+let allIconsCache: Record<string, IconSvgElement> | null = null;
 
-export async function loadAllIcons(): Promise<Record<string, unknown>> {
+export async function loadAllIcons(): Promise<Record<string, IconSvgElement>> {
   if (!allIconsCache) {
-    allIconsCache = await import("@hugeicons/core-free-icons") as Record<string, unknown>;
+    allIconsCache = await import("@hugeicons/core-free-icons") as Record<string, IconSvgElement>;
   }
   return allIconsCache;
 }
@@ -224,11 +227,11 @@ function camelToLabel(name: string): string {
     .replace(/\s+/g, " ");
 }
 
-export type IconSearchResult = { name: string; label: string; icon: unknown };
+export type IconSearchResult = { name: string; label: string; icon: IconSvgElement };
 
 export function searchIcons(
   query: string,
-  allIcons: Record<string, unknown>,
+  allIcons: Record<string, IconSvgElement>,
   limit = 3,
 ): IconSearchResult[] {
   const q = query.trim().toLowerCase();
@@ -253,8 +256,8 @@ export function searchIcons(
   return results.slice(0, limit);
 }
 
-export function getWorkspaceIcon(name: string): unknown {
+export function getWorkspaceIcon(name: string): IconSvgElement | null {
   const palette = WORKSPACE_ICON_PALETTE.find((e) => e.name === name);
-  if (palette) return palette.icon;
-  return allIconsCache?.[name] ?? null;
+  if (palette) return palette.icon as IconSvgElement;
+  return (allIconsCache?.[name] as IconSvgElement) ?? null;
 }
