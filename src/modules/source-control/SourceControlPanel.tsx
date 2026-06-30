@@ -901,7 +901,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </span>
               )}
             </div>
-            <div className="flex w-full flex-col gap-2">
+            <div className="flex w-full flex-col gap-2" style={{ minHeight: 96 }}>
               {!cloneOpen ? (
                 <>
                   <Button
@@ -946,6 +946,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       onChange={(e) => setCloneUrl(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !cloneRunning) void handleGitClone();
+                        if (e.key === "Escape") void handleCancelClone();
                       }}
                       placeholder="https://github.com/user/repo.git"
                       className="h-8 w-full rounded border border-border bg-transparent px-2.5 pr-7 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
