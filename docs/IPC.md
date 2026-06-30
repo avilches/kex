@@ -134,10 +134,10 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 |---|---|
 | `open_settings_window` | Open (or focus) the Settings window, optionally deep-linking a tab |
 | `open_main_window` | Open a new main window with a fresh `w-<hex>` label |
-| `window_get_state` | Return the saved `WindowEntry` (workspaces + geometry + optional `rightPanel` chrome) for a given window label, reconstructed from the `workspaces.json` index plus the per-workspace `workspaces/<id>.json` bodies |
+| `window_get_state` | Return the saved `WindowEntry` (workspaces + geometry + optional `sidebar` chrome) for a given window label, reconstructed from the `workspaces.json` index plus the per-workspace `workspaces/<id>.json` bodies |
 | `window_save_workspace_state` | Persist workspace list and active index for a window label; writes the lean `workspaces.json` index plus one `workspaces/<id>.json` per changed workspace |
-| `window_save_right_panel(label, open, activeTab, width, side)` | Persist the per-window right-panel chrome (open, active tab, width percentage, dock side) into the `workspaces.json` index only, without rewriting the workspace bodies. Lightweight so it can fire on every tab switch or resize (the frontend debounces it ~250ms) |
-| `window_save_workspace_bar(label, width)` | Persist the workspace bar pixel width for a given window label into the `workspaces.json` index. Called on every drag resize (debounced in the frontend); separate from the right-panel width so the two can change independently. |
+| `window_save_sidebar(label, open, view, side, width)` | Persist the per-window sidebar chrome (open, active view, dock side, width percentage) into the `workspaces.json` index only, without rewriting the workspace bodies. Lightweight so it can fire on every view switch or resize (the frontend debounces it ~250ms) |
+| `window_save_workspace_bar(label, width)` | Persist the workspace bar pixel width for a given window label into the `workspaces.json` index. Called on every drag resize (debounced in the frontend); separate from the sidebar state persisted by `window_save_sidebar` so the two can change independently. |
 | `get_launch_dir` | Return the CLI launch directory (drained on first call) |
 | `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |

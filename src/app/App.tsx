@@ -97,7 +97,7 @@ import { IS_MAC } from "@/lib/platform";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
 import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
-import { RightPanel, type RightPanelHandle } from "./components/RightPanel";
+import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceBar } from "./components/WorkspaceBar";
 import { setEditorFlush } from "./lib/editorFlush";
@@ -115,11 +115,7 @@ import {
   getSavedCollapsedGroups,
   saveCollapsedGroups,
 } from "@/modules/workspaces/lib/collapsedGroupsState";
-import {
-  getSavedExplorerSidebarWidth,
-  saveExplorerSidebarWidth,
-} from "@/modules/workspaces/lib/explorerSidebarState";
-import { useRightPanelState } from "@/modules/workspaces/lib/useRightPanelState";
+import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
@@ -448,7 +444,7 @@ export default function App() {
     initDuplicateProgressListener();
   }, []);
 
-  const rightPanelRef = useRef<RightPanelHandle>(null);
+  const sidebarRef = useRef<SidebarHandle>(null);
   const [revealRequest, setRevealRequest] = useState<RevealRequest | null>(
     null,
   );
@@ -474,20 +470,17 @@ export default function App() {
     },
     [collapsedGroups, windowLabel],
   );
-  const [explorerSidebarWidth, setExplorerSidebarWidth] = useState(getSavedExplorerSidebarWidth);
-  const handleExplorerSidebarWidthChange = useCallback((w: number) => {
-    setExplorerSidebarWidth(w);
-    saveExplorerSidebarWidth(windowLabel, w);
-  }, [windowLabel]);
   const {
-    open: rightPanelOpen,
-    activeTab: rightPanelActiveTab,
-    side: panelSide,
-    stateRef: rightPanelStateRef,
-    setOpen: setRightPanelOpen,
-    setActiveTab: setRightPanelActiveTab,
-    setSide: setPanelSide,
-  } = useRightPanelState(windowLabel);
+    open: sidebarOpen,
+    view: sidebarView,
+    side: sidebarSide,
+    width: sidebarWidth,
+    stateRef: sidebarStateRef,
+    setOpen: setSidebarOpen,
+    setView: setSidebarView,
+    setSide: setSidebarSide,
+    setWidth: setSidebarWidth,
+  } = useSidebarState(windowLabel);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
@@ -708,14 +701,14 @@ export default function App() {
   // and calls focusExplorer() to open and focus the search input.
   useEffect(() => {
     if (
-      rightPanelOpen &&
-      rightPanelActiveTab === "explorer" &&
+      sidebarOpen &&
+      sidebarView === "explorer" &&
       pendingExplorerSearch.current
     ) {
       pendingExplorerSearch.current = false;
-      rightPanelRef.current?.focusExplorer();
+      sidebarRef.current?.focusExplorer();
     }
-  }, [rightPanelOpen, rightPanelActiveTab]);
+  }, [sidebarOpen, sidebarView]);
 
   const activeRootMode: ExplorerRootMode =
     activeWorkspace?.explorerRootMode ?? "filesystem";
@@ -859,10 +852,10 @@ export default function App() {
         });
 
       if (opts.fromShortcut || opts.pendingAction) {
-        const panel = rightPanelStateRef.current;
-        if (!panel.open) setRightPanelOpen(true);
-        if (panel.activeTab !== "explorer") {
-          setRightPanelActiveTab("explorer");
+        const panel = sidebarStateRef.current;
+        if (!panel.open) setSidebarOpen(true);
+        if (panel.view !== "explorer") {
+          setSidebarView("explorer");
         }
       }
     },
@@ -874,8 +867,8 @@ export default function App() {
       home,
       setExplorerRootMode,
       setFsRoot,
-      setRightPanelOpen,
-      setRightPanelActiveTab,
+      setSidebarOpen,
+      setSidebarView,
     ],
   );
 
@@ -1464,7 +1457,7 @@ export default function App() {
       try {
         await native.renameFile(oldPath, newPath);
         handlePathRenamed(oldPath, newPath);
-        rightPanelRef.current?.refreshExplorer(parent);
+        sidebarRef.current?.refreshExplorer(parent);
       } catch (e) {
         toast.error("Failed to rename file", {
           description: e instanceof Error ? e.message : String(e),
@@ -1591,54 +1584,54 @@ export default function App() {
 
   // ── Source control ────────────────────────────────────────────────────────
 
-  const toggleRightPanel = useCallback(() => {
-    setRightPanelOpen(!rightPanelStateRef.current.open);
-  }, [setRightPanelOpen]);
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen(!sidebarStateRef.current.open);
+  }, [setSidebarOpen]);
 
-  const navigateRightPanelTo = useCallback(
+  const navigateSidebarTo = useCallback(
     (tab: "explorer" | "git" | "history") => {
-      const panel = rightPanelStateRef.current;
+      const panel = sidebarStateRef.current;
       if (!panel.open) {
-        setRightPanelOpen(true);
-        setRightPanelActiveTab(tab);
-      } else if (panel.activeTab === tab) {
-        setRightPanelOpen(false);
+        setSidebarOpen(true);
+        setSidebarView(tab);
+      } else if (panel.view === tab) {
+        setSidebarOpen(false);
       } else {
-        setRightPanelActiveTab(tab);
+        setSidebarView(tab);
       }
     },
-    [setRightPanelOpen, setRightPanelActiveTab],
+    [setSidebarOpen, setSidebarView],
   );
 
-  const showRightPanelTab = useCallback(
+  const showSidebarView = useCallback(
     (tab: "explorer" | "git" | "history") => {
-      if (!rightPanelStateRef.current.open) {
-        setRightPanelOpen(true);
+      if (!sidebarStateRef.current.open) {
+        setSidebarOpen(true);
       }
-      setRightPanelActiveTab(tab);
+      setSidebarView(tab);
     },
-    [setRightPanelOpen, setRightPanelActiveTab],
+    [setSidebarOpen, setSidebarView],
   );
 
   const showExplorerWithMode = useCallback(
     (mode: ExplorerRootMode) => {
-      if (!rightPanelStateRef.current.open) {
-        setRightPanelOpen(true);
+      if (!sidebarStateRef.current.open) {
+        setSidebarOpen(true);
       }
-      setRightPanelActiveTab("explorer");
+      setSidebarView("explorer");
       handleChangeRootMode(mode);
     },
-    [handleChangeRootMode, setRightPanelOpen, setRightPanelActiveTab],
+    [handleChangeRootMode, setSidebarOpen, setSidebarView],
   );
 
   // Cmd+E: bring up the explorer, then on each press cycle its root between File
   // System and Workspace Root. With no pinned root the cycle stays on File
   // System (idempotent). It never closes the sidebar (use sidebar.toggle).
   const rotateExplorerRoot = useCallback(() => {
-    const panel = rightPanelStateRef.current;
-    const inExplorer = panel.open && panel.activeTab === "explorer";
+    const panel = sidebarStateRef.current;
+    const inExplorer = panel.open && panel.view === "explorer";
     if (!inExplorer) {
-      showRightPanelTab("explorer");
+      showSidebarView("explorer");
       return;
     }
     const mode = activeWorkspace?.explorerRootMode ?? "filesystem";
@@ -1647,7 +1640,7 @@ export default function App() {
     } else {
       handleChangeRootMode("filesystem");
     }
-  }, [activeWorkspace, handleChangeRootMode, showRightPanelTab]);
+  }, [activeWorkspace, handleChangeRootMode, showSidebarView]);
 
   const { sourceControl, toggleSourceControl, openGitGraphFromContext } =
     useSourceControlContext({
@@ -1655,7 +1648,7 @@ export default function App() {
       launchCwd,
       launchCwdResolved,
       home,
-      cycleSidebarView: () => navigateRightPanelTo("git"),
+      cycleSidebarView: () => navigateSidebarTo("git"),
       openCommitHistoryTab: openGitHistoryInPanel,
     });
 
@@ -2059,15 +2052,15 @@ export default function App() {
   }, [activeWorkspace, onSplitTerminalDownStable]);
 
   const handleExplorerSearch = useCallback(() => {
-    const panel = rightPanelStateRef.current;
-    if (panel.open && panel.activeTab === "explorer") {
-      rightPanelRef.current?.toggleExplorerSearch?.();
+    const panel = sidebarStateRef.current;
+    if (panel.open && panel.view === "explorer") {
+      sidebarRef.current?.toggleExplorerSearch?.();
     } else {
       pendingExplorerSearch.current = true;
-      setRightPanelOpen(true);
-      setRightPanelActiveTab("explorer");
+      setSidebarOpen(true);
+      setSidebarView("explorer");
     }
-  }, [setRightPanelOpen, setRightPanelActiveTab]);
+  }, [setSidebarOpen, setSidebarView]);
 
   const welcomeActions = useMemo<WelcomeActions>(
     () => ({
@@ -2211,10 +2204,10 @@ export default function App() {
       "pane.focusDown": () => focusPaneInDirection("down"),
       "pane.focusLeft": () => focusPaneInDirection("left"),
       "pane.focusRight": () => focusPaneInDirection("right"),
-      "sidebar.toggle": toggleRightPanel,
+      "sidebar.toggle": toggleSidebar,
       "sidebar.showExplorer": rotateExplorerRoot,
-      "sidebar.showGit": () => showRightPanelTab("git"),
-      "sidebar.showHistory": () => showRightPanelTab("history"),
+      "sidebar.showGit": () => showSidebarView("git"),
+      "sidebar.showHistory": () => showSidebarView("history"),
       "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
       "explorer.viewPinned": () => showExplorerWithMode("workspace"),
       "explorer.toggleHidden": handleToggleShowHidden,
@@ -2346,8 +2339,8 @@ export default function App() {
       zoomIn,
       zoomOut,
       zoomReset,
-      toggleRightPanel,
-      showRightPanelTab,
+      toggleSidebar,
+      showSidebarView,
       showExplorerWithMode,
       rotateExplorerRoot,
       toggleOverlayPreview,
@@ -2389,7 +2382,7 @@ export default function App() {
         return !(target as HTMLElement | null)?.closest?.(".xterm");
       }
       if (id === "file.rename") {
-        return rightPanelRef.current?.isExplorerFocused() ?? false;
+        return sidebarRef.current?.isExplorerFocused() ?? false;
       }
       if (id === "tab.lock") {
         return (
@@ -2466,22 +2459,22 @@ export default function App() {
         handleCloseAllPanels();
         break;
       case "toggle_sidebar":
-        toggleRightPanel();
+        toggleSidebar();
         break;
       case "toggle_explorer":
-        showRightPanelTab("explorer");
+        showSidebarView("explorer");
         break;
       case "toggle_git":
-        showRightPanelTab("git");
+        showSidebarView("git");
         break;
       case "toggle_history":
-        showRightPanelTab("history");
+        showSidebarView("history");
         break;
       case "toggle_hidden":
         handleToggleShowHidden();
         break;
-      case "toggle_panel_side":
-        setPanelSide(rightPanelStateRef.current.side === "left" ? "right" : "left");
+      case "toggle_sidebar_side":
+        setSidebarSide(sidebarStateRef.current.side === "left" ? "right" : "left");
         break;
     }
   };
@@ -2506,13 +2499,13 @@ export default function App() {
     void invoke("sync_menu", {
       state: {
         autosave: editorAutoSave,
-        sidebarOpen: rightPanelOpen,
-        activeTab: rightPanelActiveTab,
-        panelSide,
+        sidebarOpen: sidebarOpen,
+        activeView: sidebarView,
+        sidebarSide: sidebarSide,
         showHidden: activeShowHidden,
       },
     }).catch(() => {});
-  }, [editorAutoSave, rightPanelOpen, rightPanelActiveTab, panelSide, activeShowHidden]);
+  }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden]);
 
   // ── Command palette ───────────────────────────────────────────────────────
 
@@ -2538,8 +2531,8 @@ export default function App() {
             splitPaneRight: doSplitRight,
             splitPaneDown: doSplitDown,
             focusSearch: () => searchInlineRef.current?.focus(),
-            focusExplorerSearch: () => rightPanelRef.current?.focusExplorer(),
-            toggleSidebar: toggleRightPanel,
+            focusExplorerSearch: () => sidebarRef.current?.focusExplorer(),
+            toggleSidebar: toggleSidebar,
             openSettings: () => void openSettingsWindow(),
             openKeyboardShortcuts: () => void openSettingsWindow("shortcuts"),
             reopenClosedTab: () => { if (activeWorkspace) reopenClosed(); },
@@ -2573,7 +2566,7 @@ export default function App() {
       handleCloseActivePanel,
       doSplitRight,
       doSplitDown,
-      toggleRightPanel,
+      toggleSidebar,
       reopenClosed,
       clearFocusedTerminal,
       setZenPaneId,
@@ -2587,7 +2580,7 @@ export default function App() {
     void openSettingsWindow("external-editors");
   }, []);
 
-  const rightPanelRepoRoot =
+  const sidebarRepoRoot =
     sourceControl.repo?.repoRoot ?? explorerRoot ?? home ?? "";
 
   const shell = (
@@ -2595,8 +2588,8 @@ export default function App() {
       <TooltipProvider>
         <div className="zoom-content relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
           <Header
-            onToggleSidebar={toggleRightPanel}
-            panelSide={panelSide}
+            onToggleSidebar={toggleSidebar}
+            sidebarSide={sidebarSide}
             onOpenCommandPalette={() => openCommandPalette("commands")}
             onActivateAgent={onActivateAgent}
             onOpenSettings={() => void openSettingsWindow()}
@@ -2662,20 +2655,20 @@ export default function App() {
                 orientation="horizontal"
                 className="min-h-0 flex-1"
               >
-                {/* Tool panel on LEFT when panelSide === "left" */}
-                {rightPanelOpen && panelSide === "left" && (
+                {/* Tool panel on LEFT when sidebarSide === "left" */}
+                {sidebarOpen && sidebarSide === "left" && (
                   <>
                     <ResizablePanel
                       id="tool-panel"
-                      defaultSize={`${explorerSidebarWidth}%`}
+                      defaultSize={`${sidebarWidth}%`}
                       minSize="12%"
                       maxSize="70%"
-                      onResize={(size) => handleExplorerSidebarWidthChange(size.asPercentage)}
+                      onResize={(size) => setSidebarWidth(size.asPercentage)}
                     >
-                      <RightPanel
-                        ref={rightPanelRef}
-                        activeTab={rightPanelActiveTab}
-                        onChangeActiveTab={setRightPanelActiveTab}
+                      <Sidebar
+                        ref={sidebarRef}
+                        view={sidebarView}
+                        onChangeView={setSidebarView}
                         rootPath={explorerRoot}
                         rootMode={activeRootMode}
                         onChangeRootMode={handleChangeRootMode}
@@ -2714,7 +2707,7 @@ export default function App() {
                         onOpenDiff={openGitDiffInPanel}
                         onOpenGitGraph={openGitGraphFromContext}
                         onNavigateToWorktree={handleNavigateToWorktree}
-                        repoRoot={rightPanelRepoRoot}
+                        repoRoot={sidebarRepoRoot}
                         onOpenCommitFile={onOpenCommitFileStable}
                         onSearchHandle={setGitHistoryHandle}
                       />
@@ -2761,21 +2754,21 @@ export default function App() {
                   </div>
                 </ResizablePanel>
 
-                {/* Tool panel on RIGHT when panelSide === "right" (default) */}
-                {rightPanelOpen && panelSide === "right" && (
+                {/* Tool panel on RIGHT when sidebarSide === "right" (default) */}
+                {sidebarOpen && sidebarSide === "right" && (
                   <>
                     <ResizableHandle withHandle />
                     <ResizablePanel
                       id="tool-panel"
-                      defaultSize={`${explorerSidebarWidth}%`}
+                      defaultSize={`${sidebarWidth}%`}
                       minSize="12%"
                       maxSize="70%"
-                      onResize={(size) => handleExplorerSidebarWidthChange(size.asPercentage)}
+                      onResize={(size) => setSidebarWidth(size.asPercentage)}
                     >
-                      <RightPanel
-                        ref={rightPanelRef}
-                        activeTab={rightPanelActiveTab}
-                        onChangeActiveTab={setRightPanelActiveTab}
+                      <Sidebar
+                        ref={sidebarRef}
+                        view={sidebarView}
+                        onChangeView={setSidebarView}
                         rootPath={explorerRoot}
                         rootMode={activeRootMode}
                         onChangeRootMode={handleChangeRootMode}
@@ -2814,7 +2807,7 @@ export default function App() {
                         onOpenDiff={openGitDiffInPanel}
                         onOpenGitGraph={openGitGraphFromContext}
                         onNavigateToWorktree={handleNavigateToWorktree}
-                        repoRoot={rightPanelRepoRoot}
+                        repoRoot={sidebarRepoRoot}
                         onOpenCommitFile={onOpenCommitFileStable}
                         onSearchHandle={setGitHistoryHandle}
                       />

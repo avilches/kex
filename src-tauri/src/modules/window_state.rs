@@ -26,13 +26,14 @@ impl Default for WindowGeometry {
     }
 }
 
-/// Right panel chrome state, persisted per OS window in the index file.
+/// Sidebar chrome state, persisted per OS window in the index file.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RightPanelState {
+pub struct SidebarState {
     pub open: bool,
-    pub active_tab: String,
+    pub view: String,
     pub side: String,
+    pub width: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -43,11 +44,9 @@ pub struct WindowEntry {
     pub workspaces: Value,
     pub active_index: usize,
     #[serde(default)]
-    pub right_panel: Option<RightPanelState>,
+    pub sidebar: Option<SidebarState>,
     #[serde(default)]
     pub workspace_bar_width: Option<u32>,
-    #[serde(default)]
-    pub explorer_sidebar_width: Option<u32>,
     #[serde(default)]
     pub collapsed_status_groups: Vec<String>,
 }
@@ -58,9 +57,8 @@ impl Default for WindowEntry {
             geometry: WindowGeometry::default(),
             workspaces: Value::Array(vec![]),
             active_index: 0,
-            right_panel: None,
+            sidebar: None,
             workspace_bar_width: None,
-            explorer_sidebar_width: None,
             collapsed_status_groups: Vec::new(),
         }
     }
@@ -87,11 +85,9 @@ struct IndexEntry {
     workspace_ids: Vec<String>,
     active_index: usize,
     #[serde(default)]
-    right_panel: Option<RightPanelState>,
+    sidebar: Option<SidebarState>,
     #[serde(default)]
     workspace_bar_width: Option<u32>,
-    #[serde(default)]
-    explorer_sidebar_width: Option<u32>,
     #[serde(default)]
     collapsed_status_groups: Vec<String>,
 }
@@ -229,9 +225,8 @@ impl WindowStateManager {
                     geometry: ie.geometry.clone(),
                     workspaces: Value::Array(bodies),
                     active_index: ie.active_index,
-                    right_panel: ie.right_panel.clone(),
+                    sidebar: ie.sidebar.clone(),
                     workspace_bar_width: ie.workspace_bar_width,
-                    explorer_sidebar_width: ie.explorer_sidebar_width,
                     collapsed_status_groups: ie.collapsed_status_groups.clone(),
                 },
             );
@@ -299,9 +294,8 @@ impl WindowStateManager {
                     geometry: entry.geometry.clone(),
                     workspace_ids: ids,
                     active_index: entry.active_index,
-                    right_panel: entry.right_panel.clone(),
+                    sidebar: entry.sidebar.clone(),
                     workspace_bar_width: entry.workspace_bar_width,
-                    explorer_sidebar_width: entry.explorer_sidebar_width,
                     collapsed_status_groups: entry.collapsed_status_groups.clone(),
                 },
             );
@@ -388,21 +382,22 @@ impl WindowStateManager {
         }
     }
 
-    pub fn update_right_panel(&self, label: &str, state: RightPanelState) {
-        let active_tab = match state.active_tab.as_str() {
-            "explorer" | "git" | "history" => state.active_tab,
+    pub fn update_sidebar(&self, label: &str, state: SidebarState) {
+        let view = match state.view.as_str() {
+            "explorer" | "git" | "history" => state.view,
             _ => "explorer".to_string(),
         };
         let side = match state.side.as_str() {
             "left" | "right" => state.side,
             _ => "left".to_string(),
         };
-        let sanitized = RightPanelState { open: state.open, active_tab, side };
+        let width = state.width.clamp(12, 70);
+        let sanitized = SidebarState { open: state.open, view, side, width };
         let mut guard = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = guard.windows.get_mut(label) {
-            entry.right_panel = Some(sanitized);
+            entry.sidebar = Some(sanitized);
         } else {
-            log::warn!("[window-state] update_right_panel: label '{label}' not found in state");
+            log::warn!("[window-state] update_sidebar: label '{label}' not found in state");
         }
     }
 
@@ -410,13 +405,6 @@ impl WindowStateManager {
         let mut inner = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = inner.windows.get_mut(label) {
             entry.workspace_bar_width = Some(width);
-        }
-    }
-
-    pub fn update_explorer_sidebar_width(&self, label: &str, width: u32) {
-        let mut inner = self.inner.write().expect("window state lock poisoned");
-        if let Some(entry) = inner.windows.get_mut(label) {
-            entry.explorer_sidebar_width = Some(width);
         }
     }
 
@@ -656,32 +644,34 @@ mod tests {
     }
 
     #[test]
-    fn right_panel_round_trips_some_and_none() {
+    fn sidebar_round_trips_some_and_none() {
         let with = WindowEntry {
-            right_panel: Some(RightPanelState {
+            sidebar: Some(SidebarState {
                 open: false,
-                active_tab: "git".to_string(),
+                view: "git".to_string(),
                 side: "right".to_string(),
+                width: 25,
             }),
             ..WindowEntry::default()
         };
         let json = serde_json::to_string(&with).unwrap();
-        assert!(json.contains("rightPanel"));
-        assert!(json.contains("activeTab"));
+        assert!(json.contains("sidebar"));
+        assert!(json.contains("\"view\""));
         let back: WindowEntry = serde_json::from_str(&json).unwrap();
-        let rp = back.right_panel.unwrap();
-        assert!(!rp.open);
-        assert_eq!(rp.active_tab, "git");
-        assert_eq!(rp.side, "right");
+        let sb = back.sidebar.unwrap();
+        assert!(!sb.open);
+        assert_eq!(sb.view, "git");
+        assert_eq!(sb.side, "right");
+        assert_eq!(sb.width, 25);
 
         let without = WindowEntry::default();
         let json = serde_json::to_string(&without).unwrap();
         let back: WindowEntry = serde_json::from_str(&json).unwrap();
-        assert!(back.right_panel.is_none());
+        assert!(back.sidebar.is_none());
     }
 
     #[test]
-    fn index_without_right_panel_field_deserializes_to_none() {
+    fn index_without_sidebar_field_deserializes_to_none() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("workspaces.json");
         let index = serde_json::json!({
@@ -696,77 +686,68 @@ mod tests {
         std::fs::write(&path, serde_json::to_string(&index).unwrap()).unwrap();
         let mgr = WindowStateManager::new(path);
         assert!(mgr.load());
-        assert!(mgr.get_entry("w-1").unwrap().right_panel.is_none());
+        assert!(mgr.get_entry("w-1").unwrap().sidebar.is_none());
     }
 
     #[test]
-    fn update_right_panel_persists_and_reloads() {
+    fn update_sidebar_persists_and_reloads() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("workspaces.json");
         let mgr = WindowStateManager::new(path.clone());
         mgr.add_window("w-1".to_string());
-        mgr.update_right_panel(
+        mgr.update_sidebar(
             "w-1",
-            RightPanelState {
+            SidebarState {
                 open: false,
-                active_tab: "history".to_string(),
+                view: "history".to_string(),
                 side: "right".to_string(),
+                width: 30,
             },
         );
         mgr.save();
 
         let mgr2 = WindowStateManager::new(path);
         assert!(mgr2.load());
-        let rp = mgr2.get_entry("w-1").unwrap().right_panel.unwrap();
-        assert!(!rp.open);
-        assert_eq!(rp.active_tab, "history");
-        assert_eq!(rp.side, "right");
+        let sb = mgr2.get_entry("w-1").unwrap().sidebar.unwrap();
+        assert!(!sb.open);
+        assert_eq!(sb.view, "history");
+        assert_eq!(sb.side, "right");
+        assert_eq!(sb.width, 30);
     }
 
     #[test]
-    fn update_right_panel_sanitizes_invalid_values() {
+    fn update_sidebar_sanitizes_invalid_values() {
         let dir = TempDir::new().unwrap();
         let mgr = WindowStateManager::new(dir.path().join("state.json"));
         mgr.add_window("w-1".to_string());
-        mgr.update_right_panel(
+        mgr.update_sidebar(
             "w-1",
-            RightPanelState {
+            SidebarState {
                 open: true,
-                active_tab: "bogus".to_string(),
+                view: "bogus".to_string(),
                 side: "up".to_string(),
+                width: 5,
             },
         );
-        let rp = mgr.get_entry("w-1").unwrap().right_panel.unwrap();
-        assert_eq!(rp.active_tab, "explorer");
-        assert_eq!(rp.side, "left");
+        let sb = mgr.get_entry("w-1").unwrap().sidebar.unwrap();
+        assert_eq!(sb.view, "explorer");
+        assert_eq!(sb.side, "left");
+        assert_eq!(sb.width, 12);
     }
 
     #[test]
-    fn update_right_panel_on_unknown_label_is_noop() {
+    fn update_sidebar_on_unknown_label_is_noop() {
         let dir = TempDir::new().unwrap();
         let mgr = WindowStateManager::new(dir.path().join("state.json"));
-        mgr.update_right_panel(
+        mgr.update_sidebar(
             "w-ghost",
-            RightPanelState {
+            SidebarState {
                 open: true,
-                active_tab: "explorer".to_string(),
+                view: "explorer".to_string(),
                 side: "left".to_string(),
+                width: 20,
             },
         );
         assert!(mgr.get_entry("w-ghost").is_none());
-    }
-
-    #[test]
-    fn update_explorer_sidebar_width_persists_and_reloads() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("workspaces.json");
-        let mgr = WindowStateManager::new(path.clone());
-        mgr.add_window("w-1".to_string());
-        mgr.update_explorer_sidebar_width("w-1", 30);
-        mgr.save();
-
-        let mgr2 = WindowStateManager::new(path);
-        assert!(mgr2.load());
-        assert_eq!(mgr2.get_entry("w-1").unwrap().explorer_sidebar_width, Some(30));
     }
 }

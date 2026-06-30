@@ -3,11 +3,10 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { migrateExplorerRootMode } from "./explorerRoot";
 import type { Panel, RunConfig, SplitNode, Workspace } from "./types";
 import {
-  setSavedRightPanelState,
-  type RightPanelUiState,
-} from "./windowUiState";
+  setSavedSidebarState,
+  type SidebarUiState,
+} from "./sidebarState";
 import { setSavedWorkspaceBarWidth } from "./workspaceBarState";
-import { setSavedExplorerSidebarWidth } from "./explorerSidebarState";
 import { setSavedCollapsedGroups } from "./collapsedGroupsState";
 
 type SavedState = { workspaces: Workspace[]; activeIndex: number };
@@ -16,9 +15,8 @@ type SavedState = { workspaces: Workspace[]; activeIndex: number };
 type WindowEntry = {
   workspaces: Workspace[];
   activeIndex: number;
-  rightPanel?: RightPanelUiState;
+  sidebar?: SidebarUiState;
   workspaceBarWidth?: number;
-  explorerSidebarWidth?: number;
   collapsedStatusGroups?: string[];
 };
 
@@ -92,9 +90,8 @@ export async function initWorkspaceState(): Promise<void> {
     if (entry && Array.isArray(entry.workspaces) && entry.workspaces.length > 0) {
       cached = { workspaces: entry.workspaces.map(sanitizeWorkspace), activeIndex: entry.activeIndex };
     }
-    setSavedRightPanelState(entry?.rightPanel);
+    setSavedSidebarState(entry?.sidebar);
     setSavedWorkspaceBarWidth(entry?.workspaceBarWidth);
-    setSavedExplorerSidebarWidth(entry?.explorerSidebarWidth);
     setSavedCollapsedGroups(entry?.collapsedStatusGroups);
   } catch (err) {
     console.error("[workspace-state] initWorkspaceState error:", err);

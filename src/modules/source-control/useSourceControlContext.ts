@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { native } from "@/lib/native";
-import type { SidebarViewId } from "@/modules/sidebar";
+import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { useSourceControl } from "./useSourceControl";
 
 type Params = {
@@ -8,7 +8,7 @@ type Params = {
   launchCwd: string | null;
   launchCwdResolved: boolean;
   home: string | null;
-  cycleSidebarView: (view: SidebarViewId) => void;
+  cycleSidebarView: (view: SidebarView) => void;
   openCommitHistoryTab: (args: {
     repoRoot: string;
     branch: string | null;
@@ -38,7 +38,7 @@ export function useSourceControlContext({
   const sourceControl = useSourceControl(sourceControlPath ?? null, true);
 
   const toggleSourceControl = useCallback(() => {
-    cycleSidebarView("source-control");
+    cycleSidebarView("git");
   }, [cycleSidebarView]);
 
   const openGitGraphFromContext = useCallback(async () => {

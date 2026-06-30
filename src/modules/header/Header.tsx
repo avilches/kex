@@ -22,7 +22,7 @@ import {
 
 type Props = {
   onToggleSidebar: () => void;
-  panelSide: "left" | "right";
+  sidebarSide: "left" | "right";
   onOpenCommandPalette: () => void;
   onActivateAgent: (workspaceId: string, panelId: string) => void;
   onOpenSettings: () => void;
@@ -46,7 +46,7 @@ const COMPACT_WIDTH = 720;
 
 export function Header({
   onToggleSidebar,
-  panelSide,
+  sidebarSide,
   onOpenCommandPalette,
   onActivateAgent,
   onOpenSettings,
@@ -100,7 +100,7 @@ export function Header({
       className="shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
     >
       <HugeiconsIcon
-        icon={panelSide === "right" ? SidebarRightIcon : SidebarLeftIcon}
+        icon={sidebarSide === "right" ? SidebarRightIcon : SidebarLeftIcon}
         size={18}
         strokeWidth={1.75}
       />
@@ -116,7 +116,7 @@ export function Header({
       }`}
     >
       <div className="flex shrink-0 items-center gap-0.5">
-        {panelSide === "left" && toggleButton}
+        {sidebarSide === "left" && toggleButton}
 
         <Button
           size="icon-sm"
@@ -171,7 +171,7 @@ export function Header({
 
       {!IS_MAC && settingsButton}
 
-      {panelSide === "right" && (
+      {sidebarSide === "right" && (
         <>
           <span className="h-5 w-px shrink-0 bg-border/70" />
           {toggleButton}

@@ -89,7 +89,7 @@ struct DynMenuItems {
     git: tauri::menu::CheckMenuItem<tauri::Wry>,
     history: tauri::menu::CheckMenuItem<tauri::Wry>,
     show_hidden: tauri::menu::CheckMenuItem<tauri::Wry>,
-    panel_side: tauri::menu::MenuItem<tauri::Wry>,
+    sidebar_side: tauri::menu::MenuItem<tauri::Wry>,
     dock_browser: tauri::menu::MenuItem<tauri::Wry>,
     dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
 }
@@ -105,8 +105,8 @@ struct MenuHandles(Mutex<Option<DynMenuItems>>);
 struct MenuState {
     autosave: bool,
     sidebar_open: bool,
-    active_tab: String,
-    panel_side: String,
+    active_view: String,
+    sidebar_side: String,
     show_hidden: bool,
 }
 
@@ -119,12 +119,12 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
         let Some(items) = guard.as_ref() else { return };
         let _ = items.autosave.set_checked(state.autosave);
         let _ = items.sidebar.set_checked(state.sidebar_open);
-        let on = |tab: &str| state.sidebar_open && state.active_tab == tab;
+        let on = |view: &str| state.sidebar_open && state.active_view == view;
         let _ = items.explorer.set_checked(on("explorer"));
         let _ = items.git.set_checked(on("git"));
         let _ = items.history.set_checked(on("history"));
         let _ = items.show_hidden.set_checked(state.show_hidden);
-        let _ = items.panel_side.set_text(if state.panel_side == "left" {
+        let _ = items.sidebar_side.set_text(if state.sidebar_side == "left" {
             "Move Sidebar to Right"
         } else {
             "Move Sidebar to Left"
@@ -417,17 +417,18 @@ fn window_save_workspace_state(
 }
 
 #[tauri::command]
-fn window_save_right_panel(
+fn window_save_sidebar(
     app: tauri::AppHandle,
     label: String,
     open: bool,
-    active_tab: String,
+    view: String,
     side: String,
+    width: u32,
 ) {
     let mgr = app.state::<window_state::WindowStateManager>();
-    mgr.update_right_panel(
+    mgr.update_sidebar(
         &label,
-        window_state::RightPanelState { open, active_tab, side },
+        window_state::SidebarState { open, view, side, width },
     );
     mgr.save();
 }
@@ -436,13 +437,6 @@ fn window_save_right_panel(
 fn window_save_workspace_bar(app: tauri::AppHandle, label: String, width: u32) {
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_workspace_bar_width(&label, width);
-    mgr.save();
-}
-
-#[tauri::command]
-fn window_save_explorer_sidebar(app: tauri::AppHandle, label: String, width: u32) {
-    let mgr = app.state::<window_state::WindowStateManager>();
-    mgr.update_explorer_sidebar_width(&label, width);
     mgr.save();
 }
 
@@ -597,8 +591,8 @@ pub fn run() {
                         .accelerator("Cmd+Shift+.")
                         .checked(false)
                         .build(app)?;
-                let panel_side =
-                    MenuItemBuilder::with_id("toggle_panel_side", "Move Sidebar to Left")
+                let sidebar_side =
+                    MenuItemBuilder::with_id("toggle_sidebar_side", "Move Sidebar to Left")
                         .build(app)?;
                 let view_menu = SubmenuBuilder::new(app, "View")
                     .item(&sidebar)
@@ -608,7 +602,7 @@ pub fn run() {
                     .separator()
                     .item(&show_hidden)
                     .separator()
-                    .item(&panel_side)
+                    .item(&sidebar_side)
                     .build()?;
 
                 // Window (dock items start disabled; refresh_dock_menu enables them
@@ -641,7 +635,7 @@ pub fn run() {
                     git,
                     history,
                     show_hidden,
-                    panel_side,
+                    sidebar_side,
                     dock_browser,
                     dock_all_browsers,
                 }))));
@@ -861,9 +855,8 @@ pub fn run() {
             open_main_window,
             window_get_state,
             window_save_workspace_state,
-            window_save_right_panel,
+            window_save_sidebar,
             window_save_workspace_bar,
-            window_save_explorer_sidebar,
             window_save_collapsed_groups,
             restore_window_geometry,
             agent::agent_enable_claude_hooks,

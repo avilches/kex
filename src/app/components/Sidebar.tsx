@@ -11,13 +11,12 @@ import {
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SourceControlSummary } from "@/modules/source-control";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
+import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { GitCommitIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 
-export type RightPanelTab = "explorer" | "git" | "history";
-
-export type RightPanelHandle = {
+export type SidebarHandle = {
   focusExplorer: () => void;
   toggleExplorerSearch: () => void;
   isExplorerFocused: () => boolean;
@@ -33,10 +32,10 @@ type CommitFileDiffOpenInput = {
   originalPath: string | null;
 };
 
-export type RightPanelProps = {
-  // Right-panel chrome (per-window)
-  activeTab: RightPanelTab;
-  onChangeActiveTab: (tab: RightPanelTab) => void;
+export type SidebarProps = {
+  // Sidebar chrome (per-window)
+  view: SidebarView;
+  onChangeView: (view: SidebarView) => void;
   // FileExplorer props
   rootPath: string | null;
   rootMode: ExplorerRootMode;
@@ -85,15 +84,15 @@ export type RightPanelProps = {
   onSearchHandle?: (handle: GitHistorySearchHandle | null) => void;
 };
 
-const TABS: { id: RightPanelTab; label: string }[] = [
+const VIEWS: { id: SidebarView; label: string }[] = [
   { id: "explorer", label: "Explorer" },
   { id: "git", label: "Git" },
   { id: "history", label: "History" },
 ];
 
-export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
-  function RightPanel(props, ref) {
-    const activeTab = props.activeTab;
+export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
+  function Sidebar(props, ref) {
+    const view = props.view;
     const explorerRef = useRef<FileExplorerHandle>(null);
 
     useImperativeHandle(ref, () => ({
@@ -105,21 +104,21 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
 
     return (
       <div className="flex h-full flex-col bg-sidebar">
-        {/* Tab strip */}
+        {/* View strip */}
         <div className="flex h-8 shrink-0 items-center border-b border-border/60">
-          {TABS.map((tab) => (
+          {VIEWS.map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => props.onChangeActiveTab(tab.id)}
+              onClick={() => props.onChangeView(tab.id)}
               className={cn(
                 "relative h-full px-3 text-[11px] font-medium transition-colors",
-                activeTab === tab.id
+                view === tab.id
                   ? "bg-card text-foreground"
                   : "bg-muted/35 text-muted-foreground hover:bg-card hover:text-foreground",
               )}
             >
-              {activeTab === tab.id && (
+              {view === tab.id && (
                 <div className="absolute inset-x-0 top-0 h-[1.5px] bg-tab-focus-indicator" />
               )}
               {tab.label}
@@ -127,17 +126,17 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
           ))}
         </div>
 
-        {/* Content — all three mounted, only active visible */}
+        {/* Content -- all three mounted, only active visible */}
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <div
             className={cn(
               "absolute inset-0 overflow-auto",
-              activeTab !== "explorer" && "invisible pointer-events-none",
+              view !== "explorer" && "invisible pointer-events-none",
             )}
           >
             <FileExplorer
               ref={explorerRef}
-              active={activeTab === "explorer"}
+              active={view === "explorer"}
               rootPath={props.rootPath}
               rootMode={props.rootMode}
               onChangeRootMode={props.onChangeRootMode}
@@ -168,11 +167,11 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
           <div
             className={cn(
               "absolute inset-0 overflow-auto",
-              activeTab !== "git" && "invisible pointer-events-none",
+              view !== "git" && "invisible pointer-events-none",
             )}
           >
             <SourceControlPanel
-              open={activeTab === "git"}
+              open={view === "git"}
               sourceControl={props.sourceControl}
               pushOnCommit={props.pushOnCommit}
               onPushOnCommitChange={props.onPushOnCommitChange}
@@ -188,7 +187,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(
           <div
             className={cn(
               "absolute inset-0 flex flex-col overflow-hidden",
-              activeTab !== "history" && "invisible pointer-events-none",
+              view !== "history" && "invisible pointer-events-none",
             )}
           >
             {props.onOpenGitGraph ? (

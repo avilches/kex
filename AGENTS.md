@@ -99,7 +99,7 @@ own React instance. Main windows have a `w-<id>` label; the Settings window has 
 state (geometry + Workspaces + active index) is persisted by Rust in `{app_data_dir}/workspaces.json` (index) plus
 `{app_data_dir}/workspaces/<id>.json` (bodies), keyed by window label, and restored on startup. Path alias `@/*` →
 `src/*`. The layout is a 3-column shell: a narrow (52px) `WorkspaceBar`
-on the left, a resizable center content area, and a collapsible right panel (Explorer / Source Control / Git History).
+on the left, a resizable center content area, and a collapsible `Sidebar` (Explorer / Source Control / Git History).
 Content is organized as Workspaces → Panes → Panels. Panels are a tagged union (`kind`: `terminal` | `editor` |
 `browser` | `markdown` | `git-diff` | `git-history` | `git-commit-file`) and **not** unmounted on switch — they're
 hidden via `invisible pointer-events-none` so PTYs and dev servers keep streaming in the background.
@@ -129,7 +129,6 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
   the pure tree-operation library (split, remove, find, flatten). Rendering: `WorkspaceView` → `SplitNodeView` (
   recursive binary tree) → `PaneView` → `PanelContent` (switches on `panel.kind`). State persisted to
   `workspace-state.json` via `tauri-plugin-store`, debounced 300ms on every change.
-- **sidebar/** — residual module; exports `SidebarViewId` type used by right-panel tab routing.
 - **source-control/** — git status / stage / commit panel and diff workflow.
 - **git-history/** — commit graph rail, refs, per-commit file diffs.
 - **markdown/** — markdown preview renderer (backs the `markdown` tab kind).

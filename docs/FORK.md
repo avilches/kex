@@ -65,10 +65,10 @@ model.
 
 - `WorkspaceSidebar` (52px vertical strip, left) — replaces the horizontal `TabBar`. Lists workspaces as icon avatars
   with stable colors derived from their ID. Keyboard-navigable.
-- `RightPanel` (collapsible, default 240px, right) — holds Explorer, Source Control, and Git History as tabs. Width,
-  active tab, and open/closed state persist via `tauri-plugin-store`.
-- `rightPanelSide` preference — moves the tool panel to the left of the center content for users who prefer that layout.
-- `SidebarRail` and `useSidebarPanel` deleted (replaced by RightPanel).
+- `Sidebar` (collapsible, default 240px, right) — holds Explorer, Source Control, and Git History as tabs. Width,
+  active tab, open/closed state, and dock side persist via `window_save_sidebar` per OS window.
+- `sidebarSide` per-window state — moves the tool panel to the left of the center content for users who prefer that layout.
+- `SidebarRail` and `useSidebarPanel` deleted (replaced by Sidebar).
 - `Header` no longer owns the tab bar.
 - `open_main_window` Tauri command — mirrors the settings window pattern, enables multiple independent main windows (
   `Cmd+Shift+N`).
@@ -118,17 +118,17 @@ previous workspaces or pane layout.
 - Editor and other non-terminal panels restore their content reference (`path`, `url`, etc.).
 - `sanitizeWorkspace` clears transient state at save time (e.g. `editor.dirty = false`).
 
-### Per-window right panel state
+### Per-window sidebar state
 
-**Problem in the original:** the right panel view (Explorer / Git / History), its open state, width, dock side, and the
+**Problem in the original:** the sidebar view (Explorer / Git / History), its open state, width, dock side, and the
 show-hidden toggle were global preferences in `settings-general.json`, so every OS window shared one value.
 
 **What was built:**
 
-- The right panel chrome (open, active tab, width, dock side) is now per OS window. It is persisted in the
-  `workspaces.json` index as a `rightPanel` field on each window entry and restored on startup, reusing the existing
-  per-window state plumbing (`window_get_state`) plus a dedicated `window_save_right_panel` command. The frontend holds
-  it in `useRightPanelState(label)` (debounced save).
+- The sidebar chrome (open, active view, width, dock side) is now per OS window. It is persisted in the
+  `workspaces.json` index as a `sidebar` field on each window entry and restored on startup, reusing the existing
+  per-window state plumbing (`window_get_state`) plus the dedicated `window_save_sidebar` command. The frontend holds
+  it in `useSidebarState(label)` (debounced save).
 - `showHidden` moved from a global preference to a per-workspace field on `Workspace`, mirroring `explorerRootMode`, so
   each workspace tab remembers its own.
 - The old global preferences and their setters were removed, along with the "Sidebar position" control in Settings (dock
@@ -166,7 +166,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab right-click
   context menu) drives both the Explorer root and the Source Control / Git History repo when it gains focus or its cwd
   changes while focused. F4 (`tab.focusOnExplorer`) does the same anchoring unconditionally regardless of autofocus, and
-  additionally opens the right panel if closed and switches away from Git History. Both F4 and autofocus use the same
+  additionally opens the sidebar if closed and switches away from Git History. Both F4 and autofocus use the same
   cascade: folder under workspace root -> Workspace Root mode; else under a git repo -> File System rooted at that git
   root; else File System at the common ancestor / dirname. The git repo for Source Control / Git History is resolved
   from the same folder (`git_resolve_repo`), stored per workspace as `gitRootByWs`, and is `null` when no repo is
@@ -418,7 +418,7 @@ These phases are designed but not fully implemented:
 - Items opcionales re-decididos (cierre del sync):
   - 731da51 (header polish): APLICADO. Hover `hover:bg-accent hover:text-foreground` en el boton Command palette y divisores suavizados `bg-border` -> `bg-border/70`. El resto del commit (bloque spaceSwitcher+TabBar) no existe en el fork.
   - c4aaca2 (CI pnpm): APLICADO. release.yml y signpath-test.yml leen pnpm 11.5 del campo `packageManager` (antes pineaban version 10, un mismatch real con el proyecto). ci.yml ya no tenia pin.
-  - 6ebb6b8 (panel swap animation): DESCARTADO. No aplica al fork: los 3 paneles del RightPanel estan montados siempre (invisible pointer-events-none) y no se remontan al cambiar de tab, asi que una animacion de entrada CSS no se dispara. Portarlo exigiria AnimatePresence/remount (rompe el estado vivo). Queda como pulido independiente.
+  - 6ebb6b8 (panel swap animation): DESCARTADO. No aplica al fork: los 3 paneles del Sidebar estan montados siempre (invisible pointer-events-none) y no se remontan al cambiar de tab, asi que una animacion de entrada CSS no se dispara. Portarlo exigiria AnimatePresence/remount (rompe el estado vivo). Queda como pulido independiente.
   - afd1167 (appimage updater sig): DESCARTADO del sync, anotado como mejora M8 (docs/pending/improvements). El release.yml del fork divergio en el merge-base 8200938 (96 lineas) y nunca recibio la cadena de mejoras del AppImage del upstream (hoy 202 lineas, sin wayland/signer/patch-appimage). afd1167 modifica un step que el fork no tiene; adoptar el sistema completo es trabajo de infra aparte.
   - bb155d2 (tab enter animation): POSPUESTO. Portable a PaneTabBar, pero ese fichero estaba bajo un WIP de rename de pestanas (ya descartado por el usuario); se retoma cuando se quiera.
 - El resto del scope aceptado (Bucket B completo, C1/C2/C3/C5) ya estaba aplicado de sesiones previas.
