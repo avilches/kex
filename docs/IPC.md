@@ -132,7 +132,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 
 | Command | Description |
 |---|---|
-| `open_settings_window` | Open (or focus) the Settings window, optionally deep-linking a tab |
+| `open_settings_window` | Open (or focus) the Settings window, optionally deep-linking a section (`section?: string`) |
 | `open_main_window` | Open a new main window with a fresh `w-<hex>` label |
 | `window_get_state` | Return the saved `WindowEntry` (workspaces + geometry + optional `sidebar` chrome) for a given window label, reconstructed from the `workspaces.json` index plus the per-workspace `workspaces/<id>.json` bodies |
 | `window_save_workspace_state` | Persist workspace list and active index for a window label; writes the lean `workspaces.json` index plus one `workspaces/<id>.json` per changed workspace |

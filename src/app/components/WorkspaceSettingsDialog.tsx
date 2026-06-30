@@ -32,7 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
-import type { WorkspaceSettingsFocus, WorkspaceSettingsTab } from "@/modules/workspaces/lib/workspaceSettingsStore";
+import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
@@ -56,7 +56,7 @@ type Props = {
 };
 
 export function WorkspaceSettingsDialog(props: Props) {
-  const { open, workspaceId, initialTab, initialFocus, closeSettings } = useWorkspaceSettingsStore();
+  const { open, workspaceId, initialSection, initialFocus, closeSettings } = useWorkspaceSettingsStore();
   const ws = props.workspaces.find((w) => w.id === workspaceId);
 
   function handleClose() {
@@ -78,9 +78,9 @@ export function WorkspaceSettingsDialog(props: Props) {
         </DialogHeader>
         {ws && (
           <WorkspaceSettingsForm
-            key={`${ws.id}-${initialTab}-${initialFocus}`}
+            key={`${ws.id}-${initialSection}-${initialFocus}`}
             ws={ws}
-            initialTab={initialTab}
+            initialSection={initialSection}
             initialFocus={initialFocus}
             onRequestClose={handleClose}
             {...props}
@@ -302,10 +302,10 @@ function IconPicker({
   );
 }
 
-type FormProps = { ws: Workspace; initialTab: WorkspaceSettingsTab; initialFocus: WorkspaceSettingsFocus; onRequestClose: () => void } & Omit<Props, "workspaces">;
+type FormProps = { ws: Workspace; initialSection: WorkspaceSettingsSection; initialFocus: WorkspaceSettingsFocus; onRequestClose: () => void } & Omit<Props, "workspaces">;
 
-function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, ...props }: FormProps) {
-  const [activeTab, setActiveTab] = useState<WorkspaceSettingsTab>(initialTab);
+function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClose, ...props }: FormProps) {
+  const [activeSection, setActiveSection] = useState<WorkspaceSettingsSection>(initialSection);
   const [cwdValue, setCwdValue] = useState(ws.pinnedRoot ?? "");
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
   const [titleValue, setTitleValue] = useState(ws.title ?? "");
@@ -330,7 +330,7 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
   const cwdInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (activeTab === "properties") {
+    if (activeSection === "properties") {
       setTimeout(() => {
         if (initialFocus === "workspaceRoot") {
           cwdInputRef.current?.focus();
@@ -339,7 +339,7 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
         }
       }, 0);
     }
-  }, [activeTab, initialFocus]);
+  }, [activeSection, initialFocus]);
 
   useEffect(() => {
     if (!cwdValue) {
@@ -367,10 +367,10 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
           <button
             key={tab}
             type="button"
-            onClick={() => setActiveTab(tab)}
+            onClick={() => setActiveSection(tab)}
             className={cn(
               "-mb-px px-3 py-1.5 text-[12px] font-medium outline-none transition-colors focus-visible:outline-none",
-              activeTab === tab
+              activeSection === tab
                 ? "border-b-2 border-primary text-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
@@ -380,7 +380,7 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
         ))}
       </div>
 
-      {activeTab === "properties" && (
+      {activeSection === "properties" && (
         <div className="flex flex-col gap-5">
           {/* Name: full width */}
           <div className="flex flex-col gap-1.5">
@@ -541,7 +541,7 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
         </div>
       )}
 
-      {activeTab === "run-configurations" && (
+      {activeSection === "run-configurations" && (
         <RunConfigSection
           ws={ws}
           onAddRunConfig={props.onAddRunConfig}

@@ -2,7 +2,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { WindowControls } from "@/components/WindowControls";
 import { cn } from "@/lib/utils";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
-import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
+import type { SettingsSection } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   Cancel01Icon,
@@ -34,7 +34,7 @@ import { ThemesSection } from "./sections/ThemesSection";
 import { WorkspacesSection } from "./sections/WorkspacesSection";
 
 const SECTIONS: {
-  id: SettingsTab;
+  id: SettingsSection;
   label: string;
   icon: typeof Settings01Icon;
   component: () => JSX.Element;
@@ -51,29 +51,29 @@ const SECTIONS: {
   { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
 ];
 
-const VALID_TABS: SettingsTab[] = SECTIONS.map((s) => s.id);
+const VALID_SECTIONS: SettingsSection[] = SECTIONS.map((s) => s.id);
 
-function parseTabParam(raw: string | null): { tab: SettingsTab; ext?: string } {
-  if (!raw) return { tab: "general" };
-  const [tabId, ext] = raw.split(":");
-  const tab = (VALID_TABS as string[]).includes(tabId) ? (tabId as SettingsTab) : "general";
-  return { tab, ext: ext || undefined };
+function parseSectionParam(raw: string | null): { section: SettingsSection; ext?: string } {
+  if (!raw) return { section: "general" };
+  const [sectionId, ext] = raw.split(":");
+  const section = (VALID_SECTIONS as string[]).includes(sectionId) ? (sectionId as SettingsSection) : "general";
+  return { section, ext: ext || undefined };
 }
 
-function readInitialTab(): SettingsTab {
+function readInitialSection(): SettingsSection {
   if (typeof window === "undefined") return "general";
   const url = new URL(window.location.href);
-  return parseTabParam(url.searchParams.get("tab")).tab;
+  return parseSectionParam(url.searchParams.get("section")).section;
 }
 
 function readInitialFileTypesExt(): string | undefined {
   if (typeof window === "undefined") return undefined;
   const url = new URL(window.location.href);
-  return parseTabParam(url.searchParams.get("tab")).ext;
+  return parseSectionParam(url.searchParams.get("section")).ext;
 }
 
 export function SettingsApp() {
-  const [active, setActive] = useState<SettingsTab>(readInitialTab);
+  const [active, setActive] = useState<SettingsSection>(readInitialSection);
   const [fileTypesExt, setFileTypesExt] = useState<string | undefined>(readInitialFileTypesExt);
   const init = usePreferencesStore((s) => s.init);
   const ActiveSection = SECTIONS.find((s) => s.id === active)?.component;
@@ -100,15 +100,15 @@ export function SettingsApp() {
 
   useEffect(() => {
     const apply = (raw: string) => {
-      const { tab, ext } = parseTabParam(raw);
-      setActive(tab);
+      const { section, ext } = parseSectionParam(raw);
+      setActive(section);
       if (ext) {
         fileTypesExtConsumed.current = false;
         setFileTypesExt(ext);
       }
     };
     const unlistenPromise = getCurrentWebviewWindow().listen<string>(
-      "kex:settings-tab",
+      "kex:settings-section",
       (e) => apply(e.payload),
     );
     return () => {

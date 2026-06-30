@@ -62,7 +62,7 @@ goes through `invoke()` calls to commands registered in `src-tauri/src/lib.rs`:
   `kill`, `list`): long-running background processes (dev servers etc.) with bounded ring-buffer log capture.
 - `workspace::*`: `workspace_authorize` / `workspace_current_dir` (the spawn/git cwd authorization registry) plus the
   WSL bridge (`wsl_list_distros`, `wsl_default_distro`, `wsl_home`).
-- `open_settings_window`: separate webview window for Settings (optional `tab` arg deep-links a section).
+- `open_settings_window`: separate webview window for Settings (optional `section` arg deep-links a section).
 - `agent::agent_enable_claude_hooks` / `agent_claude_hooks_status`: atomically install Claude Code terminal hooks; gated
   on `KEX_TERMINAL`.
 

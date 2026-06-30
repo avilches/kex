@@ -292,9 +292,9 @@ fn create_app_window(
 }
 
 #[tauri::command]
-async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Result<(), String> {
-    let url_path = match tab.as_deref() {
-        Some(t) if !t.is_empty() => format!("settings.html?tab={}", t),
+async fn open_settings_window(app: tauri::AppHandle, section: Option<String>) -> Result<(), String> {
+    let url_path = match section.as_deref() {
+        Some(t) if !t.is_empty() => format!("settings.html?section={}", t),
         _ => "settings.html".to_string(),
     };
 
@@ -302,8 +302,8 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         let _ = window.set_always_on_top(true);
         let _ = window.show();
         let _ = window.set_focus();
-        if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
-            let _ = window.emit("kex:settings-tab", t);
+        if let Some(t) = section.as_deref().filter(|s| !s.is_empty()) {
+            let _ = window.emit("kex:settings-section", t);
         }
         return Ok(());
     }
