@@ -46,7 +46,7 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "xcode", name: "Xcode", group: "Other IDEs", type: "workspace" },
 ];
 
-export const EDITOR_GROUPS: EditorGroup[] = ["VS Code", "JetBrains", "Text Editors", "Other IDEs"];
+export const EDITOR_GROUPS: EditorGroup[] = ["Other IDEs", "VS Code", "JetBrains", "Text Editors"];
 
 const CATALOG_MAP = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
 

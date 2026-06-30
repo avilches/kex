@@ -44,7 +44,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
-const ALL_GROUPS: EditorGroup[] = ["Text Editors", "VS Code", "JetBrains", "Other IDEs"];
+const WORKSPACE_GROUP_ORDER: EditorGroup[] = ["Other IDEs", "VS Code", "JetBrains"];
 const NOT_INSTALLED_COLLAPSED = 1;
 
 function targetTypeLabel(type: EditorTargetType): string {
@@ -85,6 +85,66 @@ function GroupSection({
         {headerExtra ?? (
           <p className="text-[10px] text-muted-foreground/60">{targetTypeLabel(groupTargetType(group))}</p>
         )}
+      </div>
+      <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
+        {installed.map((entry) => {
+          const stored = detectedById.get(entry.id);
+          const isEnabled = stored?.enabled !== false;
+          return (
+            <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5">
+              <EditorIcon id={entry.id} size={18} />
+              <span className="flex-1 text-[12.5px]">{entry.name}</span>
+              <Switch
+                checked={isEnabled}
+                onCheckedChange={(v) => onToggle(entry.id, v)}
+              />
+            </div>
+          );
+        })}
+        {visibleNotInstalled.map((entry) => (
+          <div key={entry.id} className="flex items-center gap-3 px-3 py-2.5 opacity-35">
+            <EditorIcon id={entry.id} size={18} />
+            <span className="flex-1 text-[12.5px] text-muted-foreground">{entry.name}</span>
+          </div>
+        ))}
+        {!expanded && hidden > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="px-3 py-2 text-left text-[11px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+          >
+            Show {hidden} more
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceGroupSection({
+  detectedEditors,
+  onToggle,
+}: {
+  detectedEditors: DetectedEditor[];
+  onToggle: (id: string, enabled: boolean) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const detectedById = new Map(detectedEditors.map((e) => [e.id, e]));
+  const allEntries = WORKSPACE_GROUP_ORDER.flatMap((group) =>
+    EDITOR_CATALOG.filter((e) => e.group === group),
+  );
+  const installed = allEntries.filter((e) => detectedById.has(e.id));
+  const notInstalled = allEntries.filter((e) => !detectedById.has(e.id));
+  const hidden = Math.max(0, notInstalled.length - NOT_INSTALLED_COLLAPSED);
+  const visibleNotInstalled = expanded ? notInstalled : notInstalled.slice(0, NOT_INSTALLED_COLLAPSED);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div>
+        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+          IDEs
+        </h3>
+        <p className="text-[10px] text-muted-foreground/60">Opens in the workspace root</p>
       </div>
       <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
         {installed.map((entry) => {
@@ -434,35 +494,35 @@ export function ExternalEditorsSection() {
         )}
       </div>
 
-      {ALL_GROUPS.map((group) => (
-        <GroupSection
-          key={group}
-          group={group}
-          detectedEditors={detectedEditors}
-          onToggle={handleToggleDetected}
-          headerExtra={
-            group === "Text Editors" ? (
-              <RadioGroup
-                value={textEditorMode}
-                onValueChange={(v) => handleTextEditorModeChange(v as TextEditorMode)}
-                className="mt-1.5 gap-1.5"
-              >
-                {TEXT_EDITOR_MODE_OPTIONS.map((opt) => (
-                  <div key={opt.value} className="flex items-center gap-2">
-                    <RadioGroupItem value={opt.value} id={`text-editor-mode-${opt.value}`} />
-                    <label
-                      htmlFor={`text-editor-mode-${opt.value}`}
-                      className="cursor-pointer text-[12px]"
-                    >
-                      {opt.label}
-                    </label>
-                  </div>
-                ))}
-              </RadioGroup>
-            ) : undefined
-          }
-        />
-      ))}
+      <WorkspaceGroupSection
+        detectedEditors={detectedEditors}
+        onToggle={handleToggleDetected}
+      />
+
+      <GroupSection
+        group="Text Editors"
+        detectedEditors={detectedEditors}
+        onToggle={handleToggleDetected}
+        headerExtra={
+          <RadioGroup
+            value={textEditorMode}
+            onValueChange={(v) => handleTextEditorModeChange(v as TextEditorMode)}
+            className="mt-1.5 gap-1.5"
+          >
+            {TEXT_EDITOR_MODE_OPTIONS.map((opt) => (
+              <div key={opt.value} className="flex items-center gap-2">
+                <RadioGroupItem value={opt.value} id={`text-editor-mode-${opt.value}`} />
+                <label
+                  htmlFor={`text-editor-mode-${opt.value}`}
+                  className="cursor-pointer text-[12px]"
+                >
+                  {opt.label}
+                </label>
+              </div>
+            ))}
+          </RadioGroup>
+        }
+      />
     </div>
   );
 }
