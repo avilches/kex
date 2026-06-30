@@ -112,6 +112,10 @@ import {
   saveWorkspaceSidebarWidth,
 } from "@/modules/workspaces/lib/workspaceSidebarState";
 import {
+  getSavedCollapsedGroups,
+  saveCollapsedGroups,
+} from "@/modules/workspaces/lib/collapsedGroupsState";
+import {
   getSavedExplorerSidebarWidth,
   saveExplorerSidebarWidth,
 } from "@/modules/workspaces/lib/explorerSidebarState";
@@ -450,6 +454,37 @@ export default function App() {
     setWorkspaceSidebarWidth(w);
     saveWorkspaceSidebarWidth(windowLabel, w);
   }, [windowLabel]);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(getSavedCollapsedGroups()),
+  );
+  const handleToggleGroup = useCallback(
+    (statusId: string) => {
+      setCollapsedGroups((prev) => {
+        const next = new Set(prev);
+        if (next.has(statusId)) {
+          next.delete(statusId);
+        } else {
+          next.add(statusId);
+        }
+        saveCollapsedGroups(windowLabel, [...next]);
+        return next;
+      });
+    },
+    [windowLabel],
+  );
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
+    if (!ws?.statusId) return;
+    if (collapsedGroups.has(ws.statusId)) {
+      setCollapsedGroups((prev) => {
+        const next = new Set(prev);
+        next.delete(ws.statusId!);
+        saveCollapsedGroups(windowLabel, [...next]);
+        return next;
+      });
+    }
+  }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [explorerSidebarWidth, setExplorerSidebarWidth] = useState(getSavedExplorerSidebarWidth);
   const handleExplorerSidebarWidthChange = useCallback((w: number) => {
     setExplorerSidebarWidth(w);
@@ -1990,12 +2025,16 @@ export default function App() {
 
   const cycleWorkspace = useCallback(
     (delta: 1 | -1) => {
-      if (workspaces.length < 2) return;
-      const idx = workspaces.findIndex((w) => w.id === activeWorkspaceId);
-      const nextIdx = (idx + delta + workspaces.length) % workspaces.length;
-      setActiveWorkspaceId(workspaces[nextIdx].id);
+      const navigable = workspaces.filter(
+        (w) => !w.statusId || !collapsedGroups.has(w.statusId),
+      );
+      if (navigable.length < 2) return;
+      const idx = navigable.findIndex((w) => w.id === activeWorkspaceId);
+      const baseIdx = idx === -1 ? 0 : idx;
+      const nextIdx = (baseIdx + delta + navigable.length) % navigable.length;
+      setActiveWorkspaceId(navigable[nextIdx].id);
     },
-    [workspaces, activeWorkspaceId, setActiveWorkspaceId],
+    [workspaces, collapsedGroups, activeWorkspaceId, setActiveWorkspaceId],
   );
 
   function focusPaneInDirection(dir: "up" | "down" | "left" | "right") {
@@ -2614,6 +2653,8 @@ export default function App() {
               onWidthChange={handleSidebarWidthChange}
               workspaceStatuses={workspaceStatuses}
               onSetStatus={setWorkspaceStatus}
+              collapsedGroups={collapsedGroups}
+              onToggleGroup={handleToggleGroup}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
