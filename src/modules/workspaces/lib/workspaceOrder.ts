@@ -25,6 +25,43 @@ export function groupWorkspaces<T extends Grouped>(
   return result;
 }
 
+// Like groupWorkspaces but keeps every group present: the no-status group is
+// always first (so a workspace can lose its status) and every declared status
+// appears even with zero members, so each is a drop target while dragging.
+// Empty groups render as a bare header, not a placeholder box.
+export function groupWorkspacesForDrag<T extends Grouped>(
+  workspaces: T[],
+  statuses: StatusLike[],
+): WorkspaceGroup<T>[] {
+  const validIds = new Set(statuses.map((s) => s.id));
+  const noStatus = workspaces.filter((w) => !w.statusId || !validIds.has(w.statusId));
+  const result: WorkspaceGroup<T>[] = [{ id: NO_STATUS_GROUP_ID, label: null, items: noStatus }];
+  for (const status of statuses) {
+    result.push({
+      id: status.id,
+      label: status.label,
+      items: workspaces.filter((w) => w.statusId === status.id),
+    });
+  }
+  return result;
+}
+
+const GROUP_DROP_PREFIX = "group-drop:";
+
+export function groupDropId(groupId: string): string {
+  return GROUP_DROP_PREFIX + groupId;
+}
+
+// Returns the group id if `dropId` is a group drop target, else null (an item).
+export function parseGroupDropId(dropId: string): string | null {
+  return dropId.startsWith(GROUP_DROP_PREFIX) ? dropId.slice(GROUP_DROP_PREFIX.length) : null;
+}
+
+// The status a group represents: the no-status group maps to null.
+export function statusIdFromGroupId(groupId: string): string | null {
+  return groupId === NO_STATUS_GROUP_ID ? null : groupId;
+}
+
 // The workspaces reachable by keyboard navigation, in visual order. Mirrors
 // exactly what the sidebar renders: a collapsed group contributes only its
 // active member (the sole row it shows), everything else contributes all rows.

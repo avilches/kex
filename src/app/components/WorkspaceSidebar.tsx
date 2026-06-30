@@ -1,9 +1,12 @@
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
+  useDroppable,
   PointerSensor,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -17,7 +20,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Cancel01Icon, CheckmarkCircle01Icon, ChevronRightIcon, Delete02Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
@@ -39,7 +42,13 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { groupWorkspaces, NO_STATUS_GROUP_ID } from "@/modules/workspaces/lib/workspaceOrder";
+import {
+  groupDropId,
+  groupWorkspaces,
+  groupWorkspacesForDrag,
+  parseGroupDropId,
+  statusIdFromGroupId,
+} from "@/modules/workspaces/lib/workspaceOrder";
 import type { WorkspaceStatus } from "@/modules/settings/store";
 
 type WorkspaceItem = {
@@ -294,6 +303,74 @@ function SortableWorkspaceItem({
   );
 }
 
+// Prefer an item under the pointer (reorder within a group); fall back to the
+// group drop zone (change status), then to closestCenter for edge cases.
+const groupAwareCollision: CollisionDetection = (args) => {
+  const pointer = pointerWithin(args);
+  const onItem = pointer.filter((c) => parseGroupDropId(String(c.id)) === null);
+  if (onItem.length > 0) return onItem;
+  if (pointer.length > 0) return pointer;
+  return closestCenter(args);
+};
+
+// Drop target for a status group, highlighted while hovered. Only used for
+// empty groups (groups with items are reordered by dropping on their items).
+function GroupDropZone({ groupId, children }: { groupId: string; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: groupDropId(groupId) });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "w-full rounded-lg transition-colors",
+        isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Drop targets for groups with no workspaces, rendered at the end of the list
+// only while dragging. Placing them after the groups (the flex-1 spacer absorbs
+// the growth) keeps the existing items from shifting, so the drag overlay does
+// not jump. The no-status group appears here only when it is empty too.
+function EmptyGroupDropTargets({
+  workspaces,
+  workspaceStatuses,
+  compact,
+}: {
+  workspaces: WorkspaceItem[];
+  workspaceStatuses: WorkspaceStatus[];
+  compact: boolean;
+}) {
+  const empty = groupWorkspacesForDrag(workspaces, workspaceStatuses).filter(
+    (g) => g.items.length === 0,
+  );
+  if (empty.length === 0) return null;
+  return (
+    <div className="mt-1 w-full border-t border-border/40 pt-1">
+      {empty.map((group) => {
+        const label = group.label ?? "No status";
+        return (
+          <GroupDropZone key={group.id} groupId={group.id}>
+            {compact ? (
+              <div title={label} className="mx-1.5 py-2">
+                <span className="block h-px w-full rounded-full bg-border/40" />
+              </div>
+            ) : (
+              <div className="px-1.5 py-1.5">
+                <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground/50">
+                  {label}
+                </span>
+              </div>
+            )}
+          </GroupDropZone>
+        );
+      })}
+    </div>
+  );
+}
+
 export function WorkspaceSidebar({
   workspaces,
   activeId,
@@ -322,13 +399,6 @@ export function WorkspaceSidebar({
     [workspaces, workspaceStatuses],
   );
 
-  function findGroupId(itemId: string): string | null {
-    for (const g of groups) {
-      if (g.items.some((w) => w.id === itemId)) return g.id;
-    }
-    return null;
-  }
-
   function handleDragStart(event: DragStartEvent) {
     setIsDragging(true);
     const id = String(event.active.id);
@@ -339,11 +409,17 @@ export function WorkspaceSidebar({
 
   function handleDragOver(event: DragOverEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const activeGroupId = findGroupId(String(active.id));
-    const overGroupId = findGroupId(String(over.id));
-    if (overGroupId === null || activeGroupId === overGroupId) return;
-    onSetStatus(String(active.id), overGroupId === NO_STATUS_GROUP_ID ? null : overGroupId);
+    if (!over) return;
+    const overId = String(over.id);
+    // Empty-group zones assign on drop only: reassigning here would fill the
+    // group, making its header vanish from under the pointer mid-drag.
+    if (parseGroupDropId(overId) !== null) return;
+    const activeId = String(active.id);
+    if (overId === activeId) return;
+    const activeWs = workspaces.find((w) => w.id === activeId);
+    if (!activeWs) return;
+    const target = workspaces.find((w) => w.id === overId)?.statusId ?? null;
+    if (target !== (activeWs.statusId ?? null)) onSetStatus(activeId, target);
   }
 
   function handleDragCancel() {
@@ -364,14 +440,21 @@ export function WorkspaceSidebar({
     setDragActiveId(null);
     setDragStartStatus(undefined);
     const { active, over } = event;
-    if (!over || active.id === over.id) {
+    if (!over) {
       // Dropped in empty space: revert any status change made during drag
-      if (id !== null && saved !== undefined) {
-        onSetStatus(id, saved);
-      }
+      if (id !== null && saved !== undefined) onSetStatus(id, saved);
       return;
     }
-    onReorder(String(active.id), String(over.id));
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const groupId = parseGroupDropId(overId);
+    if (groupId !== null) {
+      // Dropped on an empty-group zone: assign that status, nothing to reorder.
+      onSetStatus(activeId, statusIdFromGroupId(groupId));
+      return;
+    }
+    if (overId === activeId) return;
+    onReorder(activeId, overId);
   }
 
   const dragActiveWs = dragActiveId ? workspaces.find((w) => w.id === dragActiveId) : null;
@@ -387,7 +470,7 @@ export function WorkspaceSidebar({
     >
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={groupAwareCollision}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -431,9 +514,11 @@ export function WorkspaceSidebar({
                     <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
                       {group.label}
                     </span>
-                    <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
-                      {group.items.length}
-                    </span>
+                    {group.items.length > 0 && (
+                      <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
+                        {group.items.length}
+                      </span>
+                    )}
                   </button>
                 )
               )}
@@ -482,6 +567,14 @@ export function WorkspaceSidebar({
             </div>
           );
         })}
+
+        {isDragging && (
+          <EmptyGroupDropTargets
+            workspaces={workspaces}
+            workspaceStatuses={workspaceStatuses}
+            compact={compact}
+          />
+        )}
 
         <DragOverlay dropAnimation={null}>
           {dragActiveWs ? (() => {

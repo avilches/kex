@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { groupWorkspaces, visibleWorkspaceOrder } from "./workspaceOrder";
+import {
+  groupDropId,
+  groupWorkspaces,
+  groupWorkspacesForDrag,
+  parseGroupDropId,
+  statusIdFromGroupId,
+  visibleWorkspaceOrder,
+} from "./workspaceOrder";
 
 type WS = { id: string; statusId?: string };
 
@@ -35,6 +42,31 @@ describe("groupWorkspaces", () => {
     const groups = groupWorkspaces([{ id: "X", statusId: "ghost" }], STATUSES);
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({ id: "__none__", items: [{ id: "X" }] });
+  });
+});
+
+describe("groupWorkspacesForDrag", () => {
+  it("keeps the no-status group and every status, even when empty", () => {
+    const groups = groupWorkspacesForDrag([{ id: "A", statusId: "prog" }], STATUSES);
+    expect(groups.map((g) => g.id)).toEqual(["__none__", "prog", "done"]);
+    expect(groups.map((g) => g.items.map((w) => w.id))).toEqual([[], ["A"], []]);
+  });
+
+  it("routes unknown statusId into the always-present no-status group", () => {
+    const groups = groupWorkspacesForDrag([{ id: "X", statusId: "ghost" }], STATUSES);
+    expect(groups[0]).toMatchObject({ id: "__none__", items: [{ id: "X" }] });
+  });
+});
+
+describe("group drop id helpers", () => {
+  it("round-trips a group id and rejects plain item ids", () => {
+    expect(parseGroupDropId(groupDropId("prog"))).toBe("prog");
+    expect(parseGroupDropId("ws-123")).toBeNull();
+  });
+
+  it("maps the no-status group to a null status", () => {
+    expect(statusIdFromGroupId("__none__")).toBeNull();
+    expect(statusIdFromGroupId("prog")).toBe("prog");
   });
 });
 
