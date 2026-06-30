@@ -901,7 +901,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </span>
               )}
             </div>
-            <div className="flex w-full flex-col gap-2" style={{ minHeight: 96 }}>
+            <div className="flex w-full flex-col gap-2" style={{ minHeight: 112 }}>
               {!cloneOpen ? (
                 <>
                   <Button
@@ -929,9 +929,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                         <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
                         {initRunning ? "Initializing..." : "Init"}
                       </Button>
-                      {initError && (
-                        <p className="text-[11px] text-destructive">{initError}</p>
-                      )}
+                      <p className="h-[17px] overflow-hidden text-[11px] leading-[17px] text-destructive">
+                        {initError ?? " "}
+                      </p>
                     </div>
                   )}
                 </>
@@ -991,7 +991,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       </Button>
                     </div>
                   )}
-                  <p className="text-[11px] text-destructive">{cloneError ?? " "}</p>
+                  <p className="h-[34px] overflow-hidden whitespace-pre-line text-[11px] leading-[17px] text-destructive">
+                    {cloneError ?? " "}
+                  </p>
                 </div>
               )}
             </div>
