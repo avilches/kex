@@ -315,6 +315,7 @@ export function WorkspaceSidebar({
     if (activeGroupId === null || overGroupId === null) return;
     if (activeGroupId !== overGroupId) {
       onSetStatus(String(active.id), overGroupId === "__none__" ? null : overGroupId);
+      onReorder(String(active.id), String(over.id));
     } else {
       onReorder(String(active.id), String(over.id));
     }
