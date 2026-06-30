@@ -6,9 +6,9 @@ function nid(bytes = 6): string {
 }
 
 export const newWorkspaceId = () => `ws-${nid()}`;
-export const newPaneId      = () => `grp-${nid()}`;
+export const newPaneId      = () => `pane-${nid()}`;
 export const newSplitId     = () => `sp-${nid()}`;
-export const newPanelId     = () => `tab-${nid()}`;
+export const newTabId       = () => `tab-${nid()}`;
 export const newThemeId     = () => `th-${nid()}`;
 export const newScriptId    = () => `sc-${nid()}`;
 export const newEditorId    = () => `ed-${nid()}`;

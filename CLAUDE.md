@@ -15,7 +15,7 @@ Nunca anadir codigo de migracion, shims, fallbacks de clave antigua, ni ningun m
 
 ### Generacion de IDs
 
-Todos los IDs de entidades de la aplicacion (workspaces, panes, panels, temas, scripts, editores personalizados, etc.) se generan con la funcion `nid()` de `src/lib/ids.ts`, usando los exportados prefijados: `newWorkspaceId()`, `newPanelId()`, `newEditorId()`, etc. Nunca usar `crypto.randomUUID()` ni `Math.random()` para IDs de entidades. Si se necesita un nuevo tipo de entidad, anadir su exportado `new<Tipo>Id()` en `ids.ts` antes de usarlo.
+Todos los IDs de entidades de la aplicacion (workspaces, panes, panels, temas, scripts, editores personalizados, etc.) se generan con la funcion `nid()` de `src/lib/ids.ts`, usando los exportados prefijados: `newWorkspaceId()`, `newTabId()`, `newEditorId()`, etc. Nunca usar `crypto.randomUUID()` ni `Math.random()` para IDs de entidades. Si se necesita un nuevo tipo de entidad, anadir su exportado `new<Tipo>Id()` en `ids.ts` antes de usarlo.
 
 ### Commits
 

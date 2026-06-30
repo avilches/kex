@@ -22,7 +22,7 @@ import {
 } from "./splitNode";
 import { type ClosedEntry, type Panel, type PaneNode, type RunConfig, type Workspace, type WorkspaceGitConfig, isAutofocusPanel } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
-import { newWorkspaceId, newPaneId, newSplitId, newPanelId } from "@/lib/ids";
+import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
 
 export function captureClosedEntry(
   entries: ClosedEntry[],
@@ -212,7 +212,7 @@ export async function collectRunningTerminals(
 }
 
 function newPaneNode(cwd?: string): PaneNode {
-  const panelId = newPanelId();
+  const panelId = newTabId();
   return {
     kind: "pane",
     id: newPaneId(),
@@ -534,7 +534,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     if (!target) return;
     closedPanelsRef.current = rest;
     const newPanel: Panel = (() => {
-      const base = { ...entry.panel, id: newPanelId() };
+      const base = { ...entry.panel, id: newTabId() };
       if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
       if (base.kind === "terminal" || base.kind === "git-diff") return { ...base, locked: false };
       return base;

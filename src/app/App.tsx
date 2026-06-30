@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
-import { newPanelId } from "@/lib/ids";
+import { newTabId } from "@/lib/ids";
 import { useZoom } from "@/lib/useZoom";
 import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
 import { isMarkdownPath, isHtmlPath } from "@/lib/utils";
@@ -581,7 +581,7 @@ export default function App() {
         }
       }
 
-      const freshPanelId = newPanelId();
+      const freshPanelId = newTabId();
       const panelCwd = config.cwd ?? activeWorkspace.pinnedRoot ?? activeWorkspace.cwd;
       const panel: Panel = { id: freshPanelId, kind: "terminal", cwd: panelCwd, title: config.name || undefined };
 
@@ -946,7 +946,7 @@ export default function App() {
       if (!ws) return;
       const { terminalNewFolderMode } = usePreferencesStore.getState();
       openPanel(ws.id, targetPaneId ?? ws.activePaneId, {
-        id: newPanelId(),
+        id: newTabId(),
         kind: "terminal",
         cwd: resolveNewTerminalCwd({
           mode: terminalNewFolderMode,
@@ -1016,7 +1016,7 @@ export default function App() {
           return existing.id;
         }
       }
-      const panelId = newPanelId();
+      const panelId = newTabId();
       const isPreview = !(pin ?? false);
 
       if (!markdown && isPreview) {
@@ -1077,7 +1077,7 @@ export default function App() {
           return existing.id;
         }
       }
-      const panelId = newPanelId();
+      const panelId = newTabId();
       const panel = markdown
         ? ({ id: panelId, kind: "markdown" as const, path } as const)
         : ({ id: panelId, kind: "editor" as const, path, dirty: false, preview: false } as const);
@@ -1108,7 +1108,7 @@ export default function App() {
     }) => {
       if (!activeWorkspace) return;
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: newPanelId(),
+        id: newTabId(),
         kind: "git-diff",
         ...params,
       });
@@ -1120,7 +1120,7 @@ export default function App() {
     (args: { repoRoot: string; branch: string | null }) => {
       if (!activeWorkspace) return;
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: newPanelId(),
+        id: newTabId(),
         kind: "git-history",
         repoRoot: args.repoRoot,
       });
@@ -1131,7 +1131,7 @@ export default function App() {
   const openBrowserInPanel = useCallback(
     (url: string) => {
       if (!activeWorkspace) return undefined;
-      const panelId = newPanelId();
+      const panelId = newTabId();
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: panelId,
         kind: "browser",
@@ -1264,7 +1264,7 @@ export default function App() {
       setZenPaneId(null);
       const { terminalNewFolderMode } = usePreferencesStore.getState();
       openPanel(wsId, newPaneId, {
-        id: newPanelId(),
+        id: newTabId(),
         kind: "terminal",
         cwd: resolveNewTerminalCwd({
           mode: terminalNewFolderMode,
@@ -1298,7 +1298,7 @@ export default function App() {
       setZenPaneId(null);
       const { terminalNewFolderMode } = usePreferencesStore.getState();
       openPanel(wsId, newPaneId, {
-        id: newPanelId(),
+        id: newTabId(),
         kind: "terminal",
         cwd: resolveNewTerminalCwd({
           mode: terminalNewFolderMode,
@@ -1313,7 +1313,7 @@ export default function App() {
 
   const onNewBrowserStable = useCallback(
     (wsId: string, paneId: string) => {
-      const panelId = newPanelId();
+      const panelId = newTabId();
       openPanel(wsId, paneId, { id: panelId, kind: "browser", url: "" });
       setTimeout(
         () => browserHandles.current.get(panelId)?.focusAddressBar(),
@@ -1342,7 +1342,7 @@ export default function App() {
       }
       const newPaneId = splitPane(wsId, paneId, "horizontal");
       setZenPaneId(null);
-      const panelId = newPanelId();
+      const panelId = newTabId();
       openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
       setTimeout(
         () => browserHandles.current.get(panelId)?.focusAddressBar(),
@@ -1371,7 +1371,7 @@ export default function App() {
       }
       const newPaneId = splitPane(wsId, paneId, "vertical");
       setZenPaneId(null);
-      const panelId = newPanelId();
+      const panelId = newTabId();
       openPanel(wsId, newPaneId, { id: panelId, kind: "browser", url: "" });
       setTimeout(
         () => browserHandles.current.get(panelId)?.focusAddressBar(),
@@ -1397,7 +1397,7 @@ export default function App() {
       const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
       if (!ws) return;
       openPanel(ws.id, ws.activePaneId, {
-        id: newPanelId(),
+        id: newTabId(),
         kind: "git-commit-file",
         repoRoot: params.repoRoot,
         sha: params.sha,
@@ -1711,7 +1711,7 @@ export default function App() {
   const openFolderInTerminal = useCallback(
     (path: string) => {
       if (!activeWorkspace) return;
-      const panelId = newPanelId();
+      const panelId = newTabId();
       openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
         id: panelId,
         kind: "terminal",
@@ -1844,7 +1844,7 @@ export default function App() {
       onOpenCommitFile: (input) => {
         if (!activeWorkspace) return;
         openPanel(activeWorkspace.id, activeWorkspace.activePaneId, {
-          id: newPanelId(),
+          id: newTabId(),
           kind: "git-commit-file",
           repoRoot: input.repoRoot,
           sha: input.sha,
