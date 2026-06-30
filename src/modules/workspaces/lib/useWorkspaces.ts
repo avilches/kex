@@ -119,6 +119,16 @@ export function applyGitConfig(
   );
 }
 
+export function applyWorkspaceStatus(
+  workspaces: Workspace[],
+  workspaceId: string,
+  statusId: string | null | undefined,
+): Workspace[] {
+  return workspaces.map((w) =>
+    w.id === workspaceId ? { ...w, statusId: statusId ?? undefined } : w,
+  );
+}
+
 // Per-pane most-recently-used activation history (panelIds, most recent first).
 // In memory only, never persisted. Bounds defensively; the live list is already
 // capped by the number of open tabs in the pane (see paneActivationHistoryRef).
@@ -671,6 +681,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
+  const setWorkspaceStatus = useCallback((workspaceId: string, statusId: string | null) => {
+    setWorkspaces((prev) => applyWorkspaceStatus(prev, workspaceId, statusId));
+  }, []);
+
   const addRunConfig = useCallback((workspaceId: string, config: RunConfig) => {
     setWorkspaces((prev) =>
       prev.map((w) =>
@@ -826,6 +840,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceTitle,
     setWorkspaceColor,
     setWorkspaceIcon,
+    setWorkspaceStatus,
     addRunConfig,
     updateRunConfig,
     removeRunConfig,

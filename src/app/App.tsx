@@ -202,6 +202,7 @@ export default function App() {
     setWorkspaceTitle,
     setWorkspaceColor,
     setWorkspaceIcon,
+    setWorkspaceStatus,
     setWorkspaceGitConfig,
     addRunConfig,
     updateRunConfig,
@@ -419,9 +420,21 @@ export default function App() {
   }, [bellOpen, activeWorkspaceId]);
 
   const init = usePreferencesStore((s) => s.init);
+  const workspaceStatuses = usePreferencesStore((s) => s.workspaceStatuses);
+  const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
     void init();
   }, [init]);
+
+  useEffect(() => {
+    if (!prefsHydrated) return;
+    const validIds = new Set(workspaceStatuses.map((s) => s.id));
+    for (const w of workspaces) {
+      if (w.statusId && !validIds.has(w.statusId)) {
+        setWorkspaceStatus(w.id, null);
+      }
+    }
+  }, [prefsHydrated]);
 
   useEffect(() => {
     initDuplicateProgressListener();
@@ -2588,6 +2601,7 @@ export default function App() {
                 cwd: w.cwd,
                 color: w.color,
                 icon: w.icon,
+                statusId: w.statusId,
               }))}
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}
@@ -2598,6 +2612,8 @@ export default function App() {
               onOpenSettings={(id) => useWorkspaceSettingsStore.getState().openSettings(id)}
               width={workspaceSidebarWidth}
               onWidthChange={handleSidebarWidthChange}
+              workspaceStatuses={workspaceStatuses}
+              onSetStatus={setWorkspaceStatus}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
@@ -2808,6 +2824,8 @@ export default function App() {
 
           <WorkspaceSettingsDialog
             workspaces={workspaces}
+            workspaceStatuses={workspaceStatuses}
+            onSetStatus={setWorkspaceStatus}
             onSetTitle={setWorkspaceTitle}
             onSetColor={setWorkspaceColor}
             onSetIcon={setWorkspaceIcon}

@@ -80,6 +80,7 @@ export type Workspace = {
   git?: WorkspaceGitConfig;
   color?: string | null;
   icon?: string;
+  statusId?: string;
   scripts?: RunConfig[];
   activeScript?: string;
   scriptPaneId?: string;

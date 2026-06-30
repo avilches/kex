@@ -15,6 +15,8 @@ import {
   parseTerminalNewFolderMode,
   DEFAULT_PREFERENCES,
   PREF_KEY_MAP,
+  parseWorkspaceStatuses,
+  DEFAULT_WORKSPACE_STATUSES,
 } from "./store";
 
 describe("clampToStep", () => {
@@ -150,5 +152,50 @@ describe("PREF_KEY_MAP", () => {
     expect(PREF_KEY_MAP.scratchpadInNewTerminals).toBe(
       "scratchpadInNewTerminals",
     );
+  });
+});
+
+describe("parseWorkspaceStatuses", () => {
+  it("returns DEFAULT_WORKSPACE_STATUSES when value is not an array", () => {
+    expect(parseWorkspaceStatuses(undefined)).toEqual(DEFAULT_WORKSPACE_STATUSES);
+    expect(parseWorkspaceStatuses(null)).toEqual(DEFAULT_WORKSPACE_STATUSES);
+    expect(parseWorkspaceStatuses("foo")).toEqual(DEFAULT_WORKSPACE_STATUSES);
+    expect(parseWorkspaceStatuses(42)).toEqual(DEFAULT_WORKSPACE_STATUSES);
+  });
+
+  it("filters out items with missing or non-string id/label", () => {
+    const input = [
+      { id: "a", label: "A" },
+      { id: "", label: "B" },
+      { id: "c" },
+      { label: "D" },
+      { id: "e", label: "E" },
+    ];
+    expect(parseWorkspaceStatuses(input)).toEqual([
+      { id: "a", label: "A" },
+      { id: "e", label: "E" },
+    ]);
+  });
+
+  it("returns an empty array when all items are invalid", () => {
+    expect(parseWorkspaceStatuses([{ id: "", label: "bad" }])).toEqual([]);
+  });
+
+  it("accepts a valid array as-is", () => {
+    const input = [{ id: "archived", label: "Archived" }];
+    expect(parseWorkspaceStatuses(input)).toEqual(input);
+  });
+});
+
+describe("DEFAULT_WORKSPACE_STATUSES", () => {
+  it("contains the five predefined statuses in order", () => {
+    const ids = DEFAULT_WORKSPACE_STATUSES.map((s) => s.id);
+    expect(ids).toEqual([
+      "archived",
+      "work-in-progress",
+      "on-hold",
+      "canceled",
+      "completed",
+    ]);
   });
 });

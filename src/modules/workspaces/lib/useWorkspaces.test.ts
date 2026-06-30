@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Panel, RunConfig, SplitNode, Workspace } from "./types";
-import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, applyShowHidden, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyClosePanel, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyPinnedRoot, applyShowHidden, applyWorkspaceStatus, captureClosedEntry, collectRunningTerminals, findReopenTarget, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 import { migrateWorkspace } from "./workspaceState";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
@@ -400,5 +400,28 @@ describe("RunConfig actions (pure helpers via applyPinnedRoot pattern)", () => {
   it("RunConfig panelId is optional", () => {
     const c: RunConfig = { id: "1", name: "Dev", command: "pnpm dev" };
     expect(c.panelId).toBeUndefined();
+  });
+});
+
+describe("applyWorkspaceStatus", () => {
+  it("sets statusId on the matching workspace only", () => {
+    const out = applyWorkspaceStatus([ws(), ws({ id: "w2" })], "w1", "archived");
+    expect(out[0].statusId).toBe("archived");
+    expect(out[1].statusId).toBeUndefined();
+  });
+
+  it("clears statusId when null is passed", () => {
+    const out = applyWorkspaceStatus([ws({ statusId: "archived" })], "w1", null);
+    expect(out[0].statusId).toBeUndefined();
+  });
+
+  it("clears statusId when undefined is passed", () => {
+    const out = applyWorkspaceStatus([ws({ statusId: "archived" })], "w1", undefined);
+    expect(out[0].statusId).toBeUndefined();
+  });
+
+  it("does not modify unrelated workspaces", () => {
+    const out = applyWorkspaceStatus([ws(), ws({ id: "w2", statusId: "completed" })], "w1", "on-hold");
+    expect(out[1].statusId).toBe("completed");
   });
 });

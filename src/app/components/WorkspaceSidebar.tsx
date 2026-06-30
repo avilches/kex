@@ -6,6 +6,7 @@ import {
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -16,7 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Cancel01Icon, Delete02Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
@@ -32,15 +33,26 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { WorkspaceStatus } from "@/modules/settings/store";
 
-type WorkspaceItem = { id: string; title: string; kind: string; cwd?: string; color?: string | null; icon?: string };
+type WorkspaceItem = {
+  id: string;
+  title: string;
+  kind: string;
+  cwd?: string;
+  color?: string | null;
+  icon?: string;
+  statusId?: string;
+};
 
 export type WorkspaceSidebarProps = {
   workspaces: WorkspaceItem[];
   activeId: string | null;
+  workspaceStatuses: WorkspaceStatus[];
   onSelect: (id: string) => void;
   onNew: () => void;
   onReorder: (fromId: string, toId: string) => void;
+  onSetStatus: (id: string, statusId: string | null) => void;
   onClose?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onOpenSettings: (id: string) => void;
@@ -245,25 +257,71 @@ function SortableWorkspaceItem({
   );
 }
 
-export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReorder, onClose, onRename, onOpenSettings, width, onWidthChange }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({
+  workspaces,
+  activeId,
+  workspaceStatuses,
+  onSelect,
+  onNew,
+  onReorder,
+  onSetStatus,
+  onClose,
+  onRename,
+  onOpenSettings,
+  width,
+  onWidthChange,
+}: WorkspaceSidebarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [isDragging, setIsDragging] = useState(false);
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+  const compact = width <= 80;
 
-  function handleDragStart(_event: DragStartEvent) {
+  const groups = useMemo(() => {
+    const validIds = new Set(workspaceStatuses.map((s) => s.id));
+    const noStatus = workspaces.filter((w) => !w.statusId || !validIds.has(w.statusId));
+    const result: Array<{ id: string; label: string | null; items: WorkspaceItem[] }> = [];
+    if (noStatus.length > 0) result.push({ id: "__none__", label: null, items: noStatus });
+    for (const status of workspaceStatuses) {
+      const members = workspaces.filter((w) => w.statusId === status.id);
+      if (members.length > 0) result.push({ id: status.id, label: status.label, items: members });
+    }
+    return result;
+  }, [workspaces, workspaceStatuses]);
+
+  function findGroupId(itemId: string): string | null {
+    for (const g of groups) {
+      if (g.items.some((w) => w.id === itemId)) return g.id;
+    }
+    return null;
+  }
+
+  function handleDragStart(event: DragStartEvent) {
     setIsDragging(true);
+    setDragActiveId(String(event.active.id));
   }
 
   function handleDragCancel() {
     setIsDragging(false);
+    setDragActiveId(null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setIsDragging(false);
+    setDragActiveId(null);
     const { active, over } = event;
-    if (over && active.id !== over.id) {
+    if (!over || active.id === over.id) return;
+    const activeGroupId = findGroupId(String(active.id));
+    const overGroupId = findGroupId(String(over.id));
+    if (activeGroupId === null || overGroupId === null) return;
+    if (activeGroupId !== overGroupId) {
+      onSetStatus(String(active.id), overGroupId === "__none__" ? null : overGroupId);
+      onReorder(String(active.id), String(over.id));
+    } else {
       onReorder(String(active.id), String(over.id));
     }
   }
+
+  const dragActiveWs = dragActiveId ? workspaces.find((w) => w.id === dragActiveId) : null;
 
   return (
     <nav
@@ -274,40 +332,85 @@ export function WorkspaceSidebar({ workspaces, activeId, onSelect, onNew, onReor
       )}
       style={{ width }}
     >
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
-        <SortableContext items={workspaces.map((w) => w.id)} strategy={verticalListSortingStrategy}>
-          {workspaces.map((ws) => (
-            <SortableWorkspaceItem
-              key={ws.id}
-              ws={ws}
-              active={ws.id === activeId}
-              sidebarWidth={width}
-              onSelect={onSelect}
-              onClose={onClose}
-              onRename={onRename}
-              onOpenSettings={onOpenSettings}
-            />
-          ))}
-        </SortableContext>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        {groups.map((group) => (
+          <div key={group.id} className="w-full">
+            {group.label !== null && (
+              compact ? (
+                <div className="mx-1.5 my-1 h-px bg-border/40" />
+              ) : (
+                <div className="px-2.5 pt-2 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 truncate">
+                  {group.label}
+                </div>
+              )
+            )}
+            <SortableContext
+              items={group.items.map((w) => w.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {group.items.map((ws) => (
+                <SortableWorkspaceItem
+                  key={ws.id}
+                  ws={ws}
+                  active={ws.id === activeId}
+                  sidebarWidth={width}
+                  onSelect={onSelect}
+                  onClose={onClose}
+                  onRename={onRename}
+                  onOpenSettings={onOpenSettings}
+                />
+              ))}
+            </SortableContext>
+          </div>
+        ))}
+
+        <DragOverlay dropAnimation={null}>
+          {dragActiveWs ? (() => {
+            const displayColor = resolveWorkspaceColor(dragActiveWs.color, dragActiveWs.id);
+            return (
+              <div
+                className={cn(
+                  "flex items-center justify-center rounded-lg font-semibold opacity-90",
+                  compact ? "h-9 w-9 text-[11px]" : "h-9 px-2 text-[11px]",
+                )}
+                style={
+                  displayColor
+                    ? { backgroundColor: displayColor, color: "white" }
+                    : { backgroundColor: "hsl(var(--muted))", color: "hsl(var(--foreground))" }
+                }
+              >
+                {compact
+                  ? abbrev(dragActiveWs.title, dragActiveWs.kind)
+                  : <span className="max-w-full truncate text-center">{dragActiveWs.title || dragActiveWs.kind}</span>
+                }
+              </div>
+            );
+          })() : null}
+        </DragOverlay>
       </DndContext>
+
       <div className="flex-1" />
       <button
         type="button"
-        title="New workspace (⌘N)"
+        title="New workspace (Cmd+N)"
         onClick={onNew}
         className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-border/60 text-lg text-muted-foreground transition-colors hover:border-border hover:text-foreground"
       >
         +
       </button>
 
-      {/* Resize handle on the right edge */}
       <div
         className="absolute inset-y-0 right-0 flex w-1 cursor-ew-resize items-center justify-center outline-none hover:bg-primary/20 active:bg-primary/30"
         onPointerDown={(e) => {
           const startX = e.clientX;
           const startWidth = width;
           e.currentTarget.setPointerCapture(e.pointerId);
-
           const onMove = (ev: PointerEvent) => {
             const next = Math.min(220, Math.max(52, startWidth + (ev.clientX - startX)));
             onWidthChange(next);

@@ -39,12 +39,15 @@ import {
 } from "@/modules/workspaces/lib/workspaceColor";
 import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, loadAllIcons, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
 import type { Workspace, RunConfig } from "@/modules/workspaces/lib/types";
+import type { WorkspaceStatus } from "@/modules/settings/store";
 
 type Props = {
   workspaces: Workspace[];
+  workspaceStatuses: WorkspaceStatus[];
   onSetTitle: (id: string, title: string) => void;
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
+  onSetStatus: (id: string, statusId: string | null) => void;
   onSetPinnedRoot: (id: string, path: string | undefined) => void;
   onAddRunConfig: (id: string, config: RunConfig) => void;
   onUpdateRunConfig: (id: string, configId: string, patch: Partial<RunConfig>) => void;
@@ -464,6 +467,42 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
               onSetColor={props.onSetColor}
             />
           </div>
+
+          {props.workspaceStatuses.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium">Status</label>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  title="No status"
+                  onClick={() => props.onSetStatus(ws.id, null)}
+                  className={cn(
+                    "size-6 rounded-full border-2 flex items-center justify-center bg-muted text-muted-foreground transition-colors",
+                    !ws.statusId
+                      ? "border-foreground"
+                      : "border-transparent hover:border-muted-foreground/50",
+                  )}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+                </button>
+                {props.workspaceStatuses.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => props.onSetStatus(ws.id, s.id)}
+                    className={cn(
+                      "rounded-full border-2 px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                      ws.statusId === s.id
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground",
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Icon */}
           <div className="flex flex-col gap-1.5">
