@@ -136,7 +136,7 @@ Permitir arrastrar un tab (panel) o un fichero desde el explorer y soltarlo en o
 
 ## Workspace: estados configurables (WIP, On Hold, Archived...)
 
-Estado: PARCIAL (auditado 2026-06-30). La infraestructura basica esta implementada:
+Estado: COMPLETO (2026-06-30). Lo implementado:
 
 - `WorkspaceStatus = { id: string; label: string }` en `src/modules/settings/store.ts:17`
 - Definicion de statuses en Settings (`WorkspacesSection.tsx`): anadir, renombrar, reordenar (DnD), eliminar
@@ -147,15 +147,7 @@ Estado: PARCIAL (auditado 2026-06-30). La infraestructura basica esta implementa
 
 El status del workspace activo YA se MUESTRA en la barra superior (badge en `WorkspaceTitle.tsx`, implementado 2026-06-30).
 
-Lo que FALTA de la propuesta original:
-- Color por status (el tipo es solo `{ id, label }`, sin `color`)
-- Icono/emoji por status
-- Filtrar (hoy solo agrupa, no filtra para ocultar grupos)
-- Cambiar el status desde la barra superior (el badge solo muestra; asignar/cambiar sigue siendo solo desde el dialog y el selector del sidebar)
-
-### Prioridad
-
-Bajo. Lo basico ya funciona. El color/icono anadaria valor visual pero no es urgente.
+Descartado (no se va a hacer): color por status, icono/emoji por status, filtrar para ocultar grupos, y cambiar el status desde la barra superior. La feature se considera cerrada.
 
 ---
 
