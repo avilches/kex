@@ -990,9 +990,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       </Button>
                     </div>
                   )}
-                  {cloneError && (
-                    <p className="text-[11px] text-destructive">{cloneError}</p>
-                  )}
+                  <p className="text-[11px] text-destructive">{cloneError ?? " "}</p>
                 </div>
               )}
             </div>
