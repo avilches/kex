@@ -14,6 +14,28 @@ export type ThemePref = "system" | "light" | "dark";
 
 export type TabBarStyle = "connected" | "pill";
 
+export type WorkspaceStatus = { id: string; label: string };
+
+export const DEFAULT_WORKSPACE_STATUSES: WorkspaceStatus[] = [
+  { id: "archived",         label: "Archived" },
+  { id: "work-in-progress", label: "Work in progress" },
+  { id: "on-hold",          label: "On hold" },
+  { id: "canceled",         label: "Canceled" },
+  { id: "completed",        label: "Completed" },
+];
+
+export function parseWorkspaceStatuses(value: unknown): WorkspaceStatus[] {
+  if (!Array.isArray(value)) return DEFAULT_WORKSPACE_STATUSES;
+  return (value as unknown[]).filter(
+    (item): item is WorkspaceStatus =>
+      item !== null &&
+      typeof item === "object" &&
+      typeof (item as WorkspaceStatus).id === "string" &&
+      (item as WorkspaceStatus).id.length > 0 &&
+      typeof (item as WorkspaceStatus).label === "string",
+  );
+}
+
 export type GitColorScheme = "vscode" | "jetbrains";
 
 export type ScmViewMode = "list" | "tree";
@@ -180,6 +202,7 @@ export type Preferences = {
   preferredWorkspaceEditorId: string | null;
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
+  workspaceStatuses: WorkspaceStatus[];
 };
 
 const STORE_PATH = "settings-general.json";
@@ -204,6 +227,7 @@ const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
+const KEY_WORKSPACE_STATUSES = "workspaceStatuses";
 
 // Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
@@ -396,6 +420,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   preferredWorkspaceEditorId: null,
   customEditors: [],
   detectedEditors: [],
+  workspaceStatuses: DEFAULT_WORKSPACE_STATUSES,
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -673,6 +698,11 @@ export async function loadPreferences(): Promise<Preferences> {
     detectedEditors: (() => {
       const v = get<DetectedEditor[]>(KEY_DETECTED_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
+    })(),
+    workspaceStatuses: (() => {
+      const v = get<WorkspaceStatus[]>(KEY_WORKSPACE_STATUSES);
+      if (v === undefined) return DEFAULT_WORKSPACE_STATUSES;
+      return parseWorkspaceStatuses(v);
     })(),
   };
 
@@ -959,6 +989,10 @@ export async function setDetectedEditors(value: DetectedEditor[]): Promise<void>
   await writeToolsPref(KEY_DETECTED_EDITORS, value);
 }
 
+export async function setWorkspaceStatuses(value: WorkspaceStatus[]): Promise<void> {
+  await writePref(KEY_WORKSPACE_STATUSES, value);
+}
+
 export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
@@ -1085,6 +1119,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
+  [KEY_WORKSPACE_STATUSES]: "workspaceStatuses",
 };
 
 export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
