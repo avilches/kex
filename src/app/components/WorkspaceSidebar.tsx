@@ -1,6 +1,7 @@
 import {
   DndContext,
   closestCenter,
+  defaultDropAnimationSideEffects,
   pointerWithin,
   useDroppable,
   PointerSensor,
@@ -10,6 +11,7 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  type DropAnimation,
   DragOverlay,
 } from "@dnd-kit/core";
 import {
@@ -303,6 +305,15 @@ function SortableWorkspaceItem({
   );
 }
 
+// Glide the dropped workspace from where it was released to its final slot,
+// instead of snapping. The placeholder keeps the dragging opacity so only the
+// overlay is fully visible while it travels.
+const dropAnimation: DropAnimation = {
+  duration: 200,
+  easing: "cubic-bezier(0.2, 0, 0, 1)",
+  sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.4" } } }),
+};
+
 // Prefer an item under the pointer (reorder within a group); fall back to the
 // group drop zone (change status), then to closestCenter for edge cases.
 const groupAwareCollision: CollisionDetection = (args) => {
@@ -578,7 +589,7 @@ export function WorkspaceSidebar({
         )}
         </div>
 
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={dropAnimation}>
           {dragActiveWs ? (() => {
             const displayColor = resolveWorkspaceColor(dragActiveWs.color, dragActiveWs.id);
             return (
