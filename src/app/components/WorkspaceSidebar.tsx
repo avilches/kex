@@ -443,27 +443,48 @@ export function WorkspaceSidebar({
                   </button>
                 )
               )}
-              {!isCollapsed && (
-                <SortableContext
-                  items={group.items.map((w) => w.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {group.items.map((ws) => (
-                    <SortableWorkspaceItem
-                      key={ws.id}
-                      ws={ws}
-                      active={ws.id === activeId}
-                      sidebarWidth={width}
-                      workspaceStatuses={workspaceStatuses}
-                      onSelect={onSelect}
-                      onClose={onClose}
-                      onRename={onRename}
-                      onOpenSettings={onOpenSettings}
-                      onSetStatus={onSetStatus}
-                    />
-                  ))}
-                </SortableContext>
-              )}
+              {(() => {
+                if (isCollapsed) {
+                  const activeWs = group.items.find((ws) => ws.id === activeId);
+                  if (!activeWs) return null;
+                  return (
+                    <SortableContext items={[activeWs.id]} strategy={verticalListSortingStrategy}>
+                      <SortableWorkspaceItem
+                        ws={activeWs}
+                        active={true}
+                        sidebarWidth={width}
+                        workspaceStatuses={workspaceStatuses}
+                        onSelect={onSelect}
+                        onClose={onClose}
+                        onRename={onRename}
+                        onOpenSettings={onOpenSettings}
+                        onSetStatus={onSetStatus}
+                      />
+                    </SortableContext>
+                  );
+                }
+                return (
+                  <SortableContext
+                    items={group.items.map((w) => w.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {group.items.map((ws) => (
+                      <SortableWorkspaceItem
+                        key={ws.id}
+                        ws={ws}
+                        active={ws.id === activeId}
+                        sidebarWidth={width}
+                        workspaceStatuses={workspaceStatuses}
+                        onSelect={onSelect}
+                        onClose={onClose}
+                        onRename={onRename}
+                        onOpenSettings={onOpenSettings}
+                        onSetStatus={onSetStatus}
+                      />
+                    ))}
+                  </SortableContext>
+                );
+              })()}
             </div>
           );
         })}

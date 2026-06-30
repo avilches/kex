@@ -474,22 +474,6 @@ export default function App() {
     },
     [collapsedGroups, windowLabel],
   );
-  useEffect(() => {
-    if (!activeWorkspaceId) return;
-    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
-    if (!ws?.statusId) return;
-    if (collapsedGroups.has(ws.statusId)) {
-      // Intentional: only fire on workspace switch. workspaces/collapsedGroups/windowLabel
-      // are stale closures — the functional-updater pattern is not needed here because
-      // we compute `next` from the closure's collapsedGroups snapshot (same render),
-      // which is always correct at the moment this effect fires.
-      const next = new Set(collapsedGroups);
-      next.delete(ws.statusId);
-      setCollapsedGroups(next);
-      saveCollapsedGroups(windowLabel, [...next]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWorkspaceId]);
   const [explorerSidebarWidth, setExplorerSidebarWidth] = useState(getSavedExplorerSidebarWidth);
   const handleExplorerSidebarWidthChange = useCallback((w: number) => {
     setExplorerSidebarWidth(w);
