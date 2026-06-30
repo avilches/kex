@@ -30,6 +30,7 @@ interface Props {
   target: OpenInEditorTarget | null;
   workspaceRoot: string | null;
   onOpenSettings?: () => void;
+  onSetWorkspaceRoot?: () => void;
 }
 
 function pathLabel(path: string): string {
@@ -37,7 +38,7 @@ function pathLabel(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Props) {
+export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings, onSetWorkspaceRoot }: Props) {
   const { detectedEditors, isScanning } = useExternalEditors();
   const preferredFileEditorId = usePreferencesStore((s) => s.preferredFileEditorId);
   const preferredWorkspaceEditorId = usePreferencesStore((s) => s.preferredWorkspaceEditorId);
@@ -162,9 +163,16 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings }: Pr
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52 text-[12px]">
-          <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
-            {!hasFile && !workspaceRoot ? "Please set a Workspace Root" : "No tools selected"}
-          </div>
+          {!hasFile && !workspaceRoot ? (
+            <DropdownMenuItem
+              onSelect={() => onSetWorkspaceRoot?.()}
+              className="gap-2 text-muted-foreground"
+            >
+              Set workspace root
+            </DropdownMenuItem>
+          ) : (
+            <div className="px-2 py-1.5 text-[11px] text-muted-foreground">No tools selected</div>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={() => onOpenSettings?.()}

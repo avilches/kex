@@ -30,6 +30,7 @@ type Props = {
   openInEditorTarget: OpenInEditorTarget | null;
   workspaceRoot: string | null;
   onOpenExternalEditorSettings: () => void;
+  onSetWorkspaceRoot: () => void;
   scripts: RunConfig[];
   activeScript: string | undefined;
   onSelectRunConfig: (configId: string) => void;
@@ -51,6 +52,7 @@ export function Header({
   openInEditorTarget,
   workspaceRoot,
   onOpenExternalEditorSettings,
+  onSetWorkspaceRoot,
   scripts,
   activeScript,
   onSelectRunConfig,
@@ -147,6 +149,7 @@ export function Header({
         target={openInEditorTarget}
         workspaceRoot={workspaceRoot}
         onOpenSettings={onOpenExternalEditorSettings}
+        onSetWorkspaceRoot={onSetWorkspaceRoot}
       />
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
 

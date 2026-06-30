@@ -2563,6 +2563,9 @@ export default function App() {
             openInEditorTarget={openInEditorTarget}
             workspaceRoot={workspaceRootPath}
             onOpenExternalEditorSettings={onOpenExternalEditorSettings}
+            onSetWorkspaceRoot={() =>
+              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "properties", "workspaceRoot")
+            }
             scripts={activeWorkspace?.scripts ?? []}
             activeScript={activeWorkspace?.activeScript}
             onSelectRunConfig={(id) => setActiveRunConfig(activeWorkspaceId, id)}
