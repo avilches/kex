@@ -391,9 +391,20 @@ export function ExternalEditorsSection() {
 
       {/* Custom tools - shown first */}
       <div className="flex flex-col gap-3">
-        <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-          Custom tools
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+            Custom tools
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-[12px]"
+            onClick={handleAddCustom}
+          >
+            <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
+            Add tool
+          </Button>
+        </div>
 
         {customEditors.length > 0 && (
           <DndContext
@@ -421,16 +432,6 @@ export function ExternalEditorsSection() {
             </SortableContext>
           </DndContext>
         )}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-fit gap-1.5 px-2 text-[12px]"
-          onClick={handleAddCustom}
-        >
-          <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
-          Add tool
-        </Button>
       </div>
 
       {ALL_GROUPS.map((group) => (
