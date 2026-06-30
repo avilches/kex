@@ -629,12 +629,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const [initRunning, setInitRunning] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const cloneInputRef = useRef<HTMLInputElement>(null);
+  const cloneBgHandleRef = useRef<number | null>(null);
+  const clonePollRef = useRef<number | null>(null);
+  const cloneCancelledRef = useRef(false);
 
   useEffect(() => {
     if (!cloneRunning) { setCloneElapsed(0); return; }
     const t = window.setInterval(() => setCloneElapsed((s) => s + 1), 1000);
     return () => window.clearInterval(t);
   }, [cloneRunning]);
+
+  useEffect(() => {
+    return () => {
+      if (clonePollRef.current !== null) window.clearInterval(clonePollRef.current);
+    };
+  }, []);
 
   const handleGitInit = useCallback(async () => {
     if (!workspaceCwd) return;
@@ -659,22 +668,67 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     if (!url || !workspaceCwd) return;
     setCloneRunning(true);
     setCloneError(null);
+    cloneCancelledRef.current = false;
+
+    let handle: number;
     try {
-      await invoke("shell_run_command", {
+      handle = await invoke<number>("shell_bg_spawn", {
         command: `git clone ${url} .`,
         cwd: workspaceCwd,
-        timeout_secs: 300,
         workspace: currentWorkspaceEnv(),
       });
-      setCloneOpen(false);
-      setCloneUrl("");
-      await scm.refresh();
+      cloneBgHandleRef.current = handle;
     } catch (e) {
       setCloneError(typeof e === "string" ? e : "Clone failed");
-    } finally {
       setCloneRunning(false);
+      return;
     }
+
+    type BgLogsResult = { bytes: string; exited: boolean; exit_code: number | null };
+    clonePollRef.current = window.setInterval(async () => {
+      if (cloneCancelledRef.current) return;
+      try {
+        const result = await invoke<BgLogsResult>("shell_bg_logs", { handle, since_offset: 0 });
+        if (!result.exited || cloneCancelledRef.current) return;
+        window.clearInterval(clonePollRef.current!);
+        clonePollRef.current = null;
+        cloneBgHandleRef.current = null;
+        setCloneRunning(false);
+        if (result.exit_code === 0) {
+          setCloneOpen(false);
+          setCloneUrl("");
+          void scm.refresh();
+        } else {
+          const lines = result.bytes.trim().split("\n").filter(Boolean);
+          setCloneError(lines.slice(-3).join("\n") || `Clone failed (exit ${result.exit_code ?? "?"})`);
+        }
+      } catch (e) {
+        if (cloneCancelledRef.current) return;
+        window.clearInterval(clonePollRef.current!);
+        clonePollRef.current = null;
+        cloneBgHandleRef.current = null;
+        setCloneRunning(false);
+        setCloneError(typeof e === "string" ? e : "Clone failed");
+      }
+    }, 500);
   }, [cloneUrl, workspaceCwd, scm]);
+
+  const handleCancelClone = useCallback(async () => {
+    cloneCancelledRef.current = true;
+    if (clonePollRef.current !== null) {
+      window.clearInterval(clonePollRef.current);
+      clonePollRef.current = null;
+    }
+    const handle = cloneBgHandleRef.current;
+    cloneBgHandleRef.current = null;
+    setCloneRunning(false);
+    setCloneOpen(false);
+    setCloneUrl("");
+    setCloneError(null);
+    if (handle !== null) {
+      try { await invoke("shell_bg_kill", { handle }); } catch { /* best effort */ }
+    }
+  }, []);
 
   if (!open) return null;
 
@@ -864,7 +918,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                     onChange={(e) => setCloneUrl(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void handleGitClone();
-                      if (e.key === "Escape") { setCloneOpen(false); setCloneUrl(""); setCloneError(null); }
+                      if (e.key === "Escape") void handleCancelClone();
                     }}
                     placeholder="https://github.com/user/repo.git"
                     className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -878,7 +932,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       size="sm"
                       variant="ghost"
                       className="text-[12px]"
-                      onClick={() => { setCloneOpen(false); setCloneUrl(""); setCloneError(null); }}
+                      onClick={() => void handleCancelClone()}
                     >
                       Cancel
                     </Button>
