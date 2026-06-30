@@ -424,7 +424,7 @@ export default function App() {
   }, [bellOpen, activeWorkspaceId]);
 
   const init = usePreferencesStore((s) => s.init);
-  const workspaceStatuses = usePreferencesStore((s) => s.workspaceStatuses);
+  const workspaceStatuses = usePreferencesStore((s) => s.workspaceStatuses.filter((s) => s.label.trim()));
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
     void init();

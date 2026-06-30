@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import {
   Cancel01Icon,
@@ -309,6 +309,23 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
   const [cwdValue, setCwdValue] = useState(ws.pinnedRoot ?? "");
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
   const [titleValue, setTitleValue] = useState(ws.title ?? "");
+  const [statusExpanded, setStatusExpanded] = useState(false);
+  const [hiddenStatusCount, setHiddenStatusCount] = useState(0);
+  const statusContainerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = statusContainerRef.current;
+    if (!el || statusExpanded || props.workspaceStatuses.length <= 18) {
+      setHiddenStatusCount(0);
+      return;
+    }
+    const bottom = el.getBoundingClientRect().bottom;
+    let count = 0;
+    for (const child of el.children) {
+      if ((child as HTMLElement).getBoundingClientRect().top >= bottom) count++;
+    }
+    setHiddenStatusCount(count);
+  }, [props.workspaceStatuses, statusExpanded]);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const cwdInputRef = useRef<HTMLInputElement>(null);
 
@@ -383,6 +400,57 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
               }}
             />
           </div>
+
+          {props.workspaceStatuses.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium">Status</label>
+              <div
+                ref={statusContainerRef}
+                className={cn(
+                  "flex flex-wrap items-center gap-1.5 overflow-hidden",
+                  !statusExpanded && props.workspaceStatuses.length > 18 && "max-h-[108px]",
+                )}
+              >
+                <button
+                  type="button"
+                  title="No status"
+                  onClick={() => props.onSetStatus(ws.id, null)}
+                  className={cn(
+                    "size-6 rounded-full border-2 flex items-center justify-center bg-muted text-muted-foreground transition-colors",
+                    !ws.statusId
+                      ? "border-foreground"
+                      : "border-transparent hover:border-muted-foreground/50",
+                  )}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+                </button>
+                {props.workspaceStatuses.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => props.onSetStatus(ws.id, s.id)}
+                    className={cn(
+                      "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                      ws.statusId === s.id
+                        ? "border-foreground text-foreground"
+                        : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              {props.workspaceStatuses.length > 18 && (statusExpanded || hiddenStatusCount > 0) && (
+                <button
+                  type="button"
+                  onClick={() => setStatusExpanded((v) => !v)}
+                  className="self-end text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {statusExpanded ? "Show less" : `Show ${hiddenStatusCount} more`}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Working Directory */}
           <div className="flex flex-col gap-1.5">
@@ -460,42 +528,6 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
               onSetColor={props.onSetColor}
             />
           </div>
-
-          {props.workspaceStatuses.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium">Status</label>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  title="No status"
-                  onClick={() => props.onSetStatus(ws.id, null)}
-                  className={cn(
-                    "size-6 rounded-full border-2 flex items-center justify-center bg-muted text-muted-foreground transition-colors",
-                    !ws.statusId
-                      ? "border-foreground"
-                      : "border-transparent hover:border-muted-foreground/50",
-                  )}
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-                </button>
-                {props.workspaceStatuses.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => props.onSetStatus(ws.id, s.id)}
-                    className={cn(
-                      "rounded-full border-2 px-2.5 py-0.5 text-[11px] font-medium transition-colors",
-                      ws.statusId === s.id
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground",
-                    )}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Icon */}
           <div className="flex flex-col gap-1.5">

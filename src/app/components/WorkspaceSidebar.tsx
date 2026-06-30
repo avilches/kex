@@ -236,7 +236,7 @@ function SortableWorkspaceItem({
                 <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={2} />
                 Set status
               </ContextMenuSubTrigger>
-              <ContextMenuSubContent>
+              <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
                 <ContextMenuRadioGroup
                   value={ws.statusId ?? ""}
                   onValueChange={(value) => onSetStatus(ws.id, value === "" ? null : value)}

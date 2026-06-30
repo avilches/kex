@@ -26,11 +26,13 @@ const INPUT_CLASS =
   "h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 
 function SortableStatusRow({
+  index,
   status,
   onUpdate,
   onRemove,
   inputRef,
 }: {
+  index: number;
   status: WorkspaceStatus;
   onUpdate: (label: string) => void;
   onRemove: () => void;
@@ -45,6 +47,9 @@ function SortableStatusRow({
     <div ref={setNodeRef} style={style} className="flex items-center gap-2">
       <span {...attributes} {...listeners} className="cursor-grab text-muted-foreground shrink-0">
         <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
+      </span>
+      <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground/60 select-none">
+        #{index + 1}
       </span>
       <input
         ref={inputRef}
@@ -90,7 +95,7 @@ export function WorkspacesSection() {
 
   function persist(next: WorkspaceStatus[]) {
     setStatuses(next);
-    void setWorkspaceStatuses(next);
+    void setWorkspaceStatuses(next.filter((s) => s.label.trim()));
   }
 
   function handleUpdate(id: string, label: string) {
@@ -110,7 +115,7 @@ export function WorkspacesSection() {
     const next: WorkspaceStatus = { id: newStatusId(), label: "" };
     const updated = [...statuses, next];
     setStatuses(updated);
-    void setWorkspaceStatuses(updated);
+    void setWorkspaceStatuses(updated.filter((s) => s.label.trim()));
     requestAnimationFrame(() => {
       inputRefs.current.get(next.id)?.focus();
     });
@@ -140,9 +145,10 @@ export function WorkspacesSection() {
             strategy={verticalListSortingStrategy}
           >
             <div className="flex flex-col gap-1.5">
-              {statuses.map((status) => (
+              {statuses.map((status, i) => (
                 <SortableStatusRow
                   key={status.id}
+                  index={i}
                   status={status}
                   onUpdate={(label) => handleUpdate(status.id, label)}
                   onRemove={() => handleRemove(status.id)}
