@@ -901,76 +901,73 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               )}
             </div>
             <div className="flex w-full flex-col gap-2">
-              {workspaceCwd && (
-                <div className="flex flex-col gap-1">
+              {!cloneOpen ? (
+                <>
                   <Button
                     size="sm"
                     variant="outline"
                     className="w-full gap-1.5 text-[12px]"
-                    disabled={initRunning}
-                    onClick={() => void handleGitInit()}
+                    onClick={() => {
+                      setCloneOpen(true);
+                      setCloneError(null);
+                      window.setTimeout(() => cloneInputRef.current?.focus(), 0);
+                    }}
                   >
-                    <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
-                    {initRunning ? "Initializing..." : "Init"}
+                    <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />
+                    Clone
                   </Button>
-                  {initError && (
-                    <p className="text-[11px] text-destructive">{initError}</p>
+                  {workspaceCwd && (
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full gap-1.5 text-[12px]"
+                        disabled={initRunning}
+                        onClick={() => void handleGitInit()}
+                      >
+                        <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={2} />
+                        {initRunning ? "Initializing..." : "Init"}
+                      </Button>
+                      {initError && (
+                        <p className="text-[11px] text-destructive">{initError}</p>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
-              {!cloneOpen ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full gap-1.5 text-[12px]"
-                  onClick={() => {
-                    setCloneOpen(true);
-                    setCloneError(null);
-                    window.setTimeout(() => cloneInputRef.current?.focus(), 0);
-                  }}
-                >
-                  <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />
-                  Clone
-                </Button>
+                </>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   <input
                     ref={cloneInputRef}
                     type="text"
                     value={cloneUrl}
+                    disabled={cloneRunning}
                     onChange={(e) => setCloneUrl(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") void handleGitClone();
-                      if (e.key === "Escape") void handleCancelClone();
+                      if (e.key === "Enter" && !cloneRunning) void handleGitClone();
                     }}
                     placeholder="https://github.com/user/repo.git"
-                    className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                     spellCheck={false}
                   />
                   {cloneError && (
                     <p className="text-[11px] text-destructive">{cloneError}</p>
                   )}
-                  <div className="flex gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-[12px]"
-                      onClick={() => void handleCancelClone()}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 gap-1.5 text-[12px]"
-                      disabled={!cloneUrl.trim() || cloneRunning}
-                      onClick={() => void handleGitClone()}
-                    >
-                      {cloneRunning && <Spinner className="size-3" />}
-                      {cloneRunning
-                        ? `Cloning... ${cloneElapsed > 0 ? `(${cloneElapsed}s)` : ""}`
-                        : <><HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />Clone</>}
-                    </Button>
-                  </div>
+                  {cloneRunning && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex flex-1 items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Spinner className="size-3 shrink-0" />
+                        Cloning{cloneElapsed > 0 ? ` (${cloneElapsed}s)` : "..."}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-[12px]"
+                        onClick={() => void handleCancelClone()}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
