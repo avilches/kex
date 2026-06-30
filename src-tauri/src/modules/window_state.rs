@@ -48,6 +48,8 @@ pub struct WindowEntry {
     pub workspace_sidebar_width: Option<u32>,
     #[serde(default)]
     pub explorer_sidebar_width: Option<u32>,
+    #[serde(default)]
+    pub collapsed_status_groups: Vec<String>,
 }
 
 impl Default for WindowEntry {
@@ -59,6 +61,7 @@ impl Default for WindowEntry {
             right_panel: None,
             workspace_sidebar_width: None,
             explorer_sidebar_width: None,
+            collapsed_status_groups: Vec::new(),
         }
     }
 }
@@ -89,6 +92,8 @@ struct IndexEntry {
     workspace_sidebar_width: Option<u32>,
     #[serde(default)]
     explorer_sidebar_width: Option<u32>,
+    #[serde(default)]
+    collapsed_status_groups: Vec<String>,
 }
 
 /// On-disk index file (`workspaces.json`). `BTreeMap` so serialization is
@@ -227,6 +232,7 @@ impl WindowStateManager {
                     right_panel: ie.right_panel.clone(),
                     workspace_sidebar_width: ie.workspace_sidebar_width,
                     explorer_sidebar_width: ie.explorer_sidebar_width,
+                    collapsed_status_groups: ie.collapsed_status_groups.clone(),
                 },
             );
         }
@@ -296,6 +302,7 @@ impl WindowStateManager {
                     right_panel: entry.right_panel.clone(),
                     workspace_sidebar_width: entry.workspace_sidebar_width,
                     explorer_sidebar_width: entry.explorer_sidebar_width,
+                    collapsed_status_groups: entry.collapsed_status_groups.clone(),
                 },
             );
         }
@@ -410,6 +417,13 @@ impl WindowStateManager {
         let mut inner = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = inner.windows.get_mut(label) {
             entry.explorer_sidebar_width = Some(width);
+        }
+    }
+
+    pub fn update_collapsed_status_groups(&self, label: &str, ids: Vec<String>) {
+        let mut inner = self.inner.write().expect("window state lock poisoned");
+        if let Some(entry) = inner.windows.get_mut(label) {
+            entry.collapsed_status_groups = ids;
         }
     }
 }

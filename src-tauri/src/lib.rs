@@ -446,6 +446,13 @@ fn window_save_explorer_sidebar(app: tauri::AppHandle, label: String, width: u32
     mgr.save();
 }
 
+#[tauri::command]
+fn window_save_collapsed_groups(app: tauri::AppHandle, label: String, ids: Vec<String>) {
+    let mgr = app.state::<window_state::WindowStateManager>();
+    mgr.update_collapsed_status_groups(&label, ids);
+    mgr.save();
+}
+
 /// Called from main.tsx on startup (on_window_ready equivalent) to restore window size.
 /// Uses physical pixels from inner_size(), matching tauri-plugin-window-state behaviour.
 /// Position is not restored — see WORKSPACES_GOTCHAS.md for why.
@@ -857,6 +864,7 @@ pub fn run() {
             window_save_right_panel,
             window_save_workspace_sidebar,
             window_save_explorer_sidebar,
+            window_save_collapsed_groups,
             restore_window_geometry,
             agent::agent_enable_claude_hooks,
             agent::agent_disable_claude_hooks,
