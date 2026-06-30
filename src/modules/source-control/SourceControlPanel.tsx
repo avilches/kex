@@ -952,7 +952,19 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   {cloneError && (
                     <p className="text-[11px] text-destructive">{cloneError}</p>
                   )}
-                  {cloneRunning && (
+                  {!cloneRunning ? (
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        className="gap-1.5 text-[12px]"
+                        disabled={!cloneUrl.trim()}
+                        onClick={() => void handleGitClone()}
+                      >
+                        <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={2} />
+                        Clone
+                      </Button>
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-1.5">
                       <span className="flex flex-1 items-center gap-1.5 text-[11px] text-muted-foreground">
                         <Spinner className="size-3 shrink-0" />
