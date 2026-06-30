@@ -336,6 +336,9 @@ function WorkspaceSettingsForm({ ws, initialTab, initialFocus, onRequestClose, .
             {cwdValid === false && (
               <p className="text-[11px] text-destructive">Folder does not exist</p>
             )}
+            <p className="text-[11px] text-muted-foreground/60">
+              Tip: right-click any folder in the explorer and choose &quot;Set as Workspace Root&quot;
+            </p>
           </div>
         </div>
       )}
