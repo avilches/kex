@@ -218,30 +218,15 @@ export async function loadAllIcons(): Promise<Record<string, IconSvgElement>> {
   return allIconsCache;
 }
 
-function camelToLabel(name: string): string {
-  return name
-    .replace(/Icon$/, "")
-    .replace(/([A-Z])/g, " $1")
-    .replace(/([0-9]+)/g, " $1")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
 export type IconSearchResult = { name: string; label: string; icon: IconSvgElement };
 
-export function searchIcons(
-  query: string,
-  allIcons: Record<string, IconSvgElement>,
-  limit = 3,
-): IconSearchResult[] {
+export function searchIcons(query: string, limit = 6): IconSearchResult[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const results: IconSearchResult[] = [];
-  for (const [key, value] of Object.entries(allIcons)) {
-    if (!key.endsWith("Icon")) continue;
-    const label = camelToLabel(key);
-    if (key.toLowerCase().includes(q) || label.toLowerCase().includes(q)) {
-      results.push({ name: key, label, icon: value });
+  for (const entry of WORKSPACE_ICON_PALETTE) {
+    if (entry.name.toLowerCase().includes(q) || entry.label.toLowerCase().includes(q)) {
+      results.push({ name: entry.name, label: entry.label, icon: entry.icon as IconSvgElement });
     }
   }
   results.sort((a, b) => {

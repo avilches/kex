@@ -37,7 +37,7 @@ import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
-import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, loadAllIcons, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
+import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
 import type { Workspace, RunConfig } from "@/modules/workspaces/lib/types";
 import type { WorkspaceStatus } from "@/modules/settings/store";
 
@@ -181,7 +181,6 @@ function IconPicker({
 }) {
   const currentEntry = WORKSPACE_ICON_PALETTE.find((e) => e.name === wsIcon);
   const [query, setQuery] = useState(currentEntry?.label ?? "");
-  const [allIcons, setAllIcons] = useState<Awaited<ReturnType<typeof loadAllIcons>> | null>(null);
   const [filtered, setFiltered] = useState<IconSearchResult[]>([]);
   const [page, setPage] = useState(() => {
     if (!wsIcon) return 0;
@@ -190,23 +189,17 @@ function IconPicker({
   });
 
   useEffect(() => {
-    const q = query.trim();
-    if (!q) { setFiltered([]); return; }
-    if (!allIcons) {
-      loadAllIcons().then((icons) => {
-        setAllIcons(icons);
-        setFiltered(searchIcons(q, icons));
-      });
-    } else {
-      setFiltered(searchIcons(q, allIcons));
-    }
-  }, [query, allIcons]);
+    setFiltered(searchIcons(query));
+  }, [query]);
 
   function selectIcon(name: string | null) {
     onSetIcon(wsId, name);
-    const paletteLabel = WORKSPACE_ICON_PALETTE.find((e) => e.name === name)?.label;
-    const searchLabel = filtered.find((e) => e.name === name)?.label;
-    setQuery(paletteLabel ?? searchLabel ?? "");
+    if (name) {
+      const idx = WORKSPACE_ICON_PALETTE.findIndex((e) => e.name === name);
+      if (idx !== -1) setPage(Math.floor(idx / PALETTE_PAGE_SIZE));
+    }
+    const entry = WORKSPACE_ICON_PALETTE.find((e) => e.name === name);
+    setQuery(entry?.label ?? "");
   }
 
   const pageIcons = WORKSPACE_ICON_PALETTE.slice(
