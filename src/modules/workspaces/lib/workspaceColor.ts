@@ -1,13 +1,15 @@
 export const WORKSPACE_COLOR_PALETTE = [
-  "#4f8ef7", // blue
-  "#7c6af7", // violet
-  "#c45af7", // purple
-  "#f75a8e", // pink
-  "#f7874f", // orange
-  "#f7c34f", // yellow
-  "#4fc97a", // green
-  "#4fc9c9", // teal
-  "#f75a5a", // red
+  "#3b82f6", // blue
+  "#06b6d4", // cyan
+  "#8b5cf6", // violet
+  "#a855f7", // purple
+  "#ec4899", // pink
+  "#f43f5e", // rose
+  "#f97316", // orange
+  "#eab308", // yellow
+  "#22c55e", // green
+  "#14b8a6", // teal
+  "#ef4444", // red
 ] as const;
 
 // Stable hue 0-359 derived from the workspace ID string.
