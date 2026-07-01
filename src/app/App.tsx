@@ -57,10 +57,10 @@ import {
 } from "@/modules/explorer/lib/gitignore";
 import {
   clearFocusedTerminal,
-  cycleScratchpad,
   disposeSession,
   leafHasForegroundProcess,
   type TerminalPaneHandle,
+  toggleScratchpad,
   useTerminalFileDrop,
   useTerminalMetricsSampler,
   writeToSession,
@@ -2221,7 +2221,7 @@ export default function App() {
       },
       "terminal.scratchpad": () => {
         if (activeTabId && activeTab?.kind === "terminal") {
-          cycleScratchpad(activeTabId);
+          toggleScratchpad(activeTabId);
         }
       },
       "search.focus": () => searchInlineRef.current?.focus(),

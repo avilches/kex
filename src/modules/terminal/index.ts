@@ -2,7 +2,6 @@ export { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 export { TerminalPathBar } from "./TerminalPathBar";
 export {
   clearFocusedTerminal,
-  cycleScratchpad,
   disposeSession,
   insertIntoLeafScratchpad,
   leafCwd,
@@ -12,6 +11,7 @@ export {
   refreshTerminalLeaf,
   respawnSession,
   terminalDebugStats,
+  toggleScratchpad,
   whenSessionReady,
   writeToSession,
 } from "./lib/useTerminalSession";
