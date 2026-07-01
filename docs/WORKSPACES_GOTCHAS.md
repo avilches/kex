@@ -305,6 +305,25 @@ que mostraba `---` siempre y sugeria (en falso) que el scratchpad no se abria.
 `scratchpadActive` ("focused" persistido) es una **preferencia de lado**, no el foco global: "si este
 pane gana el foco, ponlo en el scratchpad". Solo el tab activo toma el foco.
 
+### Addendum: el scratchpad restaurado quedaba sin ningun foco (nueva causa raiz)
+
+Tras el fix de arriba seguia dandose el caso, solo en el restore de arranque, de que un terminal
+restaurado con el scratchpad activo mostraba la barra abierta pero **ningun** elemento (ni scratchpad
+ni terminal) recibia el foco real. `focusLeaf` y el efecto de foco intentan `s.scratchpadFocus?.()`
+en cuanto la sesion nace con `initialScratchpad === "focused"`, pero `ScratchpadBar` solo registra ese
+callback en su propio `useEffect` de montaje (ver arriba: "no hace `el.focus()` al montar, solo
+registra"). En el arranque, con muchas tabs restaurandose a la vez, el intento de foco (via
+`s.ready.then()` tras `document.fonts.ready`, o via el `setTimeout(0)` del efecto de foco) podia
+ejecutarse antes de que `ScratchpadBar` llegara a montar y registrar `scratchpadFocus`, dejando el
+intento como no-op silencioso y sin ningun reintento posterior.
+
+**Fix**: `src/modules/terminal/lib/pendingFocus.ts` extrae el mecanismo a dos funciones puras
+(`tryRequestFocus`, `shouldFireOnRegister`) con test dedicado. Un intento de foco que llega antes del
+registro marca `Session.scratchpadFocusPending = true`; `setLeafScratchpadFocus` (llamado por
+`ScratchpadBar` al montar) consume ese pending y dispara el foco en cuanto el callback existe, sin
+depender de cuantos ticks tarde el mount. Se elimina el `setTimeout(0)` "prueba en el siguiente tick"
+de `cycleScratchpad` y del efecto de foco: ya no hace falta adivinar el timing.
+
 ## Bug 8: la navegacion por teclado entre workspaces no sigue el orden visual (RESUELTO)
 
 ### Sintoma

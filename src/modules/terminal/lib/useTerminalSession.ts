@@ -10,6 +10,7 @@ import {
 import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DormantRing } from "./dormantRing";
+import { shouldFireOnRegister, tryRequestFocus } from "./pendingFocus";
 import type { BlockMode } from "../block/lib/modeMachine";
 import {
   createShellIntegrationState,
@@ -113,6 +114,10 @@ type Session = {
   // Survives tab blur so re-focusing the tab restores that side.
   scratchpadActive: boolean;
   scratchpadFocus: (() => void) | null;
+  // A focus request arrived before ScratchpadBar mounted and registered
+  // scratchpadFocus (restore, or a just-created terminal). Consumed as soon
+  // as the callback registers, instead of guessing how many ticks to wait.
+  scratchpadFocusPending: boolean;
   scratchpadInsert: ((text: string) => void) | null;
   scratchpadDraft: string;
 };
@@ -285,6 +290,10 @@ function notifyScratchpadState(leafId: string): void {
   );
 }
 
+function requestScratchpadFocus(s: Session): void {
+  if (!tryRequestFocus(s.scratchpadFocus)) s.scratchpadFocusPending = true;
+}
+
 export function cycleScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s || s.shellExited) return;
@@ -292,14 +301,14 @@ export function cycleScratchpad(leafId: string): void {
     s.scratchpadOpen = true;
     s.scratchpadActive = true;
     notifyScratchpad(leafId);
-    // Focus callback registered after the component mounts; try next tick.
-    setTimeout(() => s.scratchpadFocus?.(), 0);
+    requestScratchpadFocus(s);
   } else if (s.scratchpadFocused) {
     s.scratchpadActive = false;
+    s.scratchpadFocusPending = false;
     focusSlot(leafId);
   } else {
     s.scratchpadActive = true;
-    s.scratchpadFocus?.();
+    requestScratchpadFocus(s);
   }
   notifyScratchpadState(leafId);
 }
@@ -311,6 +320,7 @@ export function closeScratchpad(leafId: string): void {
   s.scratchpadOpen = false;
   s.scratchpadActive = false;
   s.scratchpadFocused = false;
+  s.scratchpadFocusPending = false;
   notifyScratchpad(leafId);
   notifyScratchpadState(leafId);
   focusSlot(leafId);
@@ -320,6 +330,7 @@ export function setLeafScratchpadActive(leafId: string, active: boolean): void {
   const s = sessions.get(leafId);
   if (!s || s.scratchpadActive === active) return;
   s.scratchpadActive = active;
+  if (!active) s.scratchpadFocusPending = false;
   notifyScratchpadState(leafId);
 }
 
@@ -337,7 +348,13 @@ export function setLeafScratchpadFocus(
   fn: (() => void) | null,
 ): void {
   const s = sessions.get(leafId);
-  if (s) s.scratchpadFocus = fn;
+  if (!s) return;
+  const fire = shouldFireOnRegister(fn, s.scratchpadFocusPending);
+  s.scratchpadFocus = fn;
+  if (fire) {
+    s.scratchpadFocusPending = false;
+    fn?.();
+  }
 }
 
 export function setLeafScratchpadFocused(
@@ -506,7 +523,7 @@ configureRendererPool({
   focusLeaf(leafId) {
     const s = sessions.get(leafId);
     if (!s) return;
-    if (s.scratchpadOpen && s.scratchpadActive) s.scratchpadFocus?.();
+    if (s.scratchpadOpen && s.scratchpadActive) requestScratchpadFocus(s);
     else focusSlot(leafId);
   },
 });
@@ -556,6 +573,7 @@ function ensureSession(
     scratchpadFocused: false,
     scratchpadActive: initialScratchpad === "focused",
     scratchpadFocus: null,
+    scratchpadFocusPending: false,
     scratchpadInsert: null,
     scratchpadDraft: "",
   };
@@ -962,7 +980,7 @@ export function useTerminalSession({
       if (s.visibleNow && s.focusedNow && !s.blocks) {
         // Honor the scratchpad as the active side on first ready (new terminal
         // opened with it, or a restored tab that was focused there).
-        if (s.scratchpadOpen && s.scratchpadActive) s.scratchpadFocus?.();
+        if (s.scratchpadOpen && s.scratchpadActive) requestScratchpadFocus(s);
         else focusSlot(leafId);
       }
     });
@@ -1083,7 +1101,6 @@ export function useTerminalSession({
     if (!s) return;
     s.visibleNow = visible;
     s.focusedNow = focused;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     if (visible) {
       if (s.container && !s.hasSlot) bindLeafToSlot(leafId, s);
       else if (s.hasSlot) refreshLeafSlot(leafId);
@@ -1093,24 +1110,14 @@ export function useTerminalSession({
       // back from wherever the user just moved it (e.g. another tab).
       const gained = visible && focused && !wasFocusedRef.current;
       if (gained && !blocks) {
-        if (s.scratchpadOpen && s.scratchpadActive) {
-          timer = setTimeout(() => {
-            // Bail if focus already left this leaf before the tick ran.
-            const cur = sessions.get(leafId);
-            if (cur?.focusedNow && cur.visibleNow) cur.scratchpadFocus?.();
-          }, 0);
-        } else {
-          focusSlot(leafId);
-        }
+        if (s.scratchpadOpen && s.scratchpadActive) requestScratchpadFocus(s);
+        else focusSlot(leafId);
       }
     } else if (s.hasSlot) {
       if (s.blocks || isLeafAltScreen(leafId)) parkLeafSlot(leafId);
       else unbindLeafFromSlot(leafId, s);
     }
     wasFocusedRef.current = visible && focused;
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
   }, [leafId, visible, focused, blocks]);
 
   const write = useCallback(
