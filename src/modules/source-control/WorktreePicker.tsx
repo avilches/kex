@@ -13,7 +13,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import type { GitWorktreeInfo } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { CheckmarkCircle01Icon, StructureFolderIcon } from "@hugeicons/core-free-icons";
+import { StructureFolderIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
@@ -122,10 +122,10 @@ export function WorktreePicker({ label, onFetchWorktrees, onSelect }: Props) {
                           </span>
                           {wt.isCurrent && (
                             <HugeiconsIcon
-                              icon={CheckmarkCircle01Icon}
-                              size={12}
-                              strokeWidth={1.9}
-                              className="shrink-0 text-muted-foreground/70"
+                              icon={Tick02Icon}
+                              size={11}
+                              strokeWidth={2}
+                              className="shrink-0 text-muted-foreground"
                             />
                           )}
                         </div>

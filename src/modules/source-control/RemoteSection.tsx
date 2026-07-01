@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/popover";
 import type { GitRemoteInfo } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { Add01Icon, CheckmarkCircle01Icon, GlobalIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, GlobalIcon, PlusSignIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState, type FormEvent } from "react";
 
@@ -139,10 +139,10 @@ function RemotePicker({
                   </div>
                   {isActive && (
                     <HugeiconsIcon
-                      icon={CheckmarkCircle01Icon}
-                      size={12}
-                      strokeWidth={1.9}
-                      className="mt-0.5 shrink-0 text-muted-foreground/70"
+                      icon={Tick02Icon}
+                      size={11}
+                      strokeWidth={2}
+                      className="mt-0.5 shrink-0 text-muted-foreground"
                     />
                   )}
                 </button>

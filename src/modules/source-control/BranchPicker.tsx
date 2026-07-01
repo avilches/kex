@@ -14,7 +14,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import type { GitBranchInfo } from "@/lib/native";
 import { cn } from "@/lib/utils";
-import { Add01Icon, CheckmarkCircle01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, GitBranchIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
@@ -252,10 +252,10 @@ function BranchItem({
         )}
         {branch.isCurrent && (
           <HugeiconsIcon
-            icon={CheckmarkCircle01Icon}
-            size={12}
-            strokeWidth={1.9}
-            className="shrink-0 text-muted-foreground/70"
+            icon={Tick02Icon}
+            size={11}
+            strokeWidth={2}
+            className="shrink-0 text-muted-foreground"
           />
         )}
         {isLocked && (
