@@ -472,6 +472,19 @@ export function ptyIdForTab(tabId: string): number | null {
   return sessions.get(tabId)?.pty?.id ?? null;
 }
 
+// Put focus on whichever side this leaf's session is on (scratchpad if open
+// and active, otherwise the terminal). Callers that drive focus purely from
+// derived `visible`/`focused` props (the useTerminalSession effect) only
+// re-run when those props change; explicit user actions that don't change
+// them (e.g. re-activating a tab that was already the pane's active tab)
+// need this to reassert focus after anything else may have stolen it.
+export function requestLeafFocus(leafId: string): void {
+  const s = sessions.get(leafId);
+  if (!s) return;
+  if (s.scratchpadOpen && s.scratchpadActive) requestScratchpadFocus(s);
+  else focusSlot(leafId);
+}
+
 configureRendererPool({
   resolveLeaf(leafId) {
     const s = sessions.get(leafId);
@@ -521,10 +534,7 @@ configureRendererPool({
     return sessions.get(leafId)?.blocks ?? false;
   },
   focusLeaf(leafId) {
-    const s = sessions.get(leafId);
-    if (!s) return;
-    if (s.scratchpadOpen && s.scratchpadActive) requestScratchpadFocus(s);
-    else focusSlot(leafId);
+    requestLeafFocus(leafId);
   },
 });
 

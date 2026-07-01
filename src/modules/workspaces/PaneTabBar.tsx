@@ -204,7 +204,15 @@ function DraggableTab({
       data-tab-id={tab.id}
       title={nativeTooltip}
       onClick={() => onActivate(tab.id)}
-      onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+      onMouseDown={(e) => {
+        if (e.button === 1) e.preventDefault();
+        // This div is draggable (dnd-kit's useDraggable sets tabIndex=0), so
+        // a left-click would natively steal DOM focus onto it. That fires
+        // after PaneView's onMouseDownCapture already placed focus on the
+        // leaf's terminal/scratchpad, undoing it. Focus is owned by the
+        // session, not the tab strip.
+        else if (e.button === 0) e.preventDefault();
+      }}
       onAuxClick={(e) => { if (e.button === 1) { e.stopPropagation(); onClose(tab.id); } }}
       onContextMenu={(e) => { if (anyRenaming) e.preventDefault(); }}
       {...wrappedListeners}

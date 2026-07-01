@@ -324,6 +324,41 @@ registro marca `Session.scratchpadFocusPending = true`; `setLeafScratchpadFocus`
 depender de cuantos ticks tarde el mount. Se elimina el `setTimeout(0)` "prueba en el siguiente tick"
 de `cycleScratchpad` y del efecto de foco: ya no hace falta adivinar el timing.
 
+### Addendum 2: click en una Tab de otro Pane (split) roba el foco al volver
+
+Con dos o mas Panes visibles (split), un Tab del Pane A con el scratchpad activo pierde el foco (sin
+pasarlo a ningun sitio) si el usuario hace click con el raton en un Tab de un Pane B distinto y luego
+vuelve a hacer click en el Tab original de A. No ocurre al cambiar de Tab dentro del mismo Pane, ni al
+cambiar de Pane con un shortcut de teclado.
+
+**Causa raiz**: el `<div>` de cada Tab en `PaneTabBar.tsx` recibe `tabIndex={0}` via `{...attributes}`
+de `useDraggable` (dnd-kit), asi que es un objetivo valido de foco nativo del navegador en `mousedown`.
+Secuencia del click cruzado de panes:
+
+1. **mousedown** sobre el Tab de A → `onMouseDownCapture` en `PaneView.tsx` (`handleFocus`) →
+   `onFocusPane` → `activePaneId` cambia. En split, `visible` del Tab de A ya era `true` (es el tab
+   activo de su propio pane); solo `focused` pasa a `true` aqui, y como AMBOS cambian en el mismo
+   commit, el efecto de foco de `useTerminalSession` corre y enfoca correctamente el scratchpad.
+2. El navegador aplica la accion por defecto de `mousedown`: como el div tiene `tabIndex=0`, le roba
+   el foco DOM al scratchpad y se lo lleva el.
+3. **click** (tras mouseup) → `onActivate(tab.id)` → `onActivateTab`. Como ese Tab ya era el
+   `activeTabId` de su Pane, `visible`/`focused` no cambian en este segundo commit, asi que el efecto
+   de foco de `useTerminalSession` no se re-ejecuta (sus deps no cambiaron) y nadie corrige el robo.
+
+Por que SI funciona en los otros dos casos: en el mismo Pane, `handleFocus` en el mousedown es un
+no-op (el Pane ya estaba enfocado), asi que el unico cambio real de `visible`/`focused` ocurre en el
+`click` — ahi es donde se enfoca el scratchpad, como ULTIMA accion del gesto completo (despues del
+robo nativo del mousedown, que ya paso antes sin nada que robar). Con teclado no hay eventos de raton,
+asi que nunca hay robo nativo de foco con el que competir.
+
+**Fix (doble, sin depender de uno solo)**:
+- `PaneTabBar.tsx`: `preventDefault()` en el `onMouseDown` del Tab (boton izquierdo) para que el
+  navegador nunca robe el foco al div. Ataca la causa raiz directamente.
+- `useTerminalSession.ts` exporta `requestLeafFocus(leafId)` (misma logica que
+  `SlotAdapter.focusLeaf`); `PaneView.tsx` la llama en `handleActivate` tras `onActivateTab`, para
+  reafirmar el foco del leaf incluso cuando `visible`/`focused` no cambiaron y por tanto el efecto no
+  se re-ejecuta. Red de seguridad independiente del `preventDefault()`.
+
 ## Bug 8: la navegacion por teclado entre workspaces no sigue el orden visual (RESUELTO)
 
 ### Sintoma

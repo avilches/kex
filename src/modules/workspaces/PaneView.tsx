@@ -16,6 +16,7 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { useWorkspaceDndInsert } from "./WorkspaceDndProvider";
 import { useTabFlash } from "./lib/tabFlashStore";
 import { FlashOverlay } from "@/components/FlashOverlay";
+import { requestLeafFocus } from "@/modules/terminal/lib/useTerminalSession";
 
 type Props = {
   pane: PaneNode;
@@ -225,7 +226,15 @@ export const PaneView = memo(function PaneView({
     if (!focused) onFocusPane(workspaceId, pane.id);
   }, [focused, workspaceId, pane.id, onFocusPane]);
 
-  const handleActivate = useCallback((tabId: string) => onActivateTab(workspaceId, tabId), [onActivateTab, workspaceId]);
+  const handleActivate = useCallback((tabId: string) => {
+    onActivateTab(workspaceId, tabId);
+    // Reasserts focus even when this tab was already its pane's active tab
+    // (split: clicking a tab in another pane), since the useTerminalSession
+    // focus effect only re-runs on a visible/focused prop change and native
+    // mousedown focus (the draggable tab div has tabIndex=0) can steal it
+    // between the pane-focus commit and this activation.
+    requestLeafFocus(tabId);
+  }, [onActivateTab, workspaceId]);
   const handleClose = useCallback((tabId: string) => onCloseTab(workspaceId, tabId), [onCloseTab, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
   const handleCloseOtherTabs = useCallback((tabId: string) => {
