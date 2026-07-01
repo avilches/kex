@@ -3,7 +3,7 @@ import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
-import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
+import { resolveWorkspaceColor, resolveStatusColor } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 
 type Props = {
@@ -48,11 +48,17 @@ export function WorkspaceTitle({ workspace, tab }: Props) {
           <span className="truncate text-[13.5px] font-semibold leading-none text-foreground">
             {workspace.title || "Workspace"}
           </span>
-          {status && (
-            <span className="shrink-0 rounded border border-border/70 px-1 py-0.5 text-[9.5px] font-medium uppercase tracking-wide leading-none text-muted-foreground">
-              {status.label}
-            </span>
-          )}
+          {status && (() => {
+            const statusColor = resolveStatusColor(status.color, status.id);
+            return (
+              <span
+                className="shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide leading-none"
+                style={{ backgroundColor: statusColor, color: "white" }}
+              >
+                {status.label}
+              </span>
+            );
+          })()}
         </span>
         {subtitle && (
           <span className="flex min-w-0 items-center gap-1 text-[11px] leading-none text-muted-foreground">
