@@ -94,7 +94,6 @@ export function TerminalPathBarMenu({
       <DropdownMenuContent align="end" className="w-56 text-[12px]">
         <DropdownMenuCheckboxItem
           checked={scratchpadOn}
-          onSelect={(e) => e.preventDefault()}
           onCheckedChange={() => {
             toggleScratchpad(leafId);
             setScratchpadOn((v) => !v);
