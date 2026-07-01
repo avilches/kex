@@ -173,7 +173,9 @@ function SortableWorkspaceItem({
             ? "h-9 justify-center text-[12px]"
             : "h-9 gap-2 px-2.5 text-[12px]",
           active
-            ? "text-white"
+            ? displayColor !== null
+              ? "text-white"
+              : "text-foreground"
             : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
         )}
         style={
@@ -181,11 +183,11 @@ function SortableWorkspaceItem({
             ? displayColor !== null
               ? {
                   backgroundColor: displayColor,
-                  boxShadow: `0 0 0 2px hsl(var(--card) / 1), 0 0 0 4px ${displayColor}`,
+                  boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
                 }
               : {
-                  backgroundColor: "hsl(var(--muted))",
-                  boxShadow: "0 0 0 2px hsl(var(--card) / 1), 0 0 0 4px hsl(var(--border))",
+                  backgroundColor: "var(--muted)",
+                  boxShadow: "inset 0 0 0 1px var(--ring)",
                 }
             : undefined
         }
@@ -601,7 +603,7 @@ export function WorkspaceBar({
                 style={
                   displayColor
                     ? { backgroundColor: displayColor, color: "white" }
-                    : { backgroundColor: "hsl(var(--muted))", color: "hsl(var(--foreground))" }
+                    : { backgroundColor: "var(--muted)", color: "var(--foreground)" }
                 }
               >
                 {compact
