@@ -21,10 +21,37 @@ cd src-tauri && cargo test
 ## Production build
 
 ```bash
-pnpm tauri build
+TAURI_SIGNING_PRIVATE_KEY=$(cat ~/.tauri/kex-local.key) pnpm tauri build
 ```
 
-Artifacts land in `src-tauri/target/release/bundle/`.
+The build requires `TAURI_SIGNING_PRIVATE_KEY` because `tauri.conf.json` has an updater public key configured. Without it, Tauri aborts with "A public key has been found, but no private key."
+
+**First time:** generate a local key pair (needs a TTY — run in your terminal):
+
+```bash
+pnpm tauri signer generate -w ~/.tauri/kex-local.key
+```
+
+Leave the password blank or set one; if you set one, also export `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+Artifacts land in `src-tauri/target/release/bundle/`:
+
+| Path | Description |
+|---|---|
+| `bundle/macos/Kex.app` | App bundle, drag to `/Applications` |
+| `bundle/dmg/Kex_<ver>_aarch64.dmg` | Installer DMG |
+
+**Gatekeeper:** first launch of an unsigned build requires right-click > Open to bypass the "unidentified developer" warning.
+
+### Version mismatch gotcha
+
+If `pnpm tauri build` fails with "Found version mismatched Tauri packages", the Rust crate and the NPM package for a plugin resolved to different minor versions. Fix: update the NPM package to match the crate version shown in the error, e.g.:
+
+```bash
+pnpm add @tauri-apps/plugin-dialog@~2.7.0
+```
+
+Check `src-tauri/Cargo.lock` for the actual resolved version of each plugin.
 
 ## Bundle chunk strategy (vite.config.ts)
 
