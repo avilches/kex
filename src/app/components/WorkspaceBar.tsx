@@ -25,7 +25,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
+import { resolveWorkspaceColor, resolveStatusColor } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import {
   ContextMenu,
@@ -260,7 +260,11 @@ function SortableWorkspaceItem({
                   </ContextMenuRadioItem>
                   <ContextMenuSeparator />
                   {workspaceStatuses.map((s) => (
-                    <ContextMenuRadioItem key={s.id} value={s.id}>
+                    <ContextMenuRadioItem key={s.id} value={s.id} className="gap-2">
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: resolveStatusColor(s.color, s.id) }}
+                      />
                       {s.label}
                     </ContextMenuRadioItem>
                   ))}
@@ -525,6 +529,16 @@ export function WorkspaceBar({
                         !isCollapsed && "rotate-90",
                       )}
                     />
+                    {(() => {
+                      const st = workspaceStatuses.find((s) => s.id === group.id);
+                      if (!st) return null;
+                      return (
+                        <span
+                          className="h-3 w-1 shrink-0 rounded-full"
+                          style={{ backgroundColor: resolveStatusColor(st.color, st.id) }}
+                        />
+                      );
+                    })()}
                     <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
                       {group.label}
                     </span>
