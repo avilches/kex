@@ -855,13 +855,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </div>
               </div>
               {scm.worktreeCount > 1 && onNavigateToWorktree ? (
-                <div className="w-fit">
+                <div className="min-w-0 max-w-full">
                   <WorktreePicker
                     label={
                       scm.repo.isWorktree
                         ? `Worktree: ${pathBasename(scm.repo.repoRoot)}`
                         : "Main worktree"
                     }
+                    path={scm.repo.repoRoot}
                     onFetchWorktrees={scm.fetchWorktrees}
                     onSelect={onNavigateToWorktree}
                   />
@@ -871,7 +872,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   title={scm.repo.repoRoot}
                   className="inline-flex w-fit max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
                 >
-                  <span className="truncate">{pathBasename(scm.repo.repoRoot)}</span>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap [direction:rtl]">{scm.repo.repoRoot}</span>
                 </span>
               )}
             </div>

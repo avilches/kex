@@ -828,6 +828,8 @@ export default function App() {
     [activeWorkspace, setFsRoot],
   );
 
+  const lastFocusFolderRef = useRef<string | null>(null);
+
   const focusSidebar = useCallback(
     (folder: string, opts: { fromShortcut: boolean; pendingAction?: RevealAction }) => {
       const ws = activeWorkspace;
@@ -855,10 +857,17 @@ export default function App() {
       if (opts.fromShortcut || opts.pendingAction) {
         const sidebar = sidebarStateRef.current;
         if (!sidebar.open) setSidebarOpen(true);
-        if (sidebar.view !== "explorer") {
+        // pendingAction (reveal file etc): always switch to explorer.
+        // fromShortcut: only switch to explorer if the folder hasn't changed since
+        // the last call -- first press refreshes, second press on same dir goes to explorer.
+        const shouldSwitchToExplorer = opts.pendingAction
+          ? true
+          : lastFocusFolderRef.current === folder;
+        if (shouldSwitchToExplorer && sidebar.view !== "explorer") {
           setSidebarView("explorer");
         }
       }
+      lastFocusFolderRef.current = folder;
     },
     [
       activeWorkspace,

@@ -19,11 +19,12 @@ import { useState } from "react";
 
 type Props = {
   label: string;
+  path?: string;
   onFetchWorktrees: () => Promise<GitWorktreeInfo[]>;
   onSelect: (path: string) => void;
 };
 
-export function WorktreePicker({ label, onFetchWorktrees, onSelect }: Props) {
+export function WorktreePicker({ label, path, onFetchWorktrees, onSelect }: Props) {
   const [open, setOpen] = useState(false);
   const [worktrees, setWorktrees] = useState<GitWorktreeInfo[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,7 +54,8 @@ export function WorktreePicker({ label, onFetchWorktrees, onSelect }: Props) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-tight text-foreground transition-colors hover:bg-foreground/10"
+          title={path}
+          className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-tight text-foreground transition-colors hover:bg-foreground/10"
         >
           <HugeiconsIcon
             icon={StructureFolderIcon}
@@ -61,7 +63,12 @@ export function WorktreePicker({ label, onFetchWorktrees, onSelect }: Props) {
             strokeWidth={1.9}
             className="shrink-0 text-muted-foreground"
           />
-          <span className="truncate">{label}</span>
+          <span className="shrink-0">{label}</span>
+          {path && (
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[10.5px] text-muted-foreground/60 [direction:rtl]">
+              {path}
+            </span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent

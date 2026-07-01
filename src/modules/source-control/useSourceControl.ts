@@ -513,7 +513,7 @@ export function useSourceControl(
     let unlisten: (() => void) | undefined;
     let timer = 0;
     void listenFsChanged(() => {
-      if (!enabledRef.current || !stateRef.current.hasRepo) return;
+      if (!enabledRef.current) return;
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         timer = 0;

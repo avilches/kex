@@ -87,7 +87,6 @@ export type SidebarProps = {
 const VIEWS: { id: SidebarView; label: string }[] = [
   { id: "explorer", label: "Explorer" },
   { id: "git", label: "Git" },
-  { id: "history", label: "History" },
 ];
 
 export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(

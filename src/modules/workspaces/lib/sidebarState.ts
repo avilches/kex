@@ -33,7 +33,7 @@ function clampWidth(v: unknown): number {
 }
 
 function parseView(value: unknown): SidebarView {
-  return value === "git" || value === "history" ? value : "explorer";
+  return value === "git" ? value : "explorer";
 }
 
 function parseSide(value: unknown): SidebarSide {
