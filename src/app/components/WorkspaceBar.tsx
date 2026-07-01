@@ -217,7 +217,7 @@ function SortableWorkspaceItem({
           type="button"
           title="Close workspace"
           onClick={(e) => { e.stopPropagation(); onClose(ws.id); }}
-          className="absolute -right-0 -top-1 hidden size-[14px] items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
+          className="absolute right-0.5 top-0.5 hidden size-[14px] items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
         </button>
