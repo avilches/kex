@@ -534,7 +534,7 @@ export function WorkspaceBar({
                       if (!st) return null;
                       return (
                         <span
-                          className="h-3 w-1 shrink-0 rounded-full"
+                          className="mr-0.5 h-3 w-1 shrink-0 rounded-full"
                           style={{ backgroundColor: resolveStatusColor(st.color, st.id) }}
                         />
                       );

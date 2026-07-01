@@ -36,6 +36,7 @@ import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules
 import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
+  resolveStatusColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
 import type { Workspace, Script } from "@/modules/workspaces/lib/types";
@@ -430,12 +431,16 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                     type="button"
                     onClick={() => props.onSetStatus(ws.id, s.id)}
                     className={cn(
-                      "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                      "flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
                       ws.statusId === s.id
                         ? "border-foreground text-foreground"
                         : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
                     )}
                   >
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: resolveStatusColor(s.color, s.id) }}
+                    />
                     {s.label}
                   </button>
                 ))}
