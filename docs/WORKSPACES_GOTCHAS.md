@@ -337,3 +337,61 @@ Antes de los grupos, array y orden visual coincidian 1:1, por eso nunca habia fa
 que el orden de teclado es identico al visual y los miembros ocultos de un grupo colapsado se omiten.
 La sidebar usa `groupWorkspaces`, de modo que la agrupacion vive en un unico sitio y no puede volver
 a desincronizarse.
+
+## Bug 9: el header no muestra el mensaje en vivo del agente, solo "claude" (RESUELTO)
+
+### Sintoma
+
+Con un agente corriendo en un tab, la segunda linea del header (`WorkspaceTitle.tsx`, bajo el
+titulo del workspace) mostraba solo el nombre del agente ("claude"). La barra de tabs
+(`PaneTabBar.tsx`), en el mismo tab, si mostraba el mensaje/estado real que el agente comunica.
+
+### Pistas falsas investigadas (para no repetirlas)
+
+1. **`OSC 777` / `AgentSignal.message`**: el protocolo custom de hooks de Claude Code
+   (`agent_detect.rs`, evento `kex:agent-signal`) trae un campo `message` en eventos
+   `Notification`/`Stop`/`StopFailure`. Se investigo a fondo pensando que era la fuente del texto
+   que faltaba en el header. **No lo es**: ese `message` se usa solo para el toast puntual
+   (`route.ts` -> `showAgentToast`) y nunca se persiste; no es la fuente del texto que si se ve en
+   el tab.
+2. **El toast de Sonner ("el tab ya lo tiene")**: se penso que el tab reusaba algun estado
+   persistido con el mensaje. Tampoco: el toast es efimero, su `body` es un parametro de funcion
+   que desaparece en cuanto se cierra. No existia ningun campo `body`/`message` en
+   `AgentNotification` (`src/modules/agents/lib/types.ts`).
+3. **`agentSession.meta.sessionTitle`**: se penso en mover el "titulo en vivo" a este campo,
+   estructurado en el store del agente. Tampoco es la fuente correcta: `sessionTitle` llega **una
+   sola vez**, en el hook `SessionStart` de Claude Code (`ipc.rs`), y con frecuencia viene vacio.
+   No se actualiza mientras el agente trabaja.
+
+### Causa raiz real
+
+El titulo en vivo real viaja por un cuarto canal, ya existente y sin relacion con los tres
+anteriores: la secuencia **estandar** de titulo de ventana de terminal (OSC 0/2), que Claude Code
+actualiza continuamente mientras trabaja (con un glifo de estado delante, tipo `✳`/`⏺`). Vive en
+`oscTitleStore` (`src/modules/terminal/lib/oscTitleStore.ts`), poblado por el parser generico de
+OSC del terminal, ajeno a los agentes.
+
+`PaneTabBar.tsx` ya tenia una funcion `agentTitle` que, cuando hay agente, salta el
+`runningCommand` y usa `oscTitle` directamente. `WorkspaceTitle.tsx` en cambio calculaba el
+subtitulo con la funcion generica `tabTitle(tab, runningCommand, oscTitle)`, cuya prioridad para
+tabs terminal es `tab.title -> runningCommand -> oscTitle`. Con un agente activo, el shell reporta
+via OSC 133 que el comando en ejecucion es literalmente `claude ...`, asi que `runningCommand`
+ganaba siempre y el header se quedaba con `basename("claude")` = `"claude"`.
+
+### Fix
+
+1. `agentAwareTabTitle()` (`src/modules/workspaces/lib/tabTitle.tsx`): funcion pura con la
+   prioridad correcta para tabs con agente: `tab.title -> oscTitle -> sessionTitle -> "agente ·
+   directorio"`. `sessionTitle` (`agentSession.meta.sessionTitle`) actua solo como relleno inicial
+   mientras no ha llegado el primer `oscTitle`.
+2. `useAgentTabTitle(tab)` (`src/modules/workspaces/lib/useAgentTabTitle.ts`): hook que centraliza
+   las suscripciones (`terminalEphemeralStore`, `oscTitleStore`, `agentStore`) y aplica
+   `agentAwareTabTitle()`. Tanto `PaneTabBar.tsx` como `WorkspaceTitle.tsx` lo consumen, asi que no
+   pueden volver a divergir.
+
+### Leccion
+
+Cuando un dato "en vivo" de un agente parece faltar en un sitio pero sobra en otro, comparar primero
+como lo obtiene el sitio que **si** funciona antes de asumir que hace falta un canal de datos nuevo
+(nuevo campo en un store, nuevo evento IPC). Aqui el dato ya existia y ya estaba persistido
+(`oscTitleStore`); el bug era de prioridad de fuentes en un componente, no de falta de plumbing.
