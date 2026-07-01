@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { defaultMonoFontFamily } from "@/lib/fonts";
-import { fmtShortcut, SHIFT_KEY } from "@/lib/platform";
+import { ENTER_KEY, fmtShortcut, SHIFT_KEY } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   type CursorInactiveStyle,
@@ -229,8 +229,8 @@ export function TerminalSection() {
         <SettingRow
           title={
             scratchpadEnterSends
-              ? `Press Enter to send, ${fmtShortcut(SHIFT_KEY, "Enter")} for a new line`
-              : `Press ${fmtShortcut(SHIFT_KEY, "Enter")} to send, Enter for a new line`
+              ? `Press ${ENTER_KEY} to send, ${fmtShortcut(SHIFT_KEY, ENTER_KEY)} for a new line`
+              : `Press ${fmtShortcut(SHIFT_KEY, ENTER_KEY)} to send, ${ENTER_KEY} for a new line`
           }
         >
           <RadioGroup
@@ -245,7 +245,7 @@ export function TerminalSection() {
                 htmlFor="scratchpad-send-enter"
                 className="cursor-pointer text-[12px]"
               >
-                Enter sends{" "}
+                {ENTER_KEY} sends{" "}
                 <span className="text-[10.5px] text-muted-foreground">
                   Like Terminal
                 </span>
@@ -257,7 +257,7 @@ export function TerminalSection() {
                 htmlFor="scratchpad-send-shift"
                 className="cursor-pointer text-[12px]"
               >
-                Enter new line{" "}
+                {ENTER_KEY} new line{" "}
                 <span className="text-[10.5px] text-muted-foreground">
                   Like text field
                 </span>

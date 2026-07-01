@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ENTER_KEY } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
@@ -231,7 +232,7 @@ export function ScratchpadBar({ leafId }: Props) {
                 value="enter"
                 className="flex-col items-start gap-0"
               >
-                Enter sends
+                {ENTER_KEY} sends
                 <span className="text-[10.5px] text-muted-foreground">
                   Like Terminal
                 </span>
@@ -240,7 +241,7 @@ export function ScratchpadBar({ leafId }: Props) {
                 value="shift-enter"
                 className="flex-col items-start gap-0"
               >
-                Enter new line
+                {ENTER_KEY} new line
                 <span className="text-[10.5px] text-muted-foreground">
                   Like text field
                 </span>

@@ -1,4 +1,4 @@
-import { IS_MAC, MOD_PROP } from "@/lib/platform";
+import { ENTER_KEY, IS_MAC, MOD_PROP } from "@/lib/platform";
 
 /**
  * Single source of truth for keyboard shortcuts.
@@ -577,6 +577,7 @@ export function getBindingTokens(binding?: KeyBinding): string[] {
   else if (keyLabel === "ArrowDown") keyLabel = "↓";
   else if (keyLabel === "ArrowLeft") keyLabel = "←";
   else if (keyLabel === "ArrowRight") keyLabel = "→";
+  else if (keyLabel === "Enter") keyLabel = ENTER_KEY;
   else if (keyLabel.length === 1) keyLabel = keyLabel.toUpperCase();
 
   tokens.push(keyLabel);
