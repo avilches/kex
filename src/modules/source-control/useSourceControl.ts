@@ -6,7 +6,7 @@ import {
 import { listenFsChanged } from "@/modules/explorer/lib/watch";
 import { useWorkspaceEnvStore, workspaceScopeKey } from "@/modules/workspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { canReuseResolvedRepo } from "./repoReuse";
+import { canReuseResolvedRepo, isContextSwitching } from "./repoReuse";
 
 const AUTO_FETCH_THROTTLE_MS = 5 * 60_000;
 const AUTO_FETCH_LRU_LIMIT = 16;
@@ -37,6 +37,11 @@ export type SourceControlSummary = {
   behind: number;
   hasRepo: boolean;
   isLoading: boolean;
+  // True from the moment the context path changes until the repo/status for
+  // it resolve, even before a refetch starts. Consumers must not let the user
+  // act on `repo`/`status` while this is true: they still hold the outgoing
+  // context's data.
+  isSwitchingContext: boolean;
   localError: string | null;
   busyAction: SourceControlRemoteAction | null;
   lastRemoteError: string | null;
@@ -535,6 +540,11 @@ export function useSourceControl(
       behind: state.status?.behind ?? 0,
       hasRepo: state.hasRepo,
       isLoading: state.isLoading,
+      isSwitchingContext: isContextSwitching(
+        state.hasRepo,
+        contextPath,
+        resolvedContextRef.current,
+      ),
       localError: state.localError,
       busyAction: state.busyAction,
       lastRemoteError: state.lastRemoteError,
@@ -543,6 +553,6 @@ export function useSourceControl(
       runRemoteAction,
       clearRemoteError,
     }),
-    [state, applyStatus, refresh, runRemoteAction, clearRemoteError],
+    [state, contextPath, applyStatus, refresh, runRemoteAction, clearRemoteError],
   );
 }
