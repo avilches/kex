@@ -44,6 +44,20 @@ Cada concepto tiene UN solo nombre canonico. Si el usuario se refiere a algo con
 
 ## Reglas de trabajo
 
+### Antes de investigar un bug: comprobar los GOTCHAS docs
+
+Antes de empezar la Fase 1 (root cause investigation) de `systematic-debugging` en cualquier bug o
+comportamiento inesperado, `grep -il` por palabras clave del sintoma en `docs/*_GOTCHAS.md` (hoy:
+`docs/WORKSPACES_GOTCHAS.md`). Si hay una entrada relacionada, leerla entera antes de investigar
+nada mas: puede ahorrar horas de re-descubrir una causa raiz ya documentada, o evitar repetir un
+intento que ya fallo alli. No basta con saber que el fichero existe: hay que grepearlo activamente
+como primer paso, no confiar en recordarlo.
+
+Si la investigacion de un bug requiere mas de un intento o mas de una ronda de exploracion antes de
+dar con la causa raiz, anadir una entrada nueva al GOTCHAS del subsistema correspondiente (crear uno
+si no existe, siguiendo el formato de `WORKSPACES_GOTCHAS.md`: Sintoma, pistas falsas descartadas,
+causa raiz, fix, leccion) antes de dar la tarea por terminada.
+
 ### Sin compatibilidad hacia atras
 
 Nunca anadir codigo de migracion, shims, fallbacks de clave antigua, ni ningun mecanismo de compatibilidad hacia atras. Si se renombra un campo JSON, se cambia una API interna, o se reestructura el store, los usuarios simplemente parten de los valores por defecto. No hay excepciones.
