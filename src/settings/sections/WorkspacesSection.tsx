@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Cancel01Icon, DragDropVerticalIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -26,6 +27,11 @@ import {
   type WorkspaceStatus,
 } from "@/modules/settings/store";
 import { newStatusId } from "@/lib/ids";
+import {
+  WORKSPACE_COLOR_PALETTE,
+  randomStatusColor,
+  resolveStatusColor,
+} from "@/modules/workspaces/lib/workspaceColor";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -37,12 +43,14 @@ function SortableStatusRow({
   index,
   status,
   onUpdate,
+  onUpdateColor,
   onRemove,
   inputRef,
 }: {
   index: number;
   status: WorkspaceStatus;
   onUpdate: (label: string) => void;
+  onUpdateColor: (color: string) => void;
   onRemove: () => void;
   inputRef: (el: HTMLInputElement | null) => void;
 }) {
@@ -51,11 +59,41 @@ function SortableStatusRow({
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
+  const resolvedColor = resolveStatusColor(status.color, status.id);
+
   return (
     <div ref={setNodeRef} style={style} className="flex items-center gap-2">
       <span {...attributes} {...listeners} className="cursor-grab text-muted-foreground shrink-0">
         <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
       </span>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            title="Change color"
+            className="size-[22px] shrink-0 rounded-full border border-border/60 transition-opacity hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-ring"
+            style={{ backgroundColor: resolvedColor }}
+          />
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-2" align="start">
+          <div className="grid grid-cols-4 gap-1.5">
+            {WORKSPACE_COLOR_PALETTE.map((hex) => (
+              <button
+                key={hex}
+                type="button"
+                title={hex}
+                onClick={() => onUpdateColor(hex)}
+                className="size-6 rounded-full border-2 transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: hex,
+                  borderColor: status.color === hex ? "white" : "transparent",
+                  outline: status.color === hex ? `2px solid ${hex}` : "none",
+                }}
+              />
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
       <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground/60 select-none">
         #{index + 1}
       </span>
@@ -112,6 +150,10 @@ export function WorkspacesSection() {
     persist(statuses.map((s) => (s.id === id ? { ...s, label } : s)));
   }
 
+  function handleUpdateColor(id: string, color: string) {
+    persist(statuses.map((s) => (s.id === id ? { ...s, color } : s)));
+  }
+
   function handleRemove(id: string) {
     persist(statuses.filter((s) => s.id !== id));
   }
@@ -122,7 +164,7 @@ export function WorkspacesSection() {
       inputRefs.current.get(empty.id)?.focus();
       return;
     }
-    const next: WorkspaceStatus = { id: newStatusId(), label: "" };
+    const next: WorkspaceStatus = { id: newStatusId(), label: "", color: randomStatusColor() };
     const updated = [...statuses, next];
     setStatuses(updated);
     void setWorkspaceStatuses(updated.filter((s) => s.label?.trim()));
@@ -184,6 +226,7 @@ export function WorkspacesSection() {
                     index={i}
                     status={status}
                     onUpdate={(label) => handleUpdate(status.id, label)}
+                    onUpdateColor={(color) => handleUpdateColor(status.id, color)}
                     onRemove={() => handleRemove(status.id)}
                     inputRef={(el) => {
                       if (el) inputRefs.current.set(status.id, el);
