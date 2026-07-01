@@ -5,24 +5,19 @@ import {
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Copy01Icon,
   FolderOpenIcon,
   MoreHorizontalIcon,
-  NoteEditIcon,
   PlayIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { native } from "@/lib/native";
 import { copyToClipboard, revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import type { Tab } from "@/modules/workspaces/lib/types";
-import { leafScratchpadOpen, toggleScratchpad } from "./lib/useTerminalSession";
 
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -34,7 +29,6 @@ function formatElapsed(ms: number): string {
 }
 
 type Props = {
-  leafId: string;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
   onUpdateTab: (updater: (p: Tab) => Tab) => void;
@@ -43,7 +37,6 @@ type Props = {
 };
 
 export function TerminalPathBarMenu({
-  leafId,
   restoreOnRestart,
   persistentCommand,
   onUpdateTab,
@@ -51,13 +44,6 @@ export function TerminalPathBarMenu({
   runningCommand,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [scratchpadOn, setScratchpadOn] = useState(false);
-  const scratchpadKey = usePreferencesStore((s) =>
-    getShortcutLabel("terminal.scratchpad", s.shortcuts),
-  );
-  useEffect(() => {
-    if (open) setScratchpadOn(leafScratchpadOpen(leafId));
-  }, [open, leafId]);
   const [transcriptExists, setTranscriptExists] = useState<boolean | null>(null);
   const transcriptPath = agentSession?.meta?.transcriptPath;
 
@@ -92,20 +78,6 @@ export function TerminalPathBarMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 text-[12px]">
-        <DropdownMenuCheckboxItem
-          checked={scratchpadOn}
-          onCheckedChange={() => {
-            toggleScratchpad(leafId);
-            setScratchpadOn((v) => !v);
-          }}
-        >
-          <HugeiconsIcon icon={NoteEditIcon} className="size-3.5" strokeWidth={2} />
-          <span>Scratchpad</span>
-          {scratchpadKey && (
-            <DropdownMenuShortcut>{scratchpadKey}</DropdownMenuShortcut>
-          )}
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={checked}
           onSelect={(e) => e.preventDefault()}

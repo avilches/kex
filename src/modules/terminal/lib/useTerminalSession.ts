@@ -313,9 +313,7 @@ export function closeScratchpad(leafId: string): void {
   s.scratchpadFocused = false;
   notifyScratchpad(leafId);
   notifyScratchpadState(leafId);
-  // Deferred like the open-path focus in cycleScratchpad: a caller (e.g. the
-  // path-bar menu) may still have a modal focus trap mounted in this same tick.
-  setTimeout(() => focusSlot(leafId), 0);
+  focusSlot(leafId);
 }
 
 export function setLeafScratchpadActive(leafId: string, active: boolean): void {
