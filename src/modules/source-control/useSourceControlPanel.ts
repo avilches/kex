@@ -22,6 +22,13 @@ type SelectionTransition = "none" | "moved-group" | "reset";
 
 const RECONCILE_DEBOUNCE_MS = 180;
 const COMMIT_PERSIST_DEBOUNCE_MS = 400;
+// Delay before showing the "Loading repository" placeholder so a fast
+// context-change resolve (common case) never flashes it.
+const LOADING_SHOW_DELAY_MS = 150;
+// Sentinel actionBusy value while summary.isSwitchingContext is true, so every
+// existing `actionBusy !== null` gate blocks interaction with the outgoing
+// repo without threading a second prop through the whole render tree.
+const CONTEXT_SWITCH_BUSY_KEY = "context-switch";
 
 export type DiffSelection = {
   path: string;
@@ -52,6 +59,7 @@ type SourceControlPanelState = {
   selected: DiffSelection | null;
   commitMessage: string;
   actionBusy: string | null;
+  isSwitchingContext: boolean;
   statusError: string | null;
   actionError: string | null;
   remoteError: string | null;
@@ -457,7 +465,7 @@ export function useSourceControlPanel(
 
   const checkout = useCallback(
     async (branch: GitBranchInfo) => {
-      if (!repo) return;
+      if (!repo || summary.isSwitchingContext) return;
       setLocalActionBusy("checkout");
       setActionMessage(null);
       setActionError(null);
@@ -480,7 +488,7 @@ export function useSourceControlPanel(
 
   const createBranch = useCallback(
     async (name: string) => {
-      if (!repo) return;
+      if (!repo || summary.isSwitchingContext) return;
       setLocalActionBusy("create-branch");
       setActionMessage(null);
       setActionError(null);
@@ -500,7 +508,7 @@ export function useSourceControlPanel(
 
   const addRemote = useCallback(
     async (name: string, url: string) => {
-      if (!repo) return;
+      if (!repo || summary.isSwitchingContext) return;
       setLocalActionBusy("add-remote");
       setActionMessage(null);
       setActionError(null);
@@ -517,7 +525,7 @@ export function useSourceControlPanel(
         setLocalActionBusy(null);
       }
     },
-    [repo],
+    [repo, summary],
   );
 
   const openSelection = useCallback(
@@ -552,8 +560,11 @@ export function useSourceControlPanel(
       return;
     }
     if (summary.isLoading && !summary.hasRepo && !summary.status) {
-      setPanelState("loading");
-      return;
+      const timer = window.setTimeout(
+        () => setPanelState("loading"),
+        LOADING_SHOW_DELAY_MS,
+      );
+      return () => window.clearTimeout(timer);
     }
     if (!summary.hasRepo) {
       setRepo(null);
@@ -573,7 +584,11 @@ export function useSourceControlPanel(
     }
     if (!summary.repo || !summary.status) {
       if (summary.isLoading) {
-        setPanelState("loading");
+        const timer = window.setTimeout(
+          () => setPanelState("loading"),
+          LOADING_SHOW_DELAY_MS,
+        );
+        return () => window.clearTimeout(timer);
       }
       return;
     }
@@ -654,7 +669,7 @@ export function useSourceControlPanel(
       ipc: () => Promise<void>,
       affected: string[],
     ) => {
-      if (!repo || summary.busyAction) return;
+      if (!repo || summary.busyAction || summary.isSwitchingContext) return;
       setLocalActionBusy(busyKey);
       setActionMessage(null);
       setActionError(null);
@@ -818,7 +833,7 @@ export function useSourceControlPanel(
   );
 
   const commit = useCallback(async () => {
-    if (!repo || summary.busyAction) return;
+    if (!repo || summary.busyAction || summary.isSwitchingContext) return;
     setLocalActionBusy("commit");
     setActionMessage(null);
     setActionError(null);
@@ -855,7 +870,7 @@ export function useSourceControlPanel(
   }, [repo, status?.upstream, summary]);
 
   const commitAndPush = useCallback(async () => {
-    if (!repo || summary.busyAction) return;
+    if (!repo || summary.busyAction || summary.isSwitchingContext) return;
     setLocalActionBusy("commit");
     setActionMessage(null);
     setActionError(null);
@@ -907,7 +922,11 @@ export function useSourceControlPanel(
     status,
     selected,
     commitMessage,
-    actionBusy: localActionBusy ?? summary.busyAction,
+    actionBusy:
+      localActionBusy ??
+      summary.busyAction ??
+      (summary.isSwitchingContext ? CONTEXT_SWITCH_BUSY_KEY : null),
+    isSwitchingContext: summary.isSwitchingContext,
     statusError: summary.localError,
     actionError,
     remoteError: summary.lastRemoteError,

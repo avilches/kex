@@ -11,3 +11,18 @@ export function canReuseResolvedRepo(
 ): boolean {
   return contextPath !== null && contextPath === resolvedContext;
 }
+
+/**
+ * Whether the repo/status currently held by the summary may be stale for the
+ * active context path: a repo is displayed (hasRepo) but its context does not
+ * match the one currently in view. True from the instant the context path
+ * changes, not just once a refetch starts, so the UI can block interaction
+ * with the outgoing repo before any request is even in flight.
+ */
+export function isContextSwitching(
+  hasRepo: boolean,
+  contextPath: string | null,
+  resolvedContext: string | null,
+): boolean {
+  return hasRepo && !canReuseResolvedRepo(contextPath, resolvedContext);
+}

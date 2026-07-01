@@ -260,20 +260,24 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     scm.stagedEntries.length > 0 &&
     scm.commitMessage.trim().length > 0 &&
     !scm.actionBusy;
-  const commitDisabledReason = scm.actionBusy
-    ? "Wait for the current Git action to finish."
-    : scm.stagedEntries.length === 0
-      ? "Stage changes to enable commit."
-      : scm.commitMessage.trim().length === 0
-        ? "Enter a commit message to enable commit."
-        : null;
+  const commitDisabledReason = scm.isSwitchingContext
+    ? "Switching repository…"
+    : scm.actionBusy
+      ? "Wait for the current Git action to finish."
+      : scm.stagedEntries.length === 0
+        ? "Stage changes to enable commit."
+        : scm.commitMessage.trim().length === 0
+          ? "Enter a commit message to enable commit."
+          : null;
   const commitHint = canCommit
     ? `Commit with ${commitShortcut}.`
     : (commitDisabledReason ?? `Commit with ${commitShortcut}.`);
   const pushHint = scm.pushHint ?? "Push is unavailable right now.";
-  const pushDisabledReason = scm.actionBusy
-    ? "Wait for the current Git action to finish."
-    : pushHint;
+  const pushDisabledReason = scm.isSwitchingContext
+    ? "Switching repository…"
+    : scm.actionBusy
+      ? "Wait for the current Git action to finish."
+      : pushHint;
   const stagedCount = scm.stagedEntries.length;
   const unstagedCount = scm.unstagedEntries.length;
   const changesSummary =
