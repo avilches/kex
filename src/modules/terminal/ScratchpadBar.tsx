@@ -60,11 +60,9 @@ function placeholderMessages(
 
 type Props = {
   leafId: string;
-  /** This pane is the active/focused tab. Hint only shows for the focused tab. */
-  paneFocused: boolean;
 };
 
-export function ScratchpadBar({ leafId, paneFocused }: Props) {
+export function ScratchpadBar({ leafId }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => getLeafScratchpadDraft(leafId));
   const [focused, setFocused] = useState(false);
@@ -162,11 +160,10 @@ export function ScratchpadBar({ leafId, paneFocused }: Props) {
   const messages = placeholderMessages(enterSends, switchLabel, hasAgent);
   const placeholder = messages[Math.floor(Date.now() / ROTATE_MS) % messages.length];
 
-  // Hint shows only on the focused tab and points to the other side of the
-  // toggle: in the scratchpad it offers the terminal, and vice versa. Hidden
-  // while typing in the scratchpad.
+  // Points to the other side of the toggle: in the scratchpad it offers the
+  // terminal, and vice versa. Hidden while typing in the scratchpad.
   let hint: string | null = null;
-  if (paneFocused && switchLabel) {
+  if (switchLabel) {
     if (focused) hint = text ? null : `${switchLabel} Terminal`;
     else hint = `${switchLabel} Scratchpad`;
   }
@@ -175,8 +172,13 @@ export function ScratchpadBar({ leafId, paneFocused }: Props) {
     <div
       ref={setNodeRef}
       className={cn(
-        "flex shrink-0 items-end gap-2 border-t border-border/40 px-3 py-2 transition-colors",
-        focused && "ring-1 ring-inset ring-primary/50",
+        // m-2 reserves room outside the box for the focus glow to bleed into
+        // before PaneView's overflow-hidden clips it; the blur/spread below are
+        // sized to mostly fade out within that 8px margin so the glow reads as
+        // an outward halo instead of getting cut off mid-fade.
+        "m-2 flex shrink-0 items-end gap-2 px-3 py-2 transition-colors",
+        focused &&
+          "ring-1 ring-inset ring-primary/50 shadow-[0_0_6px_2px_var(--tw-shadow-color)] shadow-primary/50",
         isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
       )}
     >
@@ -205,56 +207,54 @@ export function ScratchpadBar({ leafId, paneFocused }: Props) {
             {hint}
           </span>
         )}
-        {paneFocused && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                title="Scratchpad settings"
-                className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              title="Scratchpad settings"
+              className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top" sideOffset={6}>
+            <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+              Send
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={enterSends ? "enter" : "shift-enter"}
+              onValueChange={(v) =>
+                void setTerminalScratchpadEnterSends(v === "enter")
+              }
+            >
+              <DropdownMenuRadioItem
+                value="enter"
+                className="flex-col items-start gap-0"
               >
-                <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" sideOffset={6}>
-              <DropdownMenuLabel className="text-[11px] text-muted-foreground">
-                Send
-              </DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={enterSends ? "enter" : "shift-enter"}
-                onValueChange={(v) =>
-                  void setTerminalScratchpadEnterSends(v === "enter")
-                }
+                Enter sends
+                <span className="text-[10.5px] text-muted-foreground">
+                  Like Terminal
+                </span>
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem
+                value="shift-enter"
+                className="flex-col items-start gap-0"
               >
-                <DropdownMenuRadioItem
-                  value="enter"
-                  className="flex-col items-start gap-0"
-                >
-                  Enter sends
-                  <span className="text-[10.5px] text-muted-foreground">
-                    Like Terminal
-                  </span>
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem
-                  value="shift-enter"
-                  className="flex-col items-start gap-0"
-                >
-                  Enter new line
-                  <span className="text-[10.5px] text-muted-foreground">
-                    Like text field
-                  </span>
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => void openSettingsWindow("terminal")}
-              >
-                <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
-                Terminal settings
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+                Enter new line
+                <span className="text-[10.5px] text-muted-foreground">
+                  Like text field
+                </span>
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => void openSettingsWindow("terminal")}
+            >
+              <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
+              Terminal settings
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

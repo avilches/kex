@@ -177,8 +177,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
               />
             </Suspense>
           </div>
-          {session.scratchpadOpen && (
-            <ScratchpadBar leafId={tabId} paneFocused={focused} />
+          {session.scratchpadOpen && focused && (
+            <ScratchpadBar leafId={tabId} />
           )}
         </div>
       );
@@ -197,8 +197,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
             if (focused) setLeafScratchpadActive(tabId, false);
           }}
         />
-        {session.scratchpadOpen && (
-          <ScratchpadBar leafId={tabId} paneFocused={focused} />
+        {session.scratchpadOpen && focused && (
+          <ScratchpadBar leafId={tabId} />
         )}
       </div>
     );
