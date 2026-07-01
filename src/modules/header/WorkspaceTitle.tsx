@@ -7,7 +7,7 @@ import {
   subscribe as subscribeOscTitles,
   getSnapshot as getOscTitlesSnapshot,
 } from "@/modules/terminal/lib/oscTitleStore";
-import { tabTitle } from "@/modules/workspaces/lib/tabTitle";
+import { agentAwareTabTitle, tabTitle } from "@/modules/workspaces/lib/tabTitle";
 import {
   getRunningCommandsSnapshot,
   subscribeToRunningCommands,
@@ -43,7 +43,16 @@ export function WorkspaceTitle({ workspace, tab }: Props) {
   const oscTitle = tab?.kind === "terminal" ? oscTitleMap.get(tab.id) : undefined;
 
   const hasAgent = !!agentSession && tab?.kind === "terminal";
-  const subtitle = tab ? tabTitle(tab, runningCommand, oscTitle) : null;
+  const subtitle = tab
+    ? agentAwareTabTitle(
+        tab,
+        hasAgent,
+        agentSession?.agent,
+        oscTitle,
+        agentSession?.meta?.sessionTitle,
+        tabTitle(tab, runningCommand, oscTitle),
+      )
+    : null;
 
   return (
     <div className="flex min-w-0 max-w-[340px] items-center gap-2">

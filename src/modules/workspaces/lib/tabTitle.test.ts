@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tabTitle } from "./tabTitle";
+import { agentAwareTabTitle, tabTitle } from "./tabTitle";
 
 const terminal = (overrides: Partial<{ cwd: string; title: string }> = {}) =>
   ({ id: "p1", kind: "terminal" as const, ...overrides });
@@ -30,5 +30,58 @@ describe("tabTitle - non-terminal tabs unaffected by oscTitle", () => {
   it("editor title ignores oscTitle", () => {
     const editor = { id: "p2", kind: "editor" as const, path: "/src/foo.ts", dirty: false, preview: false };
     expect(tabTitle(editor, null, "some osc title")).toBe("foo.ts");
+  });
+});
+
+describe("agentAwareTabTitle - sessionTitle priority", () => {
+  it("oscTitle wins over sessionTitle when both present", () => {
+    expect(
+      agentAwareTabTitle(
+        terminal({ cwd: "/home/me" }),
+        true,
+        "claude",
+        "live status",
+        "initial session title",
+        "claude",
+      ),
+    ).toBe("live status");
+  });
+
+  it("sessionTitle wins when oscTitle is absent", () => {
+    expect(
+      agentAwareTabTitle(
+        terminal({ cwd: "/home/me" }),
+        true,
+        "claude",
+        undefined,
+        "initial session title",
+        "claude",
+      ),
+    ).toBe("initial session title");
+  });
+
+  it("falls back to agentName and dirname when neither oscTitle nor sessionTitle are present", () => {
+    expect(
+      agentAwareTabTitle(terminal({ cwd: "/home/me" }), true, "claude", undefined, undefined, "claude"),
+    ).toBe("claude · me");
+  });
+
+  it("tab.title (manual rename) still wins over oscTitle and sessionTitle", () => {
+    expect(
+      agentAwareTabTitle(
+        terminal({ cwd: "/home/me", title: "renamed" }),
+        true,
+        "claude",
+        "live status",
+        "session title",
+        "claude",
+      ),
+    ).toBe("renamed");
+  });
+
+  it("no agent: returns fallbackTitle unchanged", () => {
+    expect(
+      agentAwareTabTitle(terminal({ cwd: "/home/me" }), false, undefined, "live status", "session title", "claude"),
+    ).toBe("claude");
   });
 });

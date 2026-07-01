@@ -41,6 +41,23 @@ export function tabTitle(tab: Tab, runningCommand?: string | null, oscTitle?: st
   }
 }
 
+export function agentAwareTabTitle(
+  tab: Tab,
+  hasAgent: boolean,
+  agentName: string | undefined,
+  oscTitle: string | undefined,
+  sessionTitle: string | undefined,
+  fallbackTitle: string,
+): string {
+  if (!hasAgent || tab.kind !== "terminal") return fallbackTitle;
+  if (tab.title) return tab.title;
+  if (oscTitle) return oscTitle;
+  if (sessionTitle) return sessionTitle;
+  const cwd = tab.cwd ?? "";
+  const dirname = cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd;
+  return `${agentName} · ${dirname || fallbackTitle}`;
+}
+
 const TAB_ICONS: Record<Exclude<Tab["kind"], "editor" | "markdown">, IconSvgElement> = {
   terminal: ComputerTerminal01Icon,
   browser: Globe02Icon,

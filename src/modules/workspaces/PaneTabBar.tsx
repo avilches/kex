@@ -1,7 +1,7 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
-import { tabIcon, tabTitle } from "./lib/tabTitle";
+import { agentAwareTabTitle, tabIcon, tabTitle } from "./lib/tabTitle";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
@@ -145,15 +145,14 @@ function DraggableTab({
     return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode") : null;
   }, [tab, gitStatusMap, gitStatus, gitColorScheme]);
 
-  const agentTitle = (() => {
-    if (!hasAgent || tab.kind !== "terminal") return title;
-    if (tab.title) return tab.title;
-    if (oscTitle) return oscTitle;
-    const agentName = agentSession!.agent;
-    const cwd = tab.cwd ?? "";
-    const dirname = cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd;
-    return `${agentName} · ${dirname || title}`;
-  })();
+  const agentTitle = agentAwareTabTitle(
+    tab,
+    hasAgent,
+    agentSession?.agent,
+    oscTitle,
+    agentSession?.meta?.sessionTitle,
+    title,
+  );
 
   // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
   // Paths (cwd segments): truncate from the left so the deepest directory stays visible.
