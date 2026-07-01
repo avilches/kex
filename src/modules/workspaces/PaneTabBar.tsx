@@ -1,7 +1,7 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
-import { agentAwareTabTitle, tabIcon, tabTitle } from "./lib/tabTitle";
+import { tabIcon, tabTitle } from "./lib/tabTitle";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
@@ -18,7 +18,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
-import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
@@ -135,8 +135,9 @@ function DraggableTab({
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
-  const agentSession = useAgentStore((s) => s.sessions[tab.id]);
-  const hasAgent = agentSession !== undefined;
+  const agentTabTitle = useAgentTabTitle(tab);
+  const agentSession = agentTabTitle?.agentSession;
+  const hasAgent = agentTabTitle?.hasAgent ?? false;
   const isRestoreError = agentSession?.restoreError ?? false;
 
   const tabColor = useMemo(() => {
@@ -145,18 +146,10 @@ function DraggableTab({
     return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode") : null;
   }, [tab, gitStatusMap, gitStatus, gitColorScheme]);
 
-  const agentTitle = agentAwareTabTitle(
-    tab,
-    hasAgent,
-    agentSession?.agent,
-    oscTitle,
-    agentSession?.meta?.sessionTitle,
-    title,
-  );
-
   // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
   // Paths (cwd segments): truncate from the left so the deepest directory stays visible.
-  const isDescription = !!(tab.title || oscTitle);
+  const agentTitle = agentTabTitle?.displayTitle ?? title;
+  const isDescription = agentTabTitle?.isDescription ?? false;
   const displayTitle = isDescription
     ? agentTitle
     : agentTitle.length > 28
