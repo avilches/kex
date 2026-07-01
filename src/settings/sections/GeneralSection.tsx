@@ -5,7 +5,6 @@ import {
   setAutofocusNewTabs,
   setAutostart,
   setPreviewOnClick,
-  setWarnOnCloseWorkspace,
 } from "@/modules/settings/store";
 import { CrosshairIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -21,9 +20,6 @@ export function GeneralSection() {
   const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
   const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
-  const warnOnCloseWorkspace = usePreferencesStore(
-    (s) => s.warnOnCloseWorkspace,
-  );
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
   const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
 
@@ -89,15 +85,6 @@ export function GeneralSection() {
           <Switch
             checked={autofocusNewTabs}
             onCheckedChange={(v) => void setAutofocusNewTabs(v)}
-          />
-        </SettingRow>
-        <SettingRow
-          title="Warn when closing a workspace"
-          description="Confirm before closing a workspace and its tabs."
-        >
-          <Switch
-            checked={warnOnCloseWorkspace}
-            onCheckedChange={(v) => void setWarnOnCloseWorkspace(v)}
           />
         </SettingRow>
       </div>

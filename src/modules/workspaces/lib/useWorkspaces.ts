@@ -253,10 +253,12 @@ function newPaneNode(cwd?: string): PaneNode {
 
 function newWorkspace(cwd?: string): Workspace {
   const pane = newPaneNode(cwd);
+  const randomColor = usePreferencesStore.getState().randomWorkspaceColor;
   return {
     id: newWorkspaceId(),
     title: cwd ? (cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] ?? "shell") : "shell",
     cwd,
+    color: randomColor ? undefined : null,
     paneTree: pane,
     activePaneId: pane.id,
   };

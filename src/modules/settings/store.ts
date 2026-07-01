@@ -203,6 +203,7 @@ export type Preferences = {
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
   workspaceStatuses: WorkspaceStatus[];
+  randomWorkspaceColor: boolean;
 };
 
 const STORE_PATH = "settings-general.json";
@@ -228,6 +229,7 @@ const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
 const KEY_WORKSPACE_STATUSES = "workspaceStatuses";
+const KEY_RANDOM_WORKSPACE_COLOR = "randomWorkspaceColor";
 
 // Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
@@ -421,6 +423,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   customEditors: [],
   detectedEditors: [],
   workspaceStatuses: DEFAULT_WORKSPACE_STATUSES,
+  randomWorkspaceColor: true,
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -704,6 +707,9 @@ export async function loadPreferences(): Promise<Preferences> {
       if (v === undefined) return DEFAULT_WORKSPACE_STATUSES;
       return parseWorkspaceStatuses(v);
     })(),
+    randomWorkspaceColor:
+      get<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
+      DEFAULT_PREFERENCES.randomWorkspaceColor,
   };
 
   // Persist JSON-only general keys so they're discoverable in settings-general.json.
@@ -993,6 +999,10 @@ export async function setWorkspaceStatuses(value: WorkspaceStatus[]): Promise<vo
   await writePref(KEY_WORKSPACE_STATUSES, value);
 }
 
+export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
+  await writePref(KEY_RANDOM_WORKSPACE_COLOR, value);
+}
+
 export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
@@ -1120,6 +1130,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_WORKSPACE_STATUSES]: "workspaceStatuses",
+  [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
 };
 
 export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {

@@ -17,10 +17,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { Cancel01Icon, DragDropVerticalIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setWorkspaceStatuses, type WorkspaceStatus } from "@/modules/settings/store";
+import {
+  setRandomWorkspaceColor,
+  setWarnOnCloseWorkspace,
+  setWorkspaceStatuses,
+  type WorkspaceStatus,
+} from "@/modules/settings/store";
 import { newStatusId } from "@/lib/ids";
+import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
+import { SettingRow } from "../components/SettingRow";
 
 const INPUT_CLASS =
   "h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
@@ -72,6 +80,8 @@ function SortableStatusRow({
 }
 
 export function WorkspacesSection() {
+  const warnOnCloseWorkspace = usePreferencesStore((s) => s.warnOnCloseWorkspace);
+  const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const stored = usePreferencesStore((s) => s.workspaceStatuses);
   const [statuses, setStatuses] = useState<WorkspaceStatus[]>(stored);
   const statusesRef = useRef(statuses);
@@ -132,46 +142,70 @@ export function WorkspacesSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="Workspaces" />
+      <SectionHeader title="Workspace" />
 
-      <div className="flex flex-col gap-3">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+      <div className="flex flex-col gap-2">
+        <SettingRow
+          title="Warn when closing a workspace"
+          description="Confirm before closing a workspace and its tabs."
         >
-          <SortableContext
-            items={statuses.map((s) => s.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="flex flex-col gap-1.5">
-              {statuses.map((status, i) => (
-                <SortableStatusRow
-                  key={status.id}
-                  index={i}
-                  status={status}
-                  onUpdate={(label) => handleUpdate(status.id, label)}
-                  onRemove={() => handleRemove(status.id)}
-                  inputRef={(el) => {
-                    if (el) inputRefs.current.set(status.id, el);
-                    else inputRefs.current.delete(status.id);
-                  }}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+          <Switch
+            checked={warnOnCloseWorkspace}
+            onCheckedChange={(v) => void setWarnOnCloseWorkspace(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Set a random color to new workspaces"
+          description="Assign a color automatically when a new workspace is created."
+        >
+          <Switch
+            checked={randomWorkspaceColor}
+            onCheckedChange={(v) => void setRandomWorkspaceColor(v)}
+          />
+        </SettingRow>
+      </div>
 
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-fit gap-1.5 px-2 text-[12px]"
-            onClick={handleAdd}
+      <div className="flex flex-col gap-2">
+        <FieldLabel>Statuses</FieldLabel>
+        <div className="flex flex-col gap-3">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
-            Add status
-          </Button>
+            <SortableContext
+              items={statuses.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex flex-col gap-1.5">
+                {statuses.map((status, i) => (
+                  <SortableStatusRow
+                    key={status.id}
+                    index={i}
+                    status={status}
+                    onUpdate={(label) => handleUpdate(status.id, label)}
+                    onRemove={() => handleRemove(status.id)}
+                    inputRef={(el) => {
+                      if (el) inputRefs.current.set(status.id, el);
+                      else inputRefs.current.delete(status.id);
+                    }}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-fit gap-1.5 px-2 text-[12px]"
+              onClick={handleAdd}
+            >
+              <HugeiconsIcon icon={PlusSignIcon} size={12} strokeWidth={2} />
+              Add status
+            </Button>
+          </div>
         </div>
       </div>
     </div>
