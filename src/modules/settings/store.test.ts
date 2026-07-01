@@ -185,10 +185,25 @@ describe("parseWorkspaceStatuses", () => {
     const input = [{ id: "archived", label: "Archived" }];
     expect(parseWorkspaceStatuses(input)).toEqual(input);
   });
+
+  it("preserves a valid color string", () => {
+    const input = [{ id: "a", label: "A", color: "#3b82f6" }];
+    expect(parseWorkspaceStatuses(input)).toEqual(input);
+  });
+
+  it("filters out items with a non-string color", () => {
+    const input = [{ id: "a", label: "A", color: 123 }];
+    expect(parseWorkspaceStatuses(input)).toEqual([]);
+  });
+
+  it("accepts items where color is absent", () => {
+    const input = [{ id: "a", label: "A" }];
+    expect(parseWorkspaceStatuses(input)).toEqual([{ id: "a", label: "A" }]);
+  });
 });
 
 describe("DEFAULT_WORKSPACE_STATUSES", () => {
-  it("contains the five predefined statuses in order", () => {
+  it("contains the five predefined statuses in order with colors", () => {
     const ids = DEFAULT_WORKSPACE_STATUSES.map((s) => s.id);
     expect(ids).toEqual([
       "archived",
@@ -197,5 +212,8 @@ describe("DEFAULT_WORKSPACE_STATUSES", () => {
       "canceled",
       "completed",
     ]);
+    for (const s of DEFAULT_WORKSPACE_STATUSES) {
+      expect(s.color).toMatch(/^#[0-9a-fA-F]{6}$/);
+    }
   });
 });

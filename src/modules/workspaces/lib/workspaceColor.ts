@@ -37,3 +37,21 @@ export function resolveWorkspaceColor(
   if (color === undefined) return initialColorForId(id);
   return color;
 }
+
+/**
+ * Resolves the display color for a status.
+ * Unlike workspace color, there is no "no color" (null) option -- statuses always show a color.
+ * Falls back to a stable color derived from the status ID when no explicit color is set.
+ */
+export function resolveStatusColor(color: string | undefined, id: string): string {
+  return color ?? initialColorForId(id);
+}
+
+/**
+ * Picks a random color from WORKSPACE_COLOR_PALETTE for use when creating a new status.
+ */
+export function randomStatusColor(): string {
+  return WORKSPACE_COLOR_PALETTE[
+    Math.floor(Math.random() * WORKSPACE_COLOR_PALETTE.length)
+  ]!;
+}

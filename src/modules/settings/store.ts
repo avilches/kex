@@ -14,14 +14,14 @@ export type ThemePref = "system" | "light" | "dark";
 
 export type TabBarStyle = "connected" | "pill";
 
-export type WorkspaceStatus = { id: string; label: string };
+export type WorkspaceStatus = { id: string; label: string; color?: string };
 
 export const DEFAULT_WORKSPACE_STATUSES: WorkspaceStatus[] = [
-  { id: "archived",         label: "Archived" },
-  { id: "work-in-progress", label: "Work in progress" },
-  { id: "on-hold",          label: "On hold" },
-  { id: "canceled",         label: "Canceled" },
-  { id: "completed",        label: "Completed" },
+  { id: "archived",         label: "Archived",         color: "#14b8a6" },
+  { id: "work-in-progress", label: "Work in progress", color: "#3b82f6" },
+  { id: "on-hold",          label: "On hold",           color: "#f97316" },
+  { id: "canceled",         label: "Canceled",          color: "#ef4444" },
+  { id: "completed",        label: "Completed",         color: "#22c55e" },
 ];
 
 export function parseWorkspaceStatuses(value: unknown): WorkspaceStatus[] {
@@ -32,7 +32,11 @@ export function parseWorkspaceStatuses(value: unknown): WorkspaceStatus[] {
       typeof item === "object" &&
       typeof (item as WorkspaceStatus).id === "string" &&
       (item as WorkspaceStatus).id.length > 0 &&
-      typeof (item as WorkspaceStatus).label === "string",
+      typeof (item as WorkspaceStatus).label === "string" &&
+      (
+        (item as WorkspaceStatus).color === undefined ||
+        typeof (item as WorkspaceStatus).color === "string"
+      ),
   );
 }
 
