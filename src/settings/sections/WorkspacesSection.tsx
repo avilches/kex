@@ -54,6 +54,7 @@ function SortableStatusRow({
   onRemove: () => void;
   inputRef: (el: HTMLInputElement | null) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: status.id,
   });
@@ -66,7 +67,7 @@ function SortableStatusRow({
       <span {...attributes} {...listeners} className="cursor-grab text-muted-foreground shrink-0">
         <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
       </span>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -82,7 +83,7 @@ function SortableStatusRow({
                 key={hex}
                 type="button"
                 title={hex}
-                onClick={() => onUpdateColor(hex)}
+                onClick={() => { onUpdateColor(hex); setOpen(false); }}
                 className="size-6 rounded-full border-2 transition-opacity hover:opacity-80"
                 style={{
                   backgroundColor: hex,
