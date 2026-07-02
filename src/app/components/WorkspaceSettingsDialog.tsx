@@ -54,6 +54,7 @@ type Props = {
   onUpdateScript: (id: string, configId: string, patch: Partial<Script>) => void;
   onRemoveScript: (id: string, configId: string) => void;
   onReorderScripts: (id: string, fromId: string, toId: string) => void;
+  onRestoreFocus: () => void;
 };
 
 export function WorkspaceSettingsDialog(props: Props) {
@@ -73,7 +74,13 @@ export function WorkspaceSettingsDialog(props: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent
+        className="sm:max-w-xl"
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          props.onRestoreFocus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Workspace {ws?.title}</DialogTitle>
         </DialogHeader>

@@ -40,6 +40,7 @@ type Props = {
   onOpenRunSettings: () => void;
   activeWorkspace: Workspace | null;
   activeTab: Tab | null;
+  onRestoreFocus: () => void;
 };
 
 const COMPACT_WIDTH = 720;
@@ -64,6 +65,7 @@ export function Header({
   onOpenRunSettings,
   activeWorkspace,
   activeTab,
+  onRestoreFocus,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
@@ -150,6 +152,7 @@ export function Header({
         onRun={onRunScript}
         onStop={onStopConfig}
         onOpenScripts={onOpenRunSettings}
+        onRestoreFocus={onRestoreFocus}
       />
 
       <OpenInEditorButton
@@ -157,6 +160,7 @@ export function Header({
         workspaceRoot={workspaceRoot}
         onOpenSettings={onOpenExternalEditorSettings}
         onSetWorkspaceRoot={onSetWorkspaceRoot}
+        onRestoreFocus={onRestoreFocus}
       />
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
 

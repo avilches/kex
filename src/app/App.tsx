@@ -252,6 +252,13 @@ export default function App() {
     ? (activePane?.tabs.find((p) => p.id === activeTabId) ?? null)
     : null;
 
+  // Returns focus to the active leaf's terminal/scratchpad after an
+  // incidental UI interaction closes (a dropdown, a dialog, a context menu),
+  // instead of leaving it on whatever chrome element triggered it.
+  const restoreLeafFocus = useCallback(() => {
+    if (activeTabId) requestLeafFocus(activeTabId);
+  }, [activeTabId]);
+
   const isTerminalTab = activeTab?.kind === "terminal";
   const isEditorTab = activeTab?.kind === "editor";
   const isGitHistoryTab = activeTab?.kind === "git-history";
@@ -2641,6 +2648,7 @@ export default function App() {
             }
             activeWorkspace={activeWorkspace ?? null}
             activeTab={activeTab}
+            onRestoreFocus={restoreLeafFocus}
           />
 
           {/* 3-column layout */}
@@ -2669,6 +2677,7 @@ export default function App() {
               onSetStatus={setWorkspaceStatus}
               collapsedGroups={collapsedGroups}
               onToggleGroup={handleToggleGroup}
+              onRestoreFocus={restoreLeafFocus}
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
@@ -2892,6 +2901,7 @@ export default function App() {
             onUpdateScript={updateScript}
             onRemoveScript={removeScript}
             onReorderScripts={reorderScripts}
+            onRestoreFocus={restoreLeafFocus}
           />
 
           <CloseDialogs

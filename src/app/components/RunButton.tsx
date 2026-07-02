@@ -28,6 +28,7 @@ type Props = {
   onRun: (config: Script) => void;
   onStop: (config: Script) => void;
   onOpenScripts: () => void;
+  onRestoreFocus: () => void;
 };
 
 function isComplete(c: Script): boolean {
@@ -41,6 +42,7 @@ export function RunButton({
   onRun,
   onStop,
   onOpenScripts,
+  onRestoreFocus,
 }: Props) {
   const runningMap = useSyncExternalStore(
     subscribeToScriptRunning,
@@ -60,7 +62,13 @@ export function RunButton({
   }
 
   const dropdownContent = (
-    <DropdownMenuContent align="end">
+    <DropdownMenuContent
+      align="end"
+      onCloseAutoFocus={(e) => {
+        e.preventDefault();
+        onRestoreFocus();
+      }}
+    >
       {completeConfigs.map((cfg) => {
         const state = cfgState(cfg);
         const cfgRunning = state === "running";

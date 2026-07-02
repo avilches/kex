@@ -78,6 +78,7 @@ export type WorkspaceBarProps = {
   onWidthChange: (w: number) => void;
   collapsedGroups: Set<string>;
   onToggleGroup: (statusId: string) => void;
+  onRestoreFocus: () => void;
 };
 
 function abbrev(title: string, kind: string): string {
@@ -97,6 +98,7 @@ function SortableWorkspaceItem({
   onRename,
   onOpenSettings,
   onSetStatus,
+  onRestoreFocus,
 }: {
   ws: WorkspaceItem;
   active: boolean;
@@ -107,6 +109,7 @@ function SortableWorkspaceItem({
   onRename: (id: string, newTitle: string) => void;
   onOpenSettings: (id: string) => void;
   onSetStatus: (id: string, statusId: string | null) => void;
+  onRestoreFocus: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ws.id });
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
@@ -238,7 +241,12 @@ function SortableWorkspaceItem({
             {button}
           </PopoverAnchor>
         </ContextMenuTrigger>
-        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+        <ContextMenuContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            onRestoreFocus();
+          }}
+        >
           <ContextMenuItem onSelect={() => startRename(ws.id)}>
             <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
             Rename
@@ -403,6 +411,7 @@ export function WorkspaceBar({
   onWidthChange,
   collapsedGroups,
   onToggleGroup,
+  onRestoreFocus,
 }: WorkspaceBarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [isDragging, setIsDragging] = useState(false);
@@ -566,6 +575,7 @@ export function WorkspaceBar({
                         onRename={onRename}
                         onOpenSettings={onOpenSettings}
                         onSetStatus={onSetStatus}
+                        onRestoreFocus={onRestoreFocus}
                       />
                     </SortableContext>
                   );
@@ -587,6 +597,7 @@ export function WorkspaceBar({
                         onRename={onRename}
                         onOpenSettings={onOpenSettings}
                         onSetStatus={onSetStatus}
+                        onRestoreFocus={onRestoreFocus}
                       />
                     ))}
                   </SortableContext>

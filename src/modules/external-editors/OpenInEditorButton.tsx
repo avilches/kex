@@ -31,6 +31,7 @@ interface Props {
   workspaceRoot: string | null;
   onOpenSettings?: () => void;
   onSetWorkspaceRoot?: () => void;
+  onRestoreFocus: () => void;
 }
 
 function pathLabel(path: string): string {
@@ -38,7 +39,7 @@ function pathLabel(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings, onSetWorkspaceRoot }: Props) {
+export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings, onSetWorkspaceRoot, onRestoreFocus }: Props) {
   const { detectedEditors, isScanning } = useExternalEditors();
   const preferredFileEditorId = usePreferencesStore((s) => s.preferredFileEditorId);
   const preferredWorkspaceEditorId = usePreferencesStore((s) => s.preferredWorkspaceEditorId);
@@ -162,7 +163,14 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings, onSe
             <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52 text-[12px]">
+        <DropdownMenuContent
+        align="end"
+        className="w-52 text-[12px]"
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          onRestoreFocus();
+        }}
+      >
           {!workspaceRoot ? (
             <DropdownMenuItem
               onSelect={() => onSetWorkspaceRoot?.()}
@@ -226,7 +234,14 @@ export function OpenInEditorButton({ target, workspaceRoot, onOpenSettings, onSe
             <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52 text-[12px]">
+        <DropdownMenuContent
+        align="end"
+        className="w-52 text-[12px]"
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          onRestoreFocus();
+        }}
+      >
           {isScanning && (
             <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Scanning...</div>
           )}
