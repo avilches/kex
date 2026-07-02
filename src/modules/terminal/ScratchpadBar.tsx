@@ -199,10 +199,12 @@ export function ScratchpadBar({ leafId }: Props) {
         onFocus={() => setFocused(true)}
         onBlur={(e) => {
           setFocused(false);
-          // Losing focus to something inside this bar (the settings gear
-          // trigger) is not a real "leave" -- onCloseAutoFocus brings focus
-          // back here when that dropdown closes. Anything else (the
-          // terminal, another tab, other UI chrome) closes the scratchpad.
+          // Losing focus to something inside this bar, or to the settings
+          // menu (portaled to body, so never inside containerRef), is not a
+          // real "leave" -- onCloseAutoFocus brings focus back here when the
+          // menu closes. Anything else (the terminal, another tab, other UI
+          // chrome) closes the scratchpad.
+          if (settingsOpen) return;
           const next = e.relatedTarget as Node | null;
           if (next && containerRef.current?.contains(next)) return;
           leaveLeafScratchpad(leafId);
