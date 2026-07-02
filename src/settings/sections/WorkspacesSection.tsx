@@ -109,7 +109,7 @@ function SortableStatusRow({
           />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="end">
-          <div className="flex items-center gap-1.5">
+          <div className="grid grid-cols-6 gap-1.5">
             {WORKSPACE_COLOR_PALETTE.map((hex) => (
               <button
                 key={hex}
