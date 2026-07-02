@@ -76,7 +76,7 @@ export function ScratchpadBar({ leafId }: Props) {
   });
 
   // Rotate the placeholder by wall-clock bucket so every open bar shows the same
-  // hint, advancing on the 30s boundary rather than from mount time.
+  // hint, advancing on the ROTATE_MS boundary rather than from mount time.
   const [, tick] = useReducer((c: number) => c + 1, 0);
   useEffect(() => {
     const t = setTimeout(tick, ROTATE_MS - (Date.now() % ROTATE_MS) + 50);

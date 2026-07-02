@@ -236,7 +236,7 @@ export const PaneView = memo(function PaneView({
     // mousedown focus (the draggable tab div has tabIndex=0) can steal it
     // between the pane-focus commit and this activation.
     requestLeafFocus(tabId);
-  }, [onActivateTab, workspaceId, pane.id]);
+  }, [onActivateTab, workspaceId]);
   const handleClose = useCallback((tabId: string) => onCloseTab(workspaceId, tabId), [onCloseTab, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
   const handleCloseOtherTabs = useCallback((tabId: string) => {
