@@ -16,7 +16,7 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { useWorkspaceDndInsert } from "./WorkspaceDndProvider";
 import { useTabFlash } from "./lib/tabFlashStore";
 import { FlashOverlay } from "@/components/FlashOverlay";
-import { requestLeafFocus } from "@/modules/terminal/lib/useTerminalSession";
+import { requestLastFocusedSide } from "@/modules/terminal/lib/useTerminalSession";
 
 type Props = {
   pane: PaneNode;
@@ -233,7 +233,11 @@ export const PaneView = memo(function PaneView({
     // focus effect only re-runs on a visible/focused prop change and native
     // mousedown focus (the draggable tab div has tabIndex=0) can steal it
     // between the pane-focus commit and this activation.
-    requestLeafFocus(tabId);
+    // requestLastFocusedSide (not requestLeafFocus): switching tabs within
+    // the same pane never leaves the workspace, so a deliberate click into
+    // the terminal (leaving the scratchpad open but unfocused) must survive
+    // switching away and back, same as a transient interruption would.
+    requestLastFocusedSide(tabId);
   }, [onActivateTab, workspaceId, pane.id]);
   const handleClose = useCallback((tabId: string) => onCloseTab(workspaceId, tabId), [onCloseTab, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);

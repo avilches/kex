@@ -257,7 +257,7 @@ export default function App() {
   // before a transient interruption that never left this tab -- a dropdown,
   // dialog, or context menu closing -- instead of leaving it on whatever
   // chrome element triggered it, and instead of always defaulting to the
-  // scratchpad (requestLeafFocus, used for genuine tab/workspace switches).
+  // scratchpad (requestLeafFocus, used only for genuine workspace switches).
   const restoreLeafFocus = useCallback(() => {
     if (activeTabId) requestLastFocusedSide(activeTabId);
   }, [activeTabId]);

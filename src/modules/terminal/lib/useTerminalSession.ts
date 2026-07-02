@@ -111,11 +111,12 @@ type Session = {
   // Live: does the scratchpad textarea currently have real DOM focus.
   scratchpadFocused: boolean;
   // Live: which side last held real DOM focus (terminal or scratchpad),
-  // independent of scratchpadOpen. Used to restore focus after a transient
-  // interruption that never left this tab (a dropdown/dialog closing, the
-  // OS window regaining focus, the notification bell closing) — as opposed
-  // to leaving and returning to a different tab/workspace, which always
-  // sends focus to the scratchpad if enabled (see requestLeafFocus).
+  // independent of scratchpadOpen. Used to restore focus after anything
+  // that never left this workspace — a transient interruption (dropdown/
+  // dialog closing, OS window regaining focus, notification bell closing)
+  // or switching tabs within the same pane and back — as opposed to
+  // switching to a different workspace, which always sends focus to the
+  // scratchpad if enabled (see requestLeafFocus).
   lastFocusSide: "terminal" | "scratchpad";
   scratchpadFocus: (() => void) | null;
   // A focus request arrived before ScratchpadBar mounted and registered
@@ -482,12 +483,10 @@ export function ptyIdForTab(tabId: string): number | null {
   return sessions.get(tabId)?.pty?.id ?? null;
 }
 
-// Put focus on the scratchpad if open, otherwise the terminal. Callers that
-// drive focus purely from derived `visible`/`focused` props (the
-// useTerminalSession effect) only re-run when those props change; explicit
-// user actions that don't change them (e.g. re-activating a tab that was
-// already the pane's active tab) need this to reassert focus after anything
-// else may have stolen it.
+// Put focus on the scratchpad if open, otherwise the terminal. Reserved for
+// genuine workspace switches, which is deliberate "start fresh on this tab"
+// navigation rather than a same-workspace interruption -- see
+// requestLastFocusedSide for anything that never left the current workspace.
 export function requestLeafFocus(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
