@@ -52,8 +52,12 @@ export function WorkspaceTitle({ workspace, tab }: Props) {
             const statusColor = resolveStatusColor(status.color, status.id);
             return (
               <span
-                className="shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide leading-none"
-                style={{ backgroundColor: statusColor, color: "white" }}
+                className="shrink-0 rounded border px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide leading-none"
+                style={{
+                  borderColor: statusColor,
+                  backgroundColor: `${statusColor}26`,
+                  color: statusColor,
+                }}
               >
                 {status.label}
               </span>

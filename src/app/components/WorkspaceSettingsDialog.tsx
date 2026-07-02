@@ -425,25 +425,26 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                 >
                   <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
                 </button>
-                {props.workspaceStatuses.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => props.onSetStatus(ws.id, s.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
-                      ws.statusId === s.id
-                        ? "border-foreground text-foreground"
-                        : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-                    )}
-                  >
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: resolveStatusColor(s.color, s.id) }}
-                    />
-                    {s.label}
-                  </button>
-                ))}
+                {props.workspaceStatuses.map((s) => {
+                  const sColor = resolveStatusColor(s.color, s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => props.onSetStatus(ws.id, s.id)}
+                      className="rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all"
+                      style={{
+                        borderColor: sColor,
+                        backgroundColor: `${sColor}26`,
+                        color: sColor,
+                        outline: ws.statusId === s.id ? `2px solid ${sColor}` : "none",
+                        outlineOffset: "1px",
+                      }}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
               </div>
               {props.workspaceStatuses.length > 18 && (statusExpanded || hiddenStatusCount > 0) && (
                 <button

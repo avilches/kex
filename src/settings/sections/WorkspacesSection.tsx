@@ -63,10 +63,25 @@ function SortableStatusRow({
   const resolvedColor = resolveStatusColor(status.color, status.id);
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/40 px-3 py-2"
+    >
       <span {...attributes} {...listeners} className="cursor-grab text-muted-foreground shrink-0">
         <HugeiconsIcon icon={DragDropVerticalIcon} size={12} strokeWidth={2} />
       </span>
+      <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground/60 select-none">
+        #{index + 1}
+      </span>
+      <input
+        ref={inputRef}
+        className={INPUT_CLASS}
+        placeholder="Status name"
+        spellCheck={false}
+        defaultValue={status.label}
+        onBlur={(e) => onUpdate(e.target.value)}
+      />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
@@ -76,7 +91,7 @@ function SortableStatusRow({
             style={{ backgroundColor: resolvedColor }}
           />
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" align="start">
+        <PopoverContent className="w-auto p-2" align="end">
           <div className="grid grid-cols-4 gap-1.5">
             {WORKSPACE_COLOR_PALETTE.map((hex) => (
               <button
@@ -92,20 +107,17 @@ function SortableStatusRow({
                 }}
               />
             ))}
+            <button
+              type="button"
+              title="Random color"
+              onClick={() => { onUpdateColor(randomStatusColor()); setOpen(false); }}
+              className="flex size-6 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              R
+            </button>
           </div>
         </PopoverContent>
       </Popover>
-      <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground/60 select-none">
-        #{index + 1}
-      </span>
-      <input
-        ref={inputRef}
-        className={INPUT_CLASS}
-        placeholder="Status name"
-        spellCheck={false}
-        defaultValue={status.label}
-        onBlur={(e) => onUpdate(e.target.value)}
-      />
       <button
         type="button"
         title="Remove status"
@@ -220,7 +232,7 @@ export function WorkspacesSection() {
               items={statuses.map((s) => s.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 {statuses.map((status, i) => (
                   <SortableStatusRow
                     key={status.id}
@@ -235,6 +247,11 @@ export function WorkspacesSection() {
                     }}
                   />
                 ))}
+                {statuses.length === 0 && (
+                  <p className="py-4 text-center text-[12px] text-muted-foreground">
+                    No hay estados. Añade uno con el botón +.
+                  </p>
+                )}
               </div>
             </SortableContext>
           </DndContext>
