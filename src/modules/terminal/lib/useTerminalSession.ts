@@ -274,7 +274,10 @@ function subscribeLeafScratchpad(
   }
   set.add(cb);
   return () => {
-    set.delete(cb);
+    const live = scratchpadListeners.get(leafId);
+    if (!live) return;
+    live.delete(cb);
+    if (live.size === 0) scratchpadListeners.delete(leafId);
   };
 }
 
@@ -900,6 +903,7 @@ export function disposeSession(leafId: string): void {
   clearOscTitle(leafId);
   sessions.delete(leafId);
   blockViewportListeners.delete(leafId);
+  scratchpadListeners.delete(leafId);
   readyLeaves.delete(leafId);
   const waiters = readyWaiters.get(leafId);
   if (waiters) {
