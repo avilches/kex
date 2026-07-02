@@ -19,16 +19,8 @@ type TabCommon = {
   autofocus?: boolean;
 };
 
-// Persisted visibility of a terminal's scratchpad bar, restored on startup.
-export type ScratchpadState = "hidden" | "visible" | "focused";
-
-export function scratchpadStateOf(open: boolean, active: boolean): ScratchpadState {
-  if (!open) return "hidden";
-  return active ? "focused" : "visible";
-}
-
 export type Tab =
-  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; scratchpad?: ScratchpadState })
+  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; scratchpadEnabled?: boolean })
   | (TabCommon & { kind: "editor"; path: string; dirty: boolean; preview: boolean; previewMode?: "overlay" | "split"; overrideLanguage?: string | null })
   | (TabCommon & { kind: "browser"; url: string; floating?: boolean })
   | (TabCommon & { kind: "markdown"; path: string })

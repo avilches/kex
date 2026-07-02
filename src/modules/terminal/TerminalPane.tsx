@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/modules/theme";
-import type { ScratchpadState } from "@/modules/workspaces/lib/types";
 import type { SearchAddon } from "@xterm/addon-search";
 import {
   forwardRef,
@@ -16,7 +15,6 @@ import {
   focusLeafInput,
   interruptLeaf,
   leafCwd,
-  setLeafScratchpadActive,
   submitToLeaf,
   useTerminalSession,
 } from "./lib/useTerminalSession";
@@ -47,13 +45,13 @@ type Props = {
   /** "Run on start": resume the agent or run the saved command on first spawn. */
   restoreOnRestart?: boolean;
   persistentCommand?: string;
-  /** Persisted scratchpad visibility, seeded on first mount. */
-  initialScratchpad?: ScratchpadState;
+  /** Persisted scratchpad enabled flag, seeded on first mount. */
+  initialScratchpadEnabled?: boolean;
   onSearchReady?: (tabId: string, addon: SearchAddon) => void;
   onExit?: (tabId: string, code: number) => void;
   onCwd?: (tabId: string, cwd: string) => void;
   onRunningCommand?: (tabId: string, cmd: string | null) => void;
-  onScratchpadState?: (tabId: string, state: ScratchpadState) => void;
+  onScratchpadEnabled?: (tabId: string, enabled: boolean) => void;
 };
 
 export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
@@ -66,12 +64,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       blocks = false,
       restoreOnRestart,
       persistentCommand,
-      initialScratchpad,
+      initialScratchpadEnabled,
       onSearchReady,
       onExit,
       onCwd,
       onRunningCommand,
-      onScratchpadState,
+      onScratchpadEnabled,
     },
     ref,
   ) {
@@ -88,12 +86,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       blocks,
       restoreOnRestart,
       persistentCommand,
-      initialScratchpad,
+      initialScratchpadEnabled,
       onSearchReady: (a) => onSearchReady?.(tabId, a),
       onExit: (c) => onExit?.(tabId, c),
       onCwd: (c) => onCwd?.(tabId, c),
       onRunningCommand: (cmd) => onRunningCommand?.(tabId, cmd),
-      onScratchpadState: (st) => onScratchpadState?.(tabId, st),
+      onScratchpadEnabled: (enabled) => onScratchpadEnabled?.(tabId, enabled),
     });
 
     useEffect(() => {
@@ -138,9 +136,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
               className="absolute inset-0 z-0"
               onMouseDown={(e) => {
                 downYRef.current = e.clientY;
-                // Only switch sides on a click inside an already-focused tab; a
-                // click that re-activates the tab should restore the prior side.
-                if (focused) setLeafScratchpadActive(tabId, false);
               }}
               onMouseUp={(e) => {
                 const moved =
@@ -192,10 +187,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
             "min-h-0 flex-1 transition-opacity",
             session.scratchpadFocused && "opacity-50",
           )}
-          onMouseDownCapture={() => {
-            // See blocks branch: only switch sides inside an already-focused tab.
-            if (focused) setLeafScratchpadActive(tabId, false);
-          }}
         />
         {session.scratchpadOpen && focused && (
           <ScratchpadBar leafId={tabId} />

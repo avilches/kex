@@ -10,6 +10,7 @@ import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
 import { newTabId } from "@/lib/ids";
 import { useZoom } from "@/lib/useZoom";
+import { useUiFont } from "@/lib/useUiFont";
 import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
 import { isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
@@ -57,10 +58,10 @@ import {
 } from "@/modules/explorer/lib/gitignore";
 import {
   clearFocusedTerminal,
+  cycleScratchpad,
   disposeSession,
   leafHasForegroundProcess,
   type TerminalPaneHandle,
-  toggleScratchpad,
   useTerminalFileDrop,
   useTerminalMetricsSampler,
   writeToSession,
@@ -312,6 +313,7 @@ export default function App() {
   const cwdResolverRef = useRef<(leafId: string) => string | null>(() => null);
 
   const { zoomIn, zoomOut, zoomReset } = useZoom();
+  useUiFont();
   useEditorFont();
   useTerminalFileDrop();
 
@@ -1791,11 +1793,11 @@ export default function App() {
           scriptCommandSeen.current.delete(tabId);
         }
       },
-      onScratchpadState: (tabId, state) => {
+      onScratchpadEnabled: (tabId, enabled) => {
         const found = findTabGlobal(tabId);
         if (found)
           updateTabData(found.workspace.id, tabId, (p) =>
-            p.kind === "terminal" ? { ...p, scratchpad: state } : p,
+            p.kind === "terminal" ? { ...p, scratchpadEnabled: enabled } : p,
           );
       },
       registerTerminalHandle: (tabId, h) => {
@@ -2230,7 +2232,7 @@ export default function App() {
       },
       "terminal.scratchpad": () => {
         if (activeTabId && activeTab?.kind === "terminal") {
-          toggleScratchpad(activeTabId);
+          cycleScratchpad(activeTabId);
         }
       },
       "search.focus": () => searchInlineRef.current?.focus(),

@@ -23,7 +23,6 @@ import { SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 import {
   closeScratchpad,
   getLeafScratchpadDraft,
-  setLeafScratchpadActive,
   setLeafScratchpadDraft,
   setLeafScratchpadFocus,
   setLeafScratchpadFocused,
@@ -52,7 +51,7 @@ function placeholderMessages(
       ? `Esc closes. ${switchLabel} opens the scratchpad again`
       : "Esc closes the scratchpad",
     switchLabel
-      ? `${switchLabel} toggles scratchpad`
+      ? `${switchLabel} switches to the terminal`
       : "Define a shortcut to toggle the scratchpad in settings",
     hasAgent ? "Enter your prompt" : "Enter your command",
     "Drag files onto the scratchpad",
@@ -67,6 +66,7 @@ export function ScratchpadBar({ leafId }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => getLeafScratchpadDraft(leafId));
   const [focused, setFocused] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const enterSends = usePreferencesStore((s) => s.scratchpadEnterSends);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const hasAgent = useAgentStore((s) => Boolean(s.sessions[leafId]));
@@ -195,30 +195,43 @@ export function ScratchpadBar({ leafId }: Props) {
         onFocus={() => {
           setFocused(true);
           setLeafScratchpadFocused(leafId, true);
-          setLeafScratchpadActive(leafId, true);
         }}
         onBlur={() => {
           setFocused(false);
           setLeafScratchpadFocused(leafId, false);
         }}
       />
-      <div className="flex shrink-0 items-center gap-1.5 self-center">
+      <div className="flex shrink-0 items-center gap-1.5 self-end">
         {hint && (
           <span className="pointer-events-none shrink-0 select-none whitespace-nowrap text-[10px] text-muted-foreground/40">
             {hint}
           </span>
         )}
-        <DropdownMenu>
+        {/* Always mounted (never conditionally unmounted on `focused`), so a
+            click that blurs the textarea can't make the trigger disappear
+            mid-interaction. Hidden via CSS while neither focused nor open. */}
+        <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
               title="Scratchpad settings"
-              className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+              className={cn(
+                "flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground",
+                !focused && !settingsOpen && "invisible pointer-events-none",
+              )}
             >
               <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={2} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" sideOffset={6}>
+          <DropdownMenuContent
+            align="end"
+            side="top"
+            sideOffset={6}
+            onCloseAutoFocus={(e) => {
+              e.preventDefault();
+              textareaRef.current?.focus();
+            }}
+          >
             <DropdownMenuLabel className="text-[11px] text-muted-foreground">
               Send
             </DropdownMenuLabel>

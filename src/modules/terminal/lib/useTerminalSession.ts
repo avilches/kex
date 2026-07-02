@@ -3,14 +3,10 @@ import { consumeRestorePlan, restorePlansReady } from "@/modules/agents/lib/agen
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import {
-  type ScratchpadState,
-  scratchpadStateOf,
-} from "@/modules/workspaces/lib/types";
 import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DormantRing } from "./dormantRing";
-import { shouldFireOnRegister, tryRequestFocus } from "./pendingFocus";
+import { shouldFireOnRegister } from "./pendingFocus";
 import type { BlockMode } from "../block/lib/modeMachine";
 import {
   createShellIntegrationState,
@@ -61,7 +57,7 @@ type Callbacks = {
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
   onRunningCommand?: (cmd: string | null) => void;
-  onScratchpadState?: (state: ScratchpadState) => void;
+  onScratchpadEnabled?: (enabled: boolean) => void;
 };
 
 type Session = {
@@ -108,11 +104,12 @@ type Session = {
   // at the most recent release. Read once on the next bind to trigger a
   // SIGWINCH-driven repaint instead of replaying dormant bytes.
   altScreenAtRelease: boolean;
+  // Persisted: does this leaf have the scratchpad enabled. Visibility is
+  // derived (scratchpadOpen && the tab is focused); re-focusing a tab whose
+  // scratchpad is open always sends focus there, never to the terminal.
   scratchpadOpen: boolean;
+  // Live: does the scratchpad textarea currently have real DOM focus.
   scratchpadFocused: boolean;
-  // Which side the leaf was last working on: true = scratchpad, false = terminal.
-  // Survives tab blur so re-focusing the tab restores that side.
-  scratchpadActive: boolean;
   scratchpadFocus: (() => void) | null;
   // A focus request arrived before ScratchpadBar mounted and registered
   // scratchpadFocus (restore, or a just-created terminal). Consumed as soon
@@ -281,36 +278,51 @@ function subscribeLeafScratchpad(
   };
 }
 
-// Persist the open/active pair (hidden | visible | focused) for restore.
-function notifyScratchpadState(leafId: string): void {
+// Persist the enabled flag for restore.
+function notifyScratchpadEnabled(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
-  s.callbacks.onScratchpadState?.(
-    scratchpadStateOf(s.scratchpadOpen, s.scratchpadActive),
-  );
+  s.callbacks.onScratchpadEnabled?.(s.scratchpadOpen);
+}
+
+// xterm.js can internally call .focus() on its own textarea asynchronously
+// shortly after a layout change (its container resizing when the scratchpad
+// bar mounts/unmounts changes the terminal's height). Deferring two animation
+// frames -- the same margin scheduleUnhide uses to let the browser settle --
+// and re-validating right before firing guarantees this is the last focus
+// move and bails out if something else changed the target in the meantime.
+function fireScratchpadFocus(s: Session): void {
+  const fn = s.scratchpadFocus;
+  if (!fn) return;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (s.scratchpadOpen && s.scratchpadFocus === fn) fn();
+    });
+  });
 }
 
 function requestScratchpadFocus(s: Session): void {
-  if (!tryRequestFocus(s.scratchpadFocus)) s.scratchpadFocusPending = true;
+  if (s.scratchpadFocus) fireScratchpadFocus(s);
+  else s.scratchpadFocusPending = true;
 }
 
+// Toggle: closed -> open+focus scratchpad. Open+scratchpad-focused -> focus
+// terminal (transient: leaving and re-focusing the tab goes back to the
+// scratchpad, see the useTerminalSession focus effect). Open+terminal-focused
+// -> focus scratchpad.
 export function cycleScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s || s.shellExited) return;
   if (!s.scratchpadOpen) {
     s.scratchpadOpen = true;
-    s.scratchpadActive = true;
     notifyScratchpad(leafId);
+    notifyScratchpadEnabled(leafId);
     requestScratchpadFocus(s);
   } else if (s.scratchpadFocused) {
-    s.scratchpadActive = false;
-    s.scratchpadFocusPending = false;
     focusSlot(leafId);
   } else {
-    s.scratchpadActive = true;
     requestScratchpadFocus(s);
   }
-  notifyScratchpadState(leafId);
 }
 
 export function closeScratchpad(leafId: string): void {
@@ -318,30 +330,13 @@ export function closeScratchpad(leafId: string): void {
   if (!s) return;
   if (!s.scratchpadOpen) return;
   s.scratchpadOpen = false;
-  s.scratchpadActive = false;
   s.scratchpadFocused = false;
   s.scratchpadFocusPending = false;
   notifyScratchpad(leafId);
-  notifyScratchpadState(leafId);
+  notifyScratchpadEnabled(leafId);
   focusSlot(leafId);
 }
 
-export function setLeafScratchpadActive(leafId: string, active: boolean): void {
-  const s = sessions.get(leafId);
-  if (!s || s.scratchpadActive === active) return;
-  s.scratchpadActive = active;
-  if (!active) s.scratchpadFocusPending = false;
-  notifyScratchpadState(leafId);
-}
-
-export function leafScratchpadOpen(leafId: string): boolean {
-  return sessions.get(leafId)?.scratchpadOpen ?? false;
-}
-
-export function toggleScratchpad(leafId: string): void {
-  if (leafScratchpadOpen(leafId)) closeScratchpad(leafId);
-  else cycleScratchpad(leafId);
-}
 
 export function setLeafScratchpadFocus(
   leafId: string,
@@ -353,7 +348,7 @@ export function setLeafScratchpadFocus(
   s.scratchpadFocus = fn;
   if (fire) {
     s.scratchpadFocusPending = false;
-    fn?.();
+    fireScratchpadFocus(s);
   }
 }
 
@@ -472,16 +467,16 @@ export function ptyIdForTab(tabId: string): number | null {
   return sessions.get(tabId)?.pty?.id ?? null;
 }
 
-// Put focus on whichever side this leaf's session is on (scratchpad if open
-// and active, otherwise the terminal). Callers that drive focus purely from
-// derived `visible`/`focused` props (the useTerminalSession effect) only
-// re-run when those props change; explicit user actions that don't change
-// them (e.g. re-activating a tab that was already the pane's active tab)
-// need this to reassert focus after anything else may have stolen it.
+// Put focus on the scratchpad if open, otherwise the terminal. Callers that
+// drive focus purely from derived `visible`/`focused` props (the
+// useTerminalSession effect) only re-run when those props change; explicit
+// user actions that don't change them (e.g. re-activating a tab that was
+// already the pane's active tab) need this to reassert focus after anything
+// else may have stolen it.
 export function requestLeafFocus(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
-  if (s.scratchpadOpen && s.scratchpadActive) requestScratchpadFocus(s);
+  if (s.scratchpadOpen) requestScratchpadFocus(s);
   else focusSlot(leafId);
 }
 
@@ -542,7 +537,7 @@ function ensureSession(
   leafId: string,
   initialCwd?: string,
   blocks = false,
-  initialScratchpad?: ScratchpadState,
+  initialScratchpadEnabled = false,
 ): Session {
   const existing = sessions.get(leafId);
   if (existing) return existing;
@@ -579,9 +574,8 @@ function ensureSession(
     inputActive: false,
     everSubmitted: false,
     altScreenAtRelease: false,
-    scratchpadOpen: initialScratchpad ? initialScratchpad !== "hidden" : false,
+    scratchpadOpen: initialScratchpadEnabled,
     scratchpadFocused: false,
-    scratchpadActive: initialScratchpad === "focused",
     scratchpadFocus: null,
     scratchpadFocusPending: false,
     scratchpadInsert: null,
@@ -915,12 +909,12 @@ type Options = {
   blocks?: boolean;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
-  initialScratchpad?: ScratchpadState;
+  initialScratchpadEnabled?: boolean;
   onSearchReady?: (addon: SearchAddon) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
   onRunningCommand?: (cmd: string | null) => void;
-  onScratchpadState?: (state: ScratchpadState) => void;
+  onScratchpadEnabled?: (enabled: boolean) => void;
 };
 
 export function useTerminalSession({
@@ -932,26 +926,26 @@ export function useTerminalSession({
   blocks = false,
   restoreOnRestart,
   persistentCommand,
-  initialScratchpad,
+  initialScratchpadEnabled,
   onSearchReady,
   onExit,
   onCwd,
   onRunningCommand,
-  onScratchpadState,
+  onScratchpadEnabled,
 }: Options) {
   const cbRef = useRef({
     onSearchReady,
     onExit,
     onCwd,
     onRunningCommand,
-    onScratchpadState,
+    onScratchpadEnabled,
   });
   cbRef.current = {
     onSearchReady,
     onExit,
     onCwd,
     onRunningCommand,
-    onScratchpadState,
+    onScratchpadEnabled,
   };
 
   // initialCwd seeds the first PTY spawn only. It must NOT be an effect dep:
@@ -963,8 +957,8 @@ export function useTerminalSession({
   // it in refs and off the effect deps just like initialCwd.
   const runOnStartRef = useRef({ restoreOnRestart, persistentCommand });
   runOnStartRef.current = { restoreOnRestart, persistentCommand };
-  // Seeds the initial scratchpad visibility on session creation only (restore).
-  const initialScratchpadRef = useRef(initialScratchpad);
+  // Seeds the initial scratchpad enabled flag on session creation only (restore).
+  const initialScratchpadEnabledRef = useRef(initialScratchpadEnabled);
 
   useEffect(() => {
     let cancelled = false;
@@ -972,7 +966,7 @@ export function useTerminalSession({
       leafId,
       initialCwdRef.current,
       blocks,
-      initialScratchpadRef.current,
+      initialScratchpadEnabledRef.current,
     );
     s.restoreOnRestart = runOnStartRef.current.restoreOnRestart;
     s.persistentCommand = runOnStartRef.current.persistentCommand;
@@ -985,12 +979,12 @@ export function useTerminalSession({
         onExit: (c) => cbRef.current.onExit?.(c),
         onCwd: (c) => cbRef.current.onCwd?.(c),
         onRunningCommand: (cmd) => cbRef.current.onRunningCommand?.(cmd),
-        onScratchpadState: (st) => cbRef.current.onScratchpadState?.(st),
+        onScratchpadEnabled: (enabled) => cbRef.current.onScratchpadEnabled?.(enabled),
       });
       if (s.visibleNow && s.focusedNow && !s.blocks) {
-        // Honor the scratchpad as the active side on first ready (new terminal
-        // opened with it, or a restored tab that was focused there).
-        if (s.scratchpadOpen && s.scratchpadActive) requestScratchpadFocus(s);
+        // Honor the scratchpad on first ready (new terminal opened with it,
+        // or a restored tab whose scratchpad was enabled).
+        if (s.scratchpadOpen) requestScratchpadFocus(s);
         else focusSlot(leafId);
       }
     });
@@ -1007,7 +1001,7 @@ export function useTerminalSession({
       leafId,
       initialCwdRef.current,
       blocks,
-      initialScratchpadRef.current,
+      initialScratchpadEnabledRef.current,
     );
     setBlockMode(s.blockMode);
     const cb = () => setBlockMode(sessions.get(leafId)?.blockMode ?? "prompt");
@@ -1028,7 +1022,7 @@ export function useTerminalSession({
       leafId,
       initialCwdRef.current,
       blocks,
-      initialScratchpadRef.current,
+      initialScratchpadEnabledRef.current,
     );
     setScratchpadOpen(s.scratchpadOpen);
     setScratchpadFocusedState(s.scratchpadFocused);
@@ -1120,7 +1114,7 @@ export function useTerminalSession({
       // back from wherever the user just moved it (e.g. another tab).
       const gained = visible && focused && !wasFocusedRef.current;
       if (gained && !blocks) {
-        if (s.scratchpadOpen && s.scratchpadActive) requestScratchpadFocus(s);
+        if (s.scratchpadOpen) requestScratchpadFocus(s);
         else focusSlot(leafId);
       }
     } else if (s.hasSlot) {

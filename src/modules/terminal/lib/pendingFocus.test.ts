@@ -1,18 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { shouldFireOnRegister, tryRequestFocus } from "./pendingFocus";
-
-describe("tryRequestFocus", () => {
-  it("calls the callback and returns true when already registered", () => {
-    const focus = vi.fn();
-    expect(tryRequestFocus(focus)).toBe(true);
-    expect(focus).toHaveBeenCalledOnce();
-  });
-
-  it("returns false without throwing when not registered yet", () => {
-    expect(tryRequestFocus(null)).toBe(false);
-  });
-});
+import { shouldFireOnRegister } from "./pendingFocus";
 
 describe("shouldFireOnRegister", () => {
   it("fires when a request is pending and a callback registers", () => {

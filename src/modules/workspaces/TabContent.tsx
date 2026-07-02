@@ -20,7 +20,7 @@ import {
 } from "@/modules/settings/store";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { openFileTypesSettings } from "@/modules/settings/openSettingsWindow";
-import type { Tab, ScratchpadState } from "./lib/types";
+import type { Tab } from "./lib/types";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 
 // TerminalPane is intentionally eager (terminal-first app).
@@ -70,7 +70,7 @@ export type TabCallbacks = {
   onExit?: (tabId: string, code: number) => void;
   onCwd?: (tabId: string, cwd: string) => void;
   onRunningCommand?: (tabId: string, cmd: string | null) => void;
-  onScratchpadState?: (tabId: string, state: ScratchpadState) => void;
+  onScratchpadEnabled?: (tabId: string, enabled: boolean) => void;
   registerTerminalHandle?: (tabId: string, handle: TerminalPaneHandle | null) => void;
   // Editor callbacks
   onEditorDirtyChange?: (tabId: string, dirty: boolean) => void;
@@ -218,15 +218,14 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
               blocks={tab.blocks}
               restoreOnRestart={tab.restoreOnRestart}
               persistentCommand={tab.persistentCommand}
-              initialScratchpad={
-                tab.scratchpad ??
-                (scratchpadInNewTerminals ? "focused" : "hidden")
+              initialScratchpadEnabled={
+                tab.scratchpadEnabled ?? scratchpadInNewTerminals
               }
               onSearchReady={callbacks.onSearchReady}
               onExit={callbacks.onExit}
               onCwd={callbacks.onCwd}
               onRunningCommand={callbacks.onRunningCommand}
-              onScratchpadState={callbacks.onScratchpadState}
+              onScratchpadEnabled={callbacks.onScratchpadEnabled}
             />
           </div>
         </div>

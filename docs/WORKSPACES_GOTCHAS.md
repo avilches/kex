@@ -359,6 +359,79 @@ asi que nunca hay robo nativo de foco con el que competir.
   reafirmar el foco del leaf incluso cuando `visible`/`focused` no cambiaron y por tanto el efecto no
   se re-ejecuta. Red de seguridad independiente del `preventDefault()`.
 
+### Addendum 3: el modelo de "lado activo pegajoso" (`scratchpadActive`) era la causa real
+
+Tras los dos addendums anteriores el usuario seguia viendo el bug al volver a una Tab con el
+scratchpad abierto tras cambiar de Tab/Pane con el raton. La instrumentacion con logs (`console.log`
+en cada punto de decision de foco, luego `console.trace` en el setter) revelo la causa real: el JSON
+persistido de esa Tab tenia `"scratchpad": "visible"` (abierto, pero NO el lado activo), no
+`"focused"`. El campo `scratchpadActive` (`Session.scratchpadActive`, "que lado usaste por ultima
+vez, sobrevive al cambio de tab") se ponia a `false` de forma silenciosa y permanente con un simple
+click dentro del area del terminal mientras la tab ya tenia el foco (`TerminalPane.tsx`, dos
+`onMouseDown`/`onMouseDownCapture`, llamaban a `setLeafScratchpadActive(tabId, false)`). Nada volvia
+a ponerlo a `true` salvo clicar directamente el textarea del scratchpad o el shortcut de ciclar
+(`Cmd+U`/`cycleScratchpad`) — cambiar de Tab NUNCA lo reactivaba, por diseño ("survives tab blur").
+Una vez en `false`, quedaba persistido asi para siempre: cada restore heredaba el mismo valor roto.
+
+Ningun fix de foco (pendingFocus, requestLeafFocus, preventDefault) estaba mal: todos respetaban
+`scratchpadActive` correctamente. El problema era el propio modelo de 3 estados
+(`hidden | visible | focused`) con una preferencia "pegajosa" separada del simple on/off, facil de
+desactivar sin que el usuario se diera cuenta y sin forma obvia de reactivarla con el raton.
+
+**Fix (rediseño, no otro parche)**: se elimina `scratchpadActive` por completo. El modelo pasa a ser
+`enabled: boolean` (persistido, `Session.scratchpadOpen` / `Tab.scratchpadEnabled`) +
+`visible = enabled && tab.focused` (derivado, nunca persistido). Al recuperar el foco una tab con el
+scratchpad `enabled`, el foco SIEMPRE va al scratchpad (nunca "recuerda" el lado usado la ultima vez).
+Clicar dentro del terminal mueve el foco alli de forma puramente transitoria (el foco nativo del
+click, sin ningun `setLeafScratchpadActive`): en cuanto sales y vuelves a la tab, se resetea al
+scratchpad. `cycleScratchpad` (Cmd+U/Esc) decide hacia donde alternar con el campo transitorio ya
+existente `scratchpadFocused` (tiene foco DOM ahora mismo), sin escribir ningun estado persistido
+nuevo. `ScratchpadState` (`"hidden" | "visible" | "focused"`) y `scratchpadStateOf` desaparecen;
+`Tab.scratchpad` se renombra a `Tab.scratchpadEnabled: boolean`.
+
+### Leccion
+
+Cuando una investigacion de foco/timing lleva varias rondas de logs sin encontrar la causa, comprobar
+primero el DATO PERSISTIDO real (el JSON en disco) antes de seguir asumiendo una carrera de eventos.
+Aqui la causa no era ninguna carrera: era un tercer estado silencioso, dificil de notar y sin via de
+vuelta clara, cuyo arreglo correcto fue eliminarlo del modelo en vez de sincronizarlo mejor.
+
+### Addendum 4: xterm.js roba el foco de vuelta de forma asincrona tras un resize
+
+Tras el Addendum 3 el bug de "click en Tab de otro Pane, vuelvo, el SP no gana el foco" seguia
+reproduciendose identico (raton falla, teclado funciona). Un listener global de `focusin` en
+`document` (capture) con `console.trace()` revelo la causa real: nuestro codigo pone el foco
+correctamente en el textarea del scratchpad (confirmado sincronamente, `document.activeElement`
+apunta al textarea justo despues de `el.focus()`), pero **uno o dos frames despues**, xterm.js llama
+a su propio `.focus()` interno sobre su `textarea` oculta (`xterm-helper-textarea`), robando el foco
+de vuelta. El stack trace mostraba la llamada originandose dentro del propio bundle de `@xterm/xterm`
+(`CoreBrowserTerminal`), sin ninguna llamada nuestra en medio — no es un bug en nuestro codigo de
+foco, es xterm.js reaccionando a algo (muy probablemente su propio `ResizeObserver`: el contenedor
+del terminal encoge de alto cuando el `ScratchpadBar` hermano se monta en el mismo flex column,
+disparando el recalculo de filas/columnas de xterm).
+
+Por que solo con raton: en el caso de teclado (`focusLeaf` disparado sin ningun evento de raton de
+por medio) tambien podria darse la misma carrera en teoria, pero al no haber ningun mousedown/resize
+adicional en juego el timing no coincide con la ventana en la que xterm hace su robo; con raton, el
+click en la Tab de otro Pane siempre coincide con el resize del terminal que se achica al mostrar
+el scratchpad.
+
+**Fix**: en vez de parchear xterm.js (arriesgado, tercero), `useTerminalSession.ts` aplica el mismo
+patron que `scheduleUnhide` (`rendererPool.ts`) ya usa para el mismo tipo de problema: diferir con
+doble `requestAnimationFrame` (el mismo margen que usa `scheduleUnhide` para dejar que el navegador
+se asiente) y revalidar (`s.scratchpadOpen && s.scratchpadFocus === fn`) justo antes de disparar el
+foco. Asi nuestra llamada es siempre la ULTIMA en tocar el foco, gane quien gane la carrera interna de
+xterm. Esto sustituye el disparo sincrono anterior (`tryRequestFocus` de `pendingFocus.ts`, eliminado
+por quedar sin uso) tanto en `requestScratchpadFocus` como en el consumo del pending de
+`setLeafScratchpadFocus`.
+
+### Leccion 2
+
+Un `console.log`/`console.trace` en un listener GLOBAL de `focusin` (capture, en `document`) es la
+forma mas rapida de encontrar quien roba el foco cuando ya se ha descartado el propio codigo: el
+stack trace señala directamente la libreria/lugar exacto, sin tener que teorizar sobre el orden de
+efectos de React o de eventos del navegador.
+
 ## Bug 8: la navegacion por teclado entre workspaces no sigue el orden visual (RESUELTO)
 
 ### Sintoma
