@@ -48,5 +48,24 @@ export function resolveStatusColor(color: string | undefined, id: string): strin
 }
 
 export function randomStatusColor(): string {
-  return `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0")}`;
+  return WORKSPACE_COLOR_PALETTE[Math.floor(Math.random() * WORKSPACE_COLOR_PALETTE.length)]!;
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sl = s / 100;
+  const ll = l / 100;
+  const a = sl * Math.min(ll, 1 - ll);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = ll - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * c).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+export function randomVibrantColor(): string {
+  const h = Math.floor(Math.random() * 360);
+  const s = 65 + Math.floor(Math.random() * 25);
+  const l = 45 + Math.floor(Math.random() * 20);
+  return hslToHex(h, s, l);
 }
