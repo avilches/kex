@@ -404,7 +404,7 @@ export default function App() {
           return;
         }
         const ws = workspacesRef.current.find(
-          (w) => w.id === activeWorkspaceId,
+          (w) => w.id === activeWorkspaceIdRef.current,
         );
         if (!ws) return;
         const pane = findPane(ws.paneTree, ws.activePaneId);
