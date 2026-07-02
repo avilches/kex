@@ -42,12 +42,12 @@ const SECTIONS: {
   { id: "general", label: "General", icon: Settings01Icon, component: GeneralSection },
   { id: "workspaces", label: "Workspace", icon: Layers01Icon, component: WorkspacesSection },
   { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon, component: TerminalSection },
+  { id: "external-editors", label: "Tools", icon: DocumentCodeIcon, component: ExternalEditorsSection },
   { id: "editor", label: "Editor", icon: SourceCodeIcon, component: EditorSection },
   { id: "filetypes", label: "File Types", icon: File02Icon, component: FileTypesSection },
   { id: "appearance", label: "Appearance", icon: PaintBoardIcon, component: AppearanceSection },
   { id: "themes", label: "Themes", icon: ColorsIcon, component: ThemesSection },
   { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },
-  { id: "external-editors", label: "Tools", icon: DocumentCodeIcon, component: ExternalEditorsSection },
   { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
 ];
 

@@ -63,9 +63,12 @@ function SortableStatusRow({
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
-  useEffect(() => {
-    if (open) setHexValue(resolvedColor);
-  }, [open, resolvedColor]);
+  const validHex = /^#[0-9a-fA-F]{6}$/.test(hexValue);
+
+  function applyColor(c: string) {
+    setHexValue(c);
+    onUpdateColor(c);
+  }
 
   return (
     <div
@@ -87,64 +90,32 @@ function SortableStatusRow({
         defaultValue={status.label}
         onBlur={(e) => onUpdate(e.target.value)}
       />
+      <input
+        className="h-6 w-[72px] shrink-0 rounded border border-border bg-background px-1.5 text-[11px] font-mono outline-none ring-ring focus-visible:ring-1"
+        placeholder="#rrggbb"
+        value={hexValue}
+        onChange={(e) => {
+          setHexValue(e.target.value);
+          if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) onUpdateColor(e.target.value);
+        }}
+      />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             title="Change color"
             className="size-[22px] shrink-0 rounded-full border border-border/60 transition-opacity hover:opacity-80 focus:outline-none focus:ring-1 focus:ring-ring"
-            style={{ backgroundColor: resolvedColor }}
+            style={{ backgroundColor: validHex ? hexValue : resolvedColor }}
           />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="end">
           <div className="flex items-center gap-1.5">
-            <div
-              className="size-5 shrink-0 rounded-full border border-border"
-              style={{ backgroundColor: /^#[0-9a-fA-F]{6}$/.test(hexValue) ? hexValue : resolvedColor }}
-            />
-            <input
-              className="h-6 w-20 rounded border border-border bg-background px-1.5 text-[11px] font-mono outline-none ring-ring focus-visible:ring-1"
-              placeholder="#rrggbb"
-              value={hexValue}
-              onChange={(e) => {
-                setHexValue(e.target.value);
-                if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
-                  onUpdateColor(e.target.value);
-                }
-              }}
-            />
-            <label
-              title="Pick color"
-              className="relative flex size-6 cursor-pointer items-center justify-center overflow-hidden rounded border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
-              style={{ backgroundColor: `${/^#[0-9a-fA-F]{6}$/.test(hexValue) ? hexValue : resolvedColor}33` }}
-            >
-              <input
-                type="color"
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                value={/^#[0-9a-fA-F]{6}$/.test(hexValue) ? hexValue : resolvedColor}
-                onChange={(e) => { setHexValue(e.target.value); onUpdateColor(e.target.value); }}
-              />
-              <span className="pointer-events-none text-[10px] font-bold leading-none">H</span>
-            </label>
-            <div className="mx-0.5 h-4 w-px bg-border" />
-            <button
-              type="button"
-              title="Random color"
-              onClick={() => {
-                const c = randomStatusColor();
-                setHexValue(c);
-                onUpdateColor(c);
-              }}
-              className="size-6 rounded-full border-2 border-transparent flex items-center justify-center bg-muted text-[10px] font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              R
-            </button>
             {WORKSPACE_COLOR_PALETTE.map((hex) => (
               <button
                 key={hex}
                 type="button"
                 title={hex}
-                onClick={() => { setHexValue(hex); onUpdateColor(hex); setOpen(false); }}
+                onClick={() => { applyColor(hex); setOpen(false); }}
                 className={cn(
                   "size-6 rounded-full border-2 transition-opacity hover:opacity-80",
                   resolvedColor === hex ? "border-foreground" : "border-transparent",
@@ -152,6 +123,14 @@ function SortableStatusRow({
                 style={{ backgroundColor: hex }}
               />
             ))}
+            <button
+              type="button"
+              title="Random color"
+              onClick={() => applyColor(randomStatusColor())}
+              className="size-6 rounded-full border-2 border-transparent flex items-center justify-center bg-muted text-[10px] font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              R
+            </button>
           </div>
         </PopoverContent>
       </Popover>
