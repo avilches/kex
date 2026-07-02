@@ -91,6 +91,7 @@ import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
+import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import { visibleWorkspaceOrder } from "@/modules/workspaces/lib/workspaceOrder";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -1251,17 +1252,21 @@ export default function App() {
 
   // ── WorkspaceView stable callbacks (use refs to avoid recreating on cd) ──
 
-  // Closes the scratchpad of whichever tab is being left, regardless of how
+  // Closes the scratchpad of the tab being left, and, on a cross-pane
+  // activation, also of the abandoned pane's active tab, regardless of how
   // the switch was triggered (mouse click, tab.next/prev/selectByIndex).
   // Centralized here so every activation path shares one implementation.
   const onActivateTabStable = useCallback(
     (wsId: string, tabId: string) => {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
-      const pane = ws
-        ? allPanes(ws.paneTree).find((p) => p.tabs.some((t) => t.id === tabId))
-        : null;
-      if (pane?.activeTabId && pane.activeTabId !== tabId) {
-        leaveLeafScratchpad(pane.activeTabId);
+      if (ws) {
+        for (const leafId of scratchpadLeafsToClose(
+          allPanes(ws.paneTree),
+          ws.activePaneId,
+          tabId,
+        )) {
+          leaveLeafScratchpad(leafId);
+        }
       }
       activateTab(wsId, tabId);
     },
