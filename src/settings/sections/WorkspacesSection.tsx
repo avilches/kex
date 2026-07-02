@@ -19,6 +19,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setRandomWorkspaceColor,
@@ -55,12 +56,16 @@ function SortableStatusRow({
   inputRef: (el: HTMLInputElement | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const resolvedColor = resolveStatusColor(status.color, status.id);
+  const [hexValue, setHexValue] = useState(resolvedColor);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: status.id,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
-  const resolvedColor = resolveStatusColor(status.color, status.id);
+  useEffect(() => {
+    if (open) setHexValue(resolvedColor);
+  }, [open, resolvedColor]);
 
   return (
     <div
@@ -92,29 +97,61 @@ function SortableStatusRow({
           />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="end">
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <div
+              className="size-5 shrink-0 rounded-full border border-border"
+              style={{ backgroundColor: /^#[0-9a-fA-F]{6}$/.test(hexValue) ? hexValue : resolvedColor }}
+            />
+            <input
+              className="h-6 w-20 rounded border border-border bg-background px-1.5 text-[11px] font-mono outline-none ring-ring focus-visible:ring-1"
+              placeholder="#rrggbb"
+              value={hexValue}
+              onChange={(e) => {
+                setHexValue(e.target.value);
+                if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
+                  onUpdateColor(e.target.value);
+                }
+              }}
+            />
+            <label
+              title="Pick color"
+              className="relative flex size-6 cursor-pointer items-center justify-center overflow-hidden rounded border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+              style={{ backgroundColor: `${/^#[0-9a-fA-F]{6}$/.test(hexValue) ? hexValue : resolvedColor}33` }}
+            >
+              <input
+                type="color"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                value={/^#[0-9a-fA-F]{6}$/.test(hexValue) ? hexValue : resolvedColor}
+                onChange={(e) => { setHexValue(e.target.value); onUpdateColor(e.target.value); }}
+              />
+              <span className="pointer-events-none text-[10px] font-bold leading-none">H</span>
+            </label>
+            <div className="mx-0.5 h-4 w-px bg-border" />
+            <button
+              type="button"
+              title="Random color"
+              onClick={() => {
+                const c = randomStatusColor();
+                setHexValue(c);
+                onUpdateColor(c);
+              }}
+              className="size-6 rounded-full border-2 border-transparent flex items-center justify-center bg-muted text-[10px] font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              R
+            </button>
             {WORKSPACE_COLOR_PALETTE.map((hex) => (
               <button
                 key={hex}
                 type="button"
                 title={hex}
-                onClick={() => { onUpdateColor(hex); setOpen(false); }}
-                className="size-6 rounded-full border-2 transition-opacity hover:opacity-80"
-                style={{
-                  backgroundColor: hex,
-                  borderColor: status.color === hex ? "white" : "transparent",
-                  outline: status.color === hex ? `2px solid ${hex}` : "none",
-                }}
+                onClick={() => { setHexValue(hex); onUpdateColor(hex); setOpen(false); }}
+                className={cn(
+                  "size-6 rounded-full border-2 transition-opacity hover:opacity-80",
+                  resolvedColor === hex ? "border-foreground" : "border-transparent",
+                )}
+                style={{ backgroundColor: hex }}
               />
             ))}
-            <button
-              type="button"
-              title="Random color"
-              onClick={() => { onUpdateColor(randomStatusColor()); setOpen(false); }}
-              className="flex size-6 items-center justify-center rounded-full border border-border bg-muted text-[10px] font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              R
-            </button>
           </div>
         </PopoverContent>
       </Popover>
@@ -249,7 +286,7 @@ export function WorkspacesSection() {
                 ))}
                 {statuses.length === 0 && (
                   <p className="py-4 text-center text-[12px] text-muted-foreground">
-                    No hay estados. Añade uno con el botón +.
+                    No statuses. Add one with the + button.
                   </p>
                 )}
               </div>
