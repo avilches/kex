@@ -4,12 +4,29 @@ import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setExplorerGitColorScheme,
+  setUiFont,
   setZoomLevel,
 } from "@/modules/settings/store";
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
+
+const INPUT_CLASS =
+  "h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
+
+const UI_FONT_PRESETS: { label: string; value: string }[] = [
+  { label: "Default (Inter)", value: "" },
+  { label: "Geist Variable", value: "Geist Variable" },
+  { label: "DM Sans", value: "DM Sans Variable" },
+  { label: "System UI", value: "system-ui" },
+  { label: "SF Pro (macOS)", value: "-apple-system, BlinkMacSystemFont" },
+  { label: "Helvetica Neue", value: "Helvetica Neue, Helvetica, Arial" },
+  { label: "Georgia (serif)", value: "Georgia, serif" },
+  { label: "Trebuchet MS", value: "Trebuchet MS, sans-serif" },
+  { label: "Custom...", value: "__custom__" },
+];
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
@@ -18,10 +35,63 @@ const ZOOM_STEP = 0.05;
 export function AppearanceSection() {
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
+  const uiFont = usePreferencesStore((s) => s.uiFont);
+
+  const isCustom = uiFont !== "" && !UI_FONT_PRESETS.some((p) => p.value === uiFont && p.value !== "__custom__");
+  const [showCustomInput, setShowCustomInput] = useState(isCustom);
+  const [customValue, setCustomValue] = useState(isCustom ? uiFont : "");
+
+  const selectedPreset = isCustom ? "__custom__" : uiFont;
+
+  function handlePresetChange(value: string) {
+    if (value === "__custom__") {
+      setShowCustomInput(true);
+    } else {
+      setShowCustomInput(false);
+      void setUiFont(value);
+    }
+  }
+
+  function handleCustomCommit(value: string) {
+    void setUiFont(value);
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader title="Appearance" />
+
+      <div className="flex flex-col gap-2">
+        <FieldLabel>UI Font</FieldLabel>
+        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+          <select
+            value={selectedPreset}
+            onChange={(e) => handlePresetChange(e.target.value)}
+            className={INPUT_CLASS}
+          >
+            {UI_FONT_PRESETS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          {showCustomInput && (
+            <input
+              type="text"
+              placeholder="e.g. Nunito, Helvetica Neue"
+              value={customValue}
+              onChange={(e) => setCustomValue(e.target.value)}
+              onBlur={(e) => handleCustomCommit(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                  handleCustomCommit(customValue);
+                }
+              }}
+              className={INPUT_CLASS}
+            />
+          )}
+        </div>
+      </div>
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">

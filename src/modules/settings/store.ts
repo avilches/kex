@@ -208,6 +208,7 @@ export type Preferences = {
   detectedEditors: DetectedEditor[];
   workspaceStatuses: WorkspaceStatus[];
   randomWorkspaceColor: boolean;
+  uiFont: string;
 };
 
 const STORE_PATH = "settings-general.json";
@@ -225,6 +226,7 @@ const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_WARN_ON_CLOSE_WORKSPACE = "warnOnCloseWorkspace";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
+const KEY_UI_FONT = "uiFont";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
@@ -428,6 +430,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   detectedEditors: [],
   workspaceStatuses: DEFAULT_WORKSPACE_STATUSES,
   randomWorkspaceColor: true,
+  uiFont: "",
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -714,6 +717,7 @@ export async function loadPreferences(): Promise<Preferences> {
     randomWorkspaceColor:
       get<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
       DEFAULT_PREFERENCES.randomWorkspaceColor,
+    uiFont: get<string>(KEY_UI_FONT) ?? DEFAULT_PREFERENCES.uiFont,
   };
 
   // Persist JSON-only general keys so they're discoverable in settings-general.json.
@@ -1011,6 +1015,10 @@ export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
 
+export async function setUiFont(value: string): Promise<void> {
+  await writePref(KEY_UI_FONT, value.trim());
+}
+
 function clampAutoSaveDelay(v: number): number {
   if (!Number.isFinite(v)) return 15000;
   return Math.min(60000, Math.max(100, Math.round(v)));
@@ -1135,6 +1143,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_WORKSPACE_STATUSES]: "workspaceStatuses",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
+  [KEY_UI_FONT]: "uiFont",
 };
 
 export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {

@@ -61,6 +61,7 @@ import {
   cycleScratchpad,
   disposeSession,
   leafHasForegroundProcess,
+  requestLeafFocus,
   type TerminalPaneHandle,
   useTerminalFileDrop,
   useTerminalMetricsSampler,
@@ -364,6 +365,8 @@ export default function App() {
   }, []);
 
   // Focus the active terminal when the active workspace changes (tab/workspace switch).
+  // requestLeafFocus (not a blind terminal .focus()) so a tab whose scratchpad
+  // is enabled keeps getting focus there, not the terminal.
   useEffect(() => {
     const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
     if (!ws) return;
@@ -371,12 +374,14 @@ export default function App() {
     if (!pane?.activeTabId) return;
     const tabId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
-      terminalHandles.current.get(tabId)?.focus();
+      requestLeafFocus(tabId);
     });
     return () => cancelAnimationFrame(raf);
   }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-focus the active terminal when this window regains OS focus (e.g. Cmd+Tab back).
+  // Re-focus the active terminal when this window regains OS focus (e.g. Cmd+Tab back,
+  // or a modal/separate window like Settings closing). requestLeafFocus so a tab whose
+  // scratchpad had focus gets it back, instead of always stealing it to the terminal.
   // Also fires on first window focus after startup, ensuring the terminal gets the
   // cursor even if the PTY wasn't ready when the workspace-switch effect ran.
   useEffect(() => {
@@ -393,8 +398,9 @@ export default function App() {
         if (!ws) return;
         const pane = findPane(ws.paneTree, ws.activePaneId);
         if (!pane?.activeTabId) return;
+        const tabId = pane.activeTabId;
         requestAnimationFrame(() => {
-          terminalHandles.current.get(pane.activeTabId!)?.focus();
+          requestLeafFocus(tabId);
         });
       })
       .then((u) => {
@@ -406,6 +412,7 @@ export default function App() {
 
   // Return focus to the active terminal when the notification bell closes
   // (Cmd+I again, Esc, or click outside), so typing continues in the tab.
+  // requestLeafFocus so an enabled scratchpad gets focus back, not the terminal.
   const bellOpen = useBellStore((s) => s.open);
   const bellWasOpen = useRef(false);
   useEffect(() => {
@@ -417,7 +424,7 @@ export default function App() {
     if (!pane?.activeTabId) return;
     const tabId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
-      terminalHandles.current.get(tabId)?.focus();
+      requestLeafFocus(tabId);
     });
     return () => cancelAnimationFrame(raf);
   }, [bellOpen, activeWorkspaceId]);

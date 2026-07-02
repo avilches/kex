@@ -75,7 +75,7 @@ function historyTooltipView(view: EditorView): TooltipView {
   list.className = "cm-history-list";
   const footer = document.createElement("div");
   footer.className = "cm-history-footer";
-  footer.textContent = "↑↓ navigate · ↵ run · esc";
+  footer.textContent = "↑↓ navigate · ⏎ run · esc";
   dom.append(list, footer);
 
   let lastSig = "";

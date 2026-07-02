@@ -24,7 +24,7 @@ export const CTRL_KEY = IS_MAC ? "⌃" : "Ctrl";
 export const ALT_KEY = IS_MAC ? "⌥" : "Alt";
 export const SHIFT_KEY = IS_MAC ? "⇧" : "Shift";
 export const TAB_KEY = IS_MAC ? "⇥" : "Tab";
-export const ENTER_KEY = IS_MAC ? "↵" : "Enter";
+export const ENTER_KEY = IS_MAC ? "⏎" : "Enter";
 
 export const KEY_SEP = IS_MAC ? "" : "+";
 
