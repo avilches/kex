@@ -4,6 +4,7 @@ import "./styles/globals.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { attachConsole } from "@tauri-apps/plugin-log";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
 import { flushEditors } from "./app/lib/editorFlush";
@@ -24,6 +25,9 @@ if (import.meta.env.DEV && import.meta.env.VITE_REACT_SCAN === "true") {
   const { scan } = await import("react-scan");
   scan({ enabled: true });
 }
+
+// Forward all console.* calls through the Rust logger so they land in the log file.
+await attachConsole();
 
 // Reap PTY sessions orphaned by a prior webview load before any tab spawns.
 await invoke("pty_close_all").catch(() => {});

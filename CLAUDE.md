@@ -141,6 +141,33 @@ Nunca usar `setInterval + setTick` para releer estado mutable externo (arrays a 
 
 Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una segunda instancia. Los componentes ya montados siguen usando la instancia vieja. Para diagnosticar bugs de estado mutable, siempre hacer kill del proceso y `pnpm tauri dev` fresco antes de leer logs. No confiar en resultados de sesiones con cambios via HMR.
 
+### Logs de la aplicacion
+
+La app escribe logs a fichero tanto en desarrollo como en produccion. NO pidas al usuario que abra las DevTools:
+lee directamente el fichero de log.
+
+**Donde estan los logs:**
+
+- macOS: `~/Library/Logs/app.betauer.kex/`
+- Linux: `~/.local/share/app.betauer.kex/logs/`
+- Windows: `%APPDATA%\app.betauer.kex\logs\`
+
+El fichero activo se llama por fecha (`YYYY-MM-DD.log`). Para leer los ultimos eventos:
+
+```bash
+tail -f ~/Library/Logs/app.betauer.kex/$(date +%Y-%m-%d).log   # macOS
+```
+
+**Que contienen los logs:**
+
+- Logs del proceso Rust (`log::info!`, `log::debug!`, etc.) a nivel `Info` por defecto; nivel `Debug` para
+  los modulos `agent`, `pty::agent_detect` y `pty::ipc`.
+- Logs del frontend: todos los `console.log/warn/error/info/debug` pasan por `attachConsole()` al arrancar
+  (`src/main.tsx` y `src/settings/main.tsx`) y se reenvian al logger de Rust, que los escribe en el mismo fichero.
+
+**Implementacion:** `tauri-plugin-log` con `TargetKind::LogDir` (fichero) + `TargetKind::Webview` (DevTools,
+util en desarrollo). Frontend: `attachConsole()` de `@tauri-apps/plugin-log` en ambos entry points.
+
 ## Documentacion viva
 
 - `docs/ARCHITECTURE.md` + `docs/IPC.md` + `docs/BUILD.md` — referencia principal (ver AGENTS.md para politica de actualizacion)

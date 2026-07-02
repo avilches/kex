@@ -490,6 +490,7 @@ pub fn run() {
                 .level_for("kex_lib::modules::agent", tauri_plugin_log::log::LevelFilter::Debug)
                 .level_for("kex_lib::modules::pty::agent_detect", tauri_plugin_log::log::LevelFilter::Debug)
                 .level_for("kex_lib::modules::pty::ipc", tauri_plugin_log::log::LevelFilter::Debug)
+                .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir { file_name: None }))
                 .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview))
                 .build(),
         )
