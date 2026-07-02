@@ -376,7 +376,7 @@ function EmptyGroupDropTargets({
               </div>
             ) : (
               <div className="px-1.5 py-1.5">
-                <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground/50">
+                <span className="truncate text-[10px] font-medium text-muted-foreground/50">
                   {label}
                 </span>
               </div>
@@ -539,7 +539,7 @@ export function WorkspaceBar({
                         />
                       );
                     })()}
-                    <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                    <span className="truncate text-[10px] font-medium text-muted-foreground/60">
                       {group.label}
                     </span>
                     {group.items.length > 0 && (
