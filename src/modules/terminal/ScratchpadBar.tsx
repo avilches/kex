@@ -186,6 +186,20 @@ export function ScratchpadBar({ leafId }: Props) {
           "ring-1 ring-inset ring-primary/50 shadow-[0_0_6px_2px_var(--tw-shadow-color)] shadow-primary/50",
         isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
       )}
+      onMouseDown={(e) => {
+        // A click on the bar frame (padding, hint area) must not move focus
+        // to body and close the scratchpad. The check keeps the textarea
+        // itself clickable (caret placement) and exempts the portaled menu
+        // content, whose events bubble through the React tree but whose DOM
+        // nodes are not contained here.
+        const target = e.target as Node;
+        if (
+          target !== textareaRef.current &&
+          containerRef.current?.contains(target)
+        ) {
+          e.preventDefault();
+        }
+      }}
     >
       <textarea
         ref={textareaRef}
