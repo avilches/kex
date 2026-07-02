@@ -29,3 +29,6 @@ stats.html
 *.tsbuildinfo
 .superpowers/
 .claude/settings.local.json
+user-data/*
+!user-data/create-links.sh
+!user-data/README.md

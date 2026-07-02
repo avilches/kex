@@ -152,10 +152,17 @@ lee directamente el fichero de log.
 - Linux: `~/.local/share/app.betauer.kex/logs/`
 - Windows: `%APPDATA%\app.betauer.kex\logs\`
 
-El fichero activo se llama por fecha (`YYYY-MM-DD.log`). Para leer los ultimos eventos:
+El fichero de log se llama `Kex.log`. Para seguir los eventos en tiempo real:
 
 ```bash
-tail -f ~/Library/Logs/app.betauer.kex/$(date +%Y-%m-%d).log   # macOS
+tail -f ~/Library/Logs/app.betauer.kex/Kex.log          # macOS
+tail -f ~/.local/share/app.betauer.kex/logs/Kex.log      # Linux
+```
+
+O directamente desde el worktree del proyecto (el symlink ya esta creado):
+
+```bash
+tail -f user-data/logs/Kex.log
 ```
 
 **Que contienen los logs:**
