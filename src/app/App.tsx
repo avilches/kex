@@ -1543,7 +1543,7 @@ export default function App() {
     const kind = findTabGlobal(tabId)?.tab.kind;
     requestAnimationFrame(() => {
       if (kind === "editor") editorHandles.current.get(tabId)?.focus();
-      else terminalHandles.current.get(tabId)?.focus();
+      else requestLeafFocus(tabId);
     });
   }, [findTabGlobal]);
 
@@ -2304,10 +2304,7 @@ export default function App() {
         if (!first) return;
         setActiveWorkspaceId(first.workspaceId);
         onActivateTabStable(first.workspaceId, first.tabId);
-        setTimeout(
-          () => terminalHandles.current.get(first.tabId)?.focus(),
-          50,
-        );
+        setTimeout(() => requestLeafFocus(first.tabId), 50);
       },
       "tab.lock": () => {
         if (!activeTabId || !activeTab) return;
@@ -2457,7 +2454,7 @@ export default function App() {
     (workspaceId: string, tabId: string) => {
       setActiveWorkspaceId(workspaceId);
       onActivateTabStable(workspaceId, tabId);
-      setTimeout(() => terminalHandles.current.get(tabId)?.focus(), 50);
+      setTimeout(() => requestLeafFocus(tabId), 50);
     },
     [setActiveWorkspaceId, onActivateTabStable],
   );
