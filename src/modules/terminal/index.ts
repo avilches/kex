@@ -10,6 +10,7 @@ export {
   leafIdForPty,
   navigateFocusedBlocks,
   refreshTerminalLeaf,
+  requestLeafFocus,
   respawnSession,
   terminalDebugStats,
   whenSessionReady,
