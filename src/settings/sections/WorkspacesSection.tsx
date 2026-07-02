@@ -30,12 +30,20 @@ import {
 import { newStatusId } from "@/lib/ids";
 import {
   WORKSPACE_COLOR_PALETTE,
-  randomStatusColor,
   randomVibrantColor,
   resolveStatusColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 
 const STATUS_PRESETS: { label: string; preset: readonly { label: string; color: string }[] }[] = [
+  {
+    label: "Simple",
+    preset: [
+      { label: "TODO", color: "#3b82f6" },
+      { label: "Work in progress", color: "#8b5cf6" },
+      { label: "Done", color: "#22c55e" },
+      { label: "Archived", color: "#14b8a6" },
+    ],
+  },
   {
     label: "Agent",
     preset: [
@@ -227,13 +235,23 @@ export function WorkspacesSection() {
       inputRefs.current.get(empty.id)?.focus();
       return;
     }
-    const next: WorkspaceStatus = { id: newStatusId(), label: "", color: randomStatusColor() };
+    const next: WorkspaceStatus = { id: newStatusId(), label: "", color: nextStatusColor() };
     const updated = [...statuses, next];
     setStatuses(updated);
     void setWorkspaceStatuses(updated.filter((s) => s.label?.trim()));
     requestAnimationFrame(() => {
       inputRefs.current.get(next.id)?.focus();
     });
+  }
+
+  function nextStatusColor(): string {
+    const counts = new Map<string, number>(WORKSPACE_COLOR_PALETTE.map((c) => [c, 0]));
+    for (const s of statuses) {
+      if (s.color && counts.has(s.color)) counts.set(s.color, counts.get(s.color)! + 1);
+    }
+    const min = Math.min(...counts.values());
+    const candidates = WORKSPACE_COLOR_PALETTE.filter((c) => counts.get(c) === min);
+    return candidates[Math.floor(Math.random() * candidates.length)]!;
   }
 
   function loadPreset(preset: readonly { label: string; color: string }[]) {
