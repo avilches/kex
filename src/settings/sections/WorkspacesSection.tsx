@@ -36,12 +36,12 @@ import {
 
 const STATUS_PRESETS: { label: string; preset: readonly { label: string; color: string }[] }[] = [
   {
-    label: "Simple",
+    label: "Basic",
     preset: [
-      { label: "TODO", color: "#3b82f6" },
-      { label: "Work in progress", color: "#8b5cf6" },
+      { label: "TODO", color: "#ef4444" },
+      { label: "Work in progress", color: "#3b82f6" },
       { label: "Done", color: "#22c55e" },
-      { label: "Archived", color: "#14b8a6" },
+      { label: "Archived", color: "#6b7280" },
     ],
   },
   {
