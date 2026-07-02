@@ -23,9 +23,9 @@ import { SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 import {
   closeScratchpad,
   getLeafScratchpadDraft,
+  leaveLeafScratchpad,
   setLeafScratchpadDraft,
   setLeafScratchpadFocus,
-  setLeafScratchpadFocused,
   setLeafScratchpadInsert,
   submitToLeaf,
 } from "./lib/useTerminalSession";
@@ -63,6 +63,7 @@ type Props = {
 };
 
 export function ScratchpadBar({ leafId }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => getLeafScratchpadDraft(leafId));
   const [focused, setFocused] = useState(false);
@@ -171,7 +172,10 @@ export function ScratchpadBar({ leafId }: Props) {
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        containerRef.current = node;
+      }}
       className={cn(
         // m-2 reserves room outside the box for the focus glow to bleed into
         // before PaneView's overflow-hidden clips it; the blur/spread below are
@@ -192,13 +196,16 @@ export function ScratchpadBar({ leafId }: Props) {
         style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => {
-          setFocused(true);
-          setLeafScratchpadFocused(leafId, true);
-        }}
-        onBlur={() => {
+        onFocus={() => setFocused(true)}
+        onBlur={(e) => {
           setFocused(false);
-          setLeafScratchpadFocused(leafId, false);
+          // Losing focus to something inside this bar (the settings gear
+          // trigger) is not a real "leave" -- onCloseAutoFocus brings focus
+          // back here when that dropdown closes. Anything else (the
+          // terminal, another tab, other UI chrome) closes the scratchpad.
+          const next = e.relatedTarget as Node | null;
+          if (next && containerRef.current?.contains(next)) return;
+          leaveLeafScratchpad(leafId);
         }}
       />
       <div className="flex shrink-0 items-center gap-1.5 self-end">

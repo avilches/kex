@@ -104,20 +104,12 @@ type Session = {
   // at the most recent release. Read once on the next bind to trigger a
   // SIGWINCH-driven repaint instead of replaying dormant bytes.
   altScreenAtRelease: boolean;
-  // Persisted: does this leaf have the scratchpad enabled. Visibility is
-  // derived (scratchpadOpen && the tab is focused); re-focusing a tab whose
-  // scratchpad is open always sends focus there, never to the terminal.
+  // Live: does the scratchpad exist right now. Existence and focus are the
+  // same thing here -- there is no "open but unfocused" state. Anything that
+  // takes real focus away from the scratchpad (clicking the terminal,
+  // switching tabs or workspaces, Escape, Cmd+U) closes it; visibility is
+  // derived directly from this flag (scratchpadOpen && the tab is focused).
   scratchpadOpen: boolean;
-  // Live: does the scratchpad textarea currently have real DOM focus.
-  scratchpadFocused: boolean;
-  // Live: which side last held real DOM focus (terminal or scratchpad),
-  // independent of scratchpadOpen. Used to restore focus after anything
-  // that never left this workspace — a transient interruption (dropdown/
-  // dialog closing, OS window regaining focus, notification bell closing)
-  // or switching tabs within the same pane and back — as opposed to
-  // switching to a different workspace, which always sends focus to the
-  // scratchpad if enabled (see requestLeafFocus).
-  lastFocusSide: "terminal" | "scratchpad";
   scratchpadFocus: (() => void) | null;
   // A focus request arrived before ScratchpadBar mounted and registered
   // scratchpadFocus (restore, or a just-created terminal). Consumed as soon
@@ -314,21 +306,30 @@ function requestScratchpadFocus(s: Session): void {
   else s.scratchpadFocusPending = true;
 }
 
-// Toggle: closed -> open+focus scratchpad. Open+scratchpad-focused -> focus
-// terminal (transient: leaving and re-focusing the tab goes back to the
-// scratchpad, see the useTerminalSession focus effect). Open+terminal-focused
-// -> focus scratchpad.
-export function cycleScratchpad(leafId: string): void {
+// State-only close: clears scratchpadOpen without touching where focus goes
+// next. Used when focus is already headed elsewhere (the terminal just
+// gained it, or a different tab/workspace is about to) so this never steals
+// focus back.
+function closeScratchpadState(s: Session, leafId: string): void {
+  if (!s.scratchpadOpen) return;
+  s.scratchpadOpen = false;
+  s.scratchpadFocusPending = false;
+  notifyScratchpad(leafId);
+  notifyScratchpadEnabled(leafId);
+}
+
+// Toggle: closed -> open+focus scratchpad. Open -> close (and focus the
+// terminal, since open and focused are the same state here).
+export function toggleScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s || s.shellExited) return;
-  if (!s.scratchpadOpen) {
+  if (s.scratchpadOpen) {
+    closeScratchpadState(s, leafId);
+    focusSlot(leafId);
+  } else {
     s.scratchpadOpen = true;
     notifyScratchpad(leafId);
     notifyScratchpadEnabled(leafId);
-    requestScratchpadFocus(s);
-  } else if (s.scratchpadFocused) {
-    focusSlot(leafId);
-  } else {
     requestScratchpadFocus(s);
   }
 }
@@ -336,15 +337,18 @@ export function cycleScratchpad(leafId: string): void {
 export function closeScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
-  if (!s.scratchpadOpen) return;
-  s.scratchpadOpen = false;
-  s.scratchpadFocused = false;
-  s.scratchpadFocusPending = false;
-  notifyScratchpad(leafId);
-  notifyScratchpadEnabled(leafId);
+  closeScratchpadState(s, leafId);
   focusSlot(leafId);
 }
 
+// Closes this leaf's scratchpad without focusing its terminal. Called when
+// this leaf is being left entirely (a different tab or workspace is about to
+// take focus), so it never steals focus back from wherever it's headed.
+export function leaveLeafScratchpad(leafId: string): void {
+  const s = sessions.get(leafId);
+  if (!s) return;
+  closeScratchpadState(s, leafId);
+}
 
 export function setLeafScratchpadFocus(
   leafId: string,
@@ -360,22 +364,13 @@ export function setLeafScratchpadFocus(
   }
 }
 
-export function setLeafScratchpadFocused(
-  leafId: string,
-  focused: boolean,
-): void {
-  const s = sessions.get(leafId);
-  if (!s || s.scratchpadFocused === focused) return;
-  s.scratchpadFocused = focused;
-  if (focused) s.lastFocusSide = "scratchpad";
-  notifyScratchpad(leafId);
-}
-
 // Called when the terminal grid gains real DOM focus (a leaf-scoped focusin
-// on its container), so requestLastFocusedSide knows to restore there.
+// on its container). If this leaf's own scratchpad was open, close it --
+// clicking into the terminal always dismisses the scratchpad.
 export function setLeafTerminalFocused(leafId: string): void {
   const s = sessions.get(leafId);
-  if (s) s.lastFocusSide = "terminal";
+  if (!s || !s.scratchpadOpen) return;
+  closeScratchpadState(s, leafId);
 }
 
 export function setLeafScratchpadInsert(
@@ -483,31 +478,18 @@ export function ptyIdForTab(tabId: string): number | null {
   return sessions.get(tabId)?.pty?.id ?? null;
 }
 
-// Put focus on the scratchpad if open, otherwise the terminal. Reserved for
-// genuine workspace switches, which is deliberate "start fresh on this tab"
-// navigation rather than a same-workspace interruption -- see
-// requestLastFocusedSide for anything that never left the current workspace.
+// Put focus on the scratchpad if open, otherwise the terminal. Used for every
+// case that (re)focuses a leaf: workspace switches, tab switches, and
+// restoring focus after a transient interruption (dropdown/dialog/context
+// menu closing, OS window regaining focus, notification bell closing).
+// scratchpadOpen already IS "should this leaf's scratchpad have focus right
+// now" -- there's no separate "which side" to remember, since anything that
+// took focus away from the scratchpad already closed it.
 export function requestLeafFocus(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
   if (s.scratchpadOpen) requestScratchpadFocus(s);
   else focusSlot(leafId);
-}
-
-// Restore focus to whichever side (terminal or scratchpad) actually had it
-// before a transient interruption that never left this tab -- a dropdown,
-// dialog, or context menu closing, the OS window regaining focus, or the
-// notification bell closing. Unlike requestLeafFocus (always the scratchpad
-// if enabled), this respects the user having clicked into the terminal
-// while the scratchpad stayed open.
-export function requestLastFocusedSide(leafId: string): void {
-  const s = sessions.get(leafId);
-  if (!s) return;
-  if (s.scratchpadOpen && s.lastFocusSide === "scratchpad") {
-    requestScratchpadFocus(s);
-  } else {
-    focusSlot(leafId);
-  }
 }
 
 configureRendererPool({
@@ -605,8 +587,6 @@ function ensureSession(
     everSubmitted: false,
     altScreenAtRelease: false,
     scratchpadOpen: initialScratchpadEnabled,
-    scratchpadFocused: false,
-    lastFocusSide: initialScratchpadEnabled ? "scratchpad" : "terminal",
     scratchpadFocus: null,
     scratchpadFocusPending: false,
     scratchpadInsert: null,
@@ -1045,9 +1025,6 @@ export function useTerminalSession({
   const [scratchpadOpen, setScratchpadOpen] = useState<boolean>(
     () => sessions.get(leafId)?.scratchpadOpen ?? false,
   );
-  const [scratchpadFocused, setScratchpadFocusedState] = useState<boolean>(
-    () => sessions.get(leafId)?.scratchpadFocused ?? false,
-  );
   useEffect(() => {
     const s = ensureSession(
       leafId,
@@ -1056,11 +1033,8 @@ export function useTerminalSession({
       initialScratchpadEnabledRef.current,
     );
     setScratchpadOpen(s.scratchpadOpen);
-    setScratchpadFocusedState(s.scratchpadFocused);
     const cb = () => {
-      const cur = sessions.get(leafId);
-      setScratchpadOpen(cur?.scratchpadOpen ?? false);
-      setScratchpadFocusedState(cur?.scratchpadFocused ?? false);
+      setScratchpadOpen(sessions.get(leafId)?.scratchpadOpen ?? false);
     };
     return subscribeLeafScratchpad(leafId, cb);
   }, [leafId, blocks]);
@@ -1273,7 +1247,6 @@ export function useTerminalSession({
       revealMatch,
       clearSearch,
       scratchpadOpen,
-      scratchpadFocused,
     }),
     [
       write,
@@ -1290,7 +1263,6 @@ export function useTerminalSession({
       revealMatch,
       clearSearch,
       scratchpadOpen,
-      scratchpadFocused,
     ],
   );
 }
