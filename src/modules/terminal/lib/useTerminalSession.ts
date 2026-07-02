@@ -785,14 +785,18 @@ function attachSession(
             s.pendingInput = "";
           }
           if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
-          if (!runOnStart) return;
+          if (!runOnStart) {
+            if (plan) console.info(`[agent-session] restore skipped for tab=${leafId}: restoreOnRestart=false`);
+            return;
+          }
           if (plan) {
             if (plan.resumeCmd) {
+              console.info(`[agent-session] injecting resume cmd for tab=${leafId} agent=${plan.agent}: ${plan.resumeCmd}`);
               setTimeout(() => {
                 s.pty?.write(" " + plan.resumeCmd + "\r");
               }, 200);
             } else if (plan.errorReason) {
-              console.error(`[kex] session restore failed for tab ${leafId} (${plan.agent}): ${plan.errorReason}`);
+              console.error(`[agent-session] restore failed for tab=${leafId} agent=${plan.agent}: ${plan.errorReason}`);
               useAgentStore.getState().setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
             }
             // else: no command, no error - PTY just opened at plan.cwdLaunch, nothing to do

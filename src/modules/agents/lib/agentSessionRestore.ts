@@ -23,11 +23,11 @@ export async function loadRestorePlans(): Promise<void> {
     const plans = await invoke<RestorePlan[]>("agent_session_restore_plan");
     restorePlans = new Map(plans.map((p) => [p.tabId, p]));
     if (plans.length > 0) {
-      console.debug(`[agent-session] loaded ${plans.length} restore plan(s):`, plans.map((p) =>
+      console.info(`[agent-session] loaded ${plans.length} restore plan(s):`, plans.map((p) =>
         `${p.tabId} agent=${p.agent} cwdLaunch=${p.cwdLaunch}${p.errorReason ? ` ERROR: ${p.errorReason}` : ""}`,
       ));
     } else {
-      console.debug("[agent-session] no restore plans");
+      console.info("[agent-session] no restore plans");
     }
   } catch (err) {
     console.error("[agent-session] loadRestorePlans error:", err);
@@ -42,7 +42,7 @@ export function consumeRestorePlan(tabId: string): RestorePlan | null {
   const plan = restorePlans.get(tabId) ?? null;
   restorePlans.delete(tabId);
   if (plan) {
-    console.debug(`[agent-session] consuming restore plan for tab=${tabId} agent=${plan.agent} cwdLaunch=${plan.cwdLaunch}${plan.errorReason ? ` ERROR: ${plan.errorReason}` : ""}`);
+    console.info(`[agent-session] consuming restore plan tab=${tabId} agent=${plan.agent} cwdLaunch=${plan.cwdLaunch}${plan.errorReason ? ` ERROR: ${plan.errorReason}` : ""}`);
   }
   return plan;
 }
@@ -56,7 +56,7 @@ export function pruneOrphanedPlans(knownTabIds: Set<string>): void {
   if (!restorePlans) return;
   for (const tabId of restorePlans.keys()) {
     if (!knownTabIds.has(tabId)) {
-      console.debug(`[agent-session] pruning orphaned plan tab=${tabId} (tab no longer in workspace)`);
+      console.info(`[agent-session] pruning orphaned plan tab=${tabId} (tab no longer in workspace)`);
       void detachAgentSession(tabId);
     }
   }
