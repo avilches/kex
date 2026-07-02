@@ -110,6 +110,13 @@ type Session = {
   scratchpadOpen: boolean;
   // Live: does the scratchpad textarea currently have real DOM focus.
   scratchpadFocused: boolean;
+  // Live: which side last held real DOM focus (terminal or scratchpad),
+  // independent of scratchpadOpen. Used to restore focus after a transient
+  // interruption that never left this tab (a dropdown/dialog closing, the
+  // OS window regaining focus, the notification bell closing) — as opposed
+  // to leaving and returning to a different tab/workspace, which always
+  // sends focus to the scratchpad if enabled (see requestLeafFocus).
+  lastFocusSide: "terminal" | "scratchpad";
   scratchpadFocus: (() => void) | null;
   // A focus request arrived before ScratchpadBar mounted and registered
   // scratchpadFocus (restore, or a just-created terminal). Consumed as soon
@@ -359,7 +366,15 @@ export function setLeafScratchpadFocused(
   const s = sessions.get(leafId);
   if (!s || s.scratchpadFocused === focused) return;
   s.scratchpadFocused = focused;
+  if (focused) s.lastFocusSide = "scratchpad";
   notifyScratchpad(leafId);
+}
+
+// Called when the terminal grid gains real DOM focus (a leaf-scoped focusin
+// on its container), so requestLastFocusedSide knows to restore there.
+export function setLeafTerminalFocused(leafId: string): void {
+  const s = sessions.get(leafId);
+  if (s) s.lastFocusSide = "terminal";
 }
 
 export function setLeafScratchpadInsert(
@@ -480,6 +495,22 @@ export function requestLeafFocus(leafId: string): void {
   else focusSlot(leafId);
 }
 
+// Restore focus to whichever side (terminal or scratchpad) actually had it
+// before a transient interruption that never left this tab -- a dropdown,
+// dialog, or context menu closing, the OS window regaining focus, or the
+// notification bell closing. Unlike requestLeafFocus (always the scratchpad
+// if enabled), this respects the user having clicked into the terminal
+// while the scratchpad stayed open.
+export function requestLastFocusedSide(leafId: string): void {
+  const s = sessions.get(leafId);
+  if (!s) return;
+  if (s.scratchpadOpen && s.lastFocusSide === "scratchpad") {
+    requestScratchpadFocus(s);
+  } else {
+    focusSlot(leafId);
+  }
+}
+
 configureRendererPool({
   resolveLeaf(leafId) {
     const s = sessions.get(leafId);
@@ -576,6 +607,7 @@ function ensureSession(
     altScreenAtRelease: false,
     scratchpadOpen: initialScratchpadEnabled,
     scratchpadFocused: false,
+    lastFocusSide: initialScratchpadEnabled ? "scratchpad" : "terminal",
     scratchpadFocus: null,
     scratchpadFocusPending: false,
     scratchpadInsert: null,

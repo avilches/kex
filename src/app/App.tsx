@@ -61,6 +61,7 @@ import {
   cycleScratchpad,
   disposeSession,
   leafHasForegroundProcess,
+  requestLastFocusedSide,
   requestLeafFocus,
   type TerminalPaneHandle,
   useTerminalFileDrop,
@@ -252,11 +253,13 @@ export default function App() {
     ? (activePane?.tabs.find((p) => p.id === activeTabId) ?? null)
     : null;
 
-  // Returns focus to the active leaf's terminal/scratchpad after an
-  // incidental UI interaction closes (a dropdown, a dialog, a context menu),
-  // instead of leaving it on whatever chrome element triggered it.
+  // Returns focus to whichever side (terminal or scratchpad) actually had it
+  // before a transient interruption that never left this tab -- a dropdown,
+  // dialog, or context menu closing -- instead of leaving it on whatever
+  // chrome element triggered it, and instead of always defaulting to the
+  // scratchpad (requestLeafFocus, used for genuine tab/workspace switches).
   const restoreLeafFocus = useCallback(() => {
-    if (activeTabId) requestLeafFocus(activeTabId);
+    if (activeTabId) requestLastFocusedSide(activeTabId);
   }, [activeTabId]);
 
   const isTerminalTab = activeTab?.kind === "terminal";
@@ -387,8 +390,9 @@ export default function App() {
   }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-focus the active terminal when this window regains OS focus (e.g. Cmd+Tab back,
-  // or a modal/separate window like Settings closing). requestLeafFocus so a tab whose
-  // scratchpad had focus gets it back, instead of always stealing it to the terminal.
+  // or a modal/separate window like Settings closing). This never left the tab, so
+  // requestLastFocusedSide restores whichever side actually had focus (terminal or
+  // scratchpad) instead of always defaulting to the scratchpad.
   // Also fires on first window focus after startup, ensuring the terminal gets the
   // cursor even if the PTY wasn't ready when the workspace-switch effect ran.
   useEffect(() => {
@@ -407,7 +411,7 @@ export default function App() {
         if (!pane?.activeTabId) return;
         const tabId = pane.activeTabId;
         requestAnimationFrame(() => {
-          requestLeafFocus(tabId);
+          requestLastFocusedSide(tabId);
         });
       })
       .then((u) => {
@@ -419,7 +423,8 @@ export default function App() {
 
   // Return focus to the active terminal when the notification bell closes
   // (Cmd+I again, Esc, or click outside), so typing continues in the tab.
-  // requestLeafFocus so an enabled scratchpad gets focus back, not the terminal.
+  // This never left the tab, so requestLastFocusedSide restores whichever
+  // side actually had focus instead of always defaulting to the scratchpad.
   const bellOpen = useBellStore((s) => s.open);
   const bellWasOpen = useRef(false);
   useEffect(() => {
@@ -431,7 +436,7 @@ export default function App() {
     if (!pane?.activeTabId) return;
     const tabId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
-      requestLeafFocus(tabId);
+      requestLastFocusedSide(tabId);
     });
     return () => cancelAnimationFrame(raf);
   }, [bellOpen, activeWorkspaceId]);
