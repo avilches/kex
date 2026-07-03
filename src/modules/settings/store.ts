@@ -201,6 +201,7 @@ export type Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
   scratchpadInNewTerminals: boolean;
+  scratchpadRememberFocus: boolean;
   textEditorMode: TextEditorMode;
   preferredFileEditorId: string | null;
   preferredWorkspaceEditorId: string | null;
@@ -255,6 +256,7 @@ const KEY_TERMINAL_SCROLL_SENSITIVITY = "scrollSensitivity";
 const KEY_TERMINAL_NEW_FOLDER_MODE = "newFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
+const KEY_SCRATCHPAD_REMEMBER_FOCUS = "scratchpadRememberFocus";
 
 // Editor store keys — no "editor" prefix since the file is already settings-editor.json
 const KEY_EDITOR_THEME = "theme";
@@ -423,6 +425,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keepFolderLayoutOnChangeExplorerRoot: false,
   scratchpadEnterSends: true,
   scratchpadInNewTerminals: true,
+  scratchpadRememberFocus: false,
   textEditorMode: "workspace-and-files",
   preferredFileEditorId: null,
   preferredWorkspaceEditorId: null,
@@ -694,6 +697,9 @@ export async function loadPreferences(): Promise<Preferences> {
     scratchpadInNewTerminals:
       get<boolean>(KEY_SCRATCHPAD_IN_NEW_TERMINALS) ??
       DEFAULT_PREFERENCES.scratchpadInNewTerminals,
+    scratchpadRememberFocus:
+      get<boolean>(KEY_SCRATCHPAD_REMEMBER_FOCUS) ??
+      DEFAULT_PREFERENCES.scratchpadRememberFocus,
     textEditorMode: parseTextEditorMode(get<string>(KEY_TEXT_EDITOR_MODE)),
     preferredFileEditorId:
       get<string | null>(KEY_PREFERRED_FILE_EDITOR_ID) ??
@@ -983,6 +989,10 @@ export async function setTerminalScratchpadInNewTerminals(value: boolean): Promi
   await writeTerminalPref(KEY_SCRATCHPAD_IN_NEW_TERMINALS, value);
 }
 
+export async function setTerminalScratchpadRememberFocus(value: boolean): Promise<void> {
+  await writeTerminalPref(KEY_SCRATCHPAD_REMEMBER_FOCUS, value);
+}
+
 export async function setPreferredFileEditorId(value: string | null): Promise<void> {
   await writeToolsPref(KEY_PREFERRED_FILE_EDITOR_ID, value);
 }
@@ -1164,6 +1174,7 @@ export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
   [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
+  [KEY_SCRATCHPAD_REMEMBER_FOCUS]: "scratchpadRememberFocus",
 };
 
 const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {

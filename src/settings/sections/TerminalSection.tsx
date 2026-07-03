@@ -57,6 +57,7 @@ import {
   setTerminalNewFolderMode,
   setTerminalScratchpadEnterSends,
   setTerminalScratchpadInNewTerminals,
+  setTerminalScratchpadRememberFocus,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalShell,
@@ -115,6 +116,9 @@ export function TerminalSection() {
   );
   const scratchpadInNewTerminals = usePreferencesStore(
     (s) => s.scratchpadInNewTerminals,
+  );
+  const scratchpadRememberFocus = usePreferencesStore(
+    (s) => s.scratchpadRememberFocus,
   );
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
   const terminalNewFolderMode = usePreferencesStore(
@@ -223,6 +227,17 @@ export function TerminalSection() {
             checked={scratchpadInNewTerminals}
             onCheckedChange={(v) =>
               void setTerminalScratchpadInNewTerminals(v)
+            }
+          />
+        </SettingRow>
+        <SettingRow
+          title="Remember scratchpad focus"
+          description="Reopen the scratchpad when returning to a tab that had it focused. Esc, the toggle shortcut and clicking the terminal dismiss it for that tab."
+        >
+          <Switch
+            checked={scratchpadRememberFocus}
+            onCheckedChange={(v) =>
+              void setTerminalScratchpadRememberFocus(v)
             }
           />
         </SettingRow>
