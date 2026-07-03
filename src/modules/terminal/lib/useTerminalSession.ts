@@ -110,6 +110,10 @@ type Session = {
   // switching tabs or workspaces, Escape, Cmd+U) closes it; visibility is
   // derived directly from this flag (scratchpadOpen && the tab is focused).
   scratchpadOpen: boolean;
+  // Transient resume mark, never persisted: set when the scratchpad is left
+  // open (abandon-close) with scratchpadRememberFocus on; consumed by
+  // requestLeafFocus to reopen it. Any deliberate dismiss clears it.
+  scratchpadResume: boolean;
   scratchpadFocus: (() => void) | null;
   // A focus request arrived before ScratchpadBar mounted and registered
   // scratchpadFocus (restore, or a just-created terminal). Consumed as soon
@@ -309,16 +313,46 @@ function requestScratchpadFocus(s: Session): void {
   else s.scratchpadFocusPending = true;
 }
 
+// "leave" = abandon-close (blur to chrome, tab/pane/workspace switch, the
+// sentinel effect): marks scratchpadResume when scratchpadRememberFocus is on,
+// but only when this call is the one that actually closes it (never
+// clobbers/creates a mark on an already-closed leaf, e.g. a duplicate blur).
+// "dismiss" = deliberate close (Escape, Cmd+U, clicking the terminal): always
+// clears scratchpadResume, even if the scratchpad was already closed, so a
+// dismiss can never leave a stale mark behind.
+type ScratchpadCloseReason = "leave" | "dismiss";
+
 // State-only close: clears scratchpadOpen without touching where focus goes
 // next. Used when focus is already headed elsewhere (the terminal just
 // gained it, or a different tab/workspace is about to) so this never steals
 // focus back.
-function closeScratchpadState(s: Session, leafId: string): void {
-  if (!s.scratchpadOpen) return;
+function closeScratchpadState(
+  s: Session,
+  leafId: string,
+  reason: ScratchpadCloseReason,
+): void {
+  if (!s.scratchpadOpen) {
+    if (reason === "dismiss") s.scratchpadResume = false;
+    return;
+  }
   s.scratchpadOpen = false;
   s.scratchpadFocusPending = false;
+  s.scratchpadResume =
+    reason === "leave" &&
+    usePreferencesStore.getState().scratchpadRememberFocus;
   notifyScratchpad(leafId);
   notifyScratchpadEnabled(leafId);
+}
+
+// Shared open path: used by toggleScratchpad's open branch and by
+// requestLeafFocus when consuming a resume mark. A fresh open always
+// obsoletes any pending resume mark.
+function openScratchpadState(s: Session, leafId: string): void {
+  s.scratchpadOpen = true;
+  s.scratchpadResume = false;
+  notifyScratchpad(leafId);
+  notifyScratchpadEnabled(leafId);
+  requestScratchpadFocus(s);
 }
 
 // Toggle: closed -> open+focus scratchpad. Open -> close (and focus the
@@ -327,20 +361,17 @@ export function toggleScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s || s.shellExited) return;
   if (s.scratchpadOpen) {
-    closeScratchpadState(s, leafId);
+    closeScratchpadState(s, leafId, "dismiss");
     focusSlot(leafId);
   } else {
-    s.scratchpadOpen = true;
-    notifyScratchpad(leafId);
-    notifyScratchpadEnabled(leafId);
-    requestScratchpadFocus(s);
+    openScratchpadState(s, leafId);
   }
 }
 
 export function closeScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
-  closeScratchpadState(s, leafId);
+  closeScratchpadState(s, leafId, "dismiss");
   focusSlot(leafId);
 }
 
@@ -350,7 +381,7 @@ export function closeScratchpad(leafId: string): void {
 export function leaveLeafScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
-  closeScratchpadState(s, leafId);
+  closeScratchpadState(s, leafId, "leave");
 }
 
 export function setLeafScratchpadFocus(
@@ -369,11 +400,17 @@ export function setLeafScratchpadFocus(
 
 // Called when the terminal grid gains real DOM focus (a leaf-scoped focusin
 // on its container). If this leaf's own scratchpad was open, close it --
-// clicking into the terminal always dismisses the scratchpad.
+// clicking into the terminal always dismisses the scratchpad. The resume
+// mark clears unconditionally: clicking the terminal blurs the scratchpad
+// textarea first, which already closed it and marked resume (leaveLeafScratchpad)
+// -- closeScratchpadState would early-return here since scratchpadOpen is
+// already false, so the unconditional clear is what actually dismisses the mark.
 export function setLeafTerminalFocused(leafId: string): void {
   const s = sessions.get(leafId);
-  if (!s || !s.scratchpadOpen) return;
-  closeScratchpadState(s, leafId);
+  if (!s) return;
+  s.scratchpadResume = false;
+  if (!s.scratchpadOpen) return;
+  closeScratchpadState(s, leafId, "dismiss");
 }
 
 export function setLeafScratchpadInsert(
@@ -487,12 +524,21 @@ export function ptyIdForTab(tabId: string): number | null {
 // menu closing, OS window regaining focus, notification bell closing).
 // scratchpadOpen already IS "should this leaf's scratchpad have focus right
 // now" -- there's no separate "which side" to remember, since anything that
-// took focus away from the scratchpad already closed it.
+// took focus away from the scratchpad already closed it. The one exception is
+// a pending resume mark (scratchpadRememberFocus): reopen and consume it.
 export function requestLeafFocus(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
-  if (s.scratchpadOpen) requestScratchpadFocus(s);
-  else focusSlot(leafId);
+  if (s.scratchpadOpen) {
+    requestScratchpadFocus(s);
+  } else if (
+    s.scratchpadResume &&
+    usePreferencesStore.getState().scratchpadRememberFocus
+  ) {
+    openScratchpadState(s, leafId);
+  } else {
+    focusSlot(leafId);
+  }
 }
 
 configureRendererPool({
@@ -590,6 +636,7 @@ function ensureSession(
     everSubmitted: false,
     altScreenAtRelease: false,
     scratchpadOpen: initialScratchpadEnabled,
+    scratchpadResume: false,
     scratchpadFocus: null,
     scratchpadFocusPending: false,
     scratchpadInsert: null,
