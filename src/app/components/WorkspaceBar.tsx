@@ -168,7 +168,10 @@ function SortableWorkspaceItem({
       <button
         type="button"
         title={ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : (ws.title || ws.kind)}
-        onClick={() => onSelect(ws.id)}
+        onClick={() => {
+          if (active) onRestoreFocus();
+          else onSelect(ws.id);
+        }}
         onDoubleClick={() => onOpenSettings(ws.id)}
         className={cn(
           "flex w-full items-center rounded-lg font-semibold transition-all select-none",
