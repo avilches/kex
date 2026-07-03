@@ -378,7 +378,15 @@ export default function App() {
   // Focus the active terminal when the active workspace changes (tab/workspace switch).
   // requestLeafFocus (not a blind terminal .focus()) so a tab whose scratchpad
   // is enabled keeps getting focus there, not the terminal.
+  const prevWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => {
+    const prevId = prevWorkspaceIdRef.current;
+    prevWorkspaceIdRef.current = activeWorkspaceId;
+    if (prevId && prevId !== activeWorkspaceId) {
+      const prevWs = workspacesRef.current.find((w) => w.id === prevId);
+      const prevPane = prevWs ? findPane(prevWs.paneTree, prevWs.activePaneId) : null;
+      if (prevPane?.activeTabId) leaveLeafScratchpad(prevPane.activeTabId);
+    }
     const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
     if (!ws) return;
     const pane = findPane(ws.paneTree, ws.activePaneId);
@@ -1281,9 +1289,24 @@ export default function App() {
     closeTabsRef.current(tabIds);
   }, []);
 
+  // Explicit close when leaving a pane: keyboard and programmatic pane/
+  // workspace switches move no DOM focus, so the blur can never cover them.
+  const leaveActivePaneScratchpad = useCallback(
+    (wsId: string, nextPaneId: string | null) => {
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (!ws || ws.activePaneId === nextPaneId) return;
+      const fromPane = findPane(ws.paneTree, ws.activePaneId);
+      if (fromPane?.activeTabId) leaveLeafScratchpad(fromPane.activeTabId);
+    },
+    [],
+  );
+
   const onFocusPaneStable = useCallback(
-    (wsId: string, paneId: string) => focusPane(wsId, paneId),
-    [focusPane],
+    (wsId: string, paneId: string) => {
+      leaveActivePaneScratchpad(wsId, paneId);
+      focusPane(wsId, paneId);
+    },
+    [focusPane, leaveActivePaneScratchpad],
   );
 
   const onNewTerminalStable = useCallback(
@@ -2089,7 +2112,10 @@ export default function App() {
       dir,
       rects,
     );
-    if (target) focusPane(activeWorkspace.id, target);
+    if (target) {
+      leaveActivePaneScratchpad(activeWorkspace.id, target);
+      focusPane(activeWorkspace.id, target);
+    }
   }
 
   const doSplitRight = useCallback(() => {
