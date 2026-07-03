@@ -257,8 +257,9 @@ export default function App() {
   // Returns focus to the active tab after a transient interruption -- a
   // dropdown, dialog, or context menu closing -- instead of leaving it on
   // whatever chrome element triggered it. Opening that chrome already closed
-  // the scratchpad if it was open (see ScratchpadBar's onBlur), so this
-  // always lands on the terminal.
+  // the scratchpad if it was open (see ScratchpadBar's onBlur), so this lands
+  // on the terminal, unless scratchpadRememberFocus left a resume mark, in
+  // which case requestLeafFocus reopens and focuses the scratchpad.
   const restoreLeafFocus = useCallback(() => {
     if (activeTabId) requestLeafFocus(activeTabId);
   }, [activeTabId]);
