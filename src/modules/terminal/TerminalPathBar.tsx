@@ -129,6 +129,7 @@ export function TerminalPathBar({
         )}
         {agentSession && <AgentChipIndicator session={agentSession} />}
         <TerminalPathBarMenu
+          tabId={tabId}
           restoreOnRestart={restoreOnRestart}
           persistentCommand={persistentCommand}
           onUpdateTab={onUpdateTab ?? (() => {})}

@@ -29,6 +29,7 @@ function formatElapsed(ms: number): string {
 }
 
 type Props = {
+  tabId: string;
   restoreOnRestart?: boolean;
   persistentCommand?: string;
   onUpdateTab: (updater: (p: Tab) => Tab) => void;
@@ -37,6 +38,7 @@ type Props = {
 };
 
 export function TerminalPathBarMenu({
+  tabId,
   restoreOnRestart,
   persistentCommand,
   onUpdateTab,
@@ -78,6 +80,21 @@ export function TerminalPathBarMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 text-[12px]">
+        <div className="flex items-center justify-between gap-1 px-2 py-1 text-[11px]">
+          <span className="shrink-0 text-muted-foreground">Tab id</span>
+          <span className="flex min-w-0 items-center gap-1">
+            <span className="max-w-[140px] truncate font-mono text-foreground">{tabId}</span>
+            <button
+              type="button"
+              title="Copy tab id"
+              onClick={() => void copyToClipboard(tabId)}
+              className="flex size-[20px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={1.9} />
+            </button>
+          </span>
+        </div>
+        <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={checked}
           onSelect={(e) => e.preventDefault()}
