@@ -398,6 +398,21 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sentinel: whatever gesture changed the focused leaf (tab switch, pane or
+  // workspace switch, new tab, split, open-in-tab), close the scratchpad of
+  // the leaf being left. The explicit closes elsewhere run earlier and are
+  // idempotent; this effect guarantees the binary invariant for any
+  // activation path that does not route through them.
+  const prevActiveLeafRef = useRef<string | null>(null);
+  useEffect(() => {
+    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
+    const pane = ws ? findPane(ws.paneTree, ws.activePaneId) : null;
+    const activeLeaf = pane?.activeTabId ?? null;
+    const prev = prevActiveLeafRef.current;
+    prevActiveLeafRef.current = activeLeaf;
+    if (prev && prev !== activeLeaf) leaveLeafScratchpad(prev);
+  }, [workspaces, activeWorkspaceId]);
+
   // Re-focus the active terminal when this window regains OS focus (e.g. Cmd+Tab back,
   // or a modal/separate window like Settings closing). OS-level focus changes never
   // blur the scratchpad textarea (only same-document focus moves do), so this just
