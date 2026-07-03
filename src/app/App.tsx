@@ -58,11 +58,11 @@ import {
 } from "@/modules/explorer/lib/gitignore";
 import {
   clearFocusedTerminal,
-  cycleScratchpad,
   disposeSession,
   leafHasForegroundProcess,
-  requestLastFocusedSide,
+  leaveLeafScratchpad,
   requestLeafFocus,
+  toggleScratchpad,
   type TerminalPaneHandle,
   useTerminalFileDrop,
   useTerminalMetricsSampler,
@@ -91,6 +91,7 @@ import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
+import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import { visibleWorkspaceOrder } from "@/modules/workspaces/lib/workspaceOrder";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -253,13 +254,13 @@ export default function App() {
     ? (activePane?.tabs.find((p) => p.id === activeTabId) ?? null)
     : null;
 
-  // Returns focus to whichever side (terminal or scratchpad) actually had it
-  // before a transient interruption that never left this tab -- a dropdown,
-  // dialog, or context menu closing -- instead of leaving it on whatever
-  // chrome element triggered it, and instead of always defaulting to the
-  // scratchpad (requestLeafFocus, used only for genuine workspace switches).
+  // Returns focus to the active tab after a transient interruption -- a
+  // dropdown, dialog, or context menu closing -- instead of leaving it on
+  // whatever chrome element triggered it. Opening that chrome already closed
+  // the scratchpad if it was open (see ScratchpadBar's onBlur), so this
+  // always lands on the terminal.
   const restoreLeafFocus = useCallback(() => {
-    if (activeTabId) requestLastFocusedSide(activeTabId);
+    if (activeTabId) requestLeafFocus(activeTabId);
   }, [activeTabId]);
 
   const isTerminalTab = activeTab?.kind === "terminal";
@@ -377,7 +378,15 @@ export default function App() {
   // Focus the active terminal when the active workspace changes (tab/workspace switch).
   // requestLeafFocus (not a blind terminal .focus()) so a tab whose scratchpad
   // is enabled keeps getting focus there, not the terminal.
+  const prevWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => {
+    const prevId = prevWorkspaceIdRef.current;
+    prevWorkspaceIdRef.current = activeWorkspaceId;
+    if (prevId && prevId !== activeWorkspaceId) {
+      const prevWs = workspacesRef.current.find((w) => w.id === prevId);
+      const prevPane = prevWs ? findPane(prevWs.paneTree, prevWs.activePaneId) : null;
+      if (prevPane?.activeTabId) leaveLeafScratchpad(prevPane.activeTabId);
+    }
     const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
     if (!ws) return;
     const pane = findPane(ws.paneTree, ws.activePaneId);
@@ -389,10 +398,25 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, [activeWorkspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sentinel: whatever gesture changed the focused leaf (tab switch, pane or
+  // workspace switch, new tab, split, open-in-tab), close the scratchpad of
+  // the leaf being left. The explicit closes elsewhere run earlier and are
+  // idempotent; this effect guarantees the binary invariant for any
+  // activation path that does not route through them.
+  const prevActiveLeafRef = useRef<string | null>(null);
+  useEffect(() => {
+    const ws = workspaces.find((w) => w.id === activeWorkspaceId);
+    const pane = ws ? findPane(ws.paneTree, ws.activePaneId) : null;
+    const activeLeaf = pane?.activeTabId ?? null;
+    const prev = prevActiveLeafRef.current;
+    prevActiveLeafRef.current = activeLeaf;
+    if (prev && prev !== activeLeaf) leaveLeafScratchpad(prev);
+  }, [workspaces, activeWorkspaceId]);
+
   // Re-focus the active terminal when this window regains OS focus (e.g. Cmd+Tab back,
-  // or a modal/separate window like Settings closing). This never left the tab, so
-  // requestLastFocusedSide restores whichever side actually had focus (terminal or
-  // scratchpad) instead of always defaulting to the scratchpad.
+  // or a modal/separate window like Settings closing). OS-level focus changes never
+  // blur the scratchpad textarea (only same-document focus moves do), so this just
+  // reasserts whatever was already focused.
   // Also fires on first window focus after startup, ensuring the terminal gets the
   // cursor even if the PTY wasn't ready when the workspace-switch effect ran.
   useEffect(() => {
@@ -404,14 +428,14 @@ export default function App() {
           return;
         }
         const ws = workspacesRef.current.find(
-          (w) => w.id === activeWorkspaceId,
+          (w) => w.id === activeWorkspaceIdRef.current,
         );
         if (!ws) return;
         const pane = findPane(ws.paneTree, ws.activePaneId);
         if (!pane?.activeTabId) return;
         const tabId = pane.activeTabId;
         requestAnimationFrame(() => {
-          requestLastFocusedSide(tabId);
+          requestLeafFocus(tabId);
         });
       })
       .then((u) => {
@@ -423,8 +447,8 @@ export default function App() {
 
   // Return focus to the active terminal when the notification bell closes
   // (Cmd+I again, Esc, or click outside), so typing continues in the tab.
-  // This never left the tab, so requestLastFocusedSide restores whichever
-  // side actually had focus instead of always defaulting to the scratchpad.
+  // Opening the bell already closed the scratchpad if it was open, so this
+  // lands on the terminal.
   const bellOpen = useBellStore((s) => s.open);
   const bellWasOpen = useRef(false);
   useEffect(() => {
@@ -436,7 +460,7 @@ export default function App() {
     if (!pane?.activeTabId) return;
     const tabId = pane.activeTabId;
     const raf = requestAnimationFrame(() => {
-      requestLastFocusedSide(tabId);
+      requestLeafFocus(tabId);
     });
     return () => cancelAnimationFrame(raf);
   }, [bellOpen, activeWorkspaceId]);
@@ -1251,8 +1275,24 @@ export default function App() {
 
   // ── WorkspaceView stable callbacks (use refs to avoid recreating on cd) ──
 
+  // Closes the scratchpad of the tab being left, and, on a cross-pane
+  // activation, also of the abandoned pane's active tab, regardless of how
+  // the switch was triggered (mouse click, tab.next/prev/selectByIndex).
+  // Centralized here so every activation path shares one implementation.
   const onActivateTabStable = useCallback(
-    (wsId: string, tabId: string) => activateTab(wsId, tabId),
+    (wsId: string, tabId: string) => {
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (ws) {
+        for (const leafId of scratchpadLeafsToClose(
+          allPanes(ws.paneTree),
+          ws.activePaneId,
+          tabId,
+        )) {
+          leaveLeafScratchpad(leafId);
+        }
+      }
+      activateTab(wsId, tabId);
+    },
     [activateTab],
   );
 
@@ -1264,9 +1304,24 @@ export default function App() {
     closeTabsRef.current(tabIds);
   }, []);
 
+  // Explicit close when leaving a pane: keyboard and programmatic pane/
+  // workspace switches move no DOM focus, so the blur can never cover them.
+  const leaveActivePaneScratchpad = useCallback(
+    (wsId: string, nextPaneId: string | null) => {
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (!ws || ws.activePaneId === nextPaneId) return;
+      const fromPane = findPane(ws.paneTree, ws.activePaneId);
+      if (fromPane?.activeTabId) leaveLeafScratchpad(fromPane.activeTabId);
+    },
+    [],
+  );
+
   const onFocusPaneStable = useCallback(
-    (wsId: string, paneId: string) => focusPane(wsId, paneId),
-    [focusPane],
+    (wsId: string, paneId: string) => {
+      leaveActivePaneScratchpad(wsId, paneId);
+      focusPane(wsId, paneId);
+    },
+    [focusPane, leaveActivePaneScratchpad],
   );
 
   const onNewTerminalStable = useCallback(
@@ -1531,7 +1586,7 @@ export default function App() {
     const kind = findTabGlobal(tabId)?.tab.kind;
     requestAnimationFrame(() => {
       if (kind === "editor") editorHandles.current.get(tabId)?.focus();
-      else terminalHandles.current.get(tabId)?.focus();
+      else requestLeafFocus(tabId);
     });
   }, [findTabGlobal]);
 
@@ -2072,7 +2127,10 @@ export default function App() {
       dir,
       rects,
     );
-    if (target) focusPane(activeWorkspace.id, target);
+    if (target) {
+      leaveActivePaneScratchpad(activeWorkspace.id, target);
+      focusPane(activeWorkspace.id, target);
+    }
   }
 
   const doSplitRight = useCallback(() => {
@@ -2213,7 +2271,7 @@ export default function App() {
         if (tabs.length < 2) return;
         const idx = tabs.findIndex((p) => p.id === activePane.activeTabId);
         const next = tabs[(idx + 1) % tabs.length];
-        activateTab(activeWorkspace.id, next.id);
+        onActivateTabStable(activeWorkspace.id, next.id);
       },
       "tab.prev": () => {
         if (!activeWorkspace || !activePane) return;
@@ -2221,7 +2279,7 @@ export default function App() {
         if (tabs.length < 2) return;
         const idx = tabs.findIndex((p) => p.id === activePane.activeTabId);
         const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
-        activateTab(activeWorkspace.id, prev.id);
+        onActivateTabStable(activeWorkspace.id, prev.id);
       },
       "tab.selectByIndex": (e) => {
         if (!activeWorkspace || !activePane) return;
@@ -2230,7 +2288,7 @@ export default function App() {
         const digit = parseInt(e.key, 10);
         const idx = digit === 0 ? tabs.length - 1 : digit - 1;
         if (idx >= 0 && idx < tabs.length)
-          activateTab(activeWorkspace.id, tabs[idx].id);
+          onActivateTabStable(activeWorkspace.id, tabs[idx].id);
       },
       "pane.splitRight": doSplitRight,
       "pane.splitDown": doSplitDown,
@@ -2251,7 +2309,7 @@ export default function App() {
       },
       "terminal.scratchpad": () => {
         if (activeTabId && activeTab?.kind === "terminal") {
-          cycleScratchpad(activeTabId);
+          toggleScratchpad(activeTabId);
         }
       },
       "search.focus": () => searchInlineRef.current?.focus(),
@@ -2291,11 +2349,8 @@ export default function App() {
         const first = useAgentStore.getState().notifications[0];
         if (!first) return;
         setActiveWorkspaceId(first.workspaceId);
-        activateTab(first.workspaceId, first.tabId);
-        setTimeout(
-          () => terminalHandles.current.get(first.tabId)?.focus(),
-          50,
-        );
+        onActivateTabStable(first.workspaceId, first.tabId);
+        setTimeout(() => requestLeafFocus(first.tabId), 50);
       },
       "tab.lock": () => {
         if (!activeTabId || !activeTab) return;
@@ -2363,7 +2418,7 @@ export default function App() {
       collapsedGroups,
       openCommandPalette,
       cycleWorkspace,
-      activateTab,
+      onActivateTabStable,
       handleCloseActiveTab,
       reopenClosed,
       requestCloseWorkspace,
@@ -2444,10 +2499,10 @@ export default function App() {
   const onActivateAgent = useCallback(
     (workspaceId: string, tabId: string) => {
       setActiveWorkspaceId(workspaceId);
-      activateTab(workspaceId, tabId);
-      setTimeout(() => terminalHandles.current.get(tabId)?.focus(), 50);
+      onActivateTabStable(workspaceId, tabId);
+      setTimeout(() => requestLeafFocus(tabId), 50);
     },
-    [setActiveWorkspaceId, activateTab],
+    [setActiveWorkspaceId, onActivateTabStable],
   );
 
   useEffect(() => {

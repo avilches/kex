@@ -23,9 +23,9 @@ import { SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 import {
   closeScratchpad,
   getLeafScratchpadDraft,
+  leaveLeafScratchpad,
   setLeafScratchpadDraft,
   setLeafScratchpadFocus,
-  setLeafScratchpadFocused,
   setLeafScratchpadInsert,
   submitToLeaf,
 } from "./lib/useTerminalSession";
@@ -63,6 +63,7 @@ type Props = {
 };
 
 export function ScratchpadBar({ leafId }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => getLeafScratchpadDraft(leafId));
   const [focused, setFocused] = useState(false);
@@ -75,7 +76,7 @@ export function ScratchpadBar({ leafId }: Props) {
   });
 
   // Rotate the placeholder by wall-clock bucket so every open bar shows the same
-  // hint, advancing on the 30s boundary rather than from mount time.
+  // hint, advancing on the ROTATE_MS boundary rather than from mount time.
   const [, tick] = useReducer((c: number) => c + 1, 0);
   useEffect(() => {
     const t = setTimeout(tick, ROTATE_MS - (Date.now() % ROTATE_MS) + 50);
@@ -171,7 +172,10 @@ export function ScratchpadBar({ leafId }: Props) {
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        containerRef.current = node;
+      }}
       className={cn(
         // m-2 reserves room outside the box for the focus glow to bleed into
         // before PaneView's overflow-hidden clips it; the blur/spread below are
@@ -182,6 +186,20 @@ export function ScratchpadBar({ leafId }: Props) {
           "ring-1 ring-inset ring-primary/50 shadow-[0_0_6px_2px_var(--tw-shadow-color)] shadow-primary/50",
         isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
       )}
+      onMouseDown={(e) => {
+        // A click on the bar frame (padding, hint area) must not move focus
+        // to body and close the scratchpad. The check keeps the textarea
+        // itself clickable (caret placement) and exempts the portaled menu
+        // content, whose events bubble through the React tree but whose DOM
+        // nodes are not contained here.
+        const target = e.target as Node;
+        if (
+          target !== textareaRef.current &&
+          containerRef.current?.contains(target)
+        ) {
+          e.preventDefault();
+        }
+      }}
     >
       <textarea
         ref={textareaRef}
@@ -192,13 +210,17 @@ export function ScratchpadBar({ leafId }: Props) {
         style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => {
-          setFocused(true);
-          setLeafScratchpadFocused(leafId, true);
-        }}
-        onBlur={() => {
+        onFocus={() => setFocused(true)}
+        onBlur={(e) => {
+          // Losing focus to the settings menu (portaled to body, so never
+          // inside containerRef) is not a real "leave" -- keep the focused
+          // visuals too, so the bar does not fade while its menu is open;
+          // onCloseAutoFocus brings focus back here when the menu closes.
+          if (settingsOpen) return;
           setFocused(false);
-          setLeafScratchpadFocused(leafId, false);
+          const next = e.relatedTarget as Node | null;
+          if (next && containerRef.current?.contains(next)) return;
+          leaveLeafScratchpad(leafId);
         }}
       />
       <div className="flex shrink-0 items-center gap-1.5 self-end">

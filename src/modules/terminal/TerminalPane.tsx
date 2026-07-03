@@ -126,9 +126,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           <div
             className={cn(
               "relative min-h-0 flex-1 transition-opacity",
-              session.scratchpadOpen &&
-                session.scratchpadFocused &&
-                "opacity-50",
+              session.scratchpadOpen && "opacity-50",
             )}
           >
             {/* biome-ignore lint/a11y/noStaticElementInteractions: terminal surface; pointer selects command blocks */}
@@ -187,7 +185,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           ref={containerRef}
           className={cn(
             "min-h-0 flex-1 transition-opacity",
-            session.scratchpadFocused && "opacity-50",
+            session.scratchpadOpen && "opacity-50",
           )}
           onFocus={() => setLeafTerminalFocused(tabId)}
         />

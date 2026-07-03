@@ -359,6 +359,8 @@ asi que nunca hay robo nativo de foco con el que competir.
   reafirmar el foco del leaf incluso cuando `visible`/`focused` no cambiaron y por tanto el efecto no
   se re-ejecuta. Red de seguridad independiente del `preventDefault()`.
 
+Superseded by Addendum 5: the current model is binary (scratchpadOpen only).
+
 ### Addendum 3: el modelo de "lado activo pegajoso" (`scratchpadActive`) era la causa real
 
 Tras los dos addendums anteriores el usuario seguia viendo el bug al volver a una Tab con el
@@ -396,6 +398,8 @@ primero el DATO PERSISTIDO real (el JSON en disco) antes de seguir asumiendo una
 Aqui la causa no era ninguna carrera: era un tercer estado silencioso, dificil de notar y sin via de
 vuelta clara, cuyo arreglo correcto fue eliminarlo del modelo en vez de sincronizarlo mejor.
 
+Superseded by Addendum 5: the current model is binary (scratchpadOpen only).
+
 ### Addendum 4: xterm.js roba el foco de vuelta de forma asincrona tras un resize
 
 Tras el Addendum 3 el bug de "click en Tab de otro Pane, vuelvo, el SP no gana el foco" seguia
@@ -431,6 +435,72 @@ Un `console.log`/`console.trace` en un listener GLOBAL de `focusin` (capture, en
 forma mas rapida de encontrar quien roba el foco cuando ya se ha descartado el propio codigo: el
 stack trace señala directamente la libreria/lugar exacto, sin tener que teorizar sobre el orden de
 efectos de React o de eventos del navegador.
+
+### Addendum 5: modelo binario definitivo (`scratchpadOpen`), sustituye a `enabled` + `scratchpadFocused`
+
+### Sintoma
+
+Aun despues del rediseño del Addendum 3 (que elimino `scratchpadActive` y dejo el modelo en
+`enabled: boolean` + `visible = enabled && tab.focused` derivado, con un campo transitorio separado,
+`scratchpadFocused`, para "que lado tiene el foco ahora mismo") seguian dandose bugs de "que lado
+tiene el foco": cambiar de Tab dentro de la misma pane y volver a la Tab de origen podia resetear el
+lado enfocado (terminal o scratchpad) en vez de preservar el que el usuario habia dejado (833024d,
+"same-pane tab switch reset scratchpad focus mode instead of preserving it"), y el comportamiento
+divergia entre teclado y raton: el atajo de teclado reenfocaba siempre el scratchpad via
+`requestLeafFocus` (pensada originalmente para saltos de workspace), mientras el click de raton en la
+Tab respetaba el ultimo lado usado.
+
+### Pistas falsas descartadas
+
+- Seguir parcheando el campo transitorio "ultimo lado usado" (`scratchpadFocused`) para que
+  sobreviviera correctamente a cada tipo de cambio de foco (misma tab, cross-pane, workspace, teclado,
+  raton): cada caso nuevo encontraba una combinacion de eventos que el campo no cubria.
+- Unificar `requestLeafFocus` (pensada para saltos de workspace/notificacion) con el camino de "misma
+  pane, cambio de tab" en vez de eliminar la distincion: las dos rutas debian coexistir, y cada punto
+  de entrada nuevo de foco (bell, RunButton, OpenInEditorButton, `onCloseAutoFocus` de los menus Radix)
+  era una ocasion mas de usar la funcion equivocada y reintroducir la divergencia.
+
+### Causa raiz
+
+El modelo de dos campos independientes -- `enabled` (persistido, existencia de la barra) y
+`scratchpadFocused` (que lado tiene el foco ahora mismo, con memoria propia) -- tiene mas estados
+posibles que interacciones reales necesita la app. La unica pregunta que importa es "¿tiene el usuario
+el cursor en el textarea del scratchpad ahora mismo?"; cualquier evento que no actualizara ese segundo
+campo de forma exhaustiva dejaba una combinacion sin cubrir, y multiplicar los puntos de entrada de
+foco (teclado, raton, bell, dialogs, menus Radix) multiplicaba las oportunidades de que alguno usara
+la funcion de foco equivocada o se olvidara de tocar el campo.
+
+### Fix
+
+Se colapsa el modelo a un unico estado binario, `Session.scratchpadOpen`: existencia y foco son la
+misma cosa, no hay "abierto sin foco". El cierre pasa a ser explicito y centralizado en vez de
+depender de que cada camino de foco mantenga un campo de memoria:
+- `onActivateTabStable`, con la funcion pura `scratchpadLeafsToClose`, cierra el scratchpad del tab
+  que se abandona (y, en una activacion cross-pane, tambien el de la pane abandonada).
+- `leaveActivePaneScratchpad` (via `onFocusPaneStable` / `focusPaneInDirection`) cierra al cambiar de
+  pane.
+- El efecto de cambio de workspace (`prevWorkspaceIdRef` en `App.tsx`) cierra al cambiar de workspace.
+- El blur del textarea (`leaveLeafScratchpad`) cierra en cualquier otro caso, con dos guards: el
+  estado `settingsOpen` del menu de ajustes (Radix, portaleado) y un `onMouseDown` con
+  `preventDefault` en el marco del contenedor, para que clicar el padding de la barra no cuente como
+  "salir".
+
+`requestLeafFocus(leafId)` queda como la unica primitiva "enfoca este leaf" (scratchpad si esta
+abierto, si no el slot del terminal); todos los saltos de foco (teclado, raton, notificaciones, bell,
+RunButton, OpenInEditorButton, `onCloseAutoFocus` de Radix) pasan por ella, asi que ninguno puede
+reintroducir la divergencia porque ya no queda un segundo camino con reglas distintas.
+
+### Leccion
+
+Cuando un bug de foco sobrevive a varios parches sucesivos sobre el mismo campo "de memoria", el
+problema casi siempre es el propio campo, no el ultimo evento sin cubrir: fusionar los dos estados en
+uno solo (existencia == foco) elimina la clase entera de bug en vez de tapar el siguiente caso.
+
+Leccion de F1 (Tarea 1, `ScratchpadBar.tsx`): los portales de Radix rompen los guards de containment
+en `onBlur` porque el contenido del menu vive en `document.body`, fuera de `containerRef`; Radix
+ademas hace `preventDefault` en el `pointerdown` del trigger, asi que el trigger nunca llega a recibir
+foco DOM real y el `relatedTarget` del blur no sirve para detectarlo. El guard correcto es el estado
+`open` del propio menu (`settingsOpen`), no el containment del DOM.
 
 ## Bug 8: la navegacion por teclado entre workspaces no sigue el orden visual (RESUELTO)
 
