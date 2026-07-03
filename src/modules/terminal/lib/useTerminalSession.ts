@@ -532,6 +532,9 @@ export function requestLeafFocus(leafId: string): void {
   if (s.scratchpadOpen) {
     requestScratchpadFocus(s);
   } else if (
+    // Read live: if the preference was turned off after the mark was set,
+    // this branch is skipped and the mark stays inert until a later dismiss
+    // or open clears it.
     s.scratchpadResume &&
     usePreferencesStore.getState().scratchpadRememberFocus
   ) {
