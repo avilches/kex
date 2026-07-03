@@ -50,7 +50,12 @@ move no DOM focus, so blur cannot cover them; those are closed explicitly and ce
 abandoned pane's active tab on a cross-pane activation), `leaveActivePaneScratchpad` (pane switch, via
 `onFocusPaneStable` / `focusPaneInDirection`), and the workspace-switch effect (`prevWorkspaceIdRef`
 in `App.tsx`). A focused tab whose scratchpad is open always gets keyboard focus there on regaining
-focus, never the terminal.
+focus, never the terminal. `closeScratchpadState` takes a `reason` of `"leave"` (an abandon-close: tab,
+pane or workspace switch, or transient chrome closing) or `"dismiss"` (a deliberate close: Escape,
+`Cmd+U`, clicking the terminal). With the opt-in `scratchpadRememberFocus` preference on, a `"leave"`
+close sets the transient, never-persisted `Session.scratchpadResume` mark instead of just closing;
+`requestLeafFocus` consumes it on the next focus of that leaf to reopen and focus the scratchpad. A
+`"dismiss"` close always clears the mark.
 
 A pane may have an empty `tabs` array with `activeTabId: null`. This state is valid only for
 the sole pane of a workspace (when the workspace has no split). When the last tab is closed in a

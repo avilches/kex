@@ -8,25 +8,6 @@ Bugs, features y mejoras ya auditadas y priorizadas viven aparte, en [PENDING.md
 
 ---
 
-## Scratchpad: modo remindScratchpadFocus (reapertura al volver)
-
-Estado: pendiente (anotado 2026-07-03, acordado tras el merge del modelo binario de foco, merge `c519f71`).
-
-Flag de comportamiento opcional sobre el modelo binario del scratchpad: al perder el foco un terminal con
-el scratchpad enfocado (cambio de tab/pane/workspace), el scratchpad se cierra de verdad (como hoy), pero
-la sesion recuerda una marca transitoria en memoria (no persistida) de "reabrir al volver"; cuando
-`requestLeafFocus` vuelve a enfocar ese leaf, reabre y enfoca el scratchpad de forma determinista por el
-camino de activacion propio, sin depender de eventos nativos de foco. No reintroduce el estado "abierto
-sin foco" (causa de los bugs del modelo anterior, ver `WORKSPACES_GOTCHAS.md` Bug 7 Addendum 5): mientras
-el leaf no esta activo, el scratchpad esta realmente cerrado.
-
-Puntos de integracion: los cierres centralizados de App.tsx (`onActivateTabStable`,
-`leaveActivePaneScratchpad`, efecto de workspace switch, efecto centinela del leaf activo) pasarian a usar
-una variante que marca la sesion antes de cerrar; `requestLeafFocus` consume la marca. Decidir si el flag
-es preferencia con UI (TerminalSection) o JSON-only.
-
----
-
 ## Popup de agente: fecha original de la sesion Claude
 
 Estado: pendiente (anotado 2026-06-16).
