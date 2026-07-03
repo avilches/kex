@@ -502,6 +502,47 @@ ademas hace `preventDefault` en el `pointerdown` del trigger, asi que el trigger
 foco DOM real y el `relatedTarget` del blur no sirve para detectarlo. El guard correcto es el estado
 `open` del propio menu (`settingsOpen`), no el containment del DOM.
 
+### Addendum 6: el retorno de pane por teclado no reabria el scratchpad con `scratchpadRememberFocus` activo
+
+### Sintoma
+
+Con la preferencia `scratchpadRememberFocus` activa, volver a una pane con el scratchpad marcado
+para resume (`scratchpadResume`) reabria el scratchpad al hacerlo por bell, RunButton,
+OpenInEditorButton o cierre de un dropdown/dialog/menu Radix, pero no al volver por teclado
+(`focusPane`/`focusPaneInDirection`): el foco caia siempre en el terminal, ignorando la marca.
+
+### Pistas falsas descartadas
+
+- Un fantasma de HMR (Vite recargando el modulo y dejando una instancia vieja de la sesion sin la
+  marca de resume): descartado con un `pnpm tauri dev` fresco tras matar el proceso; el bug era real,
+  no un artefacto de la sesion de dev.
+
+### Causa raiz
+
+El efecto de transicion de foco en `useTerminalSession.ts` (~linea 1174, el que reacciona a
+`focused` pasando a `true`) es el camino real que mueve el foco DOM en un cambio de pane por
+teclado, porque `focusPane` solo actualiza estado de React. Ese efecto es anterior a la marca de
+resume y tenia su propia rama inline de dos vias (`scratchpadOpen ? requestScratchpadFocus(s) :
+focusSlot(leafId)`), que nunca consultaba `scratchpadResume`. Era un cuarto camino de foco que
+bypaseaba `requestLeafFocus`, la primitiva unica establecida en el Addendum 5 precisamente para que
+ningun punto de entrada de foco pudiera reintroducir esta clase de divergencia.
+
+### Fix
+
+La transicion ahora delega en `requestLeafFocus(leafId)`, que ya implementa las tres vias
+correctas (scratchpad abierto -> foco al scratchpad; scratchpad cerrado con marca de resume viva y
+preferencia activa -> reabrir vía `openScratchpadState` y consumir la marca; si no, foco al
+terminal). El guard `gained && !blocks` se mantiene igual, solo cambia que hace dentro.
+
+### Leccion
+
+"`requestLeafFocus` es la unica primitiva de foco" es un invariante que hay que hacer cumplir en
+CADA sitio que enfoca un leaf, incluidos efectos internos del propio modulo del terminal, no solo en
+los puntos de entrada obvios (bell, RunButton, menus). Un efecto interno que predata una feature
+nueva puede quedar con su propia logica inline y bifurcar la semantica silenciosamente por
+dispositivo de entrada (raton/teclado vs otros caminos) sin que ningun test end-to-end lo note si
+solo cubre un dispositivo.
+
 ## Bug 8: la navegacion por teclado entre workspaces no sigue el orden visual (RESUELTO)
 
 ### Sintoma

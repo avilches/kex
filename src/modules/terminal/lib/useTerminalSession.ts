@@ -1170,12 +1170,12 @@ export function useTerminalSession({
       setSlotFocused(leafId, focused);
       // Only seize focus on the transition to focused-and-visible. Re-running
       // for other reasons (theme, fonts, sibling visibility) must not yank focus
-      // back from wherever the user just moved it (e.g. another tab).
+      // back from wherever the user just moved it (e.g. another tab). This is
+      // the path that moves DOM focus on keyboard pane switches (focusPane only
+      // updates React state), so it must go through requestLeafFocus like every
+      // other focus-a-leaf call site, or it silently bypasses the resume mark.
       const gained = visible && focused && !wasFocusedRef.current;
-      if (gained && !blocks) {
-        if (s.scratchpadOpen) requestScratchpadFocus(s);
-        else focusSlot(leafId);
-      }
+      if (gained && !blocks) requestLeafFocus(leafId);
     } else if (s.hasSlot) {
       if (s.blocks || isLeafAltScreen(leafId)) parkLeafSlot(leafId);
       else unbindLeafFromSlot(leafId, s);
