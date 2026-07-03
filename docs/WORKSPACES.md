@@ -36,11 +36,21 @@ Workspace           — a named environment (local or WSL distro)
 A `Tab` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
 its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`). A `terminal` panel also persists
-`scratchpadEnabled` (boolean): whether its scratchpad bar is enabled, synced from the session via
+`scratchpadEnabled` (boolean), synced from the live session (`Session.scratchpadOpen`) via
 `onScratchpadEnabled` and replayed on restore as `initialScratchpadEnabled`. When unset (a fresh
-terminal) the `scratchpadInNewTerminals` preference decides the initial value. Visibility is derived,
-not persisted: `scratchpadEnabled && tab is focused`; a focused tab with the scratchpad enabled
-always gets keyboard focus on the scratchpad, never the terminal.
+terminal) the `scratchpadInNewTerminals` preference decides the initial value. Existence and focus
+are the same state (`scratchpadOpen`): there is no "open but unfocused" scratchpad, and the flag does
+not survive independently of focus, so this persists at most the single tab that held the scratchpad
+focus when the app quit. Anything that takes real focus away closes it: clicking the terminal grid
+(`setLeafTerminalFocused`), Escape and the `Cmd+U` toggle (`closeScratchpad`/`toggleScratchpad`), and
+blurring the textarea outward (`leaveLeafScratchpad`, guarded so the portaled settings menu and clicks
+on the bar's own frame do not count as leaving). Keyboard and programmatic tab/pane/workspace switches
+move no DOM focus, so blur cannot cover them; those are closed explicitly and centrally instead:
+`onActivateTabStable` (tab switch, via the pure `scratchpadLeafsToClose`, which also closes the
+abandoned pane's active tab on a cross-pane activation), `leaveActivePaneScratchpad` (pane switch, via
+`onFocusPaneStable` / `focusPaneInDirection`), and the workspace-switch effect (`prevWorkspaceIdRef`
+in `App.tsx`). A focused tab whose scratchpad is open always gets keyboard focus there on regaining
+focus, never the terminal.
 
 A pane may have an empty `tabs` array with `activeTabId: null`. This state is valid only for
 the sole pane of a workspace (when the workspace has no split). When the last tab is closed in a
