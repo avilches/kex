@@ -611,6 +611,7 @@ export default function App() {
         if (found) {
           setActiveWorkspaceId(found.workspace.id);
           activateTab(found.workspace.id, config.tabId);
+          requestLeafFocus(config.tabId);
           if (!getScriptRunningSnapshot().get(config.tabId)) {
             const tabId = config.tabId;
             const tryWrite = (attempts = 0) => {
@@ -660,6 +661,7 @@ export default function App() {
       }
 
       updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
+      requestLeafFocus(freshTabId);
 
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(freshTabId);
@@ -680,6 +682,7 @@ export default function App() {
       if (!config.tabId) return;
       // Focus the terminal so OSC 133;D can be received and update the waiting state
       activateTab(activeWorkspace?.id ?? "", config.tabId);
+      requestLeafFocus(config.tabId);
       setScriptRunning(config.tabId, "waiting");
       const handle = terminalHandles.current.get(config.tabId);
       handle?.write("\x03");
