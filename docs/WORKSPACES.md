@@ -42,7 +42,9 @@ terminal) the `scratchpadInNewTerminals` preference decides the initial value. E
 are the same state (`scratchpadOpen`): there is no "open but unfocused" scratchpad, and the flag does
 not survive independently of focus, so this persists at most the single tab that held the scratchpad
 focus when the app quit. Anything that takes real focus away closes it: clicking the terminal grid
-(`setLeafTerminalFocused`), Escape and the `Cmd+U` toggle (`closeScratchpad`/`toggleScratchpad`), and
+of the already-focused leaf (`setLeafTerminalFocused`; clicking an unfocused leaf's terminal is a
+mouse pane/tab switch instead, see below), Escape and the `Cmd+U` toggle
+(`closeScratchpad`/`toggleScratchpad`), and
 blurring the textarea outward (`leaveLeafScratchpad`, guarded so the portaled settings menu and clicks
 on the bar's own frame do not count as leaving). Keyboard and programmatic tab/pane/workspace switches
 move no DOM focus, so blur cannot cover them; those are closed explicitly and centrally instead:
@@ -52,7 +54,9 @@ abandoned pane's active tab on a cross-pane activation), `leaveActivePaneScratch
 in `App.tsx`). A focused tab whose scratchpad is open always gets keyboard focus there on regaining
 focus, never the terminal. `closeScratchpadState` takes a `reason` of `"leave"` (an abandon-close: tab,
 pane or workspace switch, or transient chrome closing) or `"dismiss"` (a deliberate close: Escape,
-`Cmd+U`, clicking the terminal). With the opt-in `scratchpadRememberFocus` preference on, a `"leave"`
+`Cmd+U`, clicking the already-focused leaf's terminal). A mouse click that switches pane/tab (the
+terminal of an unfocused leaf) is not a dismiss: `setLeafTerminalFocused` skips it so the mark
+survives, same as a keyboard switch. With the opt-in `scratchpadRememberFocus` preference on, a `"leave"`
 close sets the transient, never-persisted `Session.scratchpadResume` mark instead of just closing;
 `requestLeafFocus` consumes it on the next focus of that leaf to reopen and focus the scratchpad. A
 `"dismiss"` close always clears the mark.

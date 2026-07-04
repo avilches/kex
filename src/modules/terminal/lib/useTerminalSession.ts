@@ -399,15 +399,19 @@ export function setLeafScratchpadFocus(
 }
 
 // Called when the terminal grid gains real DOM focus (a leaf-scoped focusin
-// on its container). If this leaf's own scratchpad was open, close it --
-// clicking into the terminal always dismisses the scratchpad. The resume
-// mark clears unconditionally: clicking the terminal blurs the scratchpad
-// textarea first, which already closed it and marked resume (leaveLeafScratchpad)
-// -- closeScratchpadState would early-return here since scratchpadOpen is
-// already false, so the unconditional clear is what actually dismisses the mark.
+// on its container). A click on the terminal of the leaf that was ALREADY
+// focused dismisses its scratchpad (and clears any resume mark): the user
+// deliberately went back to the terminal. A click on the terminal of a leaf
+// that was NOT focused is a mouse pane/tab switch, not a dismiss -- at this
+// point s.focusedNow is still false, because focusin fires during the
+// mousedown's default action, before React commits the activePaneId/tab
+// change that would flip it. Skip the clear so the focused-transition effect
+// (which runs after that commit and sets focusedNow=true) can still consume a
+// pending resume mark via requestLeafFocus, exactly like a keyboard switch.
 export function setLeafTerminalFocused(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
+  if (!s.focusedNow) return;
   s.scratchpadResume = false;
   if (!s.scratchpadOpen) return;
   closeScratchpadState(s, leafId, "dismiss");
