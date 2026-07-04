@@ -33,6 +33,8 @@ Workspace           — a named environment (local or WSL distro)
 - `runningCommands` (`Map<tabId, string>`) — foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a script is involved.
 - `scriptRunning` (`Map<tabId, ScriptState>`) — tracks which terminal tabs are currently executing a script command. Set by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
 
+`runWorkspaceConfig`/`stopWorkspaceConfig` only move focus to the script's tab when it lives in a *different* workspace. When the script's tab is in the current workspace, they call `revealTab` (makes the tab active in its own pane, `activePaneId` untouched) and restore `requestLeafFocus` on the user's own leaf, so running or stopping a script never steals focus or closes the user's open scratchpad.
+
 A `Tab` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
 its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`). A `terminal` panel also persists

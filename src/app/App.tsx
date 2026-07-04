@@ -193,6 +193,7 @@ export default function App() {
     splitPaneAndOpenTab,
     openTab,
     activateTab,
+    revealTab,
     closeTab,
     reopenClosed,
     updateTabData,
@@ -605,13 +606,24 @@ export default function App() {
     (config: Script) => {
       if (!activeWorkspace) return;
 
-      // Case 1: tab already exists -- focus it and re-run if idle
+      // The user's own leaf, captured up front so a same-workspace script run
+      // reveals its tab without moving activePaneId or focus away from here.
+      const userPaneId = activeWorkspace.activePaneId;
+      const userLeafId = findPane(activeWorkspace.paneTree, userPaneId)?.activeTabId ?? null;
+
+      // Case 1: tab already exists -- reveal it (same workspace) or focus it
+      // (other workspace) and re-run if idle
       if (config.tabId) {
         const found = findTabGlobal(config.tabId);
         if (found) {
-          setActiveWorkspaceId(found.workspace.id);
-          activateTab(found.workspace.id, config.tabId);
-          requestLeafFocus(config.tabId);
+          if (found.workspace.id === activeWorkspace.id) {
+            revealTab(found.workspace.id, config.tabId);
+            if (userLeafId) requestLeafFocus(userLeafId);
+          } else {
+            setActiveWorkspaceId(found.workspace.id);
+            activateTab(found.workspace.id, config.tabId);
+            requestLeafFocus(config.tabId);
+          }
           if (!getScriptRunningSnapshot().get(config.tabId)) {
             const tabId = config.tabId;
             const tryWrite = (attempts = 0) => {
@@ -633,23 +645,27 @@ export default function App() {
       const tabCwd = config.cwd ?? activeWorkspace.workspaceRoot ?? activeWorkspace.cwd;
       const tab: Tab = { id: freshTabId, kind: "terminal", cwd: tabCwd, title: config.name || undefined };
 
-      // Case 2: existing script pane -- add tab to it without splitting
+      // Case 2: existing script pane -- add tab to it without splitting.
+      // openTab only sets the target pane's own activeTabId, it never touches
+      // the workspace's activePaneId, so this already reveals without stealing focus.
       const existingScriptPane = activeWorkspace.scriptPaneId
         ? findPane(activeWorkspace.paneTree, activeWorkspace.scriptPaneId)
         : null;
 
       if (existingScriptPane) {
         openTab(activeWorkspace.id, activeWorkspace.scriptPaneId!, tab);
-        setActiveWorkspaceId(activeWorkspace.id);
-        activateTab(activeWorkspace.id, freshTabId);
       } else {
         // Case 3: no script pane yet -- split and record the new pane
         const { workspacePaneLimit } = usePreferencesStore.getState();
         const atLimit = allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit;
         if (atLimit) {
+          // Same reasoning as Case 2: the tab lands in the user's own active
+          // pane, so activePaneId never moves.
           openTab(activeWorkspace.id, activeWorkspace.activePaneId, tab);
           setScriptPaneId(activeWorkspace.id, activeWorkspace.activePaneId);
         } else {
+          // splitPaneAndOpenTab activates the freshly created pane, so restore
+          // the user's pane afterward.
           const freshPaneId = splitPaneAndOpenTab(
             activeWorkspace.id,
             activeWorkspace.activePaneId,
@@ -657,11 +673,12 @@ export default function App() {
             tab,
           );
           setScriptPaneId(activeWorkspace.id, freshPaneId);
+          focusPane(activeWorkspace.id, userPaneId);
         }
       }
 
       updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
-      requestLeafFocus(freshTabId);
+      if (userLeafId) requestLeafFocus(userLeafId);
 
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(freshTabId);
@@ -674,20 +691,29 @@ export default function App() {
       };
       setTimeout(tryWrite, 150);
     },
-    [activeWorkspace, findTabGlobal, setActiveWorkspaceId, activateTab, splitPaneAndOpenTab, updateScript, openTab, setScriptPaneId],
+    [activeWorkspace, findTabGlobal, setActiveWorkspaceId, activateTab, revealTab, splitPaneAndOpenTab, focusPane, updateScript, openTab, setScriptPaneId],
   );
 
   const stopWorkspaceConfig = useCallback(
     (config: Script) => {
       if (!config.tabId) return;
-      // Focus the terminal so OSC 133;D can be received and update the waiting state
-      activateTab(activeWorkspace?.id ?? "", config.tabId);
-      requestLeafFocus(config.tabId);
+      const found = findTabGlobal(config.tabId);
+      if (found && found.workspace.id === activeWorkspaceId) {
+        // Same workspace: reveal the script tab without moving the user's
+        // pane or focus away from wherever they currently are.
+        const userPaneId = found.workspace.activePaneId;
+        const userLeafId = findPane(found.workspace.paneTree, userPaneId)?.activeTabId ?? null;
+        revealTab(found.workspace.id, config.tabId);
+        if (userLeafId) requestLeafFocus(userLeafId);
+      } else {
+        activateTab(activeWorkspaceId, config.tabId);
+        requestLeafFocus(config.tabId);
+      }
       setScriptRunning(config.tabId, "waiting");
       const handle = terminalHandles.current.get(config.tabId);
       handle?.write("\x03");
     },
-    [activateTab, activeWorkspace?.id],
+    [activateTab, activeWorkspaceId, findTabGlobal, revealTab],
   );
 
   const handleCloseWorkspace = useCallback(

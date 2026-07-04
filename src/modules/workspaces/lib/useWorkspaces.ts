@@ -540,6 +540,30 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, [recordActivation]);
 
+  // Like activateTab but leaves activePaneId untouched: makes tabId the active
+  // tab of its own pane without moving the user's focus to that pane. Used to
+  // surface a script's output tab without stealing focus from wherever the
+  // user currently is.
+  const revealTab = useCallback((workspaceId: string, tabId: string) => {
+    const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    const pane = ws ? findTabPane(ws.paneTree, tabId)?.pane : undefined;
+    if (pane) recordActivation(pane.id, tabId);
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w;
+        const result = findTabPane(w.paneTree, tabId);
+        if (!result) return w;
+        return {
+          ...w,
+          paneTree: updatePane(w.paneTree, result.pane.id, (p) => ({
+            ...p,
+            activeTabId: tabId,
+          })),
+        };
+      }),
+    );
+  }, [recordActivation]);
+
   const closeTab = useCallback((workspaceId: string, tabId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     let history: string[] | undefined;
@@ -855,6 +879,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     splitPaneAndOpenTab,
     openTab,
     activateTab,
+    revealTab,
     closeTab,
     reopenClosed,
     updateTabData,
