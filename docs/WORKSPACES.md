@@ -38,30 +38,8 @@ Workspace           — a named environment (local or WSL distro)
 A `Tab` is a tagged union on `kind`: `terminal` | `editor` | `browser` | `markdown` |
 `git-diff` | `git-history` | `git-commit-file`. All kinds share `id`, `title`; each kind carries
 its own extra fields (e.g., `cwd`, `runningCommand`, `dirty`). A `terminal` panel also persists
-`scratchpadEnabled` (boolean), synced from the live session (`Session.scratchpadOpen`) via
-`onScratchpadEnabled` and replayed on restore as `initialScratchpadEnabled`. When unset (a fresh
-terminal) the `scratchpadInNewTerminals` preference decides the initial value. Existence and focus
-are the same state (`scratchpadOpen`): there is no "open but unfocused" scratchpad, and the flag does
-not survive independently of focus, so this persists at most the single tab that held the scratchpad
-focus when the app quit. Anything that takes real focus away closes it: clicking the terminal grid
-of the already-focused leaf (`setLeafTerminalFocused`; clicking an unfocused leaf's terminal is a
-mouse pane/tab switch instead, see below), Escape and the `Cmd+U` toggle
-(`closeScratchpad`/`toggleScratchpad`), and
-blurring the textarea outward (`leaveLeafScratchpad`, guarded so the portaled settings menu and clicks
-on the bar's own frame do not count as leaving). Keyboard and programmatic tab/pane/workspace switches
-move no DOM focus, so blur cannot cover them; those are closed explicitly and centrally instead:
-`onActivateTabStable` (tab switch, via the pure `scratchpadLeafsToClose`, which also closes the
-abandoned pane's active tab on a cross-pane activation), `leaveActivePaneScratchpad` (pane switch, via
-`onFocusPaneStable` / `focusPaneInDirection`), and the workspace-switch effect (`prevWorkspaceIdRef`
-in `App.tsx`). A focused tab whose scratchpad is open always gets keyboard focus there on regaining
-focus, never the terminal. `closeScratchpadState` takes a `reason` of `"leave"` (an abandon-close: tab,
-pane or workspace switch, or transient chrome closing) or `"dismiss"` (a deliberate close: Escape,
-`Cmd+U`, clicking the already-focused leaf's terminal). A mouse click that switches pane/tab (the
-terminal of an unfocused leaf) is not a dismiss: `setLeafTerminalFocused` skips it so the mark
-survives, same as a keyboard switch. With the opt-in `scratchpadRememberFocus` preference on, a `"leave"`
-close sets the transient, never-persisted `Session.scratchpadResume` mark instead of just closing;
-`requestLeafFocus` consumes it on the next focus of that leaf to reopen and focus the scratchpad. A
-`"dismiss"` close always clears the mark.
+`scratchpadEnabled` (boolean) for the scratchpad bar. See [SCRATCHPAD.md](SCRATCHPAD.md) for the
+binary focus model, the full close/focus path map, and the `requestLeafFocus` invariant.
 
 A pane may have an empty `tabs` array with `activeTabId: null`. This state is valid only for
 the sole pane of a workspace (when the workspace has no split). When the last tab is closed in a

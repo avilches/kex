@@ -266,6 +266,8 @@ verificar que el permiso correspondiente (`core:window:allow-*`) este en `capabi
 
 ## Bug 7: el scratchpad no recibe el foco (nuevos terminales y restore) (RESUELTO)
 
+See [SCRATCHPAD.md](SCRATCHPAD.md) for the current model this bug (and its addenda) converged to.
+
 ### Sintoma
 
 Con la preferencia "scratchpad en terminales nuevos" activa, la barra del scratchpad aparecia pero

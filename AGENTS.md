@@ -239,6 +239,13 @@ Deep-dive into the workspace rendering stack and terminal slot pool:
   confirmed fix. Add an entry whenever a bug in this subsystem takes more than one attempt to fix, so it is not
   re-discovered.
 
+### `docs/SCRATCHPAD.md`
+
+Single reference for the scratchpad's binary state model (`Session.scratchpadOpen`), the transient
+resume mark (`scratchpadResume`), and every focus/close path that touches a terminal leaf, including
+the `requestLeafFocus` invariant. Update whenever the scratchpad's focus model, its close/open paths,
+or the resume semantics change.
+
 ### `docs/FORK.md`
 
 Documents every significant divergence from the upstream repo ([crynta/terax-ai](https://github.com/crynta/terax-ai)):
