@@ -732,6 +732,12 @@ export default function App() {
           revealTab(found.workspace.id, config.tabId);
           if (userLeafId) requestLeafFocus(userLeafId);
         }
+      } else if (found) {
+        // Different workspace: jump to the script's workspace and tab,
+        // mirroring runWorkspaceConfig's different-workspace case.
+        setActiveWorkspaceId(found.workspace.id);
+        activateTab(found.workspace.id, config.tabId);
+        requestLeafFocus(config.tabId);
       } else {
         activateTab(activeWorkspaceId, config.tabId);
         requestLeafFocus(config.tabId);
@@ -740,7 +746,7 @@ export default function App() {
       const handle = terminalHandles.current.get(config.tabId);
       handle?.write("\x03");
     },
-    [activateTab, activeWorkspaceId, findTabGlobal, revealTab],
+    [activateTab, activeWorkspaceId, findTabGlobal, revealTab, setActiveWorkspaceId],
   );
 
   const handleCloseWorkspace = useCallback(
