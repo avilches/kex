@@ -78,6 +78,7 @@ import {
   findPane,
   findPaneInDirection,
   findTabPane,
+  focusedTabId,
   tabTitle,
   siblingPane,
   type Tab,
@@ -609,16 +610,23 @@ export default function App() {
       // The user's own leaf, captured up front so a same-workspace script run
       // reveals its tab without moving activePaneId or focus away from here.
       const userPaneId = activeWorkspace.activePaneId;
-      const userLeafId = findPane(activeWorkspace.paneTree, userPaneId)?.activeTabId ?? null;
+      const userLeafId = focusedTabId(activeWorkspace.paneTree, userPaneId);
 
-      // Case 1: tab already exists -- reveal it (same workspace) or focus it
-      // (other workspace) and re-run if idle
+      // Case 1: tab already exists -- reveal it (same workspace, different
+      // pane) or focus it (other workspace, or same pane as the user: a pane
+      // shows one tab, so revealing without stealing focus is impossible)
+      // and re-run if idle
       if (config.tabId) {
         const found = findTabGlobal(config.tabId);
         if (found) {
           if (found.workspace.id === activeWorkspace.id) {
-            revealTab(found.workspace.id, config.tabId);
-            if (userLeafId) requestLeafFocus(userLeafId);
+            if (found.pane.id === userPaneId) {
+              activateTab(found.workspace.id, config.tabId);
+              requestLeafFocus(config.tabId);
+            } else {
+              revealTab(found.workspace.id, config.tabId);
+              if (userLeafId) requestLeafFocus(userLeafId);
+            }
           } else {
             setActiveWorkspaceId(found.workspace.id);
             activateTab(found.workspace.id, config.tabId);
@@ -647,25 +655,36 @@ export default function App() {
 
       // Case 2: existing script pane -- add tab to it without splitting.
       // openTab only sets the target pane's own activeTabId, it never touches
-      // the workspace's activePaneId, so this already reveals without stealing focus.
+      // the workspace's activePaneId, so this reveals without stealing focus
+      // unless the script pane IS the user's own pane, in which case a pane
+      // showing one tab makes reveal-without-stealing impossible: activation
+      // follows the script instead.
       const existingScriptPane = activeWorkspace.scriptPaneId
         ? findPane(activeWorkspace.paneTree, activeWorkspace.scriptPaneId)
         : null;
 
       if (existingScriptPane) {
         openTab(activeWorkspace.id, activeWorkspace.scriptPaneId!, tab);
+        if (existingScriptPane.id === userPaneId) {
+          activateTab(activeWorkspace.id, freshTabId);
+          requestLeafFocus(freshTabId);
+        } else if (userLeafId) {
+          requestLeafFocus(userLeafId);
+        }
       } else {
         // Case 3: no script pane yet -- split and record the new pane
         const { workspacePaneLimit } = usePreferencesStore.getState();
         const atLimit = allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit;
         if (atLimit) {
-          // Same reasoning as Case 2: the tab lands in the user's own active
-          // pane, so activePaneId never moves.
+          // The tab lands in the user's own active pane by definition, so
+          // activation follows the script instead of trying to reveal it.
           openTab(activeWorkspace.id, activeWorkspace.activePaneId, tab);
           setScriptPaneId(activeWorkspace.id, activeWorkspace.activePaneId);
+          activateTab(activeWorkspace.id, freshTabId);
+          requestLeafFocus(freshTabId);
         } else {
-          // splitPaneAndOpenTab activates the freshly created pane, so restore
-          // the user's pane afterward.
+          // splitPaneAndOpenTab activates the freshly created pane, which is
+          // never the user's own pane, so restore it and keep focus put.
           const freshPaneId = splitPaneAndOpenTab(
             activeWorkspace.id,
             activeWorkspace.activePaneId,
@@ -674,11 +693,11 @@ export default function App() {
           );
           setScriptPaneId(activeWorkspace.id, freshPaneId);
           focusPane(activeWorkspace.id, userPaneId);
+          if (userLeafId) requestLeafFocus(userLeafId);
         }
       }
 
       updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
-      if (userLeafId) requestLeafFocus(userLeafId);
 
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(freshTabId);
@@ -700,11 +719,19 @@ export default function App() {
       const found = findTabGlobal(config.tabId);
       if (found && found.workspace.id === activeWorkspaceId) {
         // Same workspace: reveal the script tab without moving the user's
-        // pane or focus away from wherever they currently are.
+        // pane or focus away from wherever they currently are, unless the
+        // script's pane IS the user's own pane (a pane shows one tab, so
+        // reveal-without-stealing is impossible there): activation follows
+        // the script instead.
         const userPaneId = found.workspace.activePaneId;
-        const userLeafId = findPane(found.workspace.paneTree, userPaneId)?.activeTabId ?? null;
-        revealTab(found.workspace.id, config.tabId);
-        if (userLeafId) requestLeafFocus(userLeafId);
+        if (found.pane.id === userPaneId) {
+          activateTab(found.workspace.id, config.tabId);
+          requestLeafFocus(config.tabId);
+        } else {
+          const userLeafId = focusedTabId(found.workspace.paneTree, userPaneId);
+          revealTab(found.workspace.id, config.tabId);
+          if (userLeafId) requestLeafFocus(userLeafId);
+        }
       } else {
         activateTab(activeWorkspaceId, config.tabId);
         requestLeafFocus(config.tabId);
