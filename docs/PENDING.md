@@ -17,6 +17,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-40](pending/bugs/BUG-40-stage-unstage-all-incompleto.md) — Stage all / unstage all no procesa todos los ficheros (la logica de pathspecs parece correcta; el sintoma cuelga probablemente de BUG-06, renames sin original_rel. Reproducir antes de fix)
 - [BUG-42](pending/bugs/BUG-42-borrar-fichero-con-editor-abierto.md) — Borrar un fichero con el editor abierto: el editor muestra un error rojo generico (string crudo de IPC, sin distinguir ENOENT ni ofrecer accion) y la vista de diff no reacciona (contenido obsoleto). Definir mejor UX
 - [BUG-43](pending/bugs/BUG-43-restore-claude-code-con-worktree.md) — Restore de Claude Code cuando ha creado un worktree (sin verificar)
+- [BUG-SP-01](pending/bugs/BUG-SP-01-mouse-pane-return-no-resume.md) - Scratchpad (remember ON): volver a un pane con el raton no reabre el SP (teclado si funciona). Reproducir con proceso fresco antes de investigar (sospecha HMR)
 
 ## WIP en ramas
 
@@ -42,6 +43,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [M6](pending/improvements/M6-reaping-bg-procs-y-registry.md) — Reaping de procesos background y registry
 - [M7](pending/improvements/M7-quick-wins.md) — Quick wins varios (parcial: ~11/15 ya hechos; quedan items 5 (parcial), 13, 14)
 - [M8](pending/improvements/M8-release-appimage-wayland-updater-sig.md) — Adoptar sistema de release de AppImage del upstream (fix libwayland + sig race-free)
+- [IMP-SP-02](pending/improvements/IMP-SP-02-test-catalog-scratchpad.md) - Catalogo de pruebas con codigo (SP-XX) para los invariantes del scratchpad: pasos, esperado y punteros a codigo por caso; integrarlo en docs/SCRATCHPAD.md y re-validar los casos pendientes (borrador completo en el fichero)
 - [M9](pending/improvements/M9-rebind-rename-f2-shift-f6.md) — Rebind del atajo de rename: F2 -> Shift+F6
 - [M10](pending/improvements/M10-rendimiento-busqueda-ficheros.md) — Rendimiento de la busqueda de ficheros (fs_search async/paralelo/cancelable + tuning de contenido)
 
