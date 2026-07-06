@@ -1860,7 +1860,7 @@ export default function App() {
         kind: "terminal",
         cwd: path,
       });
-      setTimeout(() => terminalHandles.current.get(tabId)?.focus(), 80);
+      setTimeout(() => requestLeafFocus(tabId), 80);
     },
     [activeWorkspace, openTab],
   );
@@ -1876,7 +1876,7 @@ export default function App() {
         const tab = pane?.activeTabId
           ? pane.tabs.find((p) => p.id === pane.activeTabId)
           : pane?.tabs[0];
-        if (tab) terminalHandles.current.get(tab.id)?.focus();
+        if (tab) requestLeafFocus(tab.id);
       }, 80);
     },
     [addWorkspace, setWorkspaceRoot],
@@ -2057,7 +2057,7 @@ export default function App() {
       isTerminalTab && activeTabId !== null
         ? (cmd: string) => {
             writeToSession(activeTabId, cmd);
-            terminalHandles.current.get(activeTabId)?.focus();
+            requestLeafFocus(activeTabId);
           }
         : null,
     [isTerminalTab, activeTabId],
@@ -2070,7 +2070,7 @@ export default function App() {
       return {
         kind: "terminal",
         addon: activeSearchAddon,
-        focus: () => terminalHandles.current.get(activeTabId)?.focus(),
+        focus: () => requestLeafFocus(activeTabId),
       };
     if (isEditorTab && activeEditorHandle)
       return {
