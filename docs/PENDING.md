@@ -7,6 +7,10 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 
 ---
 
+## URGENTE
+
+- [URGENT-scratchpad-focus-y-rename-tools](pending/URGENT-scratchpad-focus-y-rename-tools.md) - Continuacion inmediata del trabajo mergeado en `6c395d6`: (1) BUG-SP-01 (pane return con raton no reabre el SP, re-probar con proceso fresco), (2) IMP-SP-02 (integrar catalogo de pruebas SP-XX en SCRATCHPAD.md y re-validar casos pendientes), (3) rename completo OpenInEditor -> OpenInTool (frontend + Rust, inventario y decisiones dentro)
+
 ## Bugs (`docs/pending/bugs/`)
 
 - [BUG-04](pending/bugs/BUG-04-diff-editor-reconstruido-por-cambio.md) — Diff editor reconstruido por cambio de dep
