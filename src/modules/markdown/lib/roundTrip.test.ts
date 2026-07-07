@@ -57,4 +57,44 @@ describe("round-trip idempotence", () => {
     const md1 = htmlToMarkdown(markdownToHtml("```rust\nfn main() {}\n```\n"));
     expect(md1).toBe("```rust\nfn main() {}\n```\n");
   });
+
+  it("does not throw on an ordinary filename with a literal percent sign", () => {
+    const md = htmlToMarkdown('<img src="assets/100%.png" alt="x">');
+    expect(md).toBe("![x](assets/100%.png)\n");
+  });
+
+  it("is idempotent for a bullet with no own text and only a nested list", () => {
+    const input = "- \n    - nested\n";
+    const md1 = htmlToMarkdown(markdownToHtml(input));
+    const md2 = htmlToMarkdown(markdownToHtml(md1));
+    expect(md2).toBe(md1);
+    expect(md1).toBe("- \n    - nested\n");
+  });
+
+  it("emits a valid GFM table (raw HTML fallback) for a table with no header row", () => {
+    const html =
+      "<table><tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody></table>";
+    const md1 = htmlToMarkdown(html);
+    // No `---` separator line was invented for a table that never had a header.
+    expect(md1).not.toMatch(/^\|.*\|\n\|\s*---/);
+    const md2 = htmlToMarkdown(markdownToHtml(md1));
+    expect(md2).toBe(md1);
+  });
+
+  it("does not misidentify a header row that isn't row 0 as a body row", () => {
+    const html =
+      "<table><tbody><tr><td>a</td><td>b</td></tr><tr><th>H1</th><th>H2</th></tr></tbody></table>";
+    const md1 = htmlToMarkdown(html);
+    // Falls back to raw HTML rather than treating the data row as the header.
+    expect(md1).toContain("<th>H1</th>");
+    expect(md1).toContain("<td>a</td>");
+  });
+
+  it("preserves a trailing hard break at the end of a list item", () => {
+    const withSibling = htmlToMarkdown("<ul><li>text<br></li><li>second</li></ul>");
+    expect(withSibling).toBe("- text  \n- second\n");
+
+    const withNestedList = htmlToMarkdown("<ul><li>text<br><ul><li>nested</li></ul></li></ul>");
+    expect(withNestedList).toBe("- text  \n    - nested\n");
+  });
 });

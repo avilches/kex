@@ -59,7 +59,9 @@ function isImageOnlyParagraph(el: Element): boolean {
 }
 
 function serializeImage(img: Element): string {
-  const src = decodeURIComponent(img.getAttribute("src") ?? "");
+  // Raw attribute value, not decoded: an ordinary filename like "assets/100%.png"
+  // is not valid percent-encoding and decodeURIComponent throws on it.
+  const src = img.getAttribute("src") ?? "";
   if (!src) return "";
   const alt = img.getAttribute("alt") ?? "";
   const size = img.getAttribute("data-size") || "full";
@@ -210,7 +212,16 @@ function serializeListItem(li: Element): string {
     if (buffer.length === 0) return;
     const raw = buffer.map((n) => serializeInline(n)).join("");
     buffer = [];
-    const text = applyLeadingWhitespace(raw).replace(/\s+$/, "");
+    const withLeading = applyLeadingWhitespace(raw);
+    // A real trailing hard break (a `<br>` element serialized as "  \n") must
+    // survive: keep the two marker spaces, drop only the trailing "\n" since
+    // parts.join("\n") below re-adds exactly one newline between parts. Any
+    // other trailing whitespace is markdown-it's pretty-printing artifact
+    // (e.g. the bare "\n" text node it inserts between a list item's inline
+    // content and a following nested list) and must be dropped entirely.
+    const text = /  \n$/.test(withLeading)
+      ? withLeading.slice(0, -1)
+      : withLeading.replace(/\s+$/, "");
     if (text.length > 0) parts.push(text);
   };
   for (const node of nodes) {
@@ -220,12 +231,16 @@ function serializeListItem(li: Element): string {
     } else if (node instanceof Element && (node.tagName === "UL" || node.tagName === "OL")) {
       flush();
       const nested = serializeBlock(node).replace(/\n$/, "");
-      parts.push(
-        nested
-          .split("\n")
-          .map((line) => `    ${line}`)
-          .join("\n"),
-      );
+      const indented = nested
+        .split("\n")
+        .map((line) => `    ${line}`)
+        .join("\n");
+      // No own text (paragraph or inline run) precedes this nested list: the
+      // item's bullet marker has nothing to attach to on its own line, so
+      // give it an empty first part rather than gluing the marker straight
+      // onto the nested list's indentation.
+      if (parts.length === 0) parts.push("");
+      parts.push(indented);
     } else {
       buffer.push(node);
     }
@@ -250,22 +265,22 @@ function serializeTableCell(cell: Element): string {
   return text.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 
+// Only called once serializeTable has confirmed row 0 carries `th` cells, so
+// the separator always belongs directly under row 0 (GFM requires exactly
+// that shape).
 function tableToMarkdown(table: Element): string {
   const rows = Array.from(table.querySelectorAll("tr"));
   if (rows.length === 0) return "";
-  let hasHeader = false;
-  const rowCells = rows.map((row) => {
-    const cells = Array.from(row.children).filter(
-      (c) => c.tagName === "TH" || c.tagName === "TD",
-    );
-    if (cells.some((c) => c.tagName === "TH")) hasHeader = true;
-    return cells.map((cell) => serializeTableCell(cell));
-  });
+  const rowCells = rows.map((row) =>
+    Array.from(row.children)
+      .filter((c) => c.tagName === "TH" || c.tagName === "TD")
+      .map((cell) => serializeTableCell(cell)),
+  );
   const colCount = Math.max(...rowCells.map((r) => r.length));
   const lines: string[] = [];
   rowCells.forEach((row, i) => {
     lines.push(`| ${row.join(" | ")} |`);
-    if (i === 0 && hasHeader) lines.push(`| ${Array(colCount).fill("---").join(" | ")} |`);
+    if (i === 0) lines.push(`| ${Array(colCount).fill("---").join(" | ")} |`);
   });
   return lines.join("\n");
 }
@@ -273,6 +288,18 @@ function tableToMarkdown(table: Element): string {
 function serializeTable(el: Element): string {
   const cells = Array.from(el.querySelectorAll("td, th"));
   if (cells.some(cellHasStyling)) return `${el.outerHTML}\n`;
+  const rows = Array.from(el.querySelectorAll("tr"));
+  if (rows.length > 0) {
+    const row0HasHeader = Array.from(rows[0].children).some((c) => c.tagName === "TH");
+    // GFM pipe tables require a header row directly above the `---`
+    // separator. A table with no `th` cells in row 0 - either a genuinely
+    // headerless table, or one whose header row isn't first - can't be
+    // represented as a clean pipe table without inventing structure that
+    // wasn't there (emitting a separator with no real header, or silently
+    // treating a data row as the header). Fall back to raw HTML, same as
+    // the styled-cell case above.
+    if (!row0HasHeader) return `${el.outerHTML}\n`;
+  }
   return `${tableToMarkdown(el)}\n`;
 }
 
