@@ -1947,7 +1947,9 @@ export default function App() {
           updateTabData(found.workspace.id, tabId, (p) =>
             p.kind === "editor"
               ? { ...p, dirty, ...(dirty ? { preview: false } : {}) }
-              : p,
+              : p.kind === "markdown"
+                ? { ...p, dirty }
+                : p,
           );
       },
       onEditorClose: (tabId) => {

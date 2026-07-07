@@ -61,9 +61,7 @@ export function MarkdownTab(props: Props): JSX.Element {
 
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-
-  // Task 17 replaces this literal with usePreferencesStore((s) => s.markdownWikiLinks).
-  const wikiLinksEnabled = false as boolean;
+  const wikiLinksEnabled = usePreferencesStore((s) => s.markdownWikiLinks);
 
   const { doc, onChange, save, reload } = useMarkdownDocument({
     path: props.path,
