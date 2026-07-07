@@ -125,10 +125,15 @@ function FolderRow(props: FolderRowProps) {
   const editing = props.editingFolder === node.relPath;
   const [draft, setDraft] = useState(node.name);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Guards against a double-invocation: unmounting the focused input (e.g. after
+  // Escape swaps the JSX branch back to a plain span) fires a blur, which would
+  // otherwise re-trigger commit with the already-abandoned draft.
+  const committedRef = useRef(false);
 
   useEffect(() => {
     if (editing) {
       setDraft(node.name);
+      committedRef.current = false;
       requestAnimationFrame(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
@@ -137,8 +142,15 @@ function FolderRow(props: FolderRowProps) {
   }, [editing, node.name]);
 
   const commitRename = () => {
+    if (committedRef.current) return;
+    committedRef.current = true;
     const trimmed = draft.trim();
     if (trimmed && trimmed !== node.name) props.onRenameFolder(node.relPath, trimmed);
+    props.onRenameFolderDone();
+  };
+  const cancelRename = () => {
+    if (committedRef.current) return;
+    committedRef.current = true;
     props.onRenameFolderDone();
   };
 
@@ -190,7 +202,7 @@ function FolderRow(props: FolderRowProps) {
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") commitRename();
-                  else if (e.key === "Escape") props.onRenameFolderDone();
+                  else if (e.key === "Escape") cancelRename();
                 }}
                 onBlur={commitRename}
                 className="h-5 w-full rounded border border-border bg-transparent px-1 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
