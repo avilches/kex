@@ -64,6 +64,29 @@ Manual `manualChunks` splits the bundle to keep the initial load fast:
 - `cm-legacy-<name>` — each legacy mode
 - `streamdown` — markdown streaming renderer
 
+### Markdown editor chunks
+
+The rich markdown editor (`src/modules/markdown/rich/`) and its two heaviest optional features are behind separate
+`import()` boundaries so a plain terminal session never pays for them. None of the three load at app startup; each
+loads only when the feature it backs is actually used.
+
+| Chunk | Trigger | Measured gzip size |
+|---|---|---|
+| `MarkdownTab` (rich editor: TipTap extension packages, `markdown-it` + plugins, `lowlight`/`highlight.js`, the `rich/` module code) | First rich markdown tab mount (`import("@/modules/markdown/rich/MarkdownTab")` in `TabContent.tsx`) | 198.15 kB (579.96 kB raw) |
+| `katex` (+ `katex.css`) | First math node encountered (`import("katex")` in `rich/extensions/math.ts`) | 77.53 kB JS + 7.92 kB CSS (259.15 kB + 28.83 kB raw) |
+| `mermaid` core | First mermaid fence rendered (`import("mermaid")` in `rich/extensions/mermaid.ts`) | 11.49 kB (33.31 kB raw) |
+
+Mermaid further splits per diagram type internally (flowchart, sequence, class, gantt, C4, git-graph, ER, etc. each in
+their own chunk) — only the syntax actually present in a note's fences is fetched.
+
+**Known issue:** the `manualChunks` predicate that pins the core React packages to the eager `react` chunk matches on
+the substring `/react/`, which also matches `@tiptap/react`'s node_modules path. That drags `@tiptap/react`,
+`@tiptap/core`, and the full ProseMirror engine (`prosemirror-view`, `-state`, `-model`, `-transform`, `-commands`,
+`-schema-list`, `-keymap`) into the eager `react` chunk even though the only importer is the lazy `rich/` module — a
+measured ~90 kB gzip regression on every cold start, including terminal-only sessions. The `@tiptap/extension-*`
+packages, `markdown-it`, and `lowlight` are unaffected and stay correctly lazy in `MarkdownTab`. Not fixed as part of
+this change; needs a tighter match (e.g. an exact `node_modules/react/` path check) in the `manualChunks` function.
+
 ## Rust release profile
 
 `codegen-units=1`, `lto=fat`, `opt-level=s` (size-optimized), `panic=abort`, `strip=true`. Result: ~7-8 MB binary.

@@ -341,6 +341,22 @@ Earlier approaches that were removed: auto-detecting installed Nerd Fonts via `d
 
 The terminal and the code editor (CodeMirror) each expose independent "Font family", "Font size", "Letter spacing" and "Line height" controls under Appearance. The editor settings are resolved through the same `resolveMonoFontFamily()` model and applied as the `--editor-font-family`, `--editor-font-size`, `--editor-letter-spacing` and `--editor-line-height` CSS variables (`useEditorFont` writes them on the document root) which the editor theme in `editor/lib/extensions.ts` reads, so a change re-renders every mounted editor without rebuilding its state. The terminal settings are pushed onto every live xterm slot from `useTerminalSession` (`applyFontSize`/`applyLetterSpacing`/`applyLineHeight` in `rendererPool.ts`). Both "Font family" fields show the platform default verbatim when unset and store an empty string for it (so the default still adapts per OS), with a reset button that clears back to it. Font size sliders are bounded to 8-18 px in 0.5 px steps (terminal sizes snap to half-pixels after the zoom multiply, see `renderFontSize`), letter spacing to -4..4 px in 0.5 px steps, and line height to 0.8..1.8 in 0.1 steps. Editor font size, like the terminal, is multiplied by the UI zoom.
 
+### 4.9 Markdown tabs are editable by default
+
+Opening a `.md` file mounts the rich TipTap editor (`markdownEditor: "rich"`, the default), not a read-only preview. The legacy Streamdown preview is still available behind `markdownEditor: "legacy"` for users who only want rendering. This is a behavior change from earlier Kex versions, where `markdown` tabs were preview-only and editing required the `Rendered | Edit` toggle to switch to the raw CodeMirror `editor` tab kind (see 7. Frontend module map, "Tab kinds"). That raw toggle still exists (`Mod+Shift+M`, source mode inside the rich editor's own shell) but is no longer the only way to edit a note.
+
+### 4.10 Buffer ownership: `useMarkdownDocument` and the disk sync point
+
+`useMarkdownDocument` (`modules/markdown/lib/useMarkdownDocument.ts`) is the single owner of a markdown tab's in-memory content, for both Rich and Source mode. Neither the TipTap editor instance nor the CodeMirror source view holds its own independent source of truth; each renders from and writes back to this one buffer. Disk is the synchronization point when switching modes: toggling Rich <-> Source does not hand content directly from one editor instance to the other in memory — it round-trips through the buffer's serialized markdown, the same string that would be written to disk. This keeps the two views from silently diverging (e.g. an HTML construct TipTap can represent but the markdown serializer would lossily flatten) and makes "what does Source mode show" always answerable as "the current buffer, serialized," not "whatever the Rich editor's internal ProseMirror doc happens to contain right now."
+
+### 4.11 Save round-trip policy
+
+Saving a markdown tab follows three rules to avoid gratuitous disk writes and content drift:
+
+- **Skip-if-equal.** A save that would write byte-identical content to what is already on disk is a no-op — opening and closing a note without editing it never touches its mtime.
+- **Dirty-only writes.** Autosave and the close-tab guard only write when the buffer differs from the last-saved snapshot; the dirty dot tracks this same comparison.
+- **Frontmatter is an opaque, byte-preserved prefix.** `lib/frontmatter.ts` splits the YAML frontmatter block off the top of the file before conversion and reattaches it verbatim on save. The rich editor and the markdown-it round trip never see or reformat frontmatter — this guarantees a note's frontmatter (key order, quoting style, comments) survives edits it never asked to be touched, even though TipTap's own document model would happily normalize it away.
+
 ---
 
 ## 5. Known limitations
@@ -463,7 +479,11 @@ src/
     │   │                            The floating tab HoverCard was removed; tabs now carry only a native `title`
     │   │                            tooltip (cwd, plus agent model and sessionId when an agent is active).
     │   └── block/                 — Block overlay, shell input, mode machine, history
-    ├── editor/                    — CodeMirror 6 stack, diffs. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter, indent size 1-12, indent with tabs) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. The per-extension settings are surfaced only in the editor overlay `[...]` menu. Global editor settings (scroll past end, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + blink rate + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences applied via CodeMirror compartments so they update live without rebuilding editor state; the global toggles appear in both the `[...]` menu and the Settings window. A few preferences are JSON-only (no UI; edit `settings-general.json`): `editorHighlightActiveLine`, `editorAutoSaveDelay`, `workspacePaneLimit`, `paneSplitLimit`, `keepFolderLayoutOnChangeExplorerRoot`.
+    ├── editor/                    — CodeMirror 6 stack, diffs. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter, indent size 1-12, indent with tabs) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. The per-extension settings are surfaced only in the editor overlay `[...]` menu. Global editor settings (scroll past end, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + blink rate + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences applied via CodeMirror compartments so they update live without rebuilding editor state; the global toggles appear in both the `[...]` menu and the Settings window. A few preferences are JSON-only (no UI). In `settings-general.json`: `workspacePaneLimit`, `paneSplitLimit`,
+`keepFolderLayoutOnChangeExplorerRoot`. In `settings-editor.json`: `editorHighlightActiveLine`,
+`editorAutoSaveDelay`, `markdownEditor` (`"rich" | "legacy"`, default `"rich"`; selects the TipTap editor or the
+Streamdown preview for the `markdown` tab kind), `markdownWikiLinks` (default `false`; enables `[[note]]`
+autocomplete, resolution, and click-navigation in the rich editor).
     ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)
     │   ├── components/            — NotificationBell
     │   ├── lib/                   — route, notify, agentIcon, agentSessionRestore
@@ -496,7 +516,20 @@ src/
     │                                `settings-general.json`, synced cross-window via `GENERAL_PREF_KEY_MAP`).
     │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
     ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
-    ├── markdown/                  — Markdown renderer pane
+    ├── markdown/                  — Markdown tab (`kind: "markdown"`). `MarkdownPreviewPane.tsx` is the legacy
+    │   │                            read-only preview (Streamdown), kept behind `markdownEditor: "legacy"`.
+    │   │                            `lib/` is the pure conversion core shared by both modes: `frontmatter.ts`
+    │   │                            (byte-preserved prefix split/rejoin), `markdownToHtml.ts` / `htmlToMarkdown.ts`
+    │   │                            (round-trip via `markdown-it`), `documentBuffer.ts`, `useMarkdownDocument.ts`
+    │   │                            (buffer ownership), `wikiLinks.ts` (`[[note]]` resolution), `callouts.ts`.
+    │   │                            `rich/` is the default TipTap 3 WYSIWYG editor: `MarkdownTab.tsx` (tab shell,
+    │   │                            owns the Rich/Source toggle), `RichMarkdownEditor.tsx` (the `useEditor` instance
+    │   │                            and extension list), `Toolbar.tsx`, `OutlinePanel.tsx`, `SlashMenu.tsx`,
+    │   │                            `FindBar.tsx`, `WikiLinkMenu.tsx`, `CodeLangDropdown.tsx`, `MathModal.tsx`, and
+    │   │                            `extensions/` (one file per TipTap extension: callout, details, table, math,
+    │   │                            mermaid, wikiLink, codeBlock, slashCommands, headingShortcuts, noteSearch, …).
+    │   │                            Lazy-loaded as its own chunk (`MarkdownTab`); see "Markdown editor chunks" in
+    │   │                            `docs/BUILD.md` for the split and its known eager-chunk leak.
     ├── workspace/                 — Local + WSL environment switching
     ├── updater/                   — Auto-updater dialog
     └── command-palette/           — Fuzzy command/file/search palette
