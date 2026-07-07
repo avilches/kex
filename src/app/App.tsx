@@ -1179,6 +1179,29 @@ export default function App() {
     [activeWorkspace, activateTab, openTab, replaceTab],
   );
 
+  const openNoteToSide = useCallback(
+    (path: string) => {
+      if (!activeWorkspace) return;
+      const i = path.lastIndexOf("/");
+      splitPaneAndOpenTab(activeWorkspace.id, activeWorkspace.activePaneId, "right", {
+        id: newTabId(),
+        kind: "markdown",
+        path,
+        title: i === -1 ? path : path.slice(i + 1),
+      });
+    },
+    [activeWorkspace, splitPaneAndOpenTab],
+  );
+
+  const revealNoteInExplorer = useCallback(
+    (path: string) => {
+      if (!sidebarStateRef.current.open) setSidebarOpen(true);
+      setSidebarView("explorer");
+      setRevealRequest((r) => ({ path, nonce: (r?.nonce ?? 0) + 1 }));
+    },
+    [setSidebarOpen, setSidebarView],
+  );
+
   const openFileInRightSplit = useCallback(
     (path: string, sourceTabId?: string) => {
       if (!activeWorkspace) return undefined;
@@ -1564,12 +1587,12 @@ export default function App() {
       for (const ws of workspacesRef.current) {
         for (const pane of allPanes(ws.paneTree)) {
           for (const tab of pane.tabs) {
-            if (tab.kind !== "editor") continue;
+            if (tab.kind !== "editor" && tab.kind !== "markdown") continue;
             const ep = tab as { path: string };
             if (ep.path === from) {
               const i = to.lastIndexOf("/");
               updateTabData(ws.id, tab.id, (p) =>
-                p.kind === "editor"
+                p.kind === "editor" || p.kind === "markdown"
                   ? { ...p, path: to, title: i === -1 ? to : to.slice(i + 1) }
                   : p,
               );
@@ -1577,7 +1600,7 @@ export default function App() {
               const newPath = `${to}${ep.path.slice(from.length)}`;
               const i = newPath.lastIndexOf("/");
               updateTabData(ws.id, tab.id, (p) =>
-                p.kind === "editor"
+                p.kind === "editor" || p.kind === "markdown"
                   ? {
                       ...p,
                       path: newPath,
@@ -2831,6 +2854,9 @@ export default function App() {
                         ref={sidebarRef}
                         view={sidebarView}
                         onChangeView={setSidebarView}
+                        notesRoot={workspaceRootPath}
+                        onOpenNoteToSide={openNoteToSide}
+                        onRevealNoteInExplorer={revealNoteInExplorer}
                         rootPath={explorerRoot}
                         rootMode={activeRootMode}
                         onChangeRootMode={handleChangeRootMode}
@@ -2931,6 +2957,9 @@ export default function App() {
                         ref={sidebarRef}
                         view={sidebarView}
                         onChangeView={setSidebarView}
+                        notesRoot={workspaceRootPath}
+                        onOpenNoteToSide={openNoteToSide}
+                        onRevealNoteInExplorer={revealNoteInExplorer}
                         rootPath={explorerRoot}
                         rootMode={activeRootMode}
                         onChangeRootMode={handleChangeRootMode}

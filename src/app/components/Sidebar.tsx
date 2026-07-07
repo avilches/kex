@@ -8,6 +8,7 @@ import {
   GitHistoryPane,
   type GitHistorySearchHandle,
 } from "@/modules/git-history/GitHistoryPane";
+import { NotesView } from "@/modules/notes";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SourceControlSummary } from "@/modules/source-control";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
@@ -36,6 +37,9 @@ export type SidebarProps = {
   // Sidebar chrome (per-window)
   view: SidebarView;
   onChangeView: (view: SidebarView) => void;
+  notesRoot: string | null;
+  onOpenNoteToSide: (path: string) => void;
+  onRevealNoteInExplorer: (path: string) => void;
   // FileExplorer props
   rootPath: string | null;
   rootMode: ExplorerRootMode;
@@ -91,7 +95,11 @@ const VIEWS: { id: SidebarView; label: string }[] = [
 
 export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
   function Sidebar(props, ref) {
-    const view = props.view;
+    const view: SidebarView =
+      props.view === "notes" && !props.notesRoot ? "explorer" : props.view;
+    const views = props.notesRoot
+      ? [...VIEWS, { id: "notes" as const, label: "Notes" }]
+      : VIEWS;
     const explorerRef = useRef<FileExplorerHandle>(null);
 
     useImperativeHandle(ref, () => ({
@@ -105,7 +113,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
       <div className="flex h-full flex-col bg-sidebar">
         {/* View strip */}
         <div className="flex h-8 shrink-0 items-center border-b border-border/60">
-          {VIEWS.map((tab) => (
+          {views.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -209,6 +217,24 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               />
             </div>
           </div>
+          {props.notesRoot ? (
+            <div
+              className={cn(
+                "absolute inset-0 overflow-hidden",
+                view !== "notes" && "invisible pointer-events-none",
+              )}
+            >
+              <NotesView
+                root={props.notesRoot}
+                active={view === "notes"}
+                onOpenFile={props.onOpenFile}
+                onOpenToSide={props.onOpenNoteToSide}
+                onRevealInExplorer={props.onRevealNoteInExplorer}
+                onPathRenamed={props.onPathRenamed ?? (() => {})}
+                onPathDeleted={props.onPathDeleted ?? (() => {})}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     );
