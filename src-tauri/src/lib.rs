@@ -805,6 +805,7 @@ pub fn run() {
             fs::grep::fs_grep,
             fs::grep::fs_grep_interactive,
             fs::grep::fs_glob,
+            fs::notes::notes_list,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,
             git::commands::git_status,

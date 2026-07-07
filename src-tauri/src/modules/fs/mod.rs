@@ -2,6 +2,7 @@ pub mod duplicate;
 pub mod file;
 pub mod grep;
 pub mod mutate;
+pub mod notes;
 pub mod search;
 pub mod tree;
 pub mod watch;
