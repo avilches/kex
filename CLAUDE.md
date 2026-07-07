@@ -167,6 +167,9 @@ Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una
    `docs/` o en PENDING antes de que muera.
 6. Un item de PENDING que se empieza a trabajar: el plan/ledger de la ejecucion lo referencia, y al
    completarse se elimina (o se anota su nuevo estado) en PENDING en el mismo commit del trabajo.
+7. Al escribir un handoff: los items de trabajo durables van PRIMERO a `docs/PENDING.md`/`docs/TODO.md`
+   (committeados); el handoff solo los referencia y añade el contexto de sesion que no tiene otro sitio
+   (estado exacto, que hacer primero, trampas). Un handoff nunca es el unico dueño de trabajo pendiente.
 
 ## Documentacion viva
 
