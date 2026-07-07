@@ -27,7 +27,6 @@ import { toast } from "sonner";
 import { htmlToMarkdown } from "@/modules/markdown/lib/htmlToMarkdown";
 import { markdownToHtml } from "@/modules/markdown/lib/markdownToHtml";
 import {
-  buildWikiLinkIndex,
   type WikiLinkContext,
   type WikiLinkEntry,
 } from "@/modules/markdown/lib/wikiLinks";
@@ -100,6 +99,9 @@ export type RichMarkdownEditorProps = {
   filePath: string;
   workspaceRoot: string | null;
   wikiLinksEnabled: boolean;
+  // Built once at the tab level so the first markdown parse already resolves
+  // wiki-link targets instead of rendering blank paths until an async load.
+  wikiEntries: WikiLinkEntry[];
   tick: MenuStore<number>;
   onEditorChange: (editor: Editor | null) => void;
   onChangeMarkdown: (md: string) => void;
@@ -174,21 +176,12 @@ export const RichMarkdownEditor = forwardRef<
     [props.wikiLinksEnabled, getWikiContext],
   );
 
-  // Load the wiki-link index for autocomplete + markdown resolution.
+  // Sync the tab-owned wiki-link index into the ref (markdown resolution) and
+  // the autocomplete controller.
   useEffect(() => {
-    if (!props.wikiLinksEnabled || !props.workspaceRoot) return;
-    let cancelled = false;
-    buildWikiLinkIndex(props.workspaceRoot)
-      .then((entries) => {
-        if (cancelled) return;
-        wikiEntriesRef.current = entries;
-        wiki?.entries.set(entries);
-      })
-      .catch((e) => console.error("Failed to load wiki-link index:", e));
-    return () => {
-      cancelled = true;
-    };
-  }, [props.wikiLinksEnabled, props.workspaceRoot, wiki]);
+    wikiEntriesRef.current = props.wikiEntries;
+    wiki?.entries.set(props.wikiEntries);
+  }, [props.wikiEntries, wiki]);
 
   const resolveImageSrc = useCallback((src: string): string => {
     if (/^(https?:|data:)/i.test(src)) return src;
@@ -200,11 +193,11 @@ export const RichMarkdownEditor = forwardRef<
   // Parse only on load / external reload, never per keystroke.
   const html = useMemo(() => {
     const wikiCtx = props.wikiLinksEnabled
-      ? { entries: wikiEntriesRef.current, root: props.workspaceRoot ?? "" }
+      ? { entries: props.wikiEntries, root: props.workspaceRoot ?? "" }
       : undefined;
     return markdownToHtml(props.body, { wikiLinks: wikiCtx, resolveImageSrc });
-    // biome-ignore lint/correctness/useExhaustiveDependencies: body is re-parsed only when revision bumps
-  }, [props.revision]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: body re-parses on a revision bump or when the wiki-link index resolves
+  }, [props.revision, props.wikiEntries]);
 
   const isDark = useCallback(
     () => document.documentElement.classList.contains("dark"),

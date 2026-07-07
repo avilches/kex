@@ -62,6 +62,8 @@ export type ShortcutId =
   | "editor.save"
   | "editor.html.toggleView"
   | "editor.preview.toggleSplit"
+  | "markdown.toggleSource"
+  | "markdown.toggleOutline"
   | "path.copy"
   | "notifications.jumpToLast";
 
@@ -465,6 +467,18 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Toggle split preview",
     group: "Editor",
     defaultBindings: [],
+  },
+  {
+    id: "markdown.toggleSource",
+    label: "Markdown: Toggle Rich/Source",
+    group: "Editor",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "m" }],
+  },
+  {
+    id: "markdown.toggleOutline",
+    label: "Markdown: Toggle Outline",
+    group: "Editor",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "o" }],
   },
   {
     id: "editor.undo",

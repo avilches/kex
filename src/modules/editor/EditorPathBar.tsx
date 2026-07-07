@@ -91,6 +91,7 @@ type Props = {
   overrideLanguage?: string | null;
   currentLanguageName?: string;
   onLanguageChange?: (lang: string | null) => void;
+  trailing?: React.ReactNode;
 };
 
 export function EditorPathBar({
@@ -112,6 +113,7 @@ export function EditorPathBar({
   overrideLanguage,
   currentLanguageName,
   onLanguageChange,
+  trailing,
 }: Props) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const shortcutId = view?.isHtml ? "editor.html.toggleView" : "editor.markdown.toggleView";
@@ -425,6 +427,7 @@ export function EditorPathBar({
             />
           </button>
         )}
+        {trailing}
       </div>
     </div>
   );
