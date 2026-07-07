@@ -3,12 +3,9 @@
    callout accent hues are fixed content colors (RGB triplets) mixed with the
    surface via opacity so one palette works on every theme. */
 
-.rich-md-body {
-  position: relative;
-  height: 100%;
-  min-height: 0;
-  overflow: auto;
-  padding: 16px 28px;
+/* Defined at :root (not scoped to .rich-md-body) because the callout type-picker
+   menu is mounted directly on document.body and needs these too. */
+:root {
   --callout-note: 68, 138, 255;
   --callout-abstract: 0, 191, 188;
   --callout-info: 0, 184, 212;
@@ -25,7 +22,7 @@
   --callout-custom: 124, 134, 156;
 }
 
-.dark .rich-md-body {
+.dark {
   --callout-note: 100, 160, 255;
   --callout-abstract: 60, 209, 205;
   --callout-info: 60, 200, 224;
@@ -40,6 +37,14 @@
   --callout-example: 165, 135, 245;
   --callout-quote: 150, 150, 162;
   --callout-custom: 150, 160, 182;
+}
+
+.rich-md-body {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 28px;
 }
 
 .rich-md-body .editor-content {
