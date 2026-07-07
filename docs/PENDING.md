@@ -4,6 +4,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 
 > Auditoria 2026-06-23 contra el codigo: ver [AUDIT-2026-06-23.md](pending/AUDIT-2026-06-23.md) para el detalle de que se elimino (ya corregido), que cambio de estado y que sigue vigente.
 > Auditoria 2026-06-30: F1 (diff side-by-side) COMPLETADO y eliminado. Ver notas de cada item para estado actualizado.
+> Auditoria 2026-07-02 (7 agentes, ~74k lineas, frontend + Rust): ver [AUDIT-2026-07-02.md](pending/AUDIT-2026-07-02.md). Backlog amplio pendiente de triaje: seguridad (sandbox html-preview, log de prompts en /tmp), leak de thread IPC por tab cerrada, colision de claves entre stores de settings, comandos Rust sincronos que congelan la UI, codigo muerto y duplicado. La cabecera del informe lista lo YA resuelto por la cadena del scratchpad (2026-07-03..06).
 
 ---
 
@@ -22,6 +23,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-42](pending/bugs/BUG-42-borrar-fichero-con-editor-abierto.md) — Borrar un fichero con el editor abierto: el editor muestra un error rojo generico (string crudo de IPC, sin distinguir ENOENT ni ofrecer accion) y la vista de diff no reacciona (contenido obsoleto). Definir mejor UX
 - [BUG-43](pending/bugs/BUG-43-restore-claude-code-con-worktree.md) — Restore de Claude Code cuando ha creado un worktree (sin verificar)
 - [BUG-SP-01](pending/bugs/BUG-SP-01-mouse-pane-return-no-resume.md) - Scratchpad (remember ON): volver a un pane con el raton no reabre el SP (teclado si funciona). Reproducir con proceso fresco antes de investigar (sospecha HMR)
+- [BUG-44](pending/bugs/BUG-44-macos-beep-shortcuts.md) - macOS: beep del sistema con Cmd+Ctrl+Flecha (navegacion de panes). Causa raiz confirmada (WKWebView -> interpretKeyEvents -> NSBeep), 2 intentos fallidos documentados, plan: responder chain sink (Opcion B) con fallback a NSEvent monitor (Opcion A)
 
 ## WIP en ramas
 
