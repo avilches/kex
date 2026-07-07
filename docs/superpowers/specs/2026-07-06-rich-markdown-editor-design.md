@@ -37,8 +37,12 @@ Port from HelixNotes (markdown-relevant features, "all the options Helix has"):
 - Formatting toolbar (buttons + heading/color/highlight/align/insert dropdowns) and outline
   side panel (headings navigation, toggle).
 - Source mode toggle: raw markdown editing.
-- Markdown round-trip: `markdownToHtml` (markdown-it + plugins) on load, `htmlToMarkdown`
-  (Helix's hand-rolled serializer) on save, both ported as pure TS modules.
+- Markdown round-trip: `markdownToHtml` (markdown-it + plugins) on load, `htmlToMarkdown` on
+  save, both ported as pure TS modules. Note: Helix's regex-based `htmlToMarkdown`
+  (Editor.svelte:3639) is dead code; the real save path is the ProseMirror-walking serializer
+  (`prosemirrorToMarkdown`, Editor.svelte:3063-3354, plus `serializeCallout` in callouts.ts).
+  The port keeps the `htmlToMarkdown(html): string` contract but transcribes the semantics of
+  the real serializer (DOMParser walk), using the regex version only as a mark-syntax reference.
 
 Explicitly excluded (decisions, see below): AI menu (no-AI fork), Secret blocks, PDF embeds,
 image paste-to-attachments. Task metadata menu (due/priority) excluded in v1.
@@ -114,7 +118,7 @@ image paste-to-attachments. Task metadata menu (due/priority) excluded in v1.
     as widget-intrinsic behavior and stays internal to the editor, like CodeMirror's own keymap.
     App-level actions (save, find-in-note open, toggle source mode, toggle outline) go through
     the `SHORTCUTS` registry (`matchesShortcut` in local handlers), reusing existing ids where
-    they exist (`file.save`, search) and adding new ones (`markdown.toggleSource`,
+    they exist (`editor.save`, `search.focus`) and adding new ones (`markdown.toggleSource`,
     `markdown.toggleOutline`).
 
 ---
