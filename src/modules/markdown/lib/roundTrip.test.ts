@@ -97,4 +97,18 @@ describe("round-trip idempotence", () => {
     const withNestedList = htmlToMarkdown("<ul><li>text<br><ul><li>nested</li></ul></li></ul>");
     expect(withNestedList).toBe("- text  \n    - nested\n");
   });
+
+  it("is idempotent for two consecutive trailing hard breaks in a list item", () => {
+    const md1 = htmlToMarkdown("<ul><li>text<br><br></li><li>second</li></ul>");
+    expect(md1).toBe("- text<br><br>\n- second\n");
+    const md2 = htmlToMarkdown(markdownToHtml(md1));
+    expect(md2).toBe(md1);
+  });
+
+  it("is idempotent for two consecutive trailing hard breaks before a nested list", () => {
+    const md1 = htmlToMarkdown("<ul><li>text<br><br><ul><li>nested</li></ul></li></ul>");
+    expect(md1).toBe("- text<br><br>\n    - nested\n");
+    const md2 = htmlToMarkdown(markdownToHtml(md1));
+    expect(md2).toBe(md1);
+  });
 });

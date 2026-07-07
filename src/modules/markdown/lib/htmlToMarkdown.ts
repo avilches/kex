@@ -213,15 +213,33 @@ function serializeListItem(li: Element): string {
     const raw = buffer.map((n) => serializeInline(n)).join("");
     buffer = [];
     const withLeading = applyLeadingWhitespace(raw);
-    // A real trailing hard break (a `<br>` element serialized as "  \n") must
-    // survive: keep the two marker spaces, drop only the trailing "\n" since
-    // parts.join("\n") below re-adds exactly one newline between parts. Any
-    // other trailing whitespace is markdown-it's pretty-printing artifact
-    // (e.g. the bare "\n" text node it inserts between a list item's inline
-    // content and a following nested list) and must be dropped entirely.
-    const text = /  \n$/.test(withLeading)
-      ? withLeading.slice(0, -1)
-      : withLeading.replace(/\s+$/, "");
+    // Each real `<br>` element serializes to a "  \n" marker (see
+    // serializeInline). A single trailing marker survives: keep the two
+    // marker spaces, drop only the trailing "\n" since parts.join("\n")
+    // below re-adds exactly one newline between parts. Two or more in a row
+    // do NOT survive as repeated "  \n" markers - CommonMark treats a
+    // whitespace-only line as a blank line that ends the paragraph, so
+    // markdown-it collapses "text  \n  \n" back down to a single "text" on
+    // reparse instead of stacking hard breaks (verified against markdown-it
+    // directly: it renders that input as two separate paragraphs, not one
+    // paragraph with two <br>s). Represent 2+ consecutive trailing breaks as
+    // literal `<br>` HTML instead: markdown-it is configured with
+    // `html: true`, so raw inline HTML round-trips through it verbatim and
+    // every subsequent pass regenerates the exact same DOM, giving true
+    // idempotence instead of just surviving one extra pass. Any other
+    // trailing whitespace (no leading two spaces) is markdown-it's bare
+    // newline pretty-printing artifact (e.g. the text node it inserts
+    // between a list item's inline content and a following nested list) and
+    // must be dropped entirely.
+    const trailingBreaks = withLeading.match(/(?: {2}\n)+$/);
+    let text: string;
+    if (trailingBreaks) {
+      const breakCount = trailingBreaks[0].length / 3;
+      const base = withLeading.slice(0, withLeading.length - trailingBreaks[0].length);
+      text = breakCount === 1 ? `${base}  ` : `${base}${"<br>".repeat(breakCount)}`;
+    } else {
+      text = withLeading.replace(/\s+$/, "");
+    }
     if (text.length > 0) parts.push(text);
   };
   for (const node of nodes) {
