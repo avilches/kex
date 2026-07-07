@@ -33,6 +33,13 @@ export function useNotesState(root: string | null, active: boolean) {
   rootRef.current = root;
 
   useEffect(() => {
+    // Reset must happen in the same effect as the load trigger: if root changes
+    // while active stays true, a separate reset effect would run after this one
+    // has already advanced loadedRootRef to the new root, making it a no-op.
+    if (loadedRootRef.current !== null && loadedRootRef.current !== root) {
+      loadedRootRef.current = null;
+      setConfig({ ...DEFAULT_NOTES_CONFIG });
+    }
     if (!root || !active || loadedRootRef.current === root) return;
     loadedRootRef.current = root;
     let cancelled = false;
@@ -43,13 +50,6 @@ export function useNotesState(root: string | null, active: boolean) {
       cancelled = true;
     };
   }, [root, active]);
-
-  useEffect(() => {
-    if (loadedRootRef.current !== null && loadedRootRef.current !== root) {
-      loadedRootRef.current = null;
-      setConfig({ ...DEFAULT_NOTES_CONFIG });
-    }
-  }, [root]);
 
   const scheduleWrite = useCallback((next: NotesConfig) => {
     const r = rootRef.current;
