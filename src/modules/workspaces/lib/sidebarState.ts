@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 // side it docks to. Persisted in the window index (workspaces.json) via a
 // dedicated lightweight command, separate from the heavy workspace-body save.
 
-export type SidebarView = "explorer" | "git" | "history";
+export type SidebarView = "explorer" | "git" | "history" | "notes";
 export type SidebarSide = "left" | "right";
 
 export type SidebarUiState = {
@@ -33,7 +33,9 @@ function clampWidth(v: unknown): number {
 }
 
 function parseView(value: unknown): SidebarView {
-  return value === "git" ? value : "explorer";
+  return value === "git" || value === "history" || value === "notes"
+    ? value
+    : "explorer";
 }
 
 function parseSide(value: unknown): SidebarSide {
