@@ -121,6 +121,7 @@ import {
   getSavedCollapsedGroups,
   saveCollapsedGroups,
 } from "@/modules/workspaces/lib/collapsedGroupsState";
+import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
@@ -1790,7 +1791,7 @@ export default function App() {
   );
 
   const showSidebarView = useCallback(
-    (tab: "explorer" | "git" | "history") => {
+    (tab: SidebarView) => {
       if (!sidebarStateRef.current.open) {
         setSidebarOpen(true);
       }
@@ -2400,6 +2401,9 @@ export default function App() {
       "sidebar.showExplorer": rotateExplorerRoot,
       "sidebar.showGit": () => showSidebarView("git"),
       "sidebar.showHistory": () => showSidebarView("history"),
+      "sidebar.showNotes": () => {
+        if (activeWorkspace?.workspaceRoot) showSidebarView("notes");
+      },
       "explorer.viewFilesystem": () => showExplorerWithMode("filesystem"),
       "explorer.viewPinned": () => showExplorerWithMode("workspace"),
       "explorer.toggleHidden": handleToggleShowHidden,

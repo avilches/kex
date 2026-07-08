@@ -38,6 +38,7 @@ export type ShortcutId =
   | "sidebar.showExplorer"
   | "sidebar.showGit"
   | "sidebar.showHistory"
+  | "sidebar.showNotes"
   | "explorer.viewFilesystem"
   | "explorer.viewPinned"
   | "explorer.toggleHidden"
@@ -190,6 +191,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Show Git History",
     group: "Sidebar",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "h" }],
+  },
+  {
+    id: "sidebar.showNotes",
+    label: "Show Notes",
+    group: "Sidebar",
+    defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "n" }],
   },
   {
     id: "explorer.viewFilesystem",
