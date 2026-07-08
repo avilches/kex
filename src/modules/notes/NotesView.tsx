@@ -16,7 +16,7 @@ import {
 import { native } from "@/lib/native";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CollectionsColumn } from "./CollectionsColumn";
 import { nextFolderName } from "./lib/folderTree";
@@ -43,6 +43,13 @@ export function NotesView(props: NotesViewProps) {
   const [primedRenamePath, setPrimedRenamePath] = useState<string | null>(null);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    // The delete confirmation is an AlertDialog rendered through a Radix
+    // Portal, so it escapes the sidebar's invisible/pointer-events-none hide
+    // pattern and would float over whatever view the user switches to.
+    if (!props.active) setPendingDelete(null);
+  }, [props.active]);
 
   const abs = useCallback(
     (relPath: string) => `${canonRoot}/${relPath}`,

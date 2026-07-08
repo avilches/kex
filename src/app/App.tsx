@@ -1182,6 +1182,18 @@ export default function App() {
   const openNoteToSide = useCallback(
     (path: string) => {
       if (!activeWorkspace) return;
+      for (const pane of allPanes(activeWorkspace.paneTree)) {
+        const existing = pane.tabs.find(
+          (p) =>
+            (p.kind === "editor" || p.kind === "markdown") &&
+            (p as { path: string }).path === path,
+        );
+        if (existing) {
+          activateTab(activeWorkspace.id, existing.id);
+          flashTab(existing.id);
+          return;
+        }
+      }
       const i = path.lastIndexOf("/");
       splitPaneAndOpenTab(activeWorkspace.id, activeWorkspace.activePaneId, "right", {
         id: newTabId(),
@@ -1190,16 +1202,18 @@ export default function App() {
         title: i === -1 ? path : path.slice(i + 1),
       });
     },
-    [activeWorkspace, splitPaneAndOpenTab],
+    [activeWorkspace, activateTab, splitPaneAndOpenTab],
   );
 
   const revealNoteInExplorer = useCallback(
     (path: string) => {
-      if (!sidebarStateRef.current.open) setSidebarOpen(true);
-      setSidebarView("explorer");
-      setRevealRequest((r) => ({ path, nonce: (r?.nonce ?? 0) + 1 }));
+      // Pre-seed the ref so focusSidebar's "second press" heuristic (see its
+      // own comment) treats this as already-focused and switches to Explorer
+      // unconditionally, matching the deterministic "explicit reveal" case.
+      lastFocusFolderRef.current = path;
+      focusSidebar(path, { fromShortcut: true });
     },
-    [setSidebarOpen, setSidebarView],
+    [focusSidebar],
   );
 
   const openFileInRightSplit = useCallback(

@@ -158,7 +158,7 @@ export function useTabCloseGuards({
       for (const ws of workspaces) {
         for (const pane of allPanes(ws.paneTree)) {
           for (const tab of pane.tabs) {
-            if (tab.kind !== "editor") continue;
+            if (tab.kind !== "editor" && tab.kind !== "markdown") continue;
             const p = (tab as { path?: string }).path ?? "";
             if (p !== path && !p.startsWith(`${path}/`)) continue;
             if ((tab as { dirty?: boolean }).dirty) {
