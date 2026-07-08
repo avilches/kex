@@ -1,5 +1,11 @@
 # Plan ejecutable: Kex como espacio componible (Notas Markdown + Marcadores)
 
+> Superseded (notes scope): las fases de notas de este documento (Fases 0-4 en lo relativo a
+> notas) quedan reemplazadas por `docs/superpowers/specs/2026-07-06-notes-sidebar-view-design.md`
+> y su plan `docs/superpowers/plans/2026-07-06-notes-sidebar-view.md` (vista Notes del Sidebar,
+> persistencia en `kex.json`). La parte de marcadores (Fase 5) sigue sin implementar y sin
+> reemplazo.
+
 Documento de especificacion e implementacion pensado para ser ejecutado por un agente.
 Cada fase es autocontenida, enviable de forma aislada, y deja todas las comprobaciones de calidad en verde.
 

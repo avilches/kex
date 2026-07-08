@@ -497,6 +497,14 @@ src/
     │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
     ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  — Markdown renderer pane
+    ├── notes/                     — HelixNotes-style notes view for the Sidebar (visible only when the workspace
+    │                                defines a `workspaceRoot`). Two resizable columns: Quick Access (pinned notes, dnd-kit
+    │                                reorder) plus folder tree, and a sortable note list (`modified | title | created | custom`,
+    │                                optional date grouping). Data comes from one `notes_list` IPC walk (title from frontmatter,
+    │                                H1 or file stem; 120-char snippet; 2 KB head reads). All view state persists to `kex.json`
+    │                                at the workspace root under the `notes` namespace (vault-relative forward-slash paths,
+    │                                read-modify-write preserves foreign namespaces, no migrations: invalid file means defaults).
+    │                                Kex never writes metadata into user `.md` files.
     ├── workspace/                 — Local + WSL environment switching
     ├── updater/                   — Auto-updater dialog
     └── command-palette/           — Fuzzy command/file/search palette

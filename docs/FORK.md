@@ -371,6 +371,16 @@ Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell com
 - **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active script of the current workspace, toggling based on the current isRunning state.
 - **Startup validation** (`validateScriptPanels`): on mount, App.tsx collects all living tab ids and calls `validateScriptPanels` for each workspace, clearing `tabId` references that no longer exist (stale from a previous session).
 
+### Notes sidebar view
+
+HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as the vault. New `notes_list` Tauri command; per-workspace UI state in `kex.json` at the workspace root. Not present upstream.
+
+- **Notes tab** — appears after Git in the Sidebar only when the workspace defines a `workspaceRoot`. Disappears (and persisted `view: "notes"` falls back to Explorer) when the root is unset.
+- **Two-column layout** — Quick Access (pinned notes, drag-reorder) and a folder tree on the left; a sortable note list on the right (four modes: `modified`, `title`, `created`, `custom`, plus optional date grouping).
+- **Note metadata** — title from frontmatter `title:` field, first H1, or file stem (in that precedence); mtime and created date from frontmatter `created:` field, btime, or mtime (in that precedence). UI shows only the first 2 KB of each note (120-char snippet for previews).
+- **Config persistence** — all view state (`quickAccess`, `sortMode`, `noteOrder`, `collapsedFolders`, `groupByDate`, `selectedFolder`) lives in `kex.json` at the workspace root under the `notes` namespace (vault-relative forward-slash paths). Read-modify-write strategy preserves foreign namespaces; invalid or missing `kex.json` falls back to defaults without overwriting until the first mutation.
+- **Immutable .md files** — Kex never writes frontmatter, metadata, or any other data into user `.md` files. State is stored exclusively in `kex.json`.
+
 ---
 
 ## Roadmap (planned, not yet built)
