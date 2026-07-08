@@ -347,15 +347,15 @@ Opening a `.md` file mounts the rich TipTap editor (`markdownEditor: "rich"`, th
 
 ### 4.10 Buffer ownership: `useMarkdownDocument` and the disk sync point
 
-`useMarkdownDocument` (`modules/markdown/lib/useMarkdownDocument.ts`) is the single owner of a markdown tab's in-memory content, for both Rich and Source mode. Neither the TipTap editor instance nor the CodeMirror source view holds its own independent source of truth; each renders from and writes back to this one buffer. Disk is the synchronization point when switching modes: toggling Rich <-> Source does not hand content directly from one editor instance to the other in memory — it round-trips through the buffer's serialized markdown, the same string that would be written to disk. This keeps the two views from silently diverging (e.g. an HTML construct TipTap can represent but the markdown serializer would lossily flatten) and makes "what does Source mode show" always answerable as "the current buffer, serialized," not "whatever the Rich editor's internal ProseMirror doc happens to contain right now."
+`useMarkdownDocument` (`modules/markdown/lib/useMarkdownDocument.ts`) is the single owner of a markdown tab's in-memory content, for both Rich and Source mode. Neither the TipTap editor instance nor the CodeMirror source view holds its own independent source of truth; each renders from and writes back to this one buffer. Disk is the synchronization point when switching modes: toggling Rich <-> Source does not hand content directly from one editor instance to the other in memory: it round-trips through the buffer's serialized markdown, the same string that would be written to disk. This keeps the two views from silently diverging (e.g. an HTML construct TipTap can represent but the markdown serializer would lossily flatten) and makes "what does Source mode show" always answerable as "the current buffer, serialized," not "whatever the Rich editor's internal ProseMirror doc happens to contain right now."
 
 ### 4.11 Save round-trip policy
 
 Saving a markdown tab follows three rules to avoid gratuitous disk writes and content drift:
 
-- **Skip-if-equal.** A save that would write byte-identical content to what is already on disk is a no-op — opening and closing a note without editing it never touches its mtime.
+- **Skip-if-equal.** A save that would write byte-identical content to what is already on disk is a no-op: opening and closing a note without editing it never touches its mtime.
 - **Dirty-only writes.** Autosave and the close-tab guard only write when the buffer differs from the last-saved snapshot; the dirty dot tracks this same comparison.
-- **Frontmatter is an opaque, byte-preserved prefix.** `lib/frontmatter.ts` splits the YAML frontmatter block off the top of the file before conversion and reattaches it verbatim on save. The rich editor and the markdown-it round trip never see or reformat frontmatter — this guarantees a note's frontmatter (key order, quoting style, comments) survives edits it never asked to be touched, even though TipTap's own document model would happily normalize it away.
+- **Frontmatter is an opaque, byte-preserved prefix.** `lib/frontmatter.ts` splits the YAML frontmatter block off the top of the file before conversion and reattaches it verbatim on save. The rich editor and the markdown-it round trip never see or reformat frontmatter, which guarantees a note's frontmatter (key order, quoting style, comments) survives edits it never asked to be touched, even though TipTap's own document model would happily normalize it away.
 
 ---
 

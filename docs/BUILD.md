@@ -77,7 +77,7 @@ loads only when the feature it backs is actually used.
 | `mermaid` core | First mermaid fence rendered (`import("mermaid")` in `rich/extensions/mermaid.ts`) | 11.46 kB (33.21 kB raw) |
 
 Mermaid further splits per diagram type internally (flowchart, sequence, class, gantt, C4, git-graph, ER, etc. each in
-their own chunk) — only the syntax actually present in a note's fences is fetched.
+their own chunk); only the syntax actually present in a note's fences is fetched.
 
 The `manualChunks` predicate that pins the core React packages to the eager `react` chunk originally matched on the
 bare substring `/react/`, which also matched `@tiptap/react`'s node_modules path (`.../node_modules/@tiptap/react/dist/...`).
