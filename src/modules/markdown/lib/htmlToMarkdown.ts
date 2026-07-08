@@ -366,7 +366,10 @@ function serializeInline(node: Node): string {
       return color ? `<span style="color: ${color}">${inner()}</span>` : inner();
     }
     case "A":
-      return `[${inner()}](${decodeURIComponent(node.getAttribute("href") ?? "")})`;
+      // Raw attribute value, not decoded: an ordinary URL like
+      // "https://en.wikipedia.org/wiki/100%_(album)" is not valid
+      // percent-encoding and decodeURIComponent throws on it.
+      return `[${inner()}](${node.getAttribute("href") ?? ""})`;
     case "IMG":
       return serializeImage(node);
     case "BR":

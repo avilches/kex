@@ -63,6 +63,12 @@ describe("round-trip idempotence", () => {
     expect(md).toBe("![x](assets/100%.png)\n");
   });
 
+  it("does not throw on a link href with a literal percent sign", () => {
+    const html = '<p><a href="https://en.wikipedia.org/wiki/100%_(album)">text</a></p>';
+    const md1 = htmlToMarkdown(html);
+    expect(md1).toBe("[text](https://en.wikipedia.org/wiki/100%_(album))\n");
+  });
+
   it("is idempotent for a bullet with no own text and only a nested list", () => {
     const input = "- \n    - nested\n";
     const md1 = htmlToMarkdown(markdownToHtml(input));
