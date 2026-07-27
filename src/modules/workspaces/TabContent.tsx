@@ -43,6 +43,9 @@ const BrowserPane = lazy(() =>
 const GitHistoryPane = lazy(() =>
   import("@/modules/git-history/GitHistoryPane").then((m) => ({ default: m.GitHistoryPane as ComponentType<any> })),
 );
+const MarkdownTab = lazy(() =>
+  import("@/modules/markdown/rich/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
+);
 
 const GLOBAL_TOGGLE_SETTERS: Record<
   EditorGlobalToggleKey,
@@ -124,6 +127,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
+  const markdownEditor = usePreferencesStore((s) => s.markdownEditor);
   const scratchpadInNewTerminals = usePreferencesStore(
     (s) => s.scratchpadInNewTerminals,
   );
@@ -360,6 +364,13 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       );
 
     case "markdown":
+      if (markdownEditor === "rich") {
+        return (
+          <Suspense fallback={null}>
+            <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
+          </Suspense>
+        );
+      }
       return (
         <Suspense fallback={null}>
           <div className="flex h-full w-full flex-col">

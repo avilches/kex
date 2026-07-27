@@ -371,6 +371,15 @@ Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell com
 - **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active script of the current workspace, toggling based on the current isRunning state.
 - **Startup validation** (`validateScriptPanels`): on mount, App.tsx collects all living tab ids and calls `validateScriptPanels` for each workspace, clearing `tabId` references that no longer exist (stale from a previous session).
 
+### Rich markdown editor (WYSIWYG)
+
+Rich markdown editor (WYSIWYG) ported from HelixNotes (TipTap 3): tasks, tables, callouts, details, math (KaTeX),
+mermaid, slash commands, outline, find-in-note, optional wiki-links; Streamdown preview retained behind
+`markdownEditor: legacy`. Excluded from the port: AI menu, secret blocks, PDF embeds, task metadata. Not present in
+upstream Terax (which has no markdown-specific editing surface at all). See `docs/ARCHITECTURE.md` (Frontend module
+map, `markdown/`; 4.9-4.11) and `docs/BUILD.md` (Markdown editor chunks) for the module layout, buffer ownership
+model, and bundle impact.
+
 ---
 
 ## Roadmap (planned, not yet built)

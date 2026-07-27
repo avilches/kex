@@ -50,6 +50,8 @@ export type DiffViewMode = "unified" | "split";
 
 export type TextEditorMode = "file-only" | "workspace-and-files";
 
+export type MarkdownEditorMode = "rich" | "legacy";
+
 export type CursorStyle = "bar" | "block" | "underline";
 
 export type CursorInactiveStyle =
@@ -195,6 +197,8 @@ export type Preferences = {
   editorBracketMatching: boolean;
   editorCloseBrackets: boolean;
   editorAutocompletion: boolean;
+  markdownEditor: MarkdownEditorMode; // JSON-only: no settings UI, edit settings-editor.json
+  markdownWikiLinks: boolean; // JSON-only: no settings UI, edit settings-editor.json
   tabBarStyle: TabBarStyle;
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
@@ -276,6 +280,8 @@ const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "highlightActiveLine";
 const KEY_EDITOR_BRACKET_MATCHING = "bracketMatching";
 const KEY_EDITOR_CLOSE_BRACKETS = "closeBrackets";
 const KEY_EDITOR_AUTOCOMPLETION = "autocompletion";
+const KEY_MARKDOWN_EDITOR = "markdownEditor";
+const KEY_MARKDOWN_WIKI_LINKS = "markdownWikiLinks";
 
 // Shortcuts store
 const KEY_SHORTCUTS = "shortcuts";
@@ -419,6 +425,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorBracketMatching: true,
   editorCloseBrackets: true,
   editorAutocompletion: true,
+  markdownEditor: "rich",
+  markdownWikiLinks: false,
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
@@ -474,6 +482,10 @@ export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMod
 export function parseTextEditorMode(value: unknown): TextEditorMode {
   if (value === "file-only") return "file-only";
   return "workspace-and-files";
+}
+
+export function parseMarkdownEditor(value: unknown): MarkdownEditorMode {
+  return value === "legacy" ? "legacy" : "rich";
 }
 
 async function writePref<T>(key: string, value: T): Promise<void> {
@@ -673,6 +685,10 @@ export async function loadPreferences(): Promise<Preferences> {
     editorAutocompletion:
       get<boolean>(KEY_EDITOR_AUTOCOMPLETION) ??
       DEFAULT_PREFERENCES.editorAutocompletion,
+    markdownEditor: parseMarkdownEditor(get(KEY_MARKDOWN_EDITOR)),
+    markdownWikiLinks:
+      get<boolean>(KEY_MARKDOWN_WIKI_LINKS) ??
+      DEFAULT_PREFERENCES.markdownWikiLinks,
     tabBarStyle: (() => {
       const v = get<string>(KEY_TAB_BAR_STYLE);
       return v === "connected" || v === "pill" ? v : DEFAULT_PREFERENCES.tabBarStyle;
@@ -733,6 +749,14 @@ export async function loadPreferences(): Promise<Preferences> {
   if (!map.has(KEY_KEEP_FOLDER_LAYOUT)) configDefaults.push([KEY_KEEP_FOLDER_LAYOUT, DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot]);
   if (configDefaults.length > 0) {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
+  }
+
+  // Persist JSON-only editor keys so they're discoverable in settings-editor.json.
+  const editorConfigDefaults: [string, unknown][] = [];
+  if (!map.has(KEY_MARKDOWN_EDITOR)) editorConfigDefaults.push([KEY_MARKDOWN_EDITOR, DEFAULT_PREFERENCES.markdownEditor]);
+  if (!map.has(KEY_MARKDOWN_WIKI_LINKS)) editorConfigDefaults.push([KEY_MARKDOWN_WIKI_LINKS, DEFAULT_PREFERENCES.markdownWikiLinks]);
+  if (editorConfigDefaults.length > 0) {
+    void Promise.all(editorConfigDefaults.map(([k, v]) => editorStore.set(k, v))).then(() => editorStore.save());
   }
 
   // Persist viewByExt to settings-editor.json so it's discoverable there.
@@ -1195,6 +1219,8 @@ const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
   [KEY_EDITOR_CLOSE_BRACKETS]: "editorCloseBrackets",
   [KEY_EDITOR_AUTOCOMPLETION]: "editorAutocompletion",
+  [KEY_MARKDOWN_EDITOR]: "markdownEditor",
+  [KEY_MARKDOWN_WIKI_LINKS]: "markdownWikiLinks",
 };
 
 const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {

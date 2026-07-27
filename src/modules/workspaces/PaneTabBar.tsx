@@ -273,7 +273,7 @@ function DraggableTab({
       >
         {displayTitle}
       </span>
-      {tab.kind === "editor" && tab.dirty && !editorAutoSave && (
+      {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && !editorAutoSave && (
         <span className="shrink-0 text-[8px] text-primary">●</span>
       )}
       {hasAgent && (
