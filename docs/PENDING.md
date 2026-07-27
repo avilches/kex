@@ -24,6 +24,13 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-43](pending/bugs/BUG-43-restore-claude-code-con-worktree.md) — Restore de Claude Code cuando ha creado un worktree (sin verificar)
 - [BUG-SP-01](pending/bugs/BUG-SP-01-mouse-pane-return-no-resume.md) - Scratchpad (remember ON): volver a un pane con el raton no reabre el SP (teclado si funciona). Reproducir con proceso fresco antes de investigar (sospecha HMR)
 - [BUG-44](pending/bugs/BUG-44-macos-beep-shortcuts.md) - macOS: beep del sistema con Cmd+Ctrl+Flecha (navegacion de panes). Causa raiz confirmada (WKWebView -> interpretKeyEvents -> NSBeep), 2 intentos fallidos documentados, plan: responder chain sink (Opcion B) con fallback a NSEvent monitor (Opcion A)
+- [BUG-45](pending/bugs/BUG-45-htmltomarkdown-alt-link-text-sin-escapar.md) - htmlToMarkdown: alt de imagen y texto de link sin escapar caracteres markdown-significativos (`]`, `)`, `|`). Hueco de la spec original del editor rich, no defecto de implementacion
+- [BUG-46](pending/bugs/BUG-46-htmltomarkdown-tabla-vacia-no-se-descarta.md) - htmlToMarkdown: una tabla de 0 filas no se descarta como el parrafo vacio, deja una linea espuria. Cosmetico, muy improbable desde el editor real
+- [BUG-47](pending/bugs/BUG-47-htmltomarkdown-br-br-p-idempotencia-lenta.md) - htmlToMarkdown: `<br><br>` seguido de `<p>` hermano en una lista tarda 2 pasadas extra en estabilizar (caso residual de una familia de bugs de idempotencia ya mayormente arreglada)
+- [BUG-48](pending/bugs/BUG-48-details-comentario-obsoleto-pos-0.md) - details.ts: comentario sobre un bug "pos-0" de `@tiptap/extension-details` puede estar obsoleto en la version fijada; solo doc, codigo ya es seguro sin el
+- [BUG-49](pending/bugs/BUG-49-wikilink-ambiguo-pierde-alias-y-anchor.md) - Wiki-link ambiguo (`[[Titulo]]` que matchea varios ficheros) pierde el alias del pipe y el anchor heading/block al resolver. Simplificacion deliberada del brief original, edge case real
+- [BUG-50](pending/bugs/BUG-50-shortcut-legacy-toggleview-inerte-markdown.md) - Shortcut legacy `editor.markdown.toggleView` queda inerte (no hace nada) para tabs markdown con el editor rich activo
+- [BUG-51](pending/bugs/BUG-51-handlepathdeleted-ignora-tabs-markdown.md) - `handlePathDeleted` (fichero borrado externamente) no ofrece guardia a tabs markdown, solo a `kind === "editor"`. Distinto del fix ya aplicado en closeQueue.ts para cierre normal
 
 ## WIP en ramas
 
@@ -52,6 +59,13 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [IMP-SP-02](pending/improvements/IMP-SP-02-test-catalog-scratchpad.md) - Catalogo de pruebas con codigo (SP-XX) para los invariantes del scratchpad: pasos, esperado y punteros a codigo por caso; integrarlo en docs/SCRATCHPAD.md y re-validar los casos pendientes (borrador completo en el fichero)
 - [M9](pending/improvements/M9-rebind-rename-f2-shift-f6.md) — Rebind del atajo de rename: F2 -> Shift+F6
 - [M10](pending/improvements/M10-rendimiento-busqueda-ficheros.md) — Rendimiento de la busqueda de ficheros (fs_search async/paralelo/cancelable + tuning de contenido)
+- [M11](pending/improvements/M11-codelangdropdown-lenguaje-actual-y-auto.md) - CodeLangDropdown: mostrar el lenguaje actual del bloque de codigo y anadir opcion "Auto" para resetear
+- [M12](pending/improvements/M12-consolidar-dropdowns-editor-rich.md) - Consolidar las 6 implementaciones de dropdown/floating-menu del editor rich (Toolbar, SlashMenu, WikiLinkMenu, CodeLangDropdown) en un componente compartido
+- [M13](pending/improvements/M13-toolbar-table-picker-hover-stale.md) - Toolbar: el hover del table-size picker queda obsoleto si se cierra sin elegir tamano (cosmetico, heredado de HelixNotes)
+- [M14](pending/improvements/M14-markdowntab-autofocus-visible-focused.md) - MarkdownTab: props `visible`/`focused` sin usar, sin autofocus del editor rich al activar el tab (a diferencia de los tabs de editor CodeMirror)
+- [M15](pending/improvements/M15-emdash-shortcuts-ts.md) - Dos em-dashes preexistentes en `shortcuts.ts` (~lineas 362 y 444), sin relacion con el editor markdown; rollar en un futuro barrido de em-dashes de todo el proyecto
+- [M16](pending/improvements/M16-markdown-prefs-no-reactivas-en-tab-abierto.md) - Nota informativa (no bug): `markdownEditor`/`markdownWikiLinks` no son reactivas en un tab ya abierto, se leen solo al montar; documentado para que no se redescubra como regresion, mas direccion opcional para hacerlas reactivas
+- [IMP-MD-01](pending/improvements/IMP-MD-01-verificacion-manual-editor-rich.md) - Checklist de verificacion manual del editor markdown rich (18 grupos de escenarios, artifact interactivo). En curso: 1 bug real ya encontrado y arreglado (autosave al cerrar, rama `worktree-fix-close-without-autosave`), quedan ~17 grupos por confirmar
 
 ## Contexto adicional (`docs/pending/`)
 
