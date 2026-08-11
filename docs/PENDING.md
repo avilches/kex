@@ -31,7 +31,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-49](pending/bugs/BUG-49-wikilink-ambiguo-pierde-alias-y-anchor.md) - Wiki-link ambiguo (`[[Titulo]]` que matchea varios ficheros) pierde el alias del pipe y el anchor heading/block al resolver. Simplificacion deliberada del brief original, edge case real
 - [BUG-50](pending/bugs/BUG-50-shortcut-legacy-toggleview-inerte-markdown.md) - Shortcut legacy `editor.markdown.toggleView` queda inerte (no hace nada) para tabs markdown con el editor rich activo
 - [BUG-52](pending/bugs/BUG-52-notes-hygiene-varios.md) - Varios items de correccion y limpieza de bajo impacto en el stack de notas (payload muerto, lectura corta en `read_head`, fecha incorrecta en orden "Created", estado colgado en `kex.json`, last-writer-wins entre ventanas)
-- [BUG-53](pending/bugs/BUG-53-autosave-flush-resucita-fichero-borrado-o-renombrado.md) - El flush de autosave al desmontar o cambiar de path resucita un fichero borrado o renombrado (afecta tabs markdown y editor con cambios sin guardar; preexistente en `main`, la vista de notas lo hace el camino mas comun)
+- [BUG-53](pending/bugs/BUG-53-autosave-flush-resucita-fichero-borrado-o-renombrado.md) - **CONFIRMADO en la app**: el flush de autosave al desmontar o cambiar de path resucita un fichero borrado o renombrado (afecta tabs markdown y editor con cambios sin guardar; preexistente en `main`, la vista de notas lo hace el camino mas comun)
 - [BUG-54](pending/bugs/BUG-54-discard-confirma-contra-el-repo-equivocado.md) - **Perdida de datos irrecuperable**: si cambias de workspace con el dialogo de descarte abierto, el `git restore` se aplica al repo nuevo con las rutas del viejo. `executeDiscard` lee `repo.repoRoot` al confirmar y nadie limpia `pendingDiscard` al cambiar de repo. Preexistente en `main`, ajeno a la vista de notas
 
 ## WIP en ramas
@@ -74,6 +74,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [IMP-NOTES-04](pending/improvements/IMP-NOTES-04-navegacion-teclado.md) - Navegacion por teclado (flechas + Enter) en filas de nota y carpeta, igualando al explorer
 - [IMP-NOTES-05](pending/improvements/IMP-NOTES-05-preview-tab-no-implementado.md) - Click simple y doble click se comportan igual al abrir una nota; los tabs markdown no tienen modo preview
 - [IMP-NOTES-06](pending/improvements/IMP-NOTES-06-huecos-de-cobertura-en-el-nucleo-puro.md) - Tres invariantes del nucleo puro sin test: desempate por `relPath` con timestamps iguales, buckets de fecha no consecutivos, y orden de hermanos anidados en el arbol de carpetas
+- [IMP-NOTES-07](pending/improvements/IMP-NOTES-07-verificacion-manual-pendiente.md) - Cuatro escenarios sin probar en la app, cada uno guardando un arreglo concreto de la revision: borrado con cambio de workspace de por medio (el bug critico, prioridad), orden custom con carpeta filtrada, coste con la vista oculta en un repo grande, y `kex.json` con claves ajenas o corrupto
 
 ## Contexto adicional (`docs/pending/`)
 

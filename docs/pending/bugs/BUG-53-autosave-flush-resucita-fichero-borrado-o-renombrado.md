@@ -3,7 +3,7 @@ id: BUG-53
 title: El flush de autosave al desmontar o cambiar de path resucita un fichero borrado o renombrado
 area: markdown / editor / document-buffer
 severity: medium-high
-status: sin confirmar
+status: CONFIRMADO en la app (2026-07-14): borrar una nota con cambios sin guardar recrea el fichero
 ---
 
 ## Descripcion
