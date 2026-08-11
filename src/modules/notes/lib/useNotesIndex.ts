@@ -5,21 +5,20 @@ import { kexJsonPath } from "./useNotesState";
 
 const REFRESH_DEBOUNCE_MS = 300;
 const EMPTY: NotesListResult = { notes: [], folders: [], truncated: false };
-const NOTE_EXTS = ["md", "markdown", "mdx"];
 
-// Shared by both fs listeners so they cannot drift apart: rejects the vault's
-// own kex.json (and its atomic-write .tmp siblings) and anything that could
-// not change the note index (only markdown files and bare directory paths do).
-function isNoteRelevantPath(root: string, path: string): boolean {
+// Shared by both fs listeners so they cannot drift apart. The watcher payload
+// carries no file-versus-directory signal, so this cannot filter by extension
+// (a directory named "v1.2" would be misread as a file and skipped). Reject
+// only what is known for certain to be noise: the vault's own root kex.json
+// and its atomic-write .tmp siblings. Everything else schedules a refresh.
+export function isNoteRelevantPath(root: string, path: string): boolean {
   const normRoot = root.replace(/\\/g, "/");
   const normPath = path.replace(/\\/g, "/");
   if (normPath !== normRoot && !normPath.startsWith(`${normRoot}/`)) return false;
   if (normPath === kexJsonPath(root)) return false;
   const basename = normPath.slice(normPath.lastIndexOf("/") + 1);
   if (basename.startsWith(".tmp")) return false;
-  const dot = basename.lastIndexOf(".");
-  if (dot === -1) return true;
-  return NOTE_EXTS.includes(basename.slice(dot + 1).toLowerCase());
+  return true;
 }
 
 export function useNotesIndex(root: string | null, active: boolean) {
