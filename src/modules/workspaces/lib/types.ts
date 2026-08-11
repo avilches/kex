@@ -23,7 +23,7 @@ export type Tab =
   | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; scratchpadEnabled?: boolean })
   | (TabCommon & { kind: "editor"; path: string; dirty: boolean; preview: boolean; previewMode?: "overlay" | "split"; overrideLanguage?: string | null })
   | (TabCommon & { kind: "browser"; url: string; floating?: boolean })
-  | (TabCommon & { kind: "markdown"; path: string })
+  | (TabCommon & { kind: "markdown"; path: string; dirty?: boolean })
   | (TabCommon & { kind: "git-diff"; path: string; repoRoot: string; mode: "-" | "+"; originalPath: string | null })
   | (TabCommon & { kind: "git-history"; repoRoot: string })
   | (TabCommon & { kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null });

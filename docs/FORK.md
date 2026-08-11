@@ -371,6 +371,15 @@ Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell com
 - **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active script of the current workspace, toggling based on the current isRunning state.
 - **Startup validation** (`validateScriptPanels`): on mount, App.tsx collects all living tab ids and calls `validateScriptPanels` for each workspace, clearing `tabId` references that no longer exist (stale from a previous session).
 
+### Rich markdown editor (WYSIWYG)
+
+Rich markdown editor (WYSIWYG) ported from HelixNotes (TipTap 3): tasks, tables, callouts, details, math (KaTeX),
+mermaid, slash commands, outline, find-in-note, optional wiki-links; Streamdown preview retained behind
+`markdownEditor: legacy`. Excluded from the port: AI menu, secret blocks, PDF embeds, task metadata. Not present in
+upstream Terax (which has no markdown-specific editing surface at all). See `docs/ARCHITECTURE.md` (Frontend module
+map, `markdown/`; 4.9-4.11) and `docs/BUILD.md` (Markdown editor chunks) for the module layout, buffer ownership
+model, and bundle impact.
+
 ### Notes sidebar view
 
 HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as the vault. New `notes_list` Tauri command; per-workspace UI state in `kex.json` at the workspace root. Not present upstream.
@@ -380,6 +389,7 @@ HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as
 - **Note metadata** — title from frontmatter `title:` field, first H1, or file stem (in that precedence); mtime and created date from frontmatter `created:` field, btime, or mtime (in that precedence). UI shows only the first 2 KB of each note (120-char snippet for previews).
 - **Config persistence** — all view state (`quickAccess`, `sortMode`, `noteOrder`, `collapsedFolders`, `groupByDate`, `selectedFolder`) lives in `kex.json` at the workspace root under the `notes` namespace (vault-relative forward-slash paths). Read-modify-write strategy preserves foreign namespaces; invalid or missing `kex.json` falls back to defaults without overwriting until the first mutation.
 - **Immutable .md files** — Kex never writes frontmatter, metadata, or any other data into user `.md` files. State is stored exclusively in `kex.json`.
+- **Opens into the rich editor** — clicking a note creates a `markdown` tab, so notes render in the TipTap editor described above.
 
 ---
 

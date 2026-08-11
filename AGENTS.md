@@ -131,12 +131,14 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
   `workspace-state.json` via `tauri-plugin-store`, debounced 300ms on every change.
 - **source-control/** — git status / stage / commit panel and diff workflow.
 - **git-history/** — commit graph rail, refs, per-commit file diffs.
-- **markdown/** — markdown preview renderer (backs the `markdown` tab kind).
+- **markdown/** — markdown preview renderer (backs the `markdown` tab kind); the default rich TipTap editor (`rich/`,
+  lazy chunk) with source-mode toggle, toolbar, outline, slash commands; and the pure markdown conversion core
+  (`lib/`: frontmatter, markdownToHtml, htmlToMarkdown, documentBuffer, wikiLinks) shared by both.
 - **notes/** — notes view for the Sidebar (Quick Access + folder tree + sortable note list).
   Functional core in `lib/` (`notesConfig.ts` for the `kex.json` `notes` namespace,
   `noteSort.ts`, `folderTree.ts`); IO hooks `useNotesState` / `useNotesIndex`; backed by the
   `notes_list` command. Mounted from `Sidebar.tsx` only when the workspace has a
-  `workspaceRoot`.
+  `workspaceRoot`. Opens each note as a `markdown` tab, so notes render in the rich editor above.
 - **workspace/** — workspace environment switching (Local + WSL distros).
 - **theme/** — custom theme engine (no `next-themes`). `ThemeProvider` + `applyTheme` write CSS variables; built-in
   presets in `themes/` (kex-default, nord, tide, catppuccin, tokyo-night, caffeine, claude, gruvbox, sage, rose-pine),
