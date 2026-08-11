@@ -1,19 +1,10 @@
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { native } from "@/lib/native";
+import { DeleteEntryModal } from "@/modules/explorer/DeleteEntryModal";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -25,6 +16,11 @@ import type { NoteListItem } from "./lib/notesList";
 import { useNotesIndex } from "./lib/useNotesIndex";
 import { useNotesState } from "./lib/useNotesState";
 import { NoteListColumn } from "./NoteListColumn";
+
+function basename(relPath: string): string {
+  const parts = relPath.split(/[\\/]/);
+  return parts[parts.length - 1] ?? relPath;
+}
 
 export type NotesViewProps = {
   root: string;
@@ -42,12 +38,15 @@ export function NotesView(props: NotesViewProps) {
   const index = useNotesIndex(canonRoot, props.active);
   const [primedRenamePath, setPrimedRenamePath] = useState<string | null>(null);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    relPath: string;
+    isDir: boolean;
+  } | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: props.active and canonRoot are reset triggers, not read in the body
   useEffect(() => {
-    // The delete confirmation is an AlertDialog rendered through a Radix
-    // Portal, so it escapes the sidebar's invisible/pointer-events-none hide
+    // DeleteEntryModal wraps an AlertDialog rendered through a Radix Portal,
+    // so it escapes the sidebar's invisible/pointer-events-none hide
     // pattern and would float over whatever view the user switches to. A
     // workspace switch changes canonRoot without deactivating the view (the
     // sidebar chrome is per-window, not per-workspace), so per-vault local
@@ -89,7 +88,10 @@ export function NotesView(props: NotesViewProps) {
         props.onOpenFile(abs(relPath), true);
         index.refresh();
       } catch (e) {
-        toast.error(`Could not create note: ${e}`);
+        console.error("Failed to create note:", e);
+        toast.error("Failed to create note", {
+          description: e instanceof Error ? e.message : String(e),
+        });
       }
     },
     [index, abs, props.onOpenFile],
@@ -111,7 +113,10 @@ export function NotesView(props: NotesViewProps) {
         setEditingFolder(relPath);
         index.refresh();
       } catch (e) {
-        toast.error(`Could not create folder: ${e}`);
+        console.error("Failed to create folder:", e);
+        toast.error("Failed to create folder", {
+          description: e instanceof Error ? e.message : String(e),
+        });
       }
     },
     [index, abs],
@@ -128,7 +133,10 @@ export function NotesView(props: NotesViewProps) {
         props.onPathRenamed(abs(relPath), abs(newRel));
         index.refresh();
       } catch (e) {
-        toast.error(`Could not rename folder: ${e}`);
+        console.error("Failed to rename folder:", e);
+        toast.error("Failed to rename folder", {
+          description: e instanceof Error ? e.message : String(e),
+        });
         index.refresh();
       }
     },
@@ -148,7 +156,10 @@ export function NotesView(props: NotesViewProps) {
         props.onPathRenamed(abs(relPath), abs(newRel));
         index.refresh();
       } catch (e) {
-        toast.error(`Could not rename: ${e}`);
+        console.error("Failed to rename:", e);
+        toast.error("Failed to rename", {
+          description: e instanceof Error ? e.message : String(e),
+        });
         index.refresh();
       }
     },
@@ -156,16 +167,39 @@ export function NotesView(props: NotesViewProps) {
   );
 
   const handleDelete = useCallback(async () => {
-    const relPath = pendingDelete;
+    const target = pendingDelete;
     setPendingDelete(null);
-    if (!relPath) return;
+    if (!target) return;
+    const { relPath } = target;
     try {
       await invoke("fs_delete", { path: abs(relPath), workspace: currentWorkspaceEnv() });
       state.notePathDeleted(relPath);
       props.onPathDeleted(abs(relPath));
       index.refresh();
     } catch (e) {
-      toast.error(`Could not delete: ${e}`);
+      console.error("fs_delete failed:", e);
+      toast.error(`Failed to delete "${basename(relPath)}"`, {
+        description: e instanceof Error ? e.message : String(e),
+      });
+      index.refresh();
+    }
+  }, [pendingDelete, abs, state, index, props.onPathDeleted]);
+
+  const handleTrash = useCallback(async () => {
+    const target = pendingDelete;
+    setPendingDelete(null);
+    if (!target) return;
+    const { relPath } = target;
+    try {
+      await invoke("fs_trash", { path: abs(relPath), workspace: currentWorkspaceEnv() });
+      state.notePathDeleted(relPath);
+      props.onPathDeleted(abs(relPath));
+      index.refresh();
+    } catch (e) {
+      console.error("fs_trash failed:", e);
+      toast.error(`Failed to move "${basename(relPath)}" to trash`, {
+        description: e instanceof Error ? e.message : String(e),
+      });
       index.refresh();
     }
   }, [pendingDelete, abs, state, index, props.onPathDeleted]);
@@ -192,7 +226,7 @@ export function NotesView(props: NotesViewProps) {
             onStartRenameFolder={setEditingFolder}
             onRenameFolder={(rel, name) => void handleRenameFolder(rel, name)}
             onRenameFolderDone={() => setEditingFolder(null)}
-            onDeleteFolder={setPendingDelete}
+            onDeleteFolder={(relPath) => setPendingDelete({ relPath, isDir: true })}
           />
         </ResizablePanel>
         <ResizableHandle />
@@ -210,7 +244,7 @@ export function NotesView(props: NotesViewProps) {
             onOpenToSide={(rel) => props.onOpenToSide(abs(rel))}
             onTogglePin={state.toggleQuickAccess}
             onRename={handleRename}
-            onDelete={setPendingDelete}
+            onDelete={(relPath) => setPendingDelete({ relPath, isDir: false })}
             onRevealInExplorer={(rel) => props.onRevealInExplorer(abs(rel))}
             onNewNote={() => void handleNewNoteIn(state.config.selectedFolder)}
             onSetSortMode={state.setSortMode}
@@ -221,27 +255,16 @@ export function NotesView(props: NotesViewProps) {
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <AlertDialog
-        open={pendingDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingDelete(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingDelete} will be permanently deleted (folders including their contents).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleDelete()}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {pendingDelete && (
+        <DeleteEntryModal
+          open
+          name={basename(pendingDelete.relPath)}
+          isDir={pendingDelete.isDir}
+          onCancel={() => setPendingDelete(null)}
+          onDelete={() => void handleDelete()}
+          onTrash={() => void handleTrash()}
+        />
+      )}
     </>
   );
 }

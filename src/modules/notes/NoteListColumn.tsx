@@ -20,6 +20,7 @@ import {
   ArrowUpDownIcon,
   Calendar03Icon,
   PlusSignIcon,
+  RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
@@ -179,6 +180,15 @@ export function NoteListColumn(props: NoteListColumnProps) {
           </button>
         )}
         <div className="flex-1" />
+        <button
+          type="button"
+          title="Refresh notes"
+          onClick={props.onRetry}
+          disabled={props.loading}
+          className={cn(HEADER_BUTTON, "disabled:pointer-events-none disabled:opacity-50")}
+        >
+          <HugeiconsIcon icon={RefreshIcon} size={12} strokeWidth={1.85} />
+        </button>
         <button
           type="button"
           title="New note"
