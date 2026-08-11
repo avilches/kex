@@ -51,6 +51,12 @@ export function useNotesState(root: string | null, active: boolean) {
     };
   }, [root, active]);
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   const scheduleWrite = useCallback((next: NotesConfig) => {
     const r = rootRef.current;
     if (!r) return;

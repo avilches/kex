@@ -44,12 +44,18 @@ export function NotesView(props: NotesViewProps) {
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: props.active and canonRoot are reset triggers, not read in the body
   useEffect(() => {
     // The delete confirmation is an AlertDialog rendered through a Radix
     // Portal, so it escapes the sidebar's invisible/pointer-events-none hide
-    // pattern and would float over whatever view the user switches to.
-    if (!props.active) setPendingDelete(null);
-  }, [props.active]);
+    // pattern and would float over whatever view the user switches to. A
+    // workspace switch changes canonRoot without deactivating the view (the
+    // sidebar chrome is per-window, not per-workspace), so per-vault local
+    // state must also reset on root change or it leaks across vaults.
+    setPendingDelete(null);
+    setEditingFolder(null);
+    setPrimedRenamePath(null);
+  }, [props.active, canonRoot]);
 
   const abs = useCallback(
     (relPath: string) => `${canonRoot}/${relPath}`,

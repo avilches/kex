@@ -99,7 +99,8 @@ own React instance. Main windows have a `w-<id>` label; the Settings window has 
 state (geometry + Workspaces + active index) is persisted by Rust in `{app_data_dir}/workspaces.json` (index) plus
 `{app_data_dir}/workspaces/<id>.json` (bodies), keyed by window label, and restored on startup. Path alias `@/*` →
 `src/*`. The layout is a 3-column shell: a narrow (52px) `WorkspaceBar`
-on the left, a resizable center content area, and a collapsible `Sidebar` (Explorer / Source Control / Git History).
+on the left, a resizable center content area, and a collapsible `Sidebar` (Explorer / Source Control / Git History /
+Notes, the last conditional on the workspace having a `workspaceRoot`).
 Content is organized as Workspaces → Panes → Tabs. Tabs are a tagged union (`kind`: `terminal` | `editor` |
 `browser` | `markdown` | `git-diff` | `git-history` | `git-commit-file`) and **not** unmounted on switch — they're
 hidden via `invisible pointer-events-none` so PTYs and dev servers keep streaming in the background.

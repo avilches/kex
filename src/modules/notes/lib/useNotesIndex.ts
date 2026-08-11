@@ -1,6 +1,7 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type NoteListItem, type NotesListResult, notesList } from "./notesList";
+import { kexJsonPath } from "./useNotesState";
 
 const REFRESH_DEBOUNCE_MS = 300;
 const EMPTY: NotesListResult = { notes: [], folders: [], truncated: false };
@@ -19,11 +20,16 @@ export function useNotesIndex(root: string | null, active: boolean) {
   // Generation token: guards against an older in-flight notesList() call
   // (superseded by a newer root/refresh) clobbering the latest result.
   const generationRef = useRef(0);
+  // Coalesces concurrent walks: a load requested while one is already in
+  // flight is deferred instead of firing a second overlapping invoke.
+  const inFlightRef = useRef(false);
+  const pendingRef = useRef(false);
+  // Set while the view is inactive (fs events arrived but were ignored) so
+  // the next activation forces one reload instead of showing stale data.
+  const staleRef = useRef(false);
 
-  const load = useCallback(() => {
-    const r = rootRef.current;
-    if (!r) return;
-    const generation = ++generationRef.current;
+  const runLoad = useCallback((r: string, generation: number) => {
+    inFlightRef.current = true;
     setLoading(true);
     notesList(r)
       .then((res) => {
@@ -36,10 +42,26 @@ export function useNotesIndex(root: string | null, active: boolean) {
         setError(String(e));
       })
       .finally(() => {
-        if (generationRef.current !== generation) return;
-        setLoading(false);
+        inFlightRef.current = false;
+        if (generationRef.current === generation) setLoading(false);
+        if (pendingRef.current) {
+          pendingRef.current = false;
+          const nextRoot = rootRef.current;
+          if (nextRoot) runLoad(nextRoot, generationRef.current);
+        }
       });
   }, []);
+
+  const load = useCallback(() => {
+    const r = rootRef.current;
+    if (!r) return;
+    const generation = ++generationRef.current;
+    if (inFlightRef.current) {
+      pendingRef.current = true;
+      return;
+    }
+    runLoad(r, generation);
+  }, [runLoad]);
 
   useEffect(() => {
     // Reset must happen in the same effect as the load trigger: if root changes
@@ -50,8 +72,10 @@ export function useNotesIndex(root: string | null, active: boolean) {
       setResult(EMPTY);
       setError(null);
     }
-    if (!root || !active || startedRef.current === root) return;
+    if (!root || !active) return;
+    if (startedRef.current === root && !staleRef.current) return;
     startedRef.current = root;
+    staleRef.current = false;
     setStarted(true);
     load();
   }, [root, active, load]);
@@ -67,16 +91,28 @@ export function useNotesIndex(root: string | null, active: boolean) {
 
   useEffect(() => {
     if (!started) return;
+    if (!active) {
+      // Stop re-walking the vault while invisible; force a reload on the
+      // next activation instead so the index isn't stale when it reappears.
+      staleRef.current = true;
+      return;
+    }
     const win = getCurrentWebviewWindow();
     const underRoot = (p: string): boolean => {
       const r = rootRef.current;
-      return r !== null && p.replace(/\\/g, "/").startsWith(r.replace(/\\/g, "/"));
+      if (r === null) return false;
+      const normRoot = r.replace(/\\/g, "/");
+      const normPath = p.replace(/\\/g, "/");
+      return normPath === normRoot || normPath.startsWith(`${normRoot}/`);
     };
     const subs = [
       win.listen<{ paths: string[] }>("fs:changed", (e) => {
         if (e.payload.paths.some(underRoot)) scheduleRefresh();
       }),
       win.listen<{ path: string; source?: string }>("fs:file-written", (e) => {
+        const r = rootRef.current;
+        if (r === null) return;
+        if (e.payload.path.replace(/\\/g, "/") === kexJsonPath(r)) return;
         if (underRoot(e.payload.path)) scheduleRefresh();
       }),
     ];
@@ -84,7 +120,7 @@ export function useNotesIndex(root: string | null, active: boolean) {
       for (const s of subs) void s.then((un) => un());
       if (timerRef.current !== null) clearTimeout(timerRef.current);
     };
-  }, [scheduleRefresh, started]);
+  }, [scheduleRefresh, started, active]);
 
   return {
     notes: result.notes as NoteListItem[],

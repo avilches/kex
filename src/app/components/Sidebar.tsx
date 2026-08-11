@@ -133,7 +133,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
           ))}
         </div>
 
-        {/* Content -- all three mounted, only active visible */}
+        {/* Content -- four panes; Notes is only mounted when notesRoot is set, the others always are */}
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <div
             className={cn(
