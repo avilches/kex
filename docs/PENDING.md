@@ -30,6 +30,8 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-48](pending/bugs/BUG-48-details-comentario-obsoleto-pos-0.md) - details.ts: comentario sobre un bug "pos-0" de `@tiptap/extension-details` puede estar obsoleto en la version fijada; solo doc, codigo ya es seguro sin el
 - [BUG-49](pending/bugs/BUG-49-wikilink-ambiguo-pierde-alias-y-anchor.md) - Wiki-link ambiguo (`[[Titulo]]` que matchea varios ficheros) pierde el alias del pipe y el anchor heading/block al resolver. Simplificacion deliberada del brief original, edge case real
 - [BUG-50](pending/bugs/BUG-50-shortcut-legacy-toggleview-inerte-markdown.md) - Shortcut legacy `editor.markdown.toggleView` queda inerte (no hace nada) para tabs markdown con el editor rich activo
+- [BUG-51](pending/bugs/BUG-51-autosave-flush-resucita-fichero-borrado-o-renombrado.md) - El flush de autosave al desmontar o cambiar de path resucita un fichero borrado o renombrado (afecta tabs markdown y editor con cambios sin guardar; preexistente en `main`, la vista de notas lo hace el camino mas comun)
+- [BUG-52](pending/bugs/BUG-52-notes-hygiene-varios.md) - Varios items de correccion y limpieza de bajo impacto en el stack de notas (payload muerto, lectura corta en `read_head`, fecha incorrecta en orden "Created", estado colgado en `kex.json`, last-writer-wins entre ventanas)
 
 ## WIP en ramas
 
@@ -65,6 +67,11 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [M15](pending/improvements/M15-emdash-shortcuts-ts.md) - Dos em-dashes preexistentes en `shortcuts.ts` (~lineas 362 y 444), sin relacion con el editor markdown; rollar en un futuro barrido de em-dashes de todo el proyecto
 - [M16](pending/improvements/M16-markdown-prefs-no-reactivas-en-tab-abierto.md) - Nota informativa (no bug): `markdownEditor`/`markdownWikiLinks` no son reactivas en un tab ya abierto, se leen solo al montar; documentado para que no se redescubra como regresion, mas direccion opcional para hacerlas reactivas
 - [IMP-MD-01](pending/improvements/IMP-MD-01-verificacion-manual-editor-rich.md) - Checklist de verificacion manual del editor markdown rich (18 grupos de escenarios, artifact interactivo). En curso: 1 bug real ya encontrado y arreglado (autosave al cerrar, rama `worktree-fix-close-without-autosave`), quedan ~17 grupos por confirmar
+- [IMP-NOTES-01](pending/improvements/IMP-NOTES-01-duplicado-basename.md) - Helper `baseName`/`basename` duplicado en `CollectionsColumn.tsx`, `NoteRow.tsx` y `NotesView.tsx`; ya existe una version equivalente en `tabTitle.tsx`
+- [IMP-NOTES-02](pending/improvements/IMP-NOTES-02-drag-listeners-durante-rename.md) - Listeners de drag activos durante el rename inline de una nota en sort mode "custom" (fix de una linea)
+- [IMP-NOTES-03](pending/improvements/IMP-NOTES-03-sin-indicador-de-carga.md) - Sin indicador visual de carga en la lista de notas durante el primer escaneo de un vault grande
+- [IMP-NOTES-04](pending/improvements/IMP-NOTES-04-navegacion-teclado.md) - Navegacion por teclado (flechas + Enter) en filas de nota y carpeta, igualando al explorer
+- [IMP-NOTES-05](pending/improvements/IMP-NOTES-05-preview-tab-no-implementado.md) - Click simple y doble click se comportan igual al abrir una nota; los tabs markdown no tienen modo preview
 
 ## Contexto adicional (`docs/pending/`)
 
