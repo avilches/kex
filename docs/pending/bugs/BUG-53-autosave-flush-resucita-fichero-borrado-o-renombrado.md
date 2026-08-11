@@ -1,5 +1,5 @@
 ---
-id: BUG-51
+id: BUG-53
 title: El flush de autosave al desmontar o cambiar de path resucita un fichero borrado o renombrado
 area: markdown / editor / document-buffer
 severity: medium-high

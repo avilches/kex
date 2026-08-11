@@ -25,7 +25,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 import type { NoteSortMode, NotesConfig } from "./lib/notesConfig";
-import { groupNotesByDate, sortNotes } from "./lib/noteSort";
+import { groupNotesByDate, mergeNoteOrder, sortNotes } from "./lib/noteSort";
 import type { NoteListItem } from "./lib/notesList";
 import { NoteRow } from "./NoteRow";
 
@@ -97,28 +97,8 @@ export function NoteListColumn(props: NoteListColumnProps) {
     rels.splice(to, 0, ...rels.splice(from, 1));
 
     // `sorted` only covers the folder-filtered rows, so the order for every
-    // other note (elsewhere in the vault) must be preserved as-is. Only the
-    // visible rows get new indices, reusing their previous slot values where
-    // possible so their position relative to the rest of the vault doesn't
-    // jump around; rows that never had a custom index get fresh slots past
-    // the current maximum.
-    const visible = new Set(rels);
-    const prevOrder = config.noteOrder;
-    const order: Record<string, number> = {};
-    let maxIndex = -1;
-    for (const [rel, idx] of Object.entries(prevOrder)) {
-      if (idx > maxIndex) maxIndex = idx;
-      if (!visible.has(rel)) order[rel] = idx;
-    }
-    const slots = rels
-      .map((rel) => prevOrder[rel])
-      .filter((v): v is number => v !== undefined)
-      .sort((a, b) => a - b);
-    while (slots.length < rels.length) slots.push(++maxIndex);
-    rels.forEach((rel, i) => {
-      order[rel] = slots[i];
-    });
-    props.onSetNoteOrder(order);
+    // other note (elsewhere in the vault) must be preserved as-is.
+    props.onSetNoteOrder(mergeNoteOrder(config.noteOrder, rels));
   };
 
   const renderRow = (note: NoteListItem) => (

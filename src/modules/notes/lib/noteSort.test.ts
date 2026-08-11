@@ -4,6 +4,7 @@ import {
   filterByFolder,
   formatRelativeDate,
   groupNotesByDate,
+  mergeNoteOrder,
   nextUntitledName,
   sortNotes,
 } from "./noteSort";
@@ -64,6 +65,45 @@ describe("sortNotes", () => {
     const input = [a, b, c];
     sortNotes(input, "title", {});
     expect(input.map((x) => x.relPath)).toEqual(["a.md", "b.md", "c.md"]);
+  });
+});
+
+describe("mergeNoteOrder", () => {
+  it("leaves notes outside the visible set at their exact previous index", () => {
+    const prevOrder = { "a.md": 0, "b.md": 1, "outside.md": 7 };
+    const merged = mergeNoteOrder(prevOrder, ["b.md", "a.md"]);
+    expect(merged["outside.md"]).toBe(7);
+  });
+
+  it("reads back the visible rows in the given order through sortNotes", () => {
+    const prevOrder = { "a.md": 0, "b.md": 1, "c.md": 2 };
+    const visible = ["c.md", "a.md", "b.md"];
+    const merged = mergeNoteOrder(prevOrder, visible);
+    const notes = [n("a.md"), n("b.md"), n("c.md")];
+    expect(sortNotes(notes, "custom", merged).map((x) => x.relPath)).toEqual(visible);
+  });
+
+  it("puts a visible row with no previous index after the mapped ones, without disturbing outsiders", () => {
+    const prevOrder = { "a.md": 0, "outside.md": 10 };
+    const visible = ["a.md", "new.md"];
+    const merged = mergeNoteOrder(prevOrder, visible);
+    expect(merged["outside.md"]).toBe(10);
+    const notes = [n("a.md"), n("new.md"), n("outside.md")];
+    expect(sortNotes(notes, "custom", merged).map((x) => x.relPath)).toEqual([
+      "a.md", "outside.md", "new.md",
+    ]);
+  });
+
+  it("keeps outsiders in their original relative order under All notes after a folder-filtered reorder", () => {
+    const prevOrder = { "docs/a.md": 0, "docs/b.md": 1, "other.md": 2, "zzz.md": 3 };
+    const visible = ["docs/b.md", "docs/a.md"];
+    const merged = mergeNoteOrder(prevOrder, visible);
+    const notes = [n("docs/a.md"), n("docs/b.md"), n("other.md"), n("zzz.md")];
+    const allNotesOrder = sortNotes(notes, "custom", merged).map((x) => x.relPath);
+    const outsiderPositions = allNotesOrder.filter(
+      (r) => r === "other.md" || r === "zzz.md",
+    );
+    expect(outsiderPositions).toEqual(["other.md", "zzz.md"]);
   });
 });
 

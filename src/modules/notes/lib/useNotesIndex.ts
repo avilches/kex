@@ -5,6 +5,22 @@ import { kexJsonPath } from "./useNotesState";
 
 const REFRESH_DEBOUNCE_MS = 300;
 const EMPTY: NotesListResult = { notes: [], folders: [], truncated: false };
+const NOTE_EXTS = ["md", "markdown", "mdx"];
+
+// Shared by both fs listeners so they cannot drift apart: rejects the vault's
+// own kex.json (and its atomic-write .tmp siblings) and anything that could
+// not change the note index (only markdown files and bare directory paths do).
+function isNoteRelevantPath(root: string, path: string): boolean {
+  const normRoot = root.replace(/\\/g, "/");
+  const normPath = path.replace(/\\/g, "/");
+  if (normPath !== normRoot && !normPath.startsWith(`${normRoot}/`)) return false;
+  if (normPath === kexJsonPath(root)) return false;
+  const basename = normPath.slice(normPath.lastIndexOf("/") + 1);
+  if (basename.startsWith(".tmp")) return false;
+  const dot = basename.lastIndexOf(".");
+  if (dot === -1) return true;
+  return NOTE_EXTS.includes(basename.slice(dot + 1).toLowerCase());
+}
 
 export function useNotesIndex(root: string | null, active: boolean) {
   const [result, setResult] = useState<NotesListResult>(EMPTY);
@@ -48,6 +64,7 @@ export function useNotesIndex(root: string | null, active: boolean) {
           pendingRef.current = false;
           const nextRoot = rootRef.current;
           if (nextRoot) runLoad(nextRoot, generationRef.current);
+          else setLoading(false);
         }
       });
   }, []);
@@ -98,22 +115,16 @@ export function useNotesIndex(root: string | null, active: boolean) {
       return;
     }
     const win = getCurrentWebviewWindow();
-    const underRoot = (p: string): boolean => {
-      const r = rootRef.current;
-      if (r === null) return false;
-      const normRoot = r.replace(/\\/g, "/");
-      const normPath = p.replace(/\\/g, "/");
-      return normPath === normRoot || normPath.startsWith(`${normRoot}/`);
-    };
     const subs = [
       win.listen<{ paths: string[] }>("fs:changed", (e) => {
-        if (e.payload.paths.some(underRoot)) scheduleRefresh();
+        const r = rootRef.current;
+        if (r !== null && e.payload.paths.some((p) => isNoteRelevantPath(r, p))) {
+          scheduleRefresh();
+        }
       }),
       win.listen<{ path: string; source?: string }>("fs:file-written", (e) => {
         const r = rootRef.current;
-        if (r === null) return;
-        if (e.payload.path.replace(/\\/g, "/") === kexJsonPath(r)) return;
-        if (underRoot(e.payload.path)) scheduleRefresh();
+        if (r !== null && isNoteRelevantPath(r, e.payload.path)) scheduleRefresh();
       }),
     ];
     return () => {

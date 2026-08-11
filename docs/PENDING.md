@@ -30,8 +30,8 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [BUG-48](pending/bugs/BUG-48-details-comentario-obsoleto-pos-0.md) - details.ts: comentario sobre un bug "pos-0" de `@tiptap/extension-details` puede estar obsoleto en la version fijada; solo doc, codigo ya es seguro sin el
 - [BUG-49](pending/bugs/BUG-49-wikilink-ambiguo-pierde-alias-y-anchor.md) - Wiki-link ambiguo (`[[Titulo]]` que matchea varios ficheros) pierde el alias del pipe y el anchor heading/block al resolver. Simplificacion deliberada del brief original, edge case real
 - [BUG-50](pending/bugs/BUG-50-shortcut-legacy-toggleview-inerte-markdown.md) - Shortcut legacy `editor.markdown.toggleView` queda inerte (no hace nada) para tabs markdown con el editor rich activo
-- [BUG-51](pending/bugs/BUG-51-autosave-flush-resucita-fichero-borrado-o-renombrado.md) - El flush de autosave al desmontar o cambiar de path resucita un fichero borrado o renombrado (afecta tabs markdown y editor con cambios sin guardar; preexistente en `main`, la vista de notas lo hace el camino mas comun)
 - [BUG-52](pending/bugs/BUG-52-notes-hygiene-varios.md) - Varios items de correccion y limpieza de bajo impacto en el stack de notas (payload muerto, lectura corta en `read_head`, fecha incorrecta en orden "Created", estado colgado en `kex.json`, last-writer-wins entre ventanas)
+- [BUG-53](pending/bugs/BUG-53-autosave-flush-resucita-fichero-borrado-o-renombrado.md) - El flush de autosave al desmontar o cambiar de path resucita un fichero borrado o renombrado (afecta tabs markdown y editor con cambios sin guardar; preexistente en `main`, la vista de notas lo hace el camino mas comun)
 
 ## WIP en ramas
 

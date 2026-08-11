@@ -31,6 +31,10 @@ export function useNotesState(root: string | null, active: boolean) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef(root);
   rootRef.current = root;
+  // Target root + payload for the write still waiting out its debounce, so an
+  // unmount can flush it immediately instead of dropping it. Both are captured
+  // at schedule time, unambiguous regardless of what root/config do afterwards.
+  const pendingWriteRef = useRef<{ root: string; config: NotesConfig } | null>(null);
 
   useEffect(() => {
     // Reset must happen in the same effect as the load trigger: if root changes
@@ -51,28 +55,42 @@ export function useNotesState(root: string | null, active: boolean) {
     };
   }, [root, active]);
 
+  const writeNow = useCallback((r: string, next: NotesConfig) => {
+    void (async () => {
+      const raw = await readRaw(r);
+      try {
+        await native.writeFile(kexJsonPath(r), serializeNotesConfig(raw, next));
+      } catch (e) {
+        console.error("[notes] kex.json write failed:", e);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     return () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
+      const pending = pendingWriteRef.current;
+      if (pending) {
+        pendingWriteRef.current = null;
+        writeNow(pending.root, pending.config);
+      }
     };
-  }, []);
+  }, [writeNow]);
 
-  const scheduleWrite = useCallback((next: NotesConfig) => {
-    const r = rootRef.current;
-    if (!r) return;
-    if (timerRef.current !== null) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      void (async () => {
-        const raw = await readRaw(r);
-        try {
-          await native.writeFile(kexJsonPath(r), serializeNotesConfig(raw, next));
-        } catch (e) {
-          console.error("[notes] kex.json write failed:", e);
-        }
-      })();
-    }, WRITE_DEBOUNCE_MS);
-  }, []);
+  const scheduleWrite = useCallback(
+    (next: NotesConfig) => {
+      const r = rootRef.current;
+      if (!r) return;
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      pendingWriteRef.current = { root: r, config: next };
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        pendingWriteRef.current = null;
+        writeNow(r, next);
+      }, WRITE_DEBOUNCE_MS);
+    },
+    [writeNow],
+  );
 
   const update = useCallback(
     (fn: (c: NotesConfig) => NotesConfig) => {

@@ -39,6 +39,35 @@ export function sortNotes(
   return copy;
 }
 
+// The merge only touches notes that are actually visible under the current
+// folder filter: everything else in `prevOrder` must survive untouched so a
+// reorder made while filtered to one folder can't scramble the rest of the
+// vault. Visible rows reuse the set of previous index values as slots (not
+// tied to which note originally held which slot) so their positions stay
+// close to where they were; rows with no previous index get fresh slots past
+// the current maximum, landing after every mapped row.
+export function mergeNoteOrder(
+  prevOrder: Record<string, number>,
+  visibleRelsInNewOrder: string[],
+): Record<string, number> {
+  const visible = new Set(visibleRelsInNewOrder);
+  const order: Record<string, number> = {};
+  let maxIndex = -1;
+  for (const [rel, idx] of Object.entries(prevOrder)) {
+    if (idx > maxIndex) maxIndex = idx;
+    if (!visible.has(rel)) order[rel] = idx;
+  }
+  const slots = visibleRelsInNewOrder
+    .map((rel) => prevOrder[rel])
+    .filter((v): v is number => v !== undefined)
+    .sort((a, b) => a - b);
+  while (slots.length < visibleRelsInNewOrder.length) slots.push(++maxIndex);
+  visibleRelsInNewOrder.forEach((rel, i) => {
+    order[rel] = slots[i];
+  });
+  return order;
+}
+
 export type DateBucket = "Today" | "Yesterday" | "This Week" | "This Month" | "Older";
 export type NoteGroup = { bucket: DateBucket; notes: NoteListItem[] };
 
