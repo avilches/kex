@@ -73,6 +73,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [IMP-NOTES-03](pending/improvements/IMP-NOTES-03-sin-indicador-de-carga.md) - Sin indicador visual de carga en la lista de notas durante el primer escaneo de un vault grande
 - [IMP-NOTES-04](pending/improvements/IMP-NOTES-04-navegacion-teclado.md) - Navegacion por teclado (flechas + Enter) en filas de nota y carpeta, igualando al explorer
 - [IMP-NOTES-05](pending/improvements/IMP-NOTES-05-preview-tab-no-implementado.md) - Click simple y doble click se comportan igual al abrir una nota; los tabs markdown no tienen modo preview
+- [IMP-NOTES-06](pending/improvements/IMP-NOTES-06-huecos-de-cobertura-en-el-nucleo-puro.md) - Tres invariantes del nucleo puro sin test: desempate por `relPath` con timestamps iguales, buckets de fecha no consecutivos, y orden de hermanos anidados en el arbol de carpetas
 
 ## Contexto adicional (`docs/pending/`)
 
