@@ -2,8 +2,7 @@ import type { NoteSortMode } from "./notesConfig";
 import type { NoteListItem } from "./notesList";
 
 export function filterByFolder(notes: NoteListItem[], folder: string): NoteListItem[] {
-  if (folder === "") return notes;
-  return notes.filter((n) => n.folder === folder || n.folder.startsWith(`${folder}/`));
+  return notes.filter((n) => n.folder === folder);
 }
 
 export function sortNotes(

@@ -25,12 +25,17 @@ function n(relPath: string, over: Partial<NoteListItem> = {}): NoteListItem {
 
 describe("filterByFolder", () => {
   const notes = [n("a.md"), n("docs/b.md"), n("docs/sub/c.md"), n("docs2/d.md")];
-  it("empty folder means all notes", () => {
-    expect(filterByFolder(notes, "")).toHaveLength(4);
+
+  it("root means only the notes directly in the root", () => {
+    expect(filterByFolder(notes, "").map((x) => x.relPath)).toEqual(["a.md"]);
   });
-  it("matches the folder and its subtree, not sibling prefixes", () => {
-    const rels = filterByFolder(notes, "docs").map((x) => x.relPath);
-    expect(rels).toEqual(["docs/b.md", "docs/sub/c.md"]);
+
+  it("matches the folder exactly, excluding its subtree and sibling prefixes", () => {
+    expect(filterByFolder(notes, "docs").map((x) => x.relPath)).toEqual(["docs/b.md"]);
+  });
+
+  it("matches a nested folder", () => {
+    expect(filterByFolder(notes, "docs/sub").map((x) => x.relPath)).toEqual(["docs/sub/c.md"]);
   });
 });
 
