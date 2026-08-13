@@ -42,3 +42,20 @@ export function nextFolderName(existingNames: string[]): string {
     if (!taken.has(candidate.toLowerCase())) return candidate;
   }
 }
+
+export function childFolders(folders: string[], parent: string): string[] {
+  const prefix = parent === "" ? "" : `${parent}/`;
+  return folders
+    .filter((f) => {
+      if (!f.startsWith(prefix)) return false;
+      const rest = f.slice(prefix.length);
+      return rest !== "" && !rest.includes("/");
+    })
+    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+
+export function countDirectNotes(notes: { folder: string }[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const n of notes) counts.set(n.folder, (counts.get(n.folder) ?? 0) + 1);
+  return counts;
+}
