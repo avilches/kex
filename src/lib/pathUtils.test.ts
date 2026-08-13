@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pathBasename, pathDirname, segmentsFromCwd } from "./pathUtils";
+import { ancestorsOf, pathBasename, pathDirname, segmentsFromCwd, splitPath } from "./pathUtils";
 
 describe("pathDirname", () => {
   it("returns parent for a forward-slash path", () => {
@@ -156,5 +156,31 @@ describe("segmentsFromCwd", () => {
     expect(segments).toHaveLength(2);
     expect(segments[0].label).toBe("~");
     expect(segments[1].label).toBe("MyProject");
+  });
+});
+
+describe("splitPath", () => {
+  it("splits a nested path into dir and name", () => {
+    expect(splitPath("docs/pending/BUG-52.md")).toEqual(["docs/pending", "BUG-52.md"]);
+  });
+  it("returns an empty dir for a root-level path", () => {
+    expect(splitPath("README.md")).toEqual(["", "README.md"]);
+  });
+  it("handles the empty string", () => {
+    expect(splitPath("")).toEqual(["", ""]);
+  });
+});
+
+describe("ancestorsOf", () => {
+  it("lists proper ancestors outermost first", () => {
+    expect(ancestorsOf("docs/pending/bugs/BUG-52.md")).toEqual([
+      "docs",
+      "docs/pending",
+      "docs/pending/bugs",
+    ]);
+  });
+  it("returns nothing for a root-level path or the root itself", () => {
+    expect(ancestorsOf("README.md")).toEqual([]);
+    expect(ancestorsOf("")).toEqual([]);
   });
 });

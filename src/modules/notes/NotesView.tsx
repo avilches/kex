@@ -4,6 +4,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { native } from "@/lib/native";
+import { pathBasename } from "@/lib/pathUtils";
 import { DeleteEntryModal } from "@/modules/explorer/DeleteEntryModal";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { invoke } from "@tauri-apps/api/core";
@@ -16,11 +17,6 @@ import type { NoteListItem } from "./lib/notesList";
 import { useNotesIndex } from "./lib/useNotesIndex";
 import { useNotesState } from "./lib/useNotesState";
 import { NoteListColumn } from "./NoteListColumn";
-
-function basename(relPath: string): string {
-  const parts = relPath.split(/[\\/]/);
-  return parts[parts.length - 1] ?? relPath;
-}
 
 export type NotesViewProps = {
   root: string;
@@ -178,7 +174,7 @@ export function NotesView(props: NotesViewProps) {
       index.refresh();
     } catch (e) {
       console.error("fs_delete failed:", e);
-      toast.error(`Failed to delete "${basename(relPath)}"`, {
+      toast.error(`Failed to delete "${pathBasename(relPath)}"`, {
         description: e instanceof Error ? e.message : String(e),
       });
       index.refresh();
@@ -197,7 +193,7 @@ export function NotesView(props: NotesViewProps) {
       index.refresh();
     } catch (e) {
       console.error("fs_trash failed:", e);
-      toast.error(`Failed to move "${basename(relPath)}" to trash`, {
+      toast.error(`Failed to move "${pathBasename(relPath)}" to trash`, {
         description: e instanceof Error ? e.message : String(e),
       });
       index.refresh();
@@ -258,7 +254,7 @@ export function NotesView(props: NotesViewProps) {
       {pendingDelete && (
         <DeleteEntryModal
           open
-          name={basename(pendingDelete.relPath)}
+          name={pathBasename(pendingDelete.relPath)}
           isDir={pendingDelete.isDir}
           onCancel={() => setPendingDelete(null)}
           onDelete={() => void handleDelete()}

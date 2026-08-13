@@ -5,6 +5,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { pathBasename } from "@/lib/pathUtils";
 import { cn } from "@/lib/utils";
 import {
   closestCenter,
@@ -53,11 +54,6 @@ export type CollectionsColumnProps = {
   onDeleteFolder: (relPath: string) => void;
 };
 
-function baseName(relPath: string): string {
-  const parts = relPath.split(/[\\/]/);
-  return parts[parts.length - 1] ?? relPath;
-}
-
 function QuickAccessRow(props: {
   relPath: string;
   note: NoteListItem | undefined;
@@ -84,7 +80,7 @@ function QuickAccessRow(props: {
     >
       <HugeiconsIcon icon={NoteIcon} size={12} strokeWidth={1.85} className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">
-        {props.note?.title ?? baseName(props.relPath)}
+        {props.note?.title ?? pathBasename(props.relPath)}
       </span>
       <button
         type="button"

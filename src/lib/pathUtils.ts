@@ -15,6 +15,22 @@ export function pathBasename(path: string): string {
   return i >= 0 ? p.slice(i + 1) : p;
 }
 
+// Vault-relative, forward-slash paths only: these two never see OS separators.
+export function splitPath(relPath: string): [string, string] {
+  const i = relPath.lastIndexOf("/");
+  return i === -1 ? ["", relPath] : [relPath.slice(0, i), relPath.slice(i + 1)];
+}
+
+export function ancestorsOf(relPath: string): string[] {
+  const out: string[] = [];
+  let i = relPath.indexOf("/");
+  while (i !== -1) {
+    out.push(relPath.slice(0, i));
+    i = relPath.indexOf("/", i + 1);
+  }
+  return out;
+}
+
 export type Segment = {
   label: string;
   fullPath: string;

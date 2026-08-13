@@ -5,6 +5,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { pathBasename } from "@/lib/pathUtils";
 import { cn } from "@/lib/utils";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -35,16 +36,11 @@ export type NoteRowProps = {
   onRevealInExplorer: (relPath: string) => void;
 };
 
-function baseName(relPath: string): string {
-  const parts = relPath.split(/[\\/]/);
-  return parts[parts.length - 1] ?? relPath;
-}
-
 export function NoteRow(props: NoteRowProps) {
   const { note } = props;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: note.relPath, disabled: !props.sortable });
-  const [draft, setDraft] = useState(baseName(note.relPath));
+  const [draft, setDraft] = useState(pathBasename(note.relPath));
   const inputRef = useRef<HTMLInputElement>(null);
   // Guards against a double-invocation: unmounting the focused input (e.g. after
   // Escape swaps the JSX branch back to a plain span) fires a blur, which would
@@ -53,7 +49,7 @@ export function NoteRow(props: NoteRowProps) {
 
   useEffect(() => {
     if (props.editing) {
-      setDraft(baseName(note.relPath));
+      setDraft(pathBasename(note.relPath));
       committedRef.current = false;
       // select the stem, keep the extension out of the selection
       requestAnimationFrame(() => {
@@ -70,7 +66,7 @@ export function NoteRow(props: NoteRowProps) {
     if (committedRef.current) return;
     committedRef.current = true;
     const trimmed = draft.trim();
-    if (trimmed && trimmed !== baseName(note.relPath)) {
+    if (trimmed && trimmed !== pathBasename(note.relPath)) {
       props.onRename(note.relPath, trimmed);
     }
     props.onRenameDone();
