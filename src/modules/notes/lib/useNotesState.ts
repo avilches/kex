@@ -6,6 +6,7 @@ import {
   type NoteSortMode,
   type NotesConfig,
   parseNotesConfig,
+  pruneNotesConfig,
   renamePathInConfig,
   serializeNotesConfig,
   withAncestors,
@@ -97,6 +98,7 @@ export function useNotesState(root: string | null, active: boolean) {
     (fn: (c: NotesConfig) => NotesConfig) => {
       setConfig((prev) => {
         const next = fn(prev);
+        if (next === prev) return prev;
         scheduleWrite(next);
         return next;
       });
@@ -158,6 +160,11 @@ export function useNotesState(root: string | null, active: boolean) {
     (relPath: string) => update((c) => deletePathInConfig(c, relPath)),
     [update],
   );
+  const pruneAgainstIndex = useCallback(
+    (folders: string[], notes: { folder: string; relPath: string }[]) =>
+      update((c) => pruneNotesConfig(c, folders, notes)),
+    [update],
+  );
 
   return {
     config,
@@ -170,5 +177,6 @@ export function useNotesState(root: string | null, active: boolean) {
     setGroupByDate,
     notePathRenamed,
     notePathDeleted,
+    pruneAgainstIndex,
   };
 }

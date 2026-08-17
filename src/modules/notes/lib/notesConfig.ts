@@ -1,4 +1,4 @@
-import { ancestorsOf, splitPath } from "@/lib/pathUtils";
+import { ancestorsOf, pathBasename, splitPath } from "@/lib/pathUtils";
 
 export type NoteSortMode = "modified" | "title" | "created" | "custom";
 
@@ -123,4 +123,52 @@ export function deletePathInConfig(config: NotesConfig, relPath: string): NotesC
     expandedFolders: config.expandedFolders.filter((p) => !gone(p)),
     selectedFolder: gone(config.selectedFolder) ? "" : config.selectedFolder,
   };
+}
+
+function sameFolderOrder(
+  a: Record<string, string[]>,
+  b: Record<string, string[]>,
+): boolean {
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((k) => {
+    const x = a[k];
+    const y = b[k];
+    return y !== undefined && x.length === y.length && x.every((v, i) => v === y[i]);
+  });
+}
+
+export function pruneNotesConfig(
+  config: NotesConfig,
+  folders: string[],
+  notes: { folder: string; relPath: string }[],
+): NotesConfig {
+  const live = new Set(folders);
+  const namesByFolder = new Map<string, Set<string>>();
+  for (const note of notes) {
+    let names = namesByFolder.get(note.folder);
+    if (!names) {
+      names = new Set<string>();
+      namesByFolder.set(note.folder, names);
+    }
+    names.add(pathBasename(note.relPath));
+  }
+
+  const expandedFolders = config.expandedFolders.filter((f) => live.has(f));
+  const folderOrder: Record<string, string[]> = {};
+  for (const [folder, names] of Object.entries(config.folderOrder)) {
+    // The vault root always exists, so it is never in the index folder list.
+    if (folder !== "" && !live.has(folder)) continue;
+    const alive = namesByFolder.get(folder);
+    const next = alive === undefined ? [] : names.filter((x) => alive.has(x));
+    if (next.length > 0) folderOrder[folder] = next;
+  }
+  const selectedFolder =
+    config.selectedFolder === "" || live.has(config.selectedFolder) ? config.selectedFolder : "";
+
+  const changed =
+    expandedFolders.length !== config.expandedFolders.length ||
+    selectedFolder !== config.selectedFolder ||
+    !sameFolderOrder(folderOrder, config.folderOrder);
+  return changed ? { ...config, expandedFolders, folderOrder, selectedFolder } : config;
 }
