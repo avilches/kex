@@ -44,19 +44,15 @@ Ninguno es urgente por si solo; se agrupan aqui para no perderlos.
    requiere pasarselo desde `NoteListColumn` (que ya sabe `config.sortMode`) o pasar
    directamente la fecha a mostrar ya resuelta.
 
-4. **Estado colgado en `kex.json` sin auto-reparacion.**
-   `src/modules/notes/lib/useNotesState.ts` solo actualiza `quickAccess` y
-   `selectedFolder` como reaccion a operaciones hechas desde dentro de Kex
-   (`notePathDeleted`, `notePathRenamed`, ambas invocadas explicitamente desde
-   `NotesView.tsx`). Si una nota se borra o renombra fuera de Kex (otro editor, la
-   terminal, git), su entrada en `quickAccess` queda huerfana para siempre: la fila
-   se renderiza en gris (`CollectionsColumn.tsx`, `QuickAccessRow`, rama
-   `!props.note`) y abrirla dispara un error de lectura. Lo mismo con
-   `selectedFolder` apuntando a una carpeta que ya no existe: la lista de notas se
-   queda vacia sin ninguna senal de que la carpeta desaparecio. `useNotesIndex` ya
-   conoce el conjunto de paths y carpetas vigentes en cada refresh
-   (`src/modules/notes/lib/useNotesIndex.ts`), asi que podar `quickAccess` y
-   resetear `selectedFolder` contra ese conjunto en cada carga seria barato.
+4. **`quickAccess` colgado en `kex.json` sin auto-reparacion.**
+   `pruneNotesConfig` ya poda en cada recorrido completo del vault `expandedFolders`,
+   `folderOrder` y `selectedFolder` contra el conjunto de carpetas y ficheros vigentes
+   (carpetas que el indice ya no reporta, nombres de fichero que ya no existen, y una
+   `selectedFolder` que desaparecio). `quickAccess` queda deliberadamente fuera de esa
+   poda: fijar una nota es intencion explicita del usuario, y la fila en gris es la
+   senal de que la nota ya no existe. Lo que sigue sin arreglar es que abrir un pin
+   fantasma (`CollectionsColumn.tsx`, `QuickAccessRow`, rama `!props.note`) dispara un
+   error de lectura en vez de, por ejemplo, ofrecer quitarlo de la lista.
 
 5. **Dos ventanas en el mismo vault: last-writer-wins sobre `kex.json`.**
    `src/modules/notes/lib/useNotesState.ts` (`kexJsonPath`, `scheduleWrite`) lee y
@@ -85,5 +81,5 @@ resolver en cualquier orden o de forma independiente.
 
 - `src-tauri/src/modules/fs/notes.rs`, `docs/IPC.md` (item 1 y 2).
 - `src/modules/notes/NoteRow.tsx`, `src/modules/notes/NoteListColumn.tsx` (item 3).
-- `src/modules/notes/lib/useNotesState.ts`, `src/modules/notes/lib/useNotesIndex.ts`,
-  `src/modules/notes/CollectionsColumn.tsx` (item 4 y 5).
+- `src/modules/notes/lib/useNotesState.ts`, `src/modules/notes/lib/notesConfig.ts`
+  (`pruneNotesConfig`), `src/modules/notes/CollectionsColumn.tsx` (item 4 y 5).

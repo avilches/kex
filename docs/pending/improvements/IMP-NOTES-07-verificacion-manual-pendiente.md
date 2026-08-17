@@ -17,8 +17,13 @@ a mano despues del merge y reporto que funciona, cubriendo estos casos:
 - Pereza: con un workspace con raiz definida y sin abrir nunca la pestaña de notas, no se
   crea ningun `kex.json` ni se lanza ningun `notes_list`.
 
-Quedan cuatro escenarios sin ejercitar. Se registran porque no son hipotesis: son los
+Quedan tres escenarios sin ejercitar. Se registran porque no son hipotesis: son los
 caminos donde un arreglo concreto de este trabajo no ha sido observado funcionando.
+
+Antes habia un cuarto escenario (orden personalizado con una carpeta filtrada), que se
+retiro de esta lista: guardaba el arreglo de `mergeNoteOrder`, funcion que se elimino al
+pasar el orden custom a ser por carpeta. Sin un mapa de orden compartido entre carpetas,
+ya no existe nada que un arrastre con filtro de carpeta pueda danar.
 
 ## Lo que falta probar
 
@@ -39,19 +44,7 @@ Nota: el mismo patron sigue vivo y **sin arreglar** en el panel de git, ver
 [BUG-54](../bugs/BUG-54-discard-confirma-contra-el-repo-equivocado.md). Al probar este
 caso conviene probar tambien el de BUG-54, que es perdida de datos irrecuperable.
 
-### 2. Orden personalizado con una carpeta filtrada
-
-Guarda el arreglo de un Important de la revision: un arrastre con filtro de carpeta
-activo reemplazaba el mapa de orden completo por solo las filas visibles, borrando el
-orden del resto del vault en `kex.json`.
-
-Pasos: poner el orden en Custom, arrastrar notas para ordenar todo el vault, seleccionar
-una subcarpeta, arrastrar una fila dentro, y volver a "All notes". El orden de las notas
-de fuera del filtro debe estar intacto. La logica esta en `mergeNoteOrder`
-(`src/modules/notes/lib/noteSort.ts`) y tiene cuatro tests, pero nunca se ha visto en la
-app.
-
-### 3. Coste con la vista oculta en un repo grande
+### 2. Coste con la vista oculta en un repo grande
 
 Guarda los arreglos de "refresh economics": la propia escritura de `kex.json` disparaba
 un recorrido completo del vault en cada cambio de interfaz, y los escuchadores no se
@@ -62,7 +55,7 @@ Pasos: abrir las notas en un repo grande, cambiar a Explorer o Git, y trabajar u
 con el editor guardando ficheros. No deberia haber tirones ni actividad de indexado; al
 volver a la pestaña de notas se hace un unico recorrido.
 
-### 4. `kex.json` con contenido ajeno o corrupto
+### 3. `kex.json` con contenido ajeno o corrupto
 
 Pasos: añadir una clave de primer nivel inventada al `kex.json` de la raiz, tocar algo en
 la vista de notas, y confirmar que la clave sobrevive (la escritura es
