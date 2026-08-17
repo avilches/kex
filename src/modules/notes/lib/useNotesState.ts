@@ -139,6 +139,15 @@ export function useNotesState(root: string | null, active: boolean) {
       })),
     [update],
   );
+  const expandFolder = useCallback(
+    (relPath: string) =>
+      update((c) =>
+        c.expandedFolders.includes(relPath)
+          ? c
+          : { ...c, expandedFolders: [...c.expandedFolders, relPath] },
+      ),
+    [update],
+  );
   const setSelectedFolder = useCallback(
     (selectedFolder: string) =>
       update((c) => ({
@@ -173,6 +182,7 @@ export function useNotesState(root: string | null, active: boolean) {
     setSortMode,
     setFolderOrder,
     toggleFolderExpanded,
+    expandFolder,
     setSelectedFolder,
     setGroupByDate,
     notePathRenamed,

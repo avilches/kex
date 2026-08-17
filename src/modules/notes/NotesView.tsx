@@ -105,6 +105,9 @@ export function NotesView(props: NotesViewProps) {
       const relPath = folder === "" ? name : `${folder}/${name}`;
       try {
         await native.createFile(abs(relPath));
+        // The list shows one folder, so the primed row only mounts if that
+        // folder is the selected one.
+        state.setSelectedFolder(folder);
         setPrimedRenamePath(relPath);
         props.onOpenFile(abs(relPath), true);
         index.refresh();
@@ -115,7 +118,7 @@ export function NotesView(props: NotesViewProps) {
         });
       }
     },
-    [index, abs, props.onOpenFile],
+    [index, abs, state, props.onOpenFile],
   );
 
   const handleNewFolder = useCallback(
@@ -131,6 +134,9 @@ export function NotesView(props: NotesViewProps) {
       const relPath = parent === "" ? name : `${parent}/${name}`;
       try {
         await native.createDir(abs(relPath));
+        // A collapsed parent renders no children, so the row carrying the
+        // rename input would never mount. Root rows always render.
+        if (parent !== "") state.expandFolder(parent);
         setEditingFolder(relPath);
         index.refresh();
       } catch (e) {
@@ -140,7 +146,7 @@ export function NotesView(props: NotesViewProps) {
         });
       }
     },
-    [index, abs],
+    [index, abs, state],
   );
 
   const handleRenameFolder = useCallback(

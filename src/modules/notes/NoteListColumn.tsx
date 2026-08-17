@@ -263,7 +263,7 @@ export function NoteListColumn(props: NoteListColumnProps) {
         )}
         {props.truncated && (
           <div className="p-2 text-[11px] text-muted-foreground">
-            Showing the first {sorted.length} notes (scan cap reached)
+            The vault scan hit its limit, so some notes may be missing
           </div>
         )}
       </div>
