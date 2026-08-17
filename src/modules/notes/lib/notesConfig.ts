@@ -30,6 +30,15 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+// kex.json is user-editable and its paths are concatenated onto the vault root,
+// so a traversal or an absolute path here would reach outside the vault.
+function isSafeVaultPath(p: string): boolean {
+  if (p === "") return true;
+  if (p.startsWith("/") || p.includes("\\")) return false;
+  if (/^[A-Za-z]:/.test(p)) return false;
+  return !p.split("/").includes("..");
+}
+
 export function withAncestors(expanded: string[], folder: string): string[] {
   const missing = ancestorsOf(folder).filter((a) => !expanded.includes(a));
   return missing.length === 0 ? expanded : [...expanded, ...missing];
@@ -52,10 +61,15 @@ export function parseNotesConfig(raw: string | null): NotesConfig {
       if (isStringArray(v)) folderOrder[k] = v;
     }
   }
-  const selectedFolder = typeof ns.selectedFolder === "string" ? ns.selectedFolder : "";
+  const selectedFolder =
+    typeof ns.selectedFolder === "string" && isSafeVaultPath(ns.selectedFolder)
+      ? ns.selectedFolder
+      : "";
   const expandedFolders = isStringArray(ns.expandedFolders) ? ns.expandedFolders : [];
   return {
-    quickAccess: isStringArray(ns.quickAccess) ? ns.quickAccess : [],
+    quickAccess: isStringArray(ns.quickAccess)
+      ? ns.quickAccess.filter(isSafeVaultPath)
+      : [],
     sortMode: SORT_MODES.includes(ns.sortMode as string)
       ? (ns.sortMode as NoteSortMode)
       : DEFAULT_NOTES_CONFIG.sortMode,

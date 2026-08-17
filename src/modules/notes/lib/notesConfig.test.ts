@@ -68,6 +68,49 @@ describe("parseNotesConfig", () => {
     });
     expect(parseNotesConfig(raw).expandedFolders).toEqual(["docs", "docs/pending"]);
   });
+
+  it("drops quickAccess entries that escape the vault", () => {
+    const raw = JSON.stringify({
+      notes: {
+        quickAccess: [
+          "docs/TODO.md",
+          "/etc/passwd",
+          "C:/Windows/win.ini",
+          "../../secrets.md",
+          "docs/../../secrets.md",
+          "docs\\TODO.md",
+        ],
+      },
+    });
+    expect(parseNotesConfig(raw).quickAccess).toEqual(["docs/TODO.md"]);
+  });
+
+  it("falls back to the vault root for a selectedFolder that escapes the vault", () => {
+    const escaping = [
+      "/etc",
+      "C:/Windows",
+      "../..",
+      "docs/../..",
+      "docs\\pending",
+    ];
+    for (const selectedFolder of escaping) {
+      const raw = JSON.stringify({ notes: { selectedFolder } });
+      expect(parseNotesConfig(raw).selectedFolder).toBe("");
+    }
+  });
+
+  it("keeps legitimate names that merely contain dots or a dot-dot prefix", () => {
+    const raw = JSON.stringify({
+      notes: {
+        quickAccess: ["..config/a..b.md", "docs/a..b.md"],
+        selectedFolder: "..config",
+      },
+    });
+    expect(parseNotesConfig(raw)).toMatchObject({
+      quickAccess: ["..config/a..b.md", "docs/a..b.md"],
+      selectedFolder: "..config",
+    });
+  });
 });
 
 describe("serializeNotesConfig", () => {

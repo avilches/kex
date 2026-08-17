@@ -150,11 +150,13 @@ export function useNotesState(root: string | null, active: boolean) {
   );
   const setSelectedFolder = useCallback(
     (selectedFolder: string) =>
-      update((c) => ({
-        ...c,
-        selectedFolder,
-        expandedFolders: withAncestors(c.expandedFolders, selectedFolder),
-      })),
+      update((c) => {
+        const expandedFolders = withAncestors(c.expandedFolders, selectedFolder);
+        return c.selectedFolder === selectedFolder &&
+          expandedFolders === c.expandedFolders
+          ? c
+          : { ...c, selectedFolder, expandedFolders };
+      }),
     [update],
   );
   const setGroupByDate = useCallback(
