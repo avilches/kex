@@ -209,13 +209,13 @@ export function NotesView(props: NotesViewProps) {
             notesByRelPath={notesByRelPath}
             folders={index.folders}
             notes={index.notes}
-            collapsedFolders={state.config.collapsedFolders}
+            expandedFolders={state.config.expandedFolders}
             selectedFolder={state.config.selectedFolder}
             editingFolder={editingFolder}
             onOpen={openRel}
             onReorderQuickAccess={state.reorderQuickAccess}
             onUnpin={state.toggleQuickAccess}
-            onToggleFolderCollapsed={state.toggleFolderCollapsed}
+            onToggleFolderExpanded={state.toggleFolderExpanded}
             onSelectFolder={state.setSelectedFolder}
             onNewNoteIn={(folder) => void handleNewNoteIn(folder)}
             onNewFolder={(parent) => void handleNewFolder(parent)}
@@ -245,7 +245,7 @@ export function NotesView(props: NotesViewProps) {
             onNewNote={() => void handleNewNoteIn(state.config.selectedFolder)}
             onSetSortMode={state.setSortMode}
             onSetGroupByDate={state.setGroupByDate}
-            onSetNoteOrder={state.setNoteOrder}
+            onSetFolderOrder={state.setFolderOrder}
             onRenameDone={() => setPrimedRenamePath(null)}
           />
         </ResizablePanel>

@@ -121,17 +121,18 @@ export function useNotesState(root: string | null, active: boolean) {
     (sortMode: NoteSortMode) => update((c) => ({ ...c, sortMode })),
     [update],
   );
-  const setNoteOrder = useCallback(
-    (noteOrder: Record<string, number>) => update((c) => ({ ...c, noteOrder })),
+  const setFolderOrder = useCallback(
+    (folder: string, names: string[]) =>
+      update((c) => ({ ...c, folderOrder: { ...c.folderOrder, [folder]: names } })),
     [update],
   );
-  const toggleFolderCollapsed = useCallback(
+  const toggleFolderExpanded = useCallback(
     (relPath: string) =>
       update((c) => ({
         ...c,
-        collapsedFolders: c.collapsedFolders.includes(relPath)
-          ? c.collapsedFolders.filter((p) => p !== relPath)
-          : [...c.collapsedFolders, relPath],
+        expandedFolders: c.expandedFolders.includes(relPath)
+          ? c.expandedFolders.filter((p) => p !== relPath)
+          : [...c.expandedFolders, relPath],
       })),
     [update],
   );
@@ -157,8 +158,8 @@ export function useNotesState(root: string | null, active: boolean) {
     toggleQuickAccess,
     reorderQuickAccess,
     setSortMode,
-    setNoteOrder,
-    toggleFolderCollapsed,
+    setFolderOrder,
+    toggleFolderExpanded,
     setSelectedFolder,
     setGroupByDate,
     notePathRenamed,

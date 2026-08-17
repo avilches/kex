@@ -1,10 +1,12 @@
+import { splitPath } from "@/lib/pathUtils";
+
 export type NoteSortMode = "modified" | "title" | "created" | "custom";
 
 export type NotesConfig = {
   quickAccess: string[];
   sortMode: NoteSortMode;
-  noteOrder: Record<string, number>;
-  collapsedFolders: string[];
+  folderOrder: Record<string, string[]>;
+  expandedFolders: string[];
   groupByDate: boolean;
   selectedFolder: string;
 };
@@ -12,8 +14,8 @@ export type NotesConfig = {
 export const DEFAULT_NOTES_CONFIG: NotesConfig = {
   quickAccess: [],
   sortMode: "modified",
-  noteOrder: {},
-  collapsedFolders: [],
+  folderOrder: {},
+  expandedFolders: [],
   groupByDate: true,
   selectedFolder: "",
 };
@@ -24,6 +26,10 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === "string");
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
 export function parseNotesConfig(raw: string | null): NotesConfig {
   if (!raw) return { ...DEFAULT_NOTES_CONFIG };
   let parsed: unknown;
@@ -32,30 +38,25 @@ export function parseNotesConfig(raw: string | null): NotesConfig {
   } catch {
     return { ...DEFAULT_NOTES_CONFIG };
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { ...DEFAULT_NOTES_CONFIG };
-  }
-  const ns = (parsed as Record<string, unknown>).notes;
-  if (typeof ns !== "object" || ns === null || Array.isArray(ns)) {
-    return { ...DEFAULT_NOTES_CONFIG };
-  }
-  const n = ns as Record<string, unknown>;
-  const noteOrder: Record<string, number> = {};
-  if (typeof n.noteOrder === "object" && n.noteOrder !== null && !Array.isArray(n.noteOrder)) {
-    for (const [k, v] of Object.entries(n.noteOrder as Record<string, unknown>)) {
-      if (typeof v === "number" && Number.isFinite(v)) noteOrder[k] = v;
+  if (!isPlainObject(parsed)) return { ...DEFAULT_NOTES_CONFIG };
+  const ns = parsed.notes;
+  if (!isPlainObject(ns)) return { ...DEFAULT_NOTES_CONFIG };
+  const folderOrder: Record<string, string[]> = {};
+  if (isPlainObject(ns.folderOrder)) {
+    for (const [k, v] of Object.entries(ns.folderOrder)) {
+      if (isStringArray(v)) folderOrder[k] = v;
     }
   }
   return {
-    quickAccess: isStringArray(n.quickAccess) ? n.quickAccess : [],
-    sortMode: SORT_MODES.includes(n.sortMode as string)
-      ? (n.sortMode as NoteSortMode)
+    quickAccess: isStringArray(ns.quickAccess) ? ns.quickAccess : [],
+    sortMode: SORT_MODES.includes(ns.sortMode as string)
+      ? (ns.sortMode as NoteSortMode)
       : DEFAULT_NOTES_CONFIG.sortMode,
-    noteOrder,
-    collapsedFolders: isStringArray(n.collapsedFolders) ? n.collapsedFolders : [],
+    folderOrder,
+    expandedFolders: isStringArray(ns.expandedFolders) ? ns.expandedFolders : [],
     groupByDate:
-      typeof n.groupByDate === "boolean" ? n.groupByDate : DEFAULT_NOTES_CONFIG.groupByDate,
-    selectedFolder: typeof n.selectedFolder === "string" ? n.selectedFolder : "",
+      typeof ns.groupByDate === "boolean" ? ns.groupByDate : DEFAULT_NOTES_CONFIG.groupByDate,
+    selectedFolder: typeof ns.selectedFolder === "string" ? ns.selectedFolder : "",
   };
 }
 
@@ -64,9 +65,7 @@ export function serializeNotesConfig(raw: string | null, config: NotesConfig): s
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-        root = parsed as Record<string, unknown>;
-      }
+      if (isPlainObject(parsed)) root = parsed;
     } catch {
       // invalid file: the first user mutation legitimately replaces it (spec, Error handling)
     }
@@ -78,28 +77,43 @@ export function serializeNotesConfig(raw: string | null, config: NotesConfig): s
 export function renamePathInConfig(config: NotesConfig, from: string, to: string): NotesConfig {
   const map = (p: string): string =>
     p === from ? to : p.startsWith(`${from}/`) ? `${to}${p.slice(from.length)}` : p;
-  const noteOrder: Record<string, number> = {};
-  for (const [k, v] of Object.entries(config.noteOrder)) noteOrder[map(k)] = v;
+  // A note rename only ever touches the list of its own folder. A folder rename
+  // cannot collide here: the filesystem forbids a note and a folder sharing a name.
+  const [fromDir, fromName] = splitPath(from);
+  const [toDir, toName] = splitPath(to);
+  const folderOrder: Record<string, string[]> = {};
+  for (const [folder, names] of Object.entries(config.folderOrder)) {
+    const next =
+      folder !== fromDir
+        ? names
+        : toDir === fromDir
+          ? names.map((x) => (x === fromName ? toName : x))
+          : names.filter((x) => x !== fromName);
+    if (next.length > 0) folderOrder[map(folder)] = next;
+  }
   return {
     ...config,
     quickAccess: config.quickAccess.map(map),
-    noteOrder,
-    collapsedFolders: config.collapsedFolders.map(map),
+    folderOrder,
+    expandedFolders: config.expandedFolders.map(map),
     selectedFolder: map(config.selectedFolder),
   };
 }
 
 export function deletePathInConfig(config: NotesConfig, relPath: string): NotesConfig {
   const gone = (p: string): boolean => p === relPath || p.startsWith(`${relPath}/`);
-  const noteOrder: Record<string, number> = {};
-  for (const [k, v] of Object.entries(config.noteOrder)) {
-    if (!gone(k)) noteOrder[k] = v;
+  const [dir, name] = splitPath(relPath);
+  const folderOrder: Record<string, string[]> = {};
+  for (const [folder, names] of Object.entries(config.folderOrder)) {
+    if (gone(folder)) continue;
+    const next = folder === dir ? names.filter((x) => x !== name) : names;
+    if (next.length > 0) folderOrder[folder] = next;
   }
   return {
     ...config,
     quickAccess: config.quickAccess.filter((p) => !gone(p)),
-    noteOrder,
-    collapsedFolders: config.collapsedFolders.filter((p) => !gone(p)),
+    folderOrder,
+    expandedFolders: config.expandedFolders.filter((p) => !gone(p)),
     selectedFolder: gone(config.selectedFolder) ? "" : config.selectedFolder,
   };
 }

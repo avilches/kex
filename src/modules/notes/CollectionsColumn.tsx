@@ -38,13 +38,13 @@ export type CollectionsColumnProps = {
   notesByRelPath: Map<string, NoteListItem>;
   folders: string[];
   notes: NoteListItem[];
-  collapsedFolders: string[];
+  expandedFolders: string[];
   selectedFolder: string;
   editingFolder: string | null;
   onOpen: (relPath: string, pin?: boolean) => void;
   onReorderQuickAccess: (paths: string[]) => void;
   onUnpin: (relPath: string) => void;
-  onToggleFolderCollapsed: (relPath: string) => void;
+  onToggleFolderExpanded: (relPath: string) => void;
   onSelectFolder: (relPath: string) => void;
   onNewNoteIn: (folderRelPath: string) => void;
   onNewFolder: (parentRelPath: string) => void;
@@ -101,10 +101,10 @@ type FolderRowProps = {
   node: FolderNode;
   depth: number;
   counts: Map<string, number>;
-  collapsed: Set<string>;
+  expanded: Set<string>;
   selectedFolder: string;
   editingFolder: string | null;
-  onToggleFolderCollapsed: (relPath: string) => void;
+  onToggleFolderExpanded: (relPath: string) => void;
   onSelectFolder: (relPath: string) => void;
   onNewNoteIn: (folderRelPath: string) => void;
   onNewFolder: (parentRelPath: string) => void;
@@ -116,7 +116,7 @@ type FolderRowProps = {
 
 function FolderRow(props: FolderRowProps) {
   const { node, depth } = props;
-  const isCollapsed = props.collapsed.has(node.relPath);
+  const isExpanded = props.expanded.has(node.relPath);
   const hasChildren = node.children.length > 0;
   const editing = props.editingFolder === node.relPath;
   const [draft, setDraft] = useState(node.name);
@@ -168,10 +168,10 @@ function FolderRow(props: FolderRowProps) {
           >
             <button
               type="button"
-              title={isCollapsed ? "Expand" : "Collapse"}
+              title={isExpanded ? "Collapse" : "Expand"}
               onClick={(e) => {
                 e.stopPropagation();
-                if (hasChildren) props.onToggleFolderCollapsed(node.relPath);
+                if (hasChildren) props.onToggleFolderExpanded(node.relPath);
               }}
               className={cn(
                 "flex size-[14px] shrink-0 items-center justify-center text-muted-foreground",
@@ -179,7 +179,7 @@ function FolderRow(props: FolderRowProps) {
               )}
             >
               <HugeiconsIcon
-                icon={isCollapsed ? ArrowRight01Icon : ArrowDown01Icon}
+                icon={isExpanded ? ArrowDown01Icon : ArrowRight01Icon}
                 size={11}
                 strokeWidth={1.85}
               />
@@ -232,7 +232,7 @@ function FolderRow(props: FolderRowProps) {
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-      {!isCollapsed &&
+      {isExpanded &&
         node.children.map((child) => (
           <FolderRow key={child.relPath} {...props} node={child} depth={depth + 1} />
         ))}
@@ -246,16 +246,13 @@ export function CollectionsColumn(props: CollectionsColumnProps) {
   );
   const tree = useMemo(() => buildFolderTree(props.folders), [props.folders]);
   const counts = useMemo(() => countNotesPerFolder(props.notes), [props.notes]);
-  const collapsed = useMemo(
-    () => new Set(props.collapsedFolders),
-    [props.collapsedFolders],
-  );
+  const expanded = useMemo(() => new Set(props.expandedFolders), [props.expandedFolders]);
   const folderRowShared = {
     counts,
-    collapsed,
+    expanded,
     selectedFolder: props.selectedFolder,
     editingFolder: props.editingFolder,
-    onToggleFolderCollapsed: props.onToggleFolderCollapsed,
+    onToggleFolderExpanded: props.onToggleFolderExpanded,
     onSelectFolder: props.onSelectFolder,
     onNewNoteIn: props.onNewNoteIn,
     onNewFolder: props.onNewFolder,

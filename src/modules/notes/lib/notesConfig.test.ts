@@ -20,8 +20,8 @@ describe("parseNotesConfig", () => {
       notes: {
         quickAccess: ["docs/TODO.md"],
         sortMode: "title",
-        noteOrder: { "docs/TODO.md": 0, "README.md": 1 },
-        collapsedFolders: ["docs/pending"],
+        folderOrder: { "": ["README.md"], docs: ["IPC.md", "TODO.md"] },
+        expandedFolders: ["docs"],
         groupByDate: false,
         selectedFolder: "docs",
       },
@@ -29,8 +29,8 @@ describe("parseNotesConfig", () => {
     expect(parseNotesConfig(raw)).toEqual({
       quickAccess: ["docs/TODO.md"],
       sortMode: "title",
-      noteOrder: { "docs/TODO.md": 0, "README.md": 1 },
-      collapsedFolders: ["docs/pending"],
+      folderOrder: { "": ["README.md"], docs: ["IPC.md", "TODO.md"] },
+      expandedFolders: ["docs"],
       groupByDate: false,
       selectedFolder: "docs",
     });
@@ -41,16 +41,23 @@ describe("parseNotesConfig", () => {
       notes: {
         quickAccess: "nope",
         sortMode: "bogus",
-        noteOrder: { a: "NaN", b: 2 },
-        collapsedFolders: [1, 2],
+        folderOrder: { docs: "nope", ok: ["a.md"], nested: [1, 2] },
+        expandedFolders: [1, 2],
         groupByDate: "yes",
         selectedFolder: 7,
       },
     });
     expect(parseNotesConfig(raw)).toEqual({
       ...DEFAULT_NOTES_CONFIG,
-      noteOrder: { b: 2 },
+      folderOrder: { ok: ["a.md"] },
     });
+  });
+
+  it("ignores the removed collapsedFolders and noteOrder keys", () => {
+    const raw = JSON.stringify({
+      notes: { collapsedFolders: ["docs"], noteOrder: { "a.md": 0 } },
+    });
+    expect(parseNotesConfig(raw)).toEqual(DEFAULT_NOTES_CONFIG);
   });
 });
 
@@ -77,21 +84,28 @@ describe("path fixups", () => {
   const config = {
     ...DEFAULT_NOTES_CONFIG,
     quickAccess: ["docs/TODO.md", "docs/pending/bugs/foo.md", "README.md"],
-    noteOrder: { "docs/TODO.md": 0, "README.md": 1 },
-    collapsedFolders: ["docs/pending"],
+    folderOrder: {
+      "": ["README.md"],
+      docs: ["TODO.md", "IPC.md"],
+      "docs/pending": ["foo.md"],
+    },
+    expandedFolders: ["docs/pending"],
     selectedFolder: "docs/pending",
   };
 
-  it("renames a file everywhere", () => {
+  it("renames a note inside its own folder list", () => {
     const next = renamePathInConfig(config, "docs/TODO.md", "docs/DONE.md");
     expect(next.quickAccess[0]).toBe("docs/DONE.md");
-    expect(next.noteOrder).toEqual({ "docs/DONE.md": 0, "README.md": 1 });
+    expect(next.folderOrder.docs).toEqual(["DONE.md", "IPC.md"]);
+    expect(next.folderOrder[""]).toEqual(["README.md"]);
   });
 
-  it("renames a folder prefix everywhere", () => {
+  it("renames a folder by remapping keys and leaving file names alone", () => {
     const next = renamePathInConfig(config, "docs/pending", "docs/queue");
     expect(next.quickAccess[1]).toBe("docs/queue/bugs/foo.md");
-    expect(next.collapsedFolders).toEqual(["docs/queue"]);
+    expect(next.folderOrder["docs/queue"]).toEqual(["foo.md"]);
+    expect(next.folderOrder["docs/pending"]).toBeUndefined();
+    expect(next.expandedFolders).toEqual(["docs/queue"]);
     expect(next.selectedFolder).toBe("docs/queue");
   });
 
@@ -101,16 +115,23 @@ describe("path fixups", () => {
     expect(next.quickAccess[0]).toBe("docs/pending2/x.md");
   });
 
-  it("deletes a file", () => {
+  it("deletes a note from its folder list", () => {
     const next = deletePathInConfig(config, "docs/TODO.md");
     expect(next.quickAccess).toEqual(["docs/pending/bugs/foo.md", "README.md"]);
-    expect(next.noteOrder).toEqual({ "README.md": 1 });
+    expect(next.folderOrder.docs).toEqual(["IPC.md"]);
+  });
+
+  it("drops a folder list that the delete emptied", () => {
+    const next = deletePathInConfig(config, "docs/pending/foo.md");
+    expect(next.folderOrder["docs/pending"]).toBeUndefined();
   });
 
   it("deletes a folder subtree and resets selectedFolder", () => {
     const next = deletePathInConfig(config, "docs/pending");
     expect(next.quickAccess).toEqual(["docs/TODO.md", "README.md"]);
-    expect(next.collapsedFolders).toEqual([]);
+    expect(next.folderOrder["docs/pending"]).toBeUndefined();
+    expect(next.folderOrder.docs).toEqual(["TODO.md", "IPC.md"]);
+    expect(next.expandedFolders).toEqual([]);
     expect(next.selectedFolder).toBe("");
   });
 });

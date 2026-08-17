@@ -1,3 +1,4 @@
+import { pathBasename } from "@/lib/pathUtils";
 import type { NoteSortMode } from "./notesConfig";
 import type { NoteListItem } from "./notesList";
 
@@ -8,7 +9,7 @@ export function filterByFolder(notes: NoteListItem[], folder: string): NoteListI
 export function sortNotes(
   notes: NoteListItem[],
   mode: NoteSortMode,
-  noteOrder: Record<string, number>,
+  order: string[] | undefined,
 ): NoteListItem[] {
   const copy = [...notes];
   switch (mode) {
@@ -22,49 +23,23 @@ export function sortNotes(
     case "created":
       copy.sort((a, b) => b.created - a.created || a.relPath.localeCompare(b.relPath));
       break;
-    case "custom":
+    case "custom": {
+      const rank = new Map<string, number>();
+      (order ?? []).forEach((name, i) => rank.set(name, i));
       copy.sort((a, b) => {
-        const ia = noteOrder[a.relPath];
-        const ib = noteOrder[b.relPath];
+        const ia = rank.get(pathBasename(a.relPath));
+        const ib = rank.get(pathBasename(b.relPath));
         if (ia !== undefined && ib !== undefined) return ia - ib;
         if (ia !== undefined) return -1;
         if (ib !== undefined) return 1;
         return b.mtime - a.mtime;
       });
       break;
+    }
     default:
       copy.sort((a, b) => b.mtime - a.mtime || a.relPath.localeCompare(b.relPath));
   }
   return copy;
-}
-
-// The merge only touches notes that are actually visible under the current
-// folder filter: everything else in `prevOrder` must survive untouched so a
-// reorder made while filtered to one folder can't scramble the rest of the
-// vault. Visible rows reuse the set of previous index values as slots (not
-// tied to which note originally held which slot) so their positions stay
-// close to where they were; rows with no previous index get fresh slots past
-// the current maximum, landing after every mapped row.
-export function mergeNoteOrder(
-  prevOrder: Record<string, number>,
-  visibleRelsInNewOrder: string[],
-): Record<string, number> {
-  const visible = new Set(visibleRelsInNewOrder);
-  const order: Record<string, number> = {};
-  let maxIndex = -1;
-  for (const [rel, idx] of Object.entries(prevOrder)) {
-    if (idx > maxIndex) maxIndex = idx;
-    if (!visible.has(rel)) order[rel] = idx;
-  }
-  const slots = visibleRelsInNewOrder
-    .map((rel) => prevOrder[rel])
-    .filter((v): v is number => v !== undefined)
-    .sort((a, b) => a - b);
-  while (slots.length < visibleRelsInNewOrder.length) slots.push(++maxIndex);
-  visibleRelsInNewOrder.forEach((rel, i) => {
-    order[rel] = slots[i];
-  });
-  return order;
 }
 
 export type DateBucket = "Today" | "Yesterday" | "This Week" | "This Month" | "Older";

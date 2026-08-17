@@ -4,7 +4,6 @@ import {
   filterByFolder,
   formatRelativeDate,
   groupNotesByDate,
-  mergeNoteOrder,
   nextUntitledName,
   sortNotes,
 } from "./noteSort";
@@ -51,70 +50,42 @@ describe("sortNotes", () => {
   const c = n("c.md", { title: "Mango", mtime: 100, created: 200 });
 
   it("modified: mtime desc", () => {
-    expect(sortNotes([c, a, b], "modified", {}).map((x) => x.relPath)).toEqual([
+    expect(sortNotes([c, a, b], "modified", undefined).map((x) => x.relPath)).toEqual([
       "a.md", "b.md", "c.md",
     ]);
   });
   it("title: case-insensitive asc", () => {
-    expect(sortNotes([a, b, c], "title", {}).map((x) => x.title)).toEqual([
+    expect(sortNotes([a, b, c], "title", undefined).map((x) => x.title)).toEqual([
       "alpha", "Mango", "Zebra",
     ]);
   });
   it("created: created desc", () => {
-    expect(sortNotes([a, b, c], "created", {}).map((x) => x.relPath)).toEqual([
+    expect(sortNotes([a, b, c], "created", undefined).map((x) => x.relPath)).toEqual([
       "b.md", "c.md", "a.md",
     ]);
   });
-  it("custom: mapped by index, unmapped after by mtime desc", () => {
-    const order = { "c.md": 0, "b.md": 1 };
+  it("custom: listed names in order, unlisted after by mtime desc", () => {
     const extra = n("z.md", { mtime: 999 });
     expect(
-      sortNotes([a, b, c, extra], "custom", order).map((x) => x.relPath),
+      sortNotes([a, b, c, extra], "custom", ["c.md", "b.md"]).map((x) => x.relPath),
     ).toEqual(["c.md", "b.md", "z.md", "a.md"]);
+  });
+  it("custom: a folder with no list falls back to mtime desc", () => {
+    expect(sortNotes([c, a, b], "custom", undefined).map((x) => x.relPath)).toEqual([
+      "a.md", "b.md", "c.md",
+    ]);
+  });
+  it("custom: matches by file name inside a nested folder", () => {
+    const x = n("docs/x.md", { mtime: 10 });
+    const y = n("docs/y.md", { mtime: 20 });
+    expect(sortNotes([x, y], "custom", ["y.md", "x.md"]).map((x2) => x2.relPath)).toEqual([
+      "docs/y.md", "docs/x.md",
+    ]);
   });
   it("does not mutate the input", () => {
     const input = [a, b, c];
-    sortNotes(input, "title", {});
+    sortNotes(input, "title", undefined);
     expect(input.map((x) => x.relPath)).toEqual(["a.md", "b.md", "c.md"]);
-  });
-});
-
-describe("mergeNoteOrder", () => {
-  it("leaves notes outside the visible set at their exact previous index", () => {
-    const prevOrder = { "a.md": 0, "b.md": 1, "outside.md": 7 };
-    const merged = mergeNoteOrder(prevOrder, ["b.md", "a.md"]);
-    expect(merged["outside.md"]).toBe(7);
-  });
-
-  it("reads back the visible rows in the given order through sortNotes", () => {
-    const prevOrder = { "a.md": 0, "b.md": 1, "c.md": 2 };
-    const visible = ["c.md", "a.md", "b.md"];
-    const merged = mergeNoteOrder(prevOrder, visible);
-    const notes = [n("a.md"), n("b.md"), n("c.md")];
-    expect(sortNotes(notes, "custom", merged).map((x) => x.relPath)).toEqual(visible);
-  });
-
-  it("puts a visible row with no previous index after the mapped ones, without disturbing outsiders", () => {
-    const prevOrder = { "a.md": 0, "outside.md": 10 };
-    const visible = ["a.md", "new.md"];
-    const merged = mergeNoteOrder(prevOrder, visible);
-    expect(merged["outside.md"]).toBe(10);
-    const notes = [n("a.md"), n("new.md"), n("outside.md")];
-    expect(sortNotes(notes, "custom", merged).map((x) => x.relPath)).toEqual([
-      "a.md", "outside.md", "new.md",
-    ]);
-  });
-
-  it("keeps outsiders in their original relative order under All notes after a folder-filtered reorder", () => {
-    const prevOrder = { "docs/a.md": 0, "docs/b.md": 1, "other.md": 2, "zzz.md": 3 };
-    const visible = ["docs/b.md", "docs/a.md"];
-    const merged = mergeNoteOrder(prevOrder, visible);
-    const notes = [n("docs/a.md"), n("docs/b.md"), n("other.md"), n("zzz.md")];
-    const allNotesOrder = sortNotes(notes, "custom", merged).map((x) => x.relPath);
-    const outsiderPositions = allNotesOrder.filter(
-      (r) => r === "other.md" || r === "zzz.md",
-    );
-    expect(outsiderPositions).toEqual(["other.md", "zzz.md"]);
   });
 });
 

@@ -23,9 +23,10 @@ import {
   RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { pathBasename } from "@/lib/pathUtils";
 import { useMemo, useState } from "react";
 import type { NoteSortMode, NotesConfig } from "./lib/notesConfig";
-import { groupNotesByDate, mergeNoteOrder, sortNotes } from "./lib/noteSort";
+import { groupNotesByDate, sortNotes } from "./lib/noteSort";
 import type { NoteListItem } from "./lib/notesList";
 import { NoteRow } from "./NoteRow";
 
@@ -47,7 +48,7 @@ export type NoteListColumnProps = {
   onNewNote: () => void;
   onSetSortMode: (mode: NoteSortMode) => void;
   onSetGroupByDate: (on: boolean) => void;
-  onSetNoteOrder: (order: Record<string, number>) => void;
+  onSetFolderOrder: (folder: string, names: string[]) => void;
   onRenameDone: () => void;
 };
 
@@ -68,9 +69,10 @@ export function NoteListColumn(props: NoteListColumnProps) {
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
+  const order = config.folderOrder[config.selectedFolder];
   const sorted = useMemo(
-    () => sortNotes(props.notes, config.sortMode, config.noteOrder),
-    [props.notes, config.sortMode, config.noteOrder],
+    () => sortNotes(props.notes, config.sortMode, order),
+    [props.notes, config.sortMode, order],
   );
   const isDateSort = config.sortMode === "modified" || config.sortMode === "created";
   const groups = useMemo(
@@ -95,10 +97,7 @@ export function NoteListColumn(props: NoteListColumnProps) {
     const to = rels.indexOf(String(over.id));
     if (from === -1 || to === -1) return;
     rels.splice(to, 0, ...rels.splice(from, 1));
-
-    // `sorted` only covers the folder-filtered rows, so the order for every
-    // other note (elsewhere in the vault) must be preserved as-is.
-    props.onSetNoteOrder(mergeNoteOrder(config.noteOrder, rels));
+    props.onSetFolderOrder(config.selectedFolder, rels.map(pathBasename));
   };
 
   const renderRow = (note: NoteListItem) => (
