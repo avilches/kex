@@ -1,4 +1,4 @@
-import { splitPath } from "@/lib/pathUtils";
+import { ancestorsOf, splitPath } from "@/lib/pathUtils";
 
 export type NoteSortMode = "modified" | "title" | "created" | "custom";
 
@@ -30,6 +30,11 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+export function withAncestors(expanded: string[], folder: string): string[] {
+  const missing = ancestorsOf(folder).filter((a) => !expanded.includes(a));
+  return missing.length === 0 ? expanded : [...expanded, ...missing];
+}
+
 export function parseNotesConfig(raw: string | null): NotesConfig {
   if (!raw) return { ...DEFAULT_NOTES_CONFIG };
   let parsed: unknown;
@@ -47,16 +52,18 @@ export function parseNotesConfig(raw: string | null): NotesConfig {
       if (isStringArray(v)) folderOrder[k] = v;
     }
   }
+  const selectedFolder = typeof ns.selectedFolder === "string" ? ns.selectedFolder : "";
+  const expandedFolders = isStringArray(ns.expandedFolders) ? ns.expandedFolders : [];
   return {
     quickAccess: isStringArray(ns.quickAccess) ? ns.quickAccess : [],
     sortMode: SORT_MODES.includes(ns.sortMode as string)
       ? (ns.sortMode as NoteSortMode)
       : DEFAULT_NOTES_CONFIG.sortMode,
     folderOrder,
-    expandedFolders: isStringArray(ns.expandedFolders) ? ns.expandedFolders : [],
+    expandedFolders: withAncestors(expandedFolders, selectedFolder),
     groupByDate:
       typeof ns.groupByDate === "boolean" ? ns.groupByDate : DEFAULT_NOTES_CONFIG.groupByDate,
-    selectedFolder: typeof ns.selectedFolder === "string" ? ns.selectedFolder : "",
+    selectedFolder,
   };
 }
 

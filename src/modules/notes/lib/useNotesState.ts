@@ -8,6 +8,7 @@ import {
   parseNotesConfig,
   renamePathInConfig,
   serializeNotesConfig,
+  withAncestors,
 } from "./notesConfig";
 
 const WRITE_DEBOUNCE_MS = 300;
@@ -137,7 +138,12 @@ export function useNotesState(root: string | null, active: boolean) {
     [update],
   );
   const setSelectedFolder = useCallback(
-    (selectedFolder: string) => update((c) => ({ ...c, selectedFolder })),
+    (selectedFolder: string) =>
+      update((c) => ({
+        ...c,
+        selectedFolder,
+        expandedFolders: withAncestors(c.expandedFolders, selectedFolder),
+      })),
     [update],
   );
   const setGroupByDate = useCallback(

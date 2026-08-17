@@ -5,6 +5,7 @@ import {
   parseNotesConfig,
   renamePathInConfig,
   serializeNotesConfig,
+  withAncestors,
 } from "./notesConfig";
 
 describe("parseNotesConfig", () => {
@@ -59,6 +60,13 @@ describe("parseNotesConfig", () => {
     });
     expect(parseNotesConfig(raw)).toEqual(DEFAULT_NOTES_CONFIG);
   });
+
+  it("seeds the ancestors of the selected folder into expandedFolders", () => {
+    const raw = JSON.stringify({
+      notes: { expandedFolders: [], selectedFolder: "docs/pending/bugs" },
+    });
+    expect(parseNotesConfig(raw).expandedFolders).toEqual(["docs", "docs/pending"]);
+  });
 });
 
 describe("serializeNotesConfig", () => {
@@ -77,6 +85,27 @@ describe("serializeNotesConfig", () => {
 
   it("ends with a newline", () => {
     expect(serializeNotesConfig(null, DEFAULT_NOTES_CONFIG).endsWith("\n")).toBe(true);
+  });
+});
+
+describe("withAncestors", () => {
+  it("adds the missing ancestors and keeps the existing entries", () => {
+    expect(withAncestors(["public"], "docs/pending/bugs")).toEqual([
+      "public",
+      "docs",
+      "docs/pending",
+    ]);
+  });
+
+  it("returns the same array reference when nothing is missing", () => {
+    const expanded = ["docs", "docs/pending"];
+    expect(withAncestors(expanded, "docs/pending")).toBe(expanded);
+  });
+
+  it("adds nothing for the root or a top-level folder", () => {
+    const expanded: string[] = [];
+    expect(withAncestors(expanded, "")).toBe(expanded);
+    expect(withAncestors(expanded, "docs")).toBe(expanded);
   });
 });
 
