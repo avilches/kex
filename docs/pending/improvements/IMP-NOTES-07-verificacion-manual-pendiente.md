@@ -78,18 +78,16 @@ guardan arreglos de la revision final de rama, o sea los que mas importan.
    ningun aviso.
 3. El arbol abre entero colapsado. Expandir `docs`, cerrar la app, reabrir: solo `docs` sigue
    expandido.
-4. Seleccionar `docs`: arriba salen sus subcarpetas con su cuenta de notas directas, debajo solo
-   las notas que estan directamente en `docs`. Pulsar una subcarpeta entra en ella y el arbol se
-   expande para dejarla visible y seleccionada.
-5. La fila raiz lleva el nombre de la carpeta del workspace y muestra solo las notas de la raiz
-   mas las carpetas de primer nivel.
+4. Seleccionar `docs`: la lista muestra solo las notas que estan directamente en `docs`, ninguna
+   de sus subcarpetas, y en el arbol cada carpeta lleva la cuenta de sus notas directas. Bajar a
+   una subcarpeta se hace desde el arbol, que es la unica via de navegacion entre carpetas.
+5. La fila raiz lleva el nombre de la carpeta del workspace y muestra solo las notas de la raiz.
 6. Poner el orden en Custom, arrastrar dos notas de `docs`, ir a otra carpeta y volver: el orden
    se mantiene. En `kex.json`, `folderOrder` tiene una entrada para `docs` con nombres de
    fichero, no rutas. Cambiar a Modified y volver a Custom: el orden sigue ahi.
 7. Con la app cerrada, borrar una carpeta que tuviera entrada de orden y estuviera expandida.
    Reabrir y entrar en notas: la entrada y la expansion desaparecen de `kex.json`, y si esa
-   carpeta estaba seleccionada la lista vuelve a la raiz. Con la agrupacion por fecha activada,
-   las filas de carpeta salen por encima de la primera cabecera de fecha.
+   carpeta estaba seleccionada la lista vuelve a la raiz.
 
 ## Relacionado
 

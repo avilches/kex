@@ -11,7 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CollectionsColumn } from "./CollectionsColumn";
-import { childFolders, countDirectNotes, nextFolderName } from "./lib/folderTree";
+import { countDirectNotes, nextFolderName } from "./lib/folderTree";
 import { filterByFolder, nextUntitledName } from "./lib/noteSort";
 import type { NoteListItem } from "./lib/notesList";
 import { useNotesIndex } from "./lib/useNotesIndex";
@@ -81,15 +81,6 @@ export function NotesView(props: NotesViewProps) {
   );
   const counts = useMemo(() => countDirectNotes(index.notes), [index.notes]);
   const rootLabel = useMemo(() => pathBasename(canonRoot) || "/", [canonRoot]);
-  const folderRows = useMemo(
-    () =>
-      childFolders(index.folders, state.config.selectedFolder).map((relPath) => ({
-        relPath,
-        name: pathBasename(relPath),
-        count: counts.get(relPath) ?? 0,
-      })),
-    [index.folders, state.config.selectedFolder, counts],
-  );
 
   const openRel = useCallback(
     (relPath: string, pin?: boolean) => props.onOpenFile(abs(relPath), pin),
@@ -279,8 +270,6 @@ export function NotesView(props: NotesViewProps) {
             onSetGroupByDate={state.setGroupByDate}
             onSetFolderOrder={state.setFolderOrder}
             onRenameDone={() => setPrimedRenamePath(null)}
-            folderRows={folderRows}
-            onSelectFolder={state.setSelectedFolder}
           />
         </ResizablePanel>
       </ResizablePanelGroup>

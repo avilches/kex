@@ -20,7 +20,6 @@ import {
   AlertCircleIcon,
   ArrowUpDownIcon,
   Calendar03Icon,
-  Folder01Icon,
   PlusSignIcon,
   RefreshIcon,
 } from "@hugeicons/core-free-icons";
@@ -51,8 +50,6 @@ export type NoteListColumnProps = {
   onSetGroupByDate: (on: boolean) => void;
   onSetFolderOrder: (folder: string, names: string[]) => void;
   onRenameDone: () => void;
-  folderRows: { relPath: string; name: string; count: number }[];
-  onSelectFolder: (relPath: string) => void;
 };
 
 const SORT_LABELS: Record<NoteSortMode, string> = {
@@ -64,25 +61,6 @@ const SORT_LABELS: Record<NoteSortMode, string> = {
 
 const HEADER_BUTTON =
   "flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground";
-
-function FolderListRow(props: {
-  relPath: string;
-  name: string;
-  count: number;
-  onSelect: (relPath: string) => void;
-}) {
-  return (
-    <div
-      className="flex h-7 cursor-pointer items-center gap-1.5 rounded px-2 text-[12.5px] text-foreground hover:bg-accent"
-      onClick={() => props.onSelect(props.relPath)}
-      title={props.relPath}
-    >
-      <HugeiconsIcon icon={Folder01Icon} size={12} strokeWidth={1.85} className="shrink-0" />
-      <span className="min-w-0 flex-1 truncate">{props.name}</span>
-      <span className="shrink-0 text-[10.5px] text-muted-foreground">{props.count}</span>
-    </div>
-  );
-}
 
 export function NoteListColumn(props: NoteListColumnProps) {
   const { config } = props;
@@ -215,51 +193,34 @@ export function NoteListColumn(props: NoteListColumnProps) {
               Retry
             </button>
           </div>
+        ) : sorted.length === 0 && !props.loading ? (
+          <div className="p-2 text-[12px] text-muted-foreground">
+            No notes here. Create one with the + button.
+          </div>
+        ) : config.sortMode === "custom" ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={sorted.map((n) => n.relPath)}
+              strategy={verticalListSortingStrategy}
+            >
+              {sorted.map(renderRow)}
+            </SortableContext>
+          </DndContext>
+        ) : groups ? (
+          groups.map((g) => (
+            <div key={g.bucket}>
+              <div className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {g.bucket}
+              </div>
+              {g.notes.map(renderRow)}
+            </div>
+          ))
         ) : (
-          <>
-            {props.folderRows.length > 0 && (
-              <div className="mb-1 border-b border-border/60 pb-1">
-                {props.folderRows.map((f) => (
-                  <FolderListRow
-                    key={f.relPath}
-                    relPath={f.relPath}
-                    name={f.name}
-                    count={f.count}
-                    onSelect={props.onSelectFolder}
-                  />
-                ))}
-              </div>
-            )}
-            {sorted.length === 0 && props.folderRows.length === 0 && !props.loading ? (
-              <div className="p-2 text-[12px] text-muted-foreground">
-                No notes here. Create one with the + button.
-              </div>
-            ) : config.sortMode === "custom" ? (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={sorted.map((n) => n.relPath)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {sorted.map(renderRow)}
-                </SortableContext>
-              </DndContext>
-            ) : groups ? (
-              groups.map((g) => (
-                <div key={g.bucket}>
-                  <div className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {g.bucket}
-                  </div>
-                  {g.notes.map(renderRow)}
-                </div>
-              ))
-            ) : (
-              sorted.map(renderRow)
-            )}
-          </>
+          sorted.map(renderRow)
         )}
         {props.truncated && (
           <div className="p-2 text-[11px] text-muted-foreground">

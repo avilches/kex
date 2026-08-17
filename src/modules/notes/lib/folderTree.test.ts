@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildFolderTree,
-  childFolders,
-  countDirectNotes,
-  nextFolderName,
-} from "./folderTree";
+import { buildFolderTree, countDirectNotes, nextFolderName } from "./folderTree";
 
 describe("buildFolderTree", () => {
   it("nests children under parents, sorted case-insensitively", () => {
@@ -26,26 +21,6 @@ describe("nextFolderName", () => {
     expect(nextFolderName([])).toBe("New Folder");
     expect(nextFolderName(["new folder"])).toBe("New Folder 2");
     expect(nextFolderName(["New Folder", "New Folder 2"])).toBe("New Folder 3");
-  });
-});
-
-describe("childFolders", () => {
-  const folders = ["docs", "docs/sub", "docs/sub/deep", "Alpha", "alpha2", "docs2"];
-
-  it("returns immediate children only, not grandchildren", () => {
-    expect(childFolders(folders, "docs")).toEqual(["docs/sub"]);
-  });
-
-  it("returns the top-level folders for the root, sorted case-insensitively", () => {
-    expect(childFolders(folders, "")).toEqual(["Alpha", "alpha2", "docs", "docs2"]);
-  });
-
-  it("does not match sibling prefixes", () => {
-    expect(childFolders(["docs2/x", "docs2"], "docs")).toEqual([]);
-  });
-
-  it("returns nothing for a leaf folder", () => {
-    expect(childFolders(folders, "docs/sub/deep")).toEqual([]);
   });
 });
 
