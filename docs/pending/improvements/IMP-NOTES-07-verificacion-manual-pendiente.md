@@ -17,8 +17,9 @@ a mano despues del merge y reporto que funciona, cubriendo estos casos:
 - Pereza: con un workspace con raiz definida y sin abrir nunca la pestaña de notas, no se
   crea ningun `kex.json` ni se lanza ningun `notes_list`.
 
-Quedan tres escenarios sin ejercitar. Se registran porque no son hipotesis: son los
-caminos donde un arreglo concreto de este trabajo no ha sido observado funcionando.
+Quedan cuatro grupos de escenarios sin ejercitar. Se registran porque no son hipotesis: son
+los caminos donde un arreglo concreto de este trabajo no ha sido observado funcionando. El
+cuarto grupo lo aporta el trabajo posterior de scoping por carpeta.
 
 Antes habia un cuarto escenario (orden personalizado con una carpeta filtrada), que se
 retiro de esta lista: guardaba el arreglo de `mergeNoteOrder`, funcion que se elimino al
@@ -62,6 +63,35 @@ la vista de notas, y confirmar que la clave sobrevive (la escritura es
 read-modify-write). Luego romper el JSON a proposito y confirmar que la vista arranca con
 valores por defecto y **no** sobrescribe el fichero hasta la primera mutacion del usuario.
 
+### 4. Scoping por carpeta: el recorrido completo de la feature nueva
+
+Siete escenarios del trabajo que hizo la lista mostrar una sola carpeta. Ningun agente pudo
+arrancar la aplicacion, y no hay infraestructura de tests de componentes en el repo, asi que
+esta es la unica cobertura de la capa React de esa feature. Los dos primeros son los que
+guardan arreglos de la revision final de rama, o sea los que mas importan.
+
+1. Crear una nota desde el menu contextual de una carpeta que **no** es la seleccionada. Debe
+   saltar a esa carpeta y abrir el rename en linea de la nota nueva. Antes del arreglo creaba
+   un `Untitled.md` sin forma de nombrarlo.
+2. Crear una carpeta dentro de una carpeta **sin hijos**. Debe expandir la carpeta padre y abrir
+   el rename en linea de la nueva. Antes del arreglo aparecia en disco como `New Folder` sin
+   ningun aviso.
+3. El arbol abre entero colapsado. Expandir `docs`, cerrar la app, reabrir: solo `docs` sigue
+   expandido.
+4. Seleccionar `docs`: arriba salen sus subcarpetas con su cuenta de notas directas, debajo solo
+   las notas que estan directamente en `docs`. Pulsar una subcarpeta entra en ella y el arbol se
+   expande para dejarla visible y seleccionada.
+5. La fila raiz lleva el nombre de la carpeta del workspace y muestra solo las notas de la raiz
+   mas las carpetas de primer nivel.
+6. Poner el orden en Custom, arrastrar dos notas de `docs`, ir a otra carpeta y volver: el orden
+   se mantiene. En `kex.json`, `folderOrder` tiene una entrada para `docs` con nombres de
+   fichero, no rutas. Cambiar a Modified y volver a Custom: el orden sigue ahi.
+7. Con la app cerrada, borrar una carpeta que tuviera entrada de orden y estuviera expandida.
+   Reabrir y entrar en notas: la entrada y la expansion desaparecen de `kex.json`, y si esa
+   carpeta estaba seleccionada la lista vuelve a la raiz. Con la agrupacion por fecha activada,
+   las filas de carpeta salen por encima de la primera cabecera de fecha.
+
 ## Relacionado
 
 - El equivalente para el editor rich: [IMP-MD-01](IMP-MD-01-verificacion-manual-editor-rich.md).
+- Los minors aceptados de la misma feature: [IMP-NOTES-08](IMP-NOTES-08-minors-del-scoping-por-carpeta.md).

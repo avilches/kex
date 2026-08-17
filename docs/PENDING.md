@@ -73,7 +73,8 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [IMP-NOTES-04](pending/improvements/IMP-NOTES-04-navegacion-teclado.md) - Navegacion por teclado (flechas + Enter) en filas de nota y carpeta, igualando al explorer
 - [IMP-NOTES-05](pending/improvements/IMP-NOTES-05-preview-tab-no-implementado.md) - Click simple y doble click se comportan igual al abrir una nota; los tabs markdown no tienen modo preview
 - [IMP-NOTES-06](pending/improvements/IMP-NOTES-06-huecos-de-cobertura-en-el-nucleo-puro.md) - Tres invariantes del nucleo puro sin test: desempate por `relPath` con timestamps iguales, buckets de fecha no consecutivos, y orden de hermanos anidados en el arbol de carpetas
-- [IMP-NOTES-07](pending/improvements/IMP-NOTES-07-verificacion-manual-pendiente.md) - Tres escenarios sin probar en la app, cada uno guardando un arreglo concreto de la revision: borrado con cambio de workspace de por medio (el bug critico, prioridad), coste con la vista oculta en un repo grande, y `kex.json` con claves ajenas o corrupto
+- [IMP-NOTES-07](pending/improvements/IMP-NOTES-07-verificacion-manual-pendiente.md) - Cuatro grupos de escenarios sin probar en la app, cada uno guardando un arreglo concreto de una revision: borrado con cambio de workspace de por medio (el bug critico, prioridad), coste con la vista oculta en un repo grande, `kex.json` con claves ajenas o corrupto, y el recorrido completo del scoping por carpeta (7 casos, unica cobertura de su capa React)
+- [IMP-NOTES-08](pending/improvements/IMP-NOTES-08-minors-del-scoping-por-carpeta.md) - Ocho minors aceptados en el trabajo de scoping por carpeta: rename con barra que pierde la posicion en el orden custom, arrastre con el vault truncado, primera poda que llega antes de leer `kex.json`, carpeta viva pero invisible al recorrido, y cosmeticos
 
 ## Contexto adicional (`docs/pending/`)
 
