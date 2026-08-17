@@ -3,7 +3,6 @@ import {
   buildFolderTree,
   childFolders,
   countDirectNotes,
-  countNotesPerFolder,
   nextFolderName,
 } from "./folderTree";
 
@@ -19,20 +18,6 @@ describe("buildFolderTree", () => {
 
   it("handles empty input", () => {
     expect(buildFolderTree([])).toEqual([]);
-  });
-});
-
-describe("countNotesPerFolder", () => {
-  it("counts subtree totals for every ancestor", () => {
-    const counts = countNotesPerFolder([
-      { folder: "" },
-      { folder: "docs" },
-      { folder: "docs/sub" },
-      { folder: "docs/sub" },
-    ]);
-    expect(counts.get("docs")).toBe(3);
-    expect(counts.get("docs/sub")).toBe(2);
-    expect(counts.get("")).toBeUndefined();
   });
 });
 

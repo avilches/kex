@@ -11,7 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CollectionsColumn } from "./CollectionsColumn";
-import { nextFolderName } from "./lib/folderTree";
+import { countDirectNotes, nextFolderName } from "./lib/folderTree";
 import { filterByFolder, nextUntitledName } from "./lib/noteSort";
 import type { NoteListItem } from "./lib/notesList";
 import { useNotesIndex } from "./lib/useNotesIndex";
@@ -79,6 +79,8 @@ export function NotesView(props: NotesViewProps) {
     () => filterByFolder(index.notes, state.config.selectedFolder),
     [index.notes, state.config.selectedFolder],
   );
+  const counts = useMemo(() => countDirectNotes(index.notes), [index.notes]);
+  const rootLabel = useMemo(() => pathBasename(canonRoot) || canonRoot, [canonRoot]);
 
   const openRel = useCallback(
     (relPath: string, pin?: boolean) => props.onOpenFile(abs(relPath), pin),
@@ -222,7 +224,8 @@ export function NotesView(props: NotesViewProps) {
             quickAccess={state.config.quickAccess}
             notesByRelPath={notesByRelPath}
             folders={index.folders}
-            notes={index.notes}
+            counts={counts}
+            rootLabel={rootLabel}
             expandedFolders={state.config.expandedFolders}
             selectedFolder={state.config.selectedFolder}
             editingFolder={editingFolder}

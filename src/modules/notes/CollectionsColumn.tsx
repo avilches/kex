@@ -30,14 +30,15 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildFolderTree, countNotesPerFolder, type FolderNode } from "./lib/folderTree";
+import { buildFolderTree, type FolderNode } from "./lib/folderTree";
 import type { NoteListItem } from "./lib/notesList";
 
 export type CollectionsColumnProps = {
   quickAccess: string[];
   notesByRelPath: Map<string, NoteListItem>;
   folders: string[];
-  notes: NoteListItem[];
+  counts: Map<string, number>;
+  rootLabel: string;
   expandedFolders: string[];
   selectedFolder: string;
   editingFolder: string | null;
@@ -245,10 +246,9 @@ export function CollectionsColumn(props: CollectionsColumnProps) {
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
   const tree = useMemo(() => buildFolderTree(props.folders), [props.folders]);
-  const counts = useMemo(() => countNotesPerFolder(props.notes), [props.notes]);
   const expanded = useMemo(() => new Set(props.expandedFolders), [props.expandedFolders]);
   const folderRowShared = {
-    counts,
+    counts: props.counts,
     expanded,
     selectedFolder: props.selectedFolder,
     editingFolder: props.editingFolder,
@@ -323,14 +323,14 @@ export function CollectionsColumn(props: CollectionsColumnProps) {
               onClick={() => props.onSelectFolder("")}
             >
               <HugeiconsIcon
-                icon={NoteIcon}
+                icon={Folder01Icon}
                 size={12}
                 strokeWidth={1.85}
                 className="shrink-0"
               />
-              <span className="min-w-0 flex-1 truncate">All notes</span>
+              <span className="min-w-0 flex-1 truncate">{props.rootLabel}</span>
               <span className="shrink-0 text-[10px] text-muted-foreground">
-                {props.notes.length}
+                {props.counts.get("") ?? 0}
               </span>
             </div>
           </ContextMenuTrigger>

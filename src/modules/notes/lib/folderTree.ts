@@ -21,19 +21,6 @@ export function buildFolderTree(folders: string[]): FolderNode[] {
   return roots;
 }
 
-export function countNotesPerFolder(notes: { folder: string }[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const n of notes) {
-    let f = n.folder;
-    while (f !== "") {
-      counts.set(f, (counts.get(f) ?? 0) + 1);
-      const i = f.lastIndexOf("/");
-      f = i === -1 ? "" : f.slice(0, i);
-    }
-  }
-  return counts;
-}
-
 export function nextFolderName(existingNames: string[]): string {
   const taken = new Set(existingNames.map((n) => n.toLowerCase()));
   if (!taken.has("new folder")) return "New Folder";
