@@ -24,7 +24,13 @@ function n(relPath: string, over: Partial<NoteListItem> = {}): NoteListItem {
 }
 
 describe("filterByFolder", () => {
-  const notes = [n("a.md"), n("docs/b.md"), n("docs/sub/c.md"), n("docs2/d.md")];
+  const notes = [
+    n("a.md"),
+    n("docs/b.md"),
+    n("docs/sub/c.md"),
+    n("docs/sub/deep/e.md"),
+    n("docs2/d.md"),
+  ];
 
   it("root means only the notes directly in the root", () => {
     expect(filterByFolder(notes, "").map((x) => x.relPath)).toEqual(["a.md"]);
