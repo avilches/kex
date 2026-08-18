@@ -26,6 +26,7 @@ describe("foldersToReload", () => {
     expect(foldersToReload(ROOT, "/vault/docs/pending", loaded)).toEqual([
       "docs/pending",
       "docs",
+      "",
     ]);
   });
 
@@ -40,5 +41,13 @@ describe("foldersToReload", () => {
 
   it("never repeats a folder", () => {
     expect(foldersToReload(ROOT, "/vault/docs", ["", "docs"])).toEqual(["docs", ""]);
+  });
+
+  it("stops at the grandparent, three levels down", () => {
+    const loaded = ["", "docs", "docs/pending", "docs/pending/sub"];
+    expect(foldersToReload(ROOT, "/vault/docs/pending/sub/x.md", loaded)).toEqual([
+      "docs/pending/sub",
+      "docs/pending",
+    ]);
   });
 });

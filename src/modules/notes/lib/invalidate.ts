@@ -19,7 +19,6 @@ export function foldersToReload(
   const live = new Set(loaded);
   const out: string[] = [];
   for (const c of candidates) {
-    if (c === "" && live.has(c) && out.length > 1) continue;
     if (live.has(c) && !out.includes(c)) out.push(c);
   }
   return out;
