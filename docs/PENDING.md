@@ -75,6 +75,7 @@ Bugs, features y mejoras identificadas pero no programadas. Ver detalles en `doc
 - [IMP-NOTES-06](pending/improvements/IMP-NOTES-06-huecos-de-cobertura-en-el-nucleo-puro.md) - Dos invariantes del nucleo puro sin test: desempate por `relPath` con timestamps iguales, y buckets de fecha no consecutivos
 - [IMP-NOTES-07](pending/improvements/IMP-NOTES-07-verificacion-manual-pendiente.md) - Cinco grupos de escenarios sin probar en la app, cada uno guardando un arreglo concreto de una revision: borrado con cambio de workspace de por medio (el bug critico, prioridad), coste con la vista oculta en un repo grande, `kex.json` con claves ajenas o corrupto, el recorrido completo del scoping por carpeta (7 casos) y el de la lectura perezosa por nivel (7 casos), ambos unica cobertura de su capa React
 - [IMP-NOTES-08](pending/improvements/IMP-NOTES-08-minors-del-scoping-por-carpeta.md) - Cuatro minors aceptados en el trabajo de scoping por carpeta: rename con barra que pierde la posicion en el orden custom, `expandFolder` sin guardarse sola contra la clave raiz, el boton "+" que reexpande ancestros colapsados, y cosmeticos
+- [IMP-NOTES-09](pending/improvements/IMP-NOTES-09-minors-de-la-lectura-por-niveles.md) - Once minors aceptados en el trabajo de lectura por niveles: rutas no canonicas aceptadas por `resolve_rel`, una carpeta pedida que sea symlink fuera del vault, el desajuste entre las carpetas que salta el watcher y las que poda el walker, y ocho mas de coste, cobertura y cosmetica
 
 ## Contexto adicional (`docs/pending/`)
 
