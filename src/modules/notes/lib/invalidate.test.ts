@@ -50,4 +50,13 @@ describe("foldersToReload", () => {
       "docs/pending",
     ]);
   });
+
+  it("invalidates three levels when the changed path is a loaded folder", () => {
+    const loaded = ["", "docs", "docs/pending", "docs/pending/sub"];
+    expect(foldersToReload(ROOT, "/vault/docs/pending/sub", loaded)).toEqual([
+      "docs/pending/sub",
+      "docs/pending",
+      "docs",
+    ]);
+  });
 });
