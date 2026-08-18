@@ -159,7 +159,7 @@ fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteItem {
     pub rel_path: String,
@@ -169,7 +169,7 @@ pub struct NoteItem {
     pub created: u64,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubfolderItem {
     pub name: String,

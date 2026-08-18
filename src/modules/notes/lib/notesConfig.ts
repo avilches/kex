@@ -58,14 +58,16 @@ export function parseNotesConfig(raw: string | null): NotesConfig {
   const folderOrder: Record<string, string[]> = {};
   if (isPlainObject(ns.folderOrder)) {
     for (const [k, v] of Object.entries(ns.folderOrder)) {
-      if (isStringArray(v)) folderOrder[k] = v;
+      if (isSafeVaultPath(k) && isStringArray(v)) folderOrder[k] = v;
     }
   }
   const selectedFolder =
     typeof ns.selectedFolder === "string" && isSafeVaultPath(ns.selectedFolder)
       ? ns.selectedFolder
       : "";
-  const expandedFolders = isStringArray(ns.expandedFolders) ? ns.expandedFolders : [];
+  const expandedFolders = isStringArray(ns.expandedFolders)
+    ? ns.expandedFolders.filter(isSafeVaultPath)
+    : [];
   return {
     quickAccess: isStringArray(ns.quickAccess)
       ? ns.quickAccess.filter(isSafeVaultPath)

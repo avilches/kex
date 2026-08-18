@@ -87,6 +87,18 @@ describe("parseNotesConfig", () => {
     expect(parseNotesConfig(raw).quickAccess).toEqual(["docs/TODO.md"]);
   });
 
+  it("drops expandedFolders entries and folderOrder keys that escape the vault", () => {
+    const raw = JSON.stringify({
+      notes: {
+        expandedFolders: ["docs", "../../etc", "/etc", "C:/Windows", "docs\\pending"],
+        folderOrder: { "": ["a.md"], docs: ["b.md"], "../../etc": ["passwd"] },
+      },
+    });
+    const config = parseNotesConfig(raw);
+    expect(config.expandedFolders).toEqual(["docs"]);
+    expect(Object.keys(config.folderOrder)).toEqual(["", "docs"]);
+  });
+
   it("falls back to the vault root for a selectedFolder that escapes the vault", () => {
     const escaping = [
       "/etc",

@@ -42,7 +42,7 @@ fn in_git_repo(dir: &Path) -> bool {
 
 // Immediate children of `dir` that git does not ignore. Outside a repo every
 // name is returned, so nothing is dimmed.
-pub(crate) fn git_non_ignored_names(dir: &Path, show_hidden: bool) -> HashSet<String> {
+fn git_non_ignored_names(dir: &Path, show_hidden: bool) -> HashSet<String> {
     WalkBuilder::new(dir)
         .hidden(!show_hidden)
         .git_ignore(true)

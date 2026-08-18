@@ -1,10 +1,11 @@
+import { listenFsChanged } from "@/modules/explorer/lib/watch";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type NoteHead, notesReadHeads } from "./notesDir";
 
 // Pinned notes can live anywhere in the vault, so their titles are read for
-// those paths alone: on activation, when the pin list changes, and when the app
-// writes one of them.
+// those paths alone: on activation, when the pin list changes, and when one of
+// them is written, by this app or from outside.
 export function useQuickAccessHeads(
   root: string | null,
   quickAccess: string[],
@@ -30,18 +31,25 @@ export function useQuickAccessHeads(
         .catch((e) => console.error("[notes] reading pinned heads failed:", e));
     };
     load();
+    const isPinned = (path: string) => {
+      const norm = path.replace(/\\/g, "/");
+      return pinnedRef.current.some((rel) => norm.endsWith(`/${rel}`));
+    };
     const sub = getCurrentWebviewWindow().listen<{ path: string }>(
       "fs:file-written",
       (e) => {
-        const norm = e.payload.path.replace(/\\/g, "/");
-        if (pinnedRef.current.some((rel) => norm.endsWith(`/${rel}`))) load();
+        if (isPinned(e.payload.path)) load();
       },
     );
+    const changed = listenFsChanged((paths) => {
+      if (paths.some(isPinned)) load();
+    });
     return () => {
       cancelled = true;
       void sub.then((un) => un());
+      void changed.then((un) => un());
     };
   }, [root, active, key]);
 
-  return useMemo(() => heads, [heads]);
+  return heads;
 }
