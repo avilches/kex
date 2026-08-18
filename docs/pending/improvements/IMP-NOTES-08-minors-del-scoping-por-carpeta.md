@@ -34,8 +34,9 @@ se retiraron de esta lista; los que quedan se renumeraron.
 
 2. **`expandFolder` no se protege sola de la clave raiz.** `src/modules/notes/lib/useNotesState.ts`:
    la guarda `parent !== ""` vive en el unico sitio que la llama, no dentro de la accion. Un
-   segundo llamante podria insertar la clave de la raiz en `expandedFolders`, que la poda
-   quitaria en el siguiente recorrido.
+   segundo llamante podria insertar la clave de la raiz en `expandedFolders`, y ahi se
+   quedaria: `pruneNotesConfig` da la raiz siempre por directorio, asi que la poda no la
+   quita. La entrada es redundante, no danina, porque la raiz siempre se carga.
 
 3. **El boton "+" de la lista vuelve a expandir ancestros colapsados a mano.** Efecto
    secundario del arreglo que selecciona la carpeta destino antes de crear la nota: si estas
