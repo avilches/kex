@@ -31,6 +31,7 @@ async function readRaw(root: string): Promise<string | null> {
 
 export function useNotesState(root: string | null, active: boolean) {
   const [config, setConfig] = useState<NotesConfig>({ ...DEFAULT_NOTES_CONFIG });
+  const [configLoaded, setConfigLoaded] = useState(false);
   const loadedRootRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef(root);
@@ -49,12 +50,15 @@ export function useNotesState(root: string | null, active: boolean) {
     if (loadedRootRef.current !== null && loadedRootRef.current !== root) {
       loadedRootRef.current = null;
       setConfig({ ...DEFAULT_NOTES_CONFIG });
+      setConfigLoaded(false);
     }
     if (!root || !active || loadedRootRef.current === root) return;
     loadedRootRef.current = root;
     let cancelled = false;
     void readRaw(root).then((raw) => {
-      if (!cancelled) setConfig(parseNotesConfig(raw));
+      if (cancelled) return;
+      setConfig(parseNotesConfig(raw));
+      setConfigLoaded(true);
     });
     return () => {
       cancelled = true;
@@ -110,14 +114,14 @@ export function useNotesState(root: string | null, active: boolean) {
     [scheduleWrite],
   );
 
-  // Repairing kex.json belongs to whoever owns the file. One call, only when the
-  // view is active and the config has been read, and never a write when nothing
-  // changed, because pruneNotesConfig returns the same object in that case.
+  // Repairing kex.json belongs to whoever owns the file. Runs once per load, not
+  // on every config edit: configLoaded (not the config object) is the trigger.
   useEffect(() => {
-    if (!root || !active || loadedRootRef.current !== root) return;
+    if (!root || !active || !configLoaded) return;
+    const paths = pathsToCheck(configRef.current);
+    if (paths.length === 0) return;
     let cancelled = false;
     void (async () => {
-      const paths = pathsToCheck(configRef.current);
       try {
         const answer = await notesPathsExist(root, paths);
         if (cancelled) return;
@@ -130,7 +134,7 @@ export function useNotesState(root: string | null, active: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [root, active, update, config]);
+  }, [root, active, update, configLoaded]);
 
   const toggleQuickAccess = useCallback(
     (relPath: string) =>

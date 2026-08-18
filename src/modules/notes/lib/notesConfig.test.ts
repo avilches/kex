@@ -131,6 +131,13 @@ describe("parseNotesConfig", () => {
     });
     expect(parseNotesConfig(raw).quickAccess).toEqual([]);
   });
+
+  it("keeps a root file literally named like a bare drive letter, but still drops a real drive prefix", () => {
+    const raw = JSON.stringify({
+      notes: { quickAccess: ["a:b.md", "C:/x.md"] },
+    });
+    expect(parseNotesConfig(raw).quickAccess).toEqual(["a:b.md"]);
+  });
 });
 
 describe("serializeNotesConfig", () => {

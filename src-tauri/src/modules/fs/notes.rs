@@ -326,7 +326,7 @@ pub(crate) fn is_safe_rel(rel: &str) -> bool {
         return false;
     }
     let b = rel.as_bytes();
-    if b.len() >= 2 && b[1] == b':' && b[0].is_ascii_alphabetic() {
+    if b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'/' || b[2] == b'\\') {
         return false;
     }
     !rel.split('/').any(|seg| seg == "..")
@@ -931,5 +931,26 @@ mod tests {
         assert!(matches!(kind("docs/gone.md"), PathKind::Absent));
         assert!(matches!(kind(""), PathKind::Dir), "the vault root is a directory");
         assert!(matches!(kind("../escape"), PathKind::Absent));
+    }
+
+    #[test]
+    fn drive_prefix_rejection_needs_a_separator_after_the_colon() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a:b.md", "a\n");
+        let got = paths_exist_blocking(
+            dir.path(),
+            &["a:b.md".to_string(), "C:/x.md".to_string()],
+        );
+        let kind = |rel: &str| {
+            got.iter()
+                .find(|p| p.rel_path == rel)
+                .map(|p| &p.kind)
+                .unwrap_or_else(|| panic!("{rel} not in the answer"))
+        };
+        assert!(
+            matches!(kind("a:b.md"), PathKind::File),
+            "a colon with no following separator is a legal file name, not a drive prefix"
+        );
+        assert!(matches!(kind("C:/x.md"), PathKind::Absent));
     }
 }

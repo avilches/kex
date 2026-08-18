@@ -35,7 +35,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 // so a traversal or an absolute path here would reach outside the vault.
 function isSafeVaultPath(p: string): boolean {
   if (p.startsWith("/") || p.includes("\\")) return false;
-  if (/^[A-Za-z]:/.test(p)) return false;
+  if (/^[A-Za-z]:[/\\]/.test(p)) return false;
   return !p.split("/").some((seg) => seg === "..");
 }
 
