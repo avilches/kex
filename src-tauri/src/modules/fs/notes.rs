@@ -516,6 +516,103 @@ fn read_note(path: &Path, rel: &str) -> NoteItem {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteHead {
+    pub rel_path: String,
+    pub title: String,
+    pub snippet: String,
+    pub missing: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PathKind {
+    File,
+    Dir,
+    Absent,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PathExists {
+    pub rel_path: String,
+    pub kind: PathKind,
+}
+
+#[tauri::command]
+pub async fn notes_read_heads(
+    root: String,
+    rel_paths: Vec<String>,
+    workspace: Option<WorkspaceEnv>,
+) -> Result<Vec<NoteHead>, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root_path = resolve_path(&root, &workspace);
+    tauri::async_runtime::spawn_blocking(move || heads_blocking(&root_path, &rel_paths))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub fn heads_blocking(root: &Path, rel_paths: &[String]) -> Vec<NoteHead> {
+    rel_paths
+        .iter()
+        .map(|rel| {
+            let stem = Path::new(rel)
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| rel.to_string());
+            let path = match resolve_rel(root, rel) {
+                Some(p) if p.is_file() => p,
+                _ => {
+                    return NoteHead {
+                        rel_path: rel.clone(),
+                        title: stem,
+                        snippet: String::new(),
+                        missing: true,
+                    }
+                }
+            };
+            let parsed = parse_head(&read_head(&path));
+            NoteHead {
+                rel_path: rel.clone(),
+                title: parsed.fm_title.or(parsed.h1).unwrap_or(stem),
+                snippet: parsed.snippet,
+                missing: false,
+            }
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub async fn notes_paths_exist(
+    root: String,
+    rel_paths: Vec<String>,
+    workspace: Option<WorkspaceEnv>,
+) -> Result<Vec<PathExists>, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root_path = resolve_path(&root, &workspace);
+    tauri::async_runtime::spawn_blocking(move || paths_exist_blocking(&root_path, &rel_paths))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+pub fn paths_exist_blocking(root: &Path, rel_paths: &[String]) -> Vec<PathExists> {
+    rel_paths
+        .iter()
+        .map(|rel| {
+            let kind = match resolve_rel(root, rel).and_then(|p| std::fs::metadata(&p).ok()) {
+                Some(meta) if meta.is_dir() => PathKind::Dir,
+                Some(_) => PathKind::File,
+                None => PathKind::Absent,
+            };
+            PathExists {
+                rel_path: rel.clone(),
+                kind,
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -783,5 +880,56 @@ mod tests {
         assert!(!d.missing, "it exists, it just cannot be read");
         assert!(d.error.is_some());
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    #[test]
+    fn heads_resolve_titles_and_mark_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "docs/a.md", "---\ntitle: Pinned A\n---\nbody line\n");
+        write(dir.path(), "b.md", "# Heading B\nbody\n");
+        let heads = heads_blocking(
+            dir.path(),
+            &[
+                "docs/a.md".to_string(),
+                "b.md".to_string(),
+                "gone.md".to_string(),
+                "../escape.md".to_string(),
+            ],
+        );
+        assert_eq!(heads.len(), 4);
+        assert_eq!(heads[0].title, "Pinned A");
+        assert_eq!(heads[0].snippet, "body line");
+        assert!(!heads[0].missing);
+        assert_eq!(heads[1].title, "Heading B");
+        assert!(heads[2].missing);
+        assert_eq!(heads[2].title, "gone", "a missing pin still shows its file stem");
+        assert!(heads[3].missing, "unsafe paths are missing, never an error");
+    }
+
+    #[test]
+    fn paths_exist_distinguishes_file_dir_and_absent() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "docs/a.md", "a\n");
+        let got = paths_exist_blocking(
+            dir.path(),
+            &[
+                "docs".to_string(),
+                "docs/a.md".to_string(),
+                "docs/gone.md".to_string(),
+                "".to_string(),
+                "../escape".to_string(),
+            ],
+        );
+        let kind = |rel: &str| {
+            got.iter()
+                .find(|p| p.rel_path == rel)
+                .map(|p| &p.kind)
+                .unwrap_or_else(|| panic!("{rel} not in the answer"))
+        };
+        assert!(matches!(kind("docs"), PathKind::Dir));
+        assert!(matches!(kind("docs/a.md"), PathKind::File));
+        assert!(matches!(kind("docs/gone.md"), PathKind::Absent));
+        assert!(matches!(kind(""), PathKind::Dir), "the vault root is a directory");
+        assert!(matches!(kind("../escape"), PathKind::Absent));
     }
 }

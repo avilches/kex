@@ -807,6 +807,8 @@ pub fn run() {
             fs::grep::fs_glob,
             fs::notes::notes_list,
             fs::notes::notes_read_dirs,
+            fs::notes::notes_read_heads,
+            fs::notes::notes_paths_exist,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,
             git::commands::git_status,
