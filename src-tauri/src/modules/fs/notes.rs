@@ -1,5 +1,6 @@
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use ignore::WalkBuilder;
@@ -285,6 +286,236 @@ fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteItem {
+    pub rel_path: String,
+    pub title: String,
+    pub snippet: String,
+    pub mtime: u64,
+    pub created: u64,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubfolderItem {
+    pub name: String,
+    pub note_count: u32,
+    pub has_subfolders: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotesDir {
+    pub folder: String,
+    pub notes: Vec<NoteItem>,
+    pub subfolders: Vec<SubfolderItem>,
+    pub missing: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct NotesReadDirsResult {
+    pub dirs: Vec<NotesDir>,
+}
+
+/// Vault-relative paths only. Anything that could escape the vault is refused
+/// here so a hand-edited kex.json cannot reach the filesystem.
+pub(crate) fn is_safe_rel(rel: &str) -> bool {
+    if rel.starts_with('/') || rel.contains('\\') {
+        return false;
+    }
+    let b = rel.as_bytes();
+    if b.len() >= 2 && b[1] == b':' && b[0].is_ascii_alphabetic() {
+        return false;
+    }
+    !rel.split('/').any(|seg| seg == "..")
+}
+
+pub(crate) fn resolve_rel(root: &Path, rel: &str) -> Option<PathBuf> {
+    if !is_safe_rel(rel) {
+        return None;
+    }
+    Some(if rel.is_empty() {
+        root.to_path_buf()
+    } else {
+        root.join(rel)
+    })
+}
+
+fn is_note(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| NOTE_EXTS.contains(&e.to_ascii_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+pub async fn notes_read_dirs(
+    root: String,
+    folders: Vec<String>,
+    workspace: Option<WorkspaceEnv>,
+) -> Result<NotesReadDirsResult, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root_path = resolve_path(&root, &workspace);
+    if !root_path.is_dir() {
+        return Err(format!("not a directory: {root}"));
+    }
+    tauri::async_runtime::spawn_blocking(move || read_dirs_blocking(&root_path, &folders))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Blocking core, separated so tests can call it without Tauri's DI container.
+pub fn read_dirs_blocking(root: &Path, folders: &[String]) -> NotesReadDirsResult {
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut dirs: Vec<NotesDir> = Vec::new();
+    for folder in folders {
+        if seen.insert(folder.as_str()) {
+            dirs.push(read_one_dir(root, folder));
+        }
+    }
+    NotesReadDirsResult { dirs }
+}
+
+fn missing_dir(folder: &str) -> NotesDir {
+    NotesDir {
+        folder: folder.to_string(),
+        notes: Vec::new(),
+        subfolders: Vec::new(),
+        missing: true,
+        error: None,
+    }
+}
+
+// One walk, two levels deep: depth 1 gives this folder's own notes and its
+// subfolder names, depth 2 gives each subfolder's direct note count and whether
+// it has children. Bounded by the entries of this folder plus the entries of
+// each child, and gitignore is applied once for the whole walk.
+fn read_one_dir(root: &Path, folder: &str) -> NotesDir {
+    let dir = match resolve_rel(root, folder) {
+        Some(d) => d,
+        None => return missing_dir(folder),
+    };
+    if !dir.is_dir() {
+        return missing_dir(folder);
+    }
+
+    let mut notes: Vec<NoteItem> = Vec::new();
+    let mut subs: HashMap<String, (u32, bool)> = HashMap::new();
+    let mut first_error: Option<String> = None;
+    let mut yielded = 0usize;
+
+    let walker = WalkBuilder::new(&dir)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .ignore(true)
+        .parents(true)
+        .follow_links(false)
+        .max_depth(Some(2))
+        .filter_entry(|dent| {
+            if dent.depth() == 0 {
+                return true;
+            }
+            match dent.file_name().to_str() {
+                Some(name) => !PRUNE_DIRS.contains(&name),
+                None => true,
+            }
+        })
+        .build();
+
+    for res in walker {
+        let dent = match res {
+            Ok(d) => d,
+            Err(e) => {
+                if first_error.is_none() {
+                    first_error = Some(e.to_string());
+                }
+                continue;
+            }
+        };
+        yielded += 1;
+        let depth = dent.depth();
+        if depth == 0 {
+            continue;
+        }
+        let is_dir = dent.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let name = match dent.file_name().to_str() {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+        if depth == 1 {
+            if is_dir {
+                subs.entry(name).or_insert((0, false));
+            } else if is_note(dent.path()) {
+                let rel = if folder.is_empty() {
+                    name
+                } else {
+                    format!("{folder}/{name}")
+                };
+                notes.push(read_note(dent.path(), &rel));
+            }
+            continue;
+        }
+        let parent = match dent
+            .path()
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+        {
+            Some(p) => p.to_string(),
+            None => continue,
+        };
+        let slot = subs.entry(parent).or_insert((0, false));
+        if is_dir {
+            slot.1 = true;
+        } else if is_note(dent.path()) {
+            slot.0 += 1;
+        }
+    }
+
+    notes.sort_by_key(|n| n.rel_path.to_lowercase());
+    let mut subfolders: Vec<SubfolderItem> = subs
+        .into_iter()
+        .map(|(name, (note_count, has_subfolders))| SubfolderItem {
+            name,
+            note_count,
+            has_subfolders,
+        })
+        .collect();
+    subfolders.sort_by_key(|s| s.name.to_lowercase());
+
+    NotesDir {
+        folder: folder.to_string(),
+        notes,
+        subfolders,
+        missing: false,
+        // Only a failure that stopped the walk from yielding anything beyond the
+        // directory itself is this folder's problem; one unreadable grandchild is not.
+        error: if yielded <= 1 { first_error } else { None },
+    }
+}
+
+fn read_note(path: &Path, rel: &str) -> NoteItem {
+    let meta = std::fs::metadata(path).ok();
+    let mtime = meta.as_ref().and_then(ms_modified).unwrap_or(0);
+    let btime = meta.as_ref().and_then(ms_created);
+    let parsed = parse_head(&read_head(path));
+    let stem = Path::new(rel)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| rel.to_string());
+    NoteItem {
+        rel_path: rel.to_string(),
+        title: parsed.fm_title.or(parsed.h1).unwrap_or(stem),
+        mtime,
+        created: parsed.fm_created_ms.or(btime).unwrap_or(mtime),
+        snippet: parsed.snippet,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -408,5 +639,149 @@ mod tests {
         );
         assert_eq!(parse_created_ms("not a date"), None);
         assert_eq!(parse_created_ms("2020-13-01"), None);
+    }
+
+    fn read_dirs(dir: &Path, folders: &[&str]) -> NotesReadDirsResult {
+        let owned: Vec<String> = folders.iter().map(|f| f.to_string()).collect();
+        read_dirs_blocking(dir, &owned)
+    }
+
+    fn one<'a>(res: &'a NotesReadDirsResult, folder: &str) -> &'a NotesDir {
+        res.dirs
+            .iter()
+            .find(|d| d.folder == folder)
+            .unwrap_or_else(|| panic!("dir {folder} not found"))
+    }
+
+    #[test]
+    fn reads_only_the_requested_level() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "root.md", "# Root\nbody\n");
+        write(dir.path(), "docs/a.md", "# A\nbody\n");
+        write(dir.path(), "docs/deep/b.md", "# B\nbody\n");
+        let res = read_dirs(dir.path(), &[""]);
+        let root = one(&res, "");
+        assert_eq!(
+            root.notes.iter().map(|n| n.rel_path.as_str()).collect::<Vec<_>>(),
+            vec!["root.md"],
+        );
+        assert_eq!(
+            root.subfolders.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            vec!["docs"],
+        );
+        assert!(!root.missing);
+        assert!(root.error.is_none());
+    }
+
+    #[test]
+    fn subfolder_counts_are_direct_and_detect_children() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "docs/a.md", "a\n");
+        write(dir.path(), "docs/b.md", "b\n");
+        write(dir.path(), "docs/notes.txt", "not a note\n");
+        write(dir.path(), "docs/deep/c.md", "c\n");
+        write(dir.path(), "flat/d.md", "d\n");
+        let res = read_dirs(dir.path(), &[""]);
+        let root = one(&res, "");
+        let docs = root.subfolders.iter().find(|s| s.name == "docs").unwrap();
+        assert_eq!(docs.note_count, 2, "counts markdown directly inside, not the .txt, not the grandchild");
+        assert!(docs.has_subfolders);
+        let flat = root.subfolders.iter().find(|s| s.name == "flat").unwrap();
+        assert_eq!(flat.note_count, 1);
+        assert!(!flat.has_subfolders);
+    }
+
+    #[test]
+    fn nested_folder_rel_paths_and_extensions() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "docs/sub/keep.md", "a\n");
+        write(dir.path(), "docs/sub/keep2.markdown", "a\n");
+        write(dir.path(), "docs/sub/keep3.mdx", "a\n");
+        write(dir.path(), "docs/sub/skip.txt", "a\n");
+        let sub = read_dirs(dir.path(), &["docs/sub"]);
+        let d = one(&sub, "docs/sub");
+        assert_eq!(
+            d.notes.iter().map(|n| n.rel_path.as_str()).collect::<Vec<_>>(),
+            vec!["docs/sub/keep.md", "docs/sub/keep2.markdown", "docs/sub/keep3.mdx"],
+        );
+    }
+
+    #[test]
+    fn skips_dot_entries_and_pruned_dirs() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), ".hidden.md", "a\n");
+        write(dir.path(), ".hiddendir/a.md", "a\n");
+        write(dir.path(), "node_modules/dep/readme.md", "a\n");
+        write(dir.path(), "keep.md", "a\n");
+        let res = read_dirs(dir.path(), &[""]);
+        let root = one(&res, "");
+        assert_eq!(root.notes.len(), 1);
+        assert!(root.subfolders.is_empty());
+    }
+
+    #[test]
+    fn several_folders_in_one_call_and_duplicates_collapse() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a/1.md", "a\n");
+        write(dir.path(), "b/2.md", "b\n");
+        let res = read_dirs(dir.path(), &["a", "b", "a"]);
+        assert_eq!(res.dirs.len(), 2);
+        assert_eq!(one(&res, "a").notes.len(), 1);
+        assert_eq!(one(&res, "b").notes.len(), 1);
+    }
+
+    #[test]
+    fn a_folder_that_does_not_exist_is_missing_not_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "keep.md", "a\n");
+        let res = read_dirs(dir.path(), &["", "gone", "../escape", "docs/../../escape"]);
+        assert!(one(&res, "").notes.len() == 1);
+        assert!(one(&res, "gone").missing);
+        assert!(one(&res, "../escape").missing, "unsafe paths are missing, never an error");
+        assert!(one(&res, "docs/../../escape").missing);
+    }
+
+    #[test]
+    fn note_metadata_matches_the_head_parser() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "fm.md", "---\ntitle: From Frontmatter\ncreated: 2020-01-02\n---\n\nFirst body line.\n");
+        let res = read_dirs(dir.path(), &[""]);
+        let n = &one(&res, "").notes[0];
+        assert_eq!(n.title, "From Frontmatter");
+        assert_eq!(n.snippet, "First body line.");
+        assert_eq!(n.created, 1_577_923_200_000);
+        assert!(n.mtime > 0);
+    }
+
+    #[test]
+    fn gitignored_entries_are_left_out() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join(".git")).unwrap();
+        write(dir.path(), ".gitignore", "secret.md\nvendor/\n");
+        write(dir.path(), "secret.md", "a\n");
+        write(dir.path(), "public.md", "a\n");
+        write(dir.path(), "vendor/v.md", "a\n");
+        let res = read_dirs(dir.path(), &[""]);
+        let root = one(&res, "");
+        assert_eq!(
+            root.notes.iter().map(|n| n.rel_path.as_str()).collect::<Vec<_>>(),
+            vec!["public.md"],
+        );
+        assert!(root.subfolders.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_folder_reports_an_error() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let locked = dir.path().join("locked");
+        std::fs::create_dir(&locked).unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let res = read_dirs(dir.path(), &["locked"]);
+        let d = one(&res, "locked");
+        assert!(!d.missing, "it exists, it just cannot be read");
+        assert!(d.error.is_some());
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
 }
