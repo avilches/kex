@@ -8,34 +8,23 @@ status: sin confirmar
 
 ## Descripcion
 
-Cinco items pequenos encontrados durante la revision final de la vista de notas.
+Cuatro items pequenos encontrados durante la revision final de la vista de notas.
 Ninguno es urgente por si solo; se agrupan aqui para no perderlos.
 
-1. **`NoteListItem.path` es un payload muerto en el frontend.**
-   `src-tauri/src/modules/fs/notes.rs` (`NoteListItem.path`, linea 20) devuelve la
-   ruta absoluta canonica de cada nota, pero nada en el frontend la lee: `NotesView`
-   reconstruye la ruta con `abs(relPath)` (`src/modules/notes/NotesView.tsx`) en vez
-   de usar `note.path`. El campo (un string largo, uno por nota, en cada refresh de
-   `notes_list`) es puro coste sin uso. `src/modules/notes/lib/notesList.ts` espeja
-   el tipo con el mismo campo `path: string`. `docs/IPC.md` tambien lo documenta
-   ("por nota `path`, `relPath`, `title` ..."). El fix es eliminar el campo (Rust +
-   tipo TS + mencion en `docs/IPC.md`) o, si se decide que hace falta en algun
-   futuro caso de uso, empezar a usarlo.
-
-2. **`read_head` con lectura corta y posible corte de UTF-8 multibyte.**
-   `src-tauri/src/modules/fs/notes.rs`, funcion `read_head` (lineas 158-165), hace
-   una unica llamada `f.read(&mut buf)` (linea 161) para llenar un buffer de
-   `HEAD_BYTES` = 2048 bytes (linea 13). `read` puede devolver menos bytes de los
+1. **`read_head` con lectura corta y posible corte de UTF-8 multibyte.**
+   `src-tauri/src/modules/fs/notes.rs`, funcion `read_head` (lineas 32-39), hace
+   una unica llamada `f.read(&mut buf)` (linea 35) para llenar un buffer de
+   `HEAD_BYTES` = 2048 bytes (linea 12). `read` puede devolver menos bytes de los
    pedidos sin que eso sea EOF (short read), asi que el snippet podria quedar mas
    corto de lo esperado sin motivo. Ademas, `String::from_utf8_lossy(&buf)`
-   (linea 164) se aplica sobre ese buffer truncado a un limite fijo de bytes: si el
+   (linea 38) se aplica sobre ese buffer truncado a un limite fijo de bytes: si el
    corte cae a mitad de un caracter multibyte, el ultimo caracter del snippet se ve
    como un caracter de sustitucion (`�`). Cambiar a `read_exact` sobre un buffer mas
    pequeno con manejo de EOF, o a `take(2048).read_to_end`, resuelve la lectura
    corta; recortar el buffer al limite del ultimo caracter UTF-8 completo antes de
    `from_utf8_lossy` resuelve el corte multibyte.
 
-3. **`formatRelativeDate` siempre usa `mtime`, incluso con `sortMode: "created"`.**
+2. **`formatRelativeDate` siempre usa `mtime`, incluso con `sortMode: "created"`.**
    `src/modules/notes/NoteRow.tsx`, linea 132, renderiza
    `formatRelativeDate(note.mtime, Date.now())` sin condicion. Cuando el usuario
    ordena por "Created" (`NoteListColumn.tsx`, `SORT_LABELS.created`), la fecha que
@@ -44,17 +33,18 @@ Ninguno es urgente por si solo; se agrupan aqui para no perderlos.
    requiere pasarselo desde `NoteListColumn` (que ya sabe `config.sortMode`) o pasar
    directamente la fecha a mostrar ya resuelta.
 
-4. **`quickAccess` colgado en `kex.json` sin auto-reparacion.**
-   `pruneNotesConfig` ya poda en cada recorrido completo del vault `expandedFolders`,
-   `folderOrder` y `selectedFolder` contra el conjunto de carpetas y ficheros vigentes
-   (carpetas que el indice ya no reporta, nombres de fichero que ya no existen, y una
-   `selectedFolder` que desaparecio). `quickAccess` queda deliberadamente fuera de esa
-   poda: fijar una nota es intencion explicita del usuario, y la fila en gris es la
-   senal de que la nota ya no existe. Lo que sigue sin arreglar es que abrir un pin
-   fantasma (`CollectionsColumn.tsx`, `QuickAccessRow`, rama `!props.note`) dispara un
-   error de lectura en vez de, por ejemplo, ofrecer quitarlo de la lista.
+3. **`quickAccess` colgado en `kex.json` sin auto-reparacion.**
+   `pruneNotesConfig` ya poda, cada vez que la vista se activa, `expandedFolders`,
+   `folderOrder` y `selectedFolder` contra lo que el filesystem confirma que existe
+   (`notes_paths_exist`): carpetas que ya no estan, nombres de fichero que ya no
+   existen, y una `selectedFolder` que desaparecio. `quickAccess` queda
+   deliberadamente fuera de esa poda: fijar una nota es intencion explicita del
+   usuario, y la fila en gris es la senal de que la nota ya no existe. Lo que sigue
+   sin arreglar es que abrir un pin fantasma (`CollectionsColumn.tsx`,
+   `QuickAccessRow`, rama `!props.note`) dispara un error de lectura en vez de, por
+   ejemplo, ofrecer quitarlo de la lista.
 
-5. **Dos ventanas en el mismo vault: last-writer-wins sobre `kex.json`.**
+4. **Dos ventanas en el mismo vault: last-writer-wins sobre `kex.json`.**
    `src/modules/notes/lib/useNotesState.ts` (`kexJsonPath`, `scheduleWrite`) lee y
    reescribe el mismo `kex.json` por vault, sin ningun tipo de merge ni lock entre
    procesos. Si el usuario tiene el mismo vault abierto en dos ventanas de Kex, el
@@ -67,9 +57,9 @@ Ninguno es urgente por si solo; se agrupan aqui para no perderlos.
 ## Impacto
 
 Bajo en todos los casos: nada de esto corrompe datos de forma irreversible ni
-bloquea el uso normal. Los items 1 y 2 son limpieza/robustez sin sintoma visible
-hoy (2048 bytes es raro que corte un vault real de forma perceptible). Los items 3,
-4 y 5 son pequenas inconsistencias de UX que un usuario podria notar pero que no
+bloquea el uso normal. El item 1 es limpieza/robustez sin sintoma visible hoy
+(2048 bytes es raro que corte un vault real de forma perceptible). Los items 2,
+3 y 4 son pequenas inconsistencias de UX que un usuario podria notar pero que no
 impiden trabajar.
 
 ## Fix sugerido
@@ -79,7 +69,7 @@ resolver en cualquier orden o de forma independiente.
 
 ## Relacionado
 
-- `src-tauri/src/modules/fs/notes.rs`, `docs/IPC.md` (item 1 y 2).
-- `src/modules/notes/NoteRow.tsx`, `src/modules/notes/NoteListColumn.tsx` (item 3).
+- `src-tauri/src/modules/fs/notes.rs` (item 1).
+- `src/modules/notes/NoteRow.tsx`, `src/modules/notes/NoteListColumn.tsx` (item 2).
 - `src/modules/notes/lib/useNotesState.ts`, `src/modules/notes/lib/notesConfig.ts`
-  (`pruneNotesConfig`), `src/modules/notes/CollectionsColumn.tsx` (item 4 y 5).
+  (`pruneNotesConfig`), `src/modules/notes/CollectionsColumn.tsx` (item 3 y 4).

@@ -533,8 +533,11 @@ autocomplete, resolution, and click-navigation in the rich editor).
     ├── notes/                     — HelixNotes-style notes view for the Sidebar (visible only when the workspace
     │                                defines a `workspaceRoot`). Two resizable columns: Quick Access (pinned notes, dnd-kit
     │                                reorder) plus folder tree, and a sortable note list (`modified | title | created | custom`,
-    │                                optional date grouping). Data comes from one `notes_list` IPC walk (title from frontmatter,
-    │                                H1 or file stem; 120-char snippet; 2 KB head reads). All view state persists to `kex.json`
+    │                                optional date grouping). The view reads one directory level at a time through
+    │                                `notes_read_dirs` (title from frontmatter, H1 or file stem; 120-char snippet; 2 KB head
+    │                                reads), keeps a per-folder cache, and registers exactly the loaded folders with the
+    │                                non-recursive filesystem watcher. Pinned titles in Quick Access resolve through
+    │                                `notes_read_heads`. All view state persists to `kex.json`
     │                                at the workspace root under the `notes` namespace (vault-relative forward-slash paths,
     │                                read-modify-write preserves foreign namespaces, no migrations: invalid file means defaults).
     │                                Kex never writes metadata into user `.md` files. Opening a note creates a `markdown`

@@ -15,11 +15,12 @@ a mano despues del merge y reporto que funciona, cubriendo estos casos:
 - Una carpeta con punto en el nombre (`docs/v1.2`) creada desde fuera aparece sola en el
   arbol, sin pulsar refresco. Correcto: era el caso que se escapo en la tercera ronda.
 - Pereza: con un workspace con raiz definida y sin abrir nunca la pestaña de notas, no se
-  crea ningun `kex.json` ni se lanza ningun `notes_list`.
+  crea ningun `kex.json` ni se lanza ninguna llamada `notes_read_dirs`.
 
-Quedan cuatro grupos de escenarios sin ejercitar. Se registran porque no son hipotesis: son
+Quedan cinco grupos de escenarios sin ejercitar. Se registran porque no son hipotesis: son
 los caminos donde un arreglo concreto de este trabajo no ha sido observado funcionando. El
-cuarto grupo lo aporta el trabajo posterior de scoping por carpeta.
+cuarto grupo lo aporta el trabajo de scoping por carpeta, y el quinto el trabajo posterior de
+lectura perezosa por nivel.
 
 Antes habia un cuarto escenario (orden personalizado con una carpeta filtrada), que se
 retiro de esta lista: guardaba el arreglo de `mergeNoteOrder`, funcion que se elimino al
@@ -88,6 +89,30 @@ guardan arreglos de la revision final de rama, o sea los que mas importan.
 7. Con la app cerrada, borrar una carpeta que tuviera entrada de orden y estuviera expandida.
    Reabrir y entrar en notas: la entrada y la expansion desaparecen de `kex.json`, y si esa
    carpeta estaba seleccionada la lista vuelve a la raiz.
+
+### 5. Lectura perezosa por nivel: el recorrido completo de la feature nueva
+
+Siete escenarios del trabajo que sustituyo el recorrido completo del vault por lecturas por
+carpeta a demanda. Ningun agente pudo arrancar la aplicacion, asi que esta es la unica
+cobertura de la capa React de esa feature.
+
+1. Abrir la vista en un repo normal: el arbol sale colapsado, con la raiz y sus carpetas de
+   primer nivel, cada una con su cuenta de notas directas y con flecha solo si tiene
+   subcarpetas.
+2. Expandir una carpeta: aparecen sus hijas con sus cuentas, y la lista sigue mostrando la
+   carpeta seleccionada.
+3. Poner la raiz del workspace en el home del usuario: el arbol carga sin tope, sin el aviso
+   de limite de escaneo, y las carpetas protegidas por privacidad de macOS salen en el arbol
+   (con error al abrirlas) en vez de desaparecer sin explicacion.
+4. Crear una nota desde el menu contextual de una carpeta colapsada y no seleccionada: salta a
+   esa carpeta y abre el rename en linea.
+5. Con la vista de notas abierta y el explorer en otra pestaña, crear un fichero markdown desde
+   el terminal dentro de la carpeta seleccionada: aparece sin pulsar refresco. Antes de este
+   trabajo esto solo funcionaba si el explorer tenia ese mismo directorio abierto.
+6. Crear un fichero dentro de una subcarpeta cargada pero colapsada: su contador en el arbol
+   sube.
+7. Fijar una nota en Quick Access, cerrar la vista, borrar el fichero desde fuera y volver: la
+   fila sale en gris con el nombre del fichero, y sigue en `kex.json`.
 
 ## Relacionado
 
