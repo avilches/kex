@@ -1,7 +1,7 @@
 import { listenFsChanged, watchAdd, watchRemove } from "@/modules/explorer/lib/watch";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { foldersToReload } from "./invalidate";
+import { foldersToReload, isSelfWrite } from "./invalidate";
 import { type NotesDir, notesReadDirs } from "./notesDir";
 
 const REFRESH_DEBOUNCE_MS = 300;
@@ -71,48 +71,60 @@ export function useNotesDirs(
       return;
     }
     loadedRef.current = new Set(wanted);
-    const abs = wanted.map((f) => (f === "" ? root : `${root}/${f}`));
-    watchAdd(abs);
-    watchedRef.current = new Set(abs);
+    const abs = new Set(wanted.map((f) => (f === "" ? root : `${root}/${f}`)));
+    const toAdd = [...abs].filter((p) => !watchedRef.current.has(p));
+    const toRemove = [...watchedRef.current].filter((p) => !abs.has(p));
+    if (toAdd.length > 0) watchAdd(toAdd);
+    if (toRemove.length > 0) watchRemove(toRemove);
+    watchedRef.current = abs;
     read(wanted);
     return () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
     };
   }, [root, active, wantedKey, read]);
 
+  // Both change sources coalesce through one pending set and one timer, so a
+  // burst of saves costs a single re-read instead of overlapping calls.
+  const schedule = useCallback(
+    (folders: string[]) => {
+      if (folders.length === 0) return;
+      for (const f of folders) pendingRef.current.add(f);
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        const next = [...pendingRef.current];
+        pendingRef.current = new Set();
+        read(next);
+      }, REFRESH_DEBOUNCE_MS);
+    },
+    [read],
+  );
+
   useEffect(() => {
     if (!root || !active) return;
     const sub = listenFsChanged((paths) => {
       const r = rootRef.current;
       if (!r) return;
+      const hits: string[] = [];
       for (const p of paths) {
-        for (const f of foldersToReload(r, p, loadedRef.current)) {
-          pendingRef.current.add(f);
-        }
+        if (isSelfWrite(r, p)) continue;
+        for (const f of foldersToReload(r, p, loadedRef.current)) hits.push(f);
       }
-      if (pendingRef.current.size === 0) return;
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        const folders = [...pendingRef.current];
-        pendingRef.current = new Set();
-        read(folders);
-      }, REFRESH_DEBOUNCE_MS);
+      schedule(hits);
     });
     const written = getCurrentWebviewWindow().listen<{ path: string }>(
       "fs:file-written",
       (e) => {
         const r = rootRef.current;
-        if (!r) return;
-        const folders = foldersToReload(r, e.payload.path, loadedRef.current);
-        if (folders.length > 0) read(folders);
+        if (!r || isSelfWrite(r, e.payload.path)) return;
+        schedule(foldersToReload(r, e.payload.path, loadedRef.current));
       },
     );
     return () => {
       void sub.then((un) => un());
       void written.then((un) => un());
     };
-  }, [root, active, read]);
+  }, [root, active, schedule]);
 
   const reload = useCallback(() => read([...loadedRef.current]), [read]);
 

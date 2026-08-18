@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { foldersToReload } from "./invalidate";
+import { foldersToReload, isSelfWrite } from "./invalidate";
 
 const ROOT = "/vault";
 
@@ -58,5 +58,23 @@ describe("foldersToReload", () => {
       "docs/pending",
       "docs",
     ]);
+  });
+});
+
+describe("isSelfWrite", () => {
+  it("treats the vault config file as our own write", () => {
+    expect(isSelfWrite(ROOT, "/vault/kex.json")).toBe(true);
+  });
+
+  it("treats an atomic-write temporary as our own write", () => {
+    expect(isSelfWrite(ROOT, "/vault/.tmpA1b2C3")).toBe(true);
+  });
+
+  it("leaves an ordinary note alone", () => {
+    expect(isSelfWrite(ROOT, "/vault/docs/kex.md")).toBe(false);
+  });
+
+  it("only claims the vault's own config, not one in a subfolder", () => {
+    expect(isSelfWrite(ROOT, "/vault/docs/kex.json")).toBe(false);
   });
 });
