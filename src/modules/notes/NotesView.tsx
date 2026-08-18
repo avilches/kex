@@ -13,9 +13,9 @@ import { toast } from "sonner";
 import { CollectionsColumn } from "./CollectionsColumn";
 import { countDirectNotes, nextFolderName } from "./lib/folderTree";
 import { filterByFolder, nextUntitledName } from "./lib/noteSort";
-import type { NoteListItem } from "./lib/notesList";
 import { useNotesIndex } from "./lib/useNotesIndex";
 import { useNotesState } from "./lib/useNotesState";
+import { useQuickAccessHeads } from "./lib/useQuickAccessHeads";
 import { NoteListColumn } from "./NoteListColumn";
 
 export type NotesViewProps = {
@@ -56,11 +56,11 @@ export function NotesView(props: NotesViewProps) {
     (relPath: string) => `${canonRoot}/${relPath}`,
     [canonRoot],
   );
-  const notesByRelPath = useMemo(() => {
-    const map = new Map<string, NoteListItem>();
-    for (const n of index.notes) map.set(n.relPath, n);
-    return map;
-  }, [index.notes]);
+  const quickAccessHeads = useQuickAccessHeads(
+    canonRoot,
+    state.config.quickAccess,
+    props.active,
+  );
   const visibleNotes = useMemo(
     () => filterByFolder(index.notes, state.config.selectedFolder),
     [index.notes, state.config.selectedFolder],
@@ -214,7 +214,7 @@ export function NotesView(props: NotesViewProps) {
         <ResizablePanel id="notes-collections" defaultSize="38%" minSize="20%" maxSize="60%">
           <CollectionsColumn
             quickAccess={state.config.quickAccess}
-            notesByRelPath={notesByRelPath}
+            heads={quickAccessHeads}
             folders={index.folders}
             counts={counts}
             rootLabel={rootLabel}

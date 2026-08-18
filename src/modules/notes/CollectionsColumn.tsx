@@ -31,11 +31,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildFolderTree, type FolderNode } from "./lib/folderTree";
-import type { NoteListItem } from "./lib/notesList";
+import type { NoteHead } from "./lib/notesDir";
 
 export type CollectionsColumnProps = {
   quickAccess: string[];
-  notesByRelPath: Map<string, NoteListItem>;
+  heads: Map<string, NoteHead>;
   folders: string[];
   counts: Map<string, number>;
   rootLabel: string;
@@ -57,7 +57,7 @@ export type CollectionsColumnProps = {
 
 function QuickAccessRow(props: {
   relPath: string;
-  note: NoteListItem | undefined;
+  head: NoteHead | undefined;
   onOpen: (relPath: string, pin?: boolean) => void;
   onUnpin: (relPath: string) => void;
 }) {
@@ -73,7 +73,7 @@ function QuickAccessRow(props: {
         "group flex h-6 cursor-pointer items-center gap-1.5 rounded px-1.5 text-[12px]",
         "text-foreground/90 hover:bg-accent",
         isDragging && "opacity-60",
-        !props.note && "text-muted-foreground",
+        (!props.head || props.head.missing) && "text-muted-foreground",
       )}
       onClick={() => props.onOpen(props.relPath)}
       onDoubleClick={() => props.onOpen(props.relPath, true)}
@@ -81,7 +81,9 @@ function QuickAccessRow(props: {
     >
       <HugeiconsIcon icon={NoteIcon} size={12} strokeWidth={1.85} className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">
-        {props.note?.title ?? pathBasename(props.relPath)}
+        {props.head && !props.head.missing
+          ? props.head.title
+          : pathBasename(props.relPath)}
       </span>
       <button
         type="button"
@@ -297,7 +299,7 @@ export function CollectionsColumn(props: CollectionsColumnProps) {
                 <QuickAccessRow
                   key={relPath}
                   relPath={relPath}
-                  note={props.notesByRelPath.get(relPath)}
+                  head={props.heads.get(relPath)}
                   onOpen={props.onOpen}
                   onUnpin={props.onUnpin}
                 />
