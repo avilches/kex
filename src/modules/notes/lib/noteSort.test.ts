@@ -1,48 +1,23 @@
 import { describe, expect, it } from "vitest";
-import type { NoteListItem } from "./notesList";
+import type { NoteItem } from "./notesDir";
 import {
-  filterByFolder,
   formatRelativeDate,
   groupNotesByDate,
+  nextFolderName,
   nextUntitledName,
   sortNotes,
 } from "./noteSort";
 
-function n(relPath: string, over: Partial<NoteListItem> = {}): NoteListItem {
-  const i = relPath.lastIndexOf("/");
+function n(relPath: string, over: Partial<NoteItem> = {}): NoteItem {
   return {
-    path: `/vault/${relPath}`,
     relPath,
     title: relPath,
     mtime: 0,
     created: 0,
     snippet: "",
-    folder: i === -1 ? "" : relPath.slice(0, i),
     ...over,
   };
 }
-
-describe("filterByFolder", () => {
-  const notes = [
-    n("a.md"),
-    n("docs/b.md"),
-    n("docs/sub/c.md"),
-    n("docs/sub/deep/e.md"),
-    n("docs2/d.md"),
-  ];
-
-  it("root means only the notes directly in the root", () => {
-    expect(filterByFolder(notes, "").map((x) => x.relPath)).toEqual(["a.md"]);
-  });
-
-  it("matches the folder exactly, excluding its subtree and sibling prefixes", () => {
-    expect(filterByFolder(notes, "docs").map((x) => x.relPath)).toEqual(["docs/b.md"]);
-  });
-
-  it("matches a nested folder", () => {
-    expect(filterByFolder(notes, "docs/sub").map((x) => x.relPath)).toEqual(["docs/sub/c.md"]);
-  });
-});
 
 describe("sortNotes", () => {
   const a = n("a.md", { title: "Zebra", mtime: 300, created: 100 });
@@ -140,5 +115,13 @@ describe("nextUntitledName", () => {
     expect(nextUntitledName([])).toBe("Untitled.md");
     expect(nextUntitledName(["untitled.md"])).toBe("Untitled 2.md");
     expect(nextUntitledName(["Untitled.md", "Untitled 2.md"])).toBe("Untitled 3.md");
+  });
+});
+
+describe("nextFolderName", () => {
+  it("starts at New Folder and increments, case-insensitive", () => {
+    expect(nextFolderName([])).toBe("New Folder");
+    expect(nextFolderName(["new folder"])).toBe("New Folder 2");
+    expect(nextFolderName(["New Folder", "New Folder 2"])).toBe("New Folder 3");
   });
 });

@@ -11,9 +11,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CollectionsColumn } from "./CollectionsColumn";
-import { countDirectNotes, nextFolderName } from "./lib/folderTree";
-import { filterByFolder, nextUntitledName } from "./lib/noteSort";
-import { useNotesIndex } from "./lib/useNotesIndex";
+import { notesReadDirs } from "./lib/notesDir";
+import { nextFolderName, nextUntitledName } from "./lib/noteSort";
+import { useNotesDirs } from "./lib/useNotesDirs";
 import { useNotesState } from "./lib/useNotesState";
 import { useQuickAccessHeads } from "./lib/useQuickAccessHeads";
 import { NoteListColumn } from "./NoteListColumn";
@@ -31,7 +31,14 @@ export type NotesViewProps = {
 export function NotesView(props: NotesViewProps) {
   const canonRoot = props.root.replace(/\\/g, "/").replace(/\/+$/, "");
   const state = useNotesState(canonRoot, props.active);
-  const index = useNotesIndex(canonRoot, props.active);
+  const { dirs, loading, error, reload } = useNotesDirs(
+    canonRoot,
+    props.active,
+    state.config.expandedFolders,
+    state.config.selectedFolder,
+  );
+  const selected = dirs.get(state.config.selectedFolder);
+  const visibleNotes = selected?.notes ?? [];
   const [primedRenamePath, setPrimedRenamePath] = useState<string | null>(null);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{
@@ -61,11 +68,6 @@ export function NotesView(props: NotesViewProps) {
     state.config.quickAccess,
     props.active,
   );
-  const visibleNotes = useMemo(
-    () => filterByFolder(index.notes, state.config.selectedFolder),
-    [index.notes, state.config.selectedFolder],
-  );
-  const counts = useMemo(() => countDirectNotes(index.notes), [index.notes]);
   const rootLabel = useMemo(() => pathBasename(canonRoot) || "/", [canonRoot]);
 
   const openRel = useCallback(
@@ -75,9 +77,12 @@ export function NotesView(props: NotesViewProps) {
 
   const handleNewNoteIn = useCallback(
     async (folder: string) => {
-      const siblings = index.notes
-        .filter((n) => n.folder === folder)
-        .map((n) => n.relPath.split("/").pop() ?? "");
+      let dir = dirs.get(folder);
+      if (!dir) {
+        const [fresh] = await notesReadDirs(canonRoot, [folder]);
+        dir = fresh;
+      }
+      const siblings = (dir?.notes ?? []).map((n) => pathBasename(n.relPath));
       const name = nextUntitledName(siblings);
       const relPath = folder === "" ? name : `${folder}/${name}`;
       try {
@@ -87,7 +92,7 @@ export function NotesView(props: NotesViewProps) {
         state.setSelectedFolder(folder);
         setPrimedRenamePath(relPath);
         props.onOpenFile(abs(relPath), true);
-        index.refresh();
+        reload();
       } catch (e) {
         console.error("Failed to create note:", e);
         toast.error("Failed to create note", {
@@ -95,18 +100,12 @@ export function NotesView(props: NotesViewProps) {
         });
       }
     },
-    [index, abs, state, props.onOpenFile],
+    [dirs, reload, canonRoot, abs, state, props.onOpenFile],
   );
 
   const handleNewFolder = useCallback(
     async (parent: string) => {
-      const siblings = index.folders
-        .filter((f) =>
-          parent === ""
-            ? !f.includes("/")
-            : f.startsWith(`${parent}/`) && !f.slice(parent.length + 1).includes("/"),
-        )
-        .map((f) => f.split("/").pop() ?? "");
+      const siblings = dirs.get(parent)?.subfolders.map((s) => s.name) ?? [];
       const name = nextFolderName(siblings);
       const relPath = parent === "" ? name : `${parent}/${name}`;
       try {
@@ -115,7 +114,7 @@ export function NotesView(props: NotesViewProps) {
         // rename input would never mount. Root rows always render.
         if (parent !== "") state.expandFolder(parent);
         setEditingFolder(relPath);
-        index.refresh();
+        reload();
       } catch (e) {
         console.error("Failed to create folder:", e);
         toast.error("Failed to create folder", {
@@ -123,7 +122,7 @@ export function NotesView(props: NotesViewProps) {
         });
       }
     },
-    [index, abs, state],
+    [dirs, reload, abs, state],
   );
 
   const handleRenameFolder = useCallback(
@@ -135,16 +134,16 @@ export function NotesView(props: NotesViewProps) {
         await native.renameFile(abs(relPath), abs(newRel));
         state.notePathRenamed(relPath, newRel);
         props.onPathRenamed(abs(relPath), abs(newRel));
-        index.refresh();
+        reload();
       } catch (e) {
         console.error("Failed to rename folder:", e);
         toast.error("Failed to rename folder", {
           description: e instanceof Error ? e.message : String(e),
         });
-        index.refresh();
+        reload();
       }
     },
-    [abs, state, index, props.onPathRenamed],
+    [abs, state, reload, props.onPathRenamed],
   );
 
   const handleRename = useCallback(
@@ -158,16 +157,16 @@ export function NotesView(props: NotesViewProps) {
         await native.renameFile(abs(relPath), abs(newRel));
         state.notePathRenamed(relPath, newRel);
         props.onPathRenamed(abs(relPath), abs(newRel));
-        index.refresh();
+        reload();
       } catch (e) {
         console.error("Failed to rename:", e);
         toast.error("Failed to rename", {
           description: e instanceof Error ? e.message : String(e),
         });
-        index.refresh();
+        reload();
       }
     },
-    [abs, state, index, props.onPathRenamed],
+    [abs, state, reload, props.onPathRenamed],
   );
 
   const handleDelete = useCallback(async () => {
@@ -179,15 +178,15 @@ export function NotesView(props: NotesViewProps) {
       await invoke("fs_delete", { path: abs(relPath), workspace: currentWorkspaceEnv() });
       state.notePathDeleted(relPath);
       props.onPathDeleted(abs(relPath));
-      index.refresh();
+      reload();
     } catch (e) {
       console.error("fs_delete failed:", e);
       toast.error(`Failed to delete "${pathBasename(relPath)}"`, {
         description: e instanceof Error ? e.message : String(e),
       });
-      index.refresh();
+      reload();
     }
-  }, [pendingDelete, abs, state, index, props.onPathDeleted]);
+  }, [pendingDelete, abs, state, reload, props.onPathDeleted]);
 
   const handleTrash = useCallback(async () => {
     const target = pendingDelete;
@@ -198,15 +197,15 @@ export function NotesView(props: NotesViewProps) {
       await invoke("fs_trash", { path: abs(relPath), workspace: currentWorkspaceEnv() });
       state.notePathDeleted(relPath);
       props.onPathDeleted(abs(relPath));
-      index.refresh();
+      reload();
     } catch (e) {
       console.error("fs_trash failed:", e);
       toast.error(`Failed to move "${pathBasename(relPath)}" to trash`, {
         description: e instanceof Error ? e.message : String(e),
       });
-      index.refresh();
+      reload();
     }
-  }, [pendingDelete, abs, state, index, props.onPathDeleted]);
+  }, [pendingDelete, abs, state, reload, props.onPathDeleted]);
 
   return (
     <>
@@ -215,8 +214,7 @@ export function NotesView(props: NotesViewProps) {
           <CollectionsColumn
             quickAccess={state.config.quickAccess}
             heads={quickAccessHeads}
-            folders={index.folders}
-            counts={counts}
+            dirs={dirs}
             rootLabel={rootLabel}
             expandedFolders={state.config.expandedFolders}
             selectedFolder={state.config.selectedFolder}
@@ -240,11 +238,10 @@ export function NotesView(props: NotesViewProps) {
             notes={visibleNotes}
             config={state.config}
             quickAccess={state.config.quickAccess}
-            loading={index.loading}
-            error={index.error}
-            truncated={index.truncated}
+            loading={loading}
+            error={error ?? selected?.error ?? null}
             primedRenamePath={primedRenamePath}
-            onRetry={index.refresh}
+            onRetry={reload}
             onOpen={openRel}
             onOpenToSide={(rel) => props.onOpenToSide(abs(rel))}
             onTogglePin={state.toggleQuickAccess}

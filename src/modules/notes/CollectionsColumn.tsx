@@ -30,14 +30,12 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildFolderTree, type FolderNode } from "./lib/folderTree";
-import type { NoteHead } from "./lib/notesDir";
+import type { NoteHead, NotesDir } from "./lib/notesDir";
 
 export type CollectionsColumnProps = {
   quickAccess: string[];
   heads: Map<string, NoteHead>;
-  folders: string[];
-  counts: Map<string, number>;
+  dirs: Map<string, NotesDir>;
   rootLabel: string;
   expandedFolders: string[];
   selectedFolder: string;
@@ -100,10 +98,28 @@ function QuickAccessRow(props: {
   );
 }
 
+type FolderEntry = {
+  name: string;
+  relPath: string;
+  noteCount: number;
+  hasSubfolders: boolean;
+};
+
+function childrenOf(dirs: Map<string, NotesDir>, folder: string): FolderEntry[] {
+  const dir = dirs.get(folder);
+  if (!dir) return [];
+  return dir.subfolders.map((s) => ({
+    name: s.name,
+    relPath: folder === "" ? s.name : `${folder}/${s.name}`,
+    noteCount: s.noteCount,
+    hasSubfolders: s.hasSubfolders,
+  }));
+}
+
 type FolderRowProps = {
-  node: FolderNode;
+  entry: FolderEntry;
+  dirs: Map<string, NotesDir>;
   depth: number;
-  counts: Map<string, number>;
   expanded: Set<string>;
   selectedFolder: string;
   editingFolder: string | null;
@@ -118,11 +134,11 @@ type FolderRowProps = {
 };
 
 function FolderRow(props: FolderRowProps) {
-  const { node, depth } = props;
-  const isExpanded = props.expanded.has(node.relPath);
-  const hasChildren = node.children.length > 0;
-  const editing = props.editingFolder === node.relPath;
-  const [draft, setDraft] = useState(node.name);
+  const { entry, depth } = props;
+  const isExpanded = props.expanded.has(entry.relPath);
+  const hasChildren = props.entry.hasSubfolders;
+  const editing = props.editingFolder === entry.relPath;
+  const [draft, setDraft] = useState(entry.name);
   const inputRef = useRef<HTMLInputElement>(null);
   // Guards against a double-invocation: unmounting the focused input (e.g. after
   // Escape swaps the JSX branch back to a plain span) fires a blur, which would
@@ -131,20 +147,20 @@ function FolderRow(props: FolderRowProps) {
 
   useEffect(() => {
     if (editing) {
-      setDraft(node.name);
+      setDraft(entry.name);
       committedRef.current = false;
       requestAnimationFrame(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
       });
     }
-  }, [editing, node.name]);
+  }, [editing, entry.name]);
 
   const commitRename = () => {
     if (committedRef.current) return;
     committedRef.current = true;
     const trimmed = draft.trim();
-    if (trimmed && trimmed !== node.name) props.onRenameFolder(node.relPath, trimmed);
+    if (trimmed && trimmed !== entry.name) props.onRenameFolder(entry.relPath, trimmed);
     props.onRenameFolderDone();
   };
   const cancelRename = () => {
@@ -160,13 +176,13 @@ function FolderRow(props: FolderRowProps) {
           <div
             className={cn(
               "flex h-6 cursor-pointer items-center gap-1 rounded px-1.5 text-[12px] hover:bg-accent",
-              props.selectedFolder === node.relPath
+              props.selectedFolder === entry.relPath
                 ? "bg-accent text-foreground"
                 : "text-foreground/90",
             )}
             style={{ paddingLeft: `${6 + depth * 12}px` }}
             onClick={() => {
-              if (!editing) props.onSelectFolder(node.relPath);
+              if (!editing) props.onSelectFolder(entry.relPath);
             }}
           >
             <button
@@ -174,7 +190,7 @@ function FolderRow(props: FolderRowProps) {
               title={isExpanded ? "Collapse" : "Expand"}
               onClick={(e) => {
                 e.stopPropagation();
-                if (hasChildren) props.onToggleFolderExpanded(node.relPath);
+                if (hasChildren) props.onToggleFolderExpanded(entry.relPath);
               }}
               className={cn(
                 "flex size-[14px] shrink-0 items-center justify-center text-muted-foreground",
@@ -207,37 +223,37 @@ function FolderRow(props: FolderRowProps) {
                 className="h-5 w-full rounded border border-border bg-transparent px-1 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               />
             ) : (
-              <span className="min-w-0 flex-1 truncate">{node.name}</span>
+              <span className="min-w-0 flex-1 truncate">{entry.name}</span>
             )}
             {!editing && (
               <span className="shrink-0 text-[10px] text-muted-foreground">
-                {props.counts.get(node.relPath) ?? 0}
+                {props.entry.noteCount}
               </span>
             )}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onSelect={() => props.onNewNoteIn(node.relPath)}>
+          <ContextMenuItem onSelect={() => props.onNewNoteIn(entry.relPath)}>
             New Note
           </ContextMenuItem>
-          <ContextMenuItem onSelect={() => props.onNewFolder(node.relPath)}>
+          <ContextMenuItem onSelect={() => props.onNewFolder(entry.relPath)}>
             New Folder
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => props.onStartRenameFolder(node.relPath)}>
+          <ContextMenuItem onSelect={() => props.onStartRenameFolder(entry.relPath)}>
             Rename
           </ContextMenuItem>
           <ContextMenuItem
             variant="destructive"
-            onSelect={() => props.onDeleteFolder(node.relPath)}
+            onSelect={() => props.onDeleteFolder(entry.relPath)}
           >
             Delete
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
       {isExpanded &&
-        node.children.map((child) => (
-          <FolderRow key={child.relPath} {...props} node={child} depth={depth + 1} />
+        childrenOf(props.dirs, entry.relPath).map((child) => (
+          <FolderRow key={child.relPath} {...props} entry={child} depth={depth + 1} />
         ))}
     </>
   );
@@ -247,10 +263,9 @@ export function CollectionsColumn(props: CollectionsColumnProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
-  const tree = useMemo(() => buildFolderTree(props.folders), [props.folders]);
   const expanded = useMemo(() => new Set(props.expandedFolders), [props.expandedFolders]);
   const folderRowShared = {
-    counts: props.counts,
+    dirs: props.dirs,
     expanded,
     selectedFolder: props.selectedFolder,
     editingFolder: props.editingFolder,
@@ -332,7 +347,7 @@ export function CollectionsColumn(props: CollectionsColumnProps) {
               />
               <span className="min-w-0 flex-1 truncate">{props.rootLabel}</span>
               <span className="shrink-0 text-[10px] text-muted-foreground">
-                {props.counts.get("") ?? 0}
+                {props.dirs.get("")?.notes.length ?? 0}
               </span>
             </div>
           </ContextMenuTrigger>
@@ -345,8 +360,8 @@ export function CollectionsColumn(props: CollectionsColumnProps) {
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
-        {tree.map((node) => (
-          <FolderRow key={node.relPath} node={node} depth={0} {...folderRowShared} />
+        {childrenOf(props.dirs, "").map((entry) => (
+          <FolderRow key={entry.relPath} entry={entry} depth={0} {...folderRowShared} />
         ))}
       </div>
     </div>

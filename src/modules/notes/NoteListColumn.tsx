@@ -26,17 +26,16 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
 import type { NoteSortMode, NotesConfig } from "./lib/notesConfig";
+import type { NoteItem } from "./lib/notesDir";
 import { groupNotesByDate, sortNotes } from "./lib/noteSort";
-import type { NoteListItem } from "./lib/notesList";
 import { NoteRow } from "./NoteRow";
 
 export type NoteListColumnProps = {
-  notes: NoteListItem[];
+  notes: NoteItem[];
   config: NotesConfig;
   quickAccess: string[];
   loading: boolean;
   error: string | null;
-  truncated: boolean;
   primedRenamePath: string | null;
   onRetry: () => void;
   onOpen: (relPath: string, pin?: boolean) => void;
@@ -100,7 +99,7 @@ export function NoteListColumn(props: NoteListColumnProps) {
     props.onSetFolderOrder(config.selectedFolder, rels.map(pathBasename));
   };
 
-  const renderRow = (note: NoteListItem) => (
+  const renderRow = (note: NoteItem) => (
     <NoteRow
       key={note.relPath}
       note={note}
@@ -221,11 +220,6 @@ export function NoteListColumn(props: NoteListColumnProps) {
           ))
         ) : (
           sorted.map(renderRow)
-        )}
-        {props.truncated && (
-          <div className="p-2 text-[11px] text-muted-foreground">
-            The vault scan hit its limit, so some notes may be missing
-          </div>
         )}
       </div>
     </div>

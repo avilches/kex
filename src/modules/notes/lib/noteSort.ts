@@ -1,16 +1,12 @@
 import { pathBasename } from "@/lib/pathUtils";
 import type { NoteSortMode } from "./notesConfig";
-import type { NoteListItem } from "./notesList";
-
-export function filterByFolder(notes: NoteListItem[], folder: string): NoteListItem[] {
-  return notes.filter((n) => n.folder === folder);
-}
+import type { NoteItem } from "./notesDir";
 
 export function sortNotes(
-  notes: NoteListItem[],
+  notes: NoteItem[],
   mode: NoteSortMode,
   order: string[] | undefined,
-): NoteListItem[] {
+): NoteItem[] {
   const copy = [...notes];
   switch (mode) {
     case "title":
@@ -43,12 +39,12 @@ export function sortNotes(
 }
 
 export type DateBucket = "Today" | "Yesterday" | "This Week" | "This Month" | "Older";
-export type NoteGroup = { bucket: DateBucket; notes: NoteListItem[] };
+export type NoteGroup = { bucket: DateBucket; notes: NoteItem[] };
 
 const DAY_MS = 86_400_000;
 
 export function groupNotesByDate(
-  sorted: NoteListItem[],
+  sorted: NoteItem[],
   mode: "modified" | "created",
   now: number,
 ): NoteGroup[] {
@@ -88,6 +84,15 @@ export function nextUntitledName(existingNames: string[]): string {
   if (!taken.has("untitled.md")) return "Untitled.md";
   for (let i = 2; ; i++) {
     const candidate = `Untitled ${i}.md`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
+export function nextFolderName(existingNames: string[]): string {
+  const taken = new Set(existingNames.map((n) => n.toLowerCase()));
+  if (!taken.has("new folder")) return "New Folder";
+  for (let i = 2; ; i++) {
+    const candidate = `New Folder ${i}`;
     if (!taken.has(candidate.toLowerCase())) return candidate;
   }
 }

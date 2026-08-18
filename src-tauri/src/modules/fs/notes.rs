@@ -7,138 +7,11 @@ use ignore::WalkBuilder;
 use serde::Serialize;
 
 use super::search::PRUNE_DIRS;
-use super::to_canon;
 use crate::modules::workspace::{resolve_path, WorkspaceEnv};
 
-const MAX_SCANNED: usize = 50_000;
 const HEAD_BYTES: usize = 2048;
 const SNIPPET_MAX_CHARS: usize = 120;
 const NOTE_EXTS: &[&str] = &["md", "markdown", "mdx"];
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct NoteListItem {
-    pub path: String,
-    pub rel_path: String,
-    pub title: String,
-    pub mtime: u64,
-    pub created: u64,
-    pub snippet: String,
-    pub folder: String,
-}
-
-#[derive(Serialize)]
-pub struct NotesListResult {
-    pub notes: Vec<NoteListItem>,
-    pub folders: Vec<String>,
-    pub truncated: bool,
-}
-
-#[tauri::command]
-pub async fn notes_list(
-    root: String,
-    workspace: Option<WorkspaceEnv>,
-) -> Result<NotesListResult, String> {
-    let workspace = WorkspaceEnv::from_option(workspace);
-    let root_path = resolve_path(&root, &workspace);
-    if !root_path.is_dir() {
-        return Err(format!("not a directory: {root}"));
-    }
-    tauri::async_runtime::spawn_blocking(move || list_blocking(&root_path, MAX_SCANNED))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
-/// Blocking core, separated so tests can call it without Tauri's DI container.
-pub fn list_blocking(root_path: &Path, max_scanned: usize) -> Result<NotesListResult, String> {
-    let mut notes: Vec<NoteListItem> = Vec::new();
-    let mut folders: Vec<String> = Vec::new();
-    let mut scanned = 0usize;
-    let mut truncated = false;
-
-    let walker = WalkBuilder::new(root_path)
-        .hidden(true)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .ignore(true)
-        .parents(true)
-        .follow_links(false)
-        .filter_entry(|dent| {
-            if dent.depth() == 0 {
-                return true;
-            }
-            match dent.file_name().to_str() {
-                Some(name) => !PRUNE_DIRS.contains(&name),
-                None => true,
-            }
-        })
-        .build();
-
-    for dent in walker.flatten() {
-        scanned += 1;
-        if scanned > max_scanned {
-            truncated = true;
-            break;
-        }
-        let path = dent.path();
-        if path == root_path {
-            continue;
-        }
-        let rel = match path.strip_prefix(root_path) {
-            Ok(r) => to_canon(r),
-            Err(_) => continue,
-        };
-        if dent.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-            folders.push(rel);
-            continue;
-        }
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_ascii_lowercase())
-            .unwrap_or_default();
-        if !NOTE_EXTS.contains(&ext.as_str()) {
-            continue;
-        }
-        notes.push(read_note_item(path, &rel));
-    }
-
-    folders.sort_by_key(|a| a.to_lowercase());
-    notes.sort_by_key(|a| a.rel_path.to_lowercase());
-    Ok(NotesListResult {
-        notes,
-        folders,
-        truncated,
-    })
-}
-
-fn read_note_item(path: &Path, rel: &str) -> NoteListItem {
-    let meta = std::fs::metadata(path).ok();
-    let mtime = meta.as_ref().and_then(ms_modified).unwrap_or(0);
-    let btime = meta.as_ref().and_then(ms_created);
-
-    let parsed = parse_head(&read_head(path));
-
-    let stem = Path::new(rel)
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| rel.to_string());
-    let folder = match rel.rsplit_once('/') {
-        Some((dir, _)) => dir.to_string(),
-        None => String::new(),
-    };
-
-    NoteListItem {
-        path: to_canon(path),
-        rel_path: rel.to_string(),
-        title: parsed.fm_title.or(parsed.h1).unwrap_or(stem),
-        mtime,
-        created: parsed.fm_created_ms.or(btime).unwrap_or(mtime),
-        snippet: parsed.snippet,
-        folder,
-    }
-}
 
 fn ms_modified(meta: &std::fs::Metadata) -> Option<u64> {
     meta.modified()
@@ -623,12 +496,8 @@ mod tests {
         std::fs::write(p, content).unwrap();
     }
 
-    fn list(dir: &Path) -> NotesListResult {
-        list_blocking(dir, MAX_SCANNED).unwrap()
-    }
-
-    fn note<'a>(res: &'a NotesListResult, rel: &str) -> &'a NoteListItem {
-        res.notes
+    fn note<'a>(notes: &'a [NoteItem], rel: &str) -> &'a NoteItem {
+        notes
             .iter()
             .find(|n| n.rel_path == rel)
             .unwrap_or_else(|| panic!("note {rel} not found"))
@@ -644,10 +513,11 @@ mod tests {
         );
         write(dir.path(), "h1.md", "# From H1\nbody\n");
         write(dir.path(), "plain.md", "just a body line\n");
-        let res = list(dir.path());
-        assert_eq!(note(&res, "fm.md").title, "From Frontmatter");
-        assert_eq!(note(&res, "h1.md").title, "From H1");
-        assert_eq!(note(&res, "plain.md").title, "plain");
+        let res = read_dirs(dir.path(), &[""]);
+        let notes = &one(&res, "").notes;
+        assert_eq!(note(notes, "fm.md").title, "From Frontmatter");
+        assert_eq!(note(notes, "h1.md").title, "From H1");
+        assert_eq!(note(notes, "plain.md").title, "plain");
     }
 
     #[test]
@@ -656,75 +526,10 @@ mod tests {
         write(dir.path(), "a.md", "# Title\n\n## Sub\n\nFirst body line here.\nsecond\n");
         let long = "x".repeat(500);
         write(dir.path(), "b.md", &format!("{long}\n"));
-        let res = list(dir.path());
-        assert_eq!(note(&res, "a.md").snippet, "First body line here.");
-        assert_eq!(note(&res, "b.md").snippet.chars().count(), 120);
-    }
-
-    #[test]
-    fn frontmatter_created_wins_over_fs_times() {
-        let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "c.md", "---\ncreated: 2020-01-02\n---\nbody\n");
-        write(dir.path(), "d.md", "body\n");
-        let res = list(dir.path());
-        // 2020-01-02T00:00:00Z in ms
-        assert_eq!(note(&res, "c.md").created, 1_577_923_200_000);
-        // fs fallback: some positive timestamp, and mtime is populated too
-        assert!(note(&res, "d.md").created > 0);
-        assert!(note(&res, "d.md").mtime > 0);
-    }
-
-    #[test]
-    fn filters_extensions_and_prunes_heavy_dirs() {
-        let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "keep.md", "a\n");
-        write(dir.path(), "keep2.markdown", "a\n");
-        write(dir.path(), "keep3.mdx", "a\n");
-        write(dir.path(), "skip.txt", "a\n");
-        write(dir.path(), "node_modules/dep/readme.md", "a\n");
-        let res = list(dir.path());
-        let rels: Vec<&str> = res.notes.iter().map(|n| n.rel_path.as_str()).collect();
-        assert_eq!(rels, vec!["keep.md", "keep2.markdown", "keep3.mdx"]);
-        assert!(!res.folders.iter().any(|f| f.starts_with("node_modules")));
-    }
-
-    #[test]
-    fn folders_include_empty_dirs_and_folder_field_is_set() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("empty")).unwrap();
-        write(dir.path(), "docs/sub/n.md", "a\n");
-        let res = list(dir.path());
-        assert!(res.folders.contains(&"empty".to_string()));
-        assert!(res.folders.contains(&"docs".to_string()));
-        assert!(res.folders.contains(&"docs/sub".to_string()));
-        assert_eq!(note(&res, "docs/sub/n.md").folder, "docs/sub");
-        assert_eq!(note(&res, "docs/sub/n.md").rel_path, "docs/sub/n.md");
-    }
-
-    #[test]
-    fn robust_against_empty_frontmatter_only_and_binary_files() {
-        let dir = tempfile::tempdir().unwrap();
-        write(dir.path(), "empty.md", "");
-        write(dir.path(), "fmonly.md", "---\ntitle: Only FM\n");
-        std::fs::write(dir.path().join("bin.md"), [0xff, 0xfe, 0x00, 0x01]).unwrap();
-        let res = list(dir.path());
-        assert_eq!(note(&res, "empty.md").title, "empty");
-        assert_eq!(note(&res, "empty.md").snippet, "");
-        assert_eq!(note(&res, "fmonly.md").title, "Only FM");
-        assert_eq!(note(&res, "bin.md").title, "bin");
-    }
-
-    #[test]
-    fn scan_cap_sets_truncated() {
-        let dir = tempfile::tempdir().unwrap();
-        for i in 0..10 {
-            write(dir.path(), &format!("n{i}.md"), "a\n");
-        }
-        let res = list_blocking(dir.path(), 3).unwrap();
-        assert!(res.truncated);
-        let full = list_blocking(dir.path(), MAX_SCANNED).unwrap();
-        assert!(!full.truncated);
-        assert_eq!(full.notes.len(), 10);
+        let res = read_dirs(dir.path(), &[""]);
+        let notes = &one(&res, "").notes;
+        assert_eq!(note(notes, "a.md").snippet, "First body line here.");
+        assert_eq!(note(notes, "b.md").snippet.chars().count(), 120);
     }
 
     #[test]

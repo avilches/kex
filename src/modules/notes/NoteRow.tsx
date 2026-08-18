@@ -18,11 +18,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
+import type { NoteItem } from "./lib/notesDir";
 import { formatRelativeDate } from "./lib/noteSort";
-import type { NoteListItem } from "./lib/notesList";
 
 export type NoteRowProps = {
-  note: NoteListItem;
+  note: NoteItem;
   pinned: boolean;
   sortable: boolean;
   editing: boolean;

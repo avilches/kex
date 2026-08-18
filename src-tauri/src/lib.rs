@@ -805,7 +805,6 @@ pub fn run() {
             fs::grep::fs_grep,
             fs::grep::fs_grep_interactive,
             fs::grep::fs_glob,
-            fs::notes::notes_list,
             fs::notes::notes_read_dirs,
             fs::notes::notes_read_heads,
             fs::notes::notes_paths_exist,
