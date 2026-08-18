@@ -15,6 +15,7 @@ export function useQuickAccessHeads(
   const pinnedRef = useRef(quickAccess);
   pinnedRef.current = quickAccess;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the pin list by value; the list itself is read through a ref so a new array identity does not refetch
   useEffect(() => {
     if (!root || !active || quickAccess.length === 0) {
       setHeads(new Map());
@@ -40,7 +41,6 @@ export function useQuickAccessHeads(
       cancelled = true;
       void sub.then((un) => un());
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the pin list by value; the list itself is read through a ref so a new array identity does not refetch
   }, [root, active, key]);
 
   return useMemo(() => heads, [heads]);
