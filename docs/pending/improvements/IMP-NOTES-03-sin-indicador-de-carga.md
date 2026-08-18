@@ -4,13 +4,14 @@ Estado: pendiente
 
 ## Contexto
 
-`src/modules/notes/NoteListColumn.tsx` recibe `props.loading` (viene de
-`index.loading`, `useNotesIndex`) pero solo lo usa para suprimir el mensaje de
-"No notes here. Create one with the + button." mientras el primer escaneo esta en
-curso (linea 217: `sorted.length === 0 && !props.loading`) y para deshabilitar el
-nuevo boton de refresh (FIX B). No hay spinner, skeleton, ni ningun otro feedback
-visual: durante el primer walk de un vault grande, el area de la lista se queda en
-blanco sin indicacion de que algo esta pasando.
+`src/modules/notes/NoteListColumn.tsx` recibe `props.loading` (viene del flag
+`loading` que devuelve `src/modules/notes/lib/useNotesDirs.ts` y que `NotesView`
+le pasa) pero solo lo usa para suprimir el mensaje de "No notes here. Create one
+with the + button." mientras la lectura de la carpeta esta en curso (linea 195:
+`sorted.length === 0 && !props.loading`) y para deshabilitar el nuevo boton de
+refresh (FIX B). No hay spinner, skeleton, ni ningun otro feedback visual: la
+lectura de una carpeta deja la lista en blanco mientras esta en vuelo, algo mas
+visible la primera vez que se lee una carpeta con muchas notas.
 
 ## Mejora propuesta
 
@@ -21,4 +22,4 @@ mostrar. El flag ya esta disponible, solo falta la UI.
 ## Relacionado
 
 - `src/modules/notes/NoteListColumn.tsx`
-- `src/modules/notes/lib/useNotesIndex.ts`
+- `src/modules/notes/lib/useNotesDirs.ts`
