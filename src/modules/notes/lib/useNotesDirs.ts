@@ -22,6 +22,8 @@ export function useNotesDirs(
   const pendingRef = useRef<Set<string>>(new Set());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const generationRef = useRef(0);
+  const requestedRef = useRef<Map<string, number>>(new Map());
+  const cacheRootRef = useRef<string | null>(null);
 
   const wanted = useMemo(() => {
     const set = new Set<string>([""]);
@@ -35,14 +37,15 @@ export function useNotesDirs(
     const r = rootRef.current;
     if (!r || folders.length === 0) return;
     const generation = ++generationRef.current;
+    for (const f of folders) requestedRef.current.set(f, generation);
     setLoading(true);
     void notesReadDirs(r, folders)
       .then((list) => {
-        if (generationRef.current !== generation) return;
-        setError(null);
+        if (generationRef.current === generation) setError(null);
         setDirs((prev) => {
           const next = new Map(prev);
           for (const d of list) {
+            if (requestedRef.current.get(d.folder) !== generation) continue;
             if (d.missing) next.delete(d.folder);
             else next.set(d.folder, d);
           }
@@ -67,8 +70,30 @@ export function useNotesDirs(
         watchedRef.current = new Set();
       }
       loadedRef.current = new Set();
+      cacheRootRef.current = null;
+      requestedRef.current = new Map();
       setDirs(new Map());
       return;
+    }
+    // Forgetting the in-flight requests too, so an answer for the old root or for
+    // a folder just collapsed cannot land in the cache after we drop its entry.
+    for (const f of requestedRef.current.keys()) {
+      if (!wanted.includes(f)) requestedRef.current.delete(f);
+    }
+    if (cacheRootRef.current !== root) {
+      cacheRootRef.current = root;
+      requestedRef.current = new Map();
+      setDirs(new Map());
+    } else {
+      // Nothing looks at a folder outside the wanted set, so its payload is dead weight.
+      setDirs((prev) => {
+        const next = new Map<string, NotesDir>();
+        for (const f of wanted) {
+          const d = prev.get(f);
+          if (d) next.set(f, d);
+        }
+        return next.size === prev.size ? prev : next;
+      });
     }
     loadedRef.current = new Set(wanted);
     const abs = new Set(wanted.map((f) => (f === "" ? root : `${root}/${f}`)));
@@ -78,10 +103,20 @@ export function useNotesDirs(
     if (toRemove.length > 0) watchRemove(toRemove);
     watchedRef.current = abs;
     read(wanted);
-    return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-    };
   }, [root, active, wantedKey, read]);
+
+  // Mount-scoped, so it does not fire on the expands and selects that re-run the
+  // load effect. NotesView really unmounts: the Sidebar drops it for a workspace
+  // without a vault root, and an unreleased watch stays refcounted forever.
+  useEffect(
+    () => () => {
+      if (watchedRef.current.size > 0) watchRemove([...watchedRef.current]);
+      watchedRef.current = new Set();
+      pendingRef.current = new Set();
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   // Both change sources coalesce through one pending set and one timer, so a
   // burst of saves costs a single re-read instead of overlapping calls.
@@ -92,8 +127,9 @@ export function useNotesDirs(
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        const next = [...pendingRef.current];
+        const next = [...pendingRef.current].filter((f) => loadedRef.current.has(f));
         pendingRef.current = new Set();
+        if (next.length === 0) return;
         read(next);
       }, REFRESH_DEBOUNCE_MS);
     },

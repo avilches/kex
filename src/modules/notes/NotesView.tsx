@@ -77,15 +77,15 @@ export function NotesView(props: NotesViewProps) {
 
   const handleNewNoteIn = useCallback(
     async (folder: string) => {
-      let dir = dirs.get(folder);
-      if (!dir) {
-        const [fresh] = await notesReadDirs(canonRoot, [folder]);
-        dir = fresh;
-      }
-      const siblings = (dir?.notes ?? []).map((n) => pathBasename(n.relPath));
-      const name = nextUntitledName(siblings);
-      const relPath = folder === "" ? name : `${folder}/${name}`;
       try {
+        let dir = dirs.get(folder);
+        if (!dir) {
+          const [fresh] = await notesReadDirs(canonRoot, [folder]);
+          dir = fresh;
+        }
+        const siblings = (dir?.notes ?? []).map((n) => pathBasename(n.relPath));
+        const name = nextUntitledName(siblings);
+        const relPath = folder === "" ? name : `${folder}/${name}`;
         await native.createFile(abs(relPath));
         // The list shows one folder, so the primed row only mounts if that
         // folder is the selected one.
