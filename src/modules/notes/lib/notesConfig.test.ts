@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { PathKind } from "./notesDir";
 import {
   DEFAULT_NOTES_CONFIG,
   deletePathInConfig,
   parseNotesConfig,
+  pathsToCheck,
   pruneNotesConfig,
   renamePathInConfig,
   serializeNotesConfig,
@@ -111,6 +113,24 @@ describe("parseNotesConfig", () => {
       selectedFolder: "..config",
     });
   });
+
+  it("accepts legitimate names that merely look suspicious", () => {
+    const raw = JSON.stringify({
+      notes: { quickAccess: ["a..b.md", "..config/x.md", "docs/a:b.md"] },
+    });
+    expect(parseNotesConfig(raw).quickAccess).toEqual([
+      "a..b.md",
+      "..config/x.md",
+      "docs/a:b.md",
+    ]);
+  });
+
+  it("still rejects paths that escape the vault", () => {
+    const raw = JSON.stringify({
+      notes: { quickAccess: ["../x.md", "/abs/x.md", "docs\\x.md", "C:/x.md"] },
+    });
+    expect(parseNotesConfig(raw).quickAccess).toEqual([]);
+  });
 });
 
 describe("serializeNotesConfig", () => {
@@ -214,6 +234,26 @@ describe("path fixups", () => {
   });
 });
 
+describe("pathsToCheck", () => {
+  it("lists every path the config records, once each", () => {
+    const config = {
+      ...DEFAULT_NOTES_CONFIG,
+      quickAccess: ["docs/pinned.md"],
+      folderOrder: { "": ["README.md"], docs: ["IPC.md", "TODO.md"] },
+      expandedFolders: ["docs", "public"],
+      selectedFolder: "docs",
+    };
+    expect(pathsToCheck(config).sort()).toEqual(
+      ["", "README.md", "docs", "docs/IPC.md", "docs/TODO.md", "public"].sort(),
+    );
+  });
+
+  it("does not include quickAccess, which is never pruned", () => {
+    const config = { ...DEFAULT_NOTES_CONFIG, quickAccess: ["docs/pinned.md"] };
+    expect(pathsToCheck(config)).not.toContain("docs/pinned.md");
+  });
+});
+
 describe("pruneNotesConfig", () => {
   const config = {
     ...DEFAULT_NOTES_CONFIG,
@@ -226,36 +266,45 @@ describe("pruneNotesConfig", () => {
     expandedFolders: ["docs", "docs/dead"],
     selectedFolder: "docs/dead",
   };
-  const folders = ["docs"];
-  const notes = [
-    { folder: "", relPath: "README.md" },
-    { folder: "docs", relPath: "docs/IPC.md" },
-  ];
+  const kinds = new Map<string, PathKind>([
+    ["", "dir"],
+    ["docs", "dir"],
+    ["docs/dead", "absent"],
+    ["README.md", "file"],
+    ["docs/IPC.md", "file"],
+    ["docs/gone.md", "absent"],
+    ["docs/dead/x.md", "absent"],
+  ]);
 
-  it("drops folders the index does not know about", () => {
-    const next = pruneNotesConfig(config, folders, notes);
+  it("drops folders that are gone and keeps the ones that are there", () => {
+    const next = pruneNotesConfig(config, kinds);
     expect(next.expandedFolders).toEqual(["docs"]);
     expect(next.folderOrder["docs/dead"]).toBeUndefined();
   });
 
-  it("keeps the root entry and drops dead file names", () => {
-    const next = pruneNotesConfig(config, folders, notes);
+  it("keeps the root entry and drops file names that are gone", () => {
+    const next = pruneNotesConfig(config, kinds);
     expect(next.folderOrder[""]).toEqual(["README.md"]);
     expect(next.folderOrder.docs).toEqual(["IPC.md"]);
   });
 
-  it("drops an entry whose folder lost every note", () => {
-    const c = { ...config, folderOrder: { docs: ["gone.md"] } };
-    const next = pruneNotesConfig(c, folders, [{ folder: "", relPath: "README.md" }]);
-    expect(next.folderOrder).toEqual({});
-  });
-
-  it("resets a selectedFolder that no longer exists", () => {
-    expect(pruneNotesConfig(config, folders, notes).selectedFolder).toBe("");
+  it("resets a selected folder that is gone", () => {
+    expect(pruneNotesConfig(config, kinds).selectedFolder).toBe("");
   });
 
   it("leaves quickAccess untouched", () => {
-    expect(pruneNotesConfig(config, folders, notes).quickAccess).toEqual(["docs/gone.md"]);
+    expect(pruneNotesConfig(config, kinds).quickAccess).toEqual(["docs/gone.md"]);
+  });
+
+  it("treats a folder path that is now a file as gone", () => {
+    const c = { ...DEFAULT_NOTES_CONFIG, expandedFolders: ["docs"], folderOrder: {} };
+    const k = new Map<string, PathKind>([["docs", "file"]]);
+    expect(pruneNotesConfig(c, k).expandedFolders).toEqual([]);
+  });
+
+  it("keeps a path the answer does not mention, rather than guessing", () => {
+    const c = { ...DEFAULT_NOTES_CONFIG, expandedFolders: ["docs"] };
+    expect(pruneNotesConfig(c, new Map())).toBe(c);
   });
 
   it("returns the same reference when there is nothing to prune", () => {
@@ -265,12 +314,6 @@ describe("pruneNotesConfig", () => {
       expandedFolders: ["docs"],
       selectedFolder: "docs",
     };
-    expect(pruneNotesConfig(clean, folders, notes)).toBe(clean);
-  });
-
-  it("keeps the root selected and the root entry when the vault has no folders", () => {
-    const clean = { ...DEFAULT_NOTES_CONFIG, folderOrder: { "": ["README.md"] } };
-    const next = pruneNotesConfig(clean, [], [{ folder: "", relPath: "README.md" }]);
-    expect(next).toBe(clean);
+    expect(pruneNotesConfig(clean, kinds)).toBe(clean);
   });
 });

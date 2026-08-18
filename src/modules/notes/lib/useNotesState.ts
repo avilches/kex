@@ -6,11 +6,13 @@ import {
   type NoteSortMode,
   type NotesConfig,
   parseNotesConfig,
+  pathsToCheck,
   pruneNotesConfig,
   renamePathInConfig,
   serializeNotesConfig,
   withAncestors,
 } from "./notesConfig";
+import { notesPathsExist } from "./notesDir";
 
 const WRITE_DEBOUNCE_MS = 300;
 
@@ -33,6 +35,8 @@ export function useNotesState(root: string | null, active: boolean) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef(root);
   rootRef.current = root;
+  const configRef = useRef(config);
+  configRef.current = config;
   // Target root + payload for the write still waiting out its debounce, so an
   // unmount can flush it immediately instead of dropping it. Both are captured
   // at schedule time, unambiguous regardless of what root/config do afterwards.
@@ -106,6 +110,28 @@ export function useNotesState(root: string | null, active: boolean) {
     [scheduleWrite],
   );
 
+  // Repairing kex.json belongs to whoever owns the file. One call, only when the
+  // view is active and the config has been read, and never a write when nothing
+  // changed, because pruneNotesConfig returns the same object in that case.
+  useEffect(() => {
+    if (!root || !active || loadedRootRef.current !== root) return;
+    let cancelled = false;
+    void (async () => {
+      const paths = pathsToCheck(configRef.current);
+      try {
+        const answer = await notesPathsExist(root, paths);
+        if (cancelled) return;
+        const kinds = new Map(answer.map((a) => [a.relPath, a.kind]));
+        update((c) => pruneNotesConfig(c, kinds));
+      } catch (e) {
+        console.error("[notes] existence check failed:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [root, active, update, config]);
+
   const toggleQuickAccess = useCallback(
     (relPath: string) =>
       update((c) => ({
@@ -171,12 +197,6 @@ export function useNotesState(root: string | null, active: boolean) {
     (relPath: string) => update((c) => deletePathInConfig(c, relPath)),
     [update],
   );
-  const pruneAgainstIndex = useCallback(
-    (folders: string[], notes: { folder: string; relPath: string }[]) =>
-      update((c) => pruneNotesConfig(c, folders, notes)),
-    [update],
-  );
-
   return {
     config,
     toggleQuickAccess,
@@ -189,6 +209,5 @@ export function useNotesState(root: string | null, active: boolean) {
     setGroupByDate,
     notePathRenamed,
     notePathDeleted,
-    pruneAgainstIndex,
   };
 }

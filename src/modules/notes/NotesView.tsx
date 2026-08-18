@@ -52,20 +52,6 @@ export function NotesView(props: NotesViewProps) {
     setPrimedRenamePath(null);
   }, [props.active, canonRoot]);
 
-  useEffect(() => {
-    // A failed, in-flight, or capped walk reports a partial folder set. Pruning
-    // against one of those would delete live state.
-    if (index.loading || index.error !== null || index.truncated) return;
-    state.pruneAgainstIndex(index.folders, index.notes);
-  }, [
-    index.loading,
-    index.error,
-    index.truncated,
-    index.folders,
-    index.notes,
-    state.pruneAgainstIndex,
-  ]);
-
   const abs = useCallback(
     (relPath: string) => `${canonRoot}/${relPath}`,
     [canonRoot],

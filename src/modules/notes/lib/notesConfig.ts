@@ -1,4 +1,5 @@
-import { ancestorsOf, pathBasename, splitPath } from "@/lib/pathUtils";
+import { ancestorsOf, splitPath } from "@/lib/pathUtils";
+import type { PathKind } from "./notesDir";
 
 export type NoteSortMode = "modified" | "title" | "created" | "custom";
 
@@ -33,10 +34,9 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 // kex.json is user-editable and its paths are concatenated onto the vault root,
 // so a traversal or an absolute path here would reach outside the vault.
 function isSafeVaultPath(p: string): boolean {
-  if (p === "") return true;
   if (p.startsWith("/") || p.includes("\\")) return false;
   if (/^[A-Za-z]:/.test(p)) return false;
-  return !p.split("/").includes("..");
+  return !p.split("/").some((seg) => seg === "..");
 }
 
 export function withAncestors(expanded: string[], folder: string): string[] {
@@ -139,6 +139,16 @@ export function deletePathInConfig(config: NotesConfig, relPath: string): NotesC
   };
 }
 
+export function pathsToCheck(config: NotesConfig): string[] {
+  const out = new Set<string>(config.expandedFolders);
+  if (config.selectedFolder !== "") out.add(config.selectedFolder);
+  for (const [folder, names] of Object.entries(config.folderOrder)) {
+    out.add(folder);
+    for (const name of names) out.add(folder === "" ? name : `${folder}/${name}`);
+  }
+  return [...out];
+}
+
 function sameFolderOrder(
   a: Record<string, string[]>,
   b: Record<string, string[]>,
@@ -154,31 +164,22 @@ function sameFolderOrder(
 
 export function pruneNotesConfig(
   config: NotesConfig,
-  folders: string[],
-  notes: { folder: string; relPath: string }[],
+  kinds: Map<string, PathKind>,
 ): NotesConfig {
-  const live = new Set(folders);
-  const namesByFolder = new Map<string, Set<string>>();
-  for (const note of notes) {
-    let names = namesByFolder.get(note.folder);
-    if (!names) {
-      names = new Set<string>();
-      namesByFolder.set(note.folder, names);
-    }
-    names.add(pathBasename(note.relPath));
-  }
+  // A path the answer does not mention was never asked about, so it stays.
+  const isDir = (p: string): boolean => p === "" || (kinds.get(p) ?? "dir") === "dir";
+  const isFile = (p: string): boolean => (kinds.get(p) ?? "file") === "file";
 
-  const expandedFolders = config.expandedFolders.filter((f) => live.has(f));
+  const expandedFolders = config.expandedFolders.filter(isDir);
   const folderOrder: Record<string, string[]> = {};
   for (const [folder, names] of Object.entries(config.folderOrder)) {
-    // The vault root always exists, so it is never in the index folder list.
-    if (folder !== "" && !live.has(folder)) continue;
-    const alive = namesByFolder.get(folder);
-    const next = alive === undefined ? [] : names.filter((x) => alive.has(x));
+    if (!isDir(folder)) continue;
+    const next = names.filter((name) =>
+      isFile(folder === "" ? name : `${folder}/${name}`),
+    );
     if (next.length > 0) folderOrder[folder] = next;
   }
-  const selectedFolder =
-    config.selectedFolder === "" || live.has(config.selectedFolder) ? config.selectedFolder : "";
+  const selectedFolder = isDir(config.selectedFolder) ? config.selectedFolder : "";
 
   const changed =
     expandedFolders.length !== config.expandedFolders.length ||
