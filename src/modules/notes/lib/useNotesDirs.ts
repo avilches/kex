@@ -1,7 +1,7 @@
 import { listenFsChanged, watchAdd, watchRemove } from "@/modules/explorer/lib/watch";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { foldersToReload, isSelfWrite } from "./invalidate";
+import { foldersToReload, isSelfWrite, visibleExpanded } from "./invalidate";
 import { type NotesDir, notesReadDirs } from "./notesDir";
 
 const REFRESH_DEBOUNCE_MS = 300;
@@ -24,10 +24,13 @@ export function useNotesDirs(
   const generationRef = useRef(0);
   const requestedRef = useRef<Map<string, number>>(new Map());
   const cacheRootRef = useRef<string | null>(null);
+  // Mirrors the keys of `dirs` so the load effect can tell what it already holds
+  // without depending on the state it also writes.
+  const cacheKeysRef = useRef<Set<string>>(new Set());
 
   const wanted = useMemo(() => {
-    const set = new Set<string>([""]);
-    for (const f of expandedFolders) set.add(f);
+    const set = new Set<string>(visibleExpanded(expandedFolders));
+    set.add("");
     set.add(selectedFolder);
     return [...set];
   }, [expandedFolders, selectedFolder]);
@@ -42,10 +45,14 @@ export function useNotesDirs(
     void notesReadDirs(r, folders)
       .then((list) => {
         if (generationRef.current === generation) setError(null);
+        const fresh = list.filter((d) => requestedRef.current.get(d.folder) === generation);
+        for (const d of fresh) {
+          if (d.missing) cacheKeysRef.current.delete(d.folder);
+          else cacheKeysRef.current.add(d.folder);
+        }
         setDirs((prev) => {
           const next = new Map(prev);
-          for (const d of list) {
-            if (requestedRef.current.get(d.folder) !== generation) continue;
+          for (const d of fresh) {
             if (d.missing) next.delete(d.folder);
             else next.set(d.folder, d);
           }
@@ -72,6 +79,7 @@ export function useNotesDirs(
       loadedRef.current = new Set();
       cacheRootRef.current = null;
       requestedRef.current = new Map();
+      cacheKeysRef.current = new Set();
       setDirs(new Map());
       return;
     }
@@ -83,9 +91,11 @@ export function useNotesDirs(
     if (cacheRootRef.current !== root) {
       cacheRootRef.current = root;
       requestedRef.current = new Map();
+      cacheKeysRef.current = new Set();
       setDirs(new Map());
     } else {
       // Nothing looks at a folder outside the wanted set, so its payload is dead weight.
+      cacheKeysRef.current = new Set(wanted.filter((f) => cacheKeysRef.current.has(f)));
       setDirs((prev) => {
         const next = new Map<string, NotesDir>();
         for (const f of wanted) {
@@ -102,7 +112,9 @@ export function useNotesDirs(
     if (toAdd.length > 0) watchAdd(toAdd);
     if (toRemove.length > 0) watchRemove(toRemove);
     watchedRef.current = abs;
-    read(wanted);
+    // Expanding or selecting a folder leaves every other cached folder valid: the
+    // watcher covers the loaded set, so only what is absent needs a read.
+    read(wanted.filter((f) => !cacheKeysRef.current.has(f)));
   }, [root, active, wantedKey, read]);
 
   // Mount-scoped, so it does not fire on the expands and selects that re-run the
@@ -164,5 +176,16 @@ export function useNotesDirs(
 
   const reload = useCallback(() => read([...loadedRef.current]), [read]);
 
-  return { dirs, loading, error, reload };
+  // A mutation the user just made has to show at once, and the watcher answers up
+  // to 450 ms later, so the folders that change are re-read here by the same rule.
+  const refreshPath = useCallback(
+    (absPath: string) => {
+      const r = rootRef.current;
+      if (!r) return;
+      read(foldersToReload(r, absPath, loadedRef.current));
+    },
+    [read],
+  );
+
+  return { dirs, loading, error, reload, refreshPath };
 }

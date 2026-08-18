@@ -1,4 +1,4 @@
-import { splitPath } from "@/lib/pathUtils";
+import { ancestorsOf, splitPath } from "@/lib/pathUtils";
 
 function canon(p: string): string {
   return p.replace(/\\/g, "/").replace(/\/+$/, "");
@@ -12,6 +12,13 @@ export function isSelfWrite(root: string, changedPath: string): boolean {
   if (normPath === `${normRoot}/kex.json`) return true;
   const base = normPath.slice(normPath.lastIndexOf("/") + 1);
   return base.startsWith(".tmp");
+}
+
+// A folder is only on screen when every ancestor above it is open too, so a
+// collapsed parent should take its whole subtree out of the loaded set.
+export function visibleExpanded(expandedFolders: string[]): string[] {
+  const open = new Set(expandedFolders);
+  return expandedFolders.filter((f) => ancestorsOf(f).every((a) => open.has(a)));
 }
 
 export function foldersToReload(

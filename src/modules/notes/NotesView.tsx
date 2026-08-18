@@ -31,9 +31,11 @@ export type NotesViewProps = {
 export function NotesView(props: NotesViewProps) {
   const canonRoot = props.root.replace(/\\/g, "/").replace(/\/+$/, "");
   const state = useNotesState(canonRoot, props.active);
-  const { dirs, loading, error, reload } = useNotesDirs(
+  // Reading before kex.json is parsed would load the root against the default
+  // config and then load it again, and would render the previous vault's tree.
+  const { dirs, loading, error, reload, refreshPath } = useNotesDirs(
     canonRoot,
-    props.active,
+    props.active && state.configLoaded,
     state.config.expandedFolders,
     state.config.selectedFolder,
   );
@@ -92,7 +94,7 @@ export function NotesView(props: NotesViewProps) {
         state.setSelectedFolder(folder);
         setPrimedRenamePath(relPath);
         props.onOpenFile(abs(relPath), true);
-        reload();
+        refreshPath(abs(relPath));
       } catch (e) {
         console.error("Failed to create note:", e);
         toast.error("Failed to create note", {
@@ -100,7 +102,7 @@ export function NotesView(props: NotesViewProps) {
         });
       }
     },
-    [dirs, reload, canonRoot, abs, state, props.onOpenFile],
+    [dirs, refreshPath, canonRoot, abs, state, props.onOpenFile],
   );
 
   const handleNewFolder = useCallback(
@@ -114,7 +116,7 @@ export function NotesView(props: NotesViewProps) {
         // rename input would never mount. Root rows always render.
         if (parent !== "") state.expandFolder(parent);
         setEditingFolder(relPath);
-        reload();
+        refreshPath(abs(relPath));
       } catch (e) {
         console.error("Failed to create folder:", e);
         toast.error("Failed to create folder", {
@@ -122,7 +124,7 @@ export function NotesView(props: NotesViewProps) {
         });
       }
     },
-    [dirs, reload, abs, state],
+    [dirs, refreshPath, abs, state],
   );
 
   const handleRenameFolder = useCallback(
@@ -134,16 +136,16 @@ export function NotesView(props: NotesViewProps) {
         await native.renameFile(abs(relPath), abs(newRel));
         state.notePathRenamed(relPath, newRel);
         props.onPathRenamed(abs(relPath), abs(newRel));
-        reload();
+        refreshPath(abs(relPath));
       } catch (e) {
         console.error("Failed to rename folder:", e);
         toast.error("Failed to rename folder", {
           description: e instanceof Error ? e.message : String(e),
         });
-        reload();
+        refreshPath(abs(relPath));
       }
     },
-    [abs, state, reload, props.onPathRenamed],
+    [abs, state, refreshPath, props.onPathRenamed],
   );
 
   const handleRename = useCallback(
@@ -157,16 +159,16 @@ export function NotesView(props: NotesViewProps) {
         await native.renameFile(abs(relPath), abs(newRel));
         state.notePathRenamed(relPath, newRel);
         props.onPathRenamed(abs(relPath), abs(newRel));
-        reload();
+        refreshPath(abs(relPath));
       } catch (e) {
         console.error("Failed to rename:", e);
         toast.error("Failed to rename", {
           description: e instanceof Error ? e.message : String(e),
         });
-        reload();
+        refreshPath(abs(relPath));
       }
     },
-    [abs, state, reload, props.onPathRenamed],
+    [abs, state, refreshPath, props.onPathRenamed],
   );
 
   const handleDelete = useCallback(async () => {
@@ -178,15 +180,15 @@ export function NotesView(props: NotesViewProps) {
       await invoke("fs_delete", { path: abs(relPath), workspace: currentWorkspaceEnv() });
       state.notePathDeleted(relPath);
       props.onPathDeleted(abs(relPath));
-      reload();
+      refreshPath(abs(relPath));
     } catch (e) {
       console.error("fs_delete failed:", e);
       toast.error(`Failed to delete "${pathBasename(relPath)}"`, {
         description: e instanceof Error ? e.message : String(e),
       });
-      reload();
+      refreshPath(abs(relPath));
     }
-  }, [pendingDelete, abs, state, reload, props.onPathDeleted]);
+  }, [pendingDelete, abs, state, refreshPath, props.onPathDeleted]);
 
   const handleTrash = useCallback(async () => {
     const target = pendingDelete;
@@ -197,15 +199,15 @@ export function NotesView(props: NotesViewProps) {
       await invoke("fs_trash", { path: abs(relPath), workspace: currentWorkspaceEnv() });
       state.notePathDeleted(relPath);
       props.onPathDeleted(abs(relPath));
-      reload();
+      refreshPath(abs(relPath));
     } catch (e) {
       console.error("fs_trash failed:", e);
       toast.error(`Failed to move "${pathBasename(relPath)}" to trash`, {
         description: e instanceof Error ? e.message : String(e),
       });
-      reload();
+      refreshPath(abs(relPath));
     }
-  }, [pendingDelete, abs, state, reload, props.onPathDeleted]);
+  }, [pendingDelete, abs, state, refreshPath, props.onPathDeleted]);
 
   return (
     <>
@@ -238,7 +240,7 @@ export function NotesView(props: NotesViewProps) {
             notes={visibleNotes}
             config={state.config}
             quickAccess={state.config.quickAccess}
-            loading={loading}
+            loading={loading || !state.configLoaded}
             error={error ?? selected?.error ?? null}
             primedRenamePath={primedRenamePath}
             onRetry={reload}

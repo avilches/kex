@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { foldersToReload, isSelfWrite } from "./invalidate";
+import { foldersToReload, isSelfWrite, visibleExpanded } from "./invalidate";
 
 const ROOT = "/vault";
 
@@ -58,6 +58,34 @@ describe("foldersToReload", () => {
       "docs/pending",
       "docs",
     ]);
+  });
+});
+
+describe("visibleExpanded", () => {
+  it("keeps every entry when they are all top level", () => {
+    expect(visibleExpanded(["docs", "notes", "src"])).toEqual(["docs", "notes", "src"]);
+  });
+
+  it("keeps a chain whose every ancestor is open", () => {
+    expect(visibleExpanded(["docs", "docs/pending", "docs/pending/bugs"])).toEqual([
+      "docs",
+      "docs/pending",
+      "docs/pending/bugs",
+    ]);
+  });
+
+  it("drops the entries under a closed middle folder", () => {
+    expect(visibleExpanded(["docs", "docs/pending/bugs", "docs/pending/bugs/old"])).toEqual([
+      "docs",
+    ]);
+  });
+
+  it("drops a folder whose parent is not in the list at all", () => {
+    expect(visibleExpanded(["docs/pending"])).toEqual([]);
+  });
+
+  it("returns an empty list for an empty list", () => {
+    expect(visibleExpanded([])).toEqual([]);
   });
 });
 

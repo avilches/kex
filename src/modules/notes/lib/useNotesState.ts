@@ -203,6 +203,7 @@ export function useNotesState(root: string | null, active: boolean) {
   );
   return {
     config,
+    configLoaded,
     toggleQuickAccess,
     reorderQuickAccess,
     setSortMode,
