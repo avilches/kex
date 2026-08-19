@@ -334,3 +334,23 @@ Estado: idea anotada (2026-06-24); la navegacion por indice ya esta hecha, queda
 
 En Windows/Linux `MOD_PROP` es Ctrl, asi que Ctrl+0 (ultimo tab) se solapa con `view.zoomReset`; el tab gana por orden de registro y Reset Zoom queda reasignable. En macOS no hay conflicto (Cmd vs Ctrl son distintos).
 
+
+## Notas: limpieza de kex.json guiada por eventos
+
+Hoy la reparacion del namespace `notes` de `kex.json` corre al activar la vista: una llamada a
+`notes_paths_exist` con todas las rutas que el fichero recuerda, y a partir de ahi solo se repara
+lo que se toca desde dentro de Kex (borrar o renombrar una nota actualiza la configuracion en la
+misma operacion).
+
+La idea: aprovechar informacion que ya llega. Cada respuesta de `notes_read_dirs` dice exactamente
+que notas y que subcarpetas hay dentro de la carpeta leida, asi que se puede limpiar la
+configuracion de esa carpeta sin una sola llamada extra. Es estrictamente mejor que un temporizador
+periodico, que se descarto por dos razones: pagaria una tanda de comprobaciones al sistema de
+ficheros para arreglar algo que nadie esta viendo (una entrada de orden custom de una nota que ya
+no existe es invisible), y `kex.json` vive en el repositorio del usuario, asi que escribirlo en un
+momento cualquiera le ensucia el arbol de git mientras hace otra cosa.
+
+Lo que no cubre: solo sirve para las carpetas cargadas. Para las que no lo estan sigue haciendo
+falta la pasada al activar la vista, asi que esto se suma a lo que hay, no lo sustituye.
+
+Solo merece la pena si algun dia se nota que un `kex.json` se queda sucio demasiado tiempo.
