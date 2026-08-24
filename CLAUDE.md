@@ -1,5 +1,17 @@
 @AGENTS.md
 
+@.memory/MEMORY.md
+
+<!-- El índice de la memoria de este proyecto, que vive en `.memory/` y está versionado.
+     Cada regla es un fichero suelto y aquí sólo entra el índice: el fichero completo se
+     lee cuando el índice apunta a algo que viene a cuento. Antes esto vivía en
+     ~/.claude/projects/<ruta-con-guiones>/memory/, fuera de git y visible sólo para
+     Claude Code.
+     ATENCIÓN: opencode NO expande los imports (Claude Code y omp sí), así que esta ruta
+     tiene que estar además en la clave "instructions" del opencode.json de la raíz.
+     Lo comprueba `bash ~/Hub/dotfiles/scripts/link-agent-instructions.sh --check`. -->
+
+
 ## Contexto del proyecto
 
 Esta aplicacion se llama **Kex**. Es un fork del proyecto open-source **Terax** (`crynta/terax-ai`).
