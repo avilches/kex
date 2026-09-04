@@ -192,9 +192,8 @@ Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una
 7. Al escribir un handoff: los items de trabajo durables van PRIMERO a Backlog.md (committeado); el
    handoff solo los referencia por ID y añade el contexto de sesion que no tiene otro sitio (estado
    exacto, que hacer primero, trampas). Un handoff nunca es el unico dueño de trabajo pendiente.
-8. Quien trabaja en el repositorio commitea los cambios de `backlog/` (creacion o edicion de
-   tareas), junto al trabajo que los motivo o en un commit propio: `auto_commit` esta apagado a
-   proposito en `backlog/config.yml`.
+8. `auto_commit` esta activado en el tablero: cada operacion de backlog genera su propio commit
+   en el repo del tablero. No hay que commitear los cambios del tablero a mano.
 
 ## Documentacion viva
 
