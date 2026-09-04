@@ -152,40 +152,49 @@ Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una
 
 ## Gestion de trabajo pendiente y progreso
 
-> Seccion autocontenida y PORTABLE: todas las reglas sobre trabajo pendiente, TODO, handoffs y
+> Seccion autocontenida y PORTABLE: todas las reglas sobre trabajo pendiente, handoffs y
 > ledgers de progreso viven SOLO aqui (ninguna otra seccion de este fichero las repite). Para
 > reutilizarla en otro proyecto, copiar la seccion entera y ajustar las rutas si difieren.
+>
+> Desde 2026-09-03 el trabajo pendiente vive en el tablero de Backlog.md (`backlog/`), no en
+> `docs/TODO.md` ni `docs/PENDING.md`/`docs/pending/` (migrados y borrados ese dia). Antes de
+> crear, buscar o actualizar una tarea, correr `backlog instructions overview` como pide el bloque
+> `BACKLOG.MD GUIDELINES` mas abajo en este mismo fichero.
 
 ### Donde vive cada cosa
 
 | Artefacto | Que contiene | Persistencia |
 |---|---|---|
-| `docs/TODO.md` | Features e ideas para el futuro, cada una enlazando a su plan/spec si existe | Committeado |
-| `docs/PENDING.md` + `docs/pending/` (subdirs `bugs/`, `features/`, `improvements/`) | Trabajo identificado y decidido como pendiente: indice de una linea por item en PENDING.md, detalle en su fichero. Seccion URGENTE al principio si algo debe hacerse lo primero | Committeado |
+| `backlog/` tareas tipo `idea` | Features e ideas para el futuro sin decidir ni priorizar (equivalente al viejo `docs/TODO.md`) | Committeado |
+| `backlog/` tareas tipo `bug`, `task`, `docs` | Trabajo identificado y aceptado: bugs, features, mejoras, discrepancias de documentacion (equivalente al viejo `docs/PENDING.md` + `docs/pending/`). Prioridad `High` para lo mas urgente | Committeado |
 | `HANDOFF-*.md` (raiz o `docs/`) | Notas de traspaso entre sesiones de agente | NUNCA se commitean |
 | `.superpowers/` (ledger de orquestacion, p. ej. `sdd/progress.md`) | Progreso interno de una ejecucion multi-agente en curso: tareas, commits, veredictos de review. Es el mapa de recuperacion del orquestador tras una compactacion de contexto | Efimero, ignorado por git, por worktree; muere con el worktree |
 
 ### Reglas
 
-1. El usuario pide recordar una feature para mas adelante: añadirla a `docs/TODO.md`.
-2. Algo queda pendiente y el usuario decide no hacerlo ahora: añadirlo a `docs/PENDING.md` con
-   referencia a su fichero de detalle en `docs/pending/`.
-3. El usuario pregunta "que queda por hacer": mostrar primero `docs/PENDING.md` (empezando por la
-   seccion URGENTE si existe), luego `docs/TODO.md`, y ademas listar los handoffs sueltos que haya,
-   diciendo de que trata cada uno y ofreciendo continuarlos, unificarlos o migrar su contenido vivo a
-   PENDING/TODO. No borrar ni mover un handoff sin confirmacion del usuario.
+1. El usuario pide recordar una feature para mas adelante: `backlog task create "..." --type idea`.
+2. Algo queda pendiente y el usuario decide no hacerlo ahora: `backlog task create "..." --type
+   bug|task|docs` segun corresponda, con `-d`/`--ac` describiendo el trabajo.
+3. El usuario pregunta "que queda por hacer": `backlog task list --plain` (o `backlog board`),
+   empezando por prioridad `High`, y ademas listar los handoffs sueltos que haya, diciendo de que
+   trata cada uno y ofreciendo continuarlos, unificarlos o migrar su contenido vivo a una tarea. No
+   borrar ni mover un handoff sin confirmacion del usuario.
 4. Los handoffs nunca se commitean. Si el usuario quiere conservar su contenido en el repo, se migra
-   a `docs/PENDING.md` (+ fichero de detalle) o `docs/TODO.md` y el handoff se borra.
+   a una tarea de Backlog.md y el handoff se borra.
 5. Cierre de un plan orquestado (SDD o similar): ANTES de eliminar el worktree, cosechar el ledger:
-   volcar a `docs/PENDING.md` los minors aceptados por las reviews, las decisiones aplazadas y los
-   follow-ups descubiertos; retirar de PENDING lo completado, en el mismo commit que cierra el
-   trabajo. El ledger no se commitea ni se recupera despues: todo lo durable debe estar en git, en
-   `docs/` o en PENDING antes de que muera.
-6. Un item de PENDING que se empieza a trabajar: el plan/ledger de la ejecucion lo referencia, y al
-   completarse se elimina (o se anota su nuevo estado) en PENDING en el mismo commit del trabajo.
-7. Al escribir un handoff: los items de trabajo durables van PRIMERO a `docs/PENDING.md`/`docs/TODO.md`
-   (committeados); el handoff solo los referencia y añade el contexto de sesion que no tiene otro sitio
-   (estado exacto, que hacer primero, trampas). Un handoff nunca es el unico dueño de trabajo pendiente.
+   crear tareas de Backlog.md para los minors aceptados por las reviews, las decisiones aplazadas y
+   los follow-ups descubiertos; cerrar (`backlog task complete`) o actualizar las tareas ya resueltas,
+   en el mismo commit que cierra el trabajo. El ledger no se commitea ni se recupera despues: todo lo
+   durable debe quedar en una tarea antes de que muera.
+6. Una tarea que se empieza a trabajar: el plan/ledger de la ejecucion la referencia (`backlog task
+   edit <id> -s "In Progress"`), y al completarse se cierra o se anota su nuevo estado en el mismo
+   commit del trabajo.
+7. Al escribir un handoff: los items de trabajo durables van PRIMERO a Backlog.md (committeado); el
+   handoff solo los referencia por ID y añade el contexto de sesion que no tiene otro sitio (estado
+   exacto, que hacer primero, trampas). Un handoff nunca es el unico dueño de trabajo pendiente.
+8. Quien trabaja en el repositorio commitea los cambios de `backlog/` (creacion o edicion de
+   tareas), junto al trabajo que los motivo o en un commit propio: `auto_commit` esta apagado a
+   proposito en `backlog/config.yml`.
 
 ## Documentacion viva
 
@@ -199,3 +208,27 @@ Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una
 ### Fix WebGL GPU al arrancar
 
 Bug resuelto (2026-06-11, documentado en `docs/WORKSPACES_GPU.md`). Fix: `setTimeout(retryMissingWebgl, 350)` en `main.tsx` tras `showWindow` a t=50ms. Los rAFs de `scheduleUnhide` se encolan mientras la ventana esta oculta. No anadir mas retries en `rendererPool.ts` sin pasar por `main.tsx`.
+
+<!-- BACKLOG.MD GUIDELINES START -->
+<!-- backlog.md-instructions-version: 1.50.1 -->
+<CRITICAL_INSTRUCTION>
+
+## Backlog.md Workflow
+
+This project uses Backlog.md for task and project management.
+
+**For every user request in this project, run `backlog instructions overview` before answering or taking action.**
+
+Use the overview to decide whether to search, read, create, or update Backlog tasks.
+
+Before task lifecycle actions, read the matching detailed guide:
+- `backlog instructions task-creation` before creating or splitting tasks
+- `backlog instructions task-execution` before planning, changing status or assignee, adding a plan or implementation notes, or implementing task work
+- `backlog instructions task-finalization` before checking acceptance criteria, writing final summaries, or moving tasks to terminal statuses
+
+Use `backlog <command> --help` before running unfamiliar commands. Help shows options, fields, and examples.
+
+Do not edit Backlog task, draft, document, decision, or milestone markdown files directly. Use the `backlog` CLI so metadata, relationships, and history stay consistent.
+
+</CRITICAL_INSTRUCTION>
+<!-- BACKLOG.MD GUIDELINES END -->
