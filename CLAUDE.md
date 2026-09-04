@@ -150,50 +150,33 @@ Nunca usar `setInterval + setTick` para releer estado mutable externo (arrays a 
 
 Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una segunda instancia. Los componentes ya montados siguen usando la instancia vieja. Para diagnosticar bugs de estado mutable, siempre hacer kill del proceso y `pnpm tauri dev` fresco antes de leer logs. No confiar en resultados de sesiones con cambios via HMR.
 
-## Gestion de trabajo pendiente y progreso
+## Handoffs y ledgers de orquestacion
 
-> Seccion autocontenida y PORTABLE: todas las reglas sobre trabajo pendiente, handoffs y
-> ledgers de progreso viven SOLO aqui (ninguna otra seccion de este fichero las repite). Para
-> reutilizarla en otro proyecto, copiar la seccion entera y ajustar las rutas si difieren.
->
-> Desde 2026-09-03 el trabajo pendiente vive en el tablero de Backlog.md (`backlog/`), no en
-> `docs/TODO.md` ni `docs/PENDING.md`/`docs/pending/` (migrados y borrados ese dia). Antes de
-> crear, buscar o actualizar una tarea, correr `backlog instructions overview` como pide el bloque
-> `BACKLOG.MD GUIDELINES` mas abajo en este mismo fichero.
+Desde 2026-09-03 el trabajo pendiente vive en el tablero de Backlog.md (`backlog/`), no en
+`docs/TODO.md` ni `docs/PENDING.md`/`docs/pending/` (migrados y borrados ese dia).
 
-### Donde vive cada cosa
+Ademas del tablero, Kex usa dos artefactos efimeros:
 
 | Artefacto | Que contiene | Persistencia |
 |---|---|---|
-| `backlog/` tareas tipo `idea` | Features e ideas para el futuro sin decidir ni priorizar (equivalente al viejo `docs/TODO.md`) | Committeado |
-| `backlog/` tareas tipo `bug`, `task`, `docs` | Trabajo identificado y aceptado: bugs, features, mejoras, discrepancias de documentacion (equivalente al viejo `docs/PENDING.md` + `docs/pending/`). Prioridad `High` para lo mas urgente | Committeado |
 | `HANDOFF-*.md` (raiz o `docs/`) | Notas de traspaso entre sesiones de agente | NUNCA se commitean |
-| `.superpowers/` (ledger de orquestacion, p. ej. `sdd/progress.md`) | Progreso interno de una ejecucion multi-agente en curso: tareas, commits, veredictos de review. Es el mapa de recuperacion del orquestador tras una compactacion de contexto | Efimero, ignorado por git, por worktree; muere con el worktree |
+| `.superpowers/` (ledger de orquestacion, p. ej. `sdd/progress.md`) | Progreso interno de una ejecucion multi-agente en curso | Efimero, ignorado por git; muere con el worktree |
 
-### Reglas
+### Reglas de handoffs y orquestacion
 
-1. El usuario pide recordar una feature para mas adelante: `backlog task create "..." --type idea`.
-2. Algo queda pendiente y el usuario decide no hacerlo ahora: `backlog task create "..." --type
-   bug|task|docs` segun corresponda, con `-d`/`--ac` describiendo el trabajo.
-3. El usuario pregunta "que queda por hacer": `backlog task list --plain` (o `backlog board`),
-   empezando por prioridad `High`, y ademas listar los handoffs sueltos que haya, diciendo de que
-   trata cada uno y ofreciendo continuarlos, unificarlos o migrar su contenido vivo a una tarea. No
-   borrar ni mover un handoff sin confirmacion del usuario.
-4. Los handoffs nunca se commitean. Si el usuario quiere conservar su contenido en el repo, se migra
+1. Los handoffs nunca se commitean. Si el usuario quiere conservar su contenido en el repo, se migra
    a una tarea de Backlog.md y el handoff se borra.
-5. Cierre de un plan orquestado (SDD o similar): ANTES de eliminar el worktree, cosechar el ledger:
+2. Cierre de un plan orquestado (SDD o similar): ANTES de eliminar el worktree, cosechar el ledger:
    crear tareas de Backlog.md para los minors aceptados por las reviews, las decisiones aplazadas y
-   los follow-ups descubiertos; cerrar (`backlog task complete`) o actualizar las tareas ya resueltas,
-   en el mismo commit que cierra el trabajo. El ledger no se commitea ni se recupera despues: todo lo
-   durable debe quedar en una tarea antes de que muera.
-6. Una tarea que se empieza a trabajar: el plan/ledger de la ejecucion la referencia (`backlog task
-   edit <id> -s "In Progress"`), y al completarse se cierra o se anota su nuevo estado en el mismo
-   commit del trabajo.
-7. Al escribir un handoff: los items de trabajo durables van PRIMERO a Backlog.md (committeado); el
-   handoff solo los referencia por ID y añade el contexto de sesion que no tiene otro sitio (estado
-   exacto, que hacer primero, trampas). Un handoff nunca es el unico dueño de trabajo pendiente.
-8. `auto_commit` esta activado en el tablero: cada operacion de backlog genera su propio commit
-   en el repo del tablero. No hay que commitear los cambios del tablero a mano.
+   los follow-ups descubiertos; cerrar (`backlog task complete`) o actualizar las tareas ya resueltas.
+   El ledger no se commitea ni se recupera despues: todo lo durable debe quedar en una tarea antes
+   de que muera.
+3. Al escribir un handoff: los items de trabajo durables van PRIMERO a Backlog.md; el handoff solo
+   los referencia por ID y añade el contexto de sesion que no tiene otro sitio (estado exacto, que
+   hacer primero, trampas). Un handoff nunca es el unico dueño de trabajo pendiente.
+4. Al preguntar "que queda por hacer": ademas de `backlog task list`, listar los handoffs sueltos
+   que haya, diciendo de que trata cada uno y ofreciendo continuarlos, unificarlos o migrar su
+   contenido vivo a una tarea. No borrar ni mover un handoff sin confirmacion del usuario.
 
 ## Documentacion viva
 
