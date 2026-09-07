@@ -148,6 +148,31 @@ Nunca usar `setInterval + setTick` para releer estado mutable externo (arrays a 
 
 Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una segunda instancia. Los componentes ya montados siguen usando la instancia vieja. Para diagnosticar bugs de estado mutable, siempre hacer kill del proceso y `pnpm tauri dev` fresco antes de leer logs. No confiar en resultados de sesiones con cambios via HMR.
 
+## Las carpetas de la máquina, y el atajo a todas ellas
+
+**`user-data/` tiene symlinks a las cuatro carpetas donde Kex escribe de verdad**, para no tener
+que acordarse de cuál es cuál ni escribir la ruta a mano. Es el mismo patrón que llevan
+Yottacast y el software de Hub, y lo recrea `user-data/create-links.sh`, que es idempotente.
+
+| Enlace | A dónde | Qué hay dentro |
+|---|---|---|
+| `user-data/logs` | `~/Library/Logs/app.betauer.kex` | `Kex.log`, el log de la aplicación |
+| `user-data/support` | `~/Library/Application Support/app.betauer.kex` | los `settings-*.json`, los temas, `workspaces.json` y `agent-sessions.json` del restore de sesiones |
+| `user-data/config` | `~/.config/kex` | `hooks/`, con los ganchos de sesión que instala el agente |
+| `user-data/cache` | `~/.cache/kex` | `shell-integration/`, lo que se inyecta en bash y zsh |
+
+Las dos primeras las nombra **Tauri** a partir del `identifier` de `src-tauri/tauri.conf.json`,
+que hoy es `app.betauer.kex`: si cambia ahí, hay que cambiarlo en el script.
+
+**En la máquina hay además carpetas de `terax`** (`~/.config/terax`, `~/.cache/terax` y
+`~/Library/Application Support/app.crynta.terax`), y **no se enlazan porque el código de Kex no
+las toca**: son del upstream del que esto es un fork, y solo aparecen en la documentación. Si
+algún día se leyeran al arrancar, entrarían como `upstream-config` y `upstream-cache`.
+
+De `user-data/` **solo se versiona el script**: los enlaces son de esta máquina y los ignora el
+`.gitignore`, con una excepción para él, porque sin versionarlo un clon nuevo se queda sin la
+carpeta y sin forma de rehacerla.
+
 ## Documentacion viva
 
 - `docs/ARCHITECTURE.md` + `docs/IPC.md` + `docs/BUILD.md` — referencia principal (ver AGENTS.md para politica de actualizacion)

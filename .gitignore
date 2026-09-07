@@ -29,3 +29,10 @@ stats.html
 *.tsbuildinfo
 .superpowers/
 .claude/settings.local.json
+
+# Atajos a las carpetas de la máquina
+# user-data/ son symlinks a donde Kex escribe de verdad (logs, Application Support, config y
+# cache). Los enlaces son de ESTA máquina y no se commitean; el script que los recrea sí, o un
+# clon nuevo no tendría con qué rehacerlos. La tabla está en CLAUDE.md.
+/user-data/*
+!/user-data/create-links.sh
