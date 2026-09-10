@@ -64,7 +64,7 @@ Cada concepto tiene UN solo nombre canonico. Si el usuario se refiere a algo con
 
 Antes de empezar la Fase 1 (root cause investigation) de `systematic-debugging` en cualquier bug o
 comportamiento inesperado, `grep -il` por palabras clave del sintoma en `docs/*_GOTCHAS.md` (hoy:
-`docs/WORKSPACES_GOTCHAS.md`). Si hay una entrada relacionada, leerla entera antes de investigar
+`docs/WORKSPACES_GOTCHAS.md` y `docs/MARKDOWN_GOTCHAS.md`). Si hay una entrada relacionada, leerla entera antes de investigar
 nada mas: puede ahorrar horas de re-descubrir una causa raiz ya documentada, o evitar repetir un
 intento que ya fallo alli. No basta con saber que el fichero existe: hay que grepearlo activamente
 como primer paso, no confiar en recordarlo.
@@ -177,6 +177,7 @@ carpeta y sin forma de rehacerla.
 
 - `docs/ARCHITECTURE.md` + `docs/IPC.md` + `docs/BUILD.md` — referencia principal (ver AGENTS.md para politica de actualizacion)
 - `docs/WORKSPACES.md` + `docs/WORKSPACES_GOTCHAS.md` — subsistema de workspaces y pool de terminales
+- `docs/MARKDOWN_GOTCHAS.md`: las tres capas del guardado de markdown y los bugs de fidelidad ya diagnosticados
 - `docs/AGENT_SESSION_RESTORE.md` — hooks, store JSON, algoritmo de restore, UI del tab, casos de error
 - `docs/RESTORE_SESSION_TESTS.md` — plan de pruebas manuales con checklist de diagnostico
 - `docs/FORK.md` — divergencias y roadmap respecto al upstream

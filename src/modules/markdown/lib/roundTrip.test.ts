@@ -28,6 +28,8 @@ const CORPUS: Record<string, string> = {
   horizontalRule: "before\n\n---\n\nafter\n",
   pageBreak: '<div style="page-break-after: always;"></div>\n',
   emptyParagraphs: "a\n\n<!-- -->\n\nb\n",
+  htmlComment: "before\n\n<!-- a real comment -->\n\nafter\n",
+  codeFenceInListItem: "- item text\n    ```tsx\n    const x = 1;\n    ```\n",
   hardBreak: "line one  \nline two\n",
   frontmatterFree: "no frontmatter here, just text\n",
 };
@@ -109,6 +111,53 @@ describe("round-trip idempotence", () => {
     expect(md1).toBe("- text<br><br>\n- second\n");
     const md2 = htmlToMarkdown(markdownToHtml(md1));
     expect(md2).toBe(md1);
+  });
+
+  it("preserves an HTML comment that carries content", () => {
+    const input = "intro\n\n<!-- BACKLOG.MD GUIDELINES START -->\n\nbody\n";
+    const md1 = htmlToMarkdown(markdownToHtml(input));
+    expect(md1).toBe(input);
+  });
+
+  it("keeps two adjacent comment lines separate and intact", () => {
+    const input = "<!-- GUIDELINES START -->\n<!-- version: 1.50.1 -->\n";
+    const md1 = htmlToMarkdown(markdownToHtml(input));
+    expect(md1).toContain("<!-- GUIDELINES START -->");
+    expect(md1).toContain("<!-- version: 1.50.1 -->");
+    const md2 = htmlToMarkdown(markdownToHtml(md1));
+    expect(md2).toBe(md1);
+  });
+
+  it("leaves a comment inside a fenced code block untouched", () => {
+    const input = "```html\n<!-- not a real comment -->\n```\n";
+    const md1 = htmlToMarkdown(markdownToHtml(input));
+    expect(md1).toBe(input);
+  });
+
+  it("leaves a comment inside a four-backtick fence that nests a fence untouched", () => {
+    const input = "````markdown\n```\n<!-- example -->\n```\n````\n";
+    const md1 = htmlToMarkdown(markdownToHtml(input));
+    expect(md1).toContain("<!-- example -->");
+    expect(md1).not.toContain("data-html-comment");
+  });
+
+  it("does not turn the empty-paragraph sentinel into a content comment", () => {
+    // The sentinel keeps its own path (empty paragraph), so it survives as `<!-- -->`
+    // rather than being re-emitted by the content-comment branch.
+    const md1 = htmlToMarkdown(markdownToHtml("a\n\n<!-- -->\n\nb\n"));
+    expect(md1).toBe("a\n\n<!-- -->\nb\n");
+  });
+
+  it("keeps a fenced code block nested in a list item as a block", () => {
+    const input = "- item text\n    ```tsx\n    const x = 1;\n    ```\n";
+    const md1 = htmlToMarkdown(markdownToHtml(input));
+    expect(md1).toBe(input);
+  });
+
+  it("keeps a fenced code block with no language nested in a list item", () => {
+    const input = "- item text\n    ```\n    plain\n    ```\n";
+    const md1 = htmlToMarkdown(markdownToHtml(input));
+    expect(md1).toBe(input);
   });
 
   it("is idempotent for two consecutive trailing hard breaks before a nested list", () => {

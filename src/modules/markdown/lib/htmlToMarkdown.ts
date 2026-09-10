@@ -67,6 +67,17 @@ function isImageOnlyParagraph(el: Element): boolean {
   );
 }
 
+// Sentinel attributes are written with encodeURIComponent, but hand-authored HTML
+// reaching the serializer may not be: a bare "%" must not abort the whole save.
+function decodeAttr(raw: string | null): string {
+  if (!raw) return "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function serializeImage(img: Element): string {
   // Raw attribute value, not decoded: an ordinary filename like "assets/100%.png"
   // is not valid percent-encoding and decodeURIComponent throws on it.
@@ -141,6 +152,9 @@ function serializeBlock(el: Element): string {
 
 function serializeDiv(el: Element): string {
   if (el.hasAttribute("data-callout")) return serializeCallout(el);
+  if (el.hasAttribute("data-html-comment")) {
+    return `<!--${decodeAttr(el.getAttribute("data-html-comment"))}-->\n`;
+  }
   if (el.hasAttribute("data-math-block")) {
     const tex = decodeURIComponent(el.getAttribute("data-math-block") ?? "");
     return `$$\n${tex}\n$$\n`;

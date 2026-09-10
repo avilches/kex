@@ -248,6 +248,14 @@ Deep-dive into the workspace rendering stack and terminal slot pool:
   confirmed fix. Add an entry whenever a bug in this subsystem takes more than one attempt to fix, so it is not
   re-discovered.
 
+### `docs/MARKDOWN_GOTCHAS.md`
+
+The three layers of the markdown save path (`markdownToHtml` -> ProseMirror document -> `htmlToMarkdown`)
+and the fidelity bugs already diagnosed in each, plus the happy-dom test traps. Read it before
+investigating any "opening and saving a .md rewrites the file" report, and add an entry whenever such a
+bug takes more than one attempt to fix. ProseMirror silently drops any DOM construct no schema rule
+claims, so a lost construct usually needs a `data-*` sentinel plus a TipTap node that reclaims it.
+
 ### `docs/SCRATCHPAD.md`
 
 Single reference for the scratchpad's binary state model (`Session.scratchpadOpen`), the transient

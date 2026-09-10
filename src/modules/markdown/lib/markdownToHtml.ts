@@ -129,6 +129,42 @@ export function markdownToHtml(md: string, opts: MarkdownToHtmlOptions = {}): st
   // around the div keep it isolated. Post-render converts it back to <p></p>.
   src = src.replace(/<!-- -->/g, "\n\n<div data-empty-para></div>\n\n");
 
+  // Pre-process: route whole-line HTML comments that carry real content through a div
+  // sentinel. markdown-it passes a comment through verbatim, but ProseMirror discards any
+  // DOM node no schema rule claims and nothing claims Comment nodes, so the comment would
+  // be gone before the user typed anything. The rawComment node reclaims this div.
+  // Inline and multi-line comments have no block sentinel to ride on: see
+  // docs/MARKDOWN_GOTCHAS.md.
+  {
+    const lines = src.split("\n");
+    // Tracks the open fence marker, not a boolean: a ```` fence can hold ``` lines that
+    // are part of the code, and only a bare run of the same character at least as long
+    // closes it. A comment inside a fence is an example, not a real comment.
+    let fence: string | null = null;
+    for (let i = 0; i < lines.length; i++) {
+      const marker = lines[i].match(/^\s*(`{3,}|~{3,})/)?.[1];
+      if (fence !== null) {
+        const rest = marker ? lines[i].trim().slice(marker.length).trim() : "";
+        if (marker && marker[0] === fence[0] && marker.length >= fence.length && !rest) {
+          fence = null;
+        }
+        continue;
+      }
+      if (marker) {
+        fence = marker;
+        continue;
+      }
+      const m = lines[i].match(/^(\s*)<!--(.*?)-->\s*$/);
+      if (!m) continue;
+      const body = m[2];
+      // Whitespace-only is the empty-paragraph sentinel, already handled above; a body
+      // holding "-->" means the line carries more than one comment.
+      if (!body.trim() || body.includes("-->")) continue;
+      lines[i] = `${m[1]}<div data-html-comment="${encodeURIComponent(body)}"></div>`;
+    }
+    src = lines.join("\n");
+  }
+
   // Pre-process: preserve blank lines before image-only lines
   // markdown-it collapses blank lines into paragraph breaks, losing the empty paragraph.
   // Insert a <div> marker that markdown-it passes through (html: true), then convert to <p></p>

@@ -527,7 +527,7 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │   │                            and extension list), `Toolbar.tsx`, `OutlinePanel.tsx`, `SlashMenu.tsx`,
     │   │                            `FindBar.tsx`, `WikiLinkMenu.tsx`, `CodeLangDropdown.tsx`, `MathModal.tsx`, and
     │   │                            `extensions/` (one file per TipTap extension: callout, details, table, math,
-    │   │                            mermaid, wikiLink, codeBlock, slashCommands, headingShortcuts, noteSearch, …).
+    │   │                            mermaid, wikiLink, codeBlock, slashCommands, headingShortcuts, noteSearch, rawComment, …).
     │   │                            Lazy-loaded as its own chunk (`MarkdownTab`); see "Markdown editor chunks" in
     │   │                            `docs/BUILD.md` for the split and its known eager-chunk leak.
     ├── notes/                     — HelixNotes-style notes view for the Sidebar (visible only when the workspace

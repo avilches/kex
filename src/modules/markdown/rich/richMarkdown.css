@@ -711,6 +711,23 @@
   color: var(--muted-foreground);
 }
 
+/* ── Raw HTML comment ── */
+
+.rich-md-body .editor-content .html-comment {
+  margin: 6px 0;
+  padding: 2px 6px;
+  border-left: 2px solid var(--muted-foreground);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--muted-foreground) 8%, transparent);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+  white-space: pre-wrap;
+  opacity: 0.75;
+  user-select: none;
+}
+
 /* ── In-note search highlight ── */
 
 .rich-md-body .editor-content .note-search-match {

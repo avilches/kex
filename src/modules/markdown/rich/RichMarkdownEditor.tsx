@@ -59,6 +59,7 @@ import { createMermaidRenderer } from "@/modules/markdown/rich/extensions/mermai
 import { MoveLineShortcuts } from "@/modules/markdown/rich/extensions/moveLineShortcuts";
 import { NoteSearchExtension } from "@/modules/markdown/rich/extensions/noteSearch";
 import { PageBreak } from "@/modules/markdown/rich/extensions/pageBreak";
+import { RawComment } from "@/modules/markdown/rich/extensions/rawComment";
 import {
   createSlashMenu,
   type SlashMenuController,
@@ -247,6 +248,7 @@ export const RichMarkdownEditor = forwardRef<
       createMathBlock(mathEdit),
       createMathInline(mathEdit),
       PageBreak,
+      RawComment,
       Callout,
       CalloutTyping,
       Details.configure({ persist: true, HTMLAttributes: { class: "editor-details" } }),
