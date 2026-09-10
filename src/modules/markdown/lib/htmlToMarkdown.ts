@@ -6,14 +6,23 @@
 export function htmlToMarkdown(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const entries: { text: string; isImage: boolean }[] = [];
-  for (const el of Array.from(doc.body.children)) {
-    if (el.tagName === "P" && el.childNodes.length === 0) {
+  // Walk childNodes, not children: a top-level HTML comment with real content
+  // (markdown-it's html:true passes it through as a Comment node, distinct
+  // from the empty `<!-- -->` sentinel, which is rewritten to a `<p></p>`
+  // div marker before it ever reaches markdown-it) is invisible to `.children`.
+  for (const node of Array.from(doc.body.childNodes)) {
+    if (node.nodeType === Node.COMMENT_NODE) {
+      entries.push({ text: `<!--${node.textContent ?? ""}-->\n`, isImage: false });
+      continue;
+    }
+    if (!(node instanceof Element)) continue;
+    if (node.tagName === "P" && node.childNodes.length === 0) {
       entries.push({ text: "<!-- -->", isImage: false });
       continue;
     }
     entries.push({
-      text: serializeBlock(el),
-      isImage: isImageOnlyParagraph(el),
+      text: serializeBlock(node),
+      isImage: isImageOnlyParagraph(node),
     });
   }
   while (entries.length > 0 && entries[entries.length - 1].text === "<!-- -->") {
@@ -242,23 +251,34 @@ function serializeListItem(li: Element): string {
     }
     if (text.length > 0) parts.push(text);
   };
+  // Nested lists and fenced code blocks are the only block-level children a
+  // list item can carry alongside its own paragraph; both need to be
+  // serialized as blocks (via serializeBlock) and indented as a continuation
+  // of the item, not flattened through the inline serializeInline() path
+  // (which would turn a multi-line PRE/CODE into a single backtick span).
+  const pushIndentedBlock = (node: Element) => {
+    flush();
+    const block = serializeBlock(node).replace(/\n$/, "");
+    const indented = block
+      .split("\n")
+      .map((line) => `    ${line}`)
+      .join("\n");
+    // No own text (paragraph or inline run) precedes this block: the item's
+    // bullet marker has nothing to attach to on its own line, so give it an
+    // empty first part rather than gluing the marker straight onto the
+    // indented block.
+    if (parts.length === 0) parts.push("");
+    parts.push(indented);
+  };
   for (const node of nodes) {
     if (node instanceof Element && node.tagName === "P") {
       flush();
       parts.push(inlineBlockText(node));
-    } else if (node instanceof Element && (node.tagName === "UL" || node.tagName === "OL")) {
-      flush();
-      const nested = serializeBlock(node).replace(/\n$/, "");
-      const indented = nested
-        .split("\n")
-        .map((line) => `    ${line}`)
-        .join("\n");
-      // No own text (paragraph or inline run) precedes this nested list: the
-      // item's bullet marker has nothing to attach to on its own line, so
-      // give it an empty first part rather than gluing the marker straight
-      // onto the nested list's indentation.
-      if (parts.length === 0) parts.push("");
-      parts.push(indented);
+    } else if (
+      node instanceof Element &&
+      (node.tagName === "UL" || node.tagName === "OL" || node.tagName === "PRE")
+    ) {
+      pushIndentedBlock(node);
     } else {
       buffer.push(node);
     }
