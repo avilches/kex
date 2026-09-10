@@ -133,10 +133,11 @@ export function markdownToHtml(md: string, opts: MarkdownToHtmlOptions = {}): st
   // sentinel. markdown-it passes a comment through verbatim, but ProseMirror discards any
   // DOM node no schema rule claims and nothing claims Comment nodes, so the comment would
   // be gone before the user typed anything. The rawComment node reclaims this div.
-  // Inline and multi-line comments have no block sentinel to ride on: see
-  // docs/MARKDOWN_GOTCHAS.md.
+  // An inline comment in the middle of a paragraph has no block sentinel to ride on and
+  // is still lost: see docs/MARKDOWN_GOTCHAS.md.
   {
     const lines = src.split("\n");
+    const outLines: string[] = [];
     // Tracks the open fence marker, not a boolean: a ```` fence can hold ``` lines that
     // are part of the code, and only a bare run of the same character at least as long
     // closes it. A comment inside a fence is an example, not a real comment.
@@ -148,21 +149,43 @@ export function markdownToHtml(md: string, opts: MarkdownToHtmlOptions = {}): st
         if (marker && marker[0] === fence[0] && marker.length >= fence.length && !rest) {
           fence = null;
         }
+        outLines.push(lines[i]);
         continue;
       }
       if (marker) {
         fence = marker;
+        outLines.push(lines[i]);
         continue;
       }
-      const m = lines[i].match(/^(\s*)<!--(.*?)-->\s*$/);
-      if (!m) continue;
-      const body = m[2];
-      // Whitespace-only is the empty-paragraph sentinel, already handled above; a body
-      // holding "-->" means the line carries more than one comment.
-      if (!body.trim() || body.includes("-->")) continue;
-      lines[i] = `${m[1]}<div data-html-comment="${encodeURIComponent(body)}"></div>`;
+      const open = lines[i].match(/^(\s*)<!--([\s\S]*)$/);
+      if (!open) {
+        outLines.push(lines[i]);
+        continue;
+      }
+      // A comment may span lines; scan forward for the line that closes it. Everything
+      // between the delimiters becomes the sentinel body, newlines included, so the
+      // original text comes back byte for byte.
+      const indent = open[1];
+      const chunk: string[] = [open[2]];
+      let end = i;
+      while (end < lines.length && !/-->\s*$/.test(lines[end])) {
+        end++;
+        if (end < lines.length) chunk.push(lines[end]);
+      }
+      const closed = end < lines.length;
+      const joined = chunk.join("\n");
+      const body = closed ? joined.replace(/-->\s*$/, "") : "";
+      // An unterminated comment, a whitespace-only body (the empty-paragraph sentinel,
+      // already handled above) or a body still holding "-->" (more than one comment on
+      // the line) all stay untouched.
+      if (!closed || !body.trim() || body.includes("-->")) {
+        outLines.push(lines[i]);
+        continue;
+      }
+      outLines.push(`${indent}<div data-html-comment="${encodeURIComponent(body)}"></div>`);
+      i = end;
     }
-    src = lines.join("\n");
+    src = outLines.join("\n");
   }
 
   // Pre-process: preserve blank lines before image-only lines

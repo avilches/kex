@@ -18,7 +18,7 @@ fichero .md
 
 ---
 
-## Bug 1: abrir un .md y guardar sin editar cambia el fichero (RESUELTO)
+## Bug 1: al guardar desaparecen los comentarios HTML y se aplanan los bloques de codigo de una lista (RESUELTO)
 
 ### Síntoma
 
@@ -60,9 +60,11 @@ la reclame se pierde en silencio al abrir el fichero.
 - `htmlToMarkdown.ts`: `PRE` se trata igual que `UL`/`OL` dentro de un `<li>`, a través del helper
   `pushIndentedBlock`, que extrae la indentación a 4 espacios que ya existía para las listas
   anidadas.
-- `markdownToHtml.ts`: un comentario HTML que ocupe toda una línea y lleve contenido real se
+- `markdownToHtml.ts`: un comentario HTML que empiece en su propia línea y lleve contenido real se
   convierte, antes de `mdit.render()`, en `<div data-html-comment="URLENCODED"></div>`. Es el mismo
-  patrón de sentinel que ya usaban `data-math-block` y `data-page-break`.
+  patrón de sentinel que ya usaban `data-math-block` y `data-page-break`. Si el comentario abarca
+  varias líneas, el escaneo avanza hasta la línea que lo cierra y mete el cuerpo entero, con sus
+  saltos de línea y su sangría, en el mismo atributo, así que vuelve a salir byte a byte.
 - `rich/extensions/rawComment.ts`: Node atom de grupo block que reclama `div[data-html-comment]`,
   para que ProseMirror lo conserve. Se renderiza como una línea mono discreta con el texto del
   comentario, en vez de dejar un hueco sin explicación en el editor.
@@ -85,8 +87,10 @@ Consecuencias:
 
 ### Limitaciones conocidas que quedan
 
-- **Comentarios HTML de varias líneas**: se siguen perdiendo. El sentinel es de una línea porque el
-  pre-proceso trabaja línea a línea, antes de que exista cualquier estructura de bloque.
+- **Comentarios sin cerrar** (`<!--` sin su `-->`): CommonMark dice que el comentario llega hasta el
+  final del documento, así que markdown-it se come lo que venga detrás. Es comportamiento anterior a
+  este fix y no se toca; lo que sí se garantiza es que el escaneo se rinde en vez de inventarse un
+  sentinel.
 - **Comentarios inline** en medio de un párrafo (`texto <!-- nota --> más texto`): se pierden. El
   sentinel es un `div` de bloque y no puede montarse dentro de un párrafo.
 - **Comentarios dentro de un blockquote** (`> <!-- x -->`): no se transforman, porque el `>` inicial
@@ -104,3 +108,49 @@ se pierde es una construcción del DOM que no es un elemento con nombre (un come
 instrucción de proceso, un atributo exótico), la respuesta casi siempre es la misma: hace falta un
 sentinel con un atributo `data-*` más un Node de TipTap que lo reclame, porque ProseMirror no
 conserva nada que su esquema no nombre.
+
+---
+
+## Bug 2: abrir un .md y guardarlo lo reescribe aunque no se pierda contenido (ABIERTO)
+
+### Síntoma
+
+Tras arreglar el bug 1, abrir el `CLAUDE.md` del repo en el editor rico y guardar sigue produciendo
+un diff enorme. Ya no se pierde contenido: lo que cambia es el formato. Los párrafos partidos a mano
+a 100 columnas salen en una sola línea larga, el padding de las columnas de las tablas se normaliza,
+y dos líneas en blanco seguidas se quedan en una.
+
+### Causa raíz
+
+`MarkdownDocumentBuffer.isDirty()` compara el markdown serializado desde el editor contra el texto
+que se leyó del disco. Pero el round-trip normaliza el formato por diseño, así que esos dos textos
+no coinciden nunca para un fichero escrito a mano: **el buffer se declara sucio sin que el usuario
+haya tocado nada**, en cuanto cualquier transacción de ProseMirror dispara el `onUpdate` de
+`RichMarkdownEditor` (una extensión que normalice el documento al cargarlo basta).
+
+A partir de ahí, cualquiera de los tres caminos de guardado escribe la versión normalizada: el Cmd+S
+explícito, el autosave de `editorAutoSaveDelay`, y el flush de desmontaje de `useMarkdownDocument`,
+que llama a `saveNow()` si el buffer está sucio. Ese último es el peor, porque reescribe el fichero
+por el simple hecho de haber abierto y cerrado el tab.
+
+El reflow en sí no tiene arreglo dentro de esta arquitectura: CommonMark trata el salto de línea
+simple como un espacio, así que el documento de ProseMirror no tiene dónde guardar "aquí había un
+salto de línea suave". Es exactamente el modo de fallo que anticipaba `TIPTAP_VS_MILKDOWN.md`.
+
+### Fix propuesto, pendiente de decisión
+
+Separar "el fichero ha cambiado" de "el usuario ha editado". Al cargar (y en `replaceFromDisk`),
+calcular una vez la forma normal del cuerpo, `htmlToMarkdown(markdownToHtml(body))`, y guardarla
+como línea base. `isDirty()` pasa a comparar el cuerpo serializado contra esa línea base en vez de
+contra el texto del disco. Así, abrir y guardar sin editar no escribe nada, y el fichero solo se
+normaliza cuando de verdad hay una edición.
+
+Ojo con lo que ese fix NO arregla: en cuanto el usuario edita una palabra y guarda, el fichero
+entero se reformatea igualmente. Garantizar la fidelidad también en ese caso es la pregunta
+arquitectónica que plantea `TIPTAP_VS_MILKDOWN.md`, y es otra tarea.
+
+### Lección
+
+Un editor WYSIWYG sobre markdown escrito a mano tiene dos problemas distintos que conviene no
+mezclar: la pérdida de contenido, que se arregla nodo a nodo, y la normalización de formato, que no
+se arregla y que por tanto no debe llegar a disco por su cuenta.

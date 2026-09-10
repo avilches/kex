@@ -29,6 +29,7 @@ const CORPUS: Record<string, string> = {
   pageBreak: '<div style="page-break-after: always;"></div>\n',
   emptyParagraphs: "a\n\n<!-- -->\n\nb\n",
   htmlComment: "before\n\n<!-- a real comment -->\n\nafter\n",
+  htmlCommentMultiline: "before\n\n<!-- line one\n     line two -->\n\nafter\n",
   codeFenceInListItem: "- item text\n    ```tsx\n    const x = 1;\n    ```\n",
   hardBreak: "line one  \nline two\n",
   frontmatterFree: "no frontmatter here, just text\n",
@@ -117,6 +118,21 @@ describe("round-trip idempotence", () => {
     const input = "intro\n\n<!-- BACKLOG.MD GUIDELINES START -->\n\nbody\n";
     const md1 = htmlToMarkdown(markdownToHtml(input));
     expect(md1).toBe(input);
+  });
+
+  it("preserves a multi-line HTML comment with its own indentation", () => {
+    const input = "intro\n\n<!-- primera linea\n     segunda linea con sangria\n     tercera -->\n\nbody\n";
+    const md1 = htmlToMarkdown(markdownToHtml(input));
+    expect(md1).toBe(input);
+  });
+
+  it("does not build a sentinel out of an unterminated comment", () => {
+    // CommonMark makes an unclosed comment run to the end of the document, so markdown-it
+    // swallows what follows. That is pre-existing and not ours to change here; what
+    // matters is that the scan gives up instead of inventing a sentinel.
+    const md1 = htmlToMarkdown(markdownToHtml("intro\n\n<!-- never closed\n\nbody\n"));
+    expect(md1).not.toContain("data-html-comment");
+    expect(md1).toBe("intro\n");
   });
 
   it("keeps two adjacent comment lines separate and intact", () => {
