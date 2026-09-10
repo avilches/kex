@@ -5,6 +5,7 @@ export class MarkdownDocumentBuffer {
   private savedBody: string;
   private body: string;
   private savedRaw: string;
+  private baselineBody: string | null;
 
   constructor(raw: string) {
     const { frontmatter, body } = splitFrontmatter(raw);
@@ -12,6 +13,7 @@ export class MarkdownDocumentBuffer {
     this.savedBody = body;
     this.body = body;
     this.savedRaw = raw;
+    this.baselineBody = null;
   }
 
   get frontmatter(): string {
@@ -26,8 +28,17 @@ export class MarkdownDocumentBuffer {
     this.body = next;
   }
 
+  // What the untouched document serializes to. The markdown round trip normalizes
+  // formatting on purpose (a hand-wrapped paragraph comes back as one line), so the
+  // editor's output never equals a hand-written file and a plain comparison against
+  // the text on disk reports every freshly opened file as modified.
+  setBaseline(body: string): void {
+    this.baselineBody = body;
+  }
+
   isDirty(): boolean {
-    return this.body !== this.savedBody;
+    if (this.body === this.savedBody) return false;
+    return this.body !== this.baselineBody;
   }
 
   contentToSave(): string | null {
@@ -38,6 +49,9 @@ export class MarkdownDocumentBuffer {
   markSaved(): void {
     this.savedBody = this.body;
     this.savedRaw = joinFrontmatter(this.frontmatterValue, this.body);
+    // The file on disk now carries the normalized text, so there is nothing left to
+    // excuse: dropping the baseline keeps an undo back to the loaded form saveable.
+    this.baselineBody = null;
   }
 
   replaceFromDisk(raw: string): boolean {
@@ -47,6 +61,7 @@ export class MarkdownDocumentBuffer {
     this.savedRaw = raw;
     this.savedBody = body;
     this.body = body;
+    this.baselineBody = null;
     return true;
   }
 }

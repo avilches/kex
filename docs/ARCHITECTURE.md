@@ -520,7 +520,9 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │   │                            read-only preview (Streamdown), kept behind `markdownEditor: "legacy"`.
     │   │                            `lib/` is the pure conversion core shared by both modes: `frontmatter.ts`
     │   │                            (byte-preserved prefix split/rejoin), `markdownToHtml.ts` / `htmlToMarkdown.ts`
-    │   │                            (round-trip via `markdown-it`), `documentBuffer.ts`, `useMarkdownDocument.ts`
+    │   │                            (round-trip via `markdown-it`), `documentBuffer.ts` (dirty tracking against a
+    │   │                            load-time baseline, so reformatting alone never reaches disk: see
+    │   │                            `docs/MARKDOWN_GOTCHAS.md` bug 2), `useMarkdownDocument.ts`
     │   │                            (buffer ownership), `wikiLinks.ts` (`[[note]]` resolution), `callouts.ts`.
     │   │                            `rich/` is the default TipTap 3 WYSIWYG editor: `MarkdownTab.tsx` (tab shell,
     │   │                            owns the Rich/Source toggle), `RichMarkdownEditor.tsx` (the `useEditor` instance

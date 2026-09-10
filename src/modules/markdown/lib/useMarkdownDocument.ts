@@ -172,6 +172,15 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     await saveNow();
   }, [clearAutoSaveTimer, saveNow]);
 
+  // Recorded once per load from the editor itself, so it matches what a save would
+  // write for an untouched document. See docs/MARKDOWN_GOTCHAS.md, bug 2.
+  const setBaseline = useCallback((body: string) => {
+    const buf = bufferRef.current;
+    if (!buf) return;
+    buf.setBaseline(body);
+    setDirty(buf.isDirty());
+  }, []);
+
   const onChange = useCallback(
     (body: string) => {
       const buf = bufferRef.current;
@@ -209,5 +218,5 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     };
   }, [path, clearAutoSaveTimer, saveNow]);
 
-  return { doc, dirty, onChange, save, reload };
+  return { doc, dirty, onChange, setBaseline, save, reload };
 }

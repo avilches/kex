@@ -111,7 +111,7 @@ conserva nada que su esquema no nombre.
 
 ---
 
-## Bug 2: abrir un .md y guardarlo lo reescribe aunque no se pierda contenido (ABIERTO)
+## Bug 2: abrir un .md y guardarlo lo reescribe aunque no se pierda contenido (RESUELTO)
 
 ### Síntoma
 
@@ -137,17 +137,33 @@ El reflow en sí no tiene arreglo dentro de esta arquitectura: CommonMark trata 
 simple como un espacio, así que el documento de ProseMirror no tiene dónde guardar "aquí había un
 salto de línea suave". Es exactamente el modo de fallo que anticipaba `TIPTAP_VS_MILKDOWN.md`.
 
-### Fix propuesto, pendiente de decisión
+### Fix
 
-Separar "el fichero ha cambiado" de "el usuario ha editado". Al cargar (y en `replaceFromDisk`),
-calcular una vez la forma normal del cuerpo, `htmlToMarkdown(markdownToHtml(body))`, y guardarla
-como línea base. `isDirty()` pasa a comparar el cuerpo serializado contra esa línea base en vez de
-contra el texto del disco. Así, abrir y guardar sin editar no escribe nada, y el fichero solo se
-normaliza cuando de verdad hay una edición.
+Se separa "el fichero ha cambiado" de "el usuario ha editado". `MarkdownDocumentBuffer` guarda una
+línea base opcional, `baselineBody`, con lo que serializa el documento recién cargado, e `isDirty()`
+devuelve falso cuando el cuerpo coincide con ella. `MarkdownTab` la registra una vez por revisión,
+en un efecto que dispara cuando la instancia del editor ya existe, llamando al `serialize()` del
+propio editor.
 
-Ojo con lo que ese fix NO arregla: en cuanto el usuario edita una palabra y guarda, el fichero
-entero se reformatea igualmente. Garantizar la fidelidad también en ese caso es la pregunta
-arquitectónica que plantea `TIPTAP_VS_MILKDOWN.md`, y es otra tarea.
+Se toma del editor, no de `htmlToMarkdown(markdownToHtml(body))`, a propósito: TipTap normaliza el
+documento al parsear el HTML, así que la forma normal de la capa pura no siempre coincide con lo que
+el editor emitiría. La línea base tiene que salir de la misma tubería que produce lo que se
+guardaría.
+
+La línea base se descarta al guardar (`markSaved`) y al recargar de disco (`replaceFromDisk`). Lo
+primero importa: sin descartarla, deshacer hasta volver a la forma cargada dejaría de considerarse
+un cambio y no se guardaría, con el fichero ya normalizado en el disco.
+
+### Lo que este fix NO arregla, a propósito
+
+- **En cuanto se edita una palabra y se guarda, el fichero entero se reformatea.** Garantizar la
+  fidelidad también en ese caso es la pregunta arquitectónica que plantea `TIPTAP_VS_MILKDOWN.md`, y
+  es otra tarea.
+- La línea base se registra **una sola vez por revisión**, cuando aparece la instancia del editor.
+  Si alguna extensión normalizase el documento en una transacción posterior a ese momento, el buffer
+  volvería a declararse sucio y el autosave escribiría. Es una decisión consciente: la alternativa
+  (seguir aceptando líneas base nuevas mientras el editor no haya tenido el foco) podría tragarse
+  una edición de verdad, y perder una edición es peor que reformatear un fichero.
 
 ### Lección
 

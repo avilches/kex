@@ -63,7 +63,7 @@ export function MarkdownTab(props: Props): JSX.Element {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const wikiLinksEnabled = usePreferencesStore((s) => s.markdownWikiLinks);
 
-  const { doc, onChange, save, reload } = useMarkdownDocument({
+  const { doc, onChange, setBaseline, save, reload } = useMarkdownDocument({
     path: props.path,
     onDirtyChange: (d) => props.callbacks.onEditorDirtyChange?.(props.tabId, d),
   });
@@ -86,6 +86,16 @@ export function MarkdownTab(props: Props): JSX.Element {
       cancelled = true;
     };
   }, [wikiLinksEnabled, workspaceRoot]);
+
+  // Record what the freshly loaded document serializes to, before the user can touch it.
+  // The round trip normalizes formatting, so without this every save path (Cmd+S, the
+  // autosave timer, the unmount flush) would rewrite a file nobody edited.
+  const readyRevision = doc.status === "ready" ? doc.revision : null;
+  useEffect(() => {
+    if (mode !== "rich" || readyRevision === null || !editor) return;
+    const md = richRef.current?.serialize();
+    if (md != null) setBaseline(md);
+  }, [editor, readyRevision, mode, setBaseline]);
 
   const handleNavigateFile = useCallback(
     (target: string) => {
