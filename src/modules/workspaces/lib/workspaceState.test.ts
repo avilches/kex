@@ -24,4 +24,29 @@ describe("sanitizeWorkspace", () => {
     expect(pane.tabs).toEqual([]);
     expect(pane.activeTabId).toBeNull();
   });
+
+  it("keeps two same-path markdown tabs with different engines", () => {
+    const w: Workspace = {
+      id: "ws-1",
+      title: "W",
+      activePaneId: "pane-1",
+      paneTree: {
+        kind: "pane",
+        id: "pane-1",
+        activeTabId: "tab-1",
+        tabs: [
+          { id: "tab-1", kind: "markdown", path: "/n/a.md", markdownEngine: "tiptap" },
+          { id: "tab-2", kind: "markdown", path: "/n/a.md", markdownEngine: "milkdown" },
+        ],
+      },
+    };
+
+    const out = sanitizeWorkspace(w);
+    const pane = out.paneTree as Extract<Workspace["paneTree"], { kind: "pane" }>;
+    expect(pane.tabs).toHaveLength(2);
+    expect(pane.tabs.map((t) => (t.kind === "markdown" ? t.markdownEngine : undefined))).toEqual([
+      "tiptap",
+      "milkdown",
+    ]);
+  });
 });

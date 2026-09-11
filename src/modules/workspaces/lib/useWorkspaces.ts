@@ -3,6 +3,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { isMarkdownPath } from "@/lib/utils";
+import { sealMarkdownEngine } from "@/modules/markdown/lib/sealMarkdownEngine";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
@@ -483,6 +484,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   ): string => {
     const freshPaneId = newPaneId();
     const freshSplitId = newSplitId();
+    const sealedTab = sealMarkdownEngine(withNewTabAutofocus(tab), usePreferencesStore.getState().markdownEngine);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -490,7 +492,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
         const newPanePosition: "first" | "second" = direction === "left" || direction === "top" ? "first" : "second";
-        const newTree = splitPaneAndInsertTab(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, withNewTabAutofocus(tab));
+        const newTree = splitPaneAndInsertTab(w.paneTree, targetPaneId, freshSplitId, freshPaneId, orientation, newPanePosition, sealedTab);
         if (newTree === w.paneTree) return w;
         return { ...w, paneTree: newTree, activePaneId: freshPaneId };
       }),
@@ -501,7 +503,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Tab operations ────────────────────────────────────────────────────────
 
   const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
-    const newTab = withNewTabAutofocus(tab);
+    const newTab = sealMarkdownEngine(withNewTabAutofocus(tab), usePreferencesStore.getState().markdownEngine);
     recordActivation(paneId, newTab.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -597,7 +599,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, [openTab, activeWorkspaceId]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
-    recordActivation(paneId, newTab.id);
+    const sealedTab = sealMarkdownEngine(newTab, usePreferencesStore.getState().markdownEngine);
+    recordActivation(paneId, sealedTab.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -607,8 +610,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
             const idx = p.tabs.findIndex((tab) => tab.id === oldTabId);
             if (idx === -1) return p;
             const newTabs = [...p.tabs];
-            newTabs[idx] = newTab;
-            return { ...p, tabs: newTabs, activeTabId: newTab.id };
+            newTabs[idx] = sealedTab;
+            return { ...p, tabs: newTabs, activeTabId: sealedTab.id };
           }),
         };
       }),
@@ -647,11 +650,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const setTabView = useCallback((workspaceId: string, tabId: string, mode: "rendered" | "raw") => {
     updateTabData(workspaceId, tabId, (p) => {
       if (mode === "raw" && p.kind === "markdown" && isMarkdownPath(p.path)) {
-        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, locked: p.locked, autofocus: p.autofocus };
+        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
       }
       if (mode === "rendered" && p.kind === "editor" && isMarkdownPath(p.path)) {
         if (p.dirty) return p;
-        return { id: p.id, kind: "markdown", path: p.path, title: p.title, locked: p.locked, autofocus: p.autofocus };
+        return { id: p.id, kind: "markdown", path: p.path, title: p.title, locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
       }
       return p;
     });

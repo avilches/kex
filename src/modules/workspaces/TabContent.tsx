@@ -10,6 +10,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
 import { resolveDisplayName } from "@/modules/editor/lib/languageResolver";
+import { resolveMarkdownEngine } from "@/modules/markdown/lib/markdownEngine";
 import {
   setEditorAutoSave,
   setEditorAutocompletion,
@@ -127,7 +128,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
-  const markdownEngine = usePreferencesStore((s) => s.markdownEngine);
+  const markdownEnginePref = usePreferencesStore((s) => s.markdownEngine);
   const scratchpadInNewTerminals = usePreferencesStore(
     (s) => s.scratchpadInNewTerminals,
   );
@@ -179,6 +180,11 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       : undefined;
   const effectivePreviewMode: "overlay" | "split" | undefined =
     rawPM === true ? "overlay" : !rawPM ? undefined : (rawPM as "overlay" | "split");
+
+  const tabMarkdownEngine =
+    tab.kind === "markdown" || tab.kind === "editor"
+      ? resolveMarkdownEngine(tab.markdownEngine, markdownEnginePref)
+      : markdownEnginePref;
 
   const prevEffectivePreviewModeRef = useRef<"overlay" | "split" | undefined>(undefined);
   useEffect(() => {
@@ -364,7 +370,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       );
 
     case "markdown":
-      if (markdownEngine === "tiptap") {
+      if (tabMarkdownEngine === "tiptap") {
         return (
           <Suspense fallback={null}>
             <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
@@ -392,7 +398,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                 onToggleOverlay: () => callbacks.onSetMarkdownView?.(tab.id, "raw"),
                 onToggleSplit: () => callbacks.onUpdateTab?.(tab.id, (p) => {
                   if (p.kind !== "markdown") return p;
-                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus };
+                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
                 }),
               }}
             />
