@@ -5,6 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
@@ -13,6 +14,7 @@ import { defaultMonoFontFamily } from "@/lib/fonts";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { type MarkdownEngine, setMarkdownEngine } from "@/modules/settings/store";
 import {
   type CursorStyle,
   type DiffViewMode,
@@ -79,6 +81,7 @@ export function EditorSection() {
   );
   const editorCursorStyle = usePreferencesStore((s) => s.editorCursorStyle);
   const diffViewMode = usePreferencesStore((s) => s.diffViewMode);
+  const markdownEngine = usePreferencesStore((s) => s.markdownEngine);
 
   return (
     <div className="flex flex-col gap-6">
@@ -193,6 +196,35 @@ export function EditorSection() {
               </SelectItem>
             </SelectContent>
           </Select>
+        </SettingRow>
+        <SettingRow
+          title="Markdown editor"
+          description="Which engine opens markdown files. Tabs that are already open keep the engine they were opened with."
+        >
+          <RadioGroup
+            value={markdownEngine}
+            onValueChange={(v) => void setMarkdownEngine(v as MarkdownEngine)}
+            className="gap-1.5"
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="tiptap" id="markdown-engine-tiptap" />
+              <label htmlFor="markdown-engine-tiptap" className="cursor-pointer text-[12px]">
+                TipTap
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="milkdown" id="markdown-engine-milkdown" />
+              <label htmlFor="markdown-engine-milkdown" className="cursor-pointer text-[12px]">
+                Milkdown
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="legacy" id="markdown-engine-legacy" />
+              <label htmlFor="markdown-engine-legacy" className="cursor-pointer text-[12px]">
+                Preview only
+              </label>
+            </div>
+          </RadioGroup>
         </SettingRow>
       </div>
 
