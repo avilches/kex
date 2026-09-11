@@ -1,0 +1,68 @@
+/* Milkdown/Crepe editor styling. No stock Crepe theme (frame, nord, etc.) is
+   imported: only the structural common/style.css plus this file, mapped onto
+   Kex tokens so switching markdown engines does not feel like switching
+   applications. Real --crepe-* names read from
+   node_modules/@milkdown/crepe/lib/theme/common/style.css and lib/theme/crepe/style.css. */
+
+.milkdown-editor .milkdown {
+  --crepe-color-background: transparent;
+  --crepe-color-on-background: var(--foreground);
+  --crepe-color-surface: var(--background);
+  --crepe-color-surface-low: var(--muted);
+  --crepe-color-on-surface: var(--foreground);
+  --crepe-color-on-surface-variant: var(--muted-foreground);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--primary);
+  --crepe-color-secondary: var(--accent);
+  --crepe-color-on-secondary: var(--accent-foreground);
+  --crepe-color-inverse: var(--foreground);
+  --crepe-color-on-inverse: var(--background);
+  --crepe-color-inline-code: var(--primary);
+  --crepe-color-error: var(--destructive);
+  --crepe-color-hover: var(--accent);
+  --crepe-color-selected: var(--accent);
+  --crepe-color-inline-area: var(--muted);
+  --crepe-base-font-size: 14px;
+  --crepe-font-title: inherit;
+  --crepe-font-default: inherit;
+  --crepe-font-code: var(--font-mono, ui-monospace, monospace);
+  height: 100%;
+}
+
+/* Crepe's stock ProseMirror padding (60px 120px) reads as a paper page; align
+   with the tiptap engine's panel padding so the two feel like one app. */
+.milkdown-editor .milkdown .ProseMirror {
+  padding: 16px 28px;
+}
+
+/* Heading scale and code radius aren't exposed as --crepe-* variables (fixed
+   em sizes and margins in reset.css), so align them with richMarkdown.css
+   directly. */
+.milkdown-editor .milkdown .ProseMirror h1 {
+  font-size: 1.75em;
+  margin-top: 1.5em;
+}
+.milkdown-editor .milkdown .ProseMirror h2 {
+  font-size: 1.4em;
+  margin-top: 1.25em;
+}
+.milkdown-editor .milkdown .ProseMirror h3 {
+  font-size: 1.2em;
+  margin-top: 1em;
+}
+.milkdown-editor .milkdown .ProseMirror h4 {
+  font-size: 1.05em;
+  margin-top: 0.9em;
+}
+.milkdown-editor .milkdown .ProseMirror h5,
+.milkdown-editor .milkdown .ProseMirror h6 {
+  font-size: 1em;
+  margin-top: 0.9em;
+}
+
+.milkdown-editor .milkdown .ProseMirror pre {
+  border-radius: 8px;
+}
+.milkdown-editor .milkdown .ProseMirror code {
+  border-radius: 4px;
+}
