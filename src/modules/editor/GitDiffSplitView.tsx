@@ -14,11 +14,6 @@ type Props = {
   themeExt: Extension;
 };
 
-const SPLIT_THEME = EditorView.theme({
-  "&": { height: "100%" },
-  ".cm-scroller": { overflow: "auto" },
-});
-
 export function GitDiffSplitView({
   path,
   originalContent,
@@ -40,7 +35,6 @@ export function GitDiffSplitView({
       EditorView.editable.of(false),
       themeExt,
       DIFF_THEME,
-      SPLIT_THEME,
       langCompartment.of(initialLang),
       lineNumbers ? lineNumbersExtView() : [],
       wrap ? EditorView.lineWrapping : [],
@@ -78,9 +72,13 @@ export function GitDiffSplitView({
   }, [path, originalContent, modifiedContent, langCompartment]);
 
   return (
-    <div
-      ref={hostRef}
-      className="h-full w-full overflow-hidden [&_.cm-mergeView]:h-full [&_.cm-mergeViewEditors]:h-full [&_.cm-mergeViewEditor]:h-full"
-    />
+    // Only .cm-mergeView must be pinned to h-full: it is the scroll container
+    // (@codemirror/merge's baseTheme forces overflow-y:auto on it and, with
+    // !important, forces every nested .cm-scroller/editor root to grow with
+    // its own content instead of the panel). Pinning .cm-mergeViewEditors or
+    // .cm-mergeViewEditor to h-full instead fights that and, combined with
+    // .cm-mergeViewEditor's own overflow:hidden, silently clips content taller
+    // than the panel instead of letting .cm-mergeView scroll it.
+    <div ref={hostRef} className="h-full w-full overflow-hidden [&_.cm-mergeView]:h-full" />
   );
 }
