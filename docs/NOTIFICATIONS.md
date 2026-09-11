@@ -1,12 +1,25 @@
 # Agent notification protocol
 
-Kex passively monitors terminal panels for coding agents (Claude Code, Codex, etc.) using OSC sequences. PTY bytes reach two consumers in parallel: `agent_detect.rs` in the Rust PTY reader, and xterm.js in the frontend via the Tauri channel. Neither consumer removes bytes from the stream.
+Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) through two independent channels that both
+end up emitting `kex:agent-signal` to the frontend, but never touch each other:
+
+1. **OSC bytes in the PTY stream.** `agent_detect.rs` in the Rust PTY reader watches for `OSC 133` (shell
+   integration) and `OSC 9` (Claude Code's built-in fallback notification). xterm.js in the frontend sees the same
+   bytes in parallel via the Tauri channel. Neither consumer removes bytes from the stream.
+2. **Claude Code hook JSON over a Unix socket, one per PTY.** `trigger-event.sh` forwards the hook's payload
+   unmodified to `pty/ipc.rs::run_listener`, which parses it directly and emits `kex:agent-signal` (or, for
+   `SessionStart`, records the session first). This path is entirely out of band from the PTY byte stream: it never
+   passes through `agent_detect.rs`, and it does not touch the OSC-driven `armed`/`status` state kept there. See
+   `docs/AGENT_SESSION_RESTORE.md` for the hook script and socket details.
+
+A previous version of the hook script (`kex-session-hook`, before it was renamed `trigger-event.sh`) fed its JSON
+through channel 1 instead, encoded as a single `OSC 777;kex;...` sequence and parsed by `agent_detect.rs`. That
+parser (`handle_kex_unified`, still tested) is kept in the code but nothing emits that sequence anymore; treat it as
+legacy/dead, not a live path (see TASK-733 for the decision on deleting it).
 
 ---
 
-## OSC sequence reference
-
-Format: `OSC 777;kex;<event>;<panel_id>;<session_id>;<transcript_path>;<cwd>[;<extra>]`
+## OSC sequence reference (channel 1: PTY bytes)
 
 | Sequence | Sent by | Cuando | `agent_detect.rs` (Rust) | `osc-handlers.ts` (xterm.js) | `AgentNotificationsBridge` (TS) |
 |---|---|---|---|---|---|
@@ -16,54 +29,74 @@ Format: `OSC 777;kex;<event>;<panel_id>;<session_id>;<transcript_path>;<cwd>[;<e
 | `OSC 133;B` | Shell (Kex init scripts) | Incrustado en `PS1`: el shell renderizó el prompt | | `state.inCommand=true` | |
 | `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse | Si `match_agent(cmd)`: `armed=true`, `status=Idle`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → noop |
 | `OSC 9;<msg>` (sin `9;4`) | Cualquier proceso | Claude Code lo usa para notificaciones cuando no hay hooks instalados | Si `armed`: `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
-| `OSC 777;kex;SessionStart;<panel_id>;<session_id>;<transcript_path>;<cwd>` | Hook `SessionStart` de Claude Code via `session.sh` | Claude Code inicia una nueva sesión (antes del primer prompt) | Parsea campos (todos percent-encoded), emit `SessionStart` (no llega al frontend) → `session_store::record_session` | | |
-| `OSC 777;kex;UserPromptSubmit;<panel_id>;<session_id>;<transcript_path>;<cwd>` | Hook `UserPromptSubmit` de Claude Code via `session.sh` | El usuario envió un prompt | `session_store::record_session` + `ensure_armed`, `status=Working`, emit `UserPromptSubmit` → `kex:agent-signal` | | `UserPromptSubmit` → `ensureSession` + `setStatus("working")` (spinner en el tab) |
-| `OSC 777;kex;Notification;<panel_id>;<session_id>;<transcript_path>;<cwd>;<type>;<msg>` | Hook `Notification` de Claude Code | Claude Code necesita input del usuario (permiso, pregunta, etc.) | Si `type == idle_prompt`: **ignorado** (ya lo cubre `Stop`). Resto: `ensure_armed`, `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
-| `OSC 777;kex;Stop;<panel_id>;<session_id>;<transcript_path>;<cwd>` | Hook `Stop` de Claude Code | Claude Code terminó de responder y vuelve a esperar input | `ensure_armed`, `status=Waiting`, emit `Stop`, `status=Idle` (permanece armado) → `kex:agent-signal` | | `Stop` → `setStatus("attention")` (dot naranja) + route "attention", salvo si el panel ya está enfocado (entonces `idle`) |
-| `OSC 777;kex;StopFailure;<panel_id>;<session_id>;<transcript_path>;<cwd>;<type>;<msg>` | Hook `StopFailure` de Claude Code | Claude Code falló con error | `status=Waiting`, emit `StopFailure` → `kex:agent-signal` | | `StopFailure` → route error + `store.finish()` + detach |
-| `OSC 777;kex;SessionEnd;<panel_id>;<session_id>;<transcript_path>;<cwd>;<reason>` | Hook `SessionEnd` de Claude Code | Sesión terminó limpiamente | emit `SessionEnd` → `kex:agent-signal` | | `SessionEnd` → `store.finish()` + detach |
-| `OSC 777;kex;PermissionRequest;<panel_id>;<session_id>;<transcript_path>;<cwd>;<tool>` | Hook `PermissionRequest` de Claude Code | Claude Code pide permiso para usar una herramienta | `ensure_armed`, `status=Waiting`, emit `PermissionRequest` → `kex:agent-signal` | | `PermissionRequest` → `setStatus("attention")` + route |
 
-`OSC 133` lo emite el shell (zsh/bash via los scripts de init de Kex), no Claude Code. Cuando el usuario lanza `claude`, el shell emite `C;claude` y deja de emitir OSC 133 porque Claude Code toma el PTY. El estado working/attention durante la sesión de Claude Code se conoce exclusivamente a través de los hooks.
+`OSC 133` lo emite el shell (zsh/bash via los scripts de init de Kex), no Claude Code. Cuando el usuario lanza `claude`, el shell emite `C;claude` y deja de emitir OSC 133 porque Claude Code toma el PTY: a partir de ahí, `armed`/`status` en `agent_detect.rs` ya no avanzan (solo `OSC 9` y `OSC 133;D` los tocan); el estado working/attention real durante la sesión se conoce a través del canal 2, más abajo.
 
 `OSC 9;4;...` es taskbar progress (Windows); se ignora aunque el detector esté armado.
 
 ---
 
-## Auto-arming (`ensure_armed`)
+## Unix socket hook events (channel 2)
 
-Si llega un `OSC 777;kex;*` sin que antes haya llegado `OSC 133;C` (bash, Windows, tmux, wrappers que no emiten shell integration), `ensure_armed` arma el detector (`status=Idle`) y emite `Started { agent: "claude" }` antes de la transición real. Esto garantiza que los hooks funcionan en cualquier entorno sin depender de la shell integration.
+`trigger-event.sh` reenvía el JSON del hook tal cual a `$KEX_IPC`. `pty/ipc.rs::dispatch` lo parsea y actúa
+directamente, sin pasar por `agent_detect.rs`:
+
+| `hook_event_name` | Cuando | `ipc.rs::dispatch` (Rust) | `AgentNotificationsBridge` (TS) |
+|---|---|---|---|
+| `SessionStart` | Claude Code inicia una nueva sesión, incluida una reanudada con `--resume` (payload `source`) | `session_store::record_session(...)`, emit `kex:agent-session-meta` (no llega a `kex:agent-signal`) | (ninguno; solo alimenta la restauración de sesión) |
+| `UserPromptSubmit` | El usuario envió un prompt | emit `kex:agent-signal` `kind: "UserPromptSubmit"` | `ensureSession` + `setStatus("working")` (spinner en el tab) |
+| `Notification` | Claude Code necesita input del usuario (permiso, pregunta, etc.) | Si `notification_type == idle_prompt`: **ignorado** (ya lo cubre `Stop`). Resto: emit `kex:agent-signal` `kind: "Notification"` | `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
+| `Stop` | Claude Code terminó de responder y vuelve a esperar input | emit `kex:agent-signal` `kind: "Stop"` | Si panel enfocado: `setStatus("idle")`. Si no: `setStatus("attention")` (dot naranja) + route "attention" |
+| `StopFailure` | Claude Code falló con error | emit `kex:agent-signal` `kind: "StopFailure"` | route error + `store.finish()` + detach |
+| `SessionEnd` | Sesión terminó limpiamente | emit `kex:agent-signal` `kind: "SessionEnd"` | `store.finish()` + detach |
+| `PermissionRequest` | Claude Code pide permiso para usar una herramienta | emit `kex:agent-signal` `kind: "PermissionRequest"` | `setStatus("attention")` + route |
+| `MessageDisplay` | Mensaje final de un turno (campos por confirmar) | Si `final` es falso, ignorado; si es verdad, emit `kex:agent-signal` `kind: "MessageDisplay"` | `ensureSession` (sin efecto adicional hoy) |
+
+Ningún evento de este canal arma ni desarma `agent_detect.rs`: `armed`/`status` ahí solo reaccionan a `OSC 133`/`OSC 9`
+(canal 1). El estado `working`/`attention`/`idle` que ve el usuario vive enteramente en `agentStore` del frontend,
+actualizado por `handleSignal` en `AgentNotificationsBridge.tsx` a partir de estos eventos.
+
+---
+
+## Auto-arming (`ensure_armed`), legado
+
+`ensure_armed` solo lo llama `handle_kex_unified`, el parser del extinto `OSC 777;kex;*` (ver arriba). Con ese canal
+muerto, `ensure_armed` es código sin ninguna ruta de entrada viva hoy: no arma nada a partir de los eventos del
+socket Unix, que nunca pasan por `agent_detect.rs`.
 
 ---
 
 ## Detector state machine
 
+El único estado que mantiene hoy `agent_detect.rs` es el de armado/desarmado del canal 1 (OSC), no el ciclo
+working/waiting completo:
+
 ```
-           OSC 133;C (match_agent) — puede disparar aunque ya esté armado
-Ground ─────────────────────────────► Armed/Idle
-         (o ensure_armed auto-arm)         │
-                                           │ OSC 777;kex;UserPromptSubmit
-                                           ▼
-                                    Armed/Working
-                                           │
-         OSC 777;kex;Notification          │ OSC 777;kex;Stop
-         OSC 777;kex;PermissionRequest     ▼
-         OSC 9 / OSC 777;otro             
-         ──────────────────────► Armed/Waiting
-                                           │
-              OSC 777;kex;UserPromptSubmit │◄──── set_working (siempre emite)
-              ─────────────────────────────┘
-                                           │
-              OSC 133;D / PTY close        ▼
-              ──────────────────────► Ground (disarmed)
+OSC 133;C (match_agent)
+Ground ──────────────────► Armed
+                              │
+       OSC 133;D / PTY close │
+       ─────────────────────►┘
+                              ▼
+                           Ground (disarmed)
 ```
 
+Mientras está `Armed`, `OSC 9` sigue produciendo una señal `Notification` genérica (sin `session_id`, para cuando
+Claude Code no tiene hooks instalados). El resto de transiciones que antes vivían en este mismo diagrama
+(`Working`/`Waiting` por `UserPromptSubmit`/`Notification`/`Stop`/etc.) ya no las lleva Rust: las decide directamente
+`agentStore` en el frontend a partir de los eventos del canal 2, uno por uno, según la tabla de la sección anterior.
+
 Notas clave:
-- **`Stop` no desarma el detector**: Claude sigue corriendo, solo ha terminado de responder. El detector Rust queda en `Idle` listo para el siguiente prompt. En el frontend, `Stop` es el origen del dot naranja (es tu turno): pone `attention` salvo que ya estés mirando el panel.
-- **El dot naranja al terminar viene de `Stop`, no de `idle_prompt`**: `idle_prompt` (un reenvío tardío que Claude puede repetir) se filtra en Rust, de modo que el fin de turno produce una sola señal de atención.
-- **`set_working` siempre emite**: no hay guard de idempotencia en Rust. El store del frontend maneja duplicados. Esto es necesario para que el spinner se recupere tras un ESC/CTRL+C (el frontend borra la sesión, Rust no lo sabe, el siguiente `UserPromptSubmit` debe re-crearla).
-- **`OSC 133;C` puede re-armar**: no hay guard `if armed { return }`. Si el usuario sale de Claude y lo relanza en el mismo terminal, el nuevo `133;C` re-arma correctamente.
-- **Otros eventos v4**: `StopFailure`, `SessionEnd`, `PermissionRequest` llegan tras ensure_armed, mueven estado según sus semánticas, y emiten señales propias al frontend.
+- **`Stop` no cierra la sesión**: Claude sigue corriendo, solo ha terminado de responder. En el frontend, `Stop` es
+  el origen del dot naranja (es tu turno): pone `attention` salvo que ya estés mirando el panel, en cuyo caso pasa a
+  `idle` directamente.
+- **El dot naranja al terminar viene de `Stop`, no de `idle_prompt`**: `idle_prompt` (un reenvío tardío que Claude
+  puede repetir) se filtra en `ipc.rs::dispatch`, de modo que el fin de turno produce una sola señal de atención.
+- **No hay guard de idempotencia en el socket**: cada `UserPromptSubmit` se reenvía tal cual llega. El store del
+  frontend maneja duplicados. Esto es necesario para que el spinner se recupere tras un ESC/CTRL+C (el frontend
+  borra la sesión, Rust no lo sabe, el siguiente `UserPromptSubmit` debe re-crearla vía `ensureSession`).
+- **`OSC 133;C` puede re-armar el canal 1**: no hay guard `if armed { return }`. Si el usuario sale de Claude y lo
+  relanza en el mismo terminal, el nuevo `133;C` re-arma correctamente, independientemente del estado del canal 2.
 
 ---
 
@@ -132,13 +165,17 @@ El spinner refleja estado real del agente, así que solo lo limpian las interrup
 
 ### Re-aparición del spinner tras interrupción
 
-Cuando el usuario interrumpe (ESC/CTRL+C), el frontend borra la sesión pero el detector Rust no cambia de estado. Cuando el usuario envía el siguiente prompt, `set_working` emite `UserPromptSubmit` siempre (sin guard), `ensureSession` re-crea la sesión, y el spinner vuelve a aparecer.
+Cuando el usuario interrumpe (ESC/CTRL+C), el frontend borra la sesión pero nada en el socket Unix ni en Rust se
+entera. Cuando el usuario envía el siguiente prompt, `trigger-event.sh` reenvía el `UserPromptSubmit` como siempre
+(sin guard de por medio), `ensureSession` re-crea la sesión en el frontend, y el spinner vuelve a aparecer.
 
 ---
 
 ## Zero cost when idle
 
-El detector corre enteramente en el filtro de bytes del PTY. Cuando no hay ningún agente corriendo no se realiza ningún trabajo extra; no hay timers ni peticiones en background.
+El detector del canal 1 corre enteramente en el filtro de bytes del PTY. El listener del canal 2 (un hilo por PTY,
+bloqueado en `accept()`) tampoco hace trabajo mientras no llega ningún hook. En ninguno de los dos casos hay timers
+ni peticiones en background cuando no hay ningún agente corriendo.
 
 ---
 
@@ -146,8 +183,10 @@ El detector corre enteramente en el filtro de bytes del PTY. Cuando no hay ning�
 
 Hooks can be installed from the notification bell popover. `agent_enable_claude_hooks`:
 - Reads `~/.claude/settings.json` atomically
-- Injects hook entries for `UserPromptSubmit`, `Notification`, `Stop`, and `SessionStart` without touching unrelated settings
-- Is idempotent — safe to run on an already-configured installation
+- Injects hook entries for all 8 events handled by `trigger-event.sh` (`SessionStart`, `UserPromptSubmit`,
+  `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`) without touching
+  unrelated settings
+- Is idempotent, safe to run on an already-configured installation
 - On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
 
-See `docs/AGENT_SESSION_RESTORE.md` for the session persistence hooks (`SessionStart`, `session.sh`).
+See `docs/AGENT_SESSION_RESTORE.md` for the session persistence hooks (`SessionStart`, `trigger-event.sh`).

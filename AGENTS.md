@@ -156,14 +156,19 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **updater/** — auto-updater UI built on `tauri-plugin-updater`.
 - **agents/** — terminal coding-agent notifications (Claude Code; Codex later). Shared store (`store/agentStore.ts`:
   terminal `sessions` + `notifications`) and a shared router (`lib/route.ts`: suppress when focused-and-visible,
-  OS-notify when unfocused, in-app Sonner toast when focused-but-hidden) feed the header `NotificationBell`. Terminal
-  detection is Rust-side (`pty/agent_detect.rs`) on the PTY reader's byte filter, armed on `OSC 133;C;<cmd>`, emitting
-  `kex:agent-signal` transitions (`started`/`working`/`attention`/`finished`/`exited`) driven only by OSC sequences (
-  never raw output, so a repainting TUI never flaps) — zero cost when no agent runs. Terminal signals arrive via Claude
-  Code hooks (`UserPromptSubmit`/`Notification`/`Stop`) returning an `OSC 777` marker through the `terminalSequence`
-  field (hooks lost `/dev/tty` access in v2.1.139); `agent_enable_claude_hooks` installs them (atomic write, never
-  clobbers invalid JSON, prunes empty groups), gated on `KEX_TERMINAL`, and the marker self-arms the detector so it
-  works in bash/Windows/tmux without shell preexec.
+  OS-notify when unfocused, in-app Sonner toast when focused-but-hidden) feed the header `NotificationBell`. Liveness
+  (`started`/`exited`) is Rust-side (`pty/agent_detect.rs`) on the PTY reader's byte filter, armed on `OSC 133;C;<cmd>`
+  and disarmed on `OSC 133;D`/PTY close, driven only by OSC sequences (never raw output, so a repainting TUI never
+  flaps). Session status (`UserPromptSubmit`/`Notification`/`Stop`/`StopFailure`/`SessionEnd`/`PermissionRequest`)
+  arrives out of band: Claude Code hooks (installed by `agent_enable_claude_hooks`, atomic write, never clobbers
+  invalid JSON, prunes empty groups, gated on `KEX_TERMINAL`) run the script `agent/hooks/trigger-event.sh` (marker
+  `kex-session-v5`), which forwards the hook's JSON payload as-is over a Unix domain socket, one per PTY
+  (`pty/ipc.rs`, `$TMPDIR/kex-ipc-<pty_id>.sock`, env `KEX_IPC`, `nc -U` with a `python3` fallback). The listener
+  (`ipc.rs::run_listener`, `#![cfg(unix)]`) parses the JSON directly and emits `kex:agent-signal` (or, for
+  `SessionStart`, calls `session_store::record_session` first); it never touches `agent_detect.rs` or its
+  armed/status state machine, and this whole path is absent on native Windows. The older `OSC 777;kex;...` unified
+  marker that a previous version of the hook script emitted through `terminalSequence` is still parsed by
+  `agent_detect.rs::handle_kex_unified`, but nothing emits it anymore — that code path is dead today.
 
 ### UI conventions
 

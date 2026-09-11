@@ -38,25 +38,31 @@ terminal, including hook scripts.
 Triggered by Claude Code at session start. The hook command:
 
 ```
-[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/session.sh" || true  # kex-session-hook
+[ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/session.sh`, marker: `kex-session-v5`) handles multiple Claude Code hook events:
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v5`) handles all 8 registered Claude Code
+hook events the same way:
 
-1. Reads `KEX_TAB_ID` from the environment. If unset, exits silently (tab is not managed by Kex).
-2. Reads the JSON event from stdin and extracts `hook_event_name`, `session_id`, `transcript_path`, and `cwd` via `jq`.
-3. For `SessionStart` and `UserPromptSubmit`: records the session via `session_store::record_session` (necessary
-   for `--resume` to work across restarts).
-4. For all events (SessionStart, UserPromptSubmit, Notification, Stop, StopFailure, SessionEnd, PermissionRequest):
-   builds a unified OSC sequence: `OSC 777;kex;<event>;<tab_id>;<session_id>;<transcript_path>;<cwd>[;<extra>]`
-   where `<extra>` fields (e.g., error type, message) are only present for certain events and are percent-encoded.
-5. Emits the OSC sequence through `terminalSequence`.
-6. Rust `agent_detect.rs` intercepts and processes the OSC, calling `session_store::record_session` for recording
-   events and emitting appropriate signals to the frontend.
+1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
+   managed by Kex).
+2. Reads the full JSON payload from stdin and extracts `hook_event_name` via `jq`, only to pick the handler and to
+   log it. `jq` is not used to build anything downstream.
+3. Appends the full payload to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` (uncapped, for field
+   discovery; see TASK-734).
+4. Forwards the JSON payload byte for byte, unmodified, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
+   falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, or
+   `KEX_IPC` is unset, the event is silently dropped (`|| true`); there is no retry or spool (TASK-730).
+5. `pty/ipc.rs::run_listener`, one thread per PTY listening on `$TMPDIR/kex-ipc-<pty_id>.sock`, reads the JSON
+   directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
+   `kex:agent-session-meta`; for every other event (`UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`,
+   `SessionEnd`, `PermissionRequest`, `MessageDisplay`) it emits `kex:agent-signal` directly with a `kind` matching
+   the event name. None of this goes through `agent_detect.rs` or its OSC byte-level state machine.
 
-`UserPromptSubmit` handling is required because Claude Code does not fire `SessionStart` when resuming a session
-with `--resume`. Without it, sessions started via `claude --resume` (whether by the user or by Kex at startup) are
-never written to the store on subsequent runs and cannot be restored on the next launch.
+Only `SessionStart` calls `session_store::record_session` today. The payload carries a `source` field
+(`startup|resume|clear|compact`, see the field-discovery comment in `agent/mod.rs`), so a session opened via
+`claude --resume` also fires `SessionStart` and gets recorded through the same path; there is no separate
+`UserPromptSubmit`-based recording in the live mechanism.
 
 Sessions are cleared from the store when the agent exits (`OSC 133;D` → `agent_detach_session`) or the user detaches
 manually. Panels typically close while in idle state because the webview is destroyed before the PTYs finish shutting
@@ -65,13 +71,15 @@ down, so a single store file is sufficient.
 ### Launch command capture
 
 The original CLI invocation is captured from `OSC 133;C;<cmd>` (the shell integration "command started" signal).
-Because `OSC 133;C` fires in the PTY reader thread while `SessionStart` arrives via the IPC socket thread,
+Because `OSC 133;C` fires in the PTY reader thread while `SessionStart` arrives on its own Unix socket thread,
 the command is bridged through a thread-safe stash:
 
-1. **Reader thread** (`session.rs`): `Transition::Started { cmd_string }` is emitted. If `cmd_string` is non-empty,
-   `session_store::stash_cmd(tab_id, cmd_string)` stores it in a `Mutex<HashMap<tab_id, cmd>>`.
-2. **IPC handler** (`agent_detect.rs` → `record_session`): `take_stashed_cmd(tab_id)` consumes and removes the
-   entry. The value becomes `SessionRecord::launch_cmd`.
+1. **PTY reader thread** (`session.rs`): `Transition::Started { cmd_string }` is emitted (from `agent_detect.rs`,
+   still driven by the real `OSC 133;C` byte). If `cmd_string` is non-empty, `session_store::stash_cmd(tab_id,
+   cmd_string)` stores it in a `Mutex<HashMap<tab_id, cmd>>`.
+2. **Unix socket listener** (`pty/ipc.rs::dispatch`, on `SessionStart`): calls `session_store::record_session(...)`,
+   which internally calls `take_stashed_cmd(tab_id)` to consume and remove the entry. The value becomes
+   `SessionRecord::launch_cmd`.
 
 The stash is keyed by `tab_id`; entries are consumed exactly once and are not visible across tabs.
 
@@ -258,6 +266,6 @@ Actions:
 | Session started with `-p`/`--print` | `record_session` skips; session never written to store |
 | JSONL transcript missing (no messages sent) | Entry removed from store; `claude --session-id <id>` injected — new session reuses same UUID |
 | cwd deleted between sessions | `resumeCmd` empty, `errorReason` set; tab shows `⚠` restore error |
-| `KEX_PANEL_ID` not set in shell | Hook exits silently; session not recorded |
+| `KEX_TAB_ID` not set in shell | Hook exits silently; session not recorded |
 | `agent_session_restore_plan` IPC fails | `loadRestorePlans` catches and sets an empty Map; no crash |
 | Resume command fails inside terminal | User sees the error in the terminal; `⚠` stays until user types |
