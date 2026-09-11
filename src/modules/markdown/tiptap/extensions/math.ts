@@ -1,6 +1,6 @@
 import { Node } from "@tiptap/core";
 import type { NodeView } from "@tiptap/pm/view";
-import type { MenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import type { MenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 
 export type MathEditRequest = { pos: number; kind: "block" | "inline"; tex: string } | null;
 

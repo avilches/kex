@@ -523,7 +523,7 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │   │                            load-time baseline, so reformatting alone never reaches disk: see
     │   │                            `docs/MARKDOWN_GOTCHAS.md` bug 2), `useMarkdownDocument.ts`
     │   │                            (buffer ownership), `wikiLinks.ts` (`[[note]]` resolution), `callouts.ts`.
-    │   │                            `rich/` is the default TipTap 3 WYSIWYG editor: `MarkdownTab.tsx` (tab shell,
+    │   │                            `tiptap/` is the default TipTap 3 WYSIWYG editor: `MarkdownTab.tsx` (tab shell,
     │   │                            owns the Rich/Source toggle), `RichMarkdownEditor.tsx` (the `useEditor` instance
     │   │                            and extension list), `Toolbar.tsx`, `OutlinePanel.tsx`, `SlashMenu.tsx`,
     │   │                            `FindBar.tsx`, `WikiLinkMenu.tsx`, `CodeLangDropdown.tsx`, `MathModal.tsx`, and

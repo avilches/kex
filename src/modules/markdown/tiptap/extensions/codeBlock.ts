@@ -3,8 +3,8 @@ import type { Node as PMNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { common, createLowlight } from "lowlight";
-import { lazyDecorationPlugin } from "@/modules/markdown/rich/extensions/lazyDecorationPlugin";
-import type { MenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import { lazyDecorationPlugin } from "@/modules/markdown/tiptap/extensions/lazyDecorationPlugin";
+import type { MenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 
 let lowlightSingleton: ReturnType<typeof createLowlight> | null = null;
 

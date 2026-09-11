@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import { type JSX, useEffect, useRef, useState } from "react";
-import type { MenuStore } from "@/modules/markdown/rich/lib/menuStore";
-import { useMenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import type { MenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
+import { useMenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 
 const OUTLINE_DEBOUNCE_MS = 250;
 const MIN_WIDTH = 160;

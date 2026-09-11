@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
-import { findMatches } from "@/modules/markdown/rich/extensions/noteSearch";
+import { findMatches } from "@/modules/markdown/tiptap/extensions/noteSearch";
 
 function docFor(html: string) {
   const editor = new Editor({ extensions: [StarterKit], content: html });

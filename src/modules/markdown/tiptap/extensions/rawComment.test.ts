@@ -4,7 +4,7 @@ import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { htmlToMarkdown } from "@/modules/markdown/lib/htmlToMarkdown";
 import { markdownToHtml } from "@/modules/markdown/lib/markdownToHtml";
-import { RawComment } from "@/modules/markdown/rich/extensions/rawComment";
+import { RawComment } from "@/modules/markdown/tiptap/extensions/rawComment";
 
 // Full save path, ProseMirror included: it is the DOM -> document parse that used to
 // drop HTML comments, so the pure markdownToHtml/htmlToMarkdown pair cannot prove this.

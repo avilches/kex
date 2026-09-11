@@ -6,7 +6,7 @@ import {
   applySearchDecorations,
   findMatches,
   type SearchMatch,
-} from "@/modules/markdown/rich/extensions/noteSearch";
+} from "@/modules/markdown/tiptap/extensions/noteSearch";
 
 const SEARCH_DEBOUNCE_MS = 150;
 

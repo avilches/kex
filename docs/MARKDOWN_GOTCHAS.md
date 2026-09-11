@@ -65,7 +65,7 @@ la reclame se pierde en silencio al abrir el fichero.
   patrón de sentinel que ya usaban `data-math-block` y `data-page-break`. Si el comentario abarca
   varias líneas, el escaneo avanza hasta la línea que lo cierra y mete el cuerpo entero, con sus
   saltos de línea y su sangría, en el mismo atributo, así que vuelve a salir byte a byte.
-- `rich/extensions/rawComment.ts`: Node atom de grupo block que reclama `div[data-html-comment]`,
+- `tiptap/extensions/rawComment.ts`: Node atom de grupo block que reclama `div[data-html-comment]`,
   para que ProseMirror lo conserve. Se renderiza como una línea mono discreta con el texto del
   comentario, en vez de dejar un hueco sin explicación en el editor.
 - `htmlToMarkdown.ts`: `serializeDiv` reconoce `data-html-comment` y devuelve `<!--contenido-->`.
@@ -82,7 +82,7 @@ Consecuencias:
 2. Es un argumento a favor del sentinel: cuando el comentario viaja como
    `<div data-html-comment="...">` es un Element, y happy-dom sí lo conserva.
 3. Para probar la capa de ProseMirror hay que construir un `Editor` de TipTap dentro del test, como
-   hace `rich/extensions/rawComment.test.ts`. Un `Editor` con solo `StarterKit` no registra la
+   hace `tiptap/extensions/rawComment.test.ts`. Un `Editor` con solo `StarterKit` no registra la
    extensión de tablas, así que una tabla se aplana en ese arnés: es artefacto del test, no un bug.
 
 ### Limitaciones conocidas que quedan

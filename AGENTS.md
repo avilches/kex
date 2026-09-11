@@ -132,7 +132,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
   `workspace-state.json` via `tauri-plugin-store`, debounced 300ms on every change.
 - **source-control/** — git status / stage / commit panel and diff workflow.
 - **git-history/** — commit graph rail, refs, per-commit file diffs.
-- **markdown/** — markdown preview renderer (backs the `markdown` tab kind); the default rich TipTap editor (`rich/`,
+- **markdown/** — markdown preview renderer (backs the `markdown` tab kind); the default rich TipTap editor (`tiptap/`,
   lazy chunk) with source-mode toggle, toolbar, outline, slash commands; and the pure markdown conversion core
   (`lib/`: frontmatter, markdownToHtml, htmlToMarkdown, documentBuffer, wikiLinks) shared by both.
 - **notes/** — notes view for the Sidebar (Quick Access + folder tree + sortable note list).

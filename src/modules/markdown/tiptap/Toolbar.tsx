@@ -1,11 +1,11 @@
 import type { Editor } from "@tiptap/core";
 import { type JSX, type ReactNode, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { insertCallout } from "@/modules/markdown/rich/extensions/callout";
-import { insertDetails } from "@/modules/markdown/rich/extensions/details";
-import { insertTimestamp } from "@/modules/markdown/rich/extensions/slashCommands";
-import type { MenuStore } from "@/modules/markdown/rich/lib/menuStore";
-import { useMenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import { insertCallout } from "@/modules/markdown/tiptap/extensions/callout";
+import { insertDetails } from "@/modules/markdown/tiptap/extensions/details";
+import { insertTimestamp } from "@/modules/markdown/tiptap/extensions/slashCommands";
+import type { MenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
+import { useMenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 
 const TEXT_COLORS: { name: string; value: string }[] = [
   { name: "Default", value: "" },

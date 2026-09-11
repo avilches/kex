@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import { createMenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 
 describe("createMenuStore", () => {
   it("reads, writes and notifies subscribers", () => {

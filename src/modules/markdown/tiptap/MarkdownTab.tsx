@@ -16,16 +16,16 @@ import {
   buildWikiLinkIndex,
   type WikiLinkEntry,
 } from "@/modules/markdown/lib/wikiLinks";
-import { OutlinePanel } from "@/modules/markdown/rich/OutlinePanel";
+import { OutlinePanel } from "@/modules/markdown/tiptap/OutlinePanel";
 import {
   RichMarkdownEditor,
   type RichMarkdownEditorHandle,
-} from "@/modules/markdown/rich/RichMarkdownEditor";
-import { Toolbar } from "@/modules/markdown/rich/Toolbar";
+} from "@/modules/markdown/tiptap/RichMarkdownEditor";
+import { Toolbar } from "@/modules/markdown/tiptap/Toolbar";
 import {
   createMenuStore,
   type MenuStore,
-} from "@/modules/markdown/rich/lib/menuStore";
+} from "@/modules/markdown/tiptap/lib/menuStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";

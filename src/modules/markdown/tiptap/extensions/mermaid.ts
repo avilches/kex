@@ -2,7 +2,7 @@ import { Extension } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { lazyDecorationPlugin } from "@/modules/markdown/rich/extensions/lazyDecorationPlugin";
+import { lazyDecorationPlugin } from "@/modules/markdown/tiptap/extensions/lazyDecorationPlugin";
 
 type MermaidModule = (typeof import("mermaid"))["default"];
 

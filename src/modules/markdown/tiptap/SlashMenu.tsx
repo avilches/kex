@@ -1,10 +1,10 @@
 import type { Editor } from "@tiptap/core";
 import { type ReactElement, useEffect, useRef, useState } from "react";
-import { useMenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import { useMenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 import {
   colorPresets,
   type SlashMenuController,
-} from "@/modules/markdown/rich/extensions/slashCommands";
+} from "@/modules/markdown/tiptap/extensions/slashCommands";
 
 const TABLE_ROWS = 8;
 const TABLE_COLS = 10;

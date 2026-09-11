@@ -2,7 +2,7 @@ import { Extension } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { lazyDecorationPlugin } from "@/modules/markdown/rich/extensions/lazyDecorationPlugin";
+import { lazyDecorationPlugin } from "@/modules/markdown/tiptap/extensions/lazyDecorationPlugin";
 
 // Color swatch decorations: render a small filled square before every hex/rgb/hsl color
 // literal (in normal text AND code blocks), VSCode-style. These are view-only widget

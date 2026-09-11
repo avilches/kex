@@ -6,10 +6,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import type { MathEditRequest } from "@/modules/markdown/rich/extensions/math";
-import { renderKatexInto } from "@/modules/markdown/rich/extensions/math";
-import type { MenuStore } from "@/modules/markdown/rich/lib/menuStore";
-import { useMenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import type { MathEditRequest } from "@/modules/markdown/tiptap/extensions/math";
+import { renderKatexInto } from "@/modules/markdown/tiptap/extensions/math";
+import type { MenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
+import { useMenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 
 const PREVIEW_DEBOUNCE_MS = 200;
 

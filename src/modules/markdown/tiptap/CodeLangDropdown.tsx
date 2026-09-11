@@ -1,8 +1,8 @@
 import { type ReactElement, useEffect, useRef, useState } from "react";
-import { getCodeLanguages } from "@/modules/markdown/rich/extensions/codeBlock";
-import type { CodeLangDropdownState } from "@/modules/markdown/rich/extensions/codeBlock";
-import type { MenuStore } from "@/modules/markdown/rich/lib/menuStore";
-import { useMenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import { getCodeLanguages } from "@/modules/markdown/tiptap/extensions/codeBlock";
+import type { CodeLangDropdownState } from "@/modules/markdown/tiptap/extensions/codeBlock";
+import type { MenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
+import { useMenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 
 export function CodeLangDropdown(props: { store: MenuStore<CodeLangDropdownState>; onSelect: (lang: string) => void }): ReactElement | null {
   const { store, onSelect } = props;

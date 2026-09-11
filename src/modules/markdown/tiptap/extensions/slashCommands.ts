@@ -8,7 +8,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import {
   createMenuStore,
   type MenuStore,
-} from "@/modules/markdown/rich/lib/menuStore";
+} from "@/modules/markdown/tiptap/lib/menuStore";
 
 export type SlashMenuState = {
   x: number;

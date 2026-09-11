@@ -27,61 +27,61 @@ import { toast } from "sonner";
 import { htmlToMarkdown } from "@/modules/markdown/lib/htmlToMarkdown";
 import { markdownToHtml } from "@/modules/markdown/lib/markdownToHtml";
 import type { WikiLinkContext, WikiLinkEntry } from "@/modules/markdown/lib/wikiLinks";
-import { CodeLangDropdown } from "@/modules/markdown/rich/CodeLangDropdown";
+import { CodeLangDropdown } from "@/modules/markdown/tiptap/CodeLangDropdown";
 import {
   Callout,
   CalloutTyping,
   insertCallout,
-} from "@/modules/markdown/rich/extensions/callout";
+} from "@/modules/markdown/tiptap/extensions/callout";
 import {
   type CodeLangDropdownState,
   CopyButtonExtension,
   createCodeBlockLanguageSelect,
   getLowlight,
-} from "@/modules/markdown/rich/extensions/codeBlock";
-import { CtrlEndScrollPastEnd } from "@/modules/markdown/rich/extensions/ctrlEndScrollPastEnd";
+} from "@/modules/markdown/tiptap/extensions/codeBlock";
+import { CtrlEndScrollPastEnd } from "@/modules/markdown/tiptap/extensions/ctrlEndScrollPastEnd";
 import {
   CollapsibleKeymap,
   DetailsOpenAttrSync,
   insertDetails,
-} from "@/modules/markdown/rich/extensions/details";
-import { HeadingShortcuts } from "@/modules/markdown/rich/extensions/headingShortcuts";
-import { RichImage } from "@/modules/markdown/rich/extensions/image";
+} from "@/modules/markdown/tiptap/extensions/details";
+import { HeadingShortcuts } from "@/modules/markdown/tiptap/extensions/headingShortcuts";
+import { RichImage } from "@/modules/markdown/tiptap/extensions/image";
 import {
   createMathBlock,
   createMathInline,
   type MathEditRequest,
-} from "@/modules/markdown/rich/extensions/math";
-import { createMermaidRenderer } from "@/modules/markdown/rich/extensions/mermaid";
-import { MoveLineShortcuts } from "@/modules/markdown/rich/extensions/moveLineShortcuts";
-import { NoteSearchExtension } from "@/modules/markdown/rich/extensions/noteSearch";
-import { PageBreak } from "@/modules/markdown/rich/extensions/pageBreak";
-import { RawComment } from "@/modules/markdown/rich/extensions/rawComment";
+} from "@/modules/markdown/tiptap/extensions/math";
+import { createMermaidRenderer } from "@/modules/markdown/tiptap/extensions/mermaid";
+import { MoveLineShortcuts } from "@/modules/markdown/tiptap/extensions/moveLineShortcuts";
+import { NoteSearchExtension } from "@/modules/markdown/tiptap/extensions/noteSearch";
+import { PageBreak } from "@/modules/markdown/tiptap/extensions/pageBreak";
+import { RawComment } from "@/modules/markdown/tiptap/extensions/rawComment";
 import {
   createSlashMenu,
   type SlashMenuController,
-} from "@/modules/markdown/rich/extensions/slashCommands";
-import { ColorSwatch } from "@/modules/markdown/rich/extensions/colorSwatch";
+} from "@/modules/markdown/tiptap/extensions/slashCommands";
+import { ColorSwatch } from "@/modules/markdown/tiptap/extensions/colorSwatch";
 import {
   RichTableCell,
   RichTableHeader,
-} from "@/modules/markdown/rich/extensions/table";
-import { TabIndent } from "@/modules/markdown/rich/extensions/tabIndent";
+} from "@/modules/markdown/tiptap/extensions/table";
+import { TabIndent } from "@/modules/markdown/tiptap/extensions/tabIndent";
 import {
   createWikiLink,
   createWikiLinkAutocomplete,
   type WikiLinkController,
-} from "@/modules/markdown/rich/extensions/wikiLink";
-import { WrapSelectedText } from "@/modules/markdown/rich/extensions/wrapSelectedText";
+} from "@/modules/markdown/tiptap/extensions/wikiLink";
+import { WrapSelectedText } from "@/modules/markdown/tiptap/extensions/wrapSelectedText";
 import {
   createMenuStore,
   type MenuStore,
-} from "@/modules/markdown/rich/lib/menuStore";
-import { FindBar } from "@/modules/markdown/rich/FindBar";
-import { MathModal } from "@/modules/markdown/rich/MathModal";
-import { SlashMenu } from "@/modules/markdown/rich/SlashMenu";
-import { WikiLinkMenu } from "@/modules/markdown/rich/WikiLinkMenu";
-import "@/modules/markdown/rich/richMarkdown.css";
+} from "@/modules/markdown/tiptap/lib/menuStore";
+import { FindBar } from "@/modules/markdown/tiptap/FindBar";
+import { MathModal } from "@/modules/markdown/tiptap/MathModal";
+import { SlashMenu } from "@/modules/markdown/tiptap/SlashMenu";
+import { WikiLinkMenu } from "@/modules/markdown/tiptap/WikiLinkMenu";
+import "@/modules/markdown/tiptap/richMarkdown.css";
 
 const SERIALIZE_DEBOUNCE_MS = 300;
 

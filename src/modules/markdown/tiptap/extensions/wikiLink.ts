@@ -6,7 +6,7 @@ import {
   type WikiLinkContext,
   type WikiLinkEntry,
 } from "@/modules/markdown/lib/wikiLinks";
-import { createMenuStore, type MenuStore } from "@/modules/markdown/rich/lib/menuStore";
+import { createMenuStore, type MenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
 
 // inclusive: true so typing at the end of a link extends the mark, allowing the user to
 // edit a title in-place. Moving the cursor one step past the mark exits it, so typing plain

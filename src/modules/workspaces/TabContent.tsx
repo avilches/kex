@@ -44,7 +44,7 @@ const GitHistoryPane = lazy(() =>
   import("@/modules/git-history/GitHistoryPane").then((m) => ({ default: m.GitHistoryPane as ComponentType<any> })),
 );
 const MarkdownTab = lazy(() =>
-  import("@/modules/markdown/rich/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
+  import("@/modules/markdown/tiptap/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
 );
 
 const GLOBAL_TOGGLE_SETTERS: Record<

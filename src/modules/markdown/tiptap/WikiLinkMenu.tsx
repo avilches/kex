@@ -1,8 +1,8 @@
 import type { Editor } from "@tiptap/core";
 import { type ReactElement, useEffect, useRef } from "react";
 import type { WikiLinkEntry } from "@/modules/markdown/lib/wikiLinks";
-import { useMenuStore } from "@/modules/markdown/rich/lib/menuStore";
-import type { WikiLinkController } from "@/modules/markdown/rich/extensions/wikiLink";
+import { useMenuStore } from "@/modules/markdown/tiptap/lib/menuStore";
+import type { WikiLinkController } from "@/modules/markdown/tiptap/extensions/wikiLink";
 
 const MAX_RESULTS = 8;
 
