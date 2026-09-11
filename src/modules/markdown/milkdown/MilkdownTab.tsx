@@ -4,6 +4,7 @@ import { EditorPathBar } from "@/modules/editor";
 import { EditorPane, type EditorPaneHandle } from "@/modules/editor/EditorPane";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
 import { useMarkdownTabController } from "@/modules/markdown/lib/useMarkdownTabController";
+import { shouldRegisterMilkdownBaseline } from "@/modules/markdown/milkdown/baselineGate";
 import {
   MilkdownEditor,
   type MilkdownEditorHandle,
@@ -25,6 +26,7 @@ export function MilkdownTab(props: Props): JSX.Element {
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [headings, setHeadings] = useState<OutlineHeading[]>([]);
   const [initError, setInitError] = useState<string | null>(null);
+  const [editorReady, setEditorReady] = useState(false);
   const milkRef = useRef<MilkdownEditorHandle>(null);
   const editorPaneRef = useRef<EditorPaneHandle>(null);
 
@@ -41,15 +43,27 @@ export function MilkdownTab(props: Props): JSX.Element {
   });
   const { mode, doc, onChange, setBaseline } = ctrl;
 
+  // MilkdownEditor (re)mounts fresh on a revision bump and on every rich<->source
+  // toggle (even one that leaves the revision untouched, e.g. peeking at Source and
+  // switching straight back). Crepe boots asynchronously, so the previous instance's
+  // readiness never applies to the new one: reset it here so the baseline effect below
+  // always waits for the fresh instance's own onReady.
+  const readyRevision = doc.status === "ready" ? doc.revision : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: readyRevision and mode are the remount signal, not read in the body
+  useEffect(() => {
+    setEditorReady(false);
+  }, [readyRevision, mode]);
+
   // Record what the freshly loaded document serializes to, before the user can touch it.
   // The round trip normalizes formatting, so without this every save path (Cmd+S, the
-  // autosave timer, the unmount flush) would rewrite a file nobody edited.
-  const readyRevision = doc.status === "ready" ? doc.revision : null;
+  // autosave timer, the unmount flush) would rewrite a file nobody edited. Gated on
+  // editorReady because Crepe.create() resolves after this component's mount effects
+  // already ran, so serialize() would otherwise read a not-yet-booted instance.
   useEffect(() => {
-    if (mode !== "rich" || readyRevision === null) return;
+    if (!shouldRegisterMilkdownBaseline({ mode, readyRevision, editorReady })) return;
     const md = milkRef.current?.serialize();
     if (md != null) setBaseline(md);
-  }, [readyRevision, mode, setBaseline]);
+  }, [readyRevision, mode, editorReady, setBaseline]);
 
   const segment = (target: "rich" | "source", label: string): JSX.Element => (
     <button
@@ -163,6 +177,7 @@ export function MilkdownTab(props: Props): JSX.Element {
               onChangeMarkdown={onChange}
               onHeadingsChange={setHeadings}
               onInitError={setInitError}
+              onReady={() => setEditorReady(true)}
             />
             {outlineOpen && (
               <OutlinePanel

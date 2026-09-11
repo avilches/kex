@@ -21,11 +21,20 @@ type Props = {
   onChangeMarkdown?: (md: string) => void;
   onHeadingsChange?: (headings: OutlineHeading[]) => void;
   onInitError?: (message: string) => void;
+  onReady?: () => void;
 };
 
 export const MilkdownEditor = forwardRef<MilkdownEditorHandle, Props>(
   function MilkdownEditor(
-    { body, revision, editable = true, onChangeMarkdown, onHeadingsChange, onInitError },
+    {
+      body,
+      revision,
+      editable = true,
+      onChangeMarkdown,
+      onHeadingsChange,
+      onInitError,
+      onReady,
+    },
     ref,
   ) {
     const rootRef = useRef<HTMLDivElement>(null);
@@ -38,6 +47,8 @@ export const MilkdownEditor = forwardRef<MilkdownEditorHandle, Props>(
     onHeadingsRef.current = onHeadingsChange;
     const onInitErrorRef = useRef(onInitError);
     onInitErrorRef.current = onInitError;
+    const onReadyRef = useRef(onReady);
+    onReadyRef.current = onReady;
 
     useImperativeHandle(ref, () => ({
       serialize: () => crepeRef.current?.getMarkdown() ?? null,
@@ -78,6 +89,7 @@ export const MilkdownEditor = forwardRef<MilkdownEditorHandle, Props>(
         instance = crepe;
         crepeRef.current = crepe;
         onHeadingsRef.current?.(headingsFromMarkdown(bodyRef.current));
+        onReadyRef.current?.();
       };
 
       boot().catch((e) => {
