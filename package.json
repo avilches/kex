@@ -59,7 +59,6 @@
     "@lezer/highlight": "^1.2.3",
     "@milkdown/crepe": "^7.22.1",
     "@milkdown/kit": "^7.22.1",
-    "@milkdown/plugin-diagram": "^7.7.0",
     "@radix-ui/react-use-controllable-state": "^1.2.3",
     "@tanstack/react-virtual": "^3.14.3",
     "@tauri-apps/api": "^2.11.1",
