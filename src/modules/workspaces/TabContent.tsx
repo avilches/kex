@@ -32,8 +32,8 @@ const EditorPane = lazy(() =>
 const GitDiffPane = lazy(() =>
   import("@/modules/editor/GitDiffPane").then((m) => ({ default: m.GitDiffPane as ComponentType<any> })),
 );
-const MarkdownPreviewPane = lazy(() =>
-  import("@/modules/markdown/MarkdownPreviewPane").then((m) => ({ default: m.MarkdownPreviewPane as ComponentType<any> })),
+const MarkdownRenderPane = lazy(() =>
+  import("@/modules/markdown/MarkdownRenderPane").then((m) => ({ default: m.MarkdownRenderPane as ComponentType<any> })),
 );
 const HtmlPreviewPane = lazy(() =>
   import("@/modules/html-preview/HtmlPreviewPane").then((m) => ({ default: m.HtmlPreviewPane as ComponentType<any> })),
@@ -342,7 +342,14 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   )}
                   style={effectivePreviewMode === "split" ? { left: "calc(50% + 1px)" } : undefined}
                 >
-                  {ismd && <MarkdownPreviewPane content={liveContent} />}
+                  {ismd && (
+                    <MarkdownRenderPane
+                      content={liveContent}
+                      engine={tabMarkdownEngine}
+                      filePath={tab.path}
+                      workspaceRoot={workspaceRoot}
+                    />
+                  )}
                   {ishtml && <HtmlPreviewPane content={liveContent} path={tab.path} />}
                 </div>
               )}
@@ -424,7 +431,12 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                 />
               </div>
               <div className="absolute inset-0" style={{ zIndex: 5 }}>
-                <MarkdownPreviewPane content={liveContent} />
+                <MarkdownRenderPane
+                  content={liveContent}
+                  engine={tabMarkdownEngine}
+                  filePath={tab.path}
+                  workspaceRoot={workspaceRoot}
+                />
               </div>
             </div>
           </div>

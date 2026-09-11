@@ -1,6 +1,7 @@
 import { Crepe } from "@milkdown/crepe";
 import "@milkdown/crepe/theme/common/style.css";
 import { headingIdGenerator } from "@milkdown/kit/preset/commonmark";
+import { replaceAll } from "@milkdown/kit/utils";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import {
   headingsFromMarkdown,
@@ -12,6 +13,9 @@ import "@/modules/markdown/milkdown/milkdownTheme.css";
 export type MilkdownEditorHandle = {
   serialize: () => string | null;
   scrollToHeading: (id: string) => void;
+  // Replaces the live document in place, without tearing down and recreating
+  // Crepe. A no-op before the instance has finished booting (see onReady).
+  replaceContent: (md: string) => void;
 };
 
 type Props = {
@@ -55,6 +59,9 @@ export const MilkdownEditor = forwardRef<MilkdownEditorHandle, Props>(
       scrollToHeading: (id: string) => {
         const el = rootRef.current?.querySelector(`[id="${CSS.escape(id)}"]`);
         el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+      replaceContent: (md: string) => {
+        crepeRef.current?.editor.action(replaceAll(md, true));
       },
     }));
 

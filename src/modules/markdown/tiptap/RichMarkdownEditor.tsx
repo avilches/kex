@@ -99,14 +99,20 @@ export type RichMarkdownEditorProps = {
   wikiLinksEnabled: boolean;
   // Built once at the tab level so the first markdown parse already resolves
   // wiki-link targets instead of rendering blank paths until an async load.
-  wikiEntries: WikiLinkEntry[];
-  tick: MenuStore<number>;
-  onEditorChange: (editor: Editor | null) => void;
-  onChangeMarkdown: (md: string) => void;
-  onNavigateFile: (path: string) => void;
-  findOpen: boolean;
-  onCloseFind: () => void;
+  wikiEntries?: WikiLinkEntry[];
+  tick?: MenuStore<number>;
+  // Read-only mounts (MarkdownRenderPane) skip the find bar and every callback
+  // below; defaults keep this the same editor with input disabled, not a fork.
+  editable?: boolean;
+  onEditorChange?: (editor: Editor | null) => void;
+  onChangeMarkdown?: (md: string) => void;
+  onNavigateFile?: (path: string) => void;
+  findOpen?: boolean;
+  onCloseFind?: () => void;
 };
+
+const EMPTY_WIKI_ENTRIES: WikiLinkEntry[] = [];
+const NOOP = () => {};
 
 function isAbsolutePath(p: string): boolean {
   return p.startsWith("/") || p.startsWith("\\") || /^[a-zA-Z]:[\\/]/.test(p);
@@ -116,6 +122,14 @@ export const RichMarkdownEditor = forwardRef<
   RichMarkdownEditorHandle,
   RichMarkdownEditorProps
 >(function RichMarkdownEditor(props, ref) {
+  const editable = props.editable ?? true;
+  const wikiEntries = props.wikiEntries ?? EMPTY_WIKI_ENTRIES;
+  const findOpen = props.findOpen ?? false;
+  const onEditorChange = props.onEditorChange ?? NOOP;
+  const onChangeMarkdown = props.onChangeMarkdown ?? NOOP;
+  const onNavigateFile = props.onNavigateFile ?? NOOP;
+  const onCloseFind = props.onCloseFind ?? NOOP;
+
   // Per-instance controllers/stores. Stable for the component's lifetime.
   const codeLangStore = useMemo<MenuStore<CodeLangDropdownState>>(
     () => createMenuStore<CodeLangDropdownState>(null),
@@ -125,6 +139,9 @@ export const RichMarkdownEditor = forwardRef<
     () => createMenuStore<MathEditRequest>(null),
     [],
   );
+  // Fallback tick sink for a read-only mount that has no toolbar to drive.
+  const fallbackTick = useMemo<MenuStore<number>>(() => createMenuStore(0), []);
+  const tick = props.tick ?? fallbackTick;
 
   const editorRef = useRef<Editor | null>(null);
 
@@ -144,14 +161,14 @@ export const RichMarkdownEditor = forwardRef<
 
   // Latest prop callbacks/values behind refs so the memoized controllers and the
   // once-created editor never capture stale closures.
-  const onEditorChangeRef = useRef(props.onEditorChange);
-  onEditorChangeRef.current = props.onEditorChange;
-  const onChangeMarkdownRef = useRef(props.onChangeMarkdown);
-  onChangeMarkdownRef.current = props.onChangeMarkdown;
-  const onNavigateRef = useRef(props.onNavigateFile);
-  onNavigateRef.current = props.onNavigateFile;
-  const tickRef = useRef(props.tick);
-  tickRef.current = props.tick;
+  const onEditorChangeRef = useRef(onEditorChange);
+  onEditorChangeRef.current = onEditorChange;
+  const onChangeMarkdownRef = useRef(onChangeMarkdown);
+  onChangeMarkdownRef.current = onChangeMarkdown;
+  const onNavigateRef = useRef(onNavigateFile);
+  onNavigateRef.current = onNavigateFile;
+  const tickRef = useRef(tick);
+  tickRef.current = tick;
   const workspaceRootRef = useRef(props.workspaceRoot);
   workspaceRootRef.current = props.workspaceRoot;
   const filePathRef = useRef(props.filePath);
@@ -177,9 +194,9 @@ export const RichMarkdownEditor = forwardRef<
   // Sync the tab-owned wiki-link index into the ref (markdown resolution) and
   // the autocomplete controller.
   useEffect(() => {
-    wikiEntriesRef.current = props.wikiEntries;
-    wiki?.entries.set(props.wikiEntries);
-  }, [props.wikiEntries, wiki]);
+    wikiEntriesRef.current = wikiEntries;
+    wiki?.entries.set(wikiEntries);
+  }, [wikiEntries, wiki]);
 
   const resolveImageSrc = useCallback((src: string): string => {
     if (/^(https?:|data:)/i.test(src)) return src;
@@ -191,11 +208,11 @@ export const RichMarkdownEditor = forwardRef<
   // Parse only on load / external reload, never per keystroke.
   const html = useMemo(() => {
     const wikiCtx = props.wikiLinksEnabled
-      ? { entries: props.wikiEntries, root: props.workspaceRoot ?? "" }
+      ? { entries: wikiEntries, root: props.workspaceRoot ?? "" }
       : undefined;
     return markdownToHtml(props.body, { wikiLinks: wikiCtx, resolveImageSrc });
     // biome-ignore lint/correctness/useExhaustiveDependencies: body re-parses on a revision bump or when the wiki-link index resolves
-  }, [props.revision, props.wikiEntries]);
+  }, [props.revision, wikiEntries]);
 
   const isDark = useCallback(
     () => document.documentElement.classList.contains("dark"),
@@ -281,6 +298,7 @@ export const RichMarkdownEditor = forwardRef<
   const editor = useEditor({
     extensions,
     content: html,
+    editable,
     editorProps: {
       attributes: { class: "editor-content", spellcheck: "false" },
       handleDOMEvents: {
@@ -376,6 +394,12 @@ export const RichMarkdownEditor = forwardRef<
     onEditorChangeRef.current(editor);
     return () => onEditorChangeRef.current(null);
   }, [editor]);
+
+  // Keep an already-created editor's editable state in sync if it changes
+  // after mount (useEditor only applies `editable` at construction).
+  useEffect(() => {
+    editor?.setEditable(editable);
+  }, [editor, editable]);
 
   // External reload: replace content without dirtying. onUpdate swallows the
   // synchronous update the setContent emits via ignoreNextUpdate.
@@ -479,7 +503,7 @@ export const RichMarkdownEditor = forwardRef<
       )}
       <CodeLangDropdown store={codeLangStore} onSelect={handleSelectLang} />
       <MathModal request={mathEdit} onCommit={handleMathCommit} />
-      <FindBar editor={editor} open={props.findOpen} onClose={props.onCloseFind} />
+      {editable && <FindBar editor={editor} open={findOpen} onClose={onCloseFind} />}
     </div>
   );
 });
