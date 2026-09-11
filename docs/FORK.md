@@ -409,7 +409,7 @@ Feature parity against the TipTap engine, as actually shipped (not as originally
 | Highlight, underline, sub/sup, color | yes | no (raw HTML preserved on round trip, not editable as rich marks) |
 | Wiki-links (pref-gated) | yes | no |
 | Move-line and tab-indent shortcuts | yes | no custom port (Crepe's own keymap applies) |
-| Images from a relative or absolute local path | yes (`resolveImageSrc` rewrites to a `convertFileSrc` asset URL before the HTML ever reaches the editor) | **unverified, likely broken**, see below |
+| Images from a relative or absolute local path | yes (`resolveImageSrc` rewrites to a `convertFileSrc` asset URL before the HTML ever reaches the editor) | **not wired up in this integration, but fixable**, see below |
 | Dirty, autosave, external reload | yes | yes (same `useMarkdownTabController`/`useMarkdownDocument` hook, engine-agnostic) |
 | Read-only preview for an editor tab (`MarkdownRenderPane`) | yes | yes |
 
@@ -434,15 +434,20 @@ Three gaps are called out individually because they differ from what the design 
   match it either). A document with two headings that share exact text will therefore navigate correctly to the first
   and miss on the second. Documented as a known, accepted gap rather than chased further; punctuation in heading text
   (e.g. `# Intro: Overview`) is unaffected, since both sides strip it identically.
-- **Local image paths are unverified against a real build, and code reading suggests they are broken.** The TipTap
-  engine resolves every local image path (relative or absolute) through `resolveImageSrc` in
-  `RichMarkdownEditor.tsx`, which calls Tauri's `convertFileSrc` before the HTML ever reaches the editor; without
-  that rewrite, a plain relative path resolves against the webview's own origin, not the note's directory, and an
-  absolute filesystem path is not a valid web URL at all. `MilkdownEditor.tsx` has no equivalent: it hands
-  `defaultValue: bodyRef.current` straight to `Crepe` with the markdown's image syntax untouched, and nothing else
-  under `src/modules/markdown/milkdown/` calls `convertFileSrc`. This was not exercised against a live app in this
-  evaluation (no GUI in this environment); it is flagged here from reading the code, not from a confirmed reproduction,
-  and is the first thing to check in the manual pass (`docs/MILKDOWN_CHECKLIST.md`).
+- **Local image paths are not wired up in this integration, but the fix is a single missing constructor option, not
+  a deeper gap in the engine.** The TipTap engine resolves every local image path (relative or absolute) through
+  `resolveImageSrc` in `RichMarkdownEditor.tsx`, which calls Tauri's `convertFileSrc` before the HTML ever reaches
+  the editor; without that rewrite, a plain relative path resolves against the webview's own origin, not the note's
+  directory, and an absolute filesystem path is not a valid web URL at all. Crepe has the same hook: its
+  `Feature.ImageBlock` config accepts `proxyDomURL: (url: string) => Promise<string> | string`
+  (`@milkdown/crepe/lib/types/feature/image-block/index.d.ts`), and `ImageBlock` is one of Crepe's features enabled
+  by default. `MilkdownEditor.tsx` simply never passes it: `new Crepe({ root, defaultValue })` has no
+  `features`/`featureConfigs` argument, so `proxyDomURL` stays unset and Crepe falls back to the raw URL from the
+  markdown, unresolved. This was not exercised against a live app in this evaluation (no GUI in this environment);
+  it is flagged here from reading the code, not from a confirmed reproduction, and is the first thing to check in
+  the manual pass (`docs/MILKDOWN_CHECKLIST.md`). Wiring `proxyDomURL` to the same logic `resolveImageSrc` already
+  has is out of scope for this evaluation task, but is not new architecture: it is filling in one config option
+  Crepe already exposes for exactly this purpose.
 
 Everything else in the "no" column above (in-note find, callouts as rich marks, details/summary, highlight/underline/
 sub/sup/color as rich marks, wiki-links, move-line/tab-indent shortcuts) was a deliberate v1 scope cut in the design

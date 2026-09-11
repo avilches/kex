@@ -31,11 +31,14 @@ items open with enough detail to file a follow-up; do not silently mark somethin
 - [ ] **The placeholder on an empty document** shows on a brand-new or emptied note and disappears once text is
   typed.
 - [ ] **Image rendering from a relative path.** Flagged by code reading, not confirmed live: `MilkdownEditor.tsx`
-  hands the raw markdown straight to `Crepe` with no `convertFileSrc` rewrite, unlike `RichMarkdownEditor.tsx`
-  (`resolveImageSrc`). Test with a note that has `![alt](./relative.png)` pointing at a real local file next to
-  it: expect this to be broken (image does not load) unless Crepe does its own path resolution internally. If it
-  turns out to work, figure out why before assuming the gap does not exist; if it is broken, this is a known,
-  already-documented gap (`docs/FORK.md`), not a new bug to file blind.
+  hands the raw markdown straight to `Crepe` with no image-path rewrite, unlike `RichMarkdownEditor.tsx`
+  (`resolveImageSrc`). This is not wired up in this integration; it is fixable via Crepe's `Feature.ImageBlock`
+  `proxyDomURL` config, the same role `resolveImageSrc` plays for the tiptap engine, so this is a config gap, not
+  a deeper limitation of the engine. Unverified against a live app. Test with a note that has
+  `![alt](./relative.png)` pointing at a real local file next to it: expect this to be broken (image does not
+  load) unless Crepe does its own path resolution internally. If it turns out to work, figure out why before
+  assuming the gap does not exist; if it is broken, this is a known, already-documented gap (`docs/FORK.md`), not
+  a new bug to file blind.
 - [ ] **The outline panel and navigation**: open the outline, click a heading, confirm it scrolls to that heading.
 - [ ] **Outline navigation with punctuation in the heading text** (e.g. `# Intro: Overview`) navigates correctly.
 - [ ] **Outline navigation to a duplicate heading's second occurrence does NOT work correctly.** This is a known,
