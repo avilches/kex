@@ -9,6 +9,13 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, highlightWhitespace } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import {
+  listenFsChanged,
+  parentDir,
+  watchAdd,
+  watchRemove,
+} from "@/modules/explorer/lib/watch";
 import {
   buildSharedExtensions,
   foldGutterCompartment,
@@ -22,6 +29,7 @@ import {
   fetchCommitDiff,
   fetchWorkingDiff,
   getCachedDiff,
+  invalidateDiff,
   workingDiffKey,
   commitDiffKey,
 } from "./lib/diffCache";
@@ -128,6 +136,18 @@ function cacheKey(source: WorkingSource | CommitSource): string {
     : commitDiffKey(source.repoRoot, source.sha, source.path);
 }
 
+export function isLiveWorkingSource(
+  source: WorkingSource | CommitSource,
+): source is WorkingSource & { mode: "-" } {
+  return source.kind === "working" && source.mode === "-";
+}
+
+function errorMessage(err: unknown): string {
+  return err && typeof err === "object" && "message" in err
+    ? String((err as { message: unknown }).message)
+    : String(err);
+}
+
 function loadStateFromCache(
   source: WorkingSource | CommitSource,
 ): LoadState {
@@ -192,18 +212,64 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
       })
       .catch((err) => {
         if (cancelled) return;
-        setState({
-          kind: "error",
-          message:
-            err && typeof err === "object" && "message" in err
-              ? String((err as { message: unknown }).message)
-              : String(err),
-        });
+        setState({ kind: "error", message: errorMessage(err) });
       });
     return () => {
       cancelled = true;
     };
   }, [active, key, originalPath, stableSource]);
+
+  // Diff content for a working, unstaged source (mode "-") reads the modified
+  // side straight off disk (see diff_content in operations.rs), so it goes
+  // stale the moment the file changes underneath the open tab. A staged
+  // diff's modified side comes from the git index instead, and a commit
+  // diff is pinned to a sha: neither needs to watch the filesystem.
+  useEffect(() => {
+    if (!isLiveWorkingSource(stableSource)) return;
+    const dir = parentDir(joinRepoPath(stableSource.repoRoot, stableSource.path));
+    watchAdd([dir]);
+    return () => watchRemove([dir]);
+  }, [stableSource]);
+
+  useEffect(() => {
+    if (!isLiveWorkingSource(stableSource)) return;
+    const live = stableSource;
+    const watchedPath = joinRepoPath(live.repoRoot, live.path).replace(/\\/g, "/");
+    let cancelled = false;
+    const revalidate = () => {
+      invalidateDiff(key);
+      fetchWorkingDiff(live.repoRoot, live.path, live.mode, live.originalPath)
+        .then((res) => {
+          if (cancelled) return;
+          setState({
+            kind: "loaded",
+            originalContent: res.originalContent,
+            modifiedContent: res.modifiedContent,
+            isBinary: res.isBinary,
+            fallbackPatch: res.fallbackPatch,
+            truncated: res.truncated,
+          });
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setState({ kind: "error", message: errorMessage(err) });
+        });
+    };
+    const unlistenWritten = getCurrentWebviewWindow().listen<{ path: string }>(
+      "fs:file-written",
+      (event) => {
+        if (event.payload.path.replace(/\\/g, "/") === watchedPath) revalidate();
+      },
+    );
+    const unlistenChanged = listenFsChanged((paths) => {
+      if (paths.some((p) => p.replace(/\\/g, "/") === watchedPath)) revalidate();
+    });
+    return () => {
+      cancelled = true;
+      void unlistenWritten.then((un) => un());
+      void unlistenChanged.then((un) => un());
+    };
+  }, [key, stableSource]);
 
   const path = source.path;
   const repoRoot = source.repoRoot;
