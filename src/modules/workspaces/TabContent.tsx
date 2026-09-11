@@ -47,6 +47,9 @@ const GitHistoryPane = lazy(() =>
 const MarkdownTab = lazy(() =>
   import("@/modules/markdown/tiptap/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
 );
+const MilkdownTab = lazy(() =>
+  import("@/modules/markdown/milkdown/MilkdownTab").then((m) => ({ default: m.MilkdownTab as ComponentType<any> })),
+);
 
 const GLOBAL_TOGGLE_SETTERS: Record<
   EditorGlobalToggleKey,
@@ -374,6 +377,13 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
         return (
           <Suspense fallback={null}>
             <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
+          </Suspense>
+        );
+      }
+      if (tabMarkdownEngine === "milkdown") {
+        return (
+          <Suspense fallback={null}>
+            <MilkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
           </Suspense>
         );
       }
