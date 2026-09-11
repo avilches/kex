@@ -73,7 +73,11 @@ export const MilkdownEditor = forwardRef<MilkdownEditorHandle, Props>(
       let instance: Crepe | null = null;
 
       const boot = async () => {
-        const crepe = new Crepe({ root: el, defaultValue: bodyRef.current });
+        const crepe = new Crepe({
+          root: el,
+          defaultValue: bodyRef.current,
+          features: { [Crepe.Feature.TopBar]: true },
+        });
         // Milkdown's default heading-id generator keeps punctuation, so it
         // never agrees with headingsFromMarkdown's slugs; scrollToHeading
         // would silently miss. Force both sides to the same base slug.
