@@ -1,17 +1,10 @@
 import type { Editor } from "@tiptap/core";
-import {
-  type JSX,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { toast } from "sonner";
+import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { EditorPathBar } from "@/modules/editor";
 import { EditorPane, type EditorPaneHandle } from "@/modules/editor/EditorPane";
-import { useMarkdownDocument } from "@/modules/markdown/lib/useMarkdownDocument";
+import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
+import { useMarkdownTabController } from "@/modules/markdown/lib/useMarkdownTabController";
 import {
   buildWikiLinkIndex,
   type WikiLinkEntry,
@@ -39,19 +32,7 @@ type Props = {
   callbacks: TabCallbacks;
 };
 
-// Mirrors EditorPane's formatting so the non-editable fallbacks read identically.
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function toDescription(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
 export function MarkdownTab(props: Props): JSX.Element {
-  const [mode, setMode] = useState<"rich" | "source">("rich");
   const [findOpen, setFindOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -63,10 +44,16 @@ export function MarkdownTab(props: Props): JSX.Element {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const wikiLinksEnabled = usePreferencesStore((s) => s.markdownWikiLinks);
 
-  const { doc, onChange, setBaseline, save, reload } = useMarkdownDocument({
+  const ctrl = useMarkdownTabController({
     path: props.path,
     onDirtyChange: (d) => props.callbacks.onEditorDirtyChange?.(props.tabId, d),
+    serializeRich: () => richRef.current?.serialize() ?? null,
+    saveSource: async () => {
+      await editorPaneRef.current?.save();
+    },
+    onToggleOutline: () => setOutlineOpen((v) => !v),
   });
+  const { mode, doc, onChange, setBaseline } = ctrl;
 
   // Own the wiki-link index at the tab level so RichMarkdownEditor's first parse
   // already resolves link targets (see RichMarkdownEditor wikiEntries prop).
@@ -104,72 +91,25 @@ export function MarkdownTab(props: Props): JSX.Element {
     [props.callbacks],
   );
 
-  const toggleMode = useCallback(async () => {
-    if (mode === "rich") {
-      const md = richRef.current?.serialize();
-      if (md != null) onChange(md);
-      try {
-        await save();
-      } catch (e) {
-        toast.error("Could not switch mode", { description: toDescription(e) });
-        return;
-      }
-      setMode("source");
-    } else {
-      try {
-        await editorPaneRef.current?.save();
-      } catch (e) {
-        toast.error("Could not switch mode", { description: toDescription(e) });
-        return;
-      }
-      reload();
-      setMode("rich");
-    }
-  }, [mode, onChange, save, reload]);
-
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (matchesShortcut(e.nativeEvent, "editor.save", userShortcuts)) {
+      if (ctrl.handleShortcut(e.nativeEvent)) {
         e.preventDefault();
-        if (mode === "rich") {
-          const md = richRef.current?.serialize();
-          if (md != null) onChange(md);
-          save().catch((err) =>
-            toast.error("Save failed", { description: toDescription(err) }),
-          );
-        } else {
-          editorPaneRef.current
-            ?.save()
-            .catch((err) =>
-              toast.error("Save failed", { description: toDescription(err) }),
-            );
-        }
-      } else if (
-        matchesShortcut(e.nativeEvent, "markdown.toggleSource", userShortcuts)
-      ) {
-        e.preventDefault();
-        void toggleMode();
-      } else if (
-        matchesShortcut(e.nativeEvent, "markdown.toggleOutline", userShortcuts)
-      ) {
-        e.preventDefault();
-        setOutlineOpen((v) => !v);
-      } else if (
-        mode === "rich" &&
-        matchesShortcut(e.nativeEvent, "search.focus", userShortcuts)
-      ) {
+        return;
+      }
+      if (mode === "rich" && matchesShortcut(e.nativeEvent, "search.focus", userShortcuts)) {
         e.preventDefault();
         setFindOpen(true);
       }
     },
-    [mode, userShortcuts, onChange, save, toggleMode],
+    [ctrl, mode, userShortcuts],
   );
 
   const segment = (target: "rich" | "source", label: string): JSX.Element => (
     <button
       type="button"
       onClick={() => {
-        if (mode !== target) void toggleMode();
+        if (mode !== target) void ctrl.toggleMode();
       }}
       className={cn(
         "px-2 py-0.5 outline-none transition-colors focus-visible:outline-none",
@@ -246,25 +186,7 @@ export function MarkdownTab(props: Props): JSX.Element {
 
   const richContent = (): JSX.Element | null => {
     if (doc.status === "loading") return null;
-    if (doc.status === "error") {
-      return (
-        <div className="flex h-full items-center justify-center px-6 text-center text-xs text-destructive">
-          {doc.message}
-        </div>
-      );
-    }
-    if (doc.status === "binary" || doc.status === "toolarge") {
-      return (
-        <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
-          <div className="text-sm text-foreground">
-            {doc.status === "binary" ? "Binary file" : "File too large"}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {formatBytes(doc.size)} · preview not supported
-          </div>
-        </div>
-      );
-    }
+    if (doc.status !== "ready") return <MarkdownDocFallback doc={doc} />;
     return (
       <div className="flex h-full min-h-0 flex-col">
         <Toolbar
