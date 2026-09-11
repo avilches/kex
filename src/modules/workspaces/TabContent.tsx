@@ -127,7 +127,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
-  const markdownEditor = usePreferencesStore((s) => s.markdownEditor);
+  const markdownEngine = usePreferencesStore((s) => s.markdownEngine);
   const scratchpadInNewTerminals = usePreferencesStore(
     (s) => s.scratchpadInNewTerminals,
   );
@@ -364,7 +364,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       );
 
     case "markdown":
-      if (markdownEditor === "rich") {
+      if (markdownEngine === "tiptap") {
         return (
           <Suspense fallback={null}>
             <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />

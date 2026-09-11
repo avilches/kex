@@ -481,8 +481,7 @@ src/
     │   └── block/                 — Block overlay, shell input, mode machine, history
     ├── editor/                    — CodeMirror 6 stack, diffs. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter, indent size 1-12, indent with tabs) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. The per-extension settings are surfaced only in the editor overlay `[...]` menu. Global editor settings (scroll past end, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + blink rate + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences applied via CodeMirror compartments so they update live without rebuilding editor state; the global toggles appear in both the `[...]` menu and the Settings window. A few preferences are JSON-only (no UI). In `settings-general.json`: `workspacePaneLimit`, `paneSplitLimit`,
 `keepFolderLayoutOnChangeExplorerRoot`. In `settings-editor.json`: `editorHighlightActiveLine`,
-`editorAutoSaveDelay`, `markdownEditor` (`"rich" | "legacy"`, default `"rich"`; selects the TipTap editor or the
-Streamdown preview for the `markdown` tab kind), `markdownWikiLinks` (default `false`; enables `[[note]]`
+`editorAutoSaveDelay`, `markdownWikiLinks` (default `false`; enables `[[note]]`
 autocomplete, resolution, and click-navigation in the rich editor).
     ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)
     │   ├── components/            — NotificationBell

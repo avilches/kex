@@ -9,6 +9,10 @@ import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
+import {
+  type MarkdownEngine,
+  parseMarkdownEngine,
+} from "@/modules/markdown/lib/markdownEngine";
 
 export type ThemePref = "system" | "light" | "dark";
 
@@ -50,7 +54,7 @@ export type DiffViewMode = "unified" | "split";
 
 export type TextEditorMode = "file-only" | "workspace-and-files";
 
-export type MarkdownEditorMode = "rich" | "legacy";
+export type { MarkdownEngine } from "@/modules/markdown/lib/markdownEngine";
 
 export type CursorStyle = "bar" | "block" | "underline";
 
@@ -197,7 +201,7 @@ export type Preferences = {
   editorBracketMatching: boolean;
   editorCloseBrackets: boolean;
   editorAutocompletion: boolean;
-  markdownEditor: MarkdownEditorMode; // JSON-only: no settings UI, edit settings-editor.json
+  markdownEngine: MarkdownEngine;
   markdownWikiLinks: boolean; // JSON-only: no settings UI, edit settings-editor.json
   tabBarStyle: TabBarStyle;
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
@@ -280,7 +284,7 @@ const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "highlightActiveLine";
 const KEY_EDITOR_BRACKET_MATCHING = "bracketMatching";
 const KEY_EDITOR_CLOSE_BRACKETS = "closeBrackets";
 const KEY_EDITOR_AUTOCOMPLETION = "autocompletion";
-const KEY_MARKDOWN_EDITOR = "markdownEditor";
+const KEY_MARKDOWN_ENGINE = "markdownEngine";
 const KEY_MARKDOWN_WIKI_LINKS = "markdownWikiLinks";
 
 // Shortcuts store
@@ -425,7 +429,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorBracketMatching: true,
   editorCloseBrackets: true,
   editorAutocompletion: true,
-  markdownEditor: "rich",
+  markdownEngine: "tiptap",
   markdownWikiLinks: false,
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
@@ -482,10 +486,6 @@ export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMod
 export function parseTextEditorMode(value: unknown): TextEditorMode {
   if (value === "file-only") return "file-only";
   return "workspace-and-files";
-}
-
-export function parseMarkdownEditor(value: unknown): MarkdownEditorMode {
-  return value === "legacy" ? "legacy" : "rich";
 }
 
 async function writePref<T>(key: string, value: T): Promise<void> {
@@ -685,7 +685,7 @@ export async function loadPreferences(): Promise<Preferences> {
     editorAutocompletion:
       get<boolean>(KEY_EDITOR_AUTOCOMPLETION) ??
       DEFAULT_PREFERENCES.editorAutocompletion,
-    markdownEditor: parseMarkdownEditor(get(KEY_MARKDOWN_EDITOR)),
+    markdownEngine: parseMarkdownEngine(get(KEY_MARKDOWN_ENGINE)),
     markdownWikiLinks:
       get<boolean>(KEY_MARKDOWN_WIKI_LINKS) ??
       DEFAULT_PREFERENCES.markdownWikiLinks,
@@ -753,7 +753,7 @@ export async function loadPreferences(): Promise<Preferences> {
 
   // Persist JSON-only editor keys so they're discoverable in settings-editor.json.
   const editorConfigDefaults: [string, unknown][] = [];
-  if (!map.has(KEY_MARKDOWN_EDITOR)) editorConfigDefaults.push([KEY_MARKDOWN_EDITOR, DEFAULT_PREFERENCES.markdownEditor]);
+  if (!map.has(KEY_MARKDOWN_ENGINE)) editorConfigDefaults.push([KEY_MARKDOWN_ENGINE, DEFAULT_PREFERENCES.markdownEngine]);
   if (!map.has(KEY_MARKDOWN_WIKI_LINKS)) editorConfigDefaults.push([KEY_MARKDOWN_WIKI_LINKS, DEFAULT_PREFERENCES.markdownWikiLinks]);
   if (editorConfigDefaults.length > 0) {
     void Promise.all(editorConfigDefaults.map(([k, v]) => editorStore.set(k, v))).then(() => editorStore.save());
@@ -1126,6 +1126,10 @@ export async function setDiffViewMode(value: DiffViewMode): Promise<void> {
   await writeEditorPref(KEY_DIFF_VIEW_MODE, value);
 }
 
+export async function setMarkdownEngine(value: MarkdownEngine): Promise<void> {
+  await writeEditorPref(KEY_MARKDOWN_ENGINE, value);
+}
+
 export async function setEditorBracketMatching(value: boolean): Promise<void> {
   await writeEditorPref(KEY_EDITOR_BRACKET_MATCHING, value);
 }
@@ -1219,7 +1223,7 @@ const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
   [KEY_EDITOR_CLOSE_BRACKETS]: "editorCloseBrackets",
   [KEY_EDITOR_AUTOCOMPLETION]: "editorAutocompletion",
-  [KEY_MARKDOWN_EDITOR]: "markdownEditor",
+  [KEY_MARKDOWN_ENGINE]: "markdownEngine",
   [KEY_MARKDOWN_WIKI_LINKS]: "markdownWikiLinks",
 };
 
