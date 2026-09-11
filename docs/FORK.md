@@ -375,10 +375,79 @@ Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell com
 
 Rich markdown editor (WYSIWYG) ported from HelixNotes (TipTap 3): tasks, tables, callouts, details, math (KaTeX),
 mermaid, slash commands, outline, find-in-note, optional wiki-links; Streamdown preview retained behind
-`markdownEditor: legacy`. Excluded from the port: AI menu, secret blocks, PDF embeds, task metadata. Not present in
+`markdownEngine: "legacy"`. Excluded from the port: AI menu, secret blocks, PDF embeds, task metadata. Not present in
 upstream Terax (which has no markdown-specific editing surface at all). See `docs/ARCHITECTURE.md` (Frontend module
 map, `markdown/`; 4.9-4.11) and `docs/BUILD.md` (Markdown editor chunks) for the module layout, buffer ownership
 model, and bundle impact.
+
+### Milkdown markdown engine (evaluation)
+
+A second rich engine, `markdownEngine: "milkdown"`, sits alongside TipTap as a third selectable value (Settings >
+Editor > Markdown editor; default stays TipTap). It is an **evaluation-stage** addition: the goal was to find out
+whether Milkdown's Crepe editor is a viable alternative to the TipTap port above, not to replace it. Not present in
+upstream Terax. Built on `@milkdown/crepe` + `@milkdown/kit` 7.22.1. See `docs/ARCHITECTURE.md` (Frontend module map,
+`markdown/`, the `milkdown/` entry) and `docs/BUILD.md` (Markdown editor chunks) for the module layout and bundle
+impact, and `docs/MARKDOWN_GOTCHAS.md` for the round-trip corpus findings engine-by-engine.
+
+Feature parity against the TipTap engine, as actually shipped (not as originally planned):
+
+| Capability | tiptap | milkdown |
+|---|---|---|
+| Headings, lists, blockquotes, hr | yes | yes |
+| Task lists (clickable) | yes | yes (GFM) |
+| Tables | yes (resizable) | yes (Crepe table block) |
+| Code blocks + language picker + copy | yes | yes (Crepe CodeMirror feature) |
+| Math KaTeX inline and block | yes | yes (Crepe Latex) |
+| Mermaid diagram rendering | yes | **no**, see below |
+| Slash commands | yes | yes (BlockEdit) |
+| Toolbar | fixed toolbar | floating selection toolbar |
+| Outline panel | yes, navigates correctly for repeated heading text | yes, but navigation to a repeated heading's second-plus occurrence is unreliable, see below |
+| Source mode toggle | yes | yes (same shortcut) |
+| In-note find | yes (FindBar) | no (use Source mode) |
+| Callouts | yes | no (rendered as blockquote) |
+| Details/summary | yes | no |
+| Highlight, underline, sub/sup, color | yes | no (raw HTML preserved on round trip, not editable as rich marks) |
+| Wiki-links (pref-gated) | yes | no |
+| Move-line and tab-indent shortcuts | yes | no custom port (Crepe's own keymap applies) |
+| Images from a relative or absolute local path | yes (`resolveImageSrc` rewrites to a `convertFileSrc` asset URL before the HTML ever reaches the editor) | **unverified, likely broken**, see below |
+| Dirty, autosave, external reload | yes | yes (same `useMarkdownTabController`/`useMarkdownDocument` hook, engine-agnostic) |
+| Read-only preview for an editor tab (`MarkdownRenderPane`) | yes | yes |
+
+Three gaps are called out individually because they differ from what the design spec assumed going in:
+
+- **Mermaid renders as a plain code block, not a diagram, and this is permanent, not a v1 gap.** The plan's original
+  parity matrix assumed `@milkdown/plugin-diagram` would give milkdown mermaid support "via plugin-diagram, escape
+  hatch decision 8." That escape hatch was taken for the opposite reason than expected: the plugin does not merely
+  have a version conflict, it **does not render diagrams at all**. Reading its `src/node.ts` in full shows the node
+  schema recognizes ` ```mermaid ` fences and calls `mermaid.initialize()`, but `toDOM` only sets `dom.textContent =
+  code`; there is no `NodeView`, no call to `mermaid.render()` or `mermaid.run()`, anywhere in the package or in
+  `@milkdown/components`. Wiring it in would have added a second, older mermaid major (`plugin-diagram@7.7.0` depends
+  on mermaid `^10.9.0`, resolving alongside the existing `11.15.0`) for a plugin that would show raw unstyled fence
+  text with no diagram. It was removed instead; mermaid fences render as an ordinary code block in the milkdown
+  engine, matching legacy/pre-fork behavior. `hasMermaidFence` (`milkdown/mermaidFence.ts`) still exists, unused, so a
+  future compatible plugin has a tested detector to build on.
+- **Outline navigation to a repeated heading is unreliable, by construction, not by bug.** Milkdown's own heading-id
+  generator was overridden (`MilkdownEditor.tsx`) to use the same base slug as the outline's `headingsFromMarkdown`
+  (`slugifyHeadingText`), so a document's first occurrence of a heading text navigates correctly. But
+  `headingsFromMarkdown` disambiguates a second occurrence with its own counter (`-1`, `-2`, ...), while the override
+  passed to Crepe does not reproduce that counter (Crepe's own internal dedup suffix, if it applies one, does not
+  match it either). A document with two headings that share exact text will therefore navigate correctly to the first
+  and miss on the second. Documented as a known, accepted gap rather than chased further; punctuation in heading text
+  (e.g. `# Intro: Overview`) is unaffected, since both sides strip it identically.
+- **Local image paths are unverified against a real build, and code reading suggests they are broken.** The TipTap
+  engine resolves every local image path (relative or absolute) through `resolveImageSrc` in
+  `RichMarkdownEditor.tsx`, which calls Tauri's `convertFileSrc` before the HTML ever reaches the editor; without
+  that rewrite, a plain relative path resolves against the webview's own origin, not the note's directory, and an
+  absolute filesystem path is not a valid web URL at all. `MilkdownEditor.tsx` has no equivalent: it hands
+  `defaultValue: bodyRef.current` straight to `Crepe` with the markdown's image syntax untouched, and nothing else
+  under `src/modules/markdown/milkdown/` calls `convertFileSrc`. This was not exercised against a live app in this
+  evaluation (no GUI in this environment); it is flagged here from reading the code, not from a confirmed reproduction,
+  and is the first thing to check in the manual pass (`docs/MILKDOWN_CHECKLIST.md`).
+
+Everything else in the "no" column above (in-note find, callouts as rich marks, details/summary, highlight/underline/
+sub/sup/color as rich marks, wiki-links, move-line/tab-indent shortcuts) was a deliberate v1 scope cut in the design
+spec, not a surprise found while building: Crepe's own feature set does not cover them, and porting them was out of
+scope for an evaluation of the engine itself.
 
 ### Notes sidebar view
 

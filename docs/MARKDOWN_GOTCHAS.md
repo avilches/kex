@@ -170,3 +170,54 @@ un cambio y no se guardaría, con el fichero ya normalizado en el disco.
 Un editor WYSIWYG sobre markdown escrito a mano tiene dos problemas distintos que conviene no
 mezclar: la pérdida de contenido, que se arregla nodo a nodo, y la normalización de formato, que no
 se arregla y que por tanto no debe llegar a disco por su cuenta.
+
+---
+
+## Milkdown: hallazgos del corpus de round-trip (evaluación, no un bug que arreglar)
+
+Milkdown (`@milkdown/crepe`) es un segundo motor rico, seleccionable por tab (`markdownEngine: "milkdown"`),
+añadido para evaluar si es una alternativa viable al puerto de TipTap documentado arriba. A diferencia del
+corpus de TipTap (`lib/roundTrip.test.ts`, que encadena las dos funciones puras `markdownToHtml` /
+`htmlToMarkdown` sin pasar por un editor real), el corpus de Milkdown
+(`milkdown/roundTrip.test.ts`) monta un `Crepe` real con `createTestCrepe` y llama a `getMarkdown()`, así que
+mide lo que el editor de verdad produce, no solo la capa de conversión pura. Quince casos, todos pasan, ninguno
+necesitó `it.fails`.
+
+Resultado, caso por caso (primera pasada frente al texto de entrada):
+
+- **Estables tal cual** (la primera normalización ya es idéntica a la entrada): encabezados, código con
+  lenguaje, bloque de matemáticas, matemáticas inline, un fence de mermaid, enlace con título, blockquote,
+  strikethrough, HTML inline crudo, y **el comentario HTML**.
+- **Normalizados en la primera pasada pero estables en la segunda** (idempotentes, sin pérdida de contenido):
+  listas anidadas y el bloque de código anidado en una lista (el marcador `-` se convierte en `*`), lista de
+  tareas (`-` a `*`), tabla (el separador `---` se acorta a `-`), e imagen (el texto alt `alt` se reescribe
+  como `1.00`, una rareza genuina de Crepe, no un error de transcripción: ver más abajo).
+
+### Las tres construcciones que rompían a TipTap (bug 1 de este documento), vistas en Milkdown
+
+- **Comentarios HTML**: Milkdown los conserva de fábrica, byte a byte, sin necesitar ningún sentinel ni Node
+  a medida. TipTap necesitó el sentinel `data-html-comment` + el Node `rawComment` porque ProseMirror
+  descarta cualquier nodo del DOM que ningún Node/Mark reclame; el esquema de Milkdown, en cambio, sí sabe
+  representar un comentario como parte del documento.
+- **Bloques de código anidados en una lista**: Milkdown los conserva enteros (fence, lenguaje e indentación),
+  solo cambia el carácter del marcador de lista. TipTap, antes del bug 1, los aplanaba en un span de código
+  roto con saltos de línea literales; Milkdown nunca tuvo ese problema en este corpus.
+- **Saltos de línea suaves (soft line breaks)**: el corpus **no incluye ningún caso** que ejercite esto (a
+  diferencia del corpus de TipTap, que sí tiene `hardBreak`). No se puede afirmar cómo se comporta Milkdown
+  aquí a partir de lo medido; queda como hueco de cobertura, no como hallazgo.
+
+### La rareza del alt text de imagen (`alt` a `1.00`)
+
+El caso `["image", "![alt](./img.png)\n"]` normaliza a algo con el texto alt `1.00` en vez de `alt`. No es un
+error de transcripción del corpus: es lo que Crepe realmente produce en la primera pasada, y a partir de ahí
+es estable (la segunda pasada no lo vuelve a cambiar). Ninguna de las herramientas de este repo reescribe el
+alt text a mano; hay que asumir que es un comportamiento propio del bloque de imagen de Crepe y tratarlo como
+una pega conocida del motor, no como algo que arreglar en el código de Kex.
+
+### Relación con el mermaid fence de este corpus
+
+El caso `mermaid fence` sale "estable tal cual" porque lo único que mide el corpus es el texto markdown que
+entra y sale de Crepe, no si se dibuja un diagrama. El fence sobrevive intacto porque `@milkdown/plugin-diagram`
+nunca se llegó a montar en el editor (ver `docs/FORK.md`); si algún día se monta un plugin de mermaid
+compatible, este caso habrá que revisarlo porque el node schema podría cambiar la representación interna del
+fence.
