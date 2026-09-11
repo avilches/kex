@@ -343,7 +343,7 @@ The terminal and the code editor (CodeMirror) each expose independent "Font fami
 
 ### 4.9 Markdown tabs are editable by default
 
-Opening a `.md` file mounts the rich TipTap editor (`markdownEditor: "rich"`, the default), not a read-only preview. The legacy Streamdown preview is still available behind `markdownEditor: "legacy"` for users who only want rendering. This is a behavior change from earlier Kex versions, where `markdown` tabs were preview-only and editing required the `Rendered | Edit` toggle to switch to the raw CodeMirror `editor` tab kind (see 7. Frontend module map, "Tab kinds"). That raw toggle still exists (`Mod+Shift+M`, source mode inside the rich editor's own shell) but is no longer the only way to edit a note.
+Opening a `.md` file mounts the rich TipTap editor (`markdownEngine: "tiptap"`, the default), not a read-only preview. The legacy Streamdown preview is still available behind `markdownEngine: "legacy"` for users who only want rendering. This is a behavior change from earlier Kex versions, where `markdown` tabs were preview-only and editing required the `Rendered | Edit` toggle to switch to the raw CodeMirror `editor` tab kind (see 7. Frontend module map, "Tab kinds"). That raw toggle still exists (`Mod+Shift+M`, source mode inside the rich editor's own shell) but is no longer the only way to edit a note.
 
 ### 4.10 Buffer ownership: `useMarkdownDocument` and the disk sync point
 
@@ -516,7 +516,7 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
     ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  — Markdown tab (`kind: "markdown"`). `MarkdownPreviewPane.tsx` is the legacy
-    │   │                            read-only preview (Streamdown), kept behind `markdownEditor: "legacy"`.
+    │   │                            read-only preview (Streamdown), kept behind `markdownEngine: "legacy"`.
     │   │                            `lib/` is the pure conversion core shared by both modes: `frontmatter.ts`
     │   │                            (byte-preserved prefix split/rejoin), `markdownToHtml.ts` / `htmlToMarkdown.ts`
     │   │                            (round-trip via `markdown-it`), `documentBuffer.ts` (dirty tracking against a
