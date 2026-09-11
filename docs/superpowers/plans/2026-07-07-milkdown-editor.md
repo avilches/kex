@@ -1,5 +1,8 @@
 # Milkdown Markdown Editor Implementation Plan
 
+> **Superseded by `2026-09-10-milkdown-editor.md`.** This plan was never started (no step was ever
+> checked). It is kept for its task breakdown; the executable version is the newer plan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a Milkdown 7 Crepe WYSIWYG editor as a third engine for the `markdown` tab, selected by the JSON-only preference `markdownEditor: "tiptap" | "milkdown" | "legacy"` (renaming the previous `"rich"` value to `"tiptap"`), reusing the TipTap engine's document lifecycle, Rich|Source toggle and shortcuts through a shared tab shell.
