@@ -311,12 +311,15 @@ src/modules/markdown/
   load is stable for headings, nested lists, task lists, GFM tables, fenced code with languages,
   math, mermaid fences, links, images, blockquotes, and for the raw-HTML constructs Milkdown does
   not model. Cases shared with the TipTap corpus where the syntax overlaps.
-- `useMarkdownTabController`: mode toggle flush ordering, dirty plumbing.
+- The shared shell's decisions (which save path a mode switch takes and in what order, which action a
+  key event routes to) and the preview's decisions (which renderer an engine maps to, whether the
+  text is debounced) are extracted as pure functions and tested there. This project has no React
+  component or hook test anywhere and no testing-library dependency, and this feature is not the
+  place to introduce one: the components stay thin shells over tested logic, which is what
+  `AGENTS.md` asks for, and the shells are covered by the manual checklist.
 - Sealing: every creation path produces a tab carrying `markdownEngine`.
 - Workspace restore: a workspace JSON with two tabs of the same path and different engines restores
   as two tabs, each with its engine, and the restore does not collapse them.
-- `MarkdownRenderPane`: renders the engine the resolver returns, debounces content updates, and
-  never calls a save or write path.
 - Existing tiptap and lib tests stay green through the rename and the shell refactor.
 - Full suites green before done: `pnpm exec biome lint ./src`, `pnpm check-types`, `pnpm test`. Rust
   is untouched.
