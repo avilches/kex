@@ -10,6 +10,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
 import { resolveDisplayName } from "@/modules/editor/lib/languageResolver";
+import { resolveMarkdownEngine } from "@/modules/markdown/lib/markdownEngine";
 import {
   setEditorAutoSave,
   setEditorAutocompletion,
@@ -31,8 +32,8 @@ const EditorPane = lazy(() =>
 const GitDiffPane = lazy(() =>
   import("@/modules/editor/GitDiffPane").then((m) => ({ default: m.GitDiffPane as ComponentType<any> })),
 );
-const MarkdownPreviewPane = lazy(() =>
-  import("@/modules/markdown/MarkdownPreviewPane").then((m) => ({ default: m.MarkdownPreviewPane as ComponentType<any> })),
+const MarkdownRenderPane = lazy(() =>
+  import("@/modules/markdown/MarkdownRenderPane").then((m) => ({ default: m.MarkdownRenderPane as ComponentType<any> })),
 );
 const HtmlPreviewPane = lazy(() =>
   import("@/modules/html-preview/HtmlPreviewPane").then((m) => ({ default: m.HtmlPreviewPane as ComponentType<any> })),
@@ -44,7 +45,10 @@ const GitHistoryPane = lazy(() =>
   import("@/modules/git-history/GitHistoryPane").then((m) => ({ default: m.GitHistoryPane as ComponentType<any> })),
 );
 const MarkdownTab = lazy(() =>
-  import("@/modules/markdown/rich/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
+  import("@/modules/markdown/tiptap/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
+);
+const MilkdownTab = lazy(() =>
+  import("@/modules/markdown/milkdown/MilkdownTab").then((m) => ({ default: m.MilkdownTab as ComponentType<any> })),
 );
 
 const GLOBAL_TOGGLE_SETTERS: Record<
@@ -127,7 +131,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
-  const markdownEditor = usePreferencesStore((s) => s.markdownEditor);
+  const markdownEnginePref = usePreferencesStore((s) => s.markdownEngine);
   const scratchpadInNewTerminals = usePreferencesStore(
     (s) => s.scratchpadInNewTerminals,
   );
@@ -179,6 +183,11 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       : undefined;
   const effectivePreviewMode: "overlay" | "split" | undefined =
     rawPM === true ? "overlay" : !rawPM ? undefined : (rawPM as "overlay" | "split");
+
+  const tabMarkdownEngine =
+    tab.kind === "markdown" || tab.kind === "editor"
+      ? resolveMarkdownEngine(tab.markdownEngine, markdownEnginePref)
+      : markdownEnginePref;
 
   const prevEffectivePreviewModeRef = useRef<"overlay" | "split" | undefined>(undefined);
   useEffect(() => {
@@ -333,7 +342,14 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   )}
                   style={effectivePreviewMode === "split" ? { left: "calc(50% + 1px)" } : undefined}
                 >
-                  {ismd && <MarkdownPreviewPane content={liveContent} />}
+                  {ismd && (
+                    <MarkdownRenderPane
+                      content={liveContent}
+                      engine={tabMarkdownEngine}
+                      filePath={tab.path}
+                      workspaceRoot={workspaceRoot}
+                    />
+                  )}
                   {ishtml && <HtmlPreviewPane content={liveContent} path={tab.path} />}
                 </div>
               )}
@@ -364,10 +380,17 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       );
 
     case "markdown":
-      if (markdownEditor === "rich") {
+      if (tabMarkdownEngine === "tiptap") {
         return (
           <Suspense fallback={null}>
             <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
+          </Suspense>
+        );
+      }
+      if (tabMarkdownEngine === "milkdown") {
+        return (
+          <Suspense fallback={null}>
+            <MilkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
           </Suspense>
         );
       }
@@ -392,7 +415,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                 onToggleOverlay: () => callbacks.onSetMarkdownView?.(tab.id, "raw"),
                 onToggleSplit: () => callbacks.onUpdateTab?.(tab.id, (p) => {
                   if (p.kind !== "markdown") return p;
-                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus };
+                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
                 }),
               }}
             />
@@ -408,7 +431,12 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                 />
               </div>
               <div className="absolute inset-0" style={{ zIndex: 5 }}>
-                <MarkdownPreviewPane content={liveContent} />
+                <MarkdownRenderPane
+                  content={liveContent}
+                  engine={tabMarkdownEngine}
+                  filePath={tab.path}
+                  workspaceRoot={workspaceRoot}
+                />
               </div>
             </div>
           </div>

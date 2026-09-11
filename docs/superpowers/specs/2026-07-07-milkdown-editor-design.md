@@ -1,5 +1,10 @@
 # Milkdown Markdown Editor Design (third markdown engine)
 
+> **Superseded by `2026-09-10-milkdown-editor-design.md`.** That revision keeps this design's engine
+> choice, module layout and testing bar, and replaces how the engine is selected: three preference
+> values with a Settings control, a per-tab engine persisted in the workspace JSON, and the editor
+> tab's preview rendered with that engine.
+
 **Feature:** Add a Milkdown (Crepe) WYSIWYG editor as a third selectable engine for the `markdown`
 tab, alongside the TipTap rich editor and the legacy Streamdown preview
 **Date:** 2026-07-07
