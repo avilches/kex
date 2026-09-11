@@ -14,7 +14,17 @@ export type DocumentState =
   | { status: "ready"; content: string; size: number }
   | { status: "binary"; size: number }
   | { status: "toolarge"; size: number; limit: number }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string }
+  | { status: "deleted" };
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await invoke("fs_stat", { path, workspace: currentWorkspaceEnv() });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 type Options = {
   path: string;
@@ -38,6 +48,9 @@ export function useDocument({ path, onDirtyChange }: Options) {
 
   const autoSaveRef = useRef({ autoSave, autoSaveDelay });
   autoSaveRef.current = { autoSave, autoSaveDelay };
+
+  const docStatusRef = useRef<DocumentState["status"]>("loading");
+  docStatusRef.current = doc.status;
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -101,7 +114,11 @@ export function useDocument({ path, onDirtyChange }: Options) {
         }
       })
       .catch((e) => {
-        if (!cancelled) setDoc({ status: "error", message: String(e) });
+        if (cancelled) return;
+        void fileExists(path).then((exists) => {
+          if (cancelled) return;
+          setDoc(exists ? { status: "error", message: String(e) } : { status: "deleted" });
+        });
       });
 
     return () => {
@@ -109,15 +126,19 @@ export function useDocument({ path, onDirtyChange }: Options) {
     };
   }, [path]);
 
-  // Skipped while dirty (never clobber unsaved edits) and when disk already
-  // matches the buffer (self-save / duplicate watcher event → no re-render).
+  // Content sync is skipped while dirty (never clobber unsaved edits) and when
+  // disk already matches the buffer (self-save / duplicate watcher event -> no
+  // re-render). The deletion check below still runs while dirty: an edit in
+  // progress must not hide that its file was removed out from under it, or
+  // autosave would go on to silently recreate it.
   const reload = useCallback((): boolean => {
-    if (dirtyRef.current) return false;
+    const wasDirty = dirtyRef.current;
     void invoke<ReadResult>("fs_read_file", {
       path,
       workspace: currentWorkspaceEnv(),
     })
       .then((res) => {
+        if (wasDirty) return;
         if (res.kind === "text") {
           if (res.content === savedRef.current) return;
           savedRef.current = res.content;
@@ -130,7 +151,15 @@ export function useDocument({ path, onDirtyChange }: Options) {
           setDoc({ status: "toolarge", size: res.size, limit: res.limit });
         }
       })
-      .catch((e) => setDoc({ status: "error", message: String(e) }));
+      .catch((e) => {
+        void fileExists(path).then((exists) => {
+          if (exists) {
+            if (!wasDirty) setDoc({ status: "error", message: String(e) });
+            return;
+          }
+          setDoc({ status: "deleted" });
+        });
+      });
     return true;
   }, [path]);
 
@@ -142,6 +171,15 @@ export function useDocument({ path, onDirtyChange }: Options) {
     await saveNow();
   }, [clearAutoSaveTimer, saveNow]);
 
+  // The explicit, opt-in way out of the deleted state: rewrite the in-memory
+  // buffer to the original path (even if it is unchanged from the last read,
+  // since save() would otherwise no-op) and hand the document back to the
+  // normal editing flow.
+  const recreate = useCallback(async () => {
+    await saveNow();
+    setDoc({ status: "ready", content: bufferRef.current, size: bufferRef.current.length });
+  }, [saveNow]);
+
   const onChange = useCallback(
     (next: string) => {
       bufferRef.current = next;
@@ -151,8 +189,9 @@ export function useDocument({ path, onDirtyChange }: Options) {
       clearAutoSaveTimer();
 
       const { autoSave: active, autoSaveDelay: delay } = autoSaveRef.current;
-      if (active && isDirty) {
+      if (active && isDirty && docStatusRef.current !== "deleted") {
         timeoutRef.current = setTimeout(() => {
+          if (docStatusRef.current === "deleted") return;
           saveNow().catch((e) => {
             console.error("[autosave]", e);
             toast.error("Autosave failed", {
@@ -168,7 +207,7 @@ export function useDocument({ path, onDirtyChange }: Options) {
   useEffect(() => {
     return () => {
       clearAutoSaveTimer();
-      if (bufferRef.current !== savedRef.current) {
+      if (docStatusRef.current !== "deleted" && bufferRef.current !== savedRef.current) {
         saveNow().catch((e) => {
           console.error("[autosave flush]", e);
         });
@@ -176,5 +215,5 @@ export function useDocument({ path, onDirtyChange }: Options) {
     };
   }, [path, clearAutoSaveTimer, saveNow]);
 
-  return { doc, dirty, onChange, save, reload };
+  return { doc, dirty, onChange, save, reload, recreate };
 }
