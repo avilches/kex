@@ -26,10 +26,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import { toast } from "sonner";
 import { htmlToMarkdown } from "@/modules/markdown/lib/htmlToMarkdown";
 import { markdownToHtml } from "@/modules/markdown/lib/markdownToHtml";
-import {
-  type WikiLinkContext,
-  type WikiLinkEntry,
-} from "@/modules/markdown/lib/wikiLinks";
+import type { WikiLinkContext, WikiLinkEntry } from "@/modules/markdown/lib/wikiLinks";
 import { CodeLangDropdown } from "@/modules/markdown/rich/CodeLangDropdown";
 import {
   Callout,
