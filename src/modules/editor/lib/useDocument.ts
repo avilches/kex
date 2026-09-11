@@ -109,10 +109,9 @@ export function useDocument({ path, onDirtyChange }: Options) {
     };
   }, [path]);
 
-  // Skipped while dirty (never clobber unsaved edits) and when disk already
-  // matches the buffer (self-save / duplicate watcher event → no re-render).
-  const reload = useCallback((): boolean => {
-    if (dirtyRef.current) return false;
+  // Skips the re-render when disk already matches the buffer (self-save /
+  // duplicate watcher event).
+  const performReload = useCallback(() => {
     void invoke<ReadResult>("fs_read_file", {
       path,
       workspace: currentWorkspaceEnv(),
@@ -131,8 +130,23 @@ export function useDocument({ path, onDirtyChange }: Options) {
         }
       })
       .catch((e) => setDoc({ status: "error", message: String(e) }));
-    return true;
   }, [path]);
+
+  // While dirty, never clobber unsaved edits silently: let the user pick
+  // between keeping them (dismiss) or discarding them for the disk version.
+  const reload = useCallback((): boolean => {
+    if (dirtyRef.current) {
+      toast(`${path.split(/[\\/]/).pop() || path} changed on disk`, {
+        id: `reload-conflict-${path}`,
+        description: "You have unsaved changes here. Reloading discards them.",
+        action: { label: "Reload from disk", onClick: performReload },
+        duration: Number.POSITIVE_INFINITY,
+      });
+      return false;
+    }
+    performReload();
+    return true;
+  }, [path, performReload]);
 
   const save = useCallback(async () => {
     clearAutoSaveTimer();
