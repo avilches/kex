@@ -5,7 +5,6 @@ import { GitDiffSplitView } from "./GitDiffSplitView";
 import { Spinner } from "@/components/ui/spinner";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
-import { listenFsChanged, parentDir, watchAdd, watchRemove } from "@/modules/explorer/lib/watch";
 import { unifiedMergeView } from "@codemirror/merge";
 import { foldGutter } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
