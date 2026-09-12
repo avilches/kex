@@ -1,8 +1,11 @@
+import { invoke } from "@tauri-apps/api/core";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GitDiffPathBar } from "./GitDiffPathBar";
 import { GitDiffSplitView } from "./GitDiffSplitView";
 import { Spinner } from "@/components/ui/spinner";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { currentWorkspaceEnv } from "@/modules/workspace";
+import { listenFsChanged, parentDir, watchAdd, watchRemove } from "@/modules/explorer/lib/watch";
 import { unifiedMergeView } from "@codemirror/merge";
 import { foldGutter } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
@@ -271,6 +274,45 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
     };
   }, [key, stableSource]);
 
+  // Deletion watch for BUG-42: kept deliberately separate from the revalidate
+  // effect above, which reacts to the file's content changing. This only
+  // answers "does the file still exist", via a targeted fs_stat, never
+  // touching originalContent/modifiedContent itself, and it runs for any
+  // working source (staged or unstaged), not just the live "-" one above.
+  // A commit diff is immutable and never runs this check. Deliberately does
+  // not check on mount: a "working" diff for an already git-deleted file (a
+  // staged or unstaged removal) legitimately has no file on disk yet still
+  // renders a correct, non-stale deletion diff, so only a live fs event while
+  // the tab is open should raise the warning.
+  const [deletedOnDisk, setDeletedOnDisk] = useState(false);
+  useEffect(() => {
+    setDeletedOnDisk(false);
+    if (stableSource.kind !== "working") return;
+    const targetPath = joinRepoPath(stableSource.repoRoot, stableSource.path).replace(/\\/g, "/");
+    const dir = parentDir(targetPath);
+    watchAdd([dir]);
+    let alive = true;
+    let unlisten: (() => void) | undefined;
+    const checkExistence = () => {
+      void invoke("fs_stat", { path: targetPath, workspace: currentWorkspaceEnv() }).catch(() => {
+        if (!alive) return;
+        setDeletedOnDisk(true);
+        invalidateDiff(key);
+      });
+    };
+    void listenFsChanged((paths) => {
+      if (paths.some((p) => p.replace(/\\/g, "/") === targetPath)) checkExistence();
+    }).then((un) => {
+      if (alive) unlisten = un;
+      else un();
+    });
+    return () => {
+      alive = false;
+      watchRemove([dir]);
+      unlisten?.();
+    };
+  }, [stableSource, key]);
+
   const path = source.path;
   const repoRoot = source.repoRoot;
   const mode = source.kind === "working" ? source.mode : "+";
@@ -379,6 +421,7 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
         isBinary={isBinary}
         isTooLarge={isTooLarge}
         truncated={truncated}
+        deletedOnDisk={deletedOnDisk}
         stats={stats}
         view={view}
         diffViewMode={diffViewMode}
@@ -387,6 +430,12 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
         onRevealPath={onRevealPath ?? (() => {})}
       />
 
+      {deletedOnDisk ? (
+        <div className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">
+          This file was deleted from disk. This diff no longer reflects the working tree.
+        </div>
+      ) : null}
+
       <div className="min-h-0 flex-1 overflow-hidden">
         {state.kind === "loading" || state.kind === "idle" ? (
           <div className="flex h-full items-center justify-center gap-2 text-[11px] text-muted-foreground">
@@ -394,9 +443,13 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
             Loading diff...
           </div>
         ) : state.kind === "error" ? (
-          <div className="flex h-full items-center justify-center px-6 text-center text-[11.5px] text-destructive">
-            {state.message}
-          </div>
+          // The deletedOnDisk banner above already explains a missing file;
+          // avoid also showing the raw git error from the failed revalidate.
+          deletedOnDisk ? null : (
+            <div className="flex h-full items-center justify-center px-6 text-center text-[11.5px] text-destructive">
+              {state.message}
+            </div>
+          )
         ) : useFallback ? (
           <ScrollArea className="h-full">
             <pre className="whitespace-pre-wrap wrap-break-word p-4 font-mono text-[12px] leading-relaxed text-muted-foreground">

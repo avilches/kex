@@ -33,6 +33,7 @@ type Props = {
   isBinary: boolean;
   isTooLarge: boolean;
   truncated: boolean;
+  deletedOnDisk: boolean;
   stats: { added: number; removed: number };
   view: EditorViewSettings;
   diffViewMode: DiffViewMode;
@@ -51,6 +52,7 @@ export function GitDiffPathBar({
   isBinary,
   isTooLarge,
   truncated,
+  deletedOnDisk,
   stats,
   view,
   diffViewMode,
@@ -104,6 +106,15 @@ export function GitDiffPathBar({
             title="The diff exceeded the size limit and was truncated; content may be incomplete."
           >
             Truncated
+          </Badge>
+        ) : null}
+        {deletedOnDisk ? (
+          <Badge
+            variant="destructive"
+            className="text-[10px]"
+            title="This file was deleted from disk; this diff no longer reflects the working tree."
+          >
+            Deleted on disk
           </Badge>
         ) : null}
         {useFallback ? (

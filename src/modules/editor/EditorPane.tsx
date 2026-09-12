@@ -24,7 +24,9 @@ import {
   useRef,
 } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 import { pathBasename } from "@/lib/pathUtils";
+import { Button } from "@/components/ui/button";
 import {
   activeLineCompartment,
   autocompletionCompartment,
@@ -83,6 +85,8 @@ type Props = {
   onReady?: (initialContent: string) => void;
   overrideLanguage?: string | null;
   onLanguageResolved?: (name: string) => void;
+  /** Called when the user closes the tab from within the pane (e.g. the deleted-file state). */
+  onClose?: () => void;
 };
 
 function formatBytes(n: number): string {
@@ -92,8 +96,8 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved }, ref) {
-    const { doc, onChange, save, reload } = useDocument({
+  function EditorPane({ path, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved, onClose }, ref) {
+    const { doc, onChange, save, reload, recreate } = useDocument({
       path,
       onDirtyChange,
     });
@@ -366,6 +370,38 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       return (
         <div className="flex h-full items-center justify-center px-6 text-center text-xs text-destructive">
           {doc.message}
+        </div>
+      );
+    }
+    if (doc.status === "deleted") {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="text-sm text-foreground">This file was deleted from disk</div>
+          <div className="max-w-sm text-xs text-muted-foreground">
+            {pathBasename(path)} no longer exists at its original location. Its last known
+            content is still kept in this tab.
+          </div>
+          <div className="mt-1 flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onClose?.()}
+            >
+              Close tab
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                recreate().catch((e) => {
+                  toast.error("Could not recreate file", {
+                    description: e instanceof Error ? e.message : String(e),
+                  });
+                });
+              }}
+            >
+              Save to recreate file
+            </Button>
+          </div>
         </div>
       );
     }

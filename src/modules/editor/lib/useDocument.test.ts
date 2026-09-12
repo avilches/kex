@@ -104,10 +104,19 @@ describe("useDocument reload", () => {
     });
 
     expect(returned).toBe(false);
-    expect(invoke).not.toHaveBeenCalled();
+    // Still probes the disk (so a concurrent deletion is caught even while
+    // dirty), but the content below shows this didn't apply the result.
+    expect(invoke).toHaveBeenCalledWith(
+      "fs_read_file",
+      expect.objectContaining({ path: "/tmp/b.txt" }),
+    );
     expect(toast).toHaveBeenCalledTimes(1);
     expect(harness.hook.dirty).toBe(true);
-    expect(harness.hook.doc.status).toBe("ready");
+    expect(harness.hook.doc).toEqual({
+      status: "ready",
+      content: "on disk",
+      size: 7,
+    } satisfies DocumentState);
 
     const [, options] = vi.mocked(toast).mock.calls[0] as [
       string,
@@ -153,6 +162,33 @@ describe("useDocument reload", () => {
     const idOf = (n: number) =>
       (vi.mocked(toast).mock.calls[n] as [string, { id: string }])[1].id;
     expect(idOf(0)).toBe(idOf(1));
+
+    harness.unmount();
+  });
+
+  it("detects the file was deleted even while dirty, without touching the buffer", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const harness = mountUseDocument("/tmp/d.txt");
+    await flush();
+
+    act(() => {
+      harness.hook.onChange("local edit");
+    });
+    expect(harness.hook.dirty).toBe(true);
+
+    // Both fs_read_file (the reload probe) and fs_stat (the existence check
+    // in its catch handler) reject: the file is gone.
+    vi.mocked(invoke).mockClear();
+    vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+
+    act(() => {
+      harness.hook.reload();
+    });
+    await flush();
+
+    expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+    // The unsaved edit itself is never discarded by the deletion check.
+    expect(harness.hook.dirty).toBe(true);
 
     harness.unmount();
   });
