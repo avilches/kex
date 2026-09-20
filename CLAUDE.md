@@ -1,3 +1,4 @@
+<!-- El contenido de este proyecto vive en AGENTS.md, que leen opencode y Codex; se importa aquí para que Claude Code y omp lo vean también. Pendiente de mover a este fichero: TASK-3 del tablero de dotfiles. -->
 @AGENTS.md
 
 @.memory/MEMORY.md
@@ -213,3 +214,6 @@ Do not edit Backlog task, draft, document, decision, or milestone markdown files
 
 </CRITICAL_INSTRUCTION>
 <!-- BACKLOG.MD GUIDELINES END -->
+
+<!-- Reglas del contenedor ~/Hub. Claude Code las carga solo al subir por los directorios; opencode, omp y Codex no suben, así que se importan a mano. -->
+@~/Hub/CLAUDE.md

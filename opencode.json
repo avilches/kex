@@ -9,6 +9,7 @@
   // Al añadir un import allí hay que añadirlo aquí, y comprobarlo con
   // `bash ~/Hub/dotfiles/scripts/link-agent-instructions.sh --check`
   "instructions": [
+    "~/Hub/CLAUDE.md",
     "AGENTS.md",
     ".memory/MEMORY.md"
   ]
