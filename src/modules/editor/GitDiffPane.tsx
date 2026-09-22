@@ -273,20 +273,25 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
     };
   }, [key, stableSource]);
 
-  // Deletion watch for BUG-42: kept deliberately separate from the revalidate
-  // effect above, which reacts to the file's content changing. This only
-  // answers "does the file still exist", via a targeted fs_stat, never
-  // touching originalContent/modifiedContent itself, and it runs for any
-  // working source (staged or unstaged), not just the live "-" one above.
-  // A commit diff is immutable and never runs this check. Deliberately does
-  // not check on mount: a "working" diff for an already git-deleted file (a
-  // staged or unstaged removal) legitimately has no file on disk yet still
-  // renders a correct, non-stale deletion diff, so only a live fs event while
-  // the tab is open should raise the warning.
+  // Deletion watch for BUG-42, staged diffs only (mode "+"). An unstaged
+  // working diff (mode "-") doesn't need this: its modified side is read
+  // straight off disk (read_text_file), which treats a missing file as
+  // TextSource::Missing => empty content, not an error, so the revalidate
+  // effect above already refetches into the correct "whole file removed"
+  // diff (all lines shown deleted) on its own; a banner on top of that would
+  // just be redundant, and even misleading since the diff below it is
+  // already accurate. A staged diff's modified side comes from the git index
+  // instead, so it stays correct and unaffected by the working file
+  // disappearing, but the file being gone is still worth flagging since
+  // nothing else in this pane would otherwise reflect it. A commit diff is
+  // immutable and never runs this check. Deliberately does not check on
+  // mount: a staged diff for an already git-deleted file legitimately has no
+  // file on disk yet is a correct, unrelated state, so only a live fs event
+  // while the tab is open should raise the warning.
   const [deletedOnDisk, setDeletedOnDisk] = useState(false);
   useEffect(() => {
     setDeletedOnDisk(false);
-    if (stableSource.kind !== "working") return;
+    if (stableSource.kind !== "working" || stableSource.mode !== "+") return;
     const targetPath = joinRepoPath(stableSource.repoRoot, stableSource.path).replace(/\\/g, "/");
     const dir = parentDir(targetPath);
     watchAdd([dir]);
