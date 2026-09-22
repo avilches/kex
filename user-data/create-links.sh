@@ -40,5 +40,11 @@ enlazar "$HOME/Library/Application Support/app.betauer.kex" "$aqui/support"
 enlazar "$HOME/.config/kex" "$aqui/config"
 enlazar "$HOME/.cache/kex" "$aqui/cache"
 
+# `pnpm tauri dev` compila con el identificador `app.betauer.kex.dev` (ver `src-tauri/build.rs`),
+# para no pisar los datos del .app instalado. config y cache no tienen equivalente -dev porque
+# esas dos rutas no dependen del identifier: se comparten a propósito entre ambas versiones.
+enlazar "$HOME/Library/Logs/app.betauer.kex.dev" "$aqui/logs-dev"
+enlazar "$HOME/Library/Application Support/app.betauer.kex.dev" "$aqui/support-dev"
+
 echo "enlaces de $aqui:"
 ls -la "$aqui" | grep -- '->' || echo "  (ninguno, y eso es un fallo: mira los avisos de arriba)"

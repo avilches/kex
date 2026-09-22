@@ -164,9 +164,20 @@ Yottacast y el software de Hub, y lo recrea `user-data/create-links.sh`, que es 
 | `user-data/support` | `~/Library/Application Support/app.betauer.kex` | los `settings-*.json`, los temas, `workspaces.json` y `agent-sessions.json` del restore de sesiones |
 | `user-data/config` | `~/.config/kex` | `hooks/`, con los ganchos de sesión que instala el agente |
 | `user-data/cache` | `~/.cache/kex` | `shell-integration/`, lo que se inyecta en bash y zsh |
+| `user-data/logs-dev` | `~/Library/Logs/app.betauer.kex.dev` | el `Kex.log` del build de desarrollo |
+| `user-data/support-dev` | `~/Library/Application Support/app.betauer.kex.dev` | los mismos ficheros que `support`, pero del build de desarrollo |
 
 Las dos primeras las nombra **Tauri** a partir del `identifier` de `src-tauri/tauri.conf.json`,
 que hoy es `app.betauer.kex`: si cambia ahí, hay que cambiarlo en el script.
+
+**`pnpm tauri dev` usa un identifier distinto, `app.betauer.kex.dev`** (y `productName: "Kex Dev"`),
+para no pisar los datos del `.app` instalado mientras se programa Kex con él abierto a la vez. Lo
+inyecta `src-tauri/build.rs` en el build de perfil `debug` vía la variable `TAURI_CONFIG`, que
+`tauri::generate_context!()` mezcla sobre `tauri.conf.json` en tiempo de compilación; `pnpm tauri
+build` (perfil `release`) no la toca y sigue usando `app.betauer.kex`. `config` y `cache`
+(`~/.config/kex`, `~/.cache/kex`) no tienen equivalente `-dev` porque no dependen del identifier:
+son la integración con Claude Code y con la shell, no datos de usuario, y se comparten a propósito
+entre ambas versiones.
 
 **En la máquina hay además carpetas de `terax`** (`~/.config/terax`, `~/.cache/terax` y
 `~/Library/Application Support/app.crynta.terax`), y **no se enlazan porque el código de Kex no
