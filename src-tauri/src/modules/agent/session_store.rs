@@ -372,6 +372,25 @@ pub fn detach_session(tab_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Read-only preview of the resume command for a single tab, used by the frontend to show
+/// what will actually run on the next Kex launch (e.g. in the "Run on start" menu) instead
+/// of a stale captured string. Runs the same computation as `load_restore_plan` but, unlike
+/// it, never mutates the store: `build_plans_from` only calls `remove_panel_from_store` when
+/// given a `store_path`, which this passes as `None`.
+pub fn preview_resume_cmd(tab_id: &str) -> Option<RestorePlan> {
+    let path = store_path()?;
+    preview_resume_cmd_from_path(tab_id, &path)
+}
+
+fn preview_resume_cmd_from_path(tab_id: &str, path: &PathBuf) -> Option<RestorePlan> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let store: SessionStore = serde_json::from_str(&content).ok()?;
+    let record = store.tabs.get(tab_id)?.clone();
+    let mut tabs = HashMap::new();
+    tabs.insert(tab_id.to_string(), record);
+    build_plans_from(tabs, None).into_iter().next()
+}
+
 pub fn load_restore_plan() -> Vec<RestorePlan> {
     let path = match store_path() {
         Some(p) => p,
@@ -493,6 +512,71 @@ mod tests {
         let cmd = format!("{base} --session-id {}", shell_quote("abc-123"));
         // --model dropped; --safe-mode kept
         assert_eq!(cmd, "claude --safe-mode --session-id 'abc-123'");
+    }
+
+    fn write_store(path: &PathBuf, tabs: HashMap<String, SessionRecord>) {
+        let store = SessionStore { version: 1, tabs };
+        std::fs::write(path, serde_json::to_string(&store).unwrap()).unwrap();
+    }
+
+    #[test]
+    fn preview_resume_cmd_from_path_returns_plan_for_known_tab() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd_launch = dir.path().join("project");
+        std::fs::create_dir_all(&cwd_launch).unwrap();
+        let jsonl = dir.path().join("session.jsonl");
+        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), SessionRecord {
+            agent: Some("claude".to_string()),
+            session_id: "abc-123".to_string(),
+            cwd_launch: cwd_launch.display().to_string(),
+            transcript_path: jsonl.display().to_string(),
+            launch_cmd: Some("claude --model opus --safe-mode".to_string()),
+            updated_at: 0,
+        });
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, tabs);
+
+        let plan = preview_resume_cmd_from_path("tab-1", &store_path).expect("plan for known tab");
+        assert_eq!(plan.tab_id, "tab-1");
+        assert_eq!(plan.resume_cmd, "claude --safe-mode --resume 'abc-123'");
+        assert_eq!(plan.error_reason, "");
+    }
+
+    #[test]
+    fn preview_resume_cmd_from_path_none_for_unknown_tab() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, HashMap::new());
+
+        assert!(preview_resume_cmd_from_path("missing-tab", &store_path).is_none());
+    }
+
+    #[test]
+    fn preview_resume_cmd_from_path_reports_missing_cwd_without_mutating_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), SessionRecord {
+            agent: Some("claude".to_string()),
+            session_id: "abc-123".to_string(),
+            cwd_launch: dir.path().join("does-not-exist").display().to_string(),
+            transcript_path: dir.path().join("missing.jsonl").display().to_string(),
+            launch_cmd: None,
+            updated_at: 0,
+        });
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, tabs);
+        let before = std::fs::read_to_string(&store_path).unwrap();
+
+        let plan = preview_resume_cmd_from_path("tab-1", &store_path).expect("plan with error");
+        assert_eq!(plan.resume_cmd, "");
+        assert!(plan.error_reason.contains("Directory not found"));
+
+        // Unlike load_restore_plan, this must never touch the store file on disk.
+        let after = std::fs::read_to_string(&store_path).unwrap();
+        assert_eq!(before, after);
     }
 
     #[test]

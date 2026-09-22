@@ -47,6 +47,18 @@ export function consumeRestorePlan(tabId: string): RestorePlan | null {
   return plan;
 }
 
+// Live, read-only preview of the resume command for a single tab (e.g. for the "Run on
+// start" menu). Unlike the startup restore plan, it is not consumed and never mutates
+// agent-sessions.json, so it can be called on demand while a session is live.
+export async function previewResumeCmd(tabId: string): Promise<RestorePlan | null> {
+  try {
+    return await invoke<RestorePlan | null>("agent_session_preview_cmd", { tabId });
+  } catch (err) {
+    console.error("[agent-session] previewResumeCmd error:", err);
+    return null;
+  }
+}
+
 export async function detachAgentSession(tabId: string): Promise<void> {
   restorePlans?.delete(tabId);
   await invoke("agent_detach_session", { tabId });

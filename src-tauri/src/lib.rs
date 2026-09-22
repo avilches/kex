@@ -472,6 +472,14 @@ fn agent_session_restore_plan() -> Vec<agent::session_store::RestorePlan> {
     plans
 }
 
+/// Live, read-only preview of the resume command for a single tab (e.g. for the "Run on
+/// start" menu). Unlike `agent_session_restore_plan`, does not consume anything and never
+/// mutates `agent-sessions.json`, so it can be called repeatedly while a session is live.
+#[tauri::command]
+fn agent_session_preview_cmd(tab_id: String) -> Option<agent::session_store::RestorePlan> {
+    agent::session_store::preview_resume_cmd(&tab_id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cli_dir = parse_launch_dir();
@@ -868,6 +876,7 @@ pub fn run() {
             agent::agent_detach_session,
             agent::pending_nav::agent_queue_nav,
             agent_session_restore_plan,
+            agent_session_preview_cmd,
             history::history_suggest,
             history::history_commands,
             history::history_record,

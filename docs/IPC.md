@@ -146,6 +146,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
 | `agent_session_restore_plan` | Return `Vec<RestorePlan>` — one entry per tab that had a running agent session at last close |
+| `agent_session_preview_cmd(tabId)` | Return `Option<RestorePlan>` for a single tab, computed live and read-only (never mutates `agent-sessions.json`). Used by the "Run on start" menu to preview the resume command that will actually run next launch |
 | `agent_queue_nav` | Store a pending OS-notification navigation target `{ window_label, workspace_id, tab_id }` with a 5-second TTL. Called by the frontend before sending an OS notification so that when the user clicks the notification and any main window gains focus, Rust can redirect to the correct window and emit `kex:activate-tab` to it. |
 | `float_browser_open(tabId, url, originWindowLabel, workspaceId)` | Open a floating `WebviewUrl::External` window for the given browser tab. If the window already exists, focuses it instead of opening a second one. State is inserted only after successful window build. |
 | `float_browser_close(tabId)` | Destroy the floating window without docking (no `kex:float-dock` event emitted). Removes from state unconditionally. |

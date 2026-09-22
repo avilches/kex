@@ -193,6 +193,14 @@ pub struct RestorePlan {
 `rename_all = "camelCase"` is required — the frontend Map is keyed by `tabId` and would silently miss all sessions
 if it received `tab_id` instead.
 
+### Single-tab preview
+
+`preview_resume_cmd(tab_id) -> Option<RestorePlan>` computes the same `RestorePlan` for one tab on demand, backing the
+`agent_session_preview_cmd` command. It shares `build_plans_from` with `load_restore_plan`, but calls it with
+`store_path: None`, which skips every `remove_panel_from_store` call in that function — so, unlike
+`load_restore_plan`, it never mutates `agent-sessions.json` and can be called repeatedly while a session is live (e.g.
+each time the "Run on start" menu opens) without racing the real startup restore.
+
 ---
 
 ## Frontend integration
@@ -204,6 +212,10 @@ if it received `tab_id` instead.
 Loaded once at app start (`App.tsx`) via `loadRestorePlans()`, which calls `agent_session_restore_plan` and stores the
 result in a module-level `Map<tabId, RestorePlan>`. `consumeRestorePlan(tabId)` returns and deletes the plan for a
 given tab — consume-once semantics prevent double injection.
+
+`previewResumeCmd(tabId)` is a separate, non-consuming call to `agent_session_preview_cmd`, used on demand by
+`TerminalPathBarMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below). It reads
+`agent-sessions.json` fresh each time and never mutates it, unlike `load_restore_plan`.
 
 ### useTerminalSession.ts
 
@@ -229,8 +241,30 @@ surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side o
 
 - **Run on start** checkbox: toggles `restoreOnRestart` on the panel. When enabled (and a `persistentCommand` is set), a
   reload icon appears inline in the path bar as a visual indicator. For agent sessions the checkbox defaults to checked
-  and enabling it captures the current running command as the `persistentCommand` if none is already set.
-- **Persistent command input**: the command that will be run when the terminal restarts. Editable inline in the menu.
+  and enabling it captures the current running command as the `persistentCommand` if none is already set — this is only
+  a fallback default now (see below), not what normally gets shown or run.
+- **Command preview**: for a tab with a live agent session, this is a *live, read-only* preview of the resume command
+  that will actually run on the next Kex launch, fetched from `agent_session_preview_cmd` (via `previewResumeCmd`) when
+  the menu opens and whenever the session id changes (e.g. after `/clear`). It is computed the same way as the startup
+  restore plan — `claude --resume <id>` once the JSONL transcript exists, `claude --session-id <id>` before that — so it
+  always matches what will actually be injected; it is not the `persistentCommand` field and cannot be edited. If the
+  tab has no agent session (a plain "Run on start" command like `lazygit`), or an agent session with no matching entry
+  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the menu falls back to the old editable
+  `persistentCommand` input instead. This replaces the previous behaviour where the input always showed
+  `persistentCommand`: a value captured once from the currently running command the first time the checkbox was
+  toggled on, then frozen forever, unrelated to the id/transcript-based command the app actually resumes with.
+
+  **Exiting and restarting the agent in the same tab** also refreshes the preview, through the existing session
+  lifecycle rather than anything preview-specific: when the agent process exits, `kex:agent-signal` fires `"exited"`
+  (`AgentNotificationsBridge.tsx`), which calls `store.finish(tabId)` — deleting the session from `agentStore`
+  entirely, not just clearing it — and `agent_detach_session`, which removes the tab's entry from
+  `agent-sessions.json`. If the menu happens to be open at that exact moment, `agentSession` becomes `null` and the
+  preview falls back to the plain editable input, per the case above. When a new agent starts in the same tab, its
+  `SessionStart` hook writes a fresh entry (new `session_id`) and emits `kex:agent-session-meta`, which updates
+  `sessions[tabId].meta.sessionId`; the preview effect depends on that value, so it refetches and shows the new
+  session's command. The only edge case is a menu left open across the exact moment of the switch: it can flicker
+  through empty → editable fallback → "…" loading → the new command, before settling. With the menu closed during
+  the switch (the common case) and reopened after, only the final, correct command is ever shown.
 - **Session id** (agent sessions only): shown read-only; click to copy.
 - **Transcript** (agent sessions only): Reveal in Finder. Existence is checked lazily on menu open via `fsStat` so
   there is no up-front IPC cost.

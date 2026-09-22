@@ -16,6 +16,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { native } from "@/lib/native";
 import { copyToClipboard, revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
+import { previewResumeCmd, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import type { Tab } from "@/modules/workspaces/lib/types";
 
@@ -48,6 +49,7 @@ export function TerminalPathBarMenu({
   const [open, setOpen] = useState(false);
   const [transcriptExists, setTranscriptExists] = useState<boolean | null>(null);
   const transcriptPath = agentSession?.meta?.transcriptPath;
+  const sessionId = agentSession?.meta?.sessionId;
 
   // Only fsStat when the menu is open to avoid IPC overhead on every render.
   useEffect(() => {
@@ -64,7 +66,23 @@ export function TerminalPathBarMenu({
     return () => { cancelled = true; };
   }, [open, transcriptPath]);
 
-  const sessionId = agentSession?.meta?.sessionId;
+  // Live preview of the command that will actually run on the next Kex launch, computed
+  // the same way as the startup restore plan (same Rust code, read-only). undefined = not
+  // fetched yet, null = fetched but no plan exists for this tab (falls back to the plain
+  // editable persistentCommand input below). Recomputed on open and whenever the session
+  // gets a new id (e.g. after /clear).
+  const [previewPlan, setPreviewPlan] = useState<RestorePlan | null | undefined>(undefined);
+  useEffect(() => {
+    if (!open || !agentSession) {
+      setPreviewPlan(undefined);
+      return;
+    }
+    let cancelled = false;
+    setPreviewPlan(undefined);
+    void previewResumeCmd(tabId).then((plan) => { if (!cancelled) setPreviewPlan(plan); });
+    return () => { cancelled = true; };
+  }, [open, tabId, agentSession, sessionId]);
+
   // Agents default to restore=true; plain terminals default to false.
   const checked = agentSession ? restoreOnRestart !== false : (restoreOnRestart ?? false);
 
@@ -113,21 +131,38 @@ export function TerminalPathBarMenu({
         </DropdownMenuCheckboxItem>
         {checked && (
           <div className="px-2 py-1">
-            <input
-              type="text"
-              placeholder="command to run (e.g. lazygit)"
-              defaultValue={persistentCommand ?? ""}
-              onBlur={(e) => {
-                const v = e.target.value.trim();
-                onUpdateTab((p) => ({ ...p, persistentCommand: v || undefined }));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                e.stopPropagation();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="h-6 w-full rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-primary"
-            />
+            {agentSession && previewPlan === undefined ? (
+              <div className="h-6 w-full rounded border border-border/60 bg-background/50 px-1.5 py-1 text-[11px] text-muted-foreground">
+                &hellip;
+              </div>
+            ) : agentSession && previewPlan?.resumeCmd ? (
+              <div
+                title={previewPlan.resumeCmd}
+                className="h-6 w-full truncate rounded border border-border/60 bg-background/50 px-1.5 py-1 font-mono text-[11px] text-muted-foreground"
+              >
+                {previewPlan.resumeCmd}
+              </div>
+            ) : agentSession && previewPlan?.errorReason ? (
+              <div className="break-words px-0.5 py-1 text-[11px] text-destructive">
+                {previewPlan.errorReason}
+              </div>
+            ) : (
+              <input
+                type="text"
+                placeholder="command to run (e.g. lazygit)"
+                defaultValue={persistentCommand ?? ""}
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  onUpdateTab((p) => ({ ...p, persistentCommand: v || undefined }));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  e.stopPropagation();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="h-6 w-full rounded border border-border/60 bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-primary"
+              />
+            )}
           </div>
         )}
         {agentSession && (
