@@ -247,7 +247,10 @@ function SortableWorkspaceItem({
         <ContextMenuContent
           onCloseAutoFocus={(e) => {
             e.preventDefault();
-            onRestoreFocus();
+            // Selecting "Rename" opens the Popover in the same tick the menu
+            // closes; restoring focus to the terminal here would steal it
+            // from the rename input and trip the Popover's onInteractOutside.
+            if (useWorkspaceRenameStore.getState().renamingId !== ws.id) onRestoreFocus();
           }}
         >
           <ContextMenuItem onSelect={() => startRename(ws.id)}>
