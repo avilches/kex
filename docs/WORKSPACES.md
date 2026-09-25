@@ -163,16 +163,23 @@ When `visible` becomes **false**:
 - **Alt-screen or blocks mode**: `parkLeafSlot` → disposes only the WebGL addon, slot stays bound;
   the xterm instance keeps receiving data (TUI apps emit incremental cursor-positioned updates that
   can't be replayed coherently from a snapshot — a SIGWINCH kick on re-show forces a full repaint)
-- **Normal mode**: `parkOrReleaseLeaf` (`useTerminalSession.ts`) → the leaf joins a recency-ordered
-  `parkedLeaves` LRU (`parkedLeafOrder.ts`). As long as it fits the budget computed by
-  `estimateParkedTerminalBudget` (`backgroundMemoryBudget.ts`) from the
-  `terminalBackgroundMemoryBudgetMB` setting, it is parked the same cheap way as alt-screen/blocks
-  (`parkLeafSlot`, `hasSlot` stays true): only the WebGL context is dropped, the xterm instance and
-  its scrollback buffer stay alive, so re-showing it is a `refreshLeafSlot` (reattach WebGL, redraw
-  the existing buffer), not a full text replay. Leaves beyond the budget, oldest first, fall back to
-  `unbindLeafFromSlot` (full release + snapshot). A budget of 0 MB evicts every leaf immediately,
-  reproducing the pre-budget behavior. The budget is also re-swept whenever the memory or scrollback
-  setting changes (`enforceParkedLeafBudget`).
+- **Normal mode**: `parkOrReleaseLeaf` (`useTerminalSession.ts`) → always parks first, the same cheap
+  way as alt-screen/blocks (`parkLeafSlot`, `hasSlot` stays true, only the WebGL context is dropped),
+  and joins a recency-ordered `parkedLeaves` LRU (`parkedLeafOrder.ts`). It then calls
+  `scheduleParkedLeafSweep`, which defers the actual budget check to a microtask instead of deciding
+  synchronously. This matters because one render can flip `visible` for several leaves at once (e.g.
+  a workspace switch); deciding evictions immediately, from the hiding leaf's own effect, could evict
+  a leaf that is becoming visible in that same commit before its own effect has run to protect itself
+  (its `dropParkedLeaf` call). The microtask runs only after every effect in the commit has finished,
+  and its guard flag also collapses the one-call-per-mounted-tab redundancy into a single sweep. The
+  sweep itself (`enforceParkedLeafBudget`) computes the budget via `estimateParkedTerminalBudget`
+  (`backgroundMemoryBudget.ts`) from `terminalBackgroundMemoryBudgetMB`, and releases leaves beyond
+  it, oldest first, via `unbindLeafFromSlot` (full release + snapshot; re-showing such a leaf is then
+  a full `bindLeafToSlot` text replay, not the cheap `refreshLeafSlot` path). A budget of 0 MB evicts
+  every leaf, reproducing the pre-budget behavior. `detachSession` (a leaf moving to a different pane
+  without being disposed) also calls `dropParkedLeaf`, so a parked leaf never leaves a stale LRU entry
+  behind when it moves. Alt-screen/blocks leaves never enter this LRU and stay parked unconditionally
+  for as long as they are hidden, regardless of the budget, same as before this setting existed.
 
 ### Hibernation (dormant ring)
 

@@ -143,31 +143,43 @@ function parkedLeafBudget(): number {
 
 // Called when a non-blocks, non-alt-screen leaf goes invisible. Keeps its
 // terminal and buffer alive (dropping only the GPU context, same as
-// parkLeafSlot does today for blocks/alt-screen leaves) as long as it fits
-// the memory budget; otherwise falls back to a full release.
-function parkOrReleaseLeaf(leafId: string, s: Session): void {
+// parkLeafSlot does today for blocks/alt-screen leaves) and defers the
+// budget sweep; see scheduleParkedLeafSweep for why it can't decide
+// synchronously which leaf (if any) to fully release.
+function parkOrReleaseLeaf(leafId: string): void {
+  parkLeafSlot(leafId);
   touchParkedLeaf(parkedLeaves, leafId);
-  const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
-  if (evicted.includes(leafId)) {
-    unbindLeafFromSlot(leafId, s);
-  } else {
-    parkLeafSlot(leafId);
-  }
-  for (const id of evicted) {
-    if (id === leafId) continue;
-    const es = sessions.get(id);
-    if (es && es.hasSlot && !es.visibleNow) unbindLeafFromSlot(id, es);
-  }
+  scheduleParkedLeafSweep();
 }
 
-// Re-sweeps parked leaves against the current budget, e.g. right after the
-// user lowers the memory budget or the scrollback setting in Settings.
 function enforceParkedLeafBudget(): void {
   const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
   for (const id of evicted) {
     const es = sessions.get(id);
     if (es && es.hasSlot && !es.visibleNow) unbindLeafFromSlot(id, es);
   }
+}
+
+let parkedLeafSweepScheduled = false;
+
+// A single render can flip `visible` for several leaves at once (e.g. a
+// workspace switch hides one pane's tab and shows another's). React runs
+// each leaf's own effect independently, in tree order, not by transition
+// direction, so a hiding leaf's effect can run before a leaf that is
+// becoming visible in that same commit has had a chance to remove itself
+// from parkedLeaves via dropParkedLeaf. Evicting synchronously from the
+// hiding side risks releasing the very leaf you just switched to. Deferring
+// the sweep to a microtask runs it only after every effect in the current
+// commit, including that leaf's own dropParkedLeaf, has already run.
+// The guard flag collapses same-tick calls (one per mounted terminal tab)
+// into a single sweep.
+function scheduleParkedLeafSweep(): void {
+  if (parkedLeafSweepScheduled) return;
+  parkedLeafSweepScheduled = true;
+  queueMicrotask(() => {
+    parkedLeafSweepScheduled = false;
+    enforceParkedLeafBudget();
+  });
 }
 
 // Block-overlay viewport listeners, keyed by leafId at module scope so the
@@ -927,6 +939,7 @@ function attachSession(
 function detachSession(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
+  dropParkedLeaf(parkedLeaves, leafId);
   unbindLeafFromSlot(leafId, s);
   s.callbacks = {};
   s.container = null;
@@ -1178,7 +1191,7 @@ export function useTerminalSession({
     (p) => p.terminalBackgroundMemoryBudgetMB,
   );
   useEffect(() => {
-    enforceParkedLeafBudget();
+    scheduleParkedLeafSweep();
   }, [backgroundMemoryBudgetMB, scrollback]);
 
   const webglPref = usePreferencesStore((p) => p.terminalWebglEnabled);
@@ -1236,7 +1249,7 @@ export function useTerminalSession({
       if (gained && !blocks) requestLeafFocus(leafId);
     } else if (s.hasSlot) {
       if (s.blocks || isLeafAltScreen(leafId)) parkLeafSlot(leafId);
-      else parkOrReleaseLeaf(leafId, s);
+      else parkOrReleaseLeaf(leafId);
     }
     wasFocusedRef.current = visible && focused;
   }, [leafId, visible, focused, blocks]);

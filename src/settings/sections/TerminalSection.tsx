@@ -20,7 +20,11 @@ import {
 import { defaultMonoFontFamily } from "@/lib/fonts";
 import { ENTER_KEY, fmtShortcut, SHIFT_KEY } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { estimateParkedTerminalBudget } from "@/modules/terminal/lib/backgroundMemoryBudget";
+import {
+  BACKGROUND_MEMORY_REFERENCE_COLS,
+  estimateParkedTerminalBudget,
+  estimateTerminalBytes,
+} from "@/modules/terminal/lib/backgroundMemoryBudget";
 import {
   type CursorInactiveStyle,
   type CursorStyle,
@@ -142,18 +146,23 @@ export function TerminalSection() {
       .catch(() => {});
   }, []);
 
+  // Shared with the Scrollback row below so the two RAM estimates on this
+  // screen can never drift apart: both are the exact xterm.js buffer cost
+  // (cols * 3 cells * 4 bytes), at the same reference width.
+  const bytesPerLineAtReference = estimateTerminalBytes(1);
   const parkedTerminalBudget = estimateParkedTerminalBudget(
     terminalBackgroundMemoryBudgetMB * 1024 * 1024,
     terminalScrollback,
   );
-  const backgroundMemoryDescription =
+  const backgroundMemoryHeadline =
     terminalBackgroundMemoryBudgetMB === 0
       ? "0 MB releases background terminals immediately, rebuilding them from scratch each time you switch back."
       : `Keeps roughly ${parkedTerminalBudget.toLocaleString()} background terminal${
           parkedTerminalBudget === 1 ? "" : "s"
         } alive instead of rebuilding ${
           parkedTerminalBudget === 1 ? "it" : "them"
-        } on your next visit. Estimated at the current scrollback and 120 columns wide.`;
+        } on your next visit. Estimated at the current scrollback and ${BACKGROUND_MEMORY_REFERENCE_COLS} columns wide.`;
+  const backgroundMemoryDescription = `${backgroundMemoryHeadline} Terminals running a full-screen app (vim, htop...) while hidden always stay alive, regardless of this setting.`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -410,7 +419,9 @@ export function TerminalSection() {
         />
         <SettingRow
           title="Scrollback"
-          description="Lines of history kept per terminal. Higher uses more RAM (~3 KB / line)."
+          description={`Lines of history kept per terminal. Higher uses more RAM (~${(
+            bytesPerLineAtReference / 1024
+          ).toFixed(1)} KB / line at ${BACKGROUND_MEMORY_REFERENCE_COLS} columns; wider terminals cost more per line).`}
         >
           <Select
             value={String(terminalScrollback)}
