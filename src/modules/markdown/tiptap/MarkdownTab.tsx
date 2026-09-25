@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { EditorPathBar } from "@/modules/editor";
+import { EditorPathBar, ReloadConflictOverlay } from "@/modules/editor";
 import { EditorPane, type EditorPaneHandle } from "@/modules/editor/EditorPane";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
 import { useMarkdownTabController } from "@/modules/markdown/lib/useMarkdownTabController";
@@ -53,7 +53,15 @@ export function MarkdownTab(props: Props): JSX.Element {
     },
     onToggleOutline: () => setOutlineOpen((v) => !v),
   });
-  const { mode, doc, onChange, setBaseline } = ctrl;
+  const {
+    mode,
+    doc,
+    onChange,
+    setBaseline,
+    conflict,
+    keepLocalChanges,
+    reloadFromDisk,
+  } = ctrl;
 
   // Own the wiki-link index at the tab level so RichMarkdownEditor's first parse
   // already resolves link targets (see RichMarkdownEditor wikiEntries prop).
@@ -246,7 +254,10 @@ export function MarkdownTab(props: Props): JSX.Element {
       <div className="relative min-h-0 flex-1">
         {mode === "source" ? (
           <EditorPane
-            ref={editorPaneRef}
+            ref={(h) => {
+              editorPaneRef.current = h;
+              props.callbacks.registerEditorHandle?.(props.tabId, h);
+            }}
             path={props.path}
             onDirtyChange={(d) =>
               props.callbacks.onEditorDirtyChange?.(props.tabId, d)
@@ -254,6 +265,13 @@ export function MarkdownTab(props: Props): JSX.Element {
           />
         ) : (
           richContent()
+        )}
+        {mode === "rich" && conflict && (
+          <ReloadConflictOverlay
+            path={props.path}
+            onKeep={keepLocalChanges}
+            onReload={reloadFromDisk}
+          />
         )}
       </div>
     </div>

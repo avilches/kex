@@ -9,6 +9,15 @@ type ReadResult =
   | { kind: "binary"; size: number }
   | { kind: "toolarge"; size: number; limit: number };
 
+// Survives a component unmount (e.g. dragging a tab to another pane, which
+// unmounts EditorPane in the source pane and mounts a fresh one in the
+// target) so an in-progress edit isn't force-saved to disk or lost just
+// because the tab moved. A real, guarded close (useTabCloseGuards) already
+// saves or asks before disposing the tab; this only covers moves that never
+// go through that flow. Keyed by path, so it's process-lifetime, not
+// persisted: it does not survive an app quit.
+const unflushedBuffers = new Map<string, string>();
+
 export type DocumentState =
   | { status: "loading" }
   | { status: "ready"; content: string; size: number }
@@ -34,6 +43,7 @@ type Options = {
 export function useDocument({ path, onDirtyChange }: Options) {
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
+  const [conflict, setConflict] = useState(false);
 
   const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const autoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
@@ -91,16 +101,20 @@ export function useDocument({ path, onDirtyChange }: Options) {
     let cancelled = false;
     setDoc({ status: "loading" });
     setDirty(false);
+    setConflict(false);
 
     invoke<ReadResult>("fs_read_file", { path, workspace: currentWorkspaceEnv() })
       .then((res) => {
         if (cancelled) return;
         if (res.kind === "text") {
+          const unflushed = unflushedBuffers.get(path);
+          unflushedBuffers.delete(path);
           savedRef.current = res.content;
-          bufferRef.current = res.content;
+          bufferRef.current = unflushed ?? res.content;
+          setDirty(unflushed != null && unflushed !== res.content);
           setDoc({
             status: "ready",
-            content: res.content,
+            content: bufferRef.current,
             size: res.size,
           });
         } else if (res.kind === "binary") {
@@ -141,7 +155,12 @@ export function useDocument({ path, onDirtyChange }: Options) {
       .then((res) => {
         if (!applyContent) return;
         if (res.kind === "text") {
-          if (res.content === savedRef.current) return;
+          // The dedup check only exists to skip a wasted re-render for a
+          // duplicate watcher event while the buffer is clean; a forced
+          // reload (the user explicitly clicked "Reload from disk") must
+          // always apply and discard the dirty buffer, even if the disk
+          // content happens to already equal what was last read.
+          if (!force && res.content === savedRef.current) return;
           savedRef.current = res.content;
           bufferRef.current = res.content;
           setDirty(false);
@@ -163,24 +182,29 @@ export function useDocument({ path, onDirtyChange }: Options) {
       });
   }, [path]);
 
-  // While dirty, never clobber unsaved edits silently: let the user pick
-  // between keeping them (dismiss) or discarding them for the disk version.
-  // performReload still runs (without applying content) so a file removed
-  // while dirty is caught even though its content sync is skipped.
+  // While dirty, never clobber unsaved edits silently: block the pane on a
+  // conflict overlay and let the user pick between keeping them (dismiss) or
+  // discarding them for the disk version. performReload still runs (without
+  // applying content) so a file removed while dirty is caught even though
+  // its content sync is skipped.
   const reload = useCallback((): boolean => {
     if (dirtyRef.current) {
       performReload();
-      toast(`${path.split(/[\\/]/).pop() || path} changed on disk`, {
-        id: `reload-conflict-${path}`,
-        description: "You have unsaved changes here. Reloading discards them.",
-        action: { label: "Reload from disk", onClick: () => performReload(true) },
-        duration: Number.POSITIVE_INFINITY,
-      });
+      setConflict(true);
       return false;
     }
     performReload();
     return true;
-  }, [path, performReload]);
+  }, [performReload]);
+
+  const keepLocalChanges = useCallback(() => {
+    setConflict(false);
+  }, []);
+
+  const reloadFromDisk = useCallback(() => {
+    setConflict(false);
+    performReload(true);
+  }, [performReload]);
 
   const save = useCallback(async () => {
     clearAutoSaveTimer();
@@ -227,12 +251,21 @@ export function useDocument({ path, onDirtyChange }: Options) {
     return () => {
       clearAutoSaveTimer();
       if (docStatusRef.current !== "deleted" && bufferRef.current !== savedRef.current) {
-        saveNow().catch((e) => {
-          console.error("[autosave flush]", e);
-        });
+        // Auto-save on: the preference already means "persist as things
+        // happen", so this is the same safety net as before, just also
+        // covering a pane move. Auto-save off: the user opted out of
+        // unprompted disk writes, so the edit is carried in memory instead
+        // and picked up if the same path mounts again (see unflushedBuffers).
+        if (autoSaveRef.current.autoSave) {
+          saveNow().catch((e) => {
+            console.error("[autosave flush]", e);
+          });
+        } else {
+          unflushedBuffers.set(path, bufferRef.current);
+        }
       }
     };
   }, [path, clearAutoSaveTimer, saveNow]);
 
-  return { doc, dirty, onChange, save, reload, recreate };
+  return { doc, dirty, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate };
 }

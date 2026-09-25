@@ -22,10 +22,11 @@ export function useMarkdownTabController(opts: {
   onToggleOutline?: () => void;
 }) {
   const [mode, setMode] = useState<MarkdownTabMode>("rich");
-  const { doc, onChange, setBaseline, save, reload } = useMarkdownDocument({
-    path: opts.path,
-    onDirtyChange: opts.onDirtyChange,
-  });
+  const { doc, onChange, setBaseline, save, reload, conflict, keepLocalChanges, reloadFromDisk } =
+    useMarkdownDocument({
+      path: opts.path,
+      onDirtyChange: opts.onDirtyChange,
+    });
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
 
   const runSavePlan = useCallback(
@@ -79,5 +80,18 @@ export function useMarkdownTabController(opts: {
     [userShortcuts, saveNow, toggleMode, opts.onToggleOutline],
   );
 
-  return { mode, doc, onChange, setBaseline, save, reload, toggleMode, saveNow, handleShortcut };
+  return {
+    mode,
+    doc,
+    onChange,
+    setBaseline,
+    save,
+    reload,
+    toggleMode,
+    saveNow,
+    handleShortcut,
+    conflict,
+    keepLocalChanges,
+    reloadFromDisk,
+  };
 }

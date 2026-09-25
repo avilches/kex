@@ -15,7 +15,6 @@ vi.mock("@/modules/settings/preferences", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { toast } from "sonner";
 import { useDocument, type DocumentState } from "./useDocument";
 
 type Hook = ReturnType<typeof useDocument>;
@@ -75,7 +74,7 @@ describe("useDocument reload", () => {
       "fs_read_file",
       expect.objectContaining({ path: "/tmp/a.txt" }),
     );
-    expect(toast).not.toHaveBeenCalled();
+    expect(harness.hook.conflict).toBe(false);
     expect(harness.hook.doc).toEqual({
       status: "ready",
       content: "changed on disk",
@@ -85,7 +84,7 @@ describe("useDocument reload", () => {
     harness.unmount();
   });
 
-  it("warns and skips the reload when the buffer is dirty, but lets the user discard local edits", async () => {
+  it("blocks the pane on a conflict when the buffer is dirty, but lets the user discard local edits", async () => {
     vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
     const harness = mountUseDocument("/tmp/b.txt");
     await flush();
@@ -110,7 +109,7 @@ describe("useDocument reload", () => {
       "fs_read_file",
       expect.objectContaining({ path: "/tmp/b.txt" }),
     );
-    expect(toast).toHaveBeenCalledTimes(1);
+    expect(harness.hook.conflict).toBe(true);
     expect(harness.hook.dirty).toBe(true);
     expect(harness.hook.doc).toEqual({
       status: "ready",
@@ -118,14 +117,8 @@ describe("useDocument reload", () => {
       size: 7,
     } satisfies DocumentState);
 
-    const [, options] = vi.mocked(toast).mock.calls[0] as [
-      string,
-      { action: { label: string; onClick: () => void } },
-    ];
-    expect(options.action.label).toBe("Reload from disk");
-
     await act(async () => {
-      options.action.onClick();
+      harness.hook.reloadFromDisk();
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -134,6 +127,7 @@ describe("useDocument reload", () => {
       "fs_read_file",
       expect.objectContaining({ path: "/tmp/b.txt" }),
     );
+    expect(harness.hook.conflict).toBe(false);
     expect(harness.hook.dirty).toBe(false);
     expect(harness.hook.doc).toEqual({
       status: "ready",
@@ -144,7 +138,7 @@ describe("useDocument reload", () => {
     harness.unmount();
   });
 
-  it("calling reload twice while dirty reuses one toast instead of stacking", async () => {
+  it("keepLocalChanges dismisses the conflict without touching the buffer", async () => {
     vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
     const harness = mountUseDocument("/tmp/c.txt");
     await flush();
@@ -158,10 +152,19 @@ describe("useDocument reload", () => {
       harness.hook.reload();
     });
 
-    expect(toast).toHaveBeenCalledTimes(2);
-    const idOf = (n: number) =>
-      (vi.mocked(toast).mock.calls[n] as [string, { id: string }])[1].id;
-    expect(idOf(0)).toBe(idOf(1));
+    expect(harness.hook.conflict).toBe(true);
+
+    act(() => {
+      harness.hook.keepLocalChanges();
+    });
+
+    expect(harness.hook.conflict).toBe(false);
+    expect(harness.hook.dirty).toBe(true);
+    expect(harness.hook.doc).toEqual({
+      status: "ready",
+      content: "on disk",
+      size: 7,
+    } satisfies DocumentState);
 
     harness.unmount();
   });
@@ -189,6 +192,74 @@ describe("useDocument reload", () => {
     expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
     // The unsaved edit itself is never discarded by the deletion check.
     expect(harness.hook.dirty).toBe(true);
+
+    harness.unmount();
+  });
+
+  it("carries an unsaved edit across unmount instead of saving it, and restores it on remount", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const first = mountUseDocument("/tmp/e.txt");
+    await flush();
+
+    act(() => {
+      first.hook.onChange("local edit");
+    });
+    expect(first.hook.dirty).toBe(true);
+
+    vi.mocked(invoke).mockClear();
+    first.unmount();
+
+    // Unmounting a dirty buffer (e.g. dragging the tab to another pane)
+    // must not write to disk on its own.
+    expect(invoke).not.toHaveBeenCalledWith(
+      "fs_write_file",
+      expect.anything(),
+    );
+
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const second = mountUseDocument("/tmp/e.txt");
+    await flush();
+
+    expect(second.hook.dirty).toBe(true);
+    expect(second.hook.doc).toEqual({
+      status: "ready",
+      content: "local edit",
+      size: 7,
+    } satisfies DocumentState);
+
+    second.unmount();
+  });
+
+  it("reloadFromDisk applies even when disk currently matches what was last read", async () => {
+    // The file was edited externally and then reverted (or was never really
+    // different from savedRef at the moment the user forces the reload):
+    // the dirty in-memory buffer must still be discarded, not kept just
+    // because it looks like a duplicate watcher event.
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const harness = mountUseDocument("/tmp/h.txt");
+    await flush();
+
+    act(() => {
+      harness.hook.onChange("local edit");
+    });
+    act(() => {
+      harness.hook.reload();
+    });
+    expect(harness.hook.conflict).toBe(true);
+
+    await act(async () => {
+      harness.hook.reloadFromDisk();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(harness.hook.conflict).toBe(false);
+    expect(harness.hook.dirty).toBe(false);
+    expect(harness.hook.doc).toEqual({
+      status: "ready",
+      content: "on disk",
+      size: 7,
+    } satisfies DocumentState);
 
     harness.unmount();
   });

@@ -1,6 +1,6 @@
 import { type JSX, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { EditorPathBar } from "@/modules/editor";
+import { EditorPathBar, ReloadConflictOverlay } from "@/modules/editor";
 import { EditorPane, type EditorPaneHandle } from "@/modules/editor/EditorPane";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
 import { useMarkdownTabController } from "@/modules/markdown/lib/useMarkdownTabController";
@@ -41,7 +41,7 @@ export function MilkdownTab(props: Props): JSX.Element {
     },
     onToggleOutline: () => setOutlineOpen((v) => !v),
   });
-  const { mode, doc, onChange, setBaseline } = ctrl;
+  const { mode, doc, onChange, setBaseline, conflict, keepLocalChanges, reloadFromDisk } = ctrl;
 
   // MilkdownEditor (re)mounts fresh on a revision bump and on every rich<->source
   // toggle (even one that leaves the revision untouched, e.g. peeking at Source and
@@ -148,7 +148,10 @@ export function MilkdownTab(props: Props): JSX.Element {
       <div className="relative min-h-0 flex-1">
         {mode === "source" ? (
           <EditorPane
-            ref={editorPaneRef}
+            ref={(h) => {
+              editorPaneRef.current = h;
+              props.callbacks.registerEditorHandle?.(props.tabId, h);
+            }}
             path={props.path}
             onDirtyChange={(d) =>
               props.callbacks.onEditorDirtyChange?.(props.tabId, d)
@@ -189,6 +192,13 @@ export function MilkdownTab(props: Props): JSX.Element {
           </div>
         ) : (
           <MarkdownDocFallback doc={doc} />
+        )}
+        {mode === "rich" && conflict && (
+          <ReloadConflictOverlay
+            path={props.path}
+            onKeep={keepLocalChanges}
+            onReload={reloadFromDisk}
+          />
         )}
       </div>
     </div>

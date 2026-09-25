@@ -54,8 +54,13 @@ export class MarkdownDocumentBuffer {
     this.baselineBody = null;
   }
 
-  replaceFromDisk(raw: string): boolean {
-    if (raw === this.savedRaw) return false;
+  // force=true is how "Reload from disk" discards a dirty buffer: it must
+  // apply even when raw happens to equal savedRaw, since the buffer's own
+  // body can still differ from both (that's exactly the conflict case). The
+  // early-return dedup is only for a duplicate watcher event on a clean,
+  // unchanged buffer.
+  replaceFromDisk(raw: string, force = false): boolean {
+    if (!force && raw === this.savedRaw) return false;
     const { frontmatter, body } = splitFrontmatter(raw);
     this.frontmatterValue = frontmatter;
     this.savedRaw = raw;
