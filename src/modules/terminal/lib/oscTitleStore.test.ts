@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@tauri-apps/plugin-log", () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
-
 import {
   _clearAll,
   cleanOscTitle,
