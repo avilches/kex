@@ -6,6 +6,8 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DormantRing } from "./dormantRing";
+import { estimateParkedTerminalBudget } from "./backgroundMemoryBudget";
+import { drop as dropParkedLeaf, evictOverflow, touch as touchParkedLeaf } from "./parkedLeafOrder";
 import { shouldFireOnRegister } from "./pendingFocus";
 import type { BlockMode } from "../block/lib/modeMachine";
 import {
@@ -124,6 +126,49 @@ type Session = {
 };
 
 const sessions = new Map<string, Session>();
+
+// Recency-ordered leaves kept "parked" (hidden, but their terminal and
+// buffer stay alive) instead of being released and rebuilt from a
+// serialized snapshot on their next visit. Bounded by
+// terminalBackgroundMemoryBudgetMB; see backgroundMemoryBudget.ts.
+const parkedLeaves: string[] = [];
+
+function parkedLeafBudget(): number {
+  const prefs = usePreferencesStore.getState();
+  return estimateParkedTerminalBudget(
+    prefs.terminalBackgroundMemoryBudgetMB * 1024 * 1024,
+    prefs.terminalScrollback,
+  );
+}
+
+// Called when a non-blocks, non-alt-screen leaf goes invisible. Keeps its
+// terminal and buffer alive (dropping only the GPU context, same as
+// parkLeafSlot does today for blocks/alt-screen leaves) as long as it fits
+// the memory budget; otherwise falls back to a full release.
+function parkOrReleaseLeaf(leafId: string, s: Session): void {
+  touchParkedLeaf(parkedLeaves, leafId);
+  const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
+  if (evicted.includes(leafId)) {
+    unbindLeafFromSlot(leafId, s);
+  } else {
+    parkLeafSlot(leafId);
+  }
+  for (const id of evicted) {
+    if (id === leafId) continue;
+    const es = sessions.get(id);
+    if (es && es.hasSlot && !es.visibleNow) unbindLeafFromSlot(id, es);
+  }
+}
+
+// Re-sweeps parked leaves against the current budget, e.g. right after the
+// user lowers the memory budget or the scrollback setting in Settings.
+function enforceParkedLeafBudget(): void {
+  const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
+  for (const id of evicted) {
+    const es = sessions.get(id);
+    if (es && es.hasSlot && !es.visibleNow) unbindLeafFromSlot(id, es);
+  }
+}
 
 // Block-overlay viewport listeners, keyed by leafId at module scope so the
 // overlay (a child) can subscribe before the parent effect creates the session.
@@ -948,6 +993,7 @@ export function disposeSession(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
   s.disposed = true;
+  dropParkedLeaf(parkedLeaves, leafId);
   disposeLeafSlot(leafId);
   s.hasSlot = false;
   s.snapshot = null;
@@ -1128,6 +1174,13 @@ export function useTerminalSession({
     applyScrollback(scrollback);
   }, [scrollback]);
 
+  const backgroundMemoryBudgetMB = usePreferencesStore(
+    (p) => p.terminalBackgroundMemoryBudgetMB,
+  );
+  useEffect(() => {
+    enforceParkedLeafBudget();
+  }, [backgroundMemoryBudgetMB, scrollback]);
+
   const webglPref = usePreferencesStore((p) => p.terminalWebglEnabled);
   useEffect(() => {
     applyWebglPreference(webglPref);
@@ -1169,6 +1222,7 @@ export function useTerminalSession({
     s.visibleNow = visible;
     s.focusedNow = focused;
     if (visible) {
+      dropParkedLeaf(parkedLeaves, leafId);
       if (s.container && !s.hasSlot) bindLeafToSlot(leafId, s);
       else if (s.hasSlot) refreshLeafSlot(leafId);
       setSlotFocused(leafId, focused);
@@ -1182,7 +1236,7 @@ export function useTerminalSession({
       if (gained && !blocks) requestLeafFocus(leafId);
     } else if (s.hasSlot) {
       if (s.blocks || isLeafAltScreen(leafId)) parkLeafSlot(leafId);
-      else unbindLeafFromSlot(leafId, s);
+      else parkOrReleaseLeaf(leafId, s);
     }
     wasFocusedRef.current = visible && focused;
   }, [leafId, visible, focused, blocks]);

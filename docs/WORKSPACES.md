@@ -160,10 +160,19 @@ When `visible` becomes **true**:
 - If slot already bound: `refreshLeafSlot` (re-attaches WebGL if needed, forces repaint)
 
 When `visible` becomes **false**:
-- **Normal mode**: `unbindLeafFromSlot` → releases slot back to pool; state serialized as snapshot
 - **Alt-screen or blocks mode**: `parkLeafSlot` → disposes only the WebGL addon, slot stays bound;
   the xterm instance keeps receiving data (TUI apps emit incremental cursor-positioned updates that
   can't be replayed coherently from a snapshot — a SIGWINCH kick on re-show forces a full repaint)
+- **Normal mode**: `parkOrReleaseLeaf` (`useTerminalSession.ts`) → the leaf joins a recency-ordered
+  `parkedLeaves` LRU (`parkedLeafOrder.ts`). As long as it fits the budget computed by
+  `estimateParkedTerminalBudget` (`backgroundMemoryBudget.ts`) from the
+  `terminalBackgroundMemoryBudgetMB` setting, it is parked the same cheap way as alt-screen/blocks
+  (`parkLeafSlot`, `hasSlot` stays true): only the WebGL context is dropped, the xterm instance and
+  its scrollback buffer stay alive, so re-showing it is a `refreshLeafSlot` (reattach WebGL, redraw
+  the existing buffer), not a full text replay. Leaves beyond the budget, oldest first, fall back to
+  `unbindLeafFromSlot` (full release + snapshot). A budget of 0 MB evicts every leaf immediately,
+  reproducing the pre-budget behavior. The budget is also re-swept whenever the memory or scrollback
+  setting changes (`enforceParkedLeafBudget`).
 
 ### Hibernation (dormant ring)
 

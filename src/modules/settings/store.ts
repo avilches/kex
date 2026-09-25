@@ -182,6 +182,7 @@ export type Preferences = {
   terminalFontSize: number;
   terminalLineHeight: number;
   terminalScrollback: number;
+  terminalBackgroundMemoryBudgetMB: number;
   terminalCursorStyle: CursorStyle;
   terminalCursorInactiveStyle: CursorInactiveStyle;
   terminalCursorWidth: number;
@@ -257,6 +258,7 @@ const KEY_TERMINAL_LETTER_SPACING = "letterSpacing";
 const KEY_TERMINAL_FONT_SIZE = "fontSize";
 const KEY_TERMINAL_LINE_HEIGHT = "lineHeight";
 const KEY_TERMINAL_SCROLLBACK = "scrollback";
+const KEY_TERMINAL_BACKGROUND_MEMORY_BUDGET = "backgroundMemoryBudgetMb";
 const KEY_TERMINAL_CURSOR_STYLE = "cursorStyle";
 const KEY_TERMINAL_CURSOR_INACTIVE_STYLE = "cursorInactiveStyle";
 const KEY_TERMINAL_CURSOR_WIDTH = "cursorWidth";
@@ -340,6 +342,17 @@ export const TERMINAL_SCROLLBACK_PRESETS = [
   500, 1000, 2000, 5000, 10_000, 25_000,
 ] as const;
 
+// How much memory background (hidden) terminals are allowed to keep alive
+// instead of being torn down and rebuilt from scratch on the next visit.
+// 0 disables parking: every hidden terminal is released immediately, same
+// as before this setting existed.
+export const TERMINAL_BACKGROUND_MEMORY_BUDGET_DEFAULT_MB = 16;
+export const TERMINAL_BACKGROUND_MEMORY_BUDGET_MIN_MB = 0;
+export const TERMINAL_BACKGROUND_MEMORY_BUDGET_MAX_MB = 512;
+export const TERMINAL_BACKGROUND_MEMORY_BUDGET_PRESETS_MB = [
+  0, 8, 16, 32, 64, 128, 256,
+] as const;
+
 export const CURSOR_STYLES = ["bar", "block", "underline"] as const;
 export const CURSOR_STYLE_DEFAULT: CursorStyle = "bar";
 
@@ -410,6 +423,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
   terminalLineHeight: TERMINAL_LINE_HEIGHT_DEFAULT,
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
+  terminalBackgroundMemoryBudgetMB: TERMINAL_BACKGROUND_MEMORY_BUDGET_DEFAULT_MB,
   terminalCursorStyle: CURSOR_STYLE_DEFAULT,
   terminalCursorInactiveStyle: CURSOR_INACTIVE_STYLE_DEFAULT,
   terminalCursorWidth: CURSOR_WIDTH_DEFAULT,
@@ -605,6 +619,10 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalScrollback: clampScrollback(
       get<number>(KEY_TERMINAL_SCROLLBACK) ??
         DEFAULT_PREFERENCES.terminalScrollback,
+    ),
+    terminalBackgroundMemoryBudgetMB: clampBackgroundMemoryBudget(
+      get<number>(KEY_TERMINAL_BACKGROUND_MEMORY_BUDGET) ??
+        DEFAULT_PREFERENCES.terminalBackgroundMemoryBudgetMB,
     ),
     terminalCursorStyle: parseCursorStyle(get<string>(KEY_TERMINAL_CURSOR_STYLE)),
     terminalCursorInactiveStyle: parseCursorInactiveStyle(
@@ -960,6 +978,25 @@ export async function setTerminalScrollback(value: number): Promise<void> {
   await writeTerminalPref(KEY_TERMINAL_SCROLLBACK, clampScrollback(value));
 }
 
+function clampBackgroundMemoryBudget(value: number): number {
+  if (!Number.isFinite(value)) {
+    return TERMINAL_BACKGROUND_MEMORY_BUDGET_DEFAULT_MB;
+  }
+  return Math.min(
+    TERMINAL_BACKGROUND_MEMORY_BUDGET_MAX_MB,
+    Math.max(TERMINAL_BACKGROUND_MEMORY_BUDGET_MIN_MB, Math.round(value)),
+  );
+}
+
+export async function setTerminalBackgroundMemoryBudget(
+  value: number,
+): Promise<void> {
+  await writeTerminalPref(
+    KEY_TERMINAL_BACKGROUND_MEMORY_BUDGET,
+    clampBackgroundMemoryBudget(value),
+  );
+}
+
 export async function setTerminalCursorStyle(value: CursorStyle): Promise<void> {
   await writeTerminalPref(KEY_TERMINAL_CURSOR_STYLE, parseCursorStyle(value));
 }
@@ -1195,6 +1232,7 @@ export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
   [KEY_TERMINAL_LINE_HEIGHT]: "terminalLineHeight",
   [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",
+  [KEY_TERMINAL_BACKGROUND_MEMORY_BUDGET]: "terminalBackgroundMemoryBudgetMB",
   [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
   [KEY_TERMINAL_CURSOR_INACTIVE_STYLE]: "terminalCursorInactiveStyle",
   [KEY_TERMINAL_CURSOR_WIDTH]: "terminalCursorWidth",

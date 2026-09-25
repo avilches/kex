@@ -20,6 +20,7 @@ import {
 import { defaultMonoFontFamily } from "@/lib/fonts";
 import { ENTER_KEY, fmtShortcut, SHIFT_KEY } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { estimateParkedTerminalBudget } from "@/modules/terminal/lib/backgroundMemoryBudget";
 import {
   type CursorInactiveStyle,
   type CursorStyle,
@@ -40,11 +41,13 @@ import {
   SCROLL_SENSITIVITY_MAX,
   SCROLL_SENSITIVITY_MIN,
   SCROLL_SENSITIVITY_STEP,
+  TERMINAL_BACKGROUND_MEMORY_BUDGET_PRESETS_MB,
   TERMINAL_FONT_SIZE_DEFAULT,
   TERMINAL_FONT_SIZE_MAX,
   TERMINAL_FONT_SIZE_MIN,
   TERMINAL_LINE_HEIGHT_DEFAULT,
   TERMINAL_SCROLLBACK_PRESETS,
+  setTerminalBackgroundMemoryBudget,
   setTerminalCursorBlink,
   setTerminalCursorInactiveStyle,
   setTerminalCursorStyle,
@@ -108,6 +111,9 @@ export function TerminalSection() {
     (s) => s.terminalScrollSensitivity,
   );
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
+  const terminalBackgroundMemoryBudgetMB = usePreferencesStore(
+    (s) => s.terminalBackgroundMemoryBudgetMB,
+  );
   const warnOnCloseRunning = usePreferencesStore(
     (s) => s.warnOnCloseTabWithRunningProcess,
   );
@@ -135,6 +141,19 @@ export function TerminalSection() {
       .then((h) => setHome(h.replace(/\\/g, "/").replace(/\/$/, "")))
       .catch(() => {});
   }, []);
+
+  const parkedTerminalBudget = estimateParkedTerminalBudget(
+    terminalBackgroundMemoryBudgetMB * 1024 * 1024,
+    terminalScrollback,
+  );
+  const backgroundMemoryDescription =
+    terminalBackgroundMemoryBudgetMB === 0
+      ? "0 MB releases background terminals immediately, rebuilding them from scratch each time you switch back."
+      : `Keeps roughly ${parkedTerminalBudget.toLocaleString()} background terminal${
+          parkedTerminalBudget === 1 ? "" : "s"
+        } alive instead of rebuilding ${
+          parkedTerminalBudget === 1 ? "it" : "them"
+        } on your next visit. Estimated at the current scrollback and 120 columns wide.`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -408,6 +427,26 @@ export function TerminalSection() {
                   className="text-[12px]"
                 >
                   {lines.toLocaleString()} lines
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+        <SettingRow
+          title="Background terminal memory budget"
+          description={backgroundMemoryDescription}
+        >
+          <Select
+            value={String(terminalBackgroundMemoryBudgetMB)}
+            onValueChange={(v) => void setTerminalBackgroundMemoryBudget(Number(v))}
+          >
+            <SelectTrigger size="sm" className="h-8 w-36 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TERMINAL_BACKGROUND_MEMORY_BUDGET_PRESETS_MB.map((mb) => (
+                <SelectItem key={mb} value={String(mb)} className="text-[12px]">
+                  {mb === 0 ? "Off" : `${mb} MB`}
                 </SelectItem>
               ))}
             </SelectContent>
