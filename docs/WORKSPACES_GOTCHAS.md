@@ -635,3 +635,60 @@ Cuando un dato "en vivo" de un agente parece faltar en un sitio pero sobra en ot
 como lo obtiene el sitio que **si** funciona antes de asumir que hace falta un canal de datos nuevo
 (nuevo campo en un store, nuevo evento IPC). Aqui el dato ya existia y ya estaba persistido
 (`oscTitleStore`); el bug era de prioridad de fuentes en un componente, no de falta de plumbing.
+
+## Bug 10: cambiar de pestana entre terminales seguia lento tras aparcar en vez de liberar (RESUELTO)
+
+### Sintoma
+
+Tras anadir el presupuesto de memoria para terminales aparcados (ver el propio TASK-761: mantener
+vivos el terminal y su buffer al ocultar una pestana, soltando solo el contexto WebGL), el usuario
+seguia notando el mismo parón al alternar entre pestanas de terminal, sobre todo con muchas sesiones
+de agente abiertas a la vez. Entre pestanas de editor iba rapido; solo entre terminales dolia.
+
+### Pistas falsas descartadas
+
+- Recrear el contexto WebGL al volver a mostrar la pestana (`attachWebgl`): medido en 4-9ms,
+  insignificante.
+- El tamano del historial de scroll (`bufferLines`): medido identico con 68 y con 2068 lineas de
+  buffer, mismo coste. No es proporcional al scrollback.
+- Perder el contexto WebGL en si (`WEBGL_lose_context`/`loseContext()`): medido en 0.0ms siempre.
+
+### Causa raiz
+
+`disposeSlotWebgl` (llamada por `parkLeafSlot` en cada ocultacion) llama a `addon.dispose()`, el
+metodo propio de `WebglAddon` de `@xterm/addon-webgl`. Ese `dispose()` registra un disposable que
+llama incondicionalmente a `renderService.setRenderer(core._createRenderer())` +
+`renderService.handleResize(...)`: reconstruye un `DomRenderer` completo (el renderer DOM de
+reserva de xterm, documentado en su propio codigo como "not meant to be particularly fast"). Su
+constructor crea un elemento DOM por cada fila *visible* del terminal, un `WidthCache` con sus
+propios elementos auxiliares, e inyecta una hoja de estilos nueva — coste fijo proporcional a
+`term.rows`, no al historial, medido en 50-65ms consistentes. Ese `DomRenderer` nunca llega a
+pintar nada: en cuanto la pestana vuelve a ser visible, `attachWebgl` crea un contexto nuevo y lo
+descarta sin usarlo. Confirmado leyendo el codigo fuente instalado de `@xterm/addon-webgl@0.19.0`
+(la version estable que usa Kex) y comparado con la beta mas reciente publicada en npm en el
+momento de la investigacion (`0.20.0-beta.300`, descargada del tarball del registro): identico en
+ambas, no es un bug con parche pendiente en una version mas nueva.
+
+### Fix
+
+`parkLeafSlot` ya no llama a `disposeSlotWebgl` de forma sincrona: llama a `scheduleWebglReap`, el
+mismo mecanismo de margen de gracia (`WEBGL_REAP_GRACE_MS = 30s`) que ya usaba `detachSlotFromLeaf`
+para slots totalmente libres. `refreshLeafSlot` (la pestana aparcada vuelve a ser visible) llama a
+`cancelWebglReap` antes de nada, asi que un cambio de pestana rapido nunca llega a pagar el coste de
+reconstruir el `DomRenderer`: solo lo paga una pestana que se queda de verdad oculta el margen
+completo. El guardian del propio temporizador (`if (slot.currentLeafId === null) disposeSlotWebgl`)
+se elimino: como todo camino que reclama el slot antes de que salte el timer lo cancela primero (
+`bindSlot`/`rewireSlot` para un slot idle recuperado, `refreshLeafSlot` para uno aparcado), si el
+timer llega a disparar es siempre seguro destruir el contexto, aparcado o no. El filtro de eviccion
+de `attachWebgl` bajo presion de `WEBGL_MAX_CONTEXTS` paso de mirar solo `currentLeafId === null` a
+mirar `webglReapTimer !== null`: un slot aparcado en tiempo de gracia es tan buen candidato a perder
+su contexto bajo presion como uno totalmente libre.
+
+### Leccion
+
+Un arreglo de rendimiento que solo mueve el coste de sitio (de "reescribir el snapshot" a "llamar a
+`dispose()` de un addon de terceros") puede reproducir el mismo sintoma por una via completamente
+distinta si no se mide el propio addon. Medir con `performance.now()` en cada frontera de la funcion
+sospechosa, no solo en la propia, encontro que el coste no estaba ni en nuestro codigo de aparcado
+ni en la perdida del contexto del navegador, sino en un efecto colateral documentado (pero facil de
+pasar por alto) de una libreria de terceros.

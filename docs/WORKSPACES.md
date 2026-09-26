@@ -160,12 +160,13 @@ When `visible` becomes **true**:
 - If slot already bound: `refreshLeafSlot` (re-attaches WebGL if needed, forces repaint)
 
 When `visible` becomes **false**:
-- **Alt-screen or blocks mode**: `parkLeafSlot` → disposes only the WebGL addon, slot stays bound;
-  the xterm instance keeps receiving data (TUI apps emit incremental cursor-positioned updates that
-  can't be replayed coherently from a snapshot — a SIGWINCH kick on re-show forces a full repaint)
+- **Alt-screen or blocks mode**: `parkLeafSlot` → schedules the WebGL addon's disposal (see
+  "WebGL context management" below), slot stays bound; the xterm instance keeps receiving data
+  (TUI apps emit incremental cursor-positioned updates that can't be replayed coherently from a
+  snapshot — a SIGWINCH kick on re-show forces a full repaint)
 - **Normal mode**: `parkOrReleaseLeaf` (`useTerminalSession.ts`) → always parks first, the same cheap
-  way as alt-screen/blocks (`parkLeafSlot`, `hasSlot` stays true, only the WebGL context is dropped),
-  and joins a recency-ordered `parkedLeaves` LRU (`parkedLeafOrder.ts`). It then calls
+  way as alt-screen/blocks (`parkLeafSlot`, `hasSlot` stays true, only the WebGL context is scheduled
+  for disposal), and joins a recency-ordered `parkedLeaves` LRU (`parkedLeafOrder.ts`). It then calls
   `scheduleParkedLeafSweep`, which defers the actual budget check to a microtask instead of deciding
   synchronously. This matters because one render can flip `visible` for several leaves at once (e.g.
   a workspace switch); deciding evictions immediately, from the hiding leaf's own effect, could evict
@@ -242,16 +243,27 @@ timer fires. Additional idle slots are disposed.
 Each slot optionally has a `WebglAddon` (one WebGL context). WebGL is attached in `scheduleUnhide`
 when the slot is stale (`> SLOT_STALE_MS = 10s` since last use) or newly created.
 
-WebGL is disposed:
-- Immediately: via `parkLeafSlot` (visibility change for alt-screen/blocks tabs)
-- After grace: via `scheduleWebglReap` at WEBGL_REAP_GRACE_MS = 30s after a slot becomes idle
+WebGL is never disposed synchronously on an ordinary hide. `disposeSlotWebgl` calls the addon's
+own `dispose()`, and `@xterm/addon-webgl`'s `WebglAddon.dispose()` unconditionally rebuilds a full
+`DomRenderer` as its fallback-on-dispose contract (one DOM row element per visible row, its own
+width cache, a freshly injected stylesheet — confirmed unchanged through its latest beta as of
+2026-09). That cost is fixed per hide (proportional to `term.rows`, not scrollback) and is thrown
+away unused the instant the leaf is shown again and `attachWebgl` recreates a context. So both
+`parkLeafSlot` (visibility change, alt-screen/blocks or normal tabs) and `detachSlotFromLeaf` (a
+slot becoming fully idle) only *schedule* the dispose via `scheduleWebglReap`, at
+`WEBGL_REAP_GRACE_MS = 30s`. `refreshLeafSlot` (a parked leaf shown again) and `bindSlot`/
+`rewireSlot` (an idle slot reclaimed) call `cancelWebglReap` first, so a quick tab switch never
+pays that cost at all — only a leaf left hidden for the full grace window does. See
+[WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md) for the full investigation.
 
 **Context limit.** WKWebView (Tauri/macOS) allows roughly 8-16 concurrent WebGL contexts. Exceeding
 the limit causes the browser to silently destroy the oldest context (`onContextLoss`). The pool
 enforces `WEBGL_MAX_CONTEXTS = 7` as a proactive guard: before calling `new WebglAddon()`, it
-checks the live context count and reaps the oldest idle slot's WebGL if needed. If all contexts
-are in active slots, the attach is skipped (that slot falls back to the DOM renderer, which is
-slower but functionally equivalent).
+checks the live context count and reaps the oldest slot with a pending `webglReapTimer` if needed
+— a fully idle slot and a parked-but-still-visible-later one are equally fair game, since both have
+already signaled "nobody needs this context right now". If all contexts are in slots without a
+pending reap (i.e. genuinely in front of the user), the attach is skipped (that slot falls back to
+the DOM renderer, which is slower but functionally equivalent).
 
 Context recovery: `onContextLoss` disposes the addon and schedules a retry at
 `WEBGL_RECOVERY_DELAY_MS = 250ms`. This handles sleep/wake GPU resets.

@@ -606,12 +606,19 @@ function detachSlotFromLeaf(slot: Slot): void {
   scheduleSlotReap(slot);
 }
 
+// Used both when a slot is fully detached (currentLeafId === null, waiting to
+// be recycled or reaped for good) and when a leaf is merely parked (hidden,
+// but still owns the slot -- see parkLeafSlot). Either way, every path that
+// reclaims this slot before the grace period elapses -- bindSlot/rewireSlot
+// for a slot picked up again, and refreshLeafSlot for a parked leaf shown
+// again -- cancels this timer first. If it still fires, nobody reclaimed it
+// in time, so it's always safe to dispose regardless of currentLeafId.
 function scheduleWebglReap(slot: Slot): void {
   cancelWebglReap(slot);
   if (!slot.webglAddon) return;
   slot.webglReapTimer = setTimeout(() => {
     slot.webglReapTimer = null;
-    if (slot.currentLeafId === null) disposeSlotWebgl(slot);
+    disposeSlotWebgl(slot);
   }, WEBGL_REAP_GRACE_MS);
 }
 
@@ -692,15 +699,19 @@ const WEBGL_MAX_CONTEXTS = 7;
 function attachWebgl(slot: Slot): void {
   if (slot.webglAddon || !slot.term.element) return;
   if (!usePreferencesStore.getState().terminalWebglEnabled) return;
-  const t0 = performance.now();
 
-  // Before creating a new context, proactively reap the oldest idle slot's
-  // context if we are at the limit. If all slots are active, bail out to avoid
-  // evicting a visible terminal.
+  // Before creating a new context, proactively reap the oldest context that
+  // is already on borrowed time: either a fully idle slot, or a parked one
+  // whose teardown parkLeafSlot deferred via scheduleWebglReap (below). A
+  // pending webglReapTimer is exactly "nobody is looking at this context
+  // right now, safe to take back under pressure" regardless of which of the
+  // two reasons scheduled it. If none qualify, every context is genuinely in
+  // front of the user right now; bail out to avoid evicting a visible
+  // terminal.
   const liveCount = slots.filter((s) => !!s.webglAddon).length;
   if (liveCount >= WEBGL_MAX_CONTEXTS) {
     const oldest = slots
-      .filter((s) => s.currentLeafId === null && !!s.webglAddon)
+      .filter((s) => s.webglReapTimer !== null && !!s.webglAddon)
       .sort((a, b) => a.lastUsedAt - b.lastUsedAt)[0];
     if (oldest) {
       cancelWebglReap(oldest);
@@ -747,8 +758,6 @@ function attachWebgl(slot: Slot): void {
     slot.webglAddon = webgl;
     slot.webglCanvases = added;
     notifyPool();
-    const ms = (performance.now() - t0).toFixed(1);
-    console.debug(`[kex-perf] attachWebgl slot=${slot.id} ${ms}ms`);
   } catch (e) {
     console.warn("[kex-webgl] unavailable:", e);
   }
@@ -757,16 +766,13 @@ function attachWebgl(slot: Slot): void {
 function disposeSlotWebgl(slot: Slot): void {
   if (!slot.webglAddon) return;
   const addon = slot.webglAddon;
-  const t0 = performance.now();
   for (const canvas of slot.webglCanvases) releaseCanvasContext(canvas);
   slot.webglCanvases = [];
-  const t1 = performance.now();
   try {
     addon.dispose();
   } catch (e) {
     console.warn("[kex-webgl] dispose failed:", e);
   }
-  const t2 = performance.now();
   try {
     const r = (
       addon as unknown as { _renderer?: Record<string, unknown> | null }
@@ -785,16 +791,9 @@ function disposeSlotWebgl(slot: Slot): void {
     )._renderService = null;
   } catch {}
   slot.webglAddon = null;
-  const releaseMs = (t1 - t0).toFixed(1);
-  const addonDisposeMs = (t2 - t1).toFixed(1);
-  const nullOutMs = (performance.now() - t2).toFixed(1);
-  console.debug(
-    `[kex-perf] disposeSlotWebgl slot=${slot.id} releaseCanvasContext=${releaseMs}ms addon.dispose=${addonDisposeMs}ms nullOut=${nullOutMs}ms`,
-  );
 }
 
 function releaseCanvasContext(canvas: HTMLCanvasElement): void {
-  const tGet0 = performance.now();
   let gl: WebGL2RenderingContext | WebGLRenderingContext | null = null;
   try {
     gl = canvas.getContext("webgl2") as WebGL2RenderingContext | null;
@@ -804,17 +803,12 @@ function releaseCanvasContext(canvas: HTMLCanvasElement): void {
       gl = canvas.getContext("webgl") as WebGLRenderingContext | null;
     } catch {}
   }
-  const tGet1 = performance.now();
   if (gl) {
     try {
       const ext = gl.getExtension("WEBGL_lose_context");
       if (ext && !gl.isContextLost()) ext.loseContext();
     } catch {}
   }
-  const tLose1 = performance.now();
-  console.debug(
-    `[kex-perf] releaseCanvasContext getContext=${(tGet1 - tGet0).toFixed(1)}ms loseContext=${(tLose1 - tGet1).toFixed(1)}ms`,
-  );
   try {
     canvas.width = 0;
     canvas.height = 0;
@@ -992,81 +986,42 @@ export function isLeafAltScreen(leafId: string): boolean {
 }
 
 // TASK-761 follow-up, not wired in yet (see docs/WORKSPACES_GOTCHAS.md and the
-// task notes for the full measurement). disposeSlotWebgl below calls the
-// webgl addon's own dispose(), which -- per @xterm/addon-webgl's own
+// task notes for the full measurement). disposeSlotWebgl calls the webgl
+// addon's own dispose(), which -- per @xterm/addon-webgl's own
 // WebglAddon.ts, confirmed unchanged in both the current stable release and
 // the latest beta (0.20.0-beta.300) -- unconditionally rebuilds a full
 // DomRenderer as its fallback-on-dispose contract: one DOM row element per
 // *visible* row, its own WidthCache, a freshly injected stylesheet. That
 // DomRenderer is discarded unused the moment the leaf is shown again and
-// attachWebgl recreates a webgl context, so every ordinary hide pays a fixed
+// attachWebgl recreates a webgl context, so every ordinary hide paid a fixed
 // ~50-65ms (proportional to term.rows, not to scrollback) for a renderer
-// nobody ever paints with -- reproducing the same class of cost this task
+// nobody ever painted with -- reproducing the same class of cost this task
 // was meant to eliminate, just through xterm.js's own dispose path instead
 // of ours.
 //
-// The parallel here is scheduleWebglReap/cancelWebglReap just below, already
-// used for slots that are fully detached (currentLeafId === null): give the
-// dispose a short grace period instead of paying it synchronously on every
-// hide, and skip it entirely if the leaf becomes visible again first. Sketch
-// (would need a Slot.parkedWebglReapTimer field, and becoming-visible in
-// useTerminalSession.ts would need to call cancelParkedWebglReap before
-// refreshLeafSlot):
-//
-// function scheduleParkedWebglReap(slot: Slot): void {
-//   cancelParkedWebglReap(slot);
-//   slot.parkedWebglReapTimer = setTimeout(() => {
-//     slot.parkedWebglReapTimer = null;
-//     disposeSlotWebgl(slot);
-//   }, WEBGL_REAP_GRACE_MS);
-// }
-//
-// function cancelParkedWebglReap(slot: Slot): void {
-//   if (slot.parkedWebglReapTimer !== null) {
-//     clearTimeout(slot.parkedWebglReapTimer);
-//     slot.parkedWebglReapTimer = null;
-//   }
-// }
-//
-// Left commented out: keeping a parked leaf's webgl context alive a little
-// longer means it counts toward WEBGL_MAX_CONTEXTS (7) for that whole grace
-// window, and attachWebgl's own "reap the oldest idle context" eviction (see
-// above) only looks at currentLeafId === null slots today -- it would need
-// to also consider parked-but-still-bound slots for this to stay safe under
-// pressure with many terminals open at once. Needs a decision on that
-// tradeoff before it's worth wiring in for real.
+// Fix: reuse the exact same deferred-teardown machinery already used for
+// slots that are fully detached (scheduleWebglReap/cancelWebglReap,
+// WEBGL_REAP_GRACE_MS) instead of disposing synchronously. refreshLeafSlot
+// cancels the pending reap the moment the leaf is shown again, so a quick
+// tab switch never pays the DomRenderer-rebuild cost at all. See the
+// attachWebgl eviction filter above: a pending webglReapTimer is what makes
+// both a genuinely idle slot AND a parked one fair game to reclaim under the
+// WEBGL_MAX_CONTEXTS cap.
 export function parkLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
-  if (!slot) return;
-  const t0 = performance.now();
-  disposeSlotWebgl(slot);
-  const ms = (performance.now() - t0).toFixed(1);
-  console.debug(
-    `[kex-perf] parkLeafSlot leaf=${leafId} disposeSlotWebgl=${ms}ms`,
-  );
+  if (slot) scheduleWebglReap(slot);
 }
 
 export function refreshLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return;
-  const tStart = performance.now();
-  const hadWebgl = !!slot.webglAddon;
+  cancelWebglReap(slot);
   if (usePreferencesStore.getState().terminalWebglEnabled && !slot.webglAddon) {
     attachWebgl(slot);
   }
-  const tAfterAttach = performance.now();
   try {
     slot.term.refresh(0, slot.term.rows - 1);
   } catch {}
-  const tEnd = performance.now();
-  const attachMs = (tAfterAttach - tStart).toFixed(1);
-  const refreshMs = (tEnd - tAfterAttach).toFixed(1);
-  const totalMs = (tEnd - tStart).toFixed(1);
-  console.debug(
-    `[kex-perf] refreshLeafSlot leaf=${leafId} hadWebgl=${hadWebgl} ` +
-      `attach=${attachMs}ms refresh=${refreshMs}ms total=${totalMs}ms ` +
-      `rows=${slot.term.rows} bufferLines=${slot.term.buffer.active.length}`,
-  );
 }
 
 export function disposeLeafSlot(leafId: string): void {
