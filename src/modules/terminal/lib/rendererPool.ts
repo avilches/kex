@@ -991,6 +991,50 @@ export function isLeafAltScreen(leafId: string): boolean {
   return slot ? isAltScreen(slot) : false;
 }
 
+// TASK-761 follow-up, not wired in yet (see docs/WORKSPACES_GOTCHAS.md and the
+// task notes for the full measurement). disposeSlotWebgl below calls the
+// webgl addon's own dispose(), which -- per @xterm/addon-webgl's own
+// WebglAddon.ts, confirmed unchanged in both the current stable release and
+// the latest beta (0.20.0-beta.300) -- unconditionally rebuilds a full
+// DomRenderer as its fallback-on-dispose contract: one DOM row element per
+// *visible* row, its own WidthCache, a freshly injected stylesheet. That
+// DomRenderer is discarded unused the moment the leaf is shown again and
+// attachWebgl recreates a webgl context, so every ordinary hide pays a fixed
+// ~50-65ms (proportional to term.rows, not to scrollback) for a renderer
+// nobody ever paints with -- reproducing the same class of cost this task
+// was meant to eliminate, just through xterm.js's own dispose path instead
+// of ours.
+//
+// The parallel here is scheduleWebglReap/cancelWebglReap just below, already
+// used for slots that are fully detached (currentLeafId === null): give the
+// dispose a short grace period instead of paying it synchronously on every
+// hide, and skip it entirely if the leaf becomes visible again first. Sketch
+// (would need a Slot.parkedWebglReapTimer field, and becoming-visible in
+// useTerminalSession.ts would need to call cancelParkedWebglReap before
+// refreshLeafSlot):
+//
+// function scheduleParkedWebglReap(slot: Slot): void {
+//   cancelParkedWebglReap(slot);
+//   slot.parkedWebglReapTimer = setTimeout(() => {
+//     slot.parkedWebglReapTimer = null;
+//     disposeSlotWebgl(slot);
+//   }, WEBGL_REAP_GRACE_MS);
+// }
+//
+// function cancelParkedWebglReap(slot: Slot): void {
+//   if (slot.parkedWebglReapTimer !== null) {
+//     clearTimeout(slot.parkedWebglReapTimer);
+//     slot.parkedWebglReapTimer = null;
+//   }
+// }
+//
+// Left commented out: keeping a parked leaf's webgl context alive a little
+// longer means it counts toward WEBGL_MAX_CONTEXTS (7) for that whole grace
+// window, and attachWebgl's own "reap the oldest idle context" eviction (see
+// above) only looks at currentLeafId === null slots today -- it would need
+// to also consider parked-but-still-bound slots for this to stay safe under
+// pressure with many terminals open at once. Needs a decision on that
+// tradeoff before it's worth wiring in for real.
 export function parkLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return;
