@@ -97,7 +97,7 @@ export function TerminalPathBarMenu({
           <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 text-[12px]">
+      <DropdownMenuContent align="end" className="w-80 text-[12px]">
         <div className="flex items-center justify-between gap-1 px-2 py-1 text-[11px]">
           <span className="shrink-0 text-muted-foreground">Tab id</span>
           <span className="flex min-w-0 items-center gap-1">
@@ -136,12 +136,15 @@ export function TerminalPathBarMenu({
                 &hellip;
               </div>
             ) : agentSession && previewPlan?.resumeCmd ? (
-              <div
-                title={previewPlan.resumeCmd}
-                className="h-6 w-full truncate rounded border border-border/60 bg-background/50 px-1.5 py-1 font-mono text-[11px] text-muted-foreground"
-              >
-                {previewPlan.resumeCmd}
-              </div>
+              <input
+                type="text"
+                readOnly
+                value={previewPlan.resumeCmd}
+                onFocus={(e) => e.currentTarget.select()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                className="h-6 w-full cursor-text rounded border border-border/60 bg-background/50 px-1.5 font-mono text-[11px] text-muted-foreground outline-none focus:border-primary"
+              />
             ) : agentSession && previewPlan?.errorReason ? (
               <div className="break-words px-0.5 py-1 text-[11px] text-destructive">
                 {previewPlan.errorReason}

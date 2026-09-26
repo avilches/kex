@@ -46,7 +46,6 @@ type Props = {
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
-  onDetachAgent: (tabId: string) => void;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onRenameFile?: (tabId: string, newName: string) => void;
@@ -74,7 +73,6 @@ function DraggableTab({
   onNewBrowser,
   onSplitBrowserRight,
   onSplitBrowserDown,
-  onDetachAgent,
   shortcutLabels,
   onRenameTab,
   onUpdateTab,
@@ -101,7 +99,6 @@ function DraggableTab({
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
-  onDetachAgent: (tabId: string) => void;
   shortcutLabels: Record<string, string | null>;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
@@ -427,15 +424,6 @@ function DraggableTab({
               <HugeiconsIcon icon={CancelSquareIcon} size={14} strokeWidth={2} />
               Close All Tabs
             </ContextMenuItem>
-            {hasAgent && (
-              <>
-                <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => onDetachAgent(tab.id)}>
-                  <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={2} />
-                  Detach Claude
-                </ContextMenuItem>
-              </>
-            )}
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={onNewTerminal}>
               <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={2} />
@@ -505,7 +493,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenameTab, onUpdateTab, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
+export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -700,7 +688,6 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           onNewBrowser={onNewBrowser}
           onSplitBrowserRight={onSplitBrowserRight}
           onSplitBrowserDown={onSplitBrowserDown}
-          onDetachAgent={onDetachAgent}
           shortcutLabels={shortcutLabels}
           onRenameTab={onRenameTab}
           onUpdateTab={onUpdateTab}

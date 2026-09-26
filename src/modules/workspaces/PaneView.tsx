@@ -11,8 +11,6 @@ import type { GitColorScheme } from "@/modules/settings/store";
 import { isBulkClosable } from "./lib/tabClose";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
-import { detachAgentSession } from "@/modules/agents/lib/agentSessionRestore";
-import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { useWorkspaceDndInsert } from "./WorkspaceDndProvider";
 import { useTabFlash } from "./lib/tabFlashStore";
 import { FlashOverlay } from "@/components/FlashOverlay";
@@ -254,10 +252,6 @@ export const PaneView = memo(function PaneView({
   const handleNewBrowser = useCallback(() => onNewBrowser(workspaceId, pane.id), [onNewBrowser, workspaceId, pane.id]);
   const handleSplitBrowserRight = useCallback(() => onSplitBrowserRight(workspaceId, pane.id), [onSplitBrowserRight, workspaceId, pane.id]);
   const handleSplitBrowserDown = useCallback(() => onSplitBrowserDown(workspaceId, pane.id), [onSplitBrowserDown, workspaceId, pane.id]);
-  const handleDetachAgent = useCallback((tabId: string) => {
-    useAgentStore.getState().finish(tabId);
-    void detachAgentSession(tabId);
-  }, []);
 
   return (
     <div
@@ -285,7 +279,6 @@ export const PaneView = memo(function PaneView({
           onNewBrowser={handleNewBrowser}
           onSplitBrowserRight={handleSplitBrowserRight}
           onSplitBrowserDown={handleSplitBrowserDown}
-          onDetachAgent={handleDetachAgent}
           onRenameTab={callbacks.onRenameTab}
           onUpdateTab={callbacks.onUpdateTab}
           onRenameFile={callbacks.onRenameFile}
