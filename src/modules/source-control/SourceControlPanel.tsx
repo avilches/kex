@@ -780,6 +780,27 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         <header className="flex shrink-0 items-start gap-1 border-b border-border/60 px-1.5 py-1">
           {scm.repo ? (
             <div className="flex flex-1 min-w-0 flex-col gap-1">
+              {scm.worktreeCount > 1 && onNavigateToWorktree ? (
+                <div className="min-w-0 max-w-full">
+                  <WorktreePicker
+                    label={
+                      scm.repo.isWorktree
+                        ? `Worktree: ${pathBasename(scm.repo.repoRoot)}`
+                        : "Main worktree"
+                    }
+                    path={scm.repo.repoRoot}
+                    onFetchWorktrees={scm.fetchWorktrees}
+                    onSelect={onNavigateToWorktree}
+                  />
+                </div>
+              ) : (
+                <span
+                  title={scm.repo.repoRoot}
+                  className="inline-flex w-fit max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
+                >
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap [direction:rtl]">{scm.repo.repoRoot}</span>
+                </span>
+              )}
               <div className="flex h-6 min-w-0 items-center gap-1.5">
                 <BranchPicker
                   currentBranch={repoLabel}
@@ -854,27 +875,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   />
                 </div>
               </div>
-              {scm.worktreeCount > 1 && onNavigateToWorktree ? (
-                <div className="min-w-0 max-w-full">
-                  <WorktreePicker
-                    label={
-                      scm.repo.isWorktree
-                        ? `Worktree: ${pathBasename(scm.repo.repoRoot)}`
-                        : "Main worktree"
-                    }
-                    path={scm.repo.repoRoot}
-                    onFetchWorktrees={scm.fetchWorktrees}
-                    onSelect={onNavigateToWorktree}
-                  />
-                </div>
-              ) : (
-                <span
-                  title={scm.repo.repoRoot}
-                  className="inline-flex w-fit max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
-                >
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap [direction:rtl]">{scm.repo.repoRoot}</span>
-                </span>
-              )}
             </div>
           ) : (
             <span className="flex h-6 items-center px-1 text-[12px] font-medium text-muted-foreground">
