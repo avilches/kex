@@ -173,6 +173,133 @@ se arregla y que por tanto no debe llegar a disco por su cuenta.
 
 ---
 
+## Bug 3: un tab markdown no reacciona a un cambio externo del fichero, y "Reload from disk" a veces no hace nada visible (RESUELTO)
+
+### Síntoma
+
+Con un `.md` abierto en modo Source, editarlo desde otra app (u otro proceso: git, un formateador)
+no actualizaba el contenido mostrado, aunque el mismo tab en modo Rich sí reaccionaba. Y por
+separado, incluso cuando aparecía el aviso de conflicto (buffer sucio + cambio externo) y se elegía
+explícitamente "Reload from disk", el editor a veces se quedaba mostrando el texto local sin
+cambiar, dando la impresión de que el botón no hacía nada.
+
+### Pistas falsas descartadas
+
+Los dos síntomas parecían el mismo bug ("el reload no funciona"), pero eran cuatro causas
+independientes en capas distintas, encontradas una detrás de otra según se iba probando cada caso:
+
+1. **Registro que falta.** El `EditorPane` embebido en modo Source de un tab markdown nunca se
+   registraba en `useEditorFileSync` (`src/modules/editor/useEditorFileSync.ts`), porque esa lista
+   solo recoge tabs cuyo `kind` es `"editor"`, y un tab markdown conserva `kind: "markdown"` aunque
+   por dentro esté mostrando ese mismo componente. Su `reload()` nunca se llamaba.
+2. **Modo Rich con el vigilante equivocado.** `useMarkdownDocument.ts` solo escuchaba
+   `fs:file-written`, el eco que Kex emite al guardar él mismo (`source: "editor"`), nunca el
+   vigilante real del sistema de ficheros (`fs:changed`, respaldado por `fs_watch_add` en Rust). Una
+   edición hecha desde fuera de la app nunca generaba ese primer evento.
+3. **El dedup de "Reload from disk" bloqueaba la propia recarga forzada.** `performReload`
+   (`useDocument.ts`) y `MarkdownDocumentBuffer.replaceFromDisk` descartan una recarga cuando el
+   contenido del disco coincide con el último leído (`savedRef`/`savedRaw`), pensado para no volver
+   a renderizar en un evento de vigilante duplicado sobre un buffer limpio. Pero "Reload from disk"
+   (`force=true`) tiene que sustituir el buffer sucio pase lo que pase, y ese `if` no distinguía el
+   caso forzado: si el disco resultaba ser igual al último valor conocido (p. ej. el cambio externo
+   se revirtió, o simplemente no había cambiado desde la última sincronización), la recarga forzada
+   se descartaba en silencio y el buffer sucio se quedaba intacto.
+4. **`@uiw/react-codemirror` compara por valor, no por identidad.** Aun arreglado el punto 3, el
+   editor seguía sin refrescarse visualmente en el caso más habitual de prueba: cuando el texto que
+   había que restaurar coincidía, letra por letra, con el último valor que `doc.content` tuvo en
+   React. Ni escribir en CodeMirror ni guardar (`saveNow`) actualizan `doc.content`, solo un buffer
+   interno; así que si una recarga trae de vuelta exactamente ese mismo texto, el `useEffect` interno
+   de la librería que sincroniza su prop `value` (dependencia `[value, view]`, comparación por
+   `===`) concluye que "no ha cambiado nada" entre renders y nunca despacha la actualización, aunque
+   lo que hay en pantalla (por haber escrito algo, o por un save que no tocó `doc.content`) sea otra
+   cosa completamente distinta.
+
+### Causa raíz
+
+Cuatro huecos separados que solo se manifestaban juntos porque compartían el mismo escenario de
+prueba (el mismo fichero, el mismo texto reutilizado en cada intento): un componente nunca
+registrado, un vigilante nunca conectado, un `if` de deduplicación que no distinguía "recarga
+forzada" de "evento duplicado", y una librería de terceros que decide si redibuja comparando texto
+en vez de fiarse de que quien la llama ya sabe que algo cambió.
+
+### Fix
+
+1. `MilkdownTab.tsx` y `MarkdownTab.tsx` (tiptap) registran su `EditorPane` de Source vía
+   `registerEditorHandle`, y `App.tsx` incluye los tabs markdown en la lista que sigue
+   `useEditorFileSync`, con el mismo tag `kind: "editor"` que ya usa esa lista internamente (no es
+   el `kind` real del tab, es la marca de "participa en este registro").
+2. `useMarkdownDocument.ts` añade su propio `watchAdd`/`watchRemove` de directorio y su propio
+   listener de `fs:changed`, igual que ya tenía `useEditorFileSync` para los tabs `editor`.
+3. `performReload`/`replaceFromDisk` reciben un parámetro `force`, y el `if` de deduplicación se
+   salta explícitamente cuando `force` es `true`: `if (!force && content === saved) return;`.
+4. `EditorPane` fuerza la sincronización con un `useEffect` propio que compara el texto que
+   CodeMirror tiene *de verdad* (`view.state.doc.toString()`) contra `doc.content`, y despacha un
+   cambio si difieren; se dispara por la identidad de `doc` (un objeto nuevo en cada `setDoc`), no
+   por su contenido, así que no le afecta la comparación por valor de la librería.
+
+### Lección
+
+Cuando "no reacciona a un cambio externo" y "el botón de recargar no hace nada" se investigan en la
+misma sesión con el mismo fichero de prueba, conviene sospechar que hay más de una causa apilada:
+cada arreglo destapaba el siguiente síntoma exactamente porque el anterior ya no lo tapaba. Y con
+componentes de terceros que exponen una prop "controlada" (aquí, `value` de CodeMirror), conviene
+no asumir que basta con actualizar el estado de React: hay que comprobar bajo qué condición esa
+librería decide, por su cuenta, si merece la pena redibujar.
+
+---
+
+## Bug 4: guardar en modo Rich y volver a el tras pasar por Source muestra un tercer contenido (RESUELTO)
+
+### Síntoma
+
+Con un tab markdown (tiptap o milkdown) en modo Rich con cambios sin guardar: al pasar a Source
+(lo que guarda esos cambios en disco, ver la nota de diseño más abajo), editar algo más ahí, y
+volver a Rich, el editor rico no mostraba ni la última edición hecha en Source ni el contenido del
+disco: mostraba el texto que había en Rich la primera vez que se abrió el tab, muchos pasos atrás.
+
+### Pistas falsas descartadas
+
+Se sospechó primero de una carrera entre el reload explícito del toggle y el evento `fs:changed`
+real que dispara el propio guardado (ambos llaman a `reload()` sobre el mismo hook). Instrumentar
+con trazas temporales en cada eslabón (`toggleMode`, `performReload`, el `watchAdd`/listener de
+`fs:changed`, el `useMemo` de HTML y el efecto de sincronización de `RichMarkdownEditor`, y el
+efecto de arranque de `MilkdownEditor`) descartó esa carrera: el evento duplicado se bloquea
+correctamente por el dedup de `replaceFromDisk` sin causar daño.
+
+### Causa raíz
+
+`saveNow()` en `useMarkdownDocument.ts` escribe el contenido a disco y llama a `buf.markSaved()`
+(que sincroniza el buffer interno `MarkdownDocumentBuffer`), pero nunca llamaba a `setDoc(...)`.
+El estado React `doc.body` (lo que un `RichMarkdownEditor`/`MilkdownEditor` recién montado usa como
+contenido inicial) se queda congelado en el valor que tenía al abrir el tab o en el último reload
+real, sin enterarse nunca de un guardado explícito ni de un autosave. Mientras el editor rico sigue
+montado esto no se nota (edita su propio estado interno, no `doc.body`), pero en un ciclo
+Rich -> Source -> Rich el editor rico se desmonta y se vuelve a montar desde cero, leyendo
+`doc.body` como contenido inicial: ahí aparece el valor viejo. El watcher de `fs:changed` no lo
+corrige porque su dedup compara contra el buffer (`savedRaw`), que sí está al día tras el guardado,
+así que descarta la actualización pensando que es un eco duplicado.
+
+### Fix
+
+`saveNow()` ahora llama también a `setDoc({status:"ready", body: buf.getBody(), revision:
+revisionRef.current})` tras `markSaved()`, sin incrementar `revisionRef`. No incrementar la
+revision es la parte importante: el `useMemo` de HTML de `RichMarkdownEditor` y el efecto de
+arranque de `MilkdownEditor` solo reaccionan a un cambio de `revision`, así que un editor rico ya
+montado y en edición activa no se ve forzado a refrescarse por su propio guardado; solo un montaje
+fresco posterior (que siempre parte de los props actuales, sin importar si `revision` cambió) ve el
+contenido correcto.
+
+### Lección
+
+Un hook con un buffer interno (ref) y un estado React expuesto (`doc`) puede parecer sincronizado
+mientras el consumidor no se desmonta, porque el consumidor edita su propio estado interno y nunca
+vuelve a leer `doc.body`. La desincronización solo se manifiesta en el siguiente montaje fresco, así
+que cualquier operación que toque el buffer (`markSaved`, `replaceFromDisk`, `setBody`) debe dejar
+`doc` en el mismo estado que el buffer, aunque ningún componente montado lo esté pidiendo en ese
+momento.
+
+---
+
 ## Milkdown: hallazgos del corpus de round-trip (evaluación, no un bug que arreglar)
 
 Milkdown (`@milkdown/crepe`) es un segundo motor rico, seleccionable por tab (`markdownEngine: "milkdown"`),

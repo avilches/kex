@@ -1,7 +1,7 @@
 import { cn, isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
-import { EditorPathBar, type EditorGlobalToggleKey } from "@/modules/editor";
+import { EditorPathBar, ReloadConflictOverlay, type EditorGlobalToggleKey } from "@/modules/editor";
 import { useEditorChrome } from "./EditorChromeContext";
 import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
@@ -123,6 +123,7 @@ type Props = {
 export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab, onDockBrowserTab, onFocusFloatBrowserTab, onNavigateFloatBrowserTab }: Props) {
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
+  const [editorConflict, setEditorConflict] = useState(false);
   const browserRef = useRef<BrowserPaneHandle>(null);
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
@@ -325,6 +326,8 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   onContentChange={handleContentChange}
                   overrideLanguage={tab.overrideLanguage}
                   onLanguageResolved={setCurrentLanguageName}
+                  onConflictChange={setEditorConflict}
+                  hideConflictOverlay={effectivePreviewMode != null}
                 />
               </div>
 
@@ -352,6 +355,17 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   )}
                   {ishtml && <HtmlPreviewPane content={liveContent} path={tab.path} />}
                 </div>
+              )}
+
+              {/* Dual layout (split/overlay): the conflict overlay spans the
+                  whole tab instead of just the editor's own half, or it'd
+                  render off-center against the preview pane sitting next to it. */}
+              {effectivePreviewMode != null && editorConflict && (
+                <ReloadConflictOverlay
+                  path={tab.path}
+                  onKeep={() => editorRef.current?.keepLocalChanges()}
+                  onReload={() => editorRef.current?.reloadFromDisk()}
+                />
               )}
             </div>
           </div>

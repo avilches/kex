@@ -2,6 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  listenFsChanged,
+  parentDir,
+  watchAdd,
+  watchRemove,
+} from "@/modules/explorer/lib/watch";
 import { MarkdownDocumentBuffer } from "@/modules/markdown/lib/documentBuffer";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
@@ -10,6 +16,13 @@ type ReadResult =
   | { kind: "text"; content: string; size: number }
   | { kind: "binary"; size: number }
   | { kind: "toolarge"; size: number; limit: number };
+
+// Survives a component unmount (e.g. dragging a tab to another pane) so an
+// in-progress edit isn't force-saved to disk or lost just because the tab
+// moved. See the matching cache in useDocument.ts (Source mode / the plain
+// editor tab) for the full rationale; this is the Rich-mode equivalent,
+// keyed by path and process-lifetime only.
+const unflushedBodies = new Map<string, string>();
 
 export type MarkdownDocState =
   | { status: "loading" }
@@ -26,11 +39,19 @@ type Options = {
 export function useMarkdownDocument({ path, onDirtyChange }: Options) {
   const [doc, setDoc] = useState<MarkdownDocState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
+  const [conflict, setConflict] = useState(false);
 
   const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const autoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
 
   const bufferRef = useRef<MarkdownDocumentBuffer | null>(null);
+  // A restored buffer's body is already an edit, not pristine loaded content,
+  // so the next setBaseline() call (the Tab component registers one once its
+  // freshly booted editor instance is ready) must not treat it as the
+  // round-trip-noise baseline: that would flip isDirty() to false even
+  // though the body still doesn't match disk. See MarkdownDocumentBuffer's
+  // own markSaved(), which resets baselineBody to null for the same reason.
+  const suppressNextBaselineRef = useRef(false);
   const dirtyRef = useRef(false);
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -63,6 +84,11 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     });
     buf.markSaved();
     setDirty(false);
+    // Keep doc.body in sync with what was just written, without bumping revision:
+    // a live Rich editor must not be force-refreshed by its own save, but a later
+    // remount (e.g. a Rich -> Source -> Rich toggle) reads doc.body as its initial
+    // content and would otherwise show what was on screen when the tab was opened.
+    setDoc({ status: "ready", body: buf.getBody(), revision: revisionRef.current });
     if (autoSaveRef.current.autoSave) {
       toast.success(`Autosaved ${path.split(/[\\/]/).pop() || path}`);
     }
@@ -80,16 +106,25 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     let cancelled = false;
     setDoc({ status: "loading" });
     setDirty(false);
+    setConflict(false);
 
     invoke<ReadResult>("fs_read_file", { path, workspace: currentWorkspaceEnv() })
       .then((res) => {
         if (cancelled) return;
         if (res.kind === "text") {
-          bufferRef.current = new MarkdownDocumentBuffer(res.content);
+          const buf = new MarkdownDocumentBuffer(res.content);
+          const unflushed = unflushedBodies.get(path);
+          unflushedBodies.delete(path);
+          if (unflushed != null) {
+            buf.setBody(unflushed);
+            suppressNextBaselineRef.current = true;
+          }
+          bufferRef.current = buf;
           revisionRef.current = 0;
+          setDirty(buf.isDirty());
           setDoc({
             status: "ready",
-            body: bufferRef.current.getBody(),
+            body: buf.getBody(),
             revision: revisionRef.current,
           });
         } else if (res.kind === "binary") {
@@ -112,10 +147,12 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     };
   }, [path]);
 
-  // Skipped while dirty (never clobber unsaved edits) and when disk already
-  // matches the buffer (self-save / duplicate watcher event -> no re-render).
-  const reload = useCallback((): boolean => {
-    if (dirtyRef.current) return false;
+  // Applies the disk content. force=true is how a conflict is force-resolved
+  // by discarding local edits (reloadFromDisk): it must apply even if the
+  // disk content happens to equal what was last read, since the buffer's own
+  // dirty body is what has to be replaced, not what replaceFromDisk compares
+  // against.
+  const performReload = useCallback((force = false): void => {
     void invoke<ReadResult>("fs_read_file", { path, workspace: currentWorkspaceEnv() })
       .then((res) => {
         if (res.kind === "text") {
@@ -130,7 +167,7 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
             });
             return;
           }
-          if (!buf.replaceFromDisk(res.content)) return;
+          if (!buf.replaceFromDisk(res.content, force)) return;
           revisionRef.current += 1;
           setDirty(false);
           setDoc({ status: "ready", body: buf.getBody(), revision: revisionRef.current });
@@ -143,14 +180,39 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
         }
       })
       .catch((e) => setDoc({ status: "error", message: String(e) }));
-    return true;
   }, [path]);
+
+  // While dirty, never clobber unsaved edits silently: block the pane on a
+  // conflict overlay and let the user pick between keeping them (dismiss) or
+  // discarding them for the disk version.
+  const reload = useCallback((): boolean => {
+    if (dirtyRef.current) {
+      setConflict(true);
+      return false;
+    }
+    performReload();
+    return true;
+  }, [performReload]);
+
+  const keepLocalChanges = useCallback(() => {
+    setConflict(false);
+  }, []);
+
+  const reloadFromDisk = useCallback(() => {
+    setConflict(false);
+    performReload(true);
+  }, [performReload]);
 
   const reloadRef = useRef(reload);
   useEffect(() => {
     reloadRef.current = reload;
   }, [reload]);
 
+  // fs:file-written only fires from Kex's own fs_write_file (always tagged
+  // source: "editor" for a save from this app), so it never reports a real
+  // external edit; it only ever catches another Kex tab/window saving the
+  // same path. Real external edits (another app, git, a script) only show up
+  // on fs:changed, backed by the native watcher registered below.
   useEffect(() => {
     const unlistenPromise = getCurrentWebviewWindow().listen<{ path: string; source?: string }>(
       "fs:file-written",
@@ -162,6 +224,30 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     );
     return () => {
       void unlistenPromise.then((un) => un());
+    };
+  }, [path]);
+
+  useEffect(() => {
+    const dir = parentDir(path);
+    watchAdd([dir]);
+    return () => watchRemove([dir]);
+  }, [path]);
+
+  useEffect(() => {
+    let alive = true;
+    let unlisten: (() => void) | undefined;
+    const normalizedPath = path.replace(/\\/g, "/");
+    void listenFsChanged((paths) => {
+      if (paths.some((p) => p.replace(/\\/g, "/") === normalizedPath)) {
+        reloadRef.current();
+      }
+    }).then((un) => {
+      if (alive) unlisten = un;
+      else un();
+    });
+    return () => {
+      alive = false;
+      unlisten?.();
     };
   }, [path]);
 
@@ -177,6 +263,10 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
   const setBaseline = useCallback((body: string) => {
     const buf = bufferRef.current;
     if (!buf) return;
+    if (suppressNextBaselineRef.current) {
+      suppressNextBaselineRef.current = false;
+      return;
+    }
     buf.setBaseline(body);
     setDirty(buf.isDirty());
   }, []);
@@ -211,12 +301,21 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
       clearAutoSaveTimer();
       const buf = bufferRef.current;
       if (buf?.isDirty()) {
-        saveNow().catch((e) => {
-          console.error("[autosave flush]", e);
-        });
+        // Auto-save on: the preference already means "persist as things
+        // happen", so this is the same safety net as before, just also
+        // covering a pane move. Auto-save off: the user opted out of
+        // unprompted disk writes, so the edit is carried in memory instead
+        // and picked up if the same path mounts again (see unflushedBodies).
+        if (autoSaveRef.current.autoSave) {
+          saveNow().catch((e) => {
+            console.error("[autosave flush]", e);
+          });
+        } else {
+          unflushedBodies.set(path, buf.getBody());
+        }
       }
     };
   }, [path, clearAutoSaveTimer, saveNow]);
 
-  return { doc, dirty, onChange, setBaseline, save, reload };
+  return { doc, dirty, conflict, keepLocalChanges, reloadFromDisk, onChange, setBaseline, save, reload };
 }

@@ -1748,6 +1748,19 @@ export default function App() {
               dirty: ep.dirty,
               preview: ep.preview,
             });
+          } else if (tab.kind === "markdown") {
+            // A markdown tab in Source mode mounts an EditorPane internally
+            // (MilkdownTab / MarkdownTab register it via registerEditorHandle),
+            // so it needs the same file-sync coverage as a real "editor" tab.
+            // In Rich mode no handle is registered and reload() is simply a
+            // no-op, so listing it here unconditionally is harmless.
+            acc.push({
+              kind: "editor",
+              id: tab.id,
+              path: tab.path,
+              dirty: tab.dirty ?? false,
+              preview: false,
+            });
           }
         }
       }
