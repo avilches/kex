@@ -33,9 +33,9 @@ export type Tab =
     })
   | (TabCommon & { kind: "browser"; url: string; floating?: boolean })
   | (TabCommon & { kind: "markdown"; path: string; dirty?: boolean; markdownEngine?: MarkdownEngine })
-  | (TabCommon & { kind: "git-diff"; path: string; repoRoot: string; mode: "-" | "+"; originalPath: string | null })
+  | (TabCommon & { kind: "git-diff"; path: string; repoRoot: string; mode: "-" | "+"; originalPath: string | null; preview: boolean })
   | (TabCommon & { kind: "git-history"; repoRoot: string })
-  | (TabCommon & { kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null });
+  | (TabCommon & { kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null; preview: boolean });
 
 // A tab can drive the sidebar (autofocus) when it resolves to a filesystem
 // location: the terminal cwd, or any kind that carries a `path` (with a file or

@@ -63,6 +63,7 @@ type CommitFileDiffOpenInput = {
   subject: string;
   path: string;
   originalPath: string | null;
+  pin: boolean;
 };
 
 export type GitHistorySearchHandle = {
@@ -482,7 +483,7 @@ export function GitHistoryPane({
   }, [openAnchor, filesTick]);
 
   const handleFileOpen = useCallback(
-    (commit: GitLogEntry, file: GitCommitFileChange) => {
+    (commit: GitLogEntry, file: GitCommitFileChange, pin: boolean) => {
       onOpenCommitFile({
         repoRoot,
         sha: commit.sha,
@@ -490,6 +491,7 @@ export function GitHistoryPane({
         subject: commit.subject,
         path: file.path,
         originalPath: file.originalPath,
+        pin,
       });
       setOpenAnchor(null);
     },
@@ -813,6 +815,7 @@ type CommitDetailProps = {
   onOpenFile: (
     commit: GitLogEntry,
     file: GitCommitFileChange,
+    pin: boolean,
   ) => Promise<void> | void;
   onRetryFiles: () => void;
 };
@@ -916,6 +919,7 @@ function CommitFiles({
   onOpenFile: (
     commit: GitLogEntry,
     file: GitCommitFileChange,
+    pin: boolean,
   ) => Promise<void> | void;
   onRetry: () => void;
 }) {
@@ -963,7 +967,7 @@ function CommitFiles({
             <li key={file.path}>
               <FileRow
                 file={file}
-                onOpen={() => void onOpenFile(commit, file)}
+                onOpen={(pin) => void onOpenFile(commit, file, pin)}
               />
             </li>
           ))}
@@ -978,7 +982,7 @@ const FileRow = memo(function FileRow({
   onOpen,
 }: {
   file: GitCommitFileChange;
-  onOpen: () => void;
+  onOpen: (pin: boolean) => void;
 }) {
   const fileName = basename(file.path);
   const dir = dirname(file.path);
@@ -986,7 +990,8 @@ const FileRow = memo(function FileRow({
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={() => onOpen(false)}
+      onDoubleClick={() => onOpen(true)}
       className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-accent/40"
     >
       {iconUrl ? (

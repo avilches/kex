@@ -22,3 +22,4 @@ export {
   updatePane,
   updateDivider,
 } from "./lib/splitNode";
+export { planDiffTabOpen, type DiffIdentity, type DiffTabPlan } from "./lib/diffTabs";

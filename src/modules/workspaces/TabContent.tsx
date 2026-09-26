@@ -69,6 +69,7 @@ type CommitFileDiffOpenInput = {
   subject: string;
   path: string;
   originalPath: string | null;
+  pin: boolean;
 };
 
 export type TabCallbacks = {
