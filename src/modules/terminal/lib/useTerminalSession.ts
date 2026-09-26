@@ -156,7 +156,13 @@ function enforceParkedLeafBudget(): void {
   const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
   for (const id of evicted) {
     const es = sessions.get(id);
-    if (es && es.hasSlot && !es.visibleNow) unbindLeafFromSlot(id, es);
+    if (!es || !es.hasSlot || es.visibleNow) continue;
+    // A leaf can enter alt-screen (or blocks) after it was parked, while
+    // still hidden. It's exempt from this LRU by the time it's evicted here,
+    // same as one that never entered it via parkOrReleaseLeaf's own guard, so
+    // don't release its slot.
+    if (es.blocks || isLeafAltScreen(id)) continue;
+    unbindLeafFromSlot(id, es);
   }
 }
 

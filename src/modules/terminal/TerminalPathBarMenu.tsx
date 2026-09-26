@@ -140,6 +140,7 @@ export function TerminalPathBarMenu({
                 type="text"
                 readOnly
                 value={previewPlan.resumeCmd}
+                title={previewPlan.resumeCmd}
                 onFocus={(e) => e.currentTarget.select()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
