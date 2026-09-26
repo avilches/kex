@@ -7,7 +7,12 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DormantRing } from "./dormantRing";
 import { estimateParkedTerminalBudget } from "./backgroundMemoryBudget";
-import { drop as dropParkedLeaf, evictOverflow, touch as touchParkedLeaf } from "./parkedLeafOrder";
+import {
+  drop as dropParkedLeaf,
+  evictOverflow,
+  shouldEvictParkedLeaf,
+  touch as touchParkedLeaf,
+} from "./parkedLeafOrder";
 import { shouldFireOnRegister } from "./pendingFocus";
 import type { BlockMode } from "../block/lib/modeMachine";
 import {
@@ -156,12 +161,7 @@ function enforceParkedLeafBudget(): void {
   const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
   for (const id of evicted) {
     const es = sessions.get(id);
-    if (!es || !es.hasSlot || es.visibleNow) continue;
-    // A leaf can enter alt-screen (or blocks) after it was parked, while
-    // still hidden. It's exempt from this LRU by the time it's evicted here,
-    // same as one that never entered it via parkOrReleaseLeaf's own guard, so
-    // don't release its slot.
-    if (es.blocks || isLeafAltScreen(id)) continue;
+    if (!es || !shouldEvictParkedLeaf(es, isLeafAltScreen(id))) continue;
     unbindLeafFromSlot(id, es);
   }
 }

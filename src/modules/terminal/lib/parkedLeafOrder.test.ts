@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { drop, evictOverflow, touch } from "./parkedLeafOrder";
+import { drop, evictOverflow, shouldEvictParkedLeaf, touch } from "./parkedLeafOrder";
 
 describe("touch", () => {
   it("appends a new id", () => {
@@ -52,5 +52,27 @@ describe("evictOverflow", () => {
     const order = ["a", "b"];
     expect(evictOverflow(order, -3)).toEqual(["a", "b"]);
     expect(order).toEqual([]);
+  });
+});
+
+describe("shouldEvictParkedLeaf", () => {
+  it("evicts a plain hidden leaf with a slot", () => {
+    expect(shouldEvictParkedLeaf({ hasSlot: true, visibleNow: false, blocks: false }, false)).toBe(true);
+  });
+
+  it("does not evict a leaf without a slot", () => {
+    expect(shouldEvictParkedLeaf({ hasSlot: false, visibleNow: false, blocks: false }, false)).toBe(false);
+  });
+
+  it("does not evict a leaf that became visible", () => {
+    expect(shouldEvictParkedLeaf({ hasSlot: true, visibleNow: true, blocks: false }, false)).toBe(false);
+  });
+
+  it("does not evict a leaf in blocks mode", () => {
+    expect(shouldEvictParkedLeaf({ hasSlot: true, visibleNow: false, blocks: true }, false)).toBe(false);
+  });
+
+  it("does not evict a leaf that entered alt-screen while parked", () => {
+    expect(shouldEvictParkedLeaf({ hasSlot: true, visibleNow: false, blocks: false }, true)).toBe(false);
   });
 });
