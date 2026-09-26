@@ -692,6 +692,7 @@ const WEBGL_MAX_CONTEXTS = 7;
 function attachWebgl(slot: Slot): void {
   if (slot.webglAddon || !slot.term.element) return;
   if (!usePreferencesStore.getState().terminalWebglEnabled) return;
+  const t0 = performance.now();
 
   // Before creating a new context, proactively reap the oldest idle slot's
   // context if we are at the limit. If all slots are active, bail out to avoid
@@ -746,6 +747,8 @@ function attachWebgl(slot: Slot): void {
     slot.webglAddon = webgl;
     slot.webglCanvases = added;
     notifyPool();
+    const ms = (performance.now() - t0).toFixed(1);
+    console.debug(`[kex-perf] attachWebgl slot=${slot.id} ${ms}ms`);
   } catch (e) {
     console.warn("[kex-webgl] unavailable:", e);
   }
@@ -975,18 +978,34 @@ export function isLeafAltScreen(leafId: string): boolean {
 
 export function parkLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
-  if (slot) disposeSlotWebgl(slot);
+  if (!slot) return;
+  const t0 = performance.now();
+  disposeSlotWebgl(slot);
+  const ms = (performance.now() - t0).toFixed(1);
+  console.debug(`[kex-perf] parkLeafSlot leaf=${leafId} disposeSlotWebgl=${ms}ms`);
 }
 
 export function refreshLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return;
+  const tStart = performance.now();
+  const hadWebgl = !!slot.webglAddon;
   if (usePreferencesStore.getState().terminalWebglEnabled && !slot.webglAddon) {
     attachWebgl(slot);
   }
+  const tAfterAttach = performance.now();
   try {
     slot.term.refresh(0, slot.term.rows - 1);
   } catch {}
+  const tEnd = performance.now();
+  const attachMs = (tAfterAttach - tStart).toFixed(1);
+  const refreshMs = (tEnd - tAfterAttach).toFixed(1);
+  const totalMs = (tEnd - tStart).toFixed(1);
+  console.debug(
+    `[kex-perf] refreshLeafSlot leaf=${leafId} hadWebgl=${hadWebgl} ` +
+      `attach=${attachMs}ms refresh=${refreshMs}ms total=${totalMs}ms ` +
+      `rows=${slot.term.rows} bufferLines=${slot.term.buffer.active.length}`,
+  );
 }
 
 export function disposeLeafSlot(leafId: string): void {
