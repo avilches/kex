@@ -757,13 +757,16 @@ function attachWebgl(slot: Slot): void {
 function disposeSlotWebgl(slot: Slot): void {
   if (!slot.webglAddon) return;
   const addon = slot.webglAddon;
+  const t0 = performance.now();
   for (const canvas of slot.webglCanvases) releaseCanvasContext(canvas);
   slot.webglCanvases = [];
+  const t1 = performance.now();
   try {
     addon.dispose();
   } catch (e) {
     console.warn("[kex-webgl] dispose failed:", e);
   }
+  const t2 = performance.now();
   try {
     const r = (
       addon as unknown as { _renderer?: Record<string, unknown> | null }
@@ -782,9 +785,16 @@ function disposeSlotWebgl(slot: Slot): void {
     )._renderService = null;
   } catch {}
   slot.webglAddon = null;
+  const releaseMs = (t1 - t0).toFixed(1);
+  const addonDisposeMs = (t2 - t1).toFixed(1);
+  const nullOutMs = (performance.now() - t2).toFixed(1);
+  console.debug(
+    `[kex-perf] disposeSlotWebgl slot=${slot.id} releaseCanvasContext=${releaseMs}ms addon.dispose=${addonDisposeMs}ms nullOut=${nullOutMs}ms`,
+  );
 }
 
 function releaseCanvasContext(canvas: HTMLCanvasElement): void {
+  const tGet0 = performance.now();
   let gl: WebGL2RenderingContext | WebGLRenderingContext | null = null;
   try {
     gl = canvas.getContext("webgl2") as WebGL2RenderingContext | null;
@@ -794,12 +804,17 @@ function releaseCanvasContext(canvas: HTMLCanvasElement): void {
       gl = canvas.getContext("webgl") as WebGLRenderingContext | null;
     } catch {}
   }
+  const tGet1 = performance.now();
   if (gl) {
     try {
       const ext = gl.getExtension("WEBGL_lose_context");
       if (ext && !gl.isContextLost()) ext.loseContext();
     } catch {}
   }
+  const tLose1 = performance.now();
+  console.debug(
+    `[kex-perf] releaseCanvasContext getContext=${(tGet1 - tGet0).toFixed(1)}ms loseContext=${(tLose1 - tGet1).toFixed(1)}ms`,
+  );
   try {
     canvas.width = 0;
     canvas.height = 0;
@@ -982,7 +997,9 @@ export function parkLeafSlot(leafId: string): void {
   const t0 = performance.now();
   disposeSlotWebgl(slot);
   const ms = (performance.now() - t0).toFixed(1);
-  console.debug(`[kex-perf] parkLeafSlot leaf=${leafId} disposeSlotWebgl=${ms}ms`);
+  console.debug(
+    `[kex-perf] parkLeafSlot leaf=${leafId} disposeSlotWebgl=${ms}ms`,
+  );
 }
 
 export function refreshLeafSlot(leafId: string): void {
