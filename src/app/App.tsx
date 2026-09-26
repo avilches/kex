@@ -931,10 +931,11 @@ export default function App() {
   const handleNavigateToWorktree = useCallback(
     (path: string) => {
       if (activeWorkspace) {
+        setExplorerRootMode(activeWorkspace.id, "filesystem");
         setFsRoot(activeWorkspace.id, path);
       }
     },
-    [activeWorkspace, setFsRoot],
+    [activeWorkspace, setExplorerRootMode, setFsRoot],
   );
 
   const lastFocusFolderRef = useRef<string | null>(null);
