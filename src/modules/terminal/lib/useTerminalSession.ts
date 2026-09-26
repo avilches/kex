@@ -153,10 +153,19 @@ function parkOrReleaseLeaf(leafId: string): void {
 }
 
 function enforceParkedLeafBudget(): void {
-  const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
+  const budget = parkedLeafBudget();
+  const evicted = evictOverflow(parkedLeaves, budget);
+  console.debug(
+    `[kex-perf] enforceParkedLeafBudget budget=${budget} parked=${parkedLeaves.length} evicted=${JSON.stringify(evicted)}`,
+  );
   for (const id of evicted) {
     const es = sessions.get(id);
-    if (es && es.hasSlot && !es.visibleNow) unbindLeafFromSlot(id, es);
+    if (es && es.hasSlot && !es.visibleNow) {
+      const t0 = performance.now();
+      unbindLeafFromSlot(id, es);
+      const ms = (performance.now() - t0).toFixed(1);
+      console.debug(`[kex-perf] enforceParkedLeafBudget unbindLeafFromSlot leaf=${id} ${ms}ms`);
+    }
   }
 }
 
@@ -1235,9 +1244,16 @@ export function useTerminalSession({
     s.visibleNow = visible;
     s.focusedNow = focused;
     if (visible) {
+      const tVisible0 = performance.now();
       dropParkedLeaf(parkedLeaves, leafId);
-      if (s.container && !s.hasSlot) bindLeafToSlot(leafId, s);
-      else if (s.hasSlot) refreshLeafSlot(leafId);
+      if (s.container && !s.hasSlot) {
+        console.debug(`[kex-perf] visibility leaf=${leafId} path=bindLeafToSlot(cold)`);
+        bindLeafToSlot(leafId, s);
+      } else if (s.hasSlot) {
+        refreshLeafSlot(leafId);
+      }
+      const visMs = (performance.now() - tVisible0).toFixed(1);
+      console.debug(`[kex-perf] visibility leaf=${leafId} becameVisible total=${visMs}ms hadSlot=${s.hasSlot}`);
       setSlotFocused(leafId, focused);
       // Only seize focus on the transition to focused-and-visible. Re-running
       // for other reasons (theme, fonts, sibling visibility) must not yank focus
@@ -1248,6 +1264,9 @@ export function useTerminalSession({
       const gained = visible && focused && !wasFocusedRef.current;
       if (gained && !blocks) requestLeafFocus(leafId);
     } else if (s.hasSlot) {
+      console.debug(
+        `[kex-perf] visibility leaf=${leafId} becameHidden blocks=${s.blocks} altScreen=${isLeafAltScreen(leafId)}`,
+      );
       if (s.blocks || isLeafAltScreen(leafId)) parkLeafSlot(leafId);
       else parkOrReleaseLeaf(leafId);
     }
