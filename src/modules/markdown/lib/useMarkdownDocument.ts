@@ -8,7 +8,11 @@ import {
   watchAdd,
   watchRemove,
 } from "@/modules/explorer/lib/watch";
+import { useAutoSaveTimer } from "@/modules/editor/lib/useAutoSaveTimer";
+import { useConflictFlag } from "@/modules/editor/lib/useConflictFlag";
+import { shouldApplyReload } from "@/modules/editor/lib/reloadPlan";
 import { MarkdownDocumentBuffer } from "@/modules/markdown/lib/documentBuffer";
+import type { MarkdownTabMode } from "@/modules/markdown/lib/markdownTabShell";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 
@@ -20,8 +24,8 @@ type ReadResult =
 // Survives a component unmount (e.g. dragging a tab to another pane) so an
 // in-progress edit isn't force-saved to disk or lost just because the tab
 // moved. See the matching cache in useDocument.ts (Source mode / the plain
-// editor tab) for the full rationale; this is the Rich-mode equivalent,
-// keyed by path and process-lifetime only.
+// editor tab) for the full rationale, including why this is keyed by tabId
+// rather than path; this is the Rich-mode equivalent, process-lifetime only.
 const unflushedBodies = new Map<string, string>();
 
 export type MarkdownDocState =
@@ -33,16 +37,27 @@ export type MarkdownDocState =
 
 type Options = {
   path: string;
+  tabId: string;
+  // Source mode mounts its own EditorPane, which already watches this same
+  // path via useEditorFileSync. Without this, both watchers would fetch and
+  // update conflict state independently for a single external change.
+  mode: MarkdownTabMode;
   onDirtyChange?: (dirty: boolean) => void;
 };
 
-export function useMarkdownDocument({ path, onDirtyChange }: Options) {
+export function useMarkdownDocument({ path, tabId, mode, onDirtyChange }: Options) {
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const [doc, setDoc] = useState<MarkdownDocState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
-  const [conflict, setConflict] = useState(false);
+  const { conflict, setConflict, keepLocalChanges } = useConflictFlag();
 
   const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const autoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
+  const { autoSaveRef, clear: clearAutoSaveTimer, scheduleIfDirty } = useAutoSaveTimer(
+    autoSave,
+    autoSaveDelay,
+  );
 
   const bufferRef = useRef<MarkdownDocumentBuffer | null>(null);
   // A restored buffer's body is already an edit, not pristine loaded content,
@@ -59,18 +74,7 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
 
   const revisionRef = useRef(0);
 
-  const autoSaveRef = useRef({ autoSave, autoSaveDelay });
-  autoSaveRef.current = { autoSave, autoSaveDelay };
-
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearAutoSaveTimer = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  }, []);
-
+  // biome-ignore lint/correctness/useExhaustiveDependencies: autoSaveRef is a stable ref from useAutoSaveTimer, read fresh on each call
   const saveNow = useCallback(async () => {
     const buf = bufferRef.current;
     if (!buf) return;
@@ -102,6 +106,7 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     onDirtyChangeRef.current?.(dirty);
   }, [dirty]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   useEffect(() => {
     let cancelled = false;
     setDoc({ status: "loading" });
@@ -113,8 +118,8 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
         if (cancelled) return;
         if (res.kind === "text") {
           const buf = new MarkdownDocumentBuffer(res.content);
-          const unflushed = unflushedBodies.get(path);
-          unflushedBodies.delete(path);
+          const unflushed = unflushedBodies.get(tabId);
+          unflushedBodies.delete(tabId);
           if (unflushed != null) {
             buf.setBody(unflushed);
             suppressNextBaselineRef.current = true;
@@ -145,16 +150,19 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, tabId]);
 
-  // Applies the disk content. force=true is how a conflict is force-resolved
-  // by discarding local edits (reloadFromDisk): it must apply even if the
-  // disk content happens to equal what was last read, since the buffer's own
-  // dirty body is what has to be replaced, not what replaceFromDisk compares
-  // against.
+  // Applies the disk content unless the buffer is dirty and this isn't a
+  // forced reload (force=true is how "Reload from disk" discards unsaved
+  // edits). The fetch itself, and its catch below, always run regardless of
+  // dirty/force: a file deleted or erroring out from under a dirty buffer
+  // must still be reported, or a delete while editing goes unnoticed until
+  // some other action forces a fresh read.
   const performReload = useCallback((force = false): void => {
+    const applyContent = shouldApplyReload(force, dirtyRef.current);
     void invoke<ReadResult>("fs_read_file", { path, workspace: currentWorkspaceEnv() })
       .then((res) => {
+        if (!applyContent) return;
         if (res.kind === "text") {
           const buf = bufferRef.current;
           if (!buf) {
@@ -184,20 +192,18 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
 
   // While dirty, never clobber unsaved edits silently: block the pane on a
   // conflict overlay and let the user pick between keeping them (dismiss) or
-  // discarding them for the disk version.
+  // discarding them for the disk version. performReload still runs (without
+  // applying content) so a file removed while dirty is caught even though
+  // its content sync is skipped.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   const reload = useCallback((): boolean => {
-    if (dirtyRef.current) {
-      setConflict(true);
-      return false;
-    }
+    const wasDirty = dirtyRef.current;
+    if (wasDirty) setConflict(true);
     performReload();
-    return true;
+    return !wasDirty;
   }, [performReload]);
 
-  const keepLocalChanges = useCallback(() => {
-    setConflict(false);
-  }, []);
-
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   const reloadFromDisk = useCallback(() => {
     setConflict(false);
     performReload(true);
@@ -217,6 +223,7 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     const unlistenPromise = getCurrentWebviewWindow().listen<{ path: string; source?: string }>(
       "fs:file-written",
       (event) => {
+        if (modeRef.current !== "rich") return;
         if (event.payload.source === "editor") return;
         if (event.payload.path.replace(/\\/g, "/") !== path.replace(/\\/g, "/")) return;
         reloadRef.current();
@@ -238,6 +245,7 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     let unlisten: (() => void) | undefined;
     const normalizedPath = path.replace(/\\/g, "/");
     void listenFsChanged((paths) => {
+      if (modeRef.current !== "rich") return;
       if (paths.some((p) => p.replace(/\\/g, "/") === normalizedPath)) {
         reloadRef.current();
       }
@@ -278,24 +286,12 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
       buf.setBody(body);
       const isDirty = buf.isDirty();
       setDirty(isDirty);
-
-      clearAutoSaveTimer();
-
-      const { autoSave: active, autoSaveDelay: delay } = autoSaveRef.current;
-      if (active && isDirty) {
-        timeoutRef.current = setTimeout(() => {
-          saveNow().catch((e) => {
-            console.error("[autosave]", e);
-            toast.error("Autosave failed", {
-              description: e instanceof Error ? e.message : String(e),
-            });
-          });
-        }, delay);
-      }
+      scheduleIfDirty(isDirty, saveNow);
     },
-    [clearAutoSaveTimer, saveNow],
+    [scheduleIfDirty, saveNow],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: autoSaveRef is a stable ref from useAutoSaveTimer, read fresh on unmount
   useEffect(() => {
     return () => {
       clearAutoSaveTimer();
@@ -305,17 +301,17 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
         // happen", so this is the same safety net as before, just also
         // covering a pane move. Auto-save off: the user opted out of
         // unprompted disk writes, so the edit is carried in memory instead
-        // and picked up if the same path mounts again (see unflushedBodies).
+        // and picked up if the same tab mounts again (see unflushedBodies).
         if (autoSaveRef.current.autoSave) {
           saveNow().catch((e) => {
             console.error("[autosave flush]", e);
           });
         } else {
-          unflushedBodies.set(path, buf.getBody());
+          unflushedBodies.set(tabId, buf.getBody());
         }
       }
     };
-  }, [path, clearAutoSaveTimer, saveNow]);
+  }, [tabId, clearAutoSaveTimer, saveNow]);
 
   return { doc, dirty, conflict, keepLocalChanges, reloadFromDisk, onChange, setBaseline, save, reload };
 }

@@ -4,3 +4,4 @@ export { useEditorFileSync } from "./useEditorFileSync";
 export { EditorPathBar } from "./EditorPathBar";
 export type { EditorGlobalToggleKey } from "./EditorPathBar";
 export { ReloadConflictOverlay } from "./ReloadConflictOverlay";
+export { useBackgroundConflictToast } from "./lib/useBackgroundConflictToast";

@@ -7,7 +7,12 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DormantRing } from "./dormantRing";
 import { estimateParkedTerminalBudget } from "./backgroundMemoryBudget";
-import { drop as dropParkedLeaf, evictOverflow, touch as touchParkedLeaf } from "./parkedLeafOrder";
+import {
+  drop as dropParkedLeaf,
+  evictOverflow,
+  shouldEvictParkedLeaf,
+  touch as touchParkedLeaf,
+} from "./parkedLeafOrder";
 import { shouldFireOnRegister } from "./pendingFocus";
 import type { BlockMode } from "../block/lib/modeMachine";
 import {
@@ -156,7 +161,8 @@ function enforceParkedLeafBudget(): void {
   const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
   for (const id of evicted) {
     const es = sessions.get(id);
-    if (es && es.hasSlot && !es.visibleNow) unbindLeafFromSlot(id, es);
+    if (!es || !shouldEvictParkedLeaf(es, isLeafAltScreen(id))) continue;
+    unbindLeafFromSlot(id, es);
   }
 }
 

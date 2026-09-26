@@ -316,9 +316,10 @@ export default function App() {
   const terminalHandles = useRef<Map<string, TerminalPaneHandle>>(new Map());
   const scriptCommandSeen = useRef<Set<string>>(new Set());
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
+  const markdownSaveHandlers = useRef<Map<string, () => Promise<void>>>(new Map());
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
-  const closeTabsRef = useRef<(tabIds: string[]) => void>(() => {});
+  const closeTabsRef = useRef<(tabIds: string[]) => Promise<boolean>>(() => Promise.resolve(true));
   const browserHandles = useRef<Map<string, BrowserPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] =
     useState<EditorPaneHandle | null>(null);
@@ -754,6 +755,15 @@ export default function App() {
 
   const handleCloseWorkspace = useCallback(
     async (wsId: string) => {
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      const tabIds = ws ? allPanes(ws.paneTree).flatMap((p) => p.tabs.map((t) => t.id)) : [];
+      // closeTabsRef reports whether every tab actually closed (false if a
+      // cancel, e.g. "Cancel" on a dirty-editor prompt, stopped the run
+      // early); re-reading workspace state here instead would race the
+      // re-render those closes trigger, since it isn't guaranteed to have
+      // happened yet right after the await.
+      const allClosed = tabIds.length > 0 ? await closeTabsRef.current(tabIds) : true;
+      if (!allClosed) return;
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
       closeWorkspace(wsId);
     },
@@ -1691,6 +1701,11 @@ export default function App() {
   // ── Close guards ──────────────────────────────────────────────────────────
 
   const saveTab = useCallback(async (tabId: string) => {
+    const markdownSave = markdownSaveHandlers.current.get(tabId);
+    if (markdownSave) {
+      await markdownSave();
+      return;
+    }
     await editorHandles.current.get(tabId)?.save();
   }, []);
 
@@ -1699,9 +1714,11 @@ export default function App() {
   // blur, tab close, and app close.
   const flushDirtyEditors = useCallback(async () => {
     if (!usePreferencesStore.getState().editorAutoSave) return;
-    const handles = [...editorHandles.current.values()];
-    await Promise.all(handles.map((h) => h.save().catch(() => {})));
-  }, []);
+    const tabIds = new Set([...editorHandles.current.keys(), ...markdownSaveHandlers.current.keys()]);
+    await Promise.all(
+      [...tabIds].map((tabId) => saveTab(tabId).catch(() => {})),
+    );
+  }, [saveTab]);
   const flushDirtyEditorsRef = useRef(flushDirtyEditors);
   flushDirtyEditorsRef.current = flushDirtyEditors;
 
@@ -2065,6 +2082,10 @@ export default function App() {
           editorHandles.current.delete(tabId);
         }
         if (tabId === activeTabId) setActiveEditorHandle(h);
+      },
+      registerMarkdownSaveHandler: (tabId, save) => {
+        if (save) markdownSaveHandlers.current.set(tabId, save);
+        else markdownSaveHandlers.current.delete(tabId);
       },
       onBrowserUrlChange: (tabId, url) => {
         const found = findTabGlobal(tabId);

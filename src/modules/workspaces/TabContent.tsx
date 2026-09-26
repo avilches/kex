@@ -1,7 +1,12 @@
 import { cn, isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
-import { EditorPathBar, ReloadConflictOverlay, type EditorGlobalToggleKey } from "@/modules/editor";
+import {
+  EditorPathBar,
+  ReloadConflictOverlay,
+  useBackgroundConflictToast,
+  type EditorGlobalToggleKey,
+} from "@/modules/editor";
 import { useEditorChrome } from "./EditorChromeContext";
 import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
@@ -84,6 +89,11 @@ export type TabCallbacks = {
   onEditorDirtyChange?: (tabId: string, dirty: boolean) => void;
   onEditorClose?: (tabId: string) => void;
   registerEditorHandle?: (tabId: string, handle: EditorPaneHandle | null) => void;
+  // A markdown tab's EditorPane (Source mode) only exists while that mode is
+  // active, so registerEditorHandle can't be relied on to save it while in
+  // Rich mode. This registers the tab's own save (mode-aware) independently
+  // of whether Source is currently mounted.
+  registerMarkdownSaveHandler?: (tabId: string, save: (() => Promise<void>) | null) => void;
   // Preview callbacks
   onToggleOverlayPreview?: (tabId: string) => void;
   onToggleSplitPreview?: (tabId: string) => void;
@@ -125,6 +135,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
   const [editorConflict, setEditorConflict] = useState(false);
+  useBackgroundConflictToast(editorConflict, visible, tab.kind === "editor" ? tab.path : "");
   const browserRef = useRef<BrowserPaneHandle>(null);
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
@@ -320,6 +331,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                     callbacks.registerEditorHandle?.(tab.id, h);
                   }}
                   path={tab.path}
+                  tabId={tab.id}
                   onDirtyChange={(dirty: boolean) =>
                     callbacks.onEditorDirtyChange?.(tab.id, dirty)
                   }
@@ -441,6 +453,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                     (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
                   }}
                   path={tab.path}
+                  tabId={tab.id}
                   onContentChange={handleContentChange}
                   onReady={handleReady}
                 />

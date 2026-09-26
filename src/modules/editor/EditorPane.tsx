@@ -83,6 +83,7 @@ export type EditorPaneHandle = {
 
 type Props = {
   path: string;
+  tabId: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onContentChange?: (content: string) => void;
@@ -105,10 +106,11 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved, onClose, onConflictChange, hideConflictOverlay }, ref) {
+  function EditorPane({ path, tabId, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved, onClose, onConflictChange, hideConflictOverlay }, ref) {
     const { doc, onChange, save, reload, recreate, conflict, keepLocalChanges, reloadFromDisk } =
       useDocument({
         path,
+        tabId,
         onDirtyChange,
       });
     const onConflictChangeRef = useRef(onConflictChange);
@@ -210,11 +212,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const pendingLineRef = useRef<number | null>(null);
     const statusRef = useRef(doc.status);
     statusRef.current = doc.status;
+    const conflictRef = useRef(conflict);
+    conflictRef.current = conflict;
 
+    // A pending reload conflict blocks the pane behind an overlay (built-in or
+    // the parent's own, per hideConflictOverlay): focusing the editor
+    // underneath would let typed input reach a buffer the user believes is
+    // frozen, so a goto-line request just waits without dismissing the line.
     const applyPendingGoto = useCallback(() => {
       const cmView = cmRef.current?.view;
       const line = pendingLineRef.current;
-      if (!cmView || line == null || statusRef.current !== "ready") return;
+      if (!cmView || line == null || statusRef.current !== "ready" || conflictRef.current) return;
       const target = Math.max(1, Math.min(line, cmView.state.doc.lines));
       const at = cmView.state.doc.line(target).from;
       cmView.dispatch({
@@ -226,8 +234,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }, []);
 
     useEffect(() => {
-      if (doc.status === "ready") applyPendingGoto();
-    }, [doc.status, applyPendingGoto]);
+      if (doc.status === "ready" && !conflict) applyPendingGoto();
+    }, [doc.status, conflict, applyPendingGoto]);
 
     const extensions = useMemo(
       () => {

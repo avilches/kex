@@ -13,8 +13,12 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 vi.mock("@/modules/workspace", () => ({ currentWorkspaceEnv: () => undefined }));
+const fsChangedListeners = vi.hoisted(() => new Set<(paths: string[]) => void>());
 vi.mock("@/modules/explorer/lib/watch", () => ({
-  listenFsChanged: () => Promise.resolve(() => {}),
+  listenFsChanged: (cb: (paths: string[]) => void) => {
+    fsChangedListeners.add(cb);
+    return Promise.resolve(() => fsChangedListeners.delete(cb));
+  },
   parentDir: (p: string) => p,
   watchAdd: () => {},
   watchRemove: () => {},
@@ -30,14 +34,18 @@ import { useMarkdownDocument } from "./useMarkdownDocument";
 
 type Hook = ReturnType<typeof useMarkdownDocument>;
 
-function mountUseMarkdownDocument(path: string) {
+function mountUseMarkdownDocument(
+  path: string,
+  mode: "rich" | "source" = "rich",
+  tabId: string = path,
+) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
   let latest: Hook | undefined;
 
   function Harness() {
-    latest = useMarkdownDocument({ path });
+    latest = useMarkdownDocument({ path, tabId, mode });
     return null;
   }
 
@@ -61,9 +69,14 @@ async function flush() {
   });
 }
 
+function triggerFsChanged(paths: string[]) {
+  for (const cb of fsChangedListeners) cb(paths);
+}
+
 describe("useMarkdownDocument unmount/remount", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fsChangedListeners.clear();
   });
 
   it("carries an unsaved edit across unmount instead of saving it, and restores it on remount", async () => {
@@ -91,6 +104,35 @@ describe("useMarkdownDocument unmount/remount", () => {
     expect(second.hook.doc).toMatchObject({ status: "ready", body: "# local edit" });
 
     second.unmount();
+  });
+
+  it("keeps two tabs on the same path from stomping each other's unflushed body", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# on disk", size: 9 });
+    const tabA = mountUseMarkdownDocument("/tmp/shared.md", "rich", "tab-a");
+    const tabB = mountUseMarkdownDocument("/tmp/shared.md", "rich", "tab-b");
+    await flush();
+
+    act(() => {
+      tabA.hook.onChange("# edit from A");
+    });
+    act(() => {
+      tabB.hook.onChange("# edit from B");
+    });
+
+    tabA.unmount();
+    tabB.unmount();
+
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# on disk", size: 9 });
+    const reopenedA = mountUseMarkdownDocument("/tmp/shared.md", "rich", "tab-a");
+    await flush();
+    expect(reopenedA.hook.doc).toMatchObject({ body: "# edit from A" });
+    reopenedA.unmount();
+
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# on disk", size: 9 });
+    const reopenedB = mountUseMarkdownDocument("/tmp/shared.md", "rich", "tab-b");
+    await flush();
+    expect(reopenedB.hook.doc).toMatchObject({ body: "# edit from B" });
+    reopenedB.unmount();
   });
 
   it("stays dirty after the freshly booted editor registers its baseline post-restore", async () => {
@@ -203,5 +245,50 @@ describe("useMarkdownDocument unmount/remount", () => {
     expect(first.hook.doc).toMatchObject({ body: "# local edit" });
 
     first.unmount();
+  });
+
+  it("reports a file deleted externally even while the buffer is dirty", async () => {
+    // reload() must still trigger a fetch when dirty (setting conflict, not
+    // skipping performReload), or a delete-while-editing never surfaces.
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# on disk", size: 9 });
+    const harness = mountUseMarkdownDocument("/tmp/j.md");
+    await flush();
+
+    act(() => {
+      harness.hook.onChange("# local edit");
+    });
+    expect(harness.hook.dirty).toBe(true);
+
+    vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+    await act(async () => {
+      harness.hook.reload();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(harness.hook.conflict).toBe(true);
+    expect(harness.hook.doc).toMatchObject({ status: "error" });
+
+    harness.unmount();
+  });
+
+  it("ignores fs:changed while in source mode, since the embedded EditorPane already watches the same path", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# on disk", size: 9 });
+    const harness = mountUseMarkdownDocument("/tmp/k.md", "source");
+    await flush();
+
+    vi.mocked(invoke).mockClear();
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# external edit", size: 16 });
+
+    await act(async () => {
+      triggerFsChanged(["/tmp/k.md"]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(invoke).not.toHaveBeenCalled();
+    expect(harness.hook.doc).toMatchObject({ body: "# on disk" });
+
+    harness.unmount();
   });
 });
