@@ -131,7 +131,6 @@ function DraggableTab({
   const title = tabTitle(tab, runningCommand, oscTitle);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
-  const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const agentTabTitle = useAgentTabTitle(tab);
   const agentSession = agentTabTitle?.agentSession;
   const hasAgent = agentTabTitle?.hasAgent ?? false;
@@ -270,7 +269,7 @@ function DraggableTab({
       >
         {displayTitle}
       </span>
-      {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && !editorAutoSave && (
+      {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
         <span className="shrink-0 text-[8px] text-primary">●</span>
       )}
       {hasAgent && (
