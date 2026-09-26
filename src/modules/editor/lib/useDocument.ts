@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useAutoSaveTimer } from "@/modules/editor/lib/useAutoSaveTimer";
+import { useConflictFlag } from "@/modules/editor/lib/useConflictFlag";
+import { shouldApplyReload } from "@/modules/editor/lib/reloadPlan";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 
@@ -14,8 +17,10 @@ type ReadResult =
 // target) so an in-progress edit isn't force-saved to disk or lost just
 // because the tab moved. A real, guarded close (useTabCloseGuards) already
 // saves or asks before disposing the tab; this only covers moves that never
-// go through that flow. Keyed by path, so it's process-lifetime, not
-// persisted: it does not survive an app quit.
+// go through that flow. Keyed by tabId, not path: the same file can be open
+// in two tabs (different panes or workspaces) at once, and keying by path
+// would let one unmounting overwrite or adopt the other's stash. Process-
+// lifetime only, so it does not survive an app quit.
 const unflushedBuffers = new Map<string, string>();
 
 export type DocumentState =
@@ -37,16 +42,21 @@ async function fileExists(path: string): Promise<boolean> {
 
 type Options = {
   path: string;
+  tabId: string;
   onDirtyChange?: (dirty: boolean) => void;
 };
 
-export function useDocument({ path, onDirtyChange }: Options) {
+export function useDocument({ path, tabId, onDirtyChange }: Options) {
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
-  const [conflict, setConflict] = useState(false);
+  const { conflict, setConflict, keepLocalChanges } = useConflictFlag();
 
   const autoSave = usePreferencesStore((s) => s.editorAutoSave);
   const autoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
+  const { autoSaveRef, clear: clearAutoSaveTimer, scheduleIfDirty } = useAutoSaveTimer(
+    autoSave,
+    autoSaveDelay,
+  );
 
   // Track the saved buffer so we can detect changes cheaply.
   const savedRef = useRef<string>("");
@@ -56,21 +66,10 @@ export function useDocument({ path, onDirtyChange }: Options) {
     dirtyRef.current = dirty;
   }, [dirty]);
 
-  const autoSaveRef = useRef({ autoSave, autoSaveDelay });
-  autoSaveRef.current = { autoSave, autoSaveDelay };
-
   const docStatusRef = useRef<DocumentState["status"]>("loading");
   docStatusRef.current = doc.status;
 
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearAutoSaveTimer = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  }, []);
-
+  // biome-ignore lint/correctness/useExhaustiveDependencies: autoSaveRef is a stable ref from useAutoSaveTimer, read fresh on each call
   const saveNow = useCallback(async () => {
     const content = bufferRef.current;
     await invoke("fs_write_file", {
@@ -97,6 +96,7 @@ export function useDocument({ path, onDirtyChange }: Options) {
   }, [dirty]);
 
   // Load on path change or explicit reload.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   useEffect(() => {
     let cancelled = false;
     setDoc({ status: "loading" });
@@ -107,8 +107,8 @@ export function useDocument({ path, onDirtyChange }: Options) {
       .then((res) => {
         if (cancelled) return;
         if (res.kind === "text") {
-          const unflushed = unflushedBuffers.get(path);
-          unflushedBuffers.delete(path);
+          const unflushed = unflushedBuffers.get(tabId);
+          unflushedBuffers.delete(tabId);
           savedRef.current = res.content;
           bufferRef.current = unflushed ?? res.content;
           setDirty(unflushed != null && unflushed !== res.content);
@@ -138,7 +138,7 @@ export function useDocument({ path, onDirtyChange }: Options) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, tabId]);
 
   // Applies the disk content unless the buffer is dirty and this isn't a
   // forced reload (force=true is how the "Reload from disk" toast action
@@ -147,7 +147,7 @@ export function useDocument({ path, onDirtyChange }: Options) {
   // its file was removed out from under it, or autosave would go on to
   // silently recreate it.
   const performReload = useCallback((force = false) => {
-    const applyContent = force || !dirtyRef.current;
+    const applyContent = shouldApplyReload(force, dirtyRef.current);
     void invoke<ReadResult>("fs_read_file", {
       path,
       workspace: currentWorkspaceEnv(),
@@ -187,6 +187,7 @@ export function useDocument({ path, onDirtyChange }: Options) {
   // discarding them for the disk version. performReload still runs (without
   // applying content) so a file removed while dirty is caught even though
   // its content sync is skipped.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   const reload = useCallback((): boolean => {
     if (dirtyRef.current) {
       performReload();
@@ -197,10 +198,7 @@ export function useDocument({ path, onDirtyChange }: Options) {
     return true;
   }, [performReload]);
 
-  const keepLocalChanges = useCallback(() => {
-    setConflict(false);
-  }, []);
-
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   const reloadFromDisk = useCallback(() => {
     setConflict(false);
     performReload(true);
@@ -223,30 +221,24 @@ export function useDocument({ path, onDirtyChange }: Options) {
     setDoc({ status: "ready", content: bufferRef.current, size: bufferRef.current.length });
   }, [saveNow]);
 
+  // Guards against the file being detected as deleted between scheduling the
+  // autosave and it actually firing.
+  const saveIfNotDeleted = useCallback(async () => {
+    if (docStatusRef.current === "deleted") return;
+    await saveNow();
+  }, [saveNow]);
+
   const onChange = useCallback(
     (next: string) => {
       bufferRef.current = next;
       const isDirty = next !== savedRef.current;
       setDirty(isDirty);
-
-      clearAutoSaveTimer();
-
-      const { autoSave: active, autoSaveDelay: delay } = autoSaveRef.current;
-      if (active && isDirty && docStatusRef.current !== "deleted") {
-        timeoutRef.current = setTimeout(() => {
-          if (docStatusRef.current === "deleted") return;
-          saveNow().catch((e) => {
-            console.error("[autosave]", e);
-            toast.error("Autosave failed", {
-              description: e instanceof Error ? e.message : String(e),
-            });
-          });
-        }, delay);
-      }
+      scheduleIfDirty(isDirty && docStatusRef.current !== "deleted", saveIfNotDeleted);
     },
-    [clearAutoSaveTimer, saveNow],
+    [scheduleIfDirty, saveIfNotDeleted],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: autoSaveRef is a stable ref from useAutoSaveTimer, read fresh on unmount
   useEffect(() => {
     return () => {
       clearAutoSaveTimer();
@@ -255,17 +247,17 @@ export function useDocument({ path, onDirtyChange }: Options) {
         // happen", so this is the same safety net as before, just also
         // covering a pane move. Auto-save off: the user opted out of
         // unprompted disk writes, so the edit is carried in memory instead
-        // and picked up if the same path mounts again (see unflushedBuffers).
+        // and picked up if the same tab mounts again (see unflushedBuffers).
         if (autoSaveRef.current.autoSave) {
           saveNow().catch((e) => {
             console.error("[autosave flush]", e);
           });
         } else {
-          unflushedBuffers.set(path, bufferRef.current);
+          unflushedBuffers.set(tabId, bufferRef.current);
         }
       }
     };
-  }, [path, clearAutoSaveTimer, saveNow]);
+  }, [tabId, clearAutoSaveTimer, saveNow]);
 
   return { doc, dirty, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate };
 }

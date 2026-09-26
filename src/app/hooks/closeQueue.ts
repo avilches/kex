@@ -58,7 +58,7 @@ export async function runCloseQueue(
           }
         }
       }
-    } else if (tab.kind === "editor") {
+    } else if (tab.kind === "editor" || tab.kind === "markdown") {
       if (tab.locked) continue;
       if (tab.dirty) {
         if (deps.isAutoSaveEnabled()) {

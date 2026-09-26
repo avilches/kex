@@ -19,14 +19,14 @@ import { useDocument, type DocumentState } from "./useDocument";
 
 type Hook = ReturnType<typeof useDocument>;
 
-function mountUseDocument(path: string) {
+function mountUseDocument(path: string, tabId: string = path) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
   let latest: Hook | undefined;
 
   function Harness() {
-    latest = useDocument({ path });
+    latest = useDocument({ path, tabId });
     return null;
   }
 
@@ -228,6 +228,38 @@ describe("useDocument reload", () => {
     } satisfies DocumentState);
 
     second.unmount();
+  });
+
+  it("keeps two tabs on the same path from stomping each other's unflushed buffer", async () => {
+    // The same file can be open in two tabs (different panes or workspaces)
+    // at once; the unflushed-buffer cache must be keyed by tab identity, not
+    // just path, or one unmounting overwrites (or adopts) the other's stash.
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const tabA = mountUseDocument("/tmp/shared.txt", "tab-a");
+    const tabB = mountUseDocument("/tmp/shared.txt", "tab-b");
+    await flush();
+
+    act(() => {
+      tabA.hook.onChange("edit from A");
+    });
+    act(() => {
+      tabB.hook.onChange("edit from B");
+    });
+
+    tabA.unmount();
+    tabB.unmount();
+
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const reopenedA = mountUseDocument("/tmp/shared.txt", "tab-a");
+    await flush();
+    expect(reopenedA.hook.doc).toMatchObject({ content: "edit from A" });
+    reopenedA.unmount();
+
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const reopenedB = mountUseDocument("/tmp/shared.txt", "tab-b");
+    await flush();
+    expect(reopenedB.hook.doc).toMatchObject({ content: "edit from B" });
+    reopenedB.unmount();
   });
 
   it("reloadFromDisk applies even when disk currently matches what was last read", async () => {

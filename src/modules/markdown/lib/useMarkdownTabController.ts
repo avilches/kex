@@ -16,6 +16,7 @@ function toDescription(e: unknown): string {
 
 export function useMarkdownTabController(opts: {
   path: string;
+  tabId: string;
   onDirtyChange?: (dirty: boolean) => void;
   serializeRich: () => string | null;
   saveSource: () => Promise<void>;
@@ -25,6 +26,8 @@ export function useMarkdownTabController(opts: {
   const { doc, onChange, setBaseline, save, reload, conflict, keepLocalChanges, reloadFromDisk } =
     useMarkdownDocument({
       path: opts.path,
+      tabId: opts.tabId,
+      mode,
       onDirtyChange: opts.onDirtyChange,
     });
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);

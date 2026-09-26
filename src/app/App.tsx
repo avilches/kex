@@ -314,9 +314,10 @@ export default function App() {
   const terminalHandles = useRef<Map<string, TerminalPaneHandle>>(new Map());
   const scriptCommandSeen = useRef<Set<string>>(new Set());
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
+  const markdownSaveHandlers = useRef<Map<string, () => Promise<void>>>(new Map());
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
-  const closeTabsRef = useRef<(tabIds: string[]) => void>(() => {});
+  const closeTabsRef = useRef<(tabIds: string[]) => Promise<void>>(() => Promise.resolve());
   const browserHandles = useRef<Map<string, BrowserPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] =
     useState<EditorPaneHandle | null>(null);
@@ -752,6 +753,14 @@ export default function App() {
 
   const handleCloseWorkspace = useCallback(
     async (wsId: string) => {
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      const tabIds = ws ? allPanes(ws.paneTree).flatMap((p) => p.tabs.map((t) => t.id)) : [];
+      if (tabIds.length > 0) await closeTabsRef.current(tabIds);
+      // A cancel in the close queue (e.g. "Cancel" on a dirty-editor prompt)
+      // leaves some tabs open: don't tear down the workspace under them.
+      const stillOpen = workspacesRef.current.find((w) => w.id === wsId);
+      const remainingTabs = stillOpen ? allPanes(stillOpen.paneTree).some((p) => p.tabs.length > 0) : false;
+      if (remainingTabs) return;
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
       closeWorkspace(wsId);
     },
@@ -1658,6 +1667,11 @@ export default function App() {
   // ── Close guards ──────────────────────────────────────────────────────────
 
   const saveTab = useCallback(async (tabId: string) => {
+    const markdownSave = markdownSaveHandlers.current.get(tabId);
+    if (markdownSave) {
+      await markdownSave();
+      return;
+    }
     await editorHandles.current.get(tabId)?.save();
   }, []);
 
@@ -1666,9 +1680,11 @@ export default function App() {
   // blur, tab close, and app close.
   const flushDirtyEditors = useCallback(async () => {
     if (!usePreferencesStore.getState().editorAutoSave) return;
-    const handles = [...editorHandles.current.values()];
-    await Promise.all(handles.map((h) => h.save().catch(() => {})));
-  }, []);
+    const tabIds = new Set([...editorHandles.current.keys(), ...markdownSaveHandlers.current.keys()]);
+    await Promise.all(
+      [...tabIds].map((tabId) => saveTab(tabId).catch(() => {})),
+    );
+  }, [saveTab]);
   const flushDirtyEditorsRef = useRef(flushDirtyEditors);
   flushDirtyEditorsRef.current = flushDirtyEditors;
 
@@ -2032,6 +2048,10 @@ export default function App() {
           editorHandles.current.delete(tabId);
         }
         if (tabId === activeTabId) setActiveEditorHandle(h);
+      },
+      registerMarkdownSaveHandler: (tabId, save) => {
+        if (save) markdownSaveHandlers.current.set(tabId, save);
+        else markdownSaveHandlers.current.delete(tabId);
       },
       onBrowserUrlChange: (tabId, url) => {
         const found = findTabGlobal(tabId);

@@ -208,6 +208,12 @@ carpeta y sin forma de rehacerla.
 
 Bug resuelto (2026-06-11, documentado en `docs/WORKSPACES_GPU.md`). Fix: `setTimeout(retryMissingWebgl, 350)` en `main.tsx` tras `showWindow` a t=50ms. Los rAFs de `scheduleUnhide` se encolan mientras la ventana esta oculta. No anadir mas retries en `rendererPool.ts` sin pasar por `main.tsx`.
 
+### Cache de buffer sin guardar indexado por tabId, no por ruta
+
+`useDocument.ts` (`unflushedBuffers`) y `useMarkdownDocument.ts` (`unflushedBodies`) preservan el buffer sucio de un tab al desmontarse (arrastrar a otro panel) para recuperarlo si la misma ruta se vuelve a montar. Estaba indexado por `path`, asi que el mismo fichero abierto en dos tabs a la vez (dos workspaces, o dos panes) hacia que el desmontaje de uno pisase o adoptase el cache del otro. Ahora la clave es `tabId` (estable por tab, unico incluso para el mismo fichero); `EditorPane`, `useDocument` y `useMarkdownDocument` reciben `tabId` como prop/opcion ademas de `path`. Ver AC8 de task-765.
+
+La maquina de estados de conflicto de recarga (flag `conflict` + `keepLocalChanges`, y el temporizador de auto-save) esta compartida entre ambos hooks via `useConflictFlag`/`useAutoSaveTimer` en `src/modules/editor/lib/`; el resto (buffer de texto plano vs `MarkdownDocumentBuffer` con frontmatter/revision/baseline, y el estado `deleted` que solo tiene el editor clasico) sigue siendo especifico de cada hook a proposito, por las diferencias reales de dominio.
+
 <!-- BACKLOG.MD GUIDELINES START -->
 <!-- backlog.md-instructions-version: 1.50.1 -->
 <CRITICAL_INSTRUCTION>

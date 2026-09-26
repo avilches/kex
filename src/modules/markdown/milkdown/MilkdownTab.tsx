@@ -1,6 +1,6 @@
-import { type JSX, useEffect, useRef, useState } from "react";
+import { type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { EditorPathBar, ReloadConflictOverlay } from "@/modules/editor";
+import { EditorPathBar, ReloadConflictOverlay, useBackgroundConflictToast } from "@/modules/editor";
 import { EditorPane, type EditorPaneHandle } from "@/modules/editor/EditorPane";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
 import { useMarkdownTabController } from "@/modules/markdown/lib/useMarkdownTabController";
@@ -29,11 +29,22 @@ export function MilkdownTab(props: Props): JSX.Element {
   const [editorReady, setEditorReady] = useState(false);
   const milkRef = useRef<MilkdownEditorHandle>(null);
   const editorPaneRef = useRef<EditorPaneHandle>(null);
+  const [sourceConflict, setSourceConflict] = useState(false);
+  const registerEditorHandleRef = useRef(props.callbacks.registerEditorHandle);
+  registerEditorHandleRef.current = props.callbacks.registerEditorHandle;
+  const registerSourceEditorHandle = useCallback(
+    (h: EditorPaneHandle | null) => {
+      editorPaneRef.current = h;
+      registerEditorHandleRef.current?.(props.tabId, h);
+    },
+    [props.tabId],
+  );
 
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
 
   const ctrl = useMarkdownTabController({
     path: props.path,
+    tabId: props.tabId,
     onDirtyChange: (d) => props.callbacks.onEditorDirtyChange?.(props.tabId, d),
     serializeRich: () => milkRef.current?.serialize() ?? null,
     saveSource: async () => {
@@ -41,7 +52,21 @@ export function MilkdownTab(props: Props): JSX.Element {
     },
     onToggleOutline: () => setOutlineOpen((v) => !v),
   });
-  const { mode, doc, onChange, setBaseline, conflict, keepLocalChanges, reloadFromDisk } = ctrl;
+  const { mode, doc, onChange, setBaseline, conflict, keepLocalChanges, reloadFromDisk, saveNow } = ctrl;
+
+  useBackgroundConflictToast(conflict || sourceConflict, props.visible, props.path);
+
+  // Registered independently of mode: a Source-mode EditorPane only exists
+  // while Source is active, but the tab-close guard needs to be able to save
+  // this tab (via saveNow, which is itself mode-aware) at any time.
+  const saveNowRef = useRef(saveNow);
+  saveNowRef.current = saveNow;
+  const registerMarkdownSaveHandlerRef = useRef(props.callbacks.registerMarkdownSaveHandler);
+  registerMarkdownSaveHandlerRef.current = props.callbacks.registerMarkdownSaveHandler;
+  useEffect(() => {
+    registerMarkdownSaveHandlerRef.current?.(props.tabId, () => saveNowRef.current());
+    return () => registerMarkdownSaveHandlerRef.current?.(props.tabId, null);
+  }, [props.tabId]);
 
   // MilkdownEditor (re)mounts fresh on a revision bump and on every rich<->source
   // toggle (even one that leaves the revision untouched, e.g. peeking at Source and
@@ -148,14 +173,13 @@ export function MilkdownTab(props: Props): JSX.Element {
       <div className="relative min-h-0 flex-1">
         {mode === "source" ? (
           <EditorPane
-            ref={(h) => {
-              editorPaneRef.current = h;
-              props.callbacks.registerEditorHandle?.(props.tabId, h);
-            }}
+            ref={registerSourceEditorHandle}
             path={props.path}
+            tabId={props.tabId}
             onDirtyChange={(d) =>
               props.callbacks.onEditorDirtyChange?.(props.tabId, d)
             }
+            onConflictChange={setSourceConflict}
           />
         ) : initError ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[12.5px] text-muted-foreground">
