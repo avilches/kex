@@ -592,7 +592,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const newTab: Tab = (() => {
       const base = { ...entry.tab, id: newTabId() };
       if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
-      if (base.kind === "terminal" || base.kind === "git-diff") return { ...base, locked: false };
+      if (base.kind === "git-diff" || base.kind === "git-commit-file") return { ...base, preview: false, locked: false };
+      if (base.kind === "terminal") return { ...base, locked: false };
       return base;
     })();
     openTab(target.workspaceId, target.paneId, newTab);

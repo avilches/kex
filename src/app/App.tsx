@@ -79,8 +79,10 @@ import {
   findPaneInDirection,
   findTabPane,
   focusedTabId,
+  planDiffTabOpen,
   tabTitle,
   siblingPane,
+  type DiffIdentity,
   type Tab,
   type TabCallbacks,
   type Rect,
@@ -1257,20 +1259,34 @@ export default function App() {
   );
 
   const openGitDiffInTab = useCallback(
-    (params: {
-      repoRoot: string;
-      path: string;
-      mode: "-" | "+";
-      originalPath: string | null;
-    }) => {
+    (
+      params: {
+        repoRoot: string;
+        path: string;
+        mode: "-" | "+";
+        originalPath: string | null;
+      },
+      pin = false,
+    ) => {
       if (!activeWorkspace) return;
-      openTab(activeWorkspace.id, activeWorkspace.activePaneId, {
-        id: newTabId(),
-        kind: "git-diff",
-        ...params,
-      });
+      const candidate: DiffIdentity = { kind: "git-diff", repoRoot: params.repoRoot, path: params.path, mode: params.mode };
+      const plan = planDiffTabOpen(allPanes(activeWorkspace.paneTree), activeWorkspace.activePaneId, candidate, pin);
+      if (plan.action === "activate") {
+        if (plan.shouldUnpin) {
+          updateTabData(activeWorkspace.id, plan.tabId, (p) => p.kind === "git-diff" ? { ...p, preview: false } : p);
+        }
+        activateTab(activeWorkspace.id, plan.tabId);
+        flashTab(plan.tabId);
+        return;
+      }
+      const newTab: Tab = { id: newTabId(), kind: "git-diff", ...params, preview: !pin };
+      if (plan.action === "replace") {
+        replaceTab(activeWorkspace.id, activeWorkspace.activePaneId, plan.oldTabId, newTab);
+        return;
+      }
+      openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
     },
-    [activeWorkspace, openTab],
+    [activeWorkspace, activateTab, updateTabData, replaceTab, openTab],
   );
 
   const openGitHistoryInTab = useCallback(
@@ -1581,19 +1597,36 @@ export default function App() {
       sha: string;
       path: string;
       originalPath: string | null;
+      pin: boolean;
     }) => {
       const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
       if (!ws) return;
-      openTab(ws.id, ws.activePaneId, {
+      const candidate: DiffIdentity = { kind: "git-commit-file", repoRoot: params.repoRoot, sha: params.sha, path: params.path };
+      const plan = planDiffTabOpen(allPanes(ws.paneTree), ws.activePaneId, candidate, params.pin);
+      if (plan.action === "activate") {
+        if (plan.shouldUnpin) {
+          updateTabData(ws.id, plan.tabId, (p) => p.kind === "git-commit-file" ? { ...p, preview: false } : p);
+        }
+        activateTab(ws.id, plan.tabId);
+        flashTab(plan.tabId);
+        return;
+      }
+      const newTab: Tab = {
         id: newTabId(),
         kind: "git-commit-file",
         repoRoot: params.repoRoot,
         sha: params.sha,
         path: params.path,
         originalPath: params.originalPath,
-      });
+        preview: !params.pin,
+      };
+      if (plan.action === "replace") {
+        replaceTab(ws.id, ws.activePaneId, plan.oldTabId, newTab);
+        return;
+      }
+      openTab(ws.id, ws.activePaneId, newTab);
     },
-    [activeWorkspaceId, openTab],
+    [activeWorkspaceId, activateTab, updateTabData, replaceTab, openTab],
   );
 
   // ── TabCallbacks ─────────────────────────────────────────────────────────
@@ -2046,14 +2079,30 @@ export default function App() {
       },
       onOpenCommitFile: (input) => {
         if (!activeWorkspace) return;
-        openTab(activeWorkspace.id, activeWorkspace.activePaneId, {
+        const candidate: DiffIdentity = { kind: "git-commit-file", repoRoot: input.repoRoot, sha: input.sha, path: input.path };
+        const plan = planDiffTabOpen(allPanes(activeWorkspace.paneTree), activeWorkspace.activePaneId, candidate, input.pin);
+        if (plan.action === "activate") {
+          if (plan.shouldUnpin) {
+            updateTabData(activeWorkspace.id, plan.tabId, (p) => p.kind === "git-commit-file" ? { ...p, preview: false } : p);
+          }
+          activateTab(activeWorkspace.id, plan.tabId);
+          flashTab(plan.tabId);
+          return;
+        }
+        const newTab: Tab = {
           id: newTabId(),
           kind: "git-commit-file",
           repoRoot: input.repoRoot,
           sha: input.sha,
           path: input.path,
           originalPath: input.originalPath,
-        });
+          preview: !input.pin,
+        };
+        if (plan.action === "replace") {
+          replaceTab(activeWorkspace.id, activeWorkspace.activePaneId, plan.oldTabId, newTab);
+          return;
+        }
+        openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
       },
       onGitHistorySearchHandle: (_tabId, handle) => {
         setGitHistoryHandle(handle);

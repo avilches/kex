@@ -263,7 +263,7 @@ function DraggableTab({
           "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
           !isDescription && tab.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
-          tab.kind === "editor" && tab.preview && "italic",
+          (tab.kind === "editor" || tab.kind === "git-diff" || tab.kind === "git-commit-file") && tab.preview && "italic",
         )}
         style={tabColor && !isRestoreError ? { color: tabColor } : undefined}
       >
@@ -396,7 +396,7 @@ function DraggableTab({
             <ContextMenuItem
               onSelect={() => onUpdateTab?.(tab.id, (p) => {
                 const newLocked = !isLocked;
-                return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
+                return { ...p, locked: newLocked, ...(newLocked && (p.kind === "editor" || p.kind === "git-diff" || p.kind === "git-commit-file") ? { preview: false } : {}) };
               })}
             >
               <HugeiconsIcon icon={isLocked ? SquareUnlock02Icon : LockKeyIcon} size={14} strokeWidth={2} />

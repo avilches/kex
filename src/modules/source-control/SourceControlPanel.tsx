@@ -111,7 +111,7 @@ type Props = {
     mode: "+" | "-";
     originalPath: string | null;
     title?: string;
-  }) => void;
+  }, pin: boolean) => void;
   onOpenFile?: (absolutePath: string, pin?: boolean) => void;
   onNavigateToWorktree?: (path: string) => void;
   workspaceCwd?: string | null;
@@ -580,7 +580,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           const entry = focusedEntry();
           if (entry) {
             event.preventDefault();
-            void scm.selectEntry(entry);
+            void scm.selectEntry(entry, true);
           }
           break;
         }
@@ -1371,7 +1371,7 @@ type RowRendererProps = {
   onStageFolder: (node: ScmDirNode) => void;
   onUnstageFolder: (node: ScmDirNode) => void;
   onDiscardFolder: (node: ScmDirNode) => void;
-  onSelectEntry: (entry: SourceControlEntry) => Promise<void>;
+  onSelectEntry: (entry: SourceControlEntry, pin: boolean) => Promise<void>;
   onStageEntry: (entry: SourceControlEntry) => Promise<void>;
   onUnstageEntry: (entry: SourceControlEntry) => Promise<void>;
   onDiscardEntry: (entry: SourceControlEntry) => void;
@@ -1635,7 +1635,6 @@ const EntryRow = memo(function EntryRow({
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
   const disabled = actionBusy !== null;
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
-  const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const statusHex = gitStatusHexColor(
     entry.statusCode as GitStatusCode,
     gitColorScheme,
@@ -1671,10 +1670,10 @@ const EntryRow = memo(function EntryRow({
             type="button"
             onClick={() => {
               onFocusRow(row.key);
-              if (previewOnClick) void onSelectEntry(entry);
+              void onSelectEntry(entry, false);
             }}
             onDoubleClick={() => {
-              if (!previewOnClick) void onSelectEntry(entry);
+              void onSelectEntry(entry, true);
             }}
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
@@ -1770,7 +1769,7 @@ const EntryRow = memo(function EntryRow({
           className={COMPACT_ITEM}
           onSelect={() => {
             onFocusRow(row.key);
-            void onSelectEntry(entry);
+            void onSelectEntry(entry, true);
           }}
         >
           <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />

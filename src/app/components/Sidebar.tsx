@@ -31,6 +31,7 @@ type CommitFileDiffOpenInput = {
   subject: string;
   path: string;
   originalPath: string | null;
+  pin: boolean;
 };
 
 export type SidebarProps = {
@@ -79,7 +80,7 @@ export type SidebarProps = {
     mode: "+" | "-";
     originalPath: string | null;
     title?: string;
-  }) => void;
+  }, pin: boolean) => void;
   onOpenGitGraph?: () => void;
   onNavigateToWorktree?: (path: string) => void;
   // GitHistoryPane props

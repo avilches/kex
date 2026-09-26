@@ -85,7 +85,7 @@ type SourceControlPanelState = {
   worktreeCount: number;
   setCommitMessage: (value: string) => void;
   refresh: () => Promise<void>;
-  selectEntry: (entry: SourceControlEntry) => Promise<void>;
+  selectEntry: (entry: SourceControlEntry, pin: boolean) => Promise<void>;
   stageEntry: (entry: SourceControlEntry) => Promise<void>;
   unstageEntry: (entry: SourceControlEntry) => Promise<void>;
   requestDiscardEntry: (entry: SourceControlEntry) => void;
@@ -284,7 +284,7 @@ export function useSourceControlPanel(
         mode: DiffMode;
         originalPath: string | null;
         title?: string;
-      }) => void)
+      }, pin: boolean) => void)
     | null,
   commitDraft: CommitDraftParams,
 ): SourceControlPanelState {
@@ -529,13 +529,13 @@ export function useSourceControlPanel(
   );
 
   const openSelection = useCallback(
-    (sel: DiffSelection, repoRoot: string, file: GitChangedFile | undefined) => {
+    (sel: DiffSelection, repoRoot: string, file: GitChangedFile | undefined, pin: boolean) => {
       onOpenDiff?.({
         path: sel.path,
         repoRoot,
         mode: sel.mode,
         originalPath: file?.originalPath ?? null,
-      });
+      }, pin);
     },
     [onOpenDiff],
   );
@@ -643,10 +643,12 @@ export function useSourceControlPanel(
   }, [panelState, loadRemotes, loadWorktreeStatus]);
 
   const selectEntry = useCallback(
-    async (entry: SourceControlEntry) => {
+    async (entry: SourceControlEntry, pin: boolean) => {
       if (!repo) return;
       const nextSelection: DiffSelection = { path: entry.path, mode: entry.mode };
-      if (sameSelection(selected, nextSelection)) {
+      // A pin (double click, or the "Open Diff" menu action) must still fix the
+      // tab in place even when re-clicking the file that is already selected.
+      if (!pin && sameSelection(selected, nextSelection)) {
         setActionError(null);
         setActionMessage(null);
         setSelectionTransition("none");
@@ -657,7 +659,7 @@ export function useSourceControlPanel(
       setActionMessage(null);
       setSelectionTransition("none");
       const file = status?.changedFiles.find((c) => c.path === entry.path);
-      openSelection(nextSelection, repo.repoRoot, file);
+      openSelection(nextSelection, repo.repoRoot, file, pin);
     },
     [openSelection, repo, selected, status],
   );
