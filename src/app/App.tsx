@@ -317,7 +317,7 @@ export default function App() {
   const markdownSaveHandlers = useRef<Map<string, () => Promise<void>>>(new Map());
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
-  const closeTabsRef = useRef<(tabIds: string[]) => Promise<void>>(() => Promise.resolve());
+  const closeTabsRef = useRef<(tabIds: string[]) => Promise<boolean>>(() => Promise.resolve(true));
   const browserHandles = useRef<Map<string, BrowserPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] =
     useState<EditorPaneHandle | null>(null);
@@ -755,12 +755,13 @@ export default function App() {
     async (wsId: string) => {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       const tabIds = ws ? allPanes(ws.paneTree).flatMap((p) => p.tabs.map((t) => t.id)) : [];
-      if (tabIds.length > 0) await closeTabsRef.current(tabIds);
-      // A cancel in the close queue (e.g. "Cancel" on a dirty-editor prompt)
-      // leaves some tabs open: don't tear down the workspace under them.
-      const stillOpen = workspacesRef.current.find((w) => w.id === wsId);
-      const remainingTabs = stillOpen ? allPanes(stillOpen.paneTree).some((p) => p.tabs.length > 0) : false;
-      if (remainingTabs) return;
+      // closeTabsRef reports whether every tab actually closed (false if a
+      // cancel, e.g. "Cancel" on a dirty-editor prompt, stopped the run
+      // early); re-reading workspace state here instead would race the
+      // re-render those closes trigger, since it isn't guaranteed to have
+      // happened yet right after the await.
+      const allClosed = tabIds.length > 0 ? await closeTabsRef.current(tabIds) : true;
+      if (!allClosed) return;
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
       closeWorkspace(wsId);
     },

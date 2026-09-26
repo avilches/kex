@@ -97,9 +97,9 @@ export function useTabCloseGuards({
   }, []);
 
   const closeTabs = useCallback(
-    async (tabIds: string[]) => {
+    async (tabIds: string[]): Promise<boolean> => {
       try {
-        await runCloseQueue(tabIds, {
+        return await runCloseQueue(tabIds, {
           getTab: (id) => {
             const found = findTab(id);
             if (!found) return null;
@@ -123,6 +123,7 @@ export function useTabCloseGuards({
         });
       } catch (e) {
         console.error("[kex] close queue failed", e);
+        return false;
       } finally {
         focusActiveTab();
       }

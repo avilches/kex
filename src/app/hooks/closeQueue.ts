@@ -32,12 +32,15 @@ export type CloseQueueDeps = {
  * Closes tabs one at a time. A tab that needs confirmation pauses the
  * queue until the user answers; a cancel stops the entire run before closing
  * the current tab. Once the user opts out of the running-process warning,
- * the rest of the run closes without re-asking.
+ * the rest of the run closes without re-asking. Returns whether every tab in
+ * the list was actually closed (false if a cancel stopped the run early), so
+ * a caller that closes a whole workspace afterward doesn't have to infer it
+ * from workspace state that may not have re-rendered yet.
  */
 export async function runCloseQueue(
   tabIds: string[],
   deps: CloseQueueDeps,
-): Promise<void> {
+): Promise<boolean> {
   let suppressTerminalWarn = false;
   for (const tabId of tabIds) {
     const tab = deps.getTab(tabId);
@@ -51,7 +54,7 @@ export async function runCloseQueue(
           .catch(() => null);
         if (processName !== null) {
           const decision = await deps.askTerminalClose(tabId, processName);
-          if (decision.type === "cancel") return;
+          if (decision.type === "cancel") return false;
           if (decision.dontAskAgain) {
             await deps.setWarnEnabled(false);
             suppressTerminalWarn = true;
@@ -65,7 +68,7 @@ export async function runCloseQueue(
           await deps.saveTab(tabId);
         } else {
           const decision = await deps.askEditorClose(tabId);
-          if (decision.type === "cancel") return;
+          if (decision.type === "cancel") return false;
           if (decision.type === "save") await deps.saveTab(tabId);
         }
       }
@@ -73,4 +76,5 @@ export async function runCloseQueue(
 
     deps.closeTab(tabId);
   }
+  return true;
 }
