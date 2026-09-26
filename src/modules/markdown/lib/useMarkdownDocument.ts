@@ -84,6 +84,11 @@ export function useMarkdownDocument({ path, onDirtyChange }: Options) {
     });
     buf.markSaved();
     setDirty(false);
+    // Keep doc.body in sync with what was just written, without bumping revision:
+    // a live Rich editor must not be force-refreshed by its own save, but a later
+    // remount (e.g. a Rich -> Source -> Rich toggle) reads doc.body as its initial
+    // content and would otherwise show what was on screen when the tab was opened.
+    setDoc({ status: "ready", body: buf.getBody(), revision: revisionRef.current });
     if (autoSaveRef.current.autoSave) {
       toast.success(`Autosaved ${path.split(/[\\/]/).pop() || path}`);
     }

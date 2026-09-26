@@ -248,6 +248,58 @@ librería decide, por su cuenta, si merece la pena redibujar.
 
 ---
 
+## Bug 4: guardar en modo Rich y volver a el tras pasar por Source muestra un tercer contenido (RESUELTO)
+
+### Síntoma
+
+Con un tab markdown (tiptap o milkdown) en modo Rich con cambios sin guardar: al pasar a Source
+(lo que guarda esos cambios en disco, ver la nota de diseño más abajo), editar algo más ahí, y
+volver a Rich, el editor rico no mostraba ni la última edición hecha en Source ni el contenido del
+disco: mostraba el texto que había en Rich la primera vez que se abrió el tab, muchos pasos atrás.
+
+### Pistas falsas descartadas
+
+Se sospechó primero de una carrera entre el reload explícito del toggle y el evento `fs:changed`
+real que dispara el propio guardado (ambos llaman a `reload()` sobre el mismo hook). Instrumentar
+con trazas temporales en cada eslabón (`toggleMode`, `performReload`, el `watchAdd`/listener de
+`fs:changed`, el `useMemo` de HTML y el efecto de sincronización de `RichMarkdownEditor`, y el
+efecto de arranque de `MilkdownEditor`) descartó esa carrera: el evento duplicado se bloquea
+correctamente por el dedup de `replaceFromDisk` sin causar daño.
+
+### Causa raíz
+
+`saveNow()` en `useMarkdownDocument.ts` escribe el contenido a disco y llama a `buf.markSaved()`
+(que sincroniza el buffer interno `MarkdownDocumentBuffer`), pero nunca llamaba a `setDoc(...)`.
+El estado React `doc.body` (lo que un `RichMarkdownEditor`/`MilkdownEditor` recién montado usa como
+contenido inicial) se queda congelado en el valor que tenía al abrir el tab o en el último reload
+real, sin enterarse nunca de un guardado explícito ni de un autosave. Mientras el editor rico sigue
+montado esto no se nota (edita su propio estado interno, no `doc.body`), pero en un ciclo
+Rich -> Source -> Rich el editor rico se desmonta y se vuelve a montar desde cero, leyendo
+`doc.body` como contenido inicial: ahí aparece el valor viejo. El watcher de `fs:changed` no lo
+corrige porque su dedup compara contra el buffer (`savedRaw`), que sí está al día tras el guardado,
+así que descarta la actualización pensando que es un eco duplicado.
+
+### Fix
+
+`saveNow()` ahora llama también a `setDoc({status:"ready", body: buf.getBody(), revision:
+revisionRef.current})` tras `markSaved()`, sin incrementar `revisionRef`. No incrementar la
+revision es la parte importante: el `useMemo` de HTML de `RichMarkdownEditor` y el efecto de
+arranque de `MilkdownEditor` solo reaccionan a un cambio de `revision`, así que un editor rico ya
+montado y en edición activa no se ve forzado a refrescarse por su propio guardado; solo un montaje
+fresco posterior (que siempre parte de los props actuales, sin importar si `revision` cambió) ve el
+contenido correcto.
+
+### Lección
+
+Un hook con un buffer interno (ref) y un estado React expuesto (`doc`) puede parecer sincronizado
+mientras el consumidor no se desmonta, porque el consumidor edita su propio estado interno y nunca
+vuelve a leer `doc.body`. La desincronización solo se manifiesta en el siguiente montaje fresco, así
+que cualquier operación que toque el buffer (`markSaved`, `replaceFromDisk`, `setBody`) debe dejar
+`doc` en el mismo estado que el buffer, aunque ningún componente montado lo esté pidiendo en ese
+momento.
+
+---
+
 ## Milkdown: hallazgos del corpus de round-trip (evaluación, no un bug que arreglar)
 
 Milkdown (`@milkdown/crepe`) es un segundo motor rico, seleccionable por tab (`markdownEngine: "milkdown"`),

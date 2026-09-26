@@ -180,4 +180,28 @@ describe("useMarkdownDocument unmount/remount", () => {
 
     harness.unmount();
   });
+
+  it("save() syncs doc.body with what was just written, so a later remount doesn't show stale content", async () => {
+    // A Rich <-> Source toggle unmounts and remounts the Rich editor. It reads
+    // doc.body as its initial content, so save() leaving doc.body stale (even
+    // though the buffer and disk are both correct) would show the tab's
+    // opening content instead of the edit that was just saved.
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# on disk", size: 9 });
+    const first = mountUseMarkdownDocument("/tmp/i.md");
+    await flush();
+
+    act(() => {
+      first.hook.onChange("# local edit");
+    });
+    expect(first.hook.dirty).toBe(true);
+
+    await act(async () => {
+      await first.hook.save();
+    });
+
+    expect(first.hook.dirty).toBe(false);
+    expect(first.hook.doc).toMatchObject({ body: "# local edit" });
+
+    first.unmount();
+  });
 });
