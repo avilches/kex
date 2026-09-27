@@ -258,6 +258,19 @@ pub fn spawn_listener(
     IpcGuard { path: socket_path, shutdown }
 }
 
+/// True when a spooled line is a `SessionEnd`/`StopFailure` notification: a
+/// live-only "the agent just finished/crashed" signal that made sense at the
+/// moment `trigger-event.sh` couldn't reach the socket, but is actively wrong
+/// once replayed after a restart, when Kex may have already relaunched the
+/// same tab and recorded a fresh session for it. Unparseable JSON is not
+/// stale (it isn't recognized as anything): let it reach `dispatch`, which
+/// has its own handling for that case.
+fn stale_spooled_event_kind(json: &str) -> Option<String> {
+    parse_payload(json)
+        .map(|p| p.event)
+        .filter(|e| e == "SessionEnd" || e == "StopFailure")
+}
+
 fn run_listener(
     listener: UnixListener,
     tab_id: String,
@@ -266,7 +279,13 @@ fn run_listener(
     shutdown: Arc<AtomicBool>,
 ) {
     if let Some(base) = spool_dir() {
-        drain_spool(&base, &tab_id, |line| dispatch(line, &tab_id, pty_id, &app));
+        drain_spool(&base, &tab_id, |line| {
+            if let Some(kind) = stale_spooled_event_kind(line) {
+                log::debug!("[ipc] discarded stale spooled {kind} event tab={tab_id}");
+                return;
+            }
+            dispatch(line, &tab_id, pty_id, &app);
+        });
     }
 
     for stream in listener.incoming() {
@@ -309,7 +328,7 @@ fn truncate_for_log(s: &str, max: usize) -> String {
 
 fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     let Some(p) = parse_payload(json) else {
-        log::debug!("[ipc] invalid JSON: {json}");
+        log::debug!("[ipc] invalid JSON: {}", truncate_for_log(json, MAX_LOG_FIELD_LEN));
         return;
     };
     match p.event.as_str() {
@@ -765,6 +784,52 @@ mod tests {
             events.push(parse_payload(line).unwrap().event);
         });
         assert_eq!(events, vec!["Stop"]);
+    }
+
+    #[test]
+    fn stale_spooled_event_kind_flags_session_end_and_stop_failure() {
+        let session_end = r#"{"hook_event_name":"SessionEnd","session_id":"s","transcript_path":"","cwd":"","reason":"exit"}"#;
+        let stop_failure = r#"{"hook_event_name":"StopFailure","session_id":"s","transcript_path":"","cwd":"","error_message":"oops"}"#;
+        assert_eq!(stale_spooled_event_kind(session_end).as_deref(), Some("SessionEnd"));
+        assert_eq!(stale_spooled_event_kind(stop_failure).as_deref(), Some("StopFailure"));
+    }
+
+    #[test]
+    fn stale_spooled_event_kind_is_none_for_other_events_and_invalid_json() {
+        let session_start = r#"{"hook_event_name":"SessionStart","session_id":"s","transcript_path":"","cwd":""}"#;
+        assert_eq!(stale_spooled_event_kind(session_start), None);
+        assert_eq!(stale_spooled_event_kind("not json"), None);
+    }
+
+    #[test]
+    fn drain_spool_discards_stale_session_end_and_stop_failure_but_replays_other_events() {
+        // Regression test: a SessionEnd/StopFailure that lands in the spool
+        // (socket unreachable while Kex was shutting down) must never reach
+        // `on_line` on the next drain, since by then Kex may have already
+        // relaunched the same tab with a fresh session. Other event kinds
+        // still replay normally.
+        let dir = tempfile::tempdir().unwrap();
+        let tab_id = "tab-drain-stale";
+        let path = spool_path_for_tab(dir.path(), tab_id);
+        let session_end = r#"{"hook_event_name":"SessionEnd","session_id":"s","transcript_path":"","cwd":"","reason":"exit"}"#;
+        let stop_failure = r#"{"hook_event_name":"StopFailure","session_id":"s","transcript_path":"","cwd":"","error_message":"oops"}"#;
+        let session_start = r#"{"hook_event_name":"SessionStart","session_id":"s","transcript_path":"","cwd":""}"#;
+        let notification = r#"{"hook_event_name":"Notification","session_id":"s","transcript_path":"","cwd":"","message":"hi","notification_type":"other"}"#;
+        std::fs::write(
+            &path,
+            format!("{session_end}\n{session_start}\n{stop_failure}\n{notification}\n"),
+        )
+        .unwrap();
+
+        let mut replayed = Vec::new();
+        drain_spool(dir.path(), tab_id, |line| {
+            if stale_spooled_event_kind(line).is_some() {
+                return;
+            }
+            replayed.push(parse_payload(line).unwrap().event);
+        });
+
+        assert_eq!(replayed, vec!["SessionStart", "Notification"]);
     }
 
     #[test]

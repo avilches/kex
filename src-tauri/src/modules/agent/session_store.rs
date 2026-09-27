@@ -362,15 +362,23 @@ fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id:
         }
         None
     };
-    let mut store = existing_content
-        .as_deref()
-        .and_then(|s| serde_json::from_str::<SessionStore>(s).ok())
-        .unwrap_or_else(|| SessionStore { version: 1, tabs: HashMap::new() });
+    // Only a previous version that parses as a SessionStore is worth backing
+    // up. A corrupt main file must leave any existing .bak untouched, or a
+    // second corruption (this write) destroys the last recoverable copy that
+    // load_restore_plan could otherwise fall back to.
+    let mut store = SessionStore { version: 1, tabs: HashMap::new() };
+    let mut valid_existing: Option<&str> = None;
+    if let Some(s) = existing_content.as_deref() {
+        if let Ok(parsed) = serde_json::from_str::<SessionStore>(s) {
+            store = parsed;
+            valid_existing = Some(s);
+        }
+    }
     store.tabs.insert(tab_id.to_string(), record);
     if let Ok(out) = serde_json::to_string_pretty(&store) {
         let tmp = path.with_extension("json.kex-tmp");
         if std::fs::write(&tmp, out).is_ok() {
-            if let Some(prev) = &existing_content {
+            if let Some(prev) = valid_existing {
                 write_backup(path, prev);
             }
             let _ = std::fs::rename(&tmp, path);
@@ -750,13 +758,23 @@ mod tests {
 
     #[test]
     fn concurrent_record_session_calls_do_not_lose_writes() {
+        // Uses record_session_at_path with a store_path local to this test,
+        // rather than record_session + init(), so this test never touches the
+        // global DATA_DIR OnceLock. Sharing that OnceLock with other tests
+        // (e.g. load_restore_plan_returns_empty_when_no_file, which calls
+        // load_restore_plan() without its own init()) made the two racy: if
+        // this test's init() won the OnceLock and the other test's read
+        // interleaved with these writes, build_plans_from could purge entries
+        // whose transcript_path doesn't exist on disk yet.
         let dir = tempfile::tempdir().unwrap();
-        init(dir.path().to_path_buf());
+        let store_path = dir.path().join("agent-sessions.json");
 
         let handles: Vec<_> = (0..20)
             .map(|i| {
+                let store_path = store_path.clone();
                 std::thread::spawn(move || {
-                    record_session(
+                    record_session_at_path(
+                        &store_path,
                         &format!("tab-{i}"),
                         "claude",
                         &format!("session-{i}"),
@@ -770,11 +788,32 @@ mod tests {
             h.join().unwrap();
         }
 
-        let content = std::fs::read_to_string(dir.path().join("agent-sessions.json")).unwrap();
+        let content = std::fs::read_to_string(&store_path).unwrap();
         let store: SessionStore = serde_json::from_str(&content).unwrap();
         assert_eq!(store.tabs.len(), 20);
         for i in 0..20 {
             assert!(store.tabs.contains_key(&format!("tab-{i}")));
         }
+    }
+
+    #[test]
+    fn record_session_at_path_does_not_overwrite_backup_when_main_file_is_corrupt() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd_launch = dir.path().join("project");
+        let jsonl = dir.path().join("session.jsonl");
+        let store_path = dir.path().join("agent-sessions.json");
+
+        let valid_store = SessionStore { version: 1, tabs: sample_tabs(&cwd_launch, &jsonl) };
+        let valid_content = serde_json::to_string_pretty(&valid_store).unwrap();
+        std::fs::write(store_path.with_extension("json.bak"), &valid_content).unwrap();
+        std::fs::write(&store_path, "{ not valid json").unwrap();
+
+        record_session_at_path(&store_path, "tab-2", "claude", "def-456", "/tmp/session2.jsonl", "/tmp/project2");
+
+        let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
+        assert_eq!(bak_content, valid_content, "a corrupt main file must not clobber a valid backup");
+
+        let after: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(after.tabs.contains_key("tab-2"));
     }
 }
