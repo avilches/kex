@@ -2,7 +2,7 @@ export type AgentStatus = "working" | "attention" | "idle";
 
 export type AgentSource = "terminal" | "local";
 
-export type AgentSignalKind =
+type AgentSignalKind =
   | "started"
   | "UserPromptSubmit"
   | "Notification"

@@ -38,7 +38,6 @@ export function registerCwdHandler(
 }
 
 export type PromptTracker = {
-  getMarker: () => IMarker | null;
   dispose: () => void;
 };
 
@@ -72,7 +71,6 @@ export function registerPromptTracker(
     return true;
   });
   return {
-    getMarker: () => (marker && !marker.isDisposed ? marker : null),
     dispose: () => {
       d.dispose();
       marker?.dispose();

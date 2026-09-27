@@ -16,7 +16,7 @@ import {
 
 export type ThemePref = "system" | "light" | "dark";
 
-export type TabBarStyle = "connected" | "pill";
+type TabBarStyle = "connected" | "pill";
 
 export type WorkspaceStatus = { id: string; label: string; color?: string };
 
@@ -154,7 +154,7 @@ export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
   "xcode-light": "Xcode Light",
 };
 
-export type PaneSplitLimit = { width: number; height: number };
+type PaneSplitLimit = { width: number; height: number };
 
 export type Preferences = {
   theme: ThemePref;

@@ -281,7 +281,6 @@ export const PaneView = memo(function PaneView({
           onSplitBrowserDown={handleSplitBrowserDown}
           onRenameTab={callbacks.onRenameTab}
           onUpdateTab={callbacks.onUpdateTab}
-          onRenameFile={callbacks.onRenameFile}
           onFocusOnExplorer={callbacks.onFocusOnExplorer}
           gitStatus={gitStatus}
           gitColorScheme={gitColorScheme}

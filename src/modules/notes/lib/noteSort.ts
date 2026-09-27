@@ -38,7 +38,7 @@ export function sortNotes(
   return copy;
 }
 
-export type DateBucket = "Today" | "Yesterday" | "This Week" | "This Month" | "Older";
+type DateBucket = "Today" | "Yesterday" | "This Week" | "This Month" | "Older";
 export type NoteGroup = { bucket: DateBucket; notes: NoteItem[] };
 
 const DAY_MS = 86_400_000;

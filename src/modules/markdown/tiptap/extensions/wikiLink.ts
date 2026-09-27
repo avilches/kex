@@ -95,7 +95,7 @@ export function createWikiLink(onNavigate: (path: string, title: string) => void
   });
 }
 
-export type WikiLinkMenuState = {
+type WikiLinkMenuState = {
   x: number;
   y: number;
   query: string;

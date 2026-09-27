@@ -18,7 +18,6 @@ import { cursorBlinkExt, cursorStyleExt } from "./cursorExtensions";
 
 // Compartments allow runtime reconfiguration without rebuilding state.
 export const languageCompartment = new Compartment();
-export const readOnlyCompartment = new Compartment();
 export const wrapCompartment = new Compartment();
 export const lineNumbersCompartment = new Compartment();
 export const whitespaceCompartment = new Compartment();

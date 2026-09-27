@@ -1,6 +1,6 @@
 import type { SourceControlEntry } from "./useSourceControlPanel";
 
-export type ScmFileNode = { type: "file"; entry: SourceControlEntry };
+type ScmFileNode = { type: "file"; entry: SourceControlEntry };
 export type ScmDirNode = {
   type: "dir";
   name: string;

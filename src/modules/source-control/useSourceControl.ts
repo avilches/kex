@@ -21,12 +21,12 @@ const FOCUS_REFRESH_MIN_INTERVAL_MS = 1500;
 const SC_STATUS_TTL_MS = 2000;
 
 export type { SourceControlRefreshMode } from "./refreshMode";
-export type SourceControlRemoteAction = "fetch" | "pull" | "push";
-export type SourceControlRemoteActionMode =
+type SourceControlRemoteAction = "fetch" | "pull" | "push";
+type SourceControlRemoteActionMode =
   | "contextual"
   | SourceControlRemoteAction;
 
-export type SourceControlRemoteActionResult = {
+type SourceControlRemoteActionResult = {
   ok: boolean;
   action: SourceControlRemoteAction | null;
   error?: string;
@@ -63,7 +63,7 @@ export type SourceControlSummary = {
   clearRemoteError: () => void;
 };
 
-export type SourceControlRemoteIndicator = {
+type SourceControlRemoteIndicator = {
   visible: boolean;
   label: string;
   title: string;

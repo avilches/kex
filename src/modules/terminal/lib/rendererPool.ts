@@ -35,7 +35,7 @@ export type SlotAdapter = {
   focusLeaf(leafId: string): void;
 };
 
-export type LeafBridge = {
+type LeafBridge = {
   writeToPty(data: string): void;
   resizePty(cols: number, rows: number): void;
   // Force a SIGWINCH on the underlying PTY at the given dims. Implemented

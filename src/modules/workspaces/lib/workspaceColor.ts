@@ -47,10 +47,6 @@ export function resolveStatusColor(color: string | undefined, id: string): strin
   return color ?? initialColorForId(id);
 }
 
-export function randomStatusColor(): string {
-  return WORKSPACE_COLOR_PALETTE[Math.floor(Math.random() * WORKSPACE_COLOR_PALETTE.length)]!;
-}
-
 function hslToHex(h: number, s: number, l: number): string {
   const sl = s / 100;
   const ll = l / 100;
