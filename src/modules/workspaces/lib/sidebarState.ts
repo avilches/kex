@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { debouncedInvoke } from "./debouncedInvoke";
 
 // Sidebar chrome is per-window state (not per-workspace, not a global
 // preference): which view is shown, whether it is open, its width, and which
@@ -71,29 +71,23 @@ export function getSavedSidebarState(): SidebarUiState {
   return { ...cached };
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let pending: { label: string; state: SidebarUiState } | null = null;
+const sidebarSave = debouncedInvoke<{ label: string; state: SidebarUiState }>({
+  command: "window_save_sidebar",
+  delayMs: 250,
+  buildArgs: ({ label, state }) => ({
+    label,
+    open: state.open,
+    view: state.view,
+    side: state.side,
+    width: Math.round(state.width),
+  }),
+  errorTag: "sidebar-state",
+});
 
 // Debounced so a drag-resize does not write on every pixel; the last value wins.
 export function saveSidebarState(
   label: string,
   state: SidebarUiState,
 ): void {
-  pending = { label, state };
-  if (saveTimer !== null) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    const p = pending;
-    pending = null;
-    if (!p) return;
-    void invoke("window_save_sidebar", {
-      label: p.label,
-      open: p.state.open,
-      view: p.state.view,
-      side: p.state.side,
-      width: Math.round(p.state.width),
-    }).catch((err) =>
-      console.error("[sidebar-state] save error:", err),
-    );
-  }, 250);
+  sidebarSave.schedule({ label, state });
 }

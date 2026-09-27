@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { debouncedInvoke } from "./debouncedInvoke";
 import { migrateExplorerRootMode } from "./explorerRoot";
 import type { Tab, SplitNode, Workspace } from "./types";
 import {
@@ -72,28 +73,25 @@ export function getSavedWorkspaceState(): SavedState | null {
   return cached;
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+type PendingWorkspaceState = { workspaces: Workspace[]; activeIndex: number };
 
-// Last known state — updated immediately on every call so flushWorkspaceState
-// can save it synchronously when the window is about to close.
-let pendingWorkspaces: Workspace[] | null = null;
-let pendingActiveIndex = 0;
-
-
-export function saveWorkspaceState(workspaces: Workspace[], activeIndex: number): void {
-  pendingWorkspaces = workspaces;
-  pendingActiveIndex = activeIndex;
-  if (saveTimer !== null) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
+const workspaceStateSave = debouncedInvoke<PendingWorkspaceState>({
+  command: "window_save_workspace_state",
+  delayMs: 800,
+  buildArgs: ({ workspaces, activeIndex }) => {
     const label = getCurrentWebviewWindow().label;
     if (import.meta.env.DEV) console.debug(`[workspace-state] saving ${workspaces.length} workspace(s) for window "${label}", activeIndex=${activeIndex}`);
-    void invoke("window_save_workspace_state", {
+    return {
       label,
       workspaces: workspaces.map(sanitizeWorkspace),
       activeIndex: Math.max(0, Math.min(activeIndex, workspaces.length - 1)),
-    }).catch((err) => console.error("[workspace-state] save error:", err));
-  }, 800);
+    };
+  },
+  errorTag: "workspace-state",
+});
+
+export function saveWorkspaceState(workspaces: Workspace[], activeIndex: number): void {
+  workspaceStateSave.schedule({ workspaces, activeIndex });
 }
 
 // Claimed once by whichever close path runs first (window X button or last-workspace-removed
@@ -108,16 +106,5 @@ export function claimClose(): boolean {
 // Called on window close — cancels the debounce and saves immediately so
 // pending workspace changes are not lost when the window closes.
 export async function flushWorkspaceState(): Promise<void> {
-  if (saveTimer !== null) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
-  }
-  if (!pendingWorkspaces) return;
-  const label = getCurrentWebviewWindow().label;
-  if (import.meta.env.DEV) console.debug(`[workspace-state] flush on close: ${pendingWorkspaces.length} workspace(s) for window "${label}"`);
-  await invoke("window_save_workspace_state", {
-    label,
-    workspaces: pendingWorkspaces.map(sanitizeWorkspace),
-    activeIndex: Math.max(0, Math.min(pendingActiveIndex, pendingWorkspaces.length - 1)),
-  }).catch((err) => console.error("[workspace-state] flush error:", err));
+  await workspaceStateSave.flush();
 }
