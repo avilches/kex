@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { normalizeError } from "@/lib/errors";
 import { splitPath } from "@/lib/pathUtils";
 import { cn } from "@/lib/utils";
 import {
@@ -85,15 +86,6 @@ type FilesEntry =
   | { state: "loading" }
   | { state: "loaded"; files: GitCommitFileChange[] }
   | { state: "error"; error: string };
-
-function normalizeError(error: unknown): string {
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  return "Unknown error";
-}
 
 function absoluteTime(secs: number): string {
   if (!secs) return "";
