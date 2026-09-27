@@ -6,10 +6,11 @@ import {
 } from "@/modules/markdown/lib/markdownEngine";
 
 describe("parseMarkdownEngine", () => {
-  it("accepts the three engines", () => {
+  it("accepts the four engines", () => {
     expect(parseMarkdownEngine("tiptap")).toBe("tiptap");
     expect(parseMarkdownEngine("milkdown")).toBe("milkdown");
     expect(parseMarkdownEngine("legacy")).toBe("legacy");
+    expect(parseMarkdownEngine("codemirror")).toBe("codemirror");
   });
 
   it("falls back to tiptap for anything else", () => {
@@ -21,7 +22,7 @@ describe("parseMarkdownEngine", () => {
   });
 
   it("lists every engine exactly once", () => {
-    expect([...MARKDOWN_ENGINES]).toEqual(["tiptap", "milkdown", "legacy"]);
+    expect([...MARKDOWN_ENGINES]).toEqual(["tiptap", "milkdown", "legacy", "codemirror"]);
   });
 });
 
@@ -29,6 +30,7 @@ describe("resolveMarkdownEngine", () => {
   it("prefers the tab's own engine", () => {
     expect(resolveMarkdownEngine("milkdown", "tiptap")).toBe("milkdown");
     expect(resolveMarkdownEngine("legacy", "milkdown")).toBe("legacy");
+    expect(resolveMarkdownEngine("codemirror", "milkdown")).toBe("codemirror");
   });
 
   it("falls back to the preference when the tab has none", () => {
