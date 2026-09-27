@@ -456,8 +456,9 @@ scope for an evaluation of the engine itself.
 
 - Added a fourth `markdown` tab engine, "Live Preview" (CodeMirror 6, evaluation stage): edits the raw markdown text
   directly with Obsidian-style live-preview decorations, never reparsing to an AST. Gaps vs TipTap/Milkdown: no outline
-  panel, no toolbar, no read-only preview integration, no decoration for GFM tables (parsed without error, shown as plain
-  text) or Setext-style headings (only ATX `#` headings are decorated).
+  panel, no toolbar, no read-only preview integration, no decoration for Setext-style headings (only ATX `#` headings
+  are decorated). GFM tables render as HTML tables off the active lines (only `[text](url)` is recognized inside a
+  cell); fenced code blocks are styled as a monospace block.
 
 ### Notes sidebar view
 

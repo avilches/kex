@@ -38,6 +38,10 @@ In scope:
   currently touches, where the raw markdown is shown untouched. Task-list checkboxes (`- [ ]` /
   `- [x]`) are the one case rendered as a real widget (`WidgetType`), since a checkbox is not text
   being restyled. Decoration computation is limited to `view.viewport`, not the whole document.
+- Fenced code blocks are always styled as one monospace block. A GFM table off the active lines
+  is replaced by a real `<table>` block widget (from a `StateField`, since CodeMirror rejects
+  block decorations from a `ViewPlugin`), with `[text](url)` cells as clickable links; any
+  cursor inside it shows the raw source. Cmd/Ctrl+click on an inline link opens it externally.
 - Frontmatter (a `---`-delimited block at the very start of the document) is styled as a plain
   monospace block and never decorated as markdown content.
 - Embedded HTML blocks/tags (recognized by `@lezer/markdown` as `HTMLBlock`/`HTMLTag` nodes) are
