@@ -95,6 +95,61 @@ describe("livePreviewPlugin", () => {
   });
 });
 
+describe("table widget", () => {
+  const TABLE =
+    "| Name | Link | N |\n" +
+    "|:---|:---:|---:|\n" +
+    "| a | [the docs](https://example.com) | 1 |\n" +
+    "| b |  | 2 |\n" +
+    "\nafter\n";
+
+  beforeEach(() => openUrl.mockClear());
+
+  it("renders an inactive table as a real <table> with its rows and cells", () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    const table = view.dom.querySelector("table");
+    expect(table).not.toBeNull();
+    const headerCells = Array.from(table?.querySelectorAll("thead th") ?? []).map((c) => c.textContent);
+    expect(headerCells).toEqual(["Name", "Link", "N"]);
+    const bodyRows = Array.from(table?.querySelectorAll("tbody tr") ?? []).map((r) =>
+      Array.from(r.querySelectorAll("td")).map((c) => c.textContent),
+    );
+    expect(bodyRows).toEqual([
+      ["a", "the docs", "1"],
+      ["b", "", "2"],
+    ]);
+    const aligns = Array.from(table?.querySelectorAll("thead th") ?? []).map(
+      (c) => (c as HTMLElement).style.textAlign,
+    );
+    expect(aligns).toEqual(["left", "center", "right"]);
+    expect(view.dom.textContent).not.toContain("|:---|");
+    view.destroy();
+  });
+
+  it("reveals the raw table source when the cursor moves onto one of its lines", () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    expect(view.dom.querySelector("table")).not.toBeNull();
+    view.dispatch({ selection: { anchor: TABLE.indexOf("| b") + 2 } });
+    expect(view.dom.querySelector("table")).toBeNull();
+    expect(view.dom.textContent).toContain("|:---|:---:|---:|");
+    view.dispatch({ selection: { anchor: TABLE.indexOf("after") } });
+    expect(view.dom.querySelector("table")).not.toBeNull();
+    view.destroy();
+  });
+
+  it("opens a cell link on a plain click without moving into the table", async () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    const link = view.dom.querySelector("table a") as HTMLAnchorElement;
+    expect(link.textContent).toBe("the docs");
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    link.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
+    expect(view.dom.querySelector("table")).not.toBeNull();
+    view.destroy();
+  });
+});
+
 describe("linkClickHandler", () => {
   beforeEach(() => openUrl.mockClear());
 

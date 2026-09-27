@@ -4,7 +4,20 @@ import type { Text } from "@codemirror/state";
 export type MarkSpec = { from: number; to: number; className: string };
 export type HideSpec = { from: number; to: number };
 export type CheckboxSpec = { from: number; to: number; checked: boolean };
-export type LivePreviewPlan = { marks: MarkSpec[]; hides: HideSpec[]; checkboxes: CheckboxSpec[] };
+export type TableAlign = "left" | "center" | "right" | null;
+export type TableSpec = {
+  from: number;
+  to: number;
+  headers: string[];
+  aligns: TableAlign[];
+  rows: string[][];
+};
+export type LivePreviewPlan = {
+  marks: MarkSpec[];
+  hides: HideSpec[];
+  checkboxes: CheckboxSpec[];
+  tables: TableSpec[];
+};
 
 export type LivePreviewInput = {
   tree: Tree;
@@ -38,6 +51,7 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
   const marks: MarkSpec[] = [];
   const hides: HideSpec[] = [];
   const checkboxes: CheckboxSpec[] = [];
+  const tables: TableSpec[] = [];
 
   // Frontmatter is never parsed as markdown (see the frontmatterEnd check inside
   // enter() below, which skips it entirely); it still needs its own monospace
@@ -59,6 +73,17 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
 
       if (node.type.name === "HTMLBlock" || node.type.name === "HTMLTag") {
         marks.push({ from: node.from, to: node.to, className: "cm-lp-html" });
+        return;
+      }
+
+      if (node.type.name === "Table") {
+        // An inactive table renders as a widget, so nothing inside it is
+        // decorated on its own; an active one falls through to the raw source.
+        const table = renderedTable(node, doc, activeLines);
+        if (table) {
+          tables.push(table);
+          return false;
+        }
         return;
       }
 
@@ -122,7 +147,88 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
     },
   });
 
-  return { marks, hides, checkboxes };
+  return { marks, hides, checkboxes, tables };
+}
+
+export type TablePlanInput = {
+  tree: Tree;
+  doc: Text;
+  activeLines: ReadonlySet<number>;
+  frontmatterEnd: number;
+};
+
+// Tables across the whole document, for the block-widget state field (block
+// decorations cannot come from the viewport-bound plugin). Only top-level
+// blocks are visited: a table nested in a list or quote never starts at a line
+// start, so renderedTable would reject it anyway.
+export function planTables(input: TablePlanInput): TableSpec[] {
+  const { tree, doc, activeLines, frontmatterEnd } = input;
+  const tables: TableSpec[] = [];
+  for (let node = tree.topNode.firstChild; node; node = node.nextSibling) {
+    if (node.type.name !== "Table" || node.from < frontmatterEnd) continue;
+    const table = renderedTable(node, doc, activeLines);
+    if (table) tables.push(table);
+  }
+  return tables;
+}
+
+// A block widget must replace whole lines, so a table indented inside a list
+// item or prefixed by a quote marker stays raw source.
+function renderedTable(node: SyntaxNode, doc: Text, activeLines: ReadonlySet<number>): TableSpec | null {
+  if (isActive(node, doc, activeLines)) return null;
+  if (doc.lineAt(node.from).from !== node.from || doc.lineAt(node.to).to !== node.to) return null;
+  const header = node.getChild("TableHeader");
+  if (!header) return null;
+  const headers = rowCells(header, doc);
+  const columns = headers.length;
+  const delimiter = node.getChild("TableDelimiter");
+  const aligns = fitRow(
+    delimiter ? splitDelimiterRow(doc.sliceString(delimiter.from, delimiter.to)).map(parseAlign) : [],
+    columns,
+    null,
+  );
+  const rows = node.getChildren("TableRow").map((row) => fitRow(rowCells(row, doc), columns, ""));
+  return { from: node.from, to: node.to, headers, aligns, rows };
+}
+
+// Cells are the gaps between a row's TableDelimiter pipes, not its TableCell
+// children: an empty cell ("|  |") has no TableCell node at all, so reading
+// only TableCell children would shift every later cell one column left.
+function rowCells(row: SyntaxNode, doc: Text): string[] {
+  const pipes = row.getChildren("TableDelimiter");
+  const ranges: { from: number; to: number }[] = [];
+  let start = row.from;
+  for (const pipe of pipes) {
+    ranges.push({ from: start, to: pipe.from });
+    start = pipe.to;
+  }
+  ranges.push({ from: start, to: row.to });
+  if (pipes.length > 0 && pipes[0].from === row.from) ranges.shift();
+  if (pipes.length > 0 && pipes[pipes.length - 1].to === row.to) ranges.pop();
+  return ranges.map((r) => doc.sliceString(r.from, r.to).trim().replace(/\\\|/g, "|"));
+}
+
+function splitDelimiterRow(text: string): string[] {
+  const cells = text.trim().split("|").map((c) => c.trim());
+  if (cells[0] === "") cells.shift();
+  if (cells.length > 0 && cells[cells.length - 1] === "") cells.pop();
+  return cells;
+}
+
+function parseAlign(cell: string): TableAlign {
+  const left = cell.startsWith(":");
+  const right = cell.endsWith(":");
+  if (left && right) return "center";
+  if (left) return "left";
+  if (right) return "right";
+  return null;
+}
+
+// GFM: the header row fixes the column count; body rows are padded or truncated.
+function fitRow<T>(cells: T[], columns: number, fill: T): T[] {
+  const out = cells.slice(0, columns);
+  while (out.length < columns) out.push(fill);
+  return out;
 }
 
 function hideMatchingChildren(node: SyntaxNode, childName: string, hides: HideSpec[]): void {

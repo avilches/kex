@@ -1,7 +1,7 @@
 import { markdownLanguage } from "@codemirror/lang-markdown";
 import { Text } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { planLivePreview } from "@/modules/markdown/codemirror/lib/livePreview";
+import { planLivePreview, planTables } from "@/modules/markdown/codemirror/lib/livePreview";
 
 function plan(
   text: string,
@@ -23,7 +23,7 @@ function plan(
 describe("planLivePreview", () => {
   it("returns nothing for plain prose", () => {
     const result = plan("Just a sentence with no markup.\n");
-    expect(result).toEqual({ marks: [], hides: [], checkboxes: [] });
+    expect(result).toEqual({ marks: [], hides: [], checkboxes: [], tables: [] });
   });
 
   it("styles a heading and hides its marker on an inactive line", () => {
@@ -141,6 +141,61 @@ describe("planLivePreview", () => {
       expect(result.hides).toEqual([]);
       expect(result.checkboxes).toEqual([]);
     }
+  });
+
+  const TABLE =
+    "| Name | Link | N | Plain |\n" +
+    "|:---|:---:|---:|---|\n" +
+    "| **a** | [the docs](https://example.com) | 1 | x |\n" +
+    "| b |  | 2 |\n" +
+    "\nafter\n";
+  const TABLE_END = TABLE.indexOf("\n\nafter");
+
+  it("plans an inactive table as a TableSpec and decorates nothing inside it", () => {
+    const result = plan(TABLE);
+    expect(result.tables).toEqual([
+      {
+        from: 0,
+        to: TABLE_END,
+        headers: ["Name", "Link", "N", "Plain"],
+        aligns: ["left", "center", "right", null],
+        rows: [
+          ["**a**", "[the docs](https://example.com)", "1", "x"],
+          // An empty cell keeps its column; a short row is padded to the header width.
+          ["b", "", "2", ""],
+        ],
+      },
+    ]);
+    expect(result.marks.filter((m) => m.from < TABLE_END)).toEqual([]);
+    expect(result.hides.filter((h) => h.from < TABLE_END)).toEqual([]);
+  });
+
+  it("plans no TableSpec while the cursor is on any line of the table", () => {
+    for (const line of [1, 2, 3, 4]) {
+      const result = plan(TABLE, [line]);
+      expect(result.tables).toEqual([]);
+    }
+    // Active: the raw source decorates normally again, e.g. the bold cell.
+    expect(plan(TABLE, [1]).marks.some((m) => m.className === "cm-lp-bold")).toBe(true);
+  });
+
+  it("reads cells of a table written without outer pipes and unescapes \\|", () => {
+    const result = plan("a | b\n--|--\nx \\| y | z\n");
+    expect(result.tables[0]?.headers).toEqual(["a", "b"]);
+    expect(result.tables[0]?.rows).toEqual([["x | y", "z"]]);
+  });
+
+  it("leaves a table nested in a list item as raw source", () => {
+    const result = plan("- item\n\n  | a | b |\n  |---|---|\n  | 1 | 2 |\n");
+    expect(result.tables).toEqual([]);
+  });
+
+  it("planTables finds the same top-level tables across the whole document", () => {
+    const doc = Text.of(TABLE.split("\n"));
+    const tree = markdownLanguage.parser.parse(TABLE);
+    const all = planTables({ tree, doc, activeLines: new Set(), frontmatterEnd: 0 });
+    expect(all).toEqual(plan(TABLE).tables);
+    expect(planTables({ tree, doc, activeLines: new Set([2]), frontmatterEnd: 0 })).toEqual([]);
   });
 
   it("styles the frontmatter block as monospace, never as markdown", () => {

@@ -11,8 +11,7 @@ export const plainUrlHighlight = HighlightStyle.define([{ tag: tags.url, color: 
 
 // GFM (tables, task lists, strikethrough) plus subscript/superscript/emoji: the
 // `markdownLanguage` export already bundles these on top of CommonMark, so no
-// manual @lezer/markdown extension list is needed. Tables parse without error
-// but are not visually decorated in this version (see the design spec's scope).
+// manual @lezer/markdown extension list is needed.
 export function buildLivePreviewExtensions(): Extension[] {
   return [
     markdown({ base: markdownLanguage }),
@@ -66,6 +65,20 @@ export function buildLivePreviewExtensions(): Extension[] {
         borderRadius: "4px",
         padding: "2px 0",
       },
+      // Matches the TipTap engine's table styling (richMarkdown.css).
+      ".cm-lp-table-wrap": { overflowX: "auto", padding: "4px 0" },
+      ".cm-lp-table": { borderCollapse: "collapse", width: "100%" },
+      ".cm-lp-table th, .cm-lp-table td": {
+        border: "1px solid var(--border)",
+        padding: "6px 12px",
+        textAlign: "left",
+        verticalAlign: "top",
+      },
+      ".cm-lp-table th": {
+        backgroundColor: "color-mix(in srgb, var(--muted) 50%, transparent)",
+        fontWeight: "600",
+      },
+      ".cm-lp-table a": { cursor: "pointer" },
     }),
   ];
 }

@@ -1,6 +1,6 @@
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
-import type { EditorState, Extension } from "@codemirror/state";
+import { type EditorState, type Extension, StateField } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -11,7 +11,12 @@ import {
 } from "@codemirror/view";
 import { isExternalUrl, openExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
 import { frontmatterEnd } from "@/modules/markdown/codemirror/lib/frontmatterEnd";
-import { planLivePreview } from "@/modules/markdown/codemirror/lib/livePreview";
+import {
+  planLivePreview,
+  planTables,
+  type TableSpec,
+} from "@/modules/markdown/codemirror/lib/livePreview";
+import { cellSegments } from "@/modules/markdown/codemirror/lib/tableCellInline";
 
 class CheckboxWidget extends WidgetType {
   constructor(
@@ -43,16 +48,97 @@ class CheckboxWidget extends WidgetType {
   }
 }
 
-function buildDecorations(view: EditorView): DecorationSet {
-  const { state } = view;
+class TableWidget extends WidgetType {
+  private readonly key: string;
+
+  constructor(private readonly spec: TableSpec) {
+    super();
+    this.key = JSON.stringify([spec.headers, spec.aligns, spec.rows]);
+  }
+
+  // Positions are left out on purpose: the DOM depends only on the content, so
+  // an edit above the table must not rebuild it.
+  override eq(other: TableWidget): boolean {
+    return other.key === this.key;
+  }
+
+  override get estimatedHeight(): number {
+    return (this.spec.rows.length + 1) * 33;
+  }
+
+  override toDOM(): HTMLElement {
+    const { headers, aligns, rows } = this.spec;
+    const wrap = document.createElement("div");
+    wrap.className = "cm-lp-table-wrap";
+    const table = document.createElement("table");
+    table.className = "cm-lp-table";
+    const thead = table.createTHead().insertRow();
+    for (const [i, text] of headers.entries()) thead.appendChild(buildCell("th", text, aligns[i]));
+    const tbody = table.createTBody();
+    for (const row of rows) {
+      const tr = tbody.insertRow();
+      for (const [i, text] of row.entries()) tr.appendChild(buildCell("td", text, aligns[i]));
+    }
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  // Clicks on a link belong to the link; any other click goes to the editor,
+  // which places the cursor on the table and so reveals its raw source.
+  override ignoreEvent(event: Event): boolean {
+    return event.target instanceof Element && event.target.closest("a") !== null;
+  }
+}
+
+function buildCell(tag: "th" | "td", text: string, align: TableSpec["aligns"][number]): HTMLElement {
+  const cell = document.createElement(tag);
+  if (align) cell.style.textAlign = align;
+  for (const segment of cellSegments(text)) {
+    if (segment.type === "text") {
+      cell.appendChild(document.createTextNode(segment.value));
+    } else if (isExternalUrl(segment.url)) {
+      cell.appendChild(buildLink(segment.text, segment.url));
+    } else {
+      cell.appendChild(document.createTextNode(segment.text));
+    }
+  }
+  return cell;
+}
+
+function buildLink(text: string, url: string): HTMLAnchorElement {
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.className = "cm-lp-link-text";
+  a.textContent = text;
+  a.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    openExternalUrl(url);
+  });
+  // The webview must never navigate itself to the link.
+  a.addEventListener("click", (e) => e.preventDefault());
+  return a;
+}
+
+function activeLinesOf(state: EditorState): Set<number> {
   const activeLines = new Set<number>();
   for (const range of state.selection.ranges) {
     const startLine = state.doc.lineAt(range.from).number;
     const endLine = state.doc.lineAt(range.to).number;
     for (let line = startLine; line <= endLine; line++) activeLines.add(line);
   }
+  return activeLines;
+}
 
-  const fmEnd = frontmatterEnd(state.doc.sliceString(0, Math.min(state.doc.length, 4096)));
+function frontmatterEndOf(state: EditorState): number {
+  return frontmatterEnd(state.doc.sliceString(0, Math.min(state.doc.length, 4096)));
+}
+
+function buildDecorations(view: EditorView): DecorationSet {
+  const { state } = view;
+  const activeLines = activeLinesOf(state);
+  const fmEnd = frontmatterEndOf(state);
 
   const decorations: { from: number; to: number; deco: Decoration }[] = [];
   for (const { from, to } of view.visibleRanges) {
@@ -77,6 +163,7 @@ function buildDecorations(view: EditorView): DecorationSet {
         deco: Decoration.replace({ widget: new CheckboxWidget(box.from, box.checked) }),
       });
     }
+    // plan.tables is rendered by tableField: block widgets cannot come from a plugin.
   }
 
   decorations.sort((a, b) => a.from - b.from || a.to - b.to);
@@ -84,7 +171,32 @@ function buildDecorations(view: EditorView): DecorationSet {
   return Decoration.set(builder, true);
 }
 
-export const livePreviewPlugin: Extension = ViewPlugin.fromClass(
+function buildTableDecorations(state: EditorState): DecorationSet {
+  const tables = planTables({
+    tree: syntaxTree(state),
+    doc: state.doc,
+    activeLines: activeLinesOf(state),
+    frontmatterEnd: frontmatterEndOf(state),
+  });
+  return Decoration.set(
+    tables.map((spec) => Decoration.replace({ widget: new TableWidget(spec), block: true }).range(spec.from, spec.to)),
+  );
+}
+
+// CodeMirror only accepts block (multi-line) replace decorations from a state
+// field, never from a ViewPlugin, so tables live here instead of in the plugin.
+const tableField = StateField.define<DecorationSet>({
+  create: buildTableDecorations,
+  update(value, tr) {
+    if (tr.docChanged || tr.selection || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
+      return buildTableDecorations(tr.state);
+    }
+    return value;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+const inlinePlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
 
@@ -108,6 +220,8 @@ export const livePreviewPlugin: Extension = ViewPlugin.fromClass(
   },
   { decorations: (v) => v.decorations },
 );
+
+export const livePreviewPlugin: Extension = [inlinePlugin, tableField];
 
 export function linkUrlAt(state: EditorState, pos: number): string | null {
   let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1);
