@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::BufRead;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -299,6 +299,12 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
     plans
 }
 
+// Preserves the version of agent-sessions.json about to be overwritten, so
+// load_restore_plan can recover from it if the new write is corrupted or truncated.
+fn write_backup(path: &Path, previous_content: &str) {
+    let _ = std::fs::write(path.with_extension("json.bak"), previous_content);
+}
+
 fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
     let Ok(content) = std::fs::read_to_string(path) else { return };
@@ -307,6 +313,7 @@ fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
     let Ok(out) = serde_json::to_string_pretty(&store) else { return };
     let tmp = path.with_extension("json.kex-tmp");
     if std::fs::write(&tmp, out).is_ok() {
+        write_backup(path, &content);
         let _ = std::fs::rename(&tmp, path);
     }
 }
@@ -321,6 +328,10 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
         Some(p) => p,
         None => return,
     };
+    record_session_at_path(&path, tab_id, agent, session_id, transcript_path, cwd_launch);
+}
+
+fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd_launch: &str) {
     let launch_cmd = take_stashed_cmd(tab_id);
     if launch_cmd.as_deref().is_some_and(is_print_mode_cmd) {
         log::info!("[agent-session] skip record: print-mode session tab={tab_id}");
@@ -343,22 +354,26 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
         updated_at: now,
     };
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
-    let mut store = if path.exists() {
-        std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str::<SessionStore>(&s).ok())
-            .unwrap_or_else(|| SessionStore { version: 1, tabs: HashMap::new() })
+    let existing_content = if path.exists() {
+        std::fs::read_to_string(path).ok()
     } else {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        SessionStore { version: 1, tabs: HashMap::new() }
+        None
     };
+    let mut store = existing_content
+        .as_deref()
+        .and_then(|s| serde_json::from_str::<SessionStore>(s).ok())
+        .unwrap_or_else(|| SessionStore { version: 1, tabs: HashMap::new() });
     store.tabs.insert(tab_id.to_string(), record);
     if let Ok(out) = serde_json::to_string_pretty(&store) {
         let tmp = path.with_extension("json.kex-tmp");
         if std::fs::write(&tmp, out).is_ok() {
-            let _ = std::fs::rename(&tmp, &path);
+            if let Some(prev) = &existing_content {
+                write_backup(path, prev);
+            }
+            let _ = std::fs::rename(&tmp, path);
         }
     }
 }
@@ -375,6 +390,7 @@ pub fn detach_session(tab_id: &str) -> Result<(), String> {
                 if let Ok(out) = serde_json::to_string_pretty(&store) {
                     let tmp = path.with_extension("json.kex-tmp");
                     if std::fs::write(&tmp, out).is_ok() {
+                        write_backup(&path, &content);
                         let _ = std::fs::rename(&tmp, &path);
                     }
                 }
@@ -403,12 +419,20 @@ fn preview_resume_cmd_from_path(tab_id: &str, path: &PathBuf) -> Option<RestoreP
     build_plans_from(tabs, None).into_iter().next()
 }
 
+fn read_backup_store(path: &Path) -> Option<SessionStore> {
+    let content = std::fs::read_to_string(path.with_extension("json.bak")).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
 pub fn load_restore_plan() -> Vec<RestorePlan> {
-    let path = match store_path() {
-        Some(p) => p,
-        None => return vec![],
-    };
-    let content = match std::fs::read_to_string(&path) {
+    match store_path() {
+        Some(p) => load_restore_plan_from_path(&p),
+        None => vec![],
+    }
+}
+
+fn load_restore_plan_from_path(path: &PathBuf) -> Vec<RestorePlan> {
+    let content = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(_) => {
             log::debug!("[agent-session] restore: no store file, starting fresh");
@@ -417,13 +441,19 @@ pub fn load_restore_plan() -> Vec<RestorePlan> {
     };
     let store: SessionStore = match serde_json::from_str(&content) {
         Ok(s) => s,
-        Err(_) => {
-            log::warn!("[agent-session] restore: store corrupt or wrong schema");
-            return vec![];
-        }
+        Err(_) => match read_backup_store(path) {
+            Some(s) => {
+                log::warn!("[agent-session] restore: store corrupt, recovered from backup");
+                s
+            }
+            None => {
+                log::warn!("[agent-session] restore: store corrupt or wrong schema");
+                return vec![];
+            }
+        },
     };
     log::info!("[agent-session] restore: {} session(s) in store", store.tabs.len());
-    build_plans_from(store.tabs, Some(&path))
+    build_plans_from(store.tabs, Some(path))
 }
 
 #[cfg(test)]
@@ -595,6 +625,105 @@ mod tests {
     fn load_restore_plan_returns_empty_when_no_file() {
         let plans = load_restore_plan();
         let _ = plans;
+    }
+
+    fn sample_tabs(cwd_launch: &Path, jsonl: &Path) -> HashMap<String, SessionRecord> {
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), SessionRecord {
+            agent: Some("claude".to_string()),
+            session_id: "abc-123".to_string(),
+            cwd_launch: cwd_launch.display().to_string(),
+            transcript_path: jsonl.display().to_string(),
+            launch_cmd: None,
+            updated_at: 0,
+        });
+        tabs
+    }
+
+    #[test]
+    fn remove_panel_from_store_writes_backup_of_previous_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd_launch = dir.path().join("project");
+        let jsonl = dir.path().join("session.jsonl");
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, sample_tabs(&cwd_launch, &jsonl));
+        let original_content = std::fs::read_to_string(&store_path).unwrap();
+
+        remove_panel_from_store("tab-1", &store_path);
+
+        let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
+        assert_eq!(bak_content, original_content);
+
+        let after: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(after.tabs.is_empty());
+    }
+
+    #[test]
+    fn record_session_at_path_skips_backup_when_no_previous_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+
+        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", "/tmp/session.jsonl", "/tmp/project");
+
+        assert!(store_path.exists());
+        assert!(!store_path.with_extension("json.bak").exists());
+    }
+
+    #[test]
+    fn record_session_at_path_writes_backup_of_previous_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+
+        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", "/tmp/session.jsonl", "/tmp/project");
+        let first_write = std::fs::read_to_string(&store_path).unwrap();
+
+        record_session_at_path(&store_path, "tab-2", "claude", "def-456", "/tmp/session2.jsonl", "/tmp/project2");
+
+        let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
+        assert_eq!(bak_content, first_write);
+    }
+
+    #[test]
+    fn load_restore_plan_from_path_recovers_from_backup_when_main_file_corrupt() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd_launch = dir.path().join("project");
+        std::fs::create_dir_all(&cwd_launch).unwrap();
+        let jsonl = dir.path().join("session.jsonl");
+        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+
+        // Two writes so the second one produces a .bak of the first, valid version.
+        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", &jsonl.display().to_string(), &cwd_launch.display().to_string());
+        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", &jsonl.display().to_string(), &cwd_launch.display().to_string());
+        assert!(store_path.with_extension("json.bak").exists());
+
+        std::fs::write(&store_path, "{ not valid json").unwrap();
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].tab_id, "tab-1");
+        assert_eq!(plans[0].resume_cmd, "claude --resume 'abc-123'");
+    }
+
+    #[test]
+    fn load_restore_plan_from_path_returns_empty_when_main_and_backup_both_corrupt() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        std::fs::write(&store_path, "{ not valid json").unwrap();
+        std::fs::write(store_path.with_extension("json.bak"), "also not valid json").unwrap();
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert!(plans.is_empty());
+    }
+
+    #[test]
+    fn load_restore_plan_from_path_returns_empty_when_main_corrupt_and_no_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        std::fs::write(&store_path, "{ not valid json").unwrap();
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert!(plans.is_empty());
     }
 
     #[test]
