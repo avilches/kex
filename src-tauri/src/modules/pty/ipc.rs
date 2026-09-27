@@ -1,6 +1,7 @@
 #![cfg(unix)]
 
 use std::io::{BufRead, BufReader};
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -14,8 +15,55 @@ use crate::modules::agent::session_store;
 const AGENT_EVENT: &str = "kex:agent-signal";
 const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
 
+/// Directory that holds this user's IPC sockets.
+///
+/// The system temp dir is shared and world-writable, so a socket placed
+/// directly inside it (the old behaviour) has a predictable path any other
+/// local user can pre-create to deny service, or (depending on umask)
+/// connect to once bound, to inject forged agent events. Prefer
+/// `XDG_RUNTIME_DIR`, which systemd/pam_systemd already creates mode 0700
+/// and owned by the user; otherwise fall back to a per-uid subdirectory of
+/// the temp dir that Kex creates itself with 0700.
+fn runtime_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from) {
+        if dir.is_dir() {
+            return dir;
+        }
+    }
+    owned_runtime_subdir(&std::env::temp_dir(), unsafe { libc::getuid() })
+}
+
+/// Creates (or reuses) a `kex-ipc-<uid>` directory under `base`, restricted
+/// to 0700. Split out of `runtime_dir` so tests can point `base` at an
+/// isolated temp dir instead of the real, possibly shared, system one.
+fn owned_runtime_subdir(base: &std::path::Path, uid: u32) -> PathBuf {
+    let dir = base.join(format!("kex-ipc-{uid}"));
+    match std::fs::create_dir(&dir) {
+        Ok(()) => {
+            let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+            dir
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            // Only trust a pre-existing directory if it is actually ours: one
+            // pre-created by another local user on a shared machine must not
+            // be silently reused.
+            match std::fs::metadata(&dir) {
+                Ok(meta) if meta.uid() == uid => dir,
+                _ => {
+                    log::warn!("[ipc] {dir:?} exists but is not owned by this user, falling back to the shared temp dir");
+                    base.to_path_buf()
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("[ipc] could not create {dir:?}: {e}, falling back to the shared temp dir");
+            base.to_path_buf()
+        }
+    }
+}
+
 pub fn socket_path_for_pty_id(id: u32) -> PathBuf {
-    std::env::temp_dir().join(format!("kex-ipc-{id}.sock"))
+    runtime_dir().join(format!("kex-ipc-{id}.sock"))
 }
 
 /// Stops the listener thread and removes the socket file when dropped.
@@ -114,6 +162,11 @@ pub fn spawn_listener(
             return IpcGuard { path: socket_path, shutdown };
         }
     };
+    // bind() creates the socket file honoring the process umask, which on a
+    // shared machine could leave it group/world accessible; force it to
+    // owner-only regardless, so another local user cannot connect and send
+    // forged agent-hook events.
+    let _ = std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600));
     log::debug!("[ipc] listening tab={tab_id} path={:?}", socket_path);
 
     let thread_shutdown = shutdown.clone();
@@ -293,6 +346,47 @@ mod tests {
     fn socket_path_for_id_is_short_enough() {
         let p = socket_path_for_pty_id(u32::MAX);
         assert!(p.to_str().unwrap().len() < 104);
+    }
+
+    #[test]
+    fn owned_runtime_subdir_is_created_owner_only() {
+        let base = tempfile::tempdir().unwrap();
+        let uid = unsafe { libc::getuid() };
+
+        let dir = owned_runtime_subdir(base.path(), uid);
+        let mode = std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700, "runtime subdir must be owner-only, got {mode:o}");
+    }
+
+    #[test]
+    fn owned_runtime_subdir_reuses_its_own_directory() {
+        // Simulates a second app launch finding the directory from a
+        // previous run: it must be recognized as ours (same uid) and reused
+        // rather than rejected as looking untrusted.
+        let base = tempfile::tempdir().unwrap();
+        let uid = unsafe { libc::getuid() };
+
+        let first = owned_runtime_subdir(base.path(), uid);
+        let second = owned_runtime_subdir(base.path(), uid);
+        assert_eq!(first, second);
+        let mode = std::fs::metadata(&second).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700);
+    }
+
+    #[test]
+    fn spawn_listener_leaves_the_socket_file_owner_only() {
+        let base = tempfile::tempdir().unwrap();
+        let socket_path = base.path().join(format!("kex-test-perms-{}.sock", std::process::id()));
+
+        // Use a Tauri-less path: bind directly the way spawn_listener does,
+        // without going through the full AppHandle machinery this test has
+        // no access to.
+        let listener = UnixListener::bind(&socket_path).unwrap();
+        std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        drop(listener);
+
+        let mode = std::fs::metadata(&socket_path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "socket file must be owner-only, got {mode:o}");
     }
 
     #[test]
