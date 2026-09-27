@@ -377,25 +377,37 @@ export function useSourceControl(
 
       const startRun = (mode: SourceControlRefreshMode): Promise<void> => {
         inflightModeRef.current = mode;
-        const run: Promise<void> = (async () => {
-          await doRefreshRef.current(mode);
-          // Drain any request(s) that queued while this run (or a chain of
-          // trailing runs before it) was executing, so none of them is
-          // silently dropped: a contextPath switch that lands mid-flight
-          // still resolves, and a post stage/unstage reconcile still gets a
-          // status read that postdates the mutation.
-          while (pendingModeRef.current !== null) {
-            const nextMode = pendingModeRef.current;
-            pendingModeRef.current = null;
-            inflightModeRef.current = nextMode;
-            await doRefreshRef.current(nextMode);
+        // Definite-assignment assertion: `run` is assigned the instant the
+        // IIFE call below returns its pending promise, before the async body
+        // resumes past its first `await` and reaches the `run` reference.
+        let run!: Promise<void>;
+        run = (async () => {
+          try {
+            await doRefreshRef.current(mode);
+            // Drain any request(s) that queued while this run (or a chain of
+            // trailing runs before it) was executing, so none of them is
+            // silently dropped: a contextPath switch that lands mid-flight
+            // still resolves, and a post stage/unstage reconcile still gets a
+            // status read that postdates the mutation.
+            while (pendingModeRef.current !== null) {
+              const nextMode = pendingModeRef.current;
+              pendingModeRef.current = null;
+              inflightModeRef.current = nextMode;
+              await doRefreshRef.current(nextMode);
+            }
+          } finally {
+            // Cleanup lives inside the async body (not chained as a `.finally()`
+            // on the returned promise) so it runs in the same synchronous
+            // continuation as the while loop's exit check, with no microtask
+            // gap in between where another refresh() could observe a stale
+            // inflightRef and queue its request into a pendingModeRef nobody
+            // will drain again.
+            if (inflightRef.current === run) {
+              inflightRef.current = null;
+              inflightModeRef.current = "never";
+            }
           }
-        })().finally(() => {
-          if (inflightRef.current === run) {
-            inflightRef.current = null;
-            inflightModeRef.current = "never";
-          }
-        });
+        })();
         inflightRef.current = run;
         return run;
       };
