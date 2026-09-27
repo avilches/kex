@@ -22,6 +22,17 @@ export function pathBasename(
   return i >= 0 ? p.slice(i + 1) : p;
 }
 
+// Joins an absolute/OS parent (which may use backslashes, e.g. a Windows repo
+// root) with a relative child (which may itself have multiple segments, e.g.
+// "src/foo.ts") into a normalized forward-slash path. A leading slash on the
+// parent is preserved; a leading slash on the child is treated like any other
+// separator, not an escape to an absolute path.
+export function pathJoin(parent: string, child: string): string {
+  const parts = [...parent.split(/[\\/]/), ...child.split(/[\\/]/)].filter(Boolean);
+  const leadingSlash = /^[\\/]/.test(parent) ? "/" : "";
+  return leadingSlash + parts.join("/");
+}
+
 // Relative, forward-slash paths only: these two never see OS separators.
 // Used for vault-relative note paths and git-relative status/commit paths alike,
 // where a top-level entry has no parent ("" rather than an OS-style "/" root).

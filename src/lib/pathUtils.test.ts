@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ancestorsOf, pathBasename, pathDirname, segmentsFromCwd, splitPath } from "./pathUtils";
+import {
+  ancestorsOf,
+  pathBasename,
+  pathDirname,
+  pathJoin,
+  segmentsFromCwd,
+  splitPath,
+} from "./pathUtils";
 
 describe("pathDirname", () => {
   it("returns parent for a forward-slash path", () => {
@@ -194,5 +201,33 @@ describe("ancestorsOf", () => {
   it("returns nothing for a root-level path or the root itself", () => {
     expect(ancestorsOf("README.md")).toEqual([]);
     expect(ancestorsOf("")).toEqual([]);
+  });
+});
+
+describe("pathJoin", () => {
+  it("joins a posix absolute parent with a relative child", () => {
+    expect(pathJoin("/home/u/repo", "src/foo.ts")).toBe("/home/u/repo/src/foo.ts");
+  });
+
+  it("preserves the leading slash and normalizes separators", () => {
+    expect(pathJoin("/home/u/repo/", "/src/foo.ts")).toBe("/home/u/repo/src/foo.ts");
+  });
+
+  it("joins a windows drive-letter parent with a backslash child", () => {
+    expect(pathJoin("C:\\Users\\u\\repo", "src\\foo.ts")).toBe(
+      "C:/Users/u/repo/src/foo.ts",
+    );
+  });
+
+  it("joins a single-segment name onto a parent without a trailing slash", () => {
+    expect(pathJoin("/repo", "foo.ts")).toBe("/repo/foo.ts");
+  });
+
+  it("does not duplicate the separator when the parent has a trailing slash", () => {
+    expect(pathJoin("/repo/", "foo.ts")).toBe("/repo/foo.ts");
+  });
+
+  it("does not add a leading slash for a bare drive-letter parent", () => {
+    expect(pathJoin("C:/Users/foo", "bar.ts")).toBe("C:/Users/foo/bar.ts");
   });
 });
