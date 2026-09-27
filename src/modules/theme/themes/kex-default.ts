@@ -24,6 +24,7 @@ export const kexDefault: Theme = {
       },
       terminal: {
         background: "#2B2B2B",
+        selection: "rgba(64,140,255,0.35)",
       },
       inactivePaneDim: { terminal: 0.12, editor: 0.12 },
     },
