@@ -1,13 +1,15 @@
 import { syntaxTree } from "@codemirror/language";
-import type { Extension } from "@codemirror/state";
+import type { SyntaxNode } from "@lezer/common";
+import type { EditorState, Extension } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
-  type EditorView,
+  EditorView,
   ViewPlugin,
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
+import { isExternalUrl, openExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
 import { frontmatterEnd } from "@/modules/markdown/codemirror/lib/frontmatterEnd";
 import { planLivePreview } from "@/modules/markdown/codemirror/lib/livePreview";
 
@@ -106,3 +108,27 @@ export const livePreviewPlugin: Extension = ViewPlugin.fromClass(
   },
   { decorations: (v) => v.decorations },
 );
+
+export function linkUrlAt(state: EditorState, pos: number): string | null {
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1);
+  while (node && node.type.name !== "Link") node = node.parent;
+  const urlNode = node?.getChild("URL");
+  if (!urlNode) return null;
+  const url = state.doc.sliceString(urlNode.from, urlNode.to);
+  return isExternalUrl(url) ? url : null;
+}
+
+// Cmd/Ctrl+click opens a link; a plain click only places the cursor, so the
+// link stays editable (Obsidian's live preview behaves the same way).
+export function handleLinkMousedown(event: MouseEvent, view: EditorView): boolean {
+  if (!event.metaKey && !event.ctrlKey) return false;
+  const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+  if (pos == null) return false;
+  const url = linkUrlAt(view.state, pos);
+  if (!url) return false;
+  event.preventDefault();
+  openExternalUrl(url);
+  return true;
+}
+
+export const linkClickHandler: Extension = EditorView.domEventHandlers({ mousedown: handleLinkMousedown });

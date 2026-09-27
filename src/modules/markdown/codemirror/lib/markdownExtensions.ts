@@ -3,7 +3,7 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { livePreviewPlugin } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
+import { linkClickHandler, livePreviewPlugin } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 
 // The user's code-syntax theme colors bare URLs arbitrarily; this engine does
 // not decorate them, so they should read as plain text.
@@ -18,6 +18,7 @@ export function buildLivePreviewExtensions(): Extension[] {
     markdown({ base: markdownLanguage }),
     syntaxHighlighting(plainUrlHighlight),
     livePreviewPlugin,
+    linkClickHandler,
     EditorView.lineWrapping,
     // `color: ... !important` on the lp classes: the user's code-syntax theme
     // colors the same markdown tokens with an equally specific class, so without

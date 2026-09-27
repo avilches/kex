@@ -3,8 +3,15 @@ import { forceParsing, syntaxTreeAvailable } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { describe, expect, it } from "vitest";
-import { livePreviewPlugin } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  handleLinkMousedown,
+  linkClickHandler,
+  livePreviewPlugin,
+} from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
+
+const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 
 function mount(doc: string, selection?: { anchor: number }) {
   const state = EditorState.create({
@@ -85,5 +92,74 @@ describe("livePreviewPlugin", () => {
     const bodyText = view.dom.textContent ?? "";
     expect(bodyText).toContain("title: **not bold**");
     view.destroy();
+  });
+});
+
+describe("linkClickHandler", () => {
+  beforeEach(() => openUrl.mockClear());
+
+  // happy-dom has no layout, so posAtCoords is stubbed to the offset under the
+  // pointer; everything after it (tree lookup, URL extraction, open) is real.
+  function mountLink(doc: string, pointerPos: number) {
+    const state = EditorState.create({
+      doc,
+      extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin, linkClickHandler],
+    });
+    const view = new EditorView({ state, parent: document.body });
+    vi.spyOn(view, "posAtCoords").mockReturnValue(pointerPos);
+    return view;
+  }
+
+  function mousedown(view: EditorView, init: MouseEventInit) {
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, ...init });
+    view.contentDOM.dispatchEvent(event);
+    return event;
+  }
+
+  const doc = "see [the docs](https://example.com) here\n";
+  const onLinkText = doc.indexOf("docs");
+
+  it("opens the link URL on Cmd+click over the link text", async () => {
+    const view = mountLink(doc, onLinkText);
+    const event = mousedown(view, { metaKey: true });
+    expect(event.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
+    view.destroy();
+  });
+
+  it("opens the link URL on Ctrl+click too", async () => {
+    const view = mountLink(doc, onLinkText);
+    mousedown(view, { ctrlKey: true });
+    await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
+    view.destroy();
+  });
+
+  // CodeMirror's own mouse-selection handling also calls preventDefault on a
+  // mousedown it receives, so the negative cases call the handler directly to
+  // see exactly what this extension does.
+  function runHandler(view: EditorView, init: MouseEventInit) {
+    const event = new MouseEvent("mousedown", { cancelable: true, ...init });
+    const handled = handleLinkMousedown(event, view);
+    return { handled, prevented: event.defaultPrevented };
+  }
+
+  it("does not open anything on a plain click", async () => {
+    const view = mountLink(doc, onLinkText);
+    expect(runHandler(view, {})).toEqual({ handled: false, prevented: false });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(openUrl).not.toHaveBeenCalled();
+    view.destroy();
+  });
+
+  it("does not open anything on Cmd+click outside a link or on a relative link", async () => {
+    const outside = mountLink(doc, 1);
+    expect(runHandler(outside, { metaKey: true })).toEqual({ handled: false, prevented: false });
+    outside.destroy();
+    const relative = "see [notes](./notes.md) here\n";
+    const rel = mountLink(relative, relative.indexOf("notes"));
+    expect(runHandler(rel, { metaKey: true })).toEqual({ handled: false, prevented: false });
+    rel.destroy();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(openUrl).not.toHaveBeenCalled();
   });
 });
