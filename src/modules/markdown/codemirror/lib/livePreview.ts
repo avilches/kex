@@ -149,6 +149,9 @@ function planLink(
     }
     child = child.nextSibling;
   }
+  // Lezer emits a Link node for any bracketed text, destination or not
+  // (`[TODO]`, Kex's own `[[Wiki Link]]`); without a URL it is not a link.
+  if (!chrome.some((c) => c.type.name === "URL")) return;
   if (!active) {
     for (const c of chrome) hides.push({ from: c.from, to: c.to });
   }

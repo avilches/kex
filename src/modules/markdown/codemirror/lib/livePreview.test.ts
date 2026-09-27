@@ -78,6 +78,14 @@ describe("planLivePreview", () => {
     expect(result.marks).toContainEqual({ from: 5, to: 13, className: "cm-lp-link-text" });
   });
 
+  it("leaves bracketed text with no destination completely undecorated", () => {
+    for (const text of ["see [TODO] here\n", "see [[My Note]] here\n"]) {
+      const result = plan(text);
+      expect(result.marks).toEqual([]);
+      expect(result.hides).toEqual([]);
+    }
+  });
+
   it("styles a bullet marker but never hides it, active or not", () => {
     const text = "- one\n- two\n";
     const result = plan(text);
@@ -93,6 +101,11 @@ describe("planLivePreview", () => {
     const result = plan(text);
     expect(result.checkboxes).toContainEqual({ from: 2, to: 5, checked: false });
     expect(result.checkboxes).toContainEqual({ from: 13, to: 16, checked: true });
+  });
+
+  it("emits a checkbox spec for a task item at the very end of the document", () => {
+    const result = plan("- [ ] todo");
+    expect(result.checkboxes).toEqual([{ from: 2, to: 5, checked: false }]);
   });
 
   it("keeps checkbox decorations even on the active line", () => {
