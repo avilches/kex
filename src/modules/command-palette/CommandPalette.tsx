@@ -12,8 +12,7 @@ import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  getBindingTokens,
-  SHORTCUTS_BY_ID,
+  getShortcutLabel,
   type KeyBinding,
   type ShortcutId,
 } from "@/modules/shortcuts";
@@ -530,9 +529,5 @@ function formatShortcut(
   shortcutId: ShortcutId | undefined,
   userShortcuts: Record<ShortcutId, KeyBinding[]>,
 ): string | null {
-  if (!shortcutId) return null;
-  const shortcut = SHORTCUTS_BY_ID.get(shortcutId);
-  const bindings = userShortcuts[shortcutId] ?? shortcut?.defaultBindings;
-  const tokens = getBindingTokens(bindings?.[0]);
-  return tokens.length ? tokens.join(" ") : null;
+  return shortcutId ? getShortcutLabel(shortcutId, userShortcuts) : null;
 }
