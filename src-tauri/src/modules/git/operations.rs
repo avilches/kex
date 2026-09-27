@@ -1019,7 +1019,16 @@ pub fn checkout_branch(
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
 
-    if branch.is_empty() || branch.len() > 255 || branch.contains('\0') || branch.contains('\n') {
+    // A name starting with '-' would be read as a flag rather than a branch
+    // name once it reaches the plain "git checkout <branch>" path below (e.g.
+    // "--orphan=x" silently creates an unrelated orphan branch, "--detach"
+    // detaches HEAD): reject it before it ever reaches a git command line.
+    if branch.is_empty()
+        || branch.len() > 255
+        || branch.contains('\0')
+        || branch.contains('\n')
+        || branch.starts_with('-')
+    {
         return Err(GitError::command("git checkout", "invalid branch name"));
     }
 
@@ -1067,7 +1076,14 @@ pub fn create_branch(
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
 
-    if name.is_empty() || name.len() > 255 || name.contains('\0') || name.contains('\n') {
+    // See the matching check in checkout_branch: a name starting with '-'
+    // must never reach a git command line as a bare positional argument.
+    if name.is_empty()
+        || name.len() > 255
+        || name.contains('\0')
+        || name.contains('\n')
+        || name.starts_with('-')
+    {
         return Err(GitError::command("git checkout", "invalid branch name"));
     }
 
@@ -1866,6 +1882,49 @@ mod tests {
         let root = dir.path().to_string_lossy().into_owned();
         let result = super::checkout_branch(&registry, &root, "", &WorkspaceEnv::Local);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn checkout_branch_rejects_names_starting_with_dash() {
+        // Without this check, git reinterprets a flag-shaped positional
+        // argument on the plain "checkout <branch>" path: "--orphan=x"
+        // silently creates an unrelated orphan branch called "x" instead of
+        // failing, and "--detach" detaches HEAD instead of switching
+        // branches. Both must be rejected before reaching git at all.
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+        let root = dir.path().to_string_lossy().into_owned();
+
+        for flag_like in ["--orphan=x", "--detach", "-b"] {
+            let result = super::checkout_branch(&registry, &root, flag_like, &WorkspaceEnv::Local);
+            assert!(result.is_err(), "expected rejection for {flag_like:?}");
+        }
+
+        let branches = Cmd::new("git")
+            .args(["branch", "--list"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        let list = String::from_utf8_lossy(&branches.stdout);
+        assert!(!list.contains('x'), "orphan branch must not have been created, got: {list}");
+    }
+
+    #[test]
+    fn create_branch_rejects_names_starting_with_dash() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+        let root = dir.path().to_string_lossy().into_owned();
+
+        for flag_like in ["--orphan=x", "--detach"] {
+            let result = super::create_branch(&registry, &root, flag_like, &WorkspaceEnv::Local);
+            assert!(result.is_err(), "expected rejection for {flag_like:?}");
+        }
     }
 
     #[test]
