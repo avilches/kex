@@ -59,8 +59,12 @@ describe("pathBasename", () => {
     expect(pathBasename("C:/", { tolerateTrailingSlash: true })).toBe("C:");
   });
 
-  it("falls back to the raw input when nothing remains after tolerating separators", () => {
+  it("falls back to the normalized path when nothing remains after tolerating separators", () => {
     expect(pathBasename("/", { tolerateTrailingSlash: true })).toBe("/");
+  });
+
+  it("falls back to the normalized (not raw) path for a lone backslash", () => {
+    expect(pathBasename("\\", { tolerateTrailingSlash: true })).toBe("/");
   });
 });
 

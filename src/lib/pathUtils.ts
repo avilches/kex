@@ -16,7 +16,7 @@ export function pathBasename(
   const p = normalizeSeparators(path);
   if (opts?.tolerateTrailingSlash) {
     const parts = p.split("/").filter(Boolean);
-    return parts.length > 0 ? parts[parts.length - 1] : path;
+    return parts.length > 0 ? parts[parts.length - 1] : p;
   }
   const i = p.lastIndexOf("/");
   return i >= 0 ? p.slice(i + 1) : p;
