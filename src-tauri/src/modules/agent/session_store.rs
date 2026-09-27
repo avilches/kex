@@ -14,6 +14,15 @@ fn pending_cmds() -> &'static Mutex<HashMap<String, String>> {
     PENDING_CMDS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+// Serializes the read-parse-mutate-serialize-write-rename cycle on agent-sessions.json
+// across remove_panel_from_store, record_session and detach_session, which can run
+// concurrently from the PTY reader thread and the IPC socket listener thread.
+static STORE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn store_lock() -> &'static Mutex<()> {
+    STORE_LOCK.get_or_init(|| Mutex::new(()))
+}
+
 /// Called by the PTY reader when OSC 133;C fires for an agent command.
 /// The stashed string is consumed by the next `record_session` call for this tab.
 pub fn stash_cmd(tab_id: &str, cmd: String) {
@@ -291,6 +300,7 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
 }
 
 fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
+    let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
     let Ok(content) = std::fs::read_to_string(path) else { return };
     let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return };
     store.tabs.remove(tab_id);
@@ -332,6 +342,7 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
         launch_cmd,
         updated_at: now,
     };
+    let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
     let mut store = if path.exists() {
         std::fs::read_to_string(&path)
             .ok()
@@ -356,6 +367,7 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
 /// Called when the agent exits (exited signal) or the user detaches manually.
 pub fn detach_session(tab_id: &str) -> Result<(), String> {
     log::info!("[agent-session] detach tab={tab_id}");
+    let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
     if let Some(path) = store_path() {
         if let Ok(content) = std::fs::read_to_string(&path) {
             if let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) {
@@ -583,5 +595,35 @@ mod tests {
     fn load_restore_plan_returns_empty_when_no_file() {
         let plans = load_restore_plan();
         let _ = plans;
+    }
+
+    #[test]
+    fn concurrent_record_session_calls_do_not_lose_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        init(dir.path().to_path_buf());
+
+        let handles: Vec<_> = (0..20)
+            .map(|i| {
+                std::thread::spawn(move || {
+                    record_session(
+                        &format!("tab-{i}"),
+                        "claude",
+                        &format!("session-{i}"),
+                        &format!("/tmp/transcript-{i}.jsonl"),
+                        "/tmp/project",
+                    );
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+
+        let content = std::fs::read_to_string(dir.path().join("agent-sessions.json")).unwrap();
+        let store: SessionStore = serde_json::from_str(&content).unwrap();
+        assert_eq!(store.tabs.len(), 20);
+        for i in 0..20 {
+            assert!(store.tabs.contains_key(&format!("tab-{i}")));
+        }
     }
 }
