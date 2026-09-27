@@ -1023,8 +1023,22 @@ pub fn checkout_branch(
         return Err(GitError::command("git checkout", "invalid branch name"));
     }
 
-    let output = if let Some(slash_pos) = branch.find('/') {
-        let local_name = &branch[slash_pos + 1..];
+    // A slash in the name is not proof the branch is remote: a local branch
+    // can itself be named "feature/login". Ask git directly whether a local
+    // ref with this exact name already exists instead of guessing from the
+    // string shape, otherwise a local branch with a slash gets a duplicate
+    // "-b <suffix> --track <name>" checkout instead of a plain switch.
+    let has_local_ref = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")],
+        DEFAULT_TIMEOUT_SECS,
+    )?
+    .exit_code
+        == Some(0);
+
+    let output = if !has_local_ref && branch.contains('/') {
+        let local_name = &branch[branch.find('/').unwrap() + 1..];
         let args: Vec<&str> = vec!["checkout", "-b", local_name, "--track", branch];
         run_git(
             &repo_root.workspace,
@@ -1751,6 +1765,94 @@ mod tests {
             .unwrap();
         let head = String::from_utf8_lossy(&out.stdout).trim().to_string();
         assert_eq!(head, "other");
+    }
+
+    #[test]
+    fn checkout_branch_with_slash_in_local_name_switches_without_duplicating() {
+        // A local branch can itself contain a slash (e.g. "feature/login").
+        // The old branch.find('/') heuristic treated any slash as a remote
+        // prefix and ran "checkout -b login --track feature/login", creating
+        // a spurious "login" branch instead of switching to "feature/login".
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+        Cmd::new("git")
+            .args(["checkout", "-b", "feature/login"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["checkout", "main"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        super::checkout_branch(&registry, &root, "feature/login", &WorkspaceEnv::Local).unwrap();
+
+        let out = Cmd::new("git")
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        let head = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        assert_eq!(head, "feature/login");
+
+        let branches = Cmd::new("git")
+            .args(["branch", "--list"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        let list = String::from_utf8_lossy(&branches.stdout);
+        let names: Vec<&str> = list.lines().map(|l| l.trim_start_matches('*').trim()).collect();
+        assert!(!names.contains(&"login"), "should not have created a spurious 'login' branch, got: {list}");
+    }
+
+    #[test]
+    fn checkout_branch_creates_tracking_branch_for_remote_ref() {
+        let remote_dir = tempfile::tempdir().unwrap();
+        Cmd::new("git").args(["init", "--bare"]).current_dir(remote_dir.path()).status().unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+        Cmd::new("git")
+            .args(["remote", "add", "origin", &remote_dir.path().to_string_lossy()])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+        Cmd::new("git")
+            .args(["checkout", "-b", "other"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+        Cmd::new("git").args(["push", "origin", "other"]).current_dir(dir.path()).status().unwrap();
+        Cmd::new("git").args(["checkout", "main"]).current_dir(dir.path()).status().unwrap();
+        Cmd::new("git").args(["branch", "-D", "other"]).current_dir(dir.path()).status().unwrap();
+        Cmd::new("git").args(["fetch", "origin"]).current_dir(dir.path()).status().unwrap();
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+
+        let root = dir.path().to_string_lossy().into_owned();
+        super::checkout_branch(&registry, &root, "origin/other", &WorkspaceEnv::Local).unwrap();
+
+        let out = Cmd::new("git")
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        let head = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        assert_eq!(head, "other");
+
+        let upstream = Cmd::new("git")
+            .args(["rev-parse", "--abbrev-ref", "other@{upstream}"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        let upstream_name = String::from_utf8_lossy(&upstream.stdout).trim().to_string();
+        assert_eq!(upstream_name, "origin/other");
     }
 
     #[test]
