@@ -17,6 +17,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -32,6 +33,8 @@ import { useBellStore } from "../store/bellStore";
 type Props = {
   onActivate: (workspaceId: string, tabId: string) => void;
 };
+
+const RELATIVE_TIME_TICK_MS = 30_000;
 
 function relativeTime(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -97,6 +100,16 @@ export function NotificationBell({ onActivate }: Props) {
     subscribeOscTitles,
     getOscTitlesSnapshot,
   );
+
+  // relativeTime() is only recomputed on render; without this, "3m ago" stays
+  // frozen while the user is looking straight at an open popover with no
+  // other store change to trigger a re-render.
+  const [, forceRelativeTimeTick] = useReducer((c: number) => c + 1, 0);
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(forceRelativeTimeTick, RELATIVE_TIME_TICK_MS);
+    return () => clearInterval(id);
+  }, [open]);
 
   const entries = useMemo(
     () => buildAgentEntries(sessions, notifications),
