@@ -1,26 +1,7 @@
-type Snapshot = { tabId: string | null; seq: number };
+import { createFlashStore } from "./createFlashStore";
 
-let tabId: string | null = null;
-let seq = 0;
-let snapshot: Snapshot = { tabId, seq };
-const listeners = new Set<() => void>();
+const store = createFlashStore();
 
-function notify(): void {
-  snapshot = { tabId, seq };
-  for (const l of listeners) l();
-}
-
-export function flashLockIcon(id: string): void {
-  tabId = id;
-  seq++;
-  notify();
-}
-
-export function subscribeLockFlash(l: () => void): () => void {
-  listeners.add(l);
-  return () => listeners.delete(l);
-}
-
-export function getLockFlashSnapshot(): Snapshot {
-  return snapshot;
-}
+export const flashLockIcon = store.flash;
+export const subscribeLockFlash = store.subscribe;
+export const getLockFlashSnapshot = store.getSnapshot;

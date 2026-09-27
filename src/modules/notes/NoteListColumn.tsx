@@ -96,7 +96,10 @@ export function NoteListColumn(props: NoteListColumnProps) {
     const to = rels.indexOf(String(over.id));
     if (from === -1 || to === -1) return;
     rels.splice(to, 0, ...rels.splice(from, 1));
-    props.onSetFolderOrder(config.selectedFolder, rels.map(pathBasename));
+    props.onSetFolderOrder(
+      config.selectedFolder,
+      rels.map((rel) => pathBasename(rel)),
+    );
   };
 
   const renderRow = (note: NoteItem) => (

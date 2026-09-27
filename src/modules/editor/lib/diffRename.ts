@@ -1,3 +1,5 @@
+import { pathJoin } from "@/lib/pathUtils";
+
 export function diffRenameLabel(
   path: string,
   originalPath: string | null,
@@ -6,11 +8,4 @@ export function diffRenameLabel(
   return originalPath.split(/[\\/]/).pop() ?? originalPath;
 }
 
-export function joinRepoPath(repoRoot: string, relPath: string): string {
-  const parts = [
-    ...repoRoot.split(/[\\/]/),
-    ...relPath.split(/[\\/]/),
-  ].filter(Boolean);
-  const leadingSlash = /^[\\/]/.test(repoRoot) ? "/" : "";
-  return leadingSlash + parts.join("/");
-}
+export const joinRepoPath = pathJoin;

@@ -1,3 +1,4 @@
+import { normalizeError } from "@/lib/errors";
 import {
   native,
   type GitRepoInfo,
@@ -80,15 +81,6 @@ type SourceControlSummaryState = {
   busyAction: SourceControlRemoteAction | null;
   lastRemoteError: string | null;
 };
-
-function normalizeError(error: unknown): string {
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  return "Unknown source control error";
-}
 
 function getContextualAction(
   status: GitStatusSnapshot | null,
@@ -337,7 +329,7 @@ export function useSourceControl(
             status = await native.gitStatus(repo.repoRoot);
             if (requestId !== requestIdRef.current) return;
           } catch (error) {
-            nextRemoteError = normalizeError(error);
+            nextRemoteError = normalizeError(error, "Unknown source control error");
           }
         }
 
@@ -360,7 +352,7 @@ export function useSourceControl(
           hasRepo: false,
           status: null,
           isLoading: false,
-          localError: normalizeError(error),
+          localError: normalizeError(error, "Unknown source control error"),
         }));
       } finally {
         lastRefreshAtRef.current = Date.now();
@@ -464,7 +456,7 @@ export function useSourceControl(
         await refresh({ remote: "never" });
         return { ok: true, action };
       } catch (error) {
-        const message = normalizeError(error);
+        const message = normalizeError(error, "Unknown source control error");
         setState((current) => ({ ...current, lastRemoteError: message }));
         await refresh({ remote: "never" }).catch(() => {});
         return { ok: false, action, error: message };

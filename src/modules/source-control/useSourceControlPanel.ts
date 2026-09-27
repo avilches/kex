@@ -1,3 +1,4 @@
+import { normalizeError } from "@/lib/errors";
 import {
   native,
   type GitBranchInfo,
@@ -102,15 +103,6 @@ type SourceControlPanelState = {
   push: () => Promise<void>;
   commitAndPush: () => Promise<void>;
 };
-
-function normalizeError(error: unknown): string {
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  return "Unknown source control error";
-}
 
 function normalizeStatusCode(status: string): string {
   const code = status.trim().toUpperCase();
@@ -478,7 +470,7 @@ export function useSourceControlPanel(
         setActionMessage(`Switched to ${localName}`);
         await summary.refresh({ remote: "never" });
       } catch (error) {
-        setActionError(normalizeError(error));
+        setActionError(normalizeError(error, "Unknown source control error"));
         throw error;
       } finally {
         setLocalActionBusy(null);
@@ -498,7 +490,7 @@ export function useSourceControlPanel(
         setActionMessage(`Created and switched to ${name}`);
         await summary.refresh({ remote: "never" });
       } catch (error) {
-        setActionError(normalizeError(error));
+        setActionError(normalizeError(error, "Unknown source control error"));
         throw error;
       } finally {
         setLocalActionBusy(null);
@@ -520,7 +512,7 @@ export function useSourceControlPanel(
         setSelectedRemote(name);
         setActionMessage(`Remote "${name}" added`);
       } catch (error) {
-        setActionError(normalizeError(error));
+        setActionError(normalizeError(error, "Unknown source control error"));
         throw error;
       } finally {
         setLocalActionBusy(null);
@@ -696,7 +688,7 @@ export function useSourceControlPanel(
         await ipc();
         scheduleReconcile();
       } catch (error) {
-        setActionError(normalizeError(error));
+        setActionError(normalizeError(error, "Unknown source control error"));
         cancelReconcile();
         await summary.refresh({ remote: "never" }).catch(() => {});
       } finally {
@@ -861,7 +853,7 @@ export function useSourceControlPanel(
       invalidateRepoDiffs(repo.repoRoot);
       await summary.refresh({ remote: "never" });
     } catch (error) {
-      setActionError(normalizeError(error));
+      setActionError(normalizeError(error, "Unknown source control error"));
     } finally {
       setLocalActionBusy(null);
     }
@@ -904,7 +896,7 @@ export function useSourceControlPanel(
         setActionError(pushResult.error);
       }
     } catch (error) {
-      setActionError(normalizeError(error));
+      setActionError(normalizeError(error, "Unknown source control error"));
       setLocalActionBusy(null);
     }
   }, [commitMessage, repo, summary, setCommitMessage, flushCommitMessage]);

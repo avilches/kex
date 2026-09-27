@@ -23,6 +23,32 @@ function normalizeStatusCode(status: string): GitStatusCode {
   }
 }
 
+export type GitStatusCategory = "added" | "modified" | "deleted" | "renamed" | "untracked";
+
+// Single classification shared by every status-to-color/class mapping in the app
+// (gitStatusHexColor, statusTextClass, statusTone): renamed and copied share a
+// category, as do untracked and the raw "?" git emits for it. Returns null for
+// any code outside this set so each presentational mapping keeps its own
+// fallback instead of silently defaulting to "modified".
+export function gitStatusCategory(code: string): GitStatusCategory | null {
+  switch (code.trim().toUpperCase()) {
+    case "A":
+      return "added";
+    case "M":
+      return "modified";
+    case "D":
+      return "deleted";
+    case "R":
+    case "C":
+      return "renamed";
+    case "U":
+    case "?":
+      return "untracked";
+    default:
+      return null;
+  }
+}
+
 export function statusCodeForFile(file: GitChangedFile): GitStatusCode {
   if (file.untracked) return "U";
   if (file.indexStatus === "U" || file.worktreeStatus === "U") return "U";

@@ -25,7 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { pathBasename } from "@/lib/pathUtils";
+import { pathBasename, splitPath } from "@/lib/pathUtils";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
@@ -39,7 +39,11 @@ import {
 } from "@/modules/explorer/lib/menuItemClass";
 import { joinPath } from "@/modules/explorer/lib/useFileTree";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
-import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
+import {
+  gitStatusCategory,
+  type GitStatusCategory,
+  type GitStatusCode,
+} from "@/modules/explorer/lib/gitStatusUtils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setScmViewMode } from "@/modules/settings/store";
 import {
@@ -167,18 +171,6 @@ function isEntryRow(row: RowDescriptor): row is EntryRowDescriptor {
   );
 }
 
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
-}
-
-function dirname(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index <= 0) return "";
-  return normalized.slice(0, index);
-}
-
 function entriesUnderFolder(
   fullPath: string,
   entries: SourceControlEntry[],
@@ -191,15 +183,17 @@ function entriesUnderFolder(
 }
 
 
+const STATUS_TEXT_CLASS_BY_CATEGORY: Record<GitStatusCategory, string> = {
+  added: "text-emerald-500/85",
+  untracked: "text-teal-500/85",
+  modified: "text-amber-500/85",
+  deleted: "text-rose-500/85",
+  renamed: "text-sky-500/85",
+};
+
 function statusTextClass(code: string): string {
-  switch (code) {
-    case "A": return "text-emerald-500/85";
-    case "U": return "text-teal-500/85";
-    case "M": return "text-amber-500/85";
-    case "D": return "text-rose-500/85";
-    case "R": return "text-sky-500/85";
-    default: return "text-muted-foreground/60";
-  }
+  const category = gitStatusCategory(code);
+  return category ? STATUS_TEXT_CLASS_BY_CATEGORY[category] : "text-muted-foreground/60";
 }
 
 
@@ -1349,9 +1343,9 @@ export const SourceControlPanel = memo(
                   `All ${scm.pendingDiscard.count} unstaged changes will be discarded. This can't be undone.`
                 )
               ) : scm.pendingDiscard?.untracked ? (
-                `"${basename(scm.pendingDiscard.label)}" is not tracked by git. It will be removed from disk. This can't be undone.`
+                `"${pathBasename(scm.pendingDiscard.label)}" is not tracked by git. It will be removed from disk. This can't be undone.`
               ) : scm.pendingDiscard ? (
-                `Your edits to "${basename(scm.pendingDiscard.label)}" will be lost. This can't be undone.`
+                `Your edits to "${pathBasename(scm.pendingDiscard.label)}" will be lost. This can't be undone.`
               ) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1684,12 +1678,12 @@ const EntryRow = memo(function EntryRow({
   const showDirname = row.kind !== "tree-file";
   const isSelected =
     selected?.path === entry.path && selected?.mode === entry.mode;
-  const fileName = basename(entry.path);
+  const [entryDir, fileName] = splitPath(entry.path);
   const iconUrl = fileIconUrl(fileName);
   const pathLabel = entry.originalPath
     ? `${entry.originalPath} → ${entry.path}`
     : showDirname
-      ? dirname(entry.path)
+      ? entryDir
       : null;
   const isStageBusy = actionBusy === `stage:${entry.path}`;
   const isUnstageBusy = actionBusy === `unstage:${entry.path}`;
