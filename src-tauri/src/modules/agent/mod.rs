@@ -21,7 +21,6 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v5";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
-// Each invocation also appends the full payload to /tmp/kex-hook-<EVENT>.log for field discovery.
 //
 // Known extra fields per event:
 //   SessionStart:       [5]=source (startup|resume|clear|compact), [6]=sessionTitle
@@ -31,7 +30,7 @@ const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v5";
 //   StopFailure:        [5]=error_type, [6]=error_message
 //   SessionEnd:         [5]=end_reason
 //   PermissionRequest:  [5]=tool_name
-//   MessageDisplay:     TBD (see /tmp/kex-hook-MessageDisplay.log)
+//   MessageDisplay:     TBD
 const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 
 // All 8 events handled by trigger-event.sh in v5.

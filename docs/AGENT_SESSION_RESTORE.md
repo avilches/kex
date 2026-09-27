@@ -46,14 +46,15 @@ hook events the same way:
 
 1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
    managed by Kex).
-2. Reads the full JSON payload from stdin and extracts `hook_event_name` via `jq`, only to pick the handler and to
-   log it. `jq` is not used to build anything downstream.
-3. Appends the full payload to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` (uncapped, for field
-   discovery; see TASK-734).
-4. Forwards the JSON payload byte for byte, unmodified, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
+2. Reads the full JSON payload from stdin and extracts `hook_event_name` via `jq`, only to pick the handler.
+   `jq` is not used to build anything downstream. The script no longer writes the payload to disk: an earlier
+   version dumped it unbounded to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` for field discovery,
+   which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew
+   without rotation (TASK-557); removed with no replacement since nothing depended on it.
+3. Forwards the JSON payload byte for byte, unmodified, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
    falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, or
    `KEX_IPC` is unset, the event is silently dropped (`|| true`); there is no retry or spool (TASK-730).
-5. `pty/ipc.rs::run_listener`, one thread per PTY listening on `$TMPDIR/kex-ipc-<pty_id>.sock`, reads the JSON
+4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `$TMPDIR/kex-ipc-<pty_id>.sock`, reads the JSON
    directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
    `kex:agent-session-meta`; for every other event (`UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`,
    `SessionEnd`, `PermissionRequest`, `MessageDisplay`) it emits `kex:agent-signal` directly with a `kind` matching
