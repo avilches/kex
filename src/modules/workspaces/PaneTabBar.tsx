@@ -499,17 +499,20 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const shortcutLabels: Record<string, string | null> = {
-    "tab.close":       getShortcutLabel("tab.close",       userShortcuts),
-    "tab.new":         getShortcutLabel("tab.new",         userShortcuts),
-    "pane.splitRight": getShortcutLabel("pane.splitRight", userShortcuts),
-    "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
-    "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
-    "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
-    "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
-    "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
-    "tab.toggleAutofocus": getShortcutLabel("tab.toggleAutofocus", userShortcuts),
-  };
+  const shortcutLabels: Record<string, string | null> = useMemo(
+    () => ({
+      "tab.close":       getShortcutLabel("tab.close",       userShortcuts),
+      "tab.new":         getShortcutLabel("tab.new",         userShortcuts),
+      "pane.splitRight": getShortcutLabel("pane.splitRight", userShortcuts),
+      "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
+      "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
+      "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
+      "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
+      "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
+      "tab.toggleAutofocus": getShortcutLabel("tab.toggleAutofocus", userShortcuts),
+    }),
+    [userShortcuts],
+  );
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
