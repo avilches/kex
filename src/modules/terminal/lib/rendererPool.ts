@@ -387,6 +387,20 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
   slot.currentLeafId = p.leafId;
   slot.lastUsedAt = performance.now();
 
+  // Restore per-leaf terminal state a previous occupant may have mutated
+  // directly (never through applyX broadcasts, so it survives past that
+  // leaf's own detach/dispose): block mode disables the helper textarea at
+  // the prompt (applyBlockMode) and BlockDecorations hides the inactive
+  // cursor for the whole terminal instance. Neither is undone when a blocks
+  // tab closes, so an unreset slot recycled into a plain terminal would
+  // start with a keyboard-dead textarea or the wrong cursor style.
+  if (slot.term.textarea) slot.term.textarea.disabled = false;
+  const cursorInactiveStyle =
+    usePreferencesStore.getState().terminalCursorInactiveStyle;
+  if (slot.term.options.cursorInactiveStyle !== cursorInactiveStyle) {
+    slot.term.options.cursorInactiveStyle = cursorInactiveStyle;
+  }
+
   cancelPendingUnhide(slot);
   cancelWebglReap(slot);
   cancelSlotReap(slot);
