@@ -25,7 +25,8 @@
     "analyze:eager": "node scripts/eager-graph.mjs src/main.tsx && node scripts/eager-graph.mjs src/settings/main.tsx",
     "size": "size-limit",
     "knip": "knip",
-    "bump-version": "node scripts/bump-version.mjs"
+    "bump-version": "node scripts/bump-version.mjs",
+    "build:local": "bash scripts/build-local-app.sh"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

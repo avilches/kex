@@ -43,6 +43,10 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 
 **Gatekeeper:** first launch of an unsigned build requires right-click > Open to bypass the "unidentified developer" warning.
 
+### Fast local install (no signing key, no dmg)
+
+`pnpm build:local` (runs `scripts/build-local-app.sh`, macOS only) builds just the `.app` bundle and installs it straight into `/Applications`, replacing whatever is there. It skips the signing key entirely by disabling updater artifacts for that one build (`tauri build -b app -c '{"bundle":{"createUpdaterArtifacts":false}}'`), and skips the dmg step, so it's a much faster loop for trying a local change than the full production build. It does not quit or relaunch Kex: this script may itself be running inside a Kex terminal tab, so killing the app would kill the shell running it. Quit and reopen Kex yourself once it prints that the copy is done.
+
 ### Version mismatch gotcha
 
 If `pnpm tauri build` fails with "Found version mismatched Tauri packages", the Rust crate and the NPM package for a plugin resolved to different minor versions. Fix: update the NPM package to match the crate version shown in the error, e.g.:
