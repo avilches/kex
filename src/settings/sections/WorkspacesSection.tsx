@@ -192,12 +192,22 @@ export function WorkspacesSection() {
   const warnOnCloseWorkspace = usePreferencesStore((s) => s.warnOnCloseWorkspace);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const stored = usePreferencesStore((s) => s.workspaceStatuses);
+  const hydrated = usePreferencesStore((s) => s.hydrated);
   const [statuses, setStatuses] = useState<WorkspaceStatus[]>(stored);
   const statusesRef = useRef(statuses);
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
+
+  // Preferences hydrate asynchronously, so a mount before hydration finishes
+  // captures DEFAULT_WORKSPACE_STATUSES via the useState initializer above.
+  // Resync once the real value is in, or an edit (or the unmount cleanup
+  // below) would persist the defaults over the user's actual statuses.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stored is read fresh from the store once hydrated flips true, not tracked as its own trigger
+  useEffect(() => {
+    if (hydrated) setStatuses(stored);
+  }, [hydrated]);
 
   useEffect(() => {
     statusesRef.current = statuses;

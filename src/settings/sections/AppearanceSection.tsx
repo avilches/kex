@@ -9,7 +9,7 @@ import {
 } from "@/modules/settings/store";
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
 
@@ -36,10 +36,23 @@ export function AppearanceSection() {
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const uiFont = usePreferencesStore((s) => s.uiFont);
+  const hydrated = usePreferencesStore((s) => s.hydrated);
 
   const isCustom = uiFont !== "" && !UI_FONT_PRESETS.some((p) => p.value === uiFont && p.value !== "__custom__");
   const [showCustomInput, setShowCustomInput] = useState(isCustom);
   const [customValue, setCustomValue] = useState(isCustom ? uiFont : "");
+
+  // Preferences hydrate asynchronously, so a mount before hydration finishes
+  // captures the pre-hydration uiFont ("") via the useState initializers
+  // above. Resync once the real value is in, or a custom font saved earlier
+  // renders as the default preset with no way to see or edit its value.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: isCustom/uiFont are read fresh from the store once hydrated flips true, not tracked as their own trigger
+  useEffect(() => {
+    if (hydrated) {
+      setShowCustomInput(isCustom);
+      setCustomValue(isCustom ? uiFont : "");
+    }
+  }, [hydrated]);
 
   const selectedPreset = isCustom ? "__custom__" : uiFont;
 

@@ -7,6 +7,11 @@ import { listenFsChanged } from "@/modules/explorer/lib/watch";
 import { useWorkspaceEnvStore, workspaceScopeKey } from "@/modules/workspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { canReuseResolvedRepo, isContextSwitching } from "./repoReuse";
+import {
+  mergeRefreshMode,
+  shouldUpgradeInflightRefresh,
+  type SourceControlRefreshMode,
+} from "./refreshMode";
 
 const AUTO_FETCH_THROTTLE_MS = 5 * 60_000;
 const AUTO_FETCH_LRU_LIMIT = 16;
@@ -15,7 +20,7 @@ const FOCUS_REFRESH_MIN_INTERVAL_MS = 1500;
 // path is unchanged (a re-fired effect, not a navigation to a different folder).
 const SC_STATUS_TTL_MS = 2000;
 
-export type SourceControlRefreshMode = "auto" | "always" | "never";
+export type { SourceControlRefreshMode } from "./refreshMode";
 export type SourceControlRemoteAction = "fetch" | "pull" | "push";
 export type SourceControlRemoteActionMode =
   | "contextual"
@@ -174,6 +179,10 @@ export function useSourceControl(
   const requestIdRef = useRef(0);
   const inflightRef = useRef<Promise<void> | null>(null);
   const inflightModeRef = useRef<SourceControlRefreshMode>("never");
+  // A refresh mode queued while another run is in flight and not aggressive
+  // enough to justify a second concurrent run; drained by the in-flight run
+  // itself right before it clears inflightRef. See refresh() below.
+  const pendingModeRef = useRef<SourceControlRefreshMode | null>(null);
   const autoFetchByRepoRef = useRef(new Map<string, number>());
   const enabledRef = useRef(enabled);
   const lastRefreshAtRef = useRef(0);
@@ -360,28 +369,60 @@ export function useSourceControl(
     [contextPath, workspaceKey],
   );
 
+  // Always the latest doRefresh, read by the trailing-rerun drain loop below
+  // so a run queued against an older contextPath/workspaceKey still executes
+  // with the current one once it actually fires. Plain assignment during
+  // render, not an effect: doRefresh only closes over refs plus contextPath/
+  // workspaceKey, so keeping this in sync a render early (before any effect
+  // runs) is safe and matches the "latest ref" pattern already used elsewhere
+  // in this codebase (e.g. RichMarkdownEditor.tsx).
+  const doRefreshRef = useRef(doRefresh);
+  doRefreshRef.current = doRefresh;
+
   const refresh = useCallback(
-    async (options?: { remote?: SourceControlRefreshMode }) => {
+    (options?: { remote?: SourceControlRefreshMode }): Promise<void> => {
       const remoteMode = options?.remote ?? "never";
+
+      const startRun = (mode: SourceControlRefreshMode): Promise<void> => {
+        inflightModeRef.current = mode;
+        const run: Promise<void> = (async () => {
+          await doRefreshRef.current(mode);
+          // Drain any request(s) that queued while this run (or a chain of
+          // trailing runs before it) was executing, so none of them is
+          // silently dropped: a contextPath switch that lands mid-flight
+          // still resolves, and a post stage/unstage reconcile still gets a
+          // status read that postdates the mutation.
+          while (pendingModeRef.current !== null) {
+            const nextMode = pendingModeRef.current;
+            pendingModeRef.current = null;
+            inflightModeRef.current = nextMode;
+            await doRefreshRef.current(nextMode);
+          }
+        })().finally(() => {
+          if (inflightRef.current === run) {
+            inflightRef.current = null;
+            inflightModeRef.current = "never";
+          }
+        });
+        inflightRef.current = run;
+        return run;
+      };
+
       const inflight = inflightRef.current;
       if (inflight) {
-        const cur = inflightModeRef.current;
-        const upgrade =
-          (cur === "never" && remoteMode !== "never") ||
-          (cur === "auto" && remoteMode === "always");
-        if (!upgrade) return inflight;
-      }
-      inflightModeRef.current = remoteMode;
-      const run = doRefresh(remoteMode).finally(() => {
-        if (inflightRef.current === run) {
-          inflightRef.current = null;
-          inflightModeRef.current = "never";
+        if (shouldUpgradeInflightRefresh(inflightModeRef.current, remoteMode)) {
+          return startRun(remoteMode);
         }
-      });
-      inflightRef.current = run;
-      return run;
+        // A run is already in flight and this request isn't aggressive enough
+        // to justify a second concurrent one. Queue it as a trailing rerun
+        // instead of returning the stale in-flight promise and dropping it.
+        pendingModeRef.current = mergeRefreshMode(pendingModeRef.current, remoteMode);
+        return inflight;
+      }
+
+      return startRun(remoteMode);
     },
-    [doRefresh],
+    [],
   );
 
   const runRemoteAction = useCallback(

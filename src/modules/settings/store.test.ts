@@ -13,6 +13,7 @@ import {
   parseCursorStyle,
   parseScmViewMode,
   parseTerminalNewFolderMode,
+  parseThemePref,
   DEFAULT_PREFERENCES,
   PREF_KEY_MAP,
   parseWorkspaceStatuses,
@@ -99,6 +100,24 @@ describe("scmViewMode", () => {
     expect(parseScmViewMode(undefined)).toBe("tree");
     expect(parseScmViewMode(null)).toBe("tree");
     expect(parseScmViewMode(42)).toBe("tree");
+  });
+});
+
+describe("parseThemePref", () => {
+  it("accepts light and dark", () => {
+    expect(parseThemePref("light")).toBe("light");
+    expect(parseThemePref("dark")).toBe("dark");
+  });
+
+  it("falls back to system for anything else, including a colliding editor theme id", () => {
+    expect(parseThemePref("system")).toBe("system");
+    expect(parseThemePref(undefined)).toBe("system");
+    expect(parseThemePref(null)).toBe("system");
+    // Regression guard for TASK-575: settings-editor.json stores its theme
+    // under the same unprefixed "theme" key ("nord", "kanagawa", ...). If the
+    // general and editor stores were ever merged again, that value must not
+    // be accepted as a valid ThemePref.
+    expect(parseThemePref("nord")).toBe("system");
   });
 });
 
