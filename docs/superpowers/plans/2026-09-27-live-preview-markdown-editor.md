@@ -24,7 +24,7 @@ TypeScript, Vitest with `happy-dom`.
 - The saved file is always exactly `state.doc.toString()`. No node in this plan may transform,
   reformat, or reserialize the document; decorations are purely visual.
 - No outline panel, no toolbar, no slash commands, no Rich/Source mode toggle, no integration with
-  `MarkdownRenderPane` (the read-only preview switch) — explicit non-goals of the spec.
+  `MarkdownRenderPane` (the read-only preview switch). These are explicit non-goals of the spec.
 - Frontmatter (a `---`-delimited block at the very start of the file) is never decorated as
   markdown content.
 - Embedded HTML (`HTMLBlock`/`HTMLTag` nodes) never triggers an error or a decoration.
@@ -382,7 +382,7 @@ the installed `@lezer/markdown@1.6.4` parser table: `ATXHeading1`..`ATXHeading6`
 `ListMark`), `Task` (child `TaskMarker`, the literal 3 characters `[ ]` or `[x]`).
 
 **Known v1 gap, explicit:** Setext-style headings (`Title\n=====` or `Title\n-----`, parsed as
-`SetextHeading1`/`SetextHeading2`) are not decorated — only ATX headings (`# Title`) are. This is
+`SetextHeading1`/`SetextHeading2`) are not decorated; only ATX headings (`# Title`) are. This is
 a real gap versus full CommonMark heading support, not an oversight to silently fix mid-task: note
 it in Task 11's `docs/FORK.md` entry. ATX is the style every other engine in this app's note-taking
 workflow produces and the one this evaluation is meant to judge; adding Setext support is a small,
@@ -390,7 +390,7 @@ separable follow-up if the engine proves out.
 
 **Decision on "active line":** only marker *visibility* depends on whether the cursor/selection
 touches that line. The *styling* (bold/italic/heading-size/etc. CSS class) always applies to the
-content span, active line or not — this matches Obsidian, which keeps a line's formatting visible
+content span, active line or not. This matches Obsidian, which keeps a line's formatting visible
 even while its raw syntax is revealed for editing.
 
 **Decision on lists:** the bullet/ordered marker is never hidden (removing `-`/`1.` would make the
@@ -770,7 +770,7 @@ function planLink(
 Run: `pnpm exec vitest run src/modules/markdown/codemirror/lib/livePreview.test.ts`
 Expected: PASS. If a node-name assumption is wrong (e.g. `ListMark`'s parent chain differs from
 expectation), add a one-off debug test that logs `tree.toString()` for the failing input, read the
-printed node names, and correct the constant/lookup above — do not guess a second time.
+printed node names, and correct the constant/lookup above. Do not guess a second time.
 
 - [ ] **Step 5: Commit**
 
@@ -982,11 +982,11 @@ git commit -m "feat(markdown): wire the Live Preview planner into a CodeMirror V
 
 **Context:** `@uiw/react-codemirror`'s `<CodeMirror>` component defaults its own `theme` prop to
 `"light"` when that prop is not explicitly set, which pushes the library's stock light theme into
-the extension list ahead of anything passed via `extensions` — it does not just no-op. `EditorPane`
+the extension list ahead of anything passed via `extensions`, so it does not just no-op. `EditorPane`
 (`src/modules/editor/EditorPane.tsx:549`) avoids this by passing `theme={themeExt}` as the
 component's own `theme` prop, which replaces that default branch instead of adding to it. This
 engine must do the same: `useEditorThemeExt()`'s result is passed as `<CodeMirror>`'s `theme` prop
-in Task 8, not folded into this function's returned extension array — otherwise the app's actual
+in Task 8, not folded into this function's returned extension array, otherwise the app's actual
 color theme would end up layered underneath the library's generic light theme.
 
 **Files:**
