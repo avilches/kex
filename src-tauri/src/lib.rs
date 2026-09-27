@@ -158,6 +158,11 @@ fn get_launch_dir(state: State<'_, LaunchDir>) -> Option<String> {
     state.0.lock().expect("LaunchDir mutex poisoned").take()
 }
 
+#[tauri::command]
+fn get_git_hash() -> &'static str {
+    env!("KEX_GIT_HASH")
+}
+
 fn parse_launch_dir() -> Option<String> {
     for arg in std::env::args().skip(1) {
         if arg.starts_with('-') {
@@ -858,6 +863,7 @@ pub fn run() {
             workspace::workspace_authorize,
             workspace::workspace_current_dir,
             get_launch_dir,
+            get_git_hash,
             confirm_quit,
             cancel_quit,
             enter_windowless_mode,

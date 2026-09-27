@@ -3,6 +3,7 @@ import { useUpdater } from "@/modules/updater";
 import { GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getName, getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { arch, platform } from "@tauri-apps/plugin-os";
 import { useEffect, useState } from "react";
@@ -24,6 +25,7 @@ export function AboutSection() {
   const [version, setVersion] = useState("");
   const [name, setName] = useState("Kex");
   const [build, setBuild] = useState("");
+  const [gitHash, setGitHash] = useState("");
   const { status, check, install } = useUpdater({ autoCheck: false });
   const checking = status.kind === "checking";
   const downloading = status.kind === "downloading";
@@ -54,6 +56,7 @@ export function AboutSection() {
   useEffect(() => {
     void getVersion().then(setVersion);
     void getName().then(setName);
+    void invoke<string>("get_git_hash").then(setGitHash);
     try {
       const p = platform();
       const a = arch();
@@ -87,6 +90,7 @@ export function AboutSection() {
         <dt className="text-muted-foreground">Build</dt>
         <dd className="font-mono text-[11.5px]">
           {build ? `${build} · v${version}` : `v${version}`}
+          {gitHash && gitHash !== "unknown" ? ` (${gitHash})` : ""}
         </dd>
 
         <dt className="text-muted-foreground">Bundle ID</dt>
