@@ -113,6 +113,7 @@ function buildLink(text: string, url: string): HTMLAnchorElement {
   a.className = "cm-lp-link-text";
   a.textContent = text;
   a.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     openExternalUrl(url);
   });
@@ -244,8 +245,10 @@ export function linkUrlAt(state: EditorState, pos: number): string | null {
 }
 
 // Cmd/Ctrl+click opens a link; a plain click only places the cursor, so the
-// link stays editable (Obsidian's live preview behaves the same way).
+// link stays editable (Obsidian's live preview behaves the same way). Only the
+// primary button counts, so a right-click keeps its context menu.
 export function handleLinkMousedown(event: MouseEvent, view: EditorView): boolean {
+  if (event.button !== 0) return false;
   if (!event.metaKey && !event.ctrlKey) return false;
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
   if (pos == null) return false;

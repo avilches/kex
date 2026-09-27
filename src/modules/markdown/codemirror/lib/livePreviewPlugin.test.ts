@@ -157,6 +157,17 @@ describe("table widget", () => {
     expect(view.dom.querySelector("table")).not.toBeNull();
     view.destroy();
   });
+
+  it("does not open a cell link on a right-click", async () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    const link = view.dom.querySelector("table a") as HTMLAnchorElement;
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 2 });
+    link.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(openUrl).not.toHaveBeenCalled();
+    view.destroy();
+  });
 });
 
 describe("linkClickHandler", () => {
@@ -210,6 +221,15 @@ describe("linkClickHandler", () => {
   it("does not open anything on a plain click", async () => {
     const view = mountLink(doc, onLinkText);
     expect(runHandler(view, {})).toEqual({ handled: false, prevented: false });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(openUrl).not.toHaveBeenCalled();
+    view.destroy();
+  });
+
+  it("does not open anything on a right-click with Cmd or Ctrl held", async () => {
+    const view = mountLink(doc, onLinkText);
+    expect(runHandler(view, { metaKey: true, button: 2 })).toEqual({ handled: false, prevented: false });
+    expect(runHandler(view, { ctrlKey: true, button: 2 })).toEqual({ handled: false, prevented: false });
     await new Promise((r) => setTimeout(r, 20));
     expect(openUrl).not.toHaveBeenCalled();
     view.destroy();
