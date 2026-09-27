@@ -7,6 +7,9 @@ import { linkClickHandler, livePreviewPlugin } from "@/modules/markdown/codemirr
 
 // The user's code-syntax theme colors bare URLs arbitrarily; this engine does
 // not decorate them, so they should read as plain text.
+const LP_FOREGROUND_CLASSES = ["heading", "bold", "italic", "strike", "code", "codeblock"];
+const LP_TEXT_COLOR_SELECTORS = LP_FOREGROUND_CLASSES.flatMap((c) => [`.cm-lp-${c}`, `.cm-lp-${c} *`]).join(", ");
+
 export const plainUrlHighlight = HighlightStyle.define([{ tag: tags.url, color: "var(--foreground) !important" }]);
 
 // GFM (tables, task lists, strikethrough) plus subscript/superscript/emoji: the
@@ -19,9 +22,9 @@ export function buildLivePreviewExtensions(): Extension[] {
     livePreviewPlugin,
     linkClickHandler,
     EditorView.lineWrapping,
-    // `color: ... !important` on the lp classes: the user's code-syntax theme
-    // colors the same markdown tokens with an equally specific class, so without
-    // it the winner depends on stylesheet insertion order.
+    // The syntax highlighter nests its own colored span inside each lp span, and
+    // an element's own color always beats an inherited one, so the color rules
+    // also target descendants (`.cm-lp-x *`), with !important to beat the theme.
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
         backgroundColor: "transparent !important",
@@ -34,22 +37,23 @@ export function buildLivePreviewExtensions(): Extension[] {
         lineHeight: "1.6",
       },
       ".cm-content": { caretColor: "var(--foreground)" },
-      ".cm-lp-heading": { fontWeight: "700", color: "var(--foreground) !important" },
+      ".cm-lp-heading": { fontWeight: "700" },
       ".cm-lp-h1": { fontSize: "1.6em" },
       ".cm-lp-h2": { fontSize: "1.4em" },
       ".cm-lp-h3": { fontSize: "1.2em" },
       ".cm-lp-h4, .cm-lp-h5, .cm-lp-h6": { fontSize: "1.05em" },
-      ".cm-lp-bold": { fontWeight: "700", color: "var(--foreground) !important" },
-      ".cm-lp-italic": { fontStyle: "italic", color: "var(--foreground) !important" },
-      ".cm-lp-strike": { textDecoration: "line-through", color: "var(--foreground) !important" },
+      ".cm-lp-bold": { fontWeight: "700" },
+      ".cm-lp-italic": { fontStyle: "italic" },
+      ".cm-lp-strike": { textDecoration: "line-through" },
       ".cm-lp-code": {
         fontFamily: "var(--font-mono, monospace)",
-        color: "var(--foreground) !important",
         backgroundColor: "color-mix(in srgb, var(--foreground) 8%, transparent)",
         borderRadius: "3px",
         padding: "0 3px",
       },
-      ".cm-lp-link-text": { color: "var(--primary, #3b82f6) !important", textDecoration: "underline" },
+      ".cm-lp-link-text": { textDecoration: "underline" },
+      [LP_TEXT_COLOR_SELECTORS]: { color: "var(--foreground) !important" },
+      ".cm-lp-link-text, .cm-lp-link-text *": { color: "var(--primary, #3b82f6) !important" },
       ".cm-lp-bullet": { color: "var(--muted-foreground)" },
       ".cm-lp-checkbox": { marginRight: "4px", cursor: "pointer" },
       ".cm-lp-frontmatter": {
@@ -60,7 +64,6 @@ export function buildLivePreviewExtensions(): Extension[] {
       ".cm-lp-codeblock": {
         display: "inline-block",
         fontFamily: "var(--font-mono, monospace)",
-        color: "var(--foreground) !important",
         backgroundColor: "color-mix(in srgb, var(--foreground) 6%, transparent)",
         borderRadius: "4px",
         padding: "2px 0",
