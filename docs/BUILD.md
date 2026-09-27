@@ -53,6 +53,19 @@ pnpm add @tauri-apps/plugin-dialog@~2.7.0
 
 Check `src-tauri/Cargo.lock` for the actual resolved version of each plugin.
 
+## Releasing a new version
+
+The version is hardcoded in three places that must stay in sync: `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`. `pnpm bump-version <version>` (runs `scripts/bump-version.mjs`) updates all three plus `src-tauri/Cargo.lock`'s own entry for the `kex` package (via `cargo check --offline`, so it never touches dependency resolution), then prints the commit/tag commands. It does not commit, tag or push:
+
+```bash
+pnpm bump-version 0.7.4
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+git commit -m "Bump version to 0.7.4"
+git tag v0.7.4 && git push origin v0.7.4
+```
+
+Pushing the tag triggers `.github/workflows/release.yml` (matches `v*`), which builds all four platform targets with `tauri-action` and publishes the release, including the `latest.json` manifest the auto-updater polls.
+
 ## Bundle chunk strategy (vite.config.ts)
 
 Manual `manualChunks` splits the bundle to keep the initial load fast:
