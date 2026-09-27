@@ -18,8 +18,21 @@ fn main() {
         .map(|hash| hash.trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
     println!("cargo:rustc-env=KEX_GIT_HASH={git_hash}");
+
+    // "HEAD" (detached, e.g. mid-rebase) isn't a branch name worth showing.
+    let git_branch = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|branch| branch.trim().to_string())
+        .filter(|branch| branch != "HEAD")
+        .unwrap_or_else(|| "unknown".to_string());
+    println!("cargo:rustc-env=KEX_GIT_BRANCH={git_branch}");
+
     // The reflog is touched by every commit/checkout/merge, unlike .git/HEAD which
-    // only changes on branch switches. Rebuilds pick up the new hash off that.
+    // only changes on branch switches. Rebuilds pick up the new hash/branch off that.
     println!("cargo:rerun-if-changed=../.git/logs/HEAD");
 
     tauri_build::build()

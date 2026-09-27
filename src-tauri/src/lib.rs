@@ -1,6 +1,7 @@
 pub mod modules;
 
 use modules::{agent, editors, float_browser, fs, git, history, pty, shell, window_state, workspace};
+use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
@@ -158,9 +159,18 @@ fn get_launch_dir(state: State<'_, LaunchDir>) -> Option<String> {
     state.0.lock().expect("LaunchDir mutex poisoned").take()
 }
 
+#[derive(Serialize)]
+struct BuildInfo {
+    hash: &'static str,
+    branch: &'static str,
+}
+
 #[tauri::command]
-fn get_git_hash() -> &'static str {
-    env!("KEX_GIT_HASH")
+fn get_build_info() -> BuildInfo {
+    BuildInfo {
+        hash: env!("KEX_GIT_HASH"),
+        branch: env!("KEX_GIT_BRANCH"),
+    }
 }
 
 fn parse_launch_dir() -> Option<String> {
@@ -863,7 +873,7 @@ pub fn run() {
             workspace::workspace_authorize,
             workspace::workspace_current_dir,
             get_launch_dir,
-            get_git_hash,
+            get_build_info,
             confirm_quit,
             cancel_quit,
             enter_windowless_mode,
