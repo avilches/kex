@@ -6,19 +6,6 @@
 PAYLOAD="$(cat)"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
-# Append full payload to /tmp (does not overwrite).
-# Two files: per-event (all tabs) and per-tab (all events for this tab).
-# Header shows the event and the IPC socket where the payload will be sent.
-log_payload() {
-    local ipc_dest="${KEX_IPC:-(not set)}"
-    local entry
-    entry="$(printf '=== %s  [%s -> %s] ===\n' "$(date)" "$EVENT" "$ipc_dest"
-             printf '%s' "$PAYLOAD" | jq '.'
-             printf '\n')"
-    printf '%s\n' "$entry" >> "/tmp/kex-hook-${EVENT}.log"        2>/dev/null
-    printf '%s\n' "$entry" >> "/tmp/kex-tab-${KEX_TAB_ID}.log" 2>/dev/null
-}
-
 # Send raw payload to KEX_IPC Unix socket.
 # Uses nc -U (BSD/OpenBSD netcat on macOS + most Linux), falls back to python3.
 # Fails silently if KEX_IPC is unset or socket is unavailable.
@@ -38,42 +25,34 @@ finally:
 }
 
 handle_SessionStart() {
-    log_payload
     send_ipc
 }
 
 handle_UserPromptSubmit() {
-    log_payload
     send_ipc
 }
 
 handle_Notification() {
-    log_payload
     send_ipc
 }
 
 handle_Stop() {
-    log_payload
     send_ipc
 }
 
 handle_StopFailure() {
-    log_payload
     send_ipc
 }
 
 handle_SessionEnd() {
-    log_payload
     send_ipc
 }
 
 handle_PermissionRequest() {
-    log_payload
     send_ipc
 }
 
 handle_MessageDisplay() {
-    log_payload
     send_ipc
 }
 
