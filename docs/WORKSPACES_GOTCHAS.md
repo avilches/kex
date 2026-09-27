@@ -692,3 +692,107 @@ distinta si no se mide el propio addon. Medir con `performance.now()` en cada fr
 sospechosa, no solo en la propia, encontro que el coste no estaba ni en nuestro codigo de aparcado
 ni en la perdida del contexto del navegador, sino en un efecto colateral documentado (pero facil de
 pasar por alto) de una libreria de terceros.
+
+---
+
+## Bug 11: crear un segundo grupo del WorkspaceBar borraba el grupo recien creado (RESUELTO)
+
+### Sintoma
+
+Al introducir los grupos de workspace por ventana (TASK-768, sustituyendo el antiguo "status"
+global), crear un grupo nuevo desde "Move to group" -> "New" funcionaba la primera vez: se podia
+escribir el nombre. Pero al crear un SEGUNDO grupo nuevo (sobre un workspace que ya pertenecia a
+otro grupo), el grupo recien creado desaparecia de la barra en cuanto se confirmaba, dejando el
+workspace suelto en la seccion "sin grupo", y ningun intento posterior de "New" volvia a funcionar.
+
+### Pistas falsas descartadas
+
+- Un bug de foco/Popover en `SortableGroupHeader` (el mismo patron que ya usa el rename de
+  workspace, calcado sin cambios de logica): descartado porque el nombre SI llega a escribirse y
+  persistirse (`onRenameGroup` se ejecuta), solo el grupo desaparece despues.
+- Colision de IDs de `newGroupId()`: descartado, 6 bytes de `crypto.getRandomValues` por grupo, sin
+  reutilizacion posible en una sesion.
+- Un problema del `SortableContext` exterior anadido para poder arrastrar cabeceras de grupo:
+  descartado tras revisar que `useSortable` resuelve siempre al `SortableContext` mas cercano, y los
+  items de un grupo siguen anidados en su propio contexto interior, sin tocar el exterior.
+
+### Causa raiz
+
+`handleSetGroup` (en `App.tsx`) leia `workspaces` — el array de React, capturado por el closure del
+`useCallback` — para decidir si el grupo de origen del workspace se habia quedado vacio y debia
+podarse. Pero `setWorkspaceGroup(workspaceId, groupId)` solo *programa* la actualizacion: el array
+`workspaces` que ve el resto de la misma funcion, en el mismo evento sincrono, sigue siendo el de
+ANTES del cambio (React no aplica el nuevo estado hasta el siguiente render). Para un workspace que
+aun no tenia grupo, `prevGroupId` era `null` y una guarda evitaba podar nada — de ahi que la
+PRIMERA creacion funcionara siempre. Pero al mover un workspace YA agrupado a un grupo nuevo,
+`pruneEmptyGroups` se ejecutaba sobre ese array desactualizado: el grupo de origen seguia
+"pareciendo usado" (el workspace aun no habia salido de el, segun ese snapshot) asi que NO se
+podaba, mientras que el grupo nuevo no aparecia usado por nadie (el snapshot no sabe que el
+workspace acaba de entrar en el) asi que SI se podaba, borrando exactamente el grupo que se
+acababa de crear. Reproducido de forma determinista con un script que simula la secuencia exacta de
+`handleCreateGroup` -> `handleSetGroup` -> poda usando solo las funciones puras, sin necesidad de
+arrancar la app.
+
+### Fix
+
+Nueva funcion pura `reconcileGroupsAfterMove(groups, workspacesBeforeMove, workspaceId, nextGroupId)`
+en `workspaceOrder.ts`: en vez de que el llamador intente adivinar o esperar a que `workspaces` ya
+refleje el movimiento, la propia funcion aplica el movimiento sobre la copia que recibe (`.map` puro,
+sin depender de ningun estado de React) y solo despues llama a `pruneEmptyGroups` sobre ese
+resultado. `handleSetGroup` le pasa el `workspaces` capturado tal cual, ANTES de aplicar nada, y la
+funcion se encarga de calcular el "despues" ella misma — asi ya no importa en que momento del ciclo
+de React se lea el closure, porque nunca se confia en que ya se haya actualizado. `handleCommitGroupMove`
+(el que se dispara al soltar un drag) no necesito este mismo tratamiento: para cuando el drag
+termina, los cambios de grupo en vivo (`handlePreviewGroup`, durante el `dragOver`) ya se aplicaron
+en renders previos y separados en el tiempo, asi que ahi `workspaces` si esta al dia.
+
+### Leccion
+
+Cuando un handler necesita decidir algo basandose en "el estado tal y como quedara" justo despues de
+programar un cambio con un setter de React, no leer el estado de React para eso: calcular el
+resultado con una funcion pura que reciba el estado ANTERIOR explicito y aplique el cambio ella
+misma. Cualquier atajo que asuma "total, para cuando se ejecute esta linea ya se habra aplicado" es
+una apuesta sobre el orden de re-render de React, no un hecho garantizado en el mismo evento
+sincrono. El primer intento de una feature que solo se prueba con el caso mas simple (un workspace
+sin grupo previo) puede ocultar durante un rato un bug que solo aparece al repetir la accion sobre
+estado ya no-trivial.
+
+---
+
+## Bug 12: arrastrar la cabecera de un grupo para reordenar hacia un "swap" raro (RESUELTO)
+
+### Sintoma
+
+Arrastrar la cabecera de un grupo del WorkspaceBar para reordenarlo respecto a otro grupo (TASK-768)
+producia un reordenamiento que parecia intercambiar posiciones de forma brusca en vez de deslizar
+los grupos de por medio, sobre todo notorio cuando los grupos involucrados tenian un numero muy
+distinto de workspaces dentro.
+
+### Causa raiz
+
+`useSortable` se llamaba dentro de `SortableGroupHeader`, y su `setNodeRef` solo se aplicaba al
+`<button>` de la cabecera, no al bloque completo del grupo (cabecera + su lista variable de
+workspaces). dnd-kit mide el nodo que recibe `setNodeRef` para calcular, con la estrategia
+`verticalListSortingStrategy`, cuanto debe desplazarse cada elemento durante el arrastre. Al medir
+solo la cabecera (una altura fija y pequeña, igual para todos los grupos) pero reordenar en realidad
+bloques de altura muy distinta (cabecera mas N workspaces), los calculos de desplazamiento no
+correspondian con el tamano real de lo que se movia en el DOM, y el resultado visual parecia un
+intercambio en vez de un deslizamiento proporcional.
+
+### Fix
+
+Patron oficial de dnd-kit para "drag handles": `useSortable` se llama una unica vez en un nuevo
+componente contenedor, `SortableGroupBlock`, cuyo `setNodeRef`/`style` se aplican al `<div>` que
+envuelve la cabecera Y los workspaces del grupo (el bloque completo, con su altura real). Los
+`attributes`/`listeners` que activan el arrastre se pasan hacia abajo como props a
+`SortableGroupHeader`, que los aplica solo a su `<button>`: asi el punto de agarre sigue siendo
+unicamente la cabecera, pero lo que dnd-kit mide y anima es el bloque entero.
+
+### Leccion
+
+En una lista de dnd-kit con elementos de tamano variable, el nodo que recibe `setNodeRef` de
+`useSortable` debe ser el que ocupa el espacio real que se reordena, no un "handle" visual mas
+pequeno dentro de el. Cuando se quiere restringir el arrastre a una zona concreta (un icono, una
+cabecera) sin que el nodo medido sea esa misma zona, hay que separar `setNodeRef` (en el contenedor)
+de `attributes`/`listeners` (en el handle), llamando a `useSortable` una sola vez en el nivel que
+tiene acceso a ambos.

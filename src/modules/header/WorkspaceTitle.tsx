@@ -1,26 +1,25 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
-import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
-import { resolveWorkspaceColor, resolveStatusColor } from "@/modules/workspaces/lib/workspaceColor";
+import type { Tab, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
+import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 
 type Props = {
-  workspace: Pick<Workspace, "id" | "title" | "icon" | "color" | "statusId"> | null;
+  workspace: Pick<Workspace, "id" | "title" | "icon" | "color" | "groupId"> | null;
   tab: Tab | null;
+  groups: WorkspaceGroup[];
 };
 
-export function WorkspaceTitle({ workspace, tab }: Props) {
+export function WorkspaceTitle({ workspace, tab, groups }: Props) {
   const agentTabTitle = useAgentTabTitle(tab);
-  const workspaceStatuses = usePreferencesStore((s) => s.workspaceStatuses);
 
   if (!workspace) return null;
 
   const color = resolveWorkspaceColor(workspace.color, workspace.id);
   const icon = workspace.icon ? getWorkspaceIcon(workspace.icon) : null;
-  const status = workspace.statusId
-    ? (workspaceStatuses.find((s) => s.id === workspace.statusId) ?? null)
+  const group = workspace.groupId
+    ? (groups.find((g) => g.id === workspace.groupId) ?? null)
     : null;
 
   const hasAgent = agentTabTitle?.hasAgent ?? false;
@@ -48,21 +47,11 @@ export function WorkspaceTitle({ workspace, tab }: Props) {
           <span className="truncate text-[13.5px] font-semibold leading-none text-foreground">
             {workspace.title || "Workspace"}
           </span>
-          {status && (() => {
-            const statusColor = resolveStatusColor(status.color, status.id);
-            return (
-              <span
-                className="shrink-0 rounded-md border px-1.5 py-0.5 text-[10.5px] font-medium leading-none"
-                style={{
-                  borderColor: statusColor,
-                  backgroundColor: `${statusColor}26`,
-                  color: statusColor,
-                }}
-              >
-                {status.label}
-              </span>
-            );
-          })()}
+          {group && (
+            <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[10.5px] font-medium leading-none text-muted-foreground">
+              {group.label}
+            </span>
+          )}
         </span>
         {subtitle && (
           <span className="flex min-w-0 items-center gap-1 text-[11px] leading-none text-muted-foreground">

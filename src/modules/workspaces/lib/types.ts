@@ -68,6 +68,8 @@ export type WorkspaceGitConfig = {
   pushOnCommit: boolean;
 };
 
+export type WorkspaceGroup = { id: string; label: string };
+
 export type Workspace = {
   id: string;
   title: string;
@@ -81,7 +83,7 @@ export type Workspace = {
   git?: WorkspaceGitConfig;
   color?: string | null;
   icon?: string;
-  statusId?: string;
+  groupId?: string;
   scripts?: Script[];
   activeScript?: string;
   scriptPaneId?: string;

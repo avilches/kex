@@ -120,13 +120,13 @@ export function applyGitConfig(
   );
 }
 
-export function applyWorkspaceStatus(
+export function applyWorkspaceGroup(
   workspaces: Workspace[],
   workspaceId: string,
-  statusId: string | null | undefined,
+  groupId: string | null | undefined,
 ): Workspace[] {
   return workspaces.map((w) =>
-    w.id === workspaceId ? { ...w, statusId: statusId ?? undefined } : w,
+    w.id === workspaceId ? { ...w, groupId: groupId ?? undefined } : w,
   );
 }
 
@@ -144,8 +144,8 @@ export function tabInsertionIndex(
 }
 
 // A new workspace is inserted right after the active one and inherits its
-// status, so it lands in the same sidebar group (groupWorkspaces filters by
-// status preserving array order, so array adjacency == in-group adjacency).
+// group, so it lands in the same sidebar group (groupWorkspaces filters by
+// group preserving array order, so array adjacency == in-group adjacency).
 export function insertWorkspaceAfterActive(
   workspaces: Workspace[],
   activeWorkspaceId: string,
@@ -154,7 +154,7 @@ export function insertWorkspaceAfterActive(
   const activeIdx = workspaces.findIndex((w) => w.id === activeWorkspaceId);
   if (activeIdx === -1) return [...workspaces, newWorkspace];
   const active = workspaces[activeIdx]!;
-  const placed = active.statusId ? { ...newWorkspace, statusId: active.statusId } : newWorkspace;
+  const placed = active.groupId ? { ...newWorkspace, groupId: active.groupId } : newWorkspace;
   const next = [...workspaces];
   next.splice(activeIdx + 1, 0, placed);
   return next;
@@ -739,8 +739,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const setWorkspaceStatus = useCallback((workspaceId: string, statusId: string | null) => {
-    setWorkspaces((prev) => applyWorkspaceStatus(prev, workspaceId, statusId));
+  const setWorkspaceGroup = useCallback((workspaceId: string, groupId: string | null) => {
+    setWorkspaces((prev) => applyWorkspaceGroup(prev, workspaceId, groupId));
   }, []);
 
   const addScript = useCallback((workspaceId: string, config: Script) => {
@@ -899,7 +899,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceTitle,
     setWorkspaceColor,
     setWorkspaceIcon,
-    setWorkspaceStatus,
+    setWorkspaceGroup,
     addScript,
     updateScript,
     removeScript,

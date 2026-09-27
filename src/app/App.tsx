@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
-import { newTabId } from "@/lib/ids";
+import { newGroupId, newTabId } from "@/lib/ids";
 import { useZoom } from "@/lib/useZoom";
 import { useUiFont } from "@/lib/useUiFont";
 import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
@@ -90,7 +90,7 @@ import {
   useWorkspaces,
   WorkspaceView,
 } from "@/modules/workspaces";
-import type { Script } from "@/modules/workspaces/lib/types";
+import type { Script, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
@@ -98,13 +98,24 @@ import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
 import { isBulkClosable } from "@/modules/workspaces/lib/tabClose";
 import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
-import { visibleWorkspaceOrder } from "@/modules/workspaces/lib/workspaceOrder";
+import {
+  pruneEmptyGroups,
+  reconcileGroupsAfterMove,
+  visibleWorkspaceOrder,
+} from "@/modules/workspaces/lib/workspaceOrder";
 import type { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { IS_MAC } from "@/lib/platform";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
 import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
@@ -125,10 +136,15 @@ import {
   getSavedCollapsedGroups,
   saveCollapsedGroups,
 } from "@/modules/workspaces/lib/collapsedGroupsState";
+import {
+  getSavedGroups,
+  saveGroups,
+} from "@/modules/workspaces/lib/workspaceGroupsState";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
+import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import { useFileRenameStore } from "@/modules/workspaces/lib/fileRenameStore";
 import {
@@ -152,6 +168,7 @@ import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import { isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename } from "@/lib/pathUtils";
+import { arrayMove } from "@dnd-kit/sortable";
 
 function toastSplitBlocked(
   reason: "pane-limit" | "too-narrow" | "too-short",
@@ -210,7 +227,7 @@ export default function App() {
     setWorkspaceTitle,
     setWorkspaceColor,
     setWorkspaceIcon,
-    setWorkspaceStatus,
+    setWorkspaceGroup,
     setWorkspaceGitConfig,
     addScript,
     updateScript,
@@ -290,7 +307,9 @@ export default function App() {
       case "git-history":
         return { path: activeTab.repoRoot, kind: "dir" };
       case "browser":
-        return activeWorkspace?.cwd ? { path: activeWorkspace.cwd, kind: "dir" } : null;
+        return activeWorkspace?.cwd
+          ? { path: activeWorkspace.cwd, kind: "dir" }
+          : null;
       default:
         return null;
     }
@@ -301,7 +320,7 @@ export default function App() {
     activeTab?.kind === "terminal"
       ? (activeTab.cwd ?? null)
       : contextCwdFilePath
-        ? (contextCwdFilePath.split(/[\\/]/).slice(0, -1).join("/") || null)
+        ? contextCwdFilePath.split(/[\\/]/).slice(0, -1).join("/") || null
         : null;
   contextCwdRef.current = contextCwd;
 
@@ -314,19 +333,29 @@ export default function App() {
   const terminalHandles = useRef<Map<string, TerminalPaneHandle>>(new Map());
   const scriptCommandSeen = useRef<Set<string>>(new Set());
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
-  const markdownSaveHandlers = useRef<Map<string, () => Promise<void>>>(new Map());
+  const markdownSaveHandlers = useRef<Map<string, () => Promise<void>>>(
+    new Map(),
+  );
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
-  const closeTabsRef = useRef<(tabIds: string[]) => Promise<boolean>>(() => Promise.resolve(true));
+  const closeTabsRef = useRef<(tabIds: string[]) => Promise<boolean>>(() =>
+    Promise.resolve(true),
+  );
   const browserHandles = useRef<Map<string, BrowserPaneHandle>>(new Map());
   const [activeEditorHandle, setActiveEditorHandle] =
     useState<EditorPaneHandle | null>(null);
   const [gitHistoryHandle, setGitHistoryHandle] =
     useState<GitHistorySearchHandle | null>(null);
   const pendingGotoLine = useRef<Map<string, number>>(new Map());
-  const fileLinkHandlerRef = useRef<(path: string, cwd: string | null, line?: number, col?: number, sourceTabId?: string) => void>(
-    () => {},
-  );
+  const fileLinkHandlerRef = useRef<
+    (
+      path: string,
+      cwd: string | null,
+      line?: number,
+      col?: number,
+      sourceTabId?: string,
+    ) => void
+  >(() => {});
   const cwdResolverRef = useRef<(leafId: string) => string | null>(() => null);
 
   const { zoomIn, zoomOut, zoomReset } = useZoom();
@@ -369,7 +398,7 @@ export default function App() {
       }
       validateScriptTabs(ws.id, livingTabIds);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const restoredRef = useRef(false);
@@ -377,7 +406,7 @@ export default function App() {
     if (restoredRef.current) return;
     restoredRef.current = true;
     void restoreFloatingTabs(workspacesRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Focus the active terminal when the active workspace changes (tab/workspace switch).
@@ -389,7 +418,9 @@ export default function App() {
     prevWorkspaceIdRef.current = activeWorkspaceId;
     if (prevId && prevId !== activeWorkspaceId) {
       const prevWs = workspacesRef.current.find((w) => w.id === prevId);
-      const prevPane = prevWs ? findPane(prevWs.paneTree, prevWs.activePaneId) : null;
+      const prevPane = prevWs
+        ? findPane(prevWs.paneTree, prevWs.activePaneId)
+        : null;
       if (prevPane?.activeTabId) leaveLeafScratchpad(prevPane.activeTabId);
     }
     const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
@@ -471,25 +502,9 @@ export default function App() {
   }, [bellOpen, activeWorkspaceId]);
 
   const init = usePreferencesStore((s) => s.init);
-  const rawWorkspaceStatuses = usePreferencesStore((s) => s.workspaceStatuses);
-  const workspaceStatuses = useMemo(
-    () => rawWorkspaceStatuses.filter((s) => s.label?.trim()),
-    [rawWorkspaceStatuses],
-  );
-  const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
     void init();
   }, [init]);
-
-  useEffect(() => {
-    if (!prefsHydrated) return;
-    const validIds = new Set(workspaceStatuses.map((s) => s.id));
-    for (const w of workspaces) {
-      if (w.statusId && !validIds.has(w.statusId)) {
-        setWorkspaceStatus(w.id, null);
-      }
-    }
-  }, [prefsHydrated]);
 
   useEffect(() => {
     initDuplicateProgressListener();
@@ -500,26 +515,115 @@ export default function App() {
     null,
   );
   const windowLabel = useMemo(() => getCurrentWebviewWindow().label, []);
-  const [workspaceBarWidth, setWorkspaceBarWidth] = useState(getSavedWorkspaceBarWidth);
-  const handleBarWidthChange = useCallback((w: number) => {
-    setWorkspaceBarWidth(w);
-    saveWorkspaceBarWidth(windowLabel, w);
-  }, [windowLabel]);
+  const [workspaceBarWidth, setWorkspaceBarWidth] = useState(
+    getSavedWorkspaceBarWidth,
+  );
+  const handleBarWidthChange = useCallback(
+    (w: number) => {
+      setWorkspaceBarWidth(w);
+      saveWorkspaceBarWidth(windowLabel, w);
+    },
+    [windowLabel],
+  );
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(getSavedCollapsedGroups()),
   );
   const handleToggleGroup = useCallback(
-    (statusId: string) => {
+    (groupId: string) => {
       const next = new Set(collapsedGroups);
-      if (next.has(statusId)) {
-        next.delete(statusId);
+      if (next.has(groupId)) {
+        next.delete(groupId);
       } else {
-        next.add(statusId);
+        next.add(groupId);
       }
       setCollapsedGroups(next);
       saveCollapsedGroups(windowLabel, [...next]);
     },
     [collapsedGroups, windowLabel],
+  );
+  const [groups, setGroups] = useState<WorkspaceGroup[]>(() =>
+    getSavedGroups(),
+  );
+  // Confirmed group change (context menu "Move to group" / "No group" / "New"):
+  // moves the workspace, then reconciles the group list against the move.
+  // reconcileGroupsAfterMove bakes the move into its own computation instead
+  // of trusting `workspaces` state to already reflect it -- that state only
+  // lands on the next render, so reading it here would see the PRE-move
+  // membership and could prune the group the workspace just joined instead
+  // of the one it left (see task-768).
+  const handleSetGroup = useCallback(
+    (workspaceId: string, groupId: string | null) => {
+      setWorkspaceGroup(workspaceId, groupId);
+      setGroups((prev) => {
+        const next = reconcileGroupsAfterMove(
+          prev,
+          workspaces,
+          workspaceId,
+          groupId,
+        );
+        if (next.length === prev.length) return prev;
+        saveGroups(windowLabel, next);
+        return next;
+      });
+    },
+    [workspaces, setWorkspaceGroup, windowLabel],
+  );
+  // Live preview during a workspace drag (dragOver) and its cancel-revert:
+  // changes groupId without reconciling, so a cancelled drag can't lose a
+  // group that only looked empty mid-drag.
+  const handlePreviewGroup = useCallback(
+    (workspaceId: string, groupId: string | null) => {
+      setWorkspaceGroup(workspaceId, groupId);
+    },
+    [setWorkspaceGroup],
+  );
+  // Called once a workspace drag ends (not cancelled): by this point every
+  // groupId change already landed via handlePreviewGroup on earlier renders,
+  // so `workspaces` here is the real, settled membership -- a plain prune
+  // (not reconcileGroupsAfterMove) is correct.
+  const handleCommitGroupMove = useCallback(() => {
+    setGroups((prev) => {
+      const next = pruneEmptyGroups(prev, workspaces);
+      if (next.length === prev.length) return prev;
+      saveGroups(windowLabel, next);
+      return next;
+    });
+  }, [workspaces, windowLabel]);
+  const handleCreateGroup = useCallback(
+    (workspaceId: string): string => {
+      const group: WorkspaceGroup = { id: newGroupId(), label: "Group" };
+      setGroups((prev) => {
+        const withNewGroup = [...prev, group];
+        saveGroups(windowLabel, withNewGroup);
+        return withNewGroup;
+      });
+      handleSetGroup(workspaceId, group.id);
+      return group.id;
+    },
+    [windowLabel, handleSetGroup],
+  );
+  const handleRenameGroup = useCallback(
+    (groupId: string, label: string) => {
+      setGroups((prev) => {
+        const next = prev.map((g) => (g.id === groupId ? { ...g, label } : g));
+        saveGroups(windowLabel, next);
+        return next;
+      });
+    },
+    [windowLabel],
+  );
+  const handleReorderGroups = useCallback(
+    (fromId: string, toId: string) => {
+      setGroups((prev) => {
+        const from = prev.findIndex((g) => g.id === fromId);
+        const to = prev.findIndex((g) => g.id === toId);
+        if (from === -1 || to === -1) return prev;
+        const next = arrayMove(prev, from, to);
+        saveGroups(windowLabel, next);
+        return next;
+      });
+    },
+    [windowLabel],
   );
   const {
     open: sidebarOpen,
@@ -652,8 +756,14 @@ export default function App() {
       }
 
       const freshTabId = newTabId();
-      const tabCwd = config.cwd ?? activeWorkspace.workspaceRoot ?? activeWorkspace.cwd;
-      const tab: Tab = { id: freshTabId, kind: "terminal", cwd: tabCwd, title: config.name || undefined };
+      const tabCwd =
+        config.cwd ?? activeWorkspace.workspaceRoot ?? activeWorkspace.cwd;
+      const tab: Tab = {
+        id: freshTabId,
+        kind: "terminal",
+        cwd: tabCwd,
+        title: config.name || undefined,
+      };
 
       // Case 2: existing script pane -- add tab to it without splitting.
       // openTab only sets the target pane's own activeTabId, it never touches
@@ -676,7 +786,8 @@ export default function App() {
       } else {
         // Case 3: no script pane yet -- split and record the new pane
         const { workspacePaneLimit } = usePreferencesStore.getState();
-        const atLimit = allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit;
+        const atLimit =
+          allPanes(activeWorkspace.paneTree).length >= workspacePaneLimit;
         if (atLimit) {
           // The tab lands in the user's own active pane by definition, so
           // activation follows the script instead of trying to reveal it.
@@ -712,7 +823,18 @@ export default function App() {
       };
       setTimeout(tryWrite, 150);
     },
-    [activeWorkspace, findTabGlobal, setActiveWorkspaceId, activateTab, revealTab, splitPaneAndOpenTab, focusPane, updateScript, openTab, setScriptPaneId],
+    [
+      activeWorkspace,
+      findTabGlobal,
+      setActiveWorkspaceId,
+      activateTab,
+      revealTab,
+      splitPaneAndOpenTab,
+      focusPane,
+      updateScript,
+      openTab,
+      setScriptPaneId,
+    ],
   );
 
   const stopWorkspaceConfig = useCallback(
@@ -748,19 +870,28 @@ export default function App() {
       const handle = terminalHandles.current.get(config.tabId);
       handle?.write("\x03");
     },
-    [activateTab, activeWorkspaceId, findTabGlobal, revealTab, setActiveWorkspaceId],
+    [
+      activateTab,
+      activeWorkspaceId,
+      findTabGlobal,
+      revealTab,
+      setActiveWorkspaceId,
+    ],
   );
 
   const handleCloseWorkspace = useCallback(
     async (wsId: string) => {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
-      const tabIds = ws ? allPanes(ws.paneTree).flatMap((p) => p.tabs.map((t) => t.id)) : [];
+      const tabIds = ws
+        ? allPanes(ws.paneTree).flatMap((p) => p.tabs.map((t) => t.id))
+        : [];
       // closeTabsRef reports whether every tab actually closed (false if a
       // cancel, e.g. "Cancel" on a dirty-editor prompt, stopped the run
       // early); re-reading workspace state here instead would race the
       // re-render those closes trigger, since it isn't guaranteed to have
       // happened yet right after the await.
-      const allClosed = tabIds.length > 0 ? await closeTabsRef.current(tabIds) : true;
+      const allClosed =
+        tabIds.length > 0 ? await closeTabsRef.current(tabIds) : true;
       if (!allClosed) return;
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
       closeWorkspace(wsId);
@@ -772,12 +903,14 @@ export default function App() {
   const handleCloseWorkspaceRef = useRef(handleCloseWorkspace);
   handleCloseWorkspaceRef.current = handleCloseWorkspace;
 
-  const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState<
-    { id: string; scriptCount: number } | null
-  >(null);
-  const [pendingWorkspaceProcesses, setPendingWorkspaceProcesses] = useState<
-    { id: string; processes: { tabId: string; label: string }[] } | null
-  >(null);
+  const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState<{
+    id: string;
+    scriptCount: number;
+  } | null>(null);
+  const [pendingWorkspaceProcesses, setPendingWorkspaceProcesses] = useState<{
+    id: string;
+    processes: { tabId: string; label: string }[];
+  } | null>(null);
 
   const requestCloseWorkspace = useCallback(async (wsId: string) => {
     const prefs = usePreferencesStore.getState();
@@ -794,7 +927,8 @@ export default function App() {
       }
     }
     if (prefs.warnOnCloseWorkspace) {
-      const scriptCount = ws?.scripts?.filter((s) => s.command.trim()).length ?? 0;
+      const scriptCount =
+        ws?.scripts?.filter((s) => s.command.trim()).length ?? 0;
       setPendingCloseWorkspace({ id: wsId, scriptCount });
       return;
     }
@@ -803,17 +937,16 @@ export default function App() {
 
   const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
   const setWorkspaceEnv = useWorkspaceEnvStore((s) => s.setEnv);
-  const { home, launchCwd, launchCwdResolved } =
-    useWorkspaceSwitcher({
-      workspacesRef,
-      workspaceEnv,
-      setWorkspaceEnv,
-      resetToHome: (home) => {
-        clearWorkspaceState();
-        resetWorkspaces(home);
-      },
-      clearWorkspaceState,
-    });
+  const { home, launchCwd, launchCwdResolved } = useWorkspaceSwitcher({
+    workspacesRef,
+    workspaceEnv,
+    setWorkspaceEnv,
+    resetToHome: (home) => {
+      clearWorkspaceState();
+      resetWorkspaces(home);
+    },
+    clearWorkspaceState,
+  });
   homeRef.current = home;
 
   // When Cmd+Shift+F is pressed while the sidebar is closed, the sidebar opens
@@ -951,7 +1084,10 @@ export default function App() {
   const lastFocusFolderRef = useRef<string | null>(null);
 
   const focusSidebar = useCallback(
-    (folder: string, opts: { fromShortcut: boolean; pendingAction?: RevealAction }) => {
+    (
+      folder: string,
+      opts: { fromShortcut: boolean; pendingAction?: RevealAction },
+    ) => {
       const ws = activeWorkspace;
       if (!ws) return;
       void native
@@ -971,7 +1107,11 @@ export default function App() {
           if (target.mode === "filesystem" && target.fsRoot) {
             setFsRoot(ws.id, target.fsRoot);
           }
-          setRevealRequest((r) => ({ path: folder, nonce: (r?.nonce ?? 0) + 1, pendingAction: opts.pendingAction }));
+          setRevealRequest((r) => ({
+            path: folder,
+            nonce: (r?.nonce ?? 0) + 1,
+            pendingAction: opts.pendingAction,
+          }));
         });
 
       if (opts.fromShortcut || opts.pendingAction) {
@@ -1198,12 +1338,17 @@ export default function App() {
         return;
       }
       const i = path.lastIndexOf("/");
-      splitPaneAndOpenTab(activeWorkspace.id, activeWorkspace.activePaneId, "right", {
-        id: newTabId(),
-        kind: "markdown",
-        path,
-        title: i === -1 ? path : path.slice(i + 1),
-      });
+      splitPaneAndOpenTab(
+        activeWorkspace.id,
+        activeWorkspace.activePaneId,
+        "right",
+        {
+          id: newTabId(),
+          kind: "markdown",
+          path,
+          title: i === -1 ? path : path.slice(i + 1),
+        },
+      );
     },
     [activeWorkspace, activateTab, splitPaneAndOpenTab],
   );
@@ -1232,7 +1377,13 @@ export default function App() {
       const tabId = newTabId();
       const newTab = markdown
         ? ({ id: tabId, kind: "markdown" as const, path } as const)
-        : ({ id: tabId, kind: "editor" as const, path, dirty: false, preview: false } as const);
+        : ({
+            id: tabId,
+            kind: "editor" as const,
+            path,
+            dirty: false,
+            preview: false,
+          } as const);
       const sourcePaneId = sourceTabId
         ? findTabPane(activeWorkspace.paneTree, sourceTabId)?.pane.id
         : undefined;
@@ -1241,7 +1392,12 @@ export default function App() {
         if (sibling) {
           openTab(activeWorkspace.id, sibling.id, newTab);
         } else {
-          splitPaneAndOpenTab(activeWorkspace.id, sourcePaneId, "right", newTab);
+          splitPaneAndOpenTab(
+            activeWorkspace.id,
+            sourcePaneId,
+            "right",
+            newTab,
+          );
         }
       } else {
         openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
@@ -1262,19 +1418,41 @@ export default function App() {
       pin = false,
     ) => {
       if (!activeWorkspace) return;
-      const candidate: DiffIdentity = { kind: "git-diff", repoRoot: params.repoRoot, path: params.path, mode: params.mode };
-      const plan = planDiffTabOpen(allPanes(activeWorkspace.paneTree), activeWorkspace.activePaneId, candidate, pin);
+      const candidate: DiffIdentity = {
+        kind: "git-diff",
+        repoRoot: params.repoRoot,
+        path: params.path,
+        mode: params.mode,
+      };
+      const plan = planDiffTabOpen(
+        allPanes(activeWorkspace.paneTree),
+        activeWorkspace.activePaneId,
+        candidate,
+        pin,
+      );
       if (plan.action === "activate") {
         if (plan.shouldUnpin) {
-          updateTabData(activeWorkspace.id, plan.tabId, (p) => p.kind === "git-diff" ? { ...p, preview: false } : p);
+          updateTabData(activeWorkspace.id, plan.tabId, (p) =>
+            p.kind === "git-diff" ? { ...p, preview: false } : p,
+          );
         }
         activateTab(activeWorkspace.id, plan.tabId);
         flashTab(plan.tabId);
         return;
       }
-      const newTab: Tab = { id: newTabId(), kind: "git-diff", ...params, preview: !pin };
+      const newTab: Tab = {
+        id: newTabId(),
+        kind: "git-diff",
+        ...params,
+        preview: !pin,
+      };
       if (plan.action === "replace") {
-        replaceTab(activeWorkspace.id, activeWorkspace.activePaneId, plan.oldTabId, newTab);
+        replaceTab(
+          activeWorkspace.id,
+          activeWorkspace.activePaneId,
+          plan.oldTabId,
+          newTab,
+        );
         return;
       }
       openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
@@ -1321,7 +1499,9 @@ export default function App() {
     } else if (!path.startsWith("/") && cwd) {
       absPath = `${cwd}/${path}`;
     }
-    void invoke<{ kind: "file" | "dir" | "symlink" }>("fs_stat", { path: absPath })
+    void invoke<{ kind: "file" | "dir" | "symlink" }>("fs_stat", {
+      path: absPath,
+    })
       .then((stat) => {
         if (stat.kind === "dir") {
           focusSidebar(absPath, { fromShortcut: true });
@@ -1347,7 +1527,8 @@ export default function App() {
 
   useEffect(() => {
     configureTerminalLinkBridge({
-      onFileLink: (path, cwd, line, col, sourceTabId) => fileLinkHandlerRef.current(path, cwd, line, col, sourceTabId),
+      onFileLink: (path, cwd, line, col, sourceTabId) =>
+        fileLinkHandlerRef.current(path, cwd, line, col, sourceTabId),
       resolveLeafCwd: (leafId) => cwdResolverRef.current(leafId),
     });
   }, []);
@@ -1411,9 +1592,12 @@ export default function App() {
     closeTabsRef.current([tabId]);
   }, []);
 
-  const onCloseManyTabsStable = useCallback((_wsId: string, tabIds: string[]) => {
-    closeTabsRef.current(tabIds);
-  }, []);
+  const onCloseManyTabsStable = useCallback(
+    (_wsId: string, tabIds: string[]) => {
+      closeTabsRef.current(tabIds);
+    },
+    [],
+  );
 
   // Explicit close when leaving a pane: keyboard and programmatic pane/
   // workspace switches move no DOM focus, so the blur can never cover them.
@@ -1512,10 +1696,7 @@ export default function App() {
     (wsId: string, paneId: string) => {
       const tabId = newTabId();
       openTab(wsId, paneId, { id: tabId, kind: "browser", url: "" });
-      setTimeout(
-        () => browserHandles.current.get(tabId)?.focusAddressBar(),
-        0,
-      );
+      setTimeout(() => browserHandles.current.get(tabId)?.focusAddressBar(), 0);
     },
     [openTab],
   );
@@ -1541,10 +1722,7 @@ export default function App() {
       setZenPaneId(null);
       const tabId = newTabId();
       openTab(wsId, newPaneId, { id: tabId, kind: "browser", url: "" });
-      setTimeout(
-        () => browserHandles.current.get(tabId)?.focusAddressBar(),
-        0,
-      );
+      setTimeout(() => browserHandles.current.get(tabId)?.focusAddressBar(), 0);
     },
     [splitPane, openTab],
   );
@@ -1570,10 +1748,7 @@ export default function App() {
       setZenPaneId(null);
       const tabId = newTabId();
       openTab(wsId, newPaneId, { id: tabId, kind: "browser", url: "" });
-      setTimeout(
-        () => browserHandles.current.get(tabId)?.focusAddressBar(),
-        0,
-      );
+      setTimeout(() => browserHandles.current.get(tabId)?.focusAddressBar(), 0);
     },
     [splitPane, openTab],
   );
@@ -1594,11 +1769,23 @@ export default function App() {
     }) => {
       const ws = workspacesRef.current.find((w) => w.id === activeWorkspaceId);
       if (!ws) return;
-      const candidate: DiffIdentity = { kind: "git-commit-file", repoRoot: params.repoRoot, sha: params.sha, path: params.path };
-      const plan = planDiffTabOpen(allPanes(ws.paneTree), ws.activePaneId, candidate, params.pin);
+      const candidate: DiffIdentity = {
+        kind: "git-commit-file",
+        repoRoot: params.repoRoot,
+        sha: params.sha,
+        path: params.path,
+      };
+      const plan = planDiffTabOpen(
+        allPanes(ws.paneTree),
+        ws.activePaneId,
+        candidate,
+        params.pin,
+      );
       if (plan.action === "activate") {
         if (plan.shouldUnpin) {
-          updateTabData(ws.id, plan.tabId, (p) => p.kind === "git-commit-file" ? { ...p, preview: false } : p);
+          updateTabData(ws.id, plan.tabId, (p) =>
+            p.kind === "git-commit-file" ? { ...p, preview: false } : p,
+          );
         }
         activateTab(ws.id, plan.tabId);
         flashTab(plan.tabId);
@@ -1697,7 +1884,10 @@ export default function App() {
   // blur, tab close, and app close.
   const flushDirtyEditors = useCallback(async () => {
     if (!usePreferencesStore.getState().editorAutoSave) return;
-    const tabIds = new Set([...editorHandles.current.keys(), ...markdownSaveHandlers.current.keys()]);
+    const tabIds = new Set([
+      ...editorHandles.current.keys(),
+      ...markdownSaveHandlers.current.keys(),
+    ]);
     await Promise.all(
       [...tabIds].map((tabId) => saveTab(tabId).catch(() => {})),
     );
@@ -1933,7 +2123,10 @@ export default function App() {
       if (hasGitignoreEntry(content, entry)) {
         toast.info(`${entry} is already in .gitignore`);
       } else {
-        await native.writeFile(gitignorePath, appendGitignoreEntry(content, entry));
+        await native.writeFile(
+          gitignorePath,
+          appendGitignoreEntry(content, entry),
+        );
       }
       openFileInTab(gitignorePath, true);
     },
@@ -2083,11 +2276,23 @@ export default function App() {
       },
       onOpenCommitFile: (input) => {
         if (!activeWorkspace) return;
-        const candidate: DiffIdentity = { kind: "git-commit-file", repoRoot: input.repoRoot, sha: input.sha, path: input.path };
-        const plan = planDiffTabOpen(allPanes(activeWorkspace.paneTree), activeWorkspace.activePaneId, candidate, input.pin);
+        const candidate: DiffIdentity = {
+          kind: "git-commit-file",
+          repoRoot: input.repoRoot,
+          sha: input.sha,
+          path: input.path,
+        };
+        const plan = planDiffTabOpen(
+          allPanes(activeWorkspace.paneTree),
+          activeWorkspace.activePaneId,
+          candidate,
+          input.pin,
+        );
         if (plan.action === "activate") {
           if (plan.shouldUnpin) {
-            updateTabData(activeWorkspace.id, plan.tabId, (p) => p.kind === "git-commit-file" ? { ...p, preview: false } : p);
+            updateTabData(activeWorkspace.id, plan.tabId, (p) =>
+              p.kind === "git-commit-file" ? { ...p, preview: false } : p,
+            );
           }
           activateTab(activeWorkspace.id, plan.tabId);
           flashTab(plan.tabId);
@@ -2103,7 +2308,12 @@ export default function App() {
           preview: !input.pin,
         };
         if (plan.action === "replace") {
-          replaceTab(activeWorkspace.id, activeWorkspace.activePaneId, plan.oldTabId, newTab);
+          replaceTab(
+            activeWorkspace.id,
+            activeWorkspace.activePaneId,
+            plan.oldTabId,
+            newTab,
+          );
           return;
         }
         openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
@@ -2127,18 +2337,30 @@ export default function App() {
         const found = findTabGlobal(tabId);
         if (!found || found.tab.kind !== "git-diff") return;
         const next = sidebarRef.current?.navigateGitDiffEntry(
-          { repoRoot: found.tab.repoRoot, path: found.tab.path, mode: found.tab.mode },
+          {
+            repoRoot: found.tab.repoRoot,
+            path: found.tab.path,
+            mode: found.tab.mode,
+          },
           direction,
         );
         if (!next) return;
         updateTabData(found.workspace.id, tabId, (p) =>
-          p.kind === "git-diff" ? { ...p, path: next.path, originalPath: next.originalPath, mode: next.mode } : p,
+          p.kind === "git-diff"
+            ? {
+                ...p,
+                path: next.path,
+                originalPath: next.originalPath,
+                mode: next.mode,
+              }
+            : p,
         );
       },
       onRenameFile: (tabId, newName) => {
         void handleRenameFileFromTab(tabId, newName);
       },
-      onFocusOnExplorer: (filePath, pendingAction) => focusSidebar(filePath, { fromShortcut: true, pendingAction }),
+      onFocusOnExplorer: (filePath, pendingAction) =>
+        focusSidebar(filePath, { fromShortcut: true, pendingAction }),
       onSetAsRoot: handleSetAsRoot,
       onNewWorkspaceFromFolder: newWorkspaceFromFolder,
       onRevealInTerminal: openFolderInTerminal,
@@ -2273,7 +2495,7 @@ export default function App() {
     (delta: 1 | -1) => {
       const visible = visibleWorkspaceOrder(
         workspaces,
-        workspaceStatuses,
+        groups,
         collapsedGroups,
         activeWorkspaceId,
       );
@@ -2283,7 +2505,13 @@ export default function App() {
       const nextIdx = (baseIdx + delta + visible.length) % visible.length;
       setActiveWorkspaceId(visible[nextIdx].id);
     },
-    [workspaces, workspaceStatuses, collapsedGroups, activeWorkspaceId, setActiveWorkspaceId],
+    [
+      workspaces,
+      groups,
+      collapsedGroups,
+      activeWorkspaceId,
+      setActiveWorkspaceId,
+    ],
   );
 
   function focusPaneInDirection(dir: "up" | "down" | "left" | "right") {
@@ -2313,7 +2541,10 @@ export default function App() {
 
   const doSplitRight = useCallback(() => {
     if (!activeWorkspace) return;
-    onSplitTerminalRightStable(activeWorkspace.id, activeWorkspace.activePaneId);
+    onSplitTerminalRightStable(
+      activeWorkspace.id,
+      activeWorkspace.activePaneId,
+    );
   }, [activeWorkspace, onSplitTerminalRightStable]);
 
   const doSplitDown = useCallback(() => {
@@ -2340,7 +2571,12 @@ export default function App() {
       onCommandPalette: () => openCommandPalette("commands"),
       onSettings: () => void openSettingsWindow(),
     }),
-    [openNewTerminal, openBrowserInTab, handleExplorerSearch, openCommandPalette],
+    [
+      openNewTerminal,
+      openBrowserInTab,
+      handleExplorerSearch,
+      openCommandPalette,
+    ],
   );
 
   const shortcutHandlers = useMemo<ShortcutHandlers>(
@@ -2355,7 +2591,9 @@ export default function App() {
         if (activeWorkspace) void requestCloseWorkspace(activeWorkspace.id);
       },
       "workspace.rename": () => {
-        if (activeWorkspaceId) useWorkspaceRenameStore.getState().startRename(activeWorkspaceId);
+        useContextMenuCloseStore.getState().closeAll();
+        if (activeWorkspaceId)
+          useWorkspaceRenameStore.getState().startRename(activeWorkspaceId);
       },
       "workspace.settings": () => {
         if (activeWorkspaceId) {
@@ -2503,7 +2741,7 @@ export default function App() {
         const idx = parseInt(e.key, 10) - 1;
         const visible = visibleWorkspaceOrder(
           workspaces,
-          workspaceStatuses,
+          groups,
           collapsedGroups,
           activeWorkspaceId,
         );
@@ -2557,8 +2795,7 @@ export default function App() {
         if (target) focusSidebar(target, { fromShortcut: true });
       },
       "tab.toggleAutofocus": () => {
-        if (!activeTabId || !activeTab || !isAutofocusTab(activeTab))
-          return;
+        if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
         const found = findTabGlobal(activeTabId);
         if (found)
           updateTabData(found.workspace.id, activeTabId, (p) =>
@@ -2595,7 +2832,7 @@ export default function App() {
       workspaces,
       findTabGlobal,
       updateTabData,
-      workspaceStatuses,
+      groups,
       collapsedGroups,
       openCommandPalette,
       cycleWorkspace,
@@ -2640,10 +2877,7 @@ export default function App() {
         );
       }
       if (id === "editor.html.toggleView") {
-        return !(
-          activeTab?.kind === "editor" &&
-          isHtmlPath(activeTab.path)
-        );
+        return !(activeTab?.kind === "editor" && isHtmlPath(activeTab.path));
       }
       if (id === "editor.preview.toggleSplit") {
         return !(
@@ -2693,9 +2927,7 @@ export default function App() {
       .then((u) => {
         unlisten = u;
       })
-      .catch((e) =>
-        console.error("[kex] kex:activate-tab listen failed:", e),
-      );
+      .catch((e) => console.error("[kex] kex:activate-tab listen failed:", e));
     return () => {
       unlisten?.();
     };
@@ -2747,7 +2979,9 @@ export default function App() {
         handleToggleShowHidden();
         break;
       case "toggle_sidebar_side":
-        setSidebarSide(sidebarStateRef.current.side === "left" ? "right" : "left");
+        setSidebarSide(
+          sidebarStateRef.current.side === "left" ? "right" : "left",
+        );
         break;
     }
   };
@@ -2808,19 +3042,27 @@ export default function App() {
             toggleSidebar: toggleSidebar,
             openSettings: () => void openSettingsWindow(),
             openKeyboardShortcuts: () => void openSettingsWindow("shortcuts"),
-            reopenClosedTab: () => { if (activeWorkspace) reopenClosed(); },
+            reopenClosedTab: () => {
+              if (activeWorkspace) reopenClosed();
+            },
             openNewWindow: () => void native.openMainWindow(),
             clearTerminal: clearFocusedTerminal,
             toggleZenMode: () => {
               if (!activeWorkspace) return;
               if (allPanes(activeWorkspace.paneTree).length <= 1) return;
-              setZenPaneId((prev) => prev !== null ? null : activeWorkspace.activePaneId);
+              setZenPaneId((prev) =>
+                prev !== null ? null : activeWorkspace.activePaneId,
+              );
             },
             hasActiveTerminal: activeTab?.kind === "terminal",
             openWorkspaceProperties: () =>
-              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId),
+              useWorkspaceSettingsStore
+                .getState()
+                .openSettings(activeWorkspaceId),
             openRunScriptConfiguration: () =>
-              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "scripts"),
+              useWorkspaceSettingsStore
+                .getState()
+                .openSettings(activeWorkspaceId, "scripts"),
           })
         : [],
     [
@@ -2867,7 +3109,7 @@ export default function App() {
         cwd: w.cwd,
         color: w.color,
         icon: w.icon,
-        statusId: w.statusId,
+        groupId: w.groupId,
       })),
     [workspaces],
   );
@@ -2888,7 +3130,9 @@ export default function App() {
             workspaceRoot={workspaceRootPath}
             onOpenExternalEditorSettings={onOpenExternalEditorSettings}
             onSetWorkspaceRoot={() =>
-              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "properties", "workspaceRoot")
+              useWorkspaceSettingsStore
+                .getState()
+                .openSettings(activeWorkspaceId, "properties", "workspaceRoot")
             }
             scripts={activeWorkspace?.scripts ?? []}
             activeScript={activeWorkspace?.activeScript}
@@ -2896,10 +3140,13 @@ export default function App() {
             onRunScript={runWorkspaceConfig}
             onStopConfig={stopWorkspaceConfig}
             onOpenRunSettings={() =>
-              useWorkspaceSettingsStore.getState().openSettings(activeWorkspaceId, "scripts")
+              useWorkspaceSettingsStore
+                .getState()
+                .openSettings(activeWorkspaceId, "scripts")
             }
             activeWorkspace={activeWorkspace ?? null}
             activeTab={activeTab}
+            groups={groups}
             onRestoreFocus={restoreLeafFocus}
           />
 
@@ -2914,11 +3161,18 @@ export default function App() {
               onReorder={reorderWorkspaces}
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
-              onOpenSettings={(id) => useWorkspaceSettingsStore.getState().openSettings(id)}
+              onOpenSettings={(id) =>
+                useWorkspaceSettingsStore.getState().openSettings(id)
+              }
               width={workspaceBarWidth}
               onWidthChange={handleBarWidthChange}
-              workspaceStatuses={workspaceStatuses}
-              onSetStatus={setWorkspaceStatus}
+              workspaceGroups={groups}
+              onSetGroup={handleSetGroup}
+              onPreviewGroup={handlePreviewGroup}
+              onCommitGroupMove={handleCommitGroupMove}
+              onCreateGroup={handleCreateGroup}
+              onRenameGroup={handleRenameGroup}
+              onReorderGroups={handleReorderGroups}
               collapsedGroups={collapsedGroups}
               onToggleGroup={handleToggleGroup}
               onRestoreFocus={restoreLeafFocus}
@@ -2980,7 +3234,11 @@ export default function App() {
                         onOpenWorkspaceProperties={() =>
                           useWorkspaceSettingsStore
                             .getState()
-                            .openSettings(activeWorkspaceId, "properties", "workspaceRoot")
+                            .openSettings(
+                              activeWorkspaceId,
+                              "properties",
+                              "workspaceRoot",
+                            )
                         }
                         onExplorerSearchClose={onExplorerSearchClose}
                         workspaceCwd={explorerRoot}
@@ -3006,30 +3264,30 @@ export default function App() {
                   <div className="flex h-full min-h-0 flex-col">
                     <div className="relative min-h-0 flex-1">
                       <EditorChromeProvider value={editorChromeWithGit}>
-                      <WorkspaceView
-                        workspaces={workspaces}
-                        activeWorkspaceId={activeWorkspaceId}
-                        expandedPaneId={zenPaneId}
-                        onActivateTab={onActivateTabStable}
-                        onCloseTab={onCloseTabStable}
-                        onCloseManyTabs={onCloseManyTabsStable}
-                        onFocusPane={onFocusPaneStable}
-                        onNewTerminal={onNewTerminalStable}
-                        onSplitTerminalRight={onSplitTerminalRightStable}
-                        onSplitTerminalDown={onSplitTerminalDownStable}
-                        onNewBrowser={onNewBrowserStable}
-                        onSplitBrowserRight={onSplitBrowserRightStable}
-                        onSplitBrowserDown={onSplitBrowserDownStable}
-                        onDividerChange={onDividerChangeStable}
-                        callbacks={tabCallbacks}
-                        gitStatus={sourceControl.status}
-                        gitColorScheme={gitColorScheme}
-                        onFloatBrowserTab={onFloatBrowserTab}
-                        onDockBrowserTab={onDockBrowserTab}
-                        onFocusFloatBrowserTab={onFocusFloatBrowserTab}
-                        onNavigateFloatBrowserTab={onNavigateFloatBrowserTab}
-                        welcomeActions={welcomeActions}
-                      />
+                        <WorkspaceView
+                          workspaces={workspaces}
+                          activeWorkspaceId={activeWorkspaceId}
+                          expandedPaneId={zenPaneId}
+                          onActivateTab={onActivateTabStable}
+                          onCloseTab={onCloseTabStable}
+                          onCloseManyTabs={onCloseManyTabsStable}
+                          onFocusPane={onFocusPaneStable}
+                          onNewTerminal={onNewTerminalStable}
+                          onSplitTerminalRight={onSplitTerminalRightStable}
+                          onSplitTerminalDown={onSplitTerminalDownStable}
+                          onNewBrowser={onNewBrowserStable}
+                          onSplitBrowserRight={onSplitBrowserRightStable}
+                          onSplitBrowserDown={onSplitBrowserDownStable}
+                          onDividerChange={onDividerChangeStable}
+                          callbacks={tabCallbacks}
+                          gitStatus={sourceControl.status}
+                          gitColorScheme={gitColorScheme}
+                          onFloatBrowserTab={onFloatBrowserTab}
+                          onDockBrowserTab={onDockBrowserTab}
+                          onFocusFloatBrowserTab={onFocusFloatBrowserTab}
+                          onNavigateFloatBrowserTab={onNavigateFloatBrowserTab}
+                          welcomeActions={welcomeActions}
+                        />
                       </EditorChromeProvider>
                     </div>
 
@@ -3083,7 +3341,11 @@ export default function App() {
                         onOpenWorkspaceProperties={() =>
                           useWorkspaceSettingsStore
                             .getState()
-                            .openSettings(activeWorkspaceId, "properties", "workspaceRoot")
+                            .openSettings(
+                              activeWorkspaceId,
+                              "properties",
+                              "workspaceRoot",
+                            )
                         }
                         onExplorerSearchClose={onExplorerSearchClose}
                         workspaceCwd={explorerRoot}
@@ -3138,8 +3400,6 @@ export default function App() {
 
           <WorkspaceSettingsDialog
             workspaces={workspaces}
-            workspaceStatuses={workspaceStatuses}
-            onSetStatus={setWorkspaceStatus}
             onSetTitle={setWorkspaceTitle}
             onSetColor={setWorkspaceColor}
             onSetIcon={setWorkspaceIcon}
@@ -3176,7 +3436,9 @@ export default function App() {
               if (id) void handleCloseWorkspaceRef.current(id);
             }}
             pendingWorkspaceProcesses={pendingWorkspaceProcesses}
-            onCancelWorkspaceProcesses={() => setPendingWorkspaceProcesses(null)}
+            onCancelWorkspaceProcesses={() =>
+              setPendingWorkspaceProcesses(null)
+            }
             onConfirmWorkspaceProcesses={(dontAskAgain) => {
               const id = pendingWorkspaceProcesses?.id;
               setPendingWorkspaceProcesses(null);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
-import { applyCloseTab, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceStatus, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -386,42 +386,42 @@ describe("insertWorkspaceAfterActive", () => {
     expect(out.map((w) => w.id)).toEqual(["w1", "new", "w2"]);
   });
 
-  it("inherits the status of the active workspace", () => {
-    const out = insertWorkspaceAfterActive([ws({ id: "w1", statusId: "wip" })], "w1", ws({ id: "new" }));
-    expect(out[1].statusId).toBe("wip");
+  it("inherits the group of the active workspace", () => {
+    const out = insertWorkspaceAfterActive([ws({ id: "w1", groupId: "wip" })], "w1", ws({ id: "new" }));
+    expect(out[1].groupId).toBe("wip");
   });
 
-  it("leaves the new workspace status-less when the active one has none", () => {
+  it("leaves the new workspace group-less when the active one has none", () => {
     const out = insertWorkspaceAfterActive([ws({ id: "w1" })], "w1", ws({ id: "new" }));
-    expect(out[1].statusId).toBeUndefined();
+    expect(out[1].groupId).toBeUndefined();
   });
 
   it("appends to the end when the active workspace is missing", () => {
     const out = insertWorkspaceAfterActive([ws({ id: "w1" })], "ghost", ws({ id: "new" }));
     expect(out.map((w) => w.id)).toEqual(["w1", "new"]);
-    expect(out[1].statusId).toBeUndefined();
+    expect(out[1].groupId).toBeUndefined();
   });
 });
 
-describe("applyWorkspaceStatus", () => {
-  it("sets statusId on the matching workspace only", () => {
-    const out = applyWorkspaceStatus([ws(), ws({ id: "w2" })], "w1", "archived");
-    expect(out[0].statusId).toBe("archived");
-    expect(out[1].statusId).toBeUndefined();
+describe("applyWorkspaceGroup", () => {
+  it("sets groupId on the matching workspace only", () => {
+    const out = applyWorkspaceGroup([ws(), ws({ id: "w2" })], "w1", "archived");
+    expect(out[0].groupId).toBe("archived");
+    expect(out[1].groupId).toBeUndefined();
   });
 
-  it("clears statusId when null is passed", () => {
-    const out = applyWorkspaceStatus([ws({ statusId: "archived" })], "w1", null);
-    expect(out[0].statusId).toBeUndefined();
+  it("clears groupId when null is passed", () => {
+    const out = applyWorkspaceGroup([ws({ groupId: "archived" })], "w1", null);
+    expect(out[0].groupId).toBeUndefined();
   });
 
-  it("clears statusId when undefined is passed", () => {
-    const out = applyWorkspaceStatus([ws({ statusId: "archived" })], "w1", undefined);
-    expect(out[0].statusId).toBeUndefined();
+  it("clears groupId when undefined is passed", () => {
+    const out = applyWorkspaceGroup([ws({ groupId: "archived" })], "w1", undefined);
+    expect(out[0].groupId).toBeUndefined();
   });
 
   it("does not modify unrelated workspaces", () => {
-    const out = applyWorkspaceStatus([ws(), ws({ id: "w2", statusId: "completed" })], "w1", "on-hold");
-    expect(out[1].statusId).toBe("completed");
+    const out = applyWorkspaceGroup([ws(), ws({ id: "w2", groupId: "completed" })], "w1", "on-hold");
+    expect(out[1].groupId).toBe("completed");
   });
 });

@@ -8,6 +8,8 @@ import {
 } from "./sidebarState";
 import { setSavedWorkspaceBarWidth } from "./workspaceBarState";
 import { setSavedCollapsedGroups } from "./collapsedGroupsState";
+import { setSavedGroups } from "./workspaceGroupsState";
+import type { WorkspaceGroup } from "./types";
 
 type SavedState = { workspaces: Workspace[]; activeIndex: number };
 
@@ -17,7 +19,8 @@ type WindowEntry = {
   activeIndex: number;
   sidebar?: SidebarUiState;
   workspaceBarWidth?: number;
-  collapsedStatusGroups?: string[];
+  collapsedGroups?: string[];
+  groups?: WorkspaceGroup[];
 };
 
 let cached: SavedState | null = null;
@@ -55,7 +58,8 @@ export async function initWorkspaceState(): Promise<void> {
     }
     setSavedSidebarState(entry?.sidebar);
     setSavedWorkspaceBarWidth(entry?.workspaceBarWidth);
-    setSavedCollapsedGroups(entry?.collapsedStatusGroups);
+    setSavedCollapsedGroups(entry?.collapsedGroups);
+    setSavedGroups(entry?.groups);
   } catch (err) {
     console.error("[workspace-state] initWorkspaceState error:", err);
     cached = null;

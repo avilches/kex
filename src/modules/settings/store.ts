@@ -19,32 +19,6 @@ export type ThemePref = "system" | "light" | "dark";
 
 type TabBarStyle = "connected" | "pill";
 
-export type WorkspaceStatus = { id: string; label: string; color?: string };
-
-export const DEFAULT_WORKSPACE_STATUSES: WorkspaceStatus[] = [
-  { id: "archived",         label: "Archived",         color: "#14b8a6" },
-  { id: "work-in-progress", label: "Work in progress", color: "#3b82f6" },
-  { id: "on-hold",          label: "On hold",           color: "#f97316" },
-  { id: "canceled",         label: "Canceled",          color: "#ef4444" },
-  { id: "completed",        label: "Completed",         color: "#22c55e" },
-];
-
-export function parseWorkspaceStatuses(value: unknown): WorkspaceStatus[] {
-  if (!Array.isArray(value)) return DEFAULT_WORKSPACE_STATUSES;
-  return (value as unknown[]).filter(
-    (item): item is WorkspaceStatus =>
-      item !== null &&
-      typeof item === "object" &&
-      typeof (item as WorkspaceStatus).id === "string" &&
-      (item as WorkspaceStatus).id.length > 0 &&
-      typeof (item as WorkspaceStatus).label === "string" &&
-      (
-        (item as WorkspaceStatus).color === undefined ||
-        typeof (item as WorkspaceStatus).color === "string"
-      ),
-  );
-}
-
 export type GitColorScheme = "vscode" | "jetbrains";
 
 export type ScmViewMode = "list" | "tree";
@@ -215,7 +189,6 @@ export type Preferences = {
   preferredWorkspaceEditorId: string | null;
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
-  workspaceStatuses: WorkspaceStatus[];
   randomWorkspaceColor: boolean;
   uiFont: string;
 };
@@ -243,7 +216,6 @@ const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
-const KEY_WORKSPACE_STATUSES = "workspaceStatuses";
 const KEY_RANDOM_WORKSPACE_COLOR = "randomWorkspaceColor";
 
 // Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
@@ -456,7 +428,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   preferredWorkspaceEditorId: null,
   customEditors: [],
   detectedEditors: [],
-  workspaceStatuses: DEFAULT_WORKSPACE_STATUSES,
   randomWorkspaceColor: true,
   uiFont: "",
 };
@@ -753,11 +724,6 @@ export async function loadPreferences(): Promise<Preferences> {
     detectedEditors: (() => {
       const v = getTools<DetectedEditor[]>(KEY_DETECTED_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
-    })(),
-    workspaceStatuses: (() => {
-      const v = getGeneral<WorkspaceStatus[]>(KEY_WORKSPACE_STATUSES);
-      if (v === undefined) return DEFAULT_WORKSPACE_STATUSES;
-      return parseWorkspaceStatuses(v);
     })(),
     randomWorkspaceColor:
       getGeneral<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
@@ -1079,10 +1045,6 @@ export async function setDetectedEditors(value: DetectedEditor[]): Promise<void>
   await writeToolsPref(KEY_DETECTED_EDITORS, value);
 }
 
-export async function setWorkspaceStatuses(value: WorkspaceStatus[]): Promise<void> {
-  await writePref(KEY_WORKSPACE_STATUSES, value);
-}
-
 export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
   await writePref(KEY_RANDOM_WORKSPACE_COLOR, value);
 }
@@ -1221,7 +1183,6 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
-  [KEY_WORKSPACE_STATUSES]: "workspaceStatuses",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
   [KEY_UI_FONT]: "uiFont",
 };

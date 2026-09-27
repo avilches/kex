@@ -38,15 +38,6 @@ export function resolveWorkspaceColor(
   return color;
 }
 
-/**
- * Resolves the display color for a status.
- * Unlike workspace color, there is no "no color" (null) option -- statuses always show a color.
- * Falls back to a stable color derived from the status ID when no explicit color is set.
- */
-export function resolveStatusColor(color: string | undefined, id: string): string {
-  return color ?? initialColorForId(id);
-}
-
 function hslToHex(h: number, s: number, l: number): string {
   const sl = s / 100;
   const ll = l / 100;

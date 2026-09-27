@@ -443,7 +443,18 @@ fn window_save_workspace_bar(app: tauri::AppHandle, label: String, width: u32) {
 #[tauri::command]
 fn window_save_collapsed_groups(app: tauri::AppHandle, label: String, ids: Vec<String>) {
     let mgr = app.state::<window_state::WindowStateManager>();
-    mgr.update_collapsed_status_groups(&label, ids);
+    mgr.update_collapsed_groups(&label, ids);
+    mgr.save();
+}
+
+#[tauri::command]
+fn window_save_groups(
+    app: tauri::AppHandle,
+    label: String,
+    groups: Vec<window_state::WorkspaceGroupEntry>,
+) {
+    let mgr = app.state::<window_state::WindowStateManager>();
+    mgr.update_groups(&label, groups);
     mgr.save();
 }
 
@@ -869,6 +880,7 @@ pub fn run() {
             window_save_sidebar,
             window_save_workspace_bar,
             window_save_collapsed_groups,
+            window_save_groups,
             restore_window_geometry,
             agent::agent_enable_claude_hooks,
             agent::agent_disable_claude_hooks,
