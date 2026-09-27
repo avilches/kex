@@ -292,6 +292,33 @@ Actions:
 
 ---
 
+## Diagnosing a failed restore with Kex.log
+
+`kex_lib::modules::agent`, `kex_lib::modules::pty::agent_detect` and `kex_lib::modules::pty::ipc` all log at
+`Debug` (see the `tauri_plugin_log::Builder` in `lib.rs`), which covers every step of the hook and restore-planner
+path above: hook payloads arriving over the Unix socket (`pty::ipc::dispatch`), `SessionStart` recording, and the
+`OSC 133;C` launch-command stash.
+
+The log file is reachable without hunting for the OS-specific path: `user-data/logs/Kex.log` (a symlink to
+`~/Library/Logs/app.betauer.kex/Kex.log` on macOS, see the root `AGENTS.md`/`CLAUDE.md` for the other platforms).
+`user-data/logs-dev` is the equivalent for a `pnpm tauri dev` build.
+
+Two things to check if the log looks unhelpful right after a restore failure:
+
+- **The file is empty or was just created.** Until TASK-769, the rotation policy was `RotationStrategy::KeepOne`,
+  which deletes the previous log with no backup, and does so as soon as the app starts (the size check runs before
+  the new session writes anything) — so a log that had already grown past `max_file_size` in the *previous* session,
+  the one that actually failed to restore, was gone before you could open it. Kex now rotates with
+  `RotationStrategy::KeepSome(4)`, which renames the oversized file instead of deleting it: look for
+  `Kex_<date>.log` siblings next to the active `Kex.log` in the same directory and check those too, not just
+  the current file.
+- **`prompt`/`msg`/`last`/`err`/`delta` fields look cut off.** `pty::ipc::dispatch` truncates these free-text agent
+  payload fields to `MAX_LOG_FIELD_LEN` (250 characters) before logging them, appending `...(N more)` when it does.
+  This is intentional (a single long `MessageDisplay` delta was observed to reach 7000+ characters, and unbounded logging
+  of a handful of those was enough to blow through the rotation size); it is not a truncation happening elsewhere in
+  the restore path, and the full untruncated value was still delivered over IPC and handled by the frontend, it is
+  only the log line that is short.
+
 ## Error cases
 
 | Case | Behaviour |
