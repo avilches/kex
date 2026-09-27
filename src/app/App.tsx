@@ -2856,6 +2856,22 @@ export default function App() {
   const sidebarRepoRoot =
     sourceControl.repo?.repoRoot ?? explorerRoot ?? home ?? "";
 
+  // Stable reference so WorkspaceBar's internal groupWorkspaces memo isn't
+  // invalidated on every App render by a freshly allocated array here.
+  const workspaceBarItems = useMemo(
+    () =>
+      workspaces.map((w) => ({
+        id: w.id,
+        title: w.title,
+        kind: "terminal",
+        cwd: w.cwd,
+        color: w.color,
+        icon: w.icon,
+        statusId: w.statusId,
+      })),
+    [workspaces],
+  );
+
   const shell = (
     <ThemeProvider>
       <TooltipProvider>
@@ -2891,15 +2907,7 @@ export default function App() {
           <div className="flex min-h-0 flex-1">
             {/* LEFT: workspace bar */}
             <WorkspaceBar
-              workspaces={workspaces.map((w) => ({
-                id: w.id,
-                title: w.title,
-                kind: "terminal",
-                cwd: w.cwd,
-                color: w.color,
-                icon: w.icon,
-                statusId: w.statusId,
-              }))}
+              workspaces={workspaceBarItems}
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}
               onNew={() => addWorkspace(home ?? undefined)}
