@@ -86,6 +86,7 @@ type SourceControlPanelState = {
   setCommitMessage: (value: string) => void;
   refresh: () => Promise<void>;
   selectEntry: (entry: SourceControlEntry, pin: boolean) => Promise<void>;
+  selectExternal: (nextSelection: DiffSelection) => void;
   stageEntry: (entry: SourceControlEntry) => Promise<void>;
   unstageEntry: (entry: SourceControlEntry) => Promise<void>;
   requestDiscardEntry: (entry: SourceControlEntry) => void;
@@ -664,6 +665,17 @@ export function useSourceControlPanel(
     [openSelection, repo, selected, status],
   );
 
+  // Mirrors the selection side effects of selectEntry, minus openSelection:
+  // this is for a diff tab already open elsewhere (e.g. prev/next navigation
+  // in GitDiffPane) telling this panel which file it's now showing, not for
+  // the panel itself opening a new diff tab.
+  const selectExternal = useCallback((nextSelection: DiffSelection) => {
+    setSelected(nextSelection);
+    setActionError(null);
+    setActionMessage(null);
+    setSelectionTransition("none");
+  }, []);
+
   const runMutation = useCallback(
     async (
       busyKey: string,
@@ -955,6 +967,7 @@ export function useSourceControlPanel(
     setCommitMessage,
     refresh,
     selectEntry,
+    selectExternal,
     stageEntry,
     unstageEntry,
     requestDiscardEntry,

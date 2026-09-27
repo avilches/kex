@@ -109,6 +109,8 @@ export type TabCallbacks = {
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   // Tab data update (used by tab bar lock/restore toggles)
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  // Prev/next file navigation inside an open git-diff tab
+  onNavigateGitDiffTab?: (tabId: string, direction: "prev" | "next") => void;
   // File rename (editor/markdown tabs - renames the file on disk)
   onRenameFile?: (tabId: string, newName: string) => void;
   // Reveal an editor/markdown/git file in the explorer tree
@@ -477,9 +479,9 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
           <GitDiffPane
             source={{ kind: "working", repoRoot: tab.repoRoot, path: tab.path, mode: tab.mode, originalPath: tab.originalPath }}
             active={visible}
-            workspaceRoot={workspaceRoot}
-            home={home}
-            onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
+            onNavigateDiff={(direction: "prev" | "next") =>
+              callbacks.onNavigateGitDiffTab?.(tab.id, direction)
+            }
           />
         </Suspense>
       );
@@ -491,9 +493,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
           <GitDiffPane
             source={{ kind: "commit", repoRoot: tab.repoRoot, sha: tab.sha, path: tab.path, originalPath: tab.originalPath }}
             active={visible}
-            workspaceRoot={workspaceRoot}
-            home={home}
-            onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
           />
         </Suspense>
       );

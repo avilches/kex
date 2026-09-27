@@ -65,9 +65,7 @@ type Props = {
   source: WorkingSource | CommitSource;
   chipLabel?: string;
   active: boolean;
-  workspaceRoot?: string | null;
-  home?: string | null;
-  onRevealPath?: (path: string) => void;
+  onNavigateDiff?: (direction: "prev" | "next") => void;
 };
 
 const READONLY_EXT = [
@@ -165,7 +163,7 @@ function loadStateFromCache(
   };
 }
 
-export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, home = null, onRevealPath }: Props) {
+export function GitDiffPane({ source, chipLabel, active, onNavigateDiff }: Props) {
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const themeExt = useEditorThemeExt();
   const [state, setState] = useState<LoadState>(() =>
@@ -418,7 +416,6 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
       <GitDiffPathBar
         path={absPath}
         originalPath={absOriginalPath}
-        repoRoot={repoRoot}
         mode={mode}
         chipLabel={chipLabel}
         useFallback={useFallback}
@@ -429,9 +426,7 @@ export function GitDiffPane({ source, chipLabel, active, workspaceRoot = null, h
         stats={stats}
         view={view}
         diffViewMode={diffViewMode}
-        workspaceRoot={workspaceRoot}
-        home={home}
-        onRevealPath={onRevealPath ?? (() => {})}
+        onNavigate={(direction) => onNavigateDiff?.(direction)}
       />
 
       {deletedOnDisk ? (

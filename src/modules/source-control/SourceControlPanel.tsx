@@ -72,9 +72,11 @@ import { currentWorkspaceEnv } from "@/modules/workspace";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  forwardRef,
   memo,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -117,6 +119,19 @@ type Props = {
   workspaceCwd?: string | null;
 };
 
+export type SourceControlPanelHandle = {
+  // Resolves the prev/next entry after (repoRoot, path, mode) in the exact
+  // order this panel renders (list or tree, staged followed by unstaged,
+  // skipping collapsed sections/folders), selects and focuses it here, and
+  // returns it so the caller can update its diff tab. Returns null if
+  // repoRoot doesn't match what this panel is currently showing, the
+  // starting entry isn't found, or there is no such neighbor.
+  navigateEntry: (
+    input: { repoRoot: string; path: string; mode: "-" | "+" },
+    direction: "prev" | "next",
+  ) => { path: string; originalPath: string | null; mode: "-" | "+" } | null;
+};
+
 const ROW_HEIGHTS = {
   banner: 32,
   header: 30,
@@ -138,6 +153,19 @@ type RowDescriptor =
       section: "staged" | "changes";
     }
   | { kind: "tree-file"; key: string; depth: number; entry: SourceControlEntry };
+
+type EntryRowDescriptor = Extract<
+  RowDescriptor,
+  { kind: "staged-entry" } | { kind: "changes-entry" } | { kind: "tree-file" }
+>;
+
+function isEntryRow(row: RowDescriptor): row is EntryRowDescriptor {
+  return (
+    row.kind === "staged-entry" ||
+    row.kind === "changes-entry" ||
+    row.kind === "tree-file"
+  );
+}
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -175,19 +203,23 @@ function statusTextClass(code: string): string {
 }
 
 
-export const SourceControlPanel = memo(function SourceControlPanel({
-  open,
-  sourceControl,
-  pushOnCommit,
-  onPushOnCommitChange,
-  gitWorkspaceId,
-  savedCommitMessage,
-  onCommitMessagePersist,
-  onOpenDiff,
-  onOpenFile,
-  onNavigateToWorktree,
-  workspaceCwd,
-}: Props) {
+export const SourceControlPanel = memo(
+  forwardRef<SourceControlPanelHandle, Props>(function SourceControlPanel(
+    {
+      open,
+      sourceControl,
+      pushOnCommit,
+      onPushOnCommitChange,
+      gitWorkspaceId,
+      savedCommitMessage,
+      onCommitMessagePersist,
+      onOpenDiff,
+      onOpenFile,
+      onNavigateToWorktree,
+      workspaceCwd,
+    }: Props,
+    ref,
+  ) {
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff, {
     workspaceId: gitWorkspaceId,
     savedCommitMessage,
@@ -439,6 +471,34 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     stagedCollapsed,
     changesCollapsed,
   ]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      navigateEntry: (input, direction) => {
+        if (scm.repo?.repoRoot !== input.repoRoot) return null;
+        const entryRows = rows.filter(isEntryRow);
+        const index = entryRows.findIndex(
+          (r) => r.entry.path === input.path && r.entry.mode === input.mode,
+        );
+        if (index === -1) return null;
+        const targetRow =
+          entryRows[direction === "prev" ? index - 1 : index + 1];
+        if (!targetRow) return null;
+        scm.selectExternal({
+          path: targetRow.entry.path,
+          mode: targetRow.entry.mode,
+        });
+        setFocusedRowKey(targetRow.key);
+        return {
+          path: targetRow.entry.path,
+          originalPath: targetRow.entry.originalPath,
+          mode: targetRow.entry.mode,
+        };
+      },
+    }),
+    [scm.repo?.repoRoot, scm.selectExternal, rows],
+  );
 
   const rowKeyToIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -1311,7 +1371,8 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       </AlertDialog>
     </TooltipProvider>
   );
-});
+  }),
+);
 
 function PanelCenter({
   title,

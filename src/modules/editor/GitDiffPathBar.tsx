@@ -12,6 +12,8 @@ import {
   setEditorViewForExt,
 } from "@/modules/settings/store";
 import {
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
   LayoutTwoColumnIcon,
   MoreHorizontalIcon,
 } from "@hugeicons/core-free-icons";
@@ -20,13 +22,11 @@ import {
   type EditorViewSettings,
   extOf,
 } from "./lib/editorViewSettings";
-import { EditorPathBreadcrumb } from "./EditorPathBreadcrumb";
 import { diffRenameLabel } from "./lib/diffRename";
 
 type Props = {
   path: string;
   originalPath: string | null;
-  repoRoot: string;
   mode: "-" | "+";
   chipLabel?: string;
   useFallback: boolean;
@@ -37,15 +37,12 @@ type Props = {
   stats: { added: number; removed: number };
   view: EditorViewSettings;
   diffViewMode: DiffViewMode;
-  workspaceRoot: string | null;
-  home: string | null;
-  onRevealPath: (path: string) => void;
+  onNavigate: (direction: "prev" | "next") => void;
 };
 
 export function GitDiffPathBar({
   path,
   originalPath,
-  repoRoot,
   mode,
   chipLabel,
   useFallback,
@@ -56,9 +53,7 @@ export function GitDiffPathBar({
   stats,
   view,
   diffViewMode,
-  workspaceRoot,
-  home,
-  onRevealPath,
+  onNavigate,
 }: Props) {
   const renameFrom = diffRenameLabel(path, originalPath);
   const ext = extOf(path);
@@ -69,12 +64,29 @@ export function GitDiffPathBar({
 
   return (
     <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
-      <Badge
-        variant="outline"
-        className="shrink-0 text-[10px] uppercase tracking-wide"
-      >
-        {chipLabel ?? (mode === "+" ? "Staged Changes" : "Changes")}
-      </Badge>
+      <div className="flex h-[18px] shrink-0 items-stretch overflow-hidden rounded border border-border/60 text-[10px] uppercase tracking-wide">
+        <button
+          type="button"
+          onClick={() => onNavigate("prev")}
+          title="Previous change"
+          aria-label="Previous change"
+          className="flex w-4 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={11} strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("next")}
+          title="Next change"
+          aria-label="Next change"
+          className="flex w-4 items-center justify-center border-l border-border/60 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <HugeiconsIcon icon={ArrowRight01Icon} size={11} strokeWidth={2} />
+        </button>
+        <span className="flex items-center border-l border-border/60 px-1.5 text-muted-foreground">
+          {chipLabel ?? (mode === "+" ? "Staged Changes" : "Changes")}
+        </span>
+      </div>
       {renameFrom ? (
         <span
           className="shrink-0 truncate font-mono text-[10px] text-muted-foreground"
@@ -83,12 +95,12 @@ export function GitDiffPathBar({
           from {renameFrom}
         </span>
       ) : null}
-      <EditorPathBreadcrumb
-        path={path}
-        workspaceRoot={workspaceRoot}
-        home={home}
-        onRevealPath={onRevealPath}
-      />
+      <span
+        className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground"
+        title={path}
+      >
+        {path}
+      </span>
       <div className="ml-auto flex shrink-0 items-center gap-2 text-[10.5px] tabular-nums text-muted-foreground">
         {isBinary ? (
           <Badge variant="secondary" className="text-[10px]">
@@ -127,9 +139,6 @@ export function GitDiffPathBar({
             </span>
           </>
         ) : null}
-        <span className="hidden truncate font-mono lg:inline max-w-60">
-          {repoRoot}
-        </span>
         <div className="flex items-center gap-1">
           <button
             type="button"
