@@ -565,7 +565,7 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │   │                            syntax markers on the active line) and never transforms the saved bytes. No
     │   │                            outline, no toolbar, no read-only preview variant. See `docs/FORK.md` and
     │   │                            `docs/superpowers/specs/2026-09-27-live-preview-markdown-editor-design.md`.
-    │   │                            Both live tab shells (`tiptap/MarkdownTab.tsx`, `milkdown/MilkdownTab.tsx`,
+    │   │                            All three live tab shells (`tiptap/MarkdownTab.tsx`, `milkdown/MilkdownTab.tsx`,
     │   │                            `codemirror/MarkdownTab.tsx`) are lazy-loaded as their own chunk from `TabContent.tsx`,
     │   │                            gated on the tab's resolved engine. `RichMarkdownEditor` and `MilkdownEditor`
     │   │                            are themselves further split into their own chunks, because each is imported
