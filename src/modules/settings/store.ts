@@ -13,6 +13,7 @@ import {
   type MarkdownEngine,
   parseMarkdownEngine,
 } from "@/modules/markdown/lib/markdownEngine";
+import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 
 export type ThemePref = "system" | "light" | "dark";
 
@@ -64,8 +65,6 @@ export type CursorInactiveStyle =
   | "bar"
   | "underline"
   | "none";
-
-export const DEFAULT_THEME_ID = "kex-default";
 
 export const EDITOR_THEMES = [
   "kanagawa",
