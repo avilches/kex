@@ -21,18 +21,18 @@ cd src-tauri && cargo test
 ## Production build
 
 ```bash
-TAURI_SIGNING_PRIVATE_KEY=$(cat ~/.tauri/kex-local.key) pnpm tauri build
+TAURI_SIGNING_PRIVATE_KEY=$(cat ~/.tauri/kex-local.key) \
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD=<password from your secret manager> \
+pnpm tauri build
 ```
 
-The build requires `TAURI_SIGNING_PRIVATE_KEY` because `tauri.conf.json` has an updater public key configured. Without it, Tauri aborts with "A public key has been found, but no private key."
+The build requires `TAURI_SIGNING_PRIVATE_KEY` because `tauri.conf.json` has an updater public key configured. Without it, Tauri aborts with "A public key has been found, but no private key." This key only signs the updater artifact (the auto-updater's signature check), it has nothing to do with Gatekeeper or Apple code signing.
 
-**First time:** generate a local key pair (needs a TTY — run in your terminal):
+**First time:** generate a local key pair with a password (needs a TTY — run in your terminal), then back up both the key file and the password in your secret manager, since losing either makes the key unusable:
 
 ```bash
-pnpm tauri signer generate -w ~/.tauri/kex-local.key
+pnpm tauri signer generate -w ~/.tauri/kex-local.key -p "<a strong password>"
 ```
-
-Leave the password blank or set one; if you set one, also export `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
 Artifacts land in `src-tauri/target/release/bundle/`:
 
