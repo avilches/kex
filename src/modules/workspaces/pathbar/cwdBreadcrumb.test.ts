@@ -3,11 +3,15 @@ import { buildCwdBreadcrumb } from "./cwdBreadcrumb";
 
 describe("buildCwdBreadcrumb", () => {
   const home = "/Users/me";
-  const root = "/Users/me/Work/terax";
+  const root = "/Users/me/Work/kex";
 
   it("collapses home and marks the root segment", () => {
-    const { segments } = buildCwdBreadcrumb("/Users/me/Work/terax/src", root, home);
-    expect(segments.map((s) => s.label)).toEqual(["~", "Work", "terax", "src"]);
+    const { segments } = buildCwdBreadcrumb(
+      "/Users/me/Work/kex/src",
+      root,
+      home,
+    );
+    expect(segments.map((s) => s.label)).toEqual(["~", "Work", "kex", "src"]);
     expect(segments.find((s) => s.fullPath === root)?.relation).toBe("root");
     expect(segments[0].isHome).toBe(true);
   });
@@ -24,7 +28,11 @@ describe("buildCwdBreadcrumb", () => {
   });
 
   it("does not treat a sibling prefix as inside root", () => {
-    const { segments } = buildCwdBreadcrumb("/Users/me/Work/teraxedge", root, home);
+    const { segments } = buildCwdBreadcrumb(
+      "/Users/me/Work/kexedge",
+      root,
+      home,
+    );
     expect(segments.some((s) => s.relation === "inside-root")).toBe(false);
   });
 

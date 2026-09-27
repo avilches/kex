@@ -155,10 +155,10 @@ describe("resolveSidebarTarget", () => {
 
   it("stays in workspace mode in a non-repo container workspace holding a nested repo", () => {
     const t = resolveSidebarTarget({
-      folder: "/Work/terax-ai/src/App.tsx",
+      folder: "/Work/kex/src/App.tsx",
       workspaceRoot: "/Work",
       workspaceGitRoot: null,
-      gitRoot: "/Work/terax-ai",
+      gitRoot: "/Work/kex",
       currentFsRoot: null,
       home,
     });
