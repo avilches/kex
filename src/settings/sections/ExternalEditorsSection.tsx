@@ -43,6 +43,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import { INPUT_CLASS } from "../components/inputClass";
 
 const WORKSPACE_GROUP_ORDER: EditorGroup[] = ["Other IDEs", "VS Code", "JetBrains"];
 const NOT_INSTALLED_COLLAPSED = 1;
@@ -185,9 +186,6 @@ const TEXT_EDITOR_MODE_OPTIONS: { value: TextEditorMode; label: string }[] = [
   { value: "file-only", label: "Opens single files only" },
   { value: "workspace-and-files", label: "Opens the workspace root and files too" },
 ];
-
-const INPUT_CLASS =
-  "h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 
 const LABEL_CLASS = "text-[10px] font-medium uppercase tracking-wide text-muted-foreground";
 

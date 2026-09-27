@@ -12,9 +12,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
-
-const INPUT_CLASS =
-  "h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
+import { INPUT_CLASS } from "../components/inputClass";
 
 const UI_FONT_PRESETS: { label: string; value: string }[] = [
   { label: "Default (Inter)", value: "" },
