@@ -111,11 +111,3 @@ export function resolveSidebarTarget(input: {
   const ca = fsRef ? commonAncestor(fsRef, folder) : null;
   return { mode: "filesystem", fsRoot: ca ?? pathDirname(folder) };
 }
-
-export function migrateExplorerRootMode(
-  mode: string | undefined,
-): ExplorerRootMode | undefined {
-  if (mode === "terminal" || mode === "git") return "filesystem";
-  if (mode === "filesystem" || mode === "workspace") return mode;
-  return undefined;
-}

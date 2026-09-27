@@ -268,9 +268,10 @@ Closing a tab with autosave on saves silently instead of prompting, and the dirt
 ### Browser tab (renamed from "preview")
 
 The web pane is a real browser (address bar, navigation, reload), so the panel `kind` and its module were renamed
-`preview` → `browser` (`src/modules/browser/`, `BrowserPane`, `BrowserPaneHandle`). Sessions saved before the rename
-are migrated on load in `sanitizePanel` (`kind: "preview"` → `"browser"`). The editor `preview` boolean (ephemeral
-tabs) and the markdown preview pane are unrelated and unchanged.
+`preview` → `browser` (`src/modules/browser/`, `BrowserPane`, `BrowserPaneHandle`). Per the no-backward-compat rule,
+sessions saved before the rename are not migrated: a persisted `kind: "preview"` tab no longer matches any case in
+`TabContent`'s exhaustive switch, so it renders blank until the user closes it. The editor `preview` boolean
+(ephemeral tabs) and the markdown preview pane are unrelated and unchanged.
 
 ### Floating browser windows
 

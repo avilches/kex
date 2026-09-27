@@ -7,7 +7,6 @@ import {
   parentRoot,
   resolveExplorerRoot,
   resolveSidebarTarget,
-  migrateExplorerRootMode,
 } from "./explorerRoot";
 
 describe("resolveExplorerRoot", () => {
@@ -236,21 +235,5 @@ describe("resolveSidebarTarget", () => {
       home: null,
     });
     expect(t).toEqual({ mode: "filesystem", fsRoot: "/x/y" });
-  });
-});
-
-describe("migrateExplorerRootMode", () => {
-  it("maps removed modes to filesystem", () => {
-    expect(migrateExplorerRootMode("terminal")).toBe("filesystem");
-    expect(migrateExplorerRootMode("git")).toBe("filesystem");
-  });
-  it("keeps valid modes", () => {
-    expect(migrateExplorerRootMode("filesystem")).toBe("filesystem");
-    expect(migrateExplorerRootMode("workspace")).toBe("workspace");
-  });
-
-  it("returns undefined for missing/unknown", () => {
-    expect(migrateExplorerRootMode(undefined)).toBeUndefined();
-    expect(migrateExplorerRootMode("bogus")).toBeUndefined();
   });
 });
