@@ -10,7 +10,10 @@ import {
 } from "@/modules/git-history/GitHistoryPane";
 import { NotesView } from "@/modules/notes";
 import { SourceControlPanel } from "@/modules/source-control";
-import type { SourceControlSummary } from "@/modules/source-control";
+import type {
+  SourceControlPanelHandle,
+  SourceControlSummary,
+} from "@/modules/source-control";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { GitCommitIcon } from "@hugeicons/core-free-icons";
@@ -22,6 +25,10 @@ export type SidebarHandle = {
   toggleExplorerSearch: () => void;
   isExplorerFocused: () => boolean;
   refreshExplorer: (path: string) => void;
+  navigateGitDiffEntry: (
+    input: { repoRoot: string; path: string; mode: "-" | "+" },
+    direction: "prev" | "next",
+  ) => { path: string; originalPath: string | null; mode: "-" | "+" } | null;
 };
 
 type CommitFileDiffOpenInput = {
@@ -102,12 +109,15 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
       ? [...VIEWS, { id: "notes" as const, label: "Notes" }]
       : VIEWS;
     const explorerRef = useRef<FileExplorerHandle>(null);
+    const sourceControlRef = useRef<SourceControlPanelHandle>(null);
 
     useImperativeHandle(ref, () => ({
       focusExplorer: () => explorerRef.current?.focusSearch?.(),
       toggleExplorerSearch: () => explorerRef.current?.toggleSearch?.(),
       isExplorerFocused: () => explorerRef.current?.isFocused() ?? false,
       refreshExplorer: (path: string) => explorerRef.current?.refresh(path),
+      navigateGitDiffEntry: (input, direction) =>
+        sourceControlRef.current?.navigateEntry(input, direction) ?? null,
     }));
 
     return (
@@ -179,6 +189,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
             )}
           >
             <SourceControlPanel
+              ref={sourceControlRef}
               open={view === "git"}
               sourceControl={props.sourceControl}
               pushOnCommit={props.pushOnCommit}

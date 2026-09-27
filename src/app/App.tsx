@@ -2119,6 +2119,18 @@ export default function App() {
         const found = findTabGlobal(tabId);
         if (found) updateTabData(found.workspace.id, tabId, updater);
       },
+      onNavigateGitDiffTab: (tabId, direction) => {
+        const found = findTabGlobal(tabId);
+        if (!found || found.tab.kind !== "git-diff") return;
+        const next = sidebarRef.current?.navigateGitDiffEntry(
+          { repoRoot: found.tab.repoRoot, path: found.tab.path, mode: found.tab.mode },
+          direction,
+        );
+        if (!next) return;
+        updateTabData(found.workspace.id, tabId, (p) =>
+          p.kind === "git-diff" ? { ...p, path: next.path, originalPath: next.originalPath, mode: next.mode } : p,
+        );
+      },
       onRenameFile: (tabId, newName) => {
         void handleRenameFileFromTab(tabId, newName);
       },
