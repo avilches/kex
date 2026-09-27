@@ -444,22 +444,24 @@ pub fn load_restore_plan() -> Vec<RestorePlan> {
 }
 
 fn load_restore_plan_from_path(path: &PathBuf) -> Vec<RestorePlan> {
-    let content = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(_) => {
-            log::debug!("[agent-session] restore: no store file, starting fresh");
-            return vec![];
-        }
-    };
-    let store: SessionStore = match serde_json::from_str(&content) {
-        Ok(s) => s,
-        Err(_) => match read_backup_store(path) {
+    let main_store = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<SessionStore>(&content).ok());
+
+    let store = match main_store {
+        Some(s) => s,
+        None => match read_backup_store(path) {
             Some(s) => {
-                log::warn!("[agent-session] restore: store corrupt, recovered from backup");
+                log::warn!("[agent-session] restore: main store unavailable, recovered from backup");
                 s
             }
             None => {
-                log::warn!("[agent-session] restore: store corrupt or wrong schema");
+                // Missing main AND missing backup is a normal first launch, not an anomaly.
+                if path.exists() || path.with_extension("json.bak").exists() {
+                    log::warn!("[agent-session] restore: store corrupt or wrong schema");
+                } else {
+                    log::debug!("[agent-session] restore: no store file, starting fresh");
+                }
                 return vec![];
             }
         },
@@ -733,6 +735,37 @@ mod tests {
         assert_eq!(plans.len(), 1);
         assert_eq!(plans[0].tab_id, "tab-1");
         assert_eq!(plans[0].resume_cmd, "claude --resume 'abc-123'");
+    }
+
+    #[test]
+    fn load_restore_plan_from_path_recovers_from_backup_when_main_file_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd_launch = dir.path().join("project");
+        std::fs::create_dir_all(&cwd_launch).unwrap();
+        let jsonl = dir.path().join("session.jsonl");
+        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+
+        // Two writes so the second one produces a .bak of the first, valid version.
+        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", &jsonl.display().to_string(), &cwd_launch.display().to_string());
+        record_session_at_path(&store_path, "tab-1", "claude", "abc-123", &jsonl.display().to_string(), &cwd_launch.display().to_string());
+        assert!(store_path.with_extension("json.bak").exists());
+
+        std::fs::remove_file(&store_path).unwrap();
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].tab_id, "tab-1");
+        assert_eq!(plans[0].resume_cmd, "claude --resume 'abc-123'");
+    }
+
+    #[test]
+    fn load_restore_plan_from_path_returns_empty_when_neither_file_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert!(plans.is_empty());
     }
 
     #[test]

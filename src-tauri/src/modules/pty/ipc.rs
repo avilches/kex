@@ -503,7 +503,10 @@ mod tests {
 
     #[test]
     fn truncate_for_log_counts_chars_not_bytes() {
-        let s = "é".repeat(300);
+        // "€" is 3 bytes in UTF-8; 250 is not a multiple of 3, so a naive byte
+        // slice at offset 250 would land mid-codepoint (unlike a 2-byte char at
+        // an even max, which happens to fall on a char boundary by coincidence).
+        let s = "€".repeat(300);
         let truncated = truncate_for_log(&s, 250);
         assert_eq!(truncated.chars().count(), 250 + "...(50 more)".chars().count());
     }

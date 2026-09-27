@@ -25,6 +25,12 @@ spool_event() {
         # both crossing the line cap) onto the same file, letting one mv
         # clobber the other's freshly-appended line. Suffix with our own PID
         # so each rotation gets its own temp file.
+        # tail reads the file at an instant before the mv below lands, so a third
+        # invocation that appends a line in that gap (with the file already at the
+        # cap) can lose it. Accepted without a lock: hooks for the same tab fire
+        # serially in normal use, and adding sync (e.g. an mkdir-based mutex) would
+        # complicate a script that runs on every hook event to close a case that
+        # doesn't happen in practice.
         local rotate_tmp="$spool_file.tmp.$$"
         tail -n "$MAX_SPOOL_LINES" "$spool_file" > "$rotate_tmp" 2>/dev/null \
             && mv "$rotate_tmp" "$spool_file"
