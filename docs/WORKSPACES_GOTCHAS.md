@@ -695,7 +695,56 @@ pasar por alto) de una libreria de terceros.
 
 ---
 
-## Bug 11: crear un segundo grupo del WorkspaceBar borraba el grupo recien creado (RESUELTO)
+## Bug 11: el menu de tres puntos del editor no aparecia al abrir un .md por primera vez (RESUELTO)
+
+### Sintoma
+
+Al arreglar que el boton de tres puntos (ajustes de vista del editor, en `EditorPathBar`) dejara de
+desmontarse al entrar en preview/split, el usuario seguia sin verlo la primera vez que abria un
+`.md`: aparecia el ojo y el boton de panel dividido, ya en modo preview, pero no el de tres puntos.
+En cuanto pulsaba cualquiera de los dos botones, el de tres puntos aparecia y ya no volvia a
+desaparecer nunca, se hiciera lo que se hiciera despues.
+
+### Pistas falsas descartadas
+
+- Vite HMR mostrando un render antiguo de una pestana ya montada antes del cambio (patron ya
+  documentado en `AGENTS.md`): descartado porque el usuario reprodujo el fallo tras matar el proceso
+  y arrancar `pnpm tauri dev` en frio.
+- Un problema de timing en el primer render (settings aun no hidratados, viewToggles llegando
+  `undefined` un instante): descartado con una traza (`console.log` temporal en `EditorPathBar`) que
+  mostro `showToggles: false` de forma estable, no solo en el primer tick.
+
+### Causa raiz
+
+Abrir un `.md` desde el explorador crea una pestana `kind: "markdown"`, no `kind: "editor"`. Ese tipo
+de pestana tiene tres motores de render distintos segun `markdownEngine` (`tiptap`, `milkdown`,
+"legacy"): el legacy es el que se activa por defecto en este repo y monta su **propio** `EditorPathBar`
+directamente en `TabContent.tsx` (rama `case "markdown"`, la que no usa `MarkdownTab.tsx`), con un
+`view={{ mode: "overlay", ... }}` fijo pero sin pasar nunca `viewToggles` ni `globalToggles`. El
+arreglo anterior solo habia tocado la rama `case "editor"`, que es donde aterriza la pestana **tras**
+pulsar el ojo o el panel dividido (`onSetMarkdownView`/`onUpdateTab` convierten la pestana de
+`markdown` a `editor`), asi que a partir de ese clic ya usaba el `viewToggles` siempre montado. La
+pestana legacy en si nunca lo tuvo.
+
+### Fix
+
+`buildViewToggles(path)` en `TabContent.tsx` concentra el calculo (antes vivia solo dentro del `case
+"editor"`) y se llama desde las dos ramas que montan un `EditorPathBar` para un archivo markdown: el
+`case "editor"` y el render legacy de `case "markdown"`. Como `effectivePreviewMode` ya vale
+`"overlay"` fijo para cualquier pestana `kind: "markdown"`, el mismo helper deja el boton disabled
+ahi automaticamente, sin condicion extra.
+
+### Leccion
+
+Un tab `kind` puede tener mas de un componente que monta la misma barra compartida (`EditorPathBar`)
+de forma independiente; arreglar la version mas obvia (la que ya usa el usuario tras un clic) no
+implica haber cubierto la que se ve **antes** de ese clic. Antes de dar un fix de una barra compartida
+por completo, `grep -rn "<EditorPathBar"` para listar todos los que la montan, no solo el que
+disparo el reporte original.
+
+---
+
+## Bug 12: crear un segundo grupo del WorkspaceBar borraba el grupo recien creado (RESUELTO)
 
 ### Sintoma
 
@@ -759,7 +808,7 @@ estado ya no-trivial.
 
 ---
 
-## Bug 12: arrastrar la cabecera de un grupo para reordenar hacia un "swap" raro (RESUELTO)
+## Bug 13: arrastrar la cabecera de un grupo para reordenar hacia un "swap" raro (RESUELTO)
 
 ### Sintoma
 

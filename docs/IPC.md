@@ -142,6 +142,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `window_save_sidebar(label, open, view, side, width)` | Persist the per-window sidebar chrome (open, active view, dock side, width percentage) into the `workspaces.json` index only, without rewriting the workspace bodies. Lightweight so it can fire on every view switch or resize (the frontend debounces it ~250ms) |
 | `window_save_workspace_bar(label, width)` | Persist the workspace bar pixel width for a given window label into the `workspaces.json` index. Called on every drag resize (debounced in the frontend); separate from the sidebar state persisted by `window_save_sidebar` so the two can change independently. |
 | `get_launch_dir` | Return the CLI launch directory (drained on first call) |
+| `get_build_info` | Return `{ hash, branch }`, both baked in at compile time by `build.rs` (`env!("KEX_GIT_HASH")` / `env!("KEX_GIT_BRANCH")`), each `"unknown"` if unavailable at build time (no `.git`, or a detached `HEAD` for `branch`). Shown in Settings > About; the branch is only displayed there in dev builds (`productName` "Kex Dev") |
 | `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
