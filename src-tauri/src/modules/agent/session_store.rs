@@ -381,23 +381,27 @@ fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id:
 /// Remove a tab entry from agent-sessions.json.
 /// Called when the agent exits (exited signal) or the user detaches manually.
 pub fn detach_session(tab_id: &str) -> Result<(), String> {
+    if let Some(path) = store_path() {
+        detach_session_at_path(&path, tab_id);
+    }
+    Ok(())
+}
+
+fn detach_session_at_path(path: &Path, tab_id: &str) {
     log::info!("[agent-session] detach tab={tab_id}");
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(path) = store_path() {
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) {
-                store.tabs.remove(tab_id);
-                if let Ok(out) = serde_json::to_string_pretty(&store) {
-                    let tmp = path.with_extension("json.kex-tmp");
-                    if std::fs::write(&tmp, out).is_ok() {
-                        write_backup(&path, &content);
-                        let _ = std::fs::rename(&tmp, &path);
-                    }
+    if let Ok(content) = std::fs::read_to_string(path) {
+        if let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) {
+            store.tabs.remove(tab_id);
+            if let Ok(out) = serde_json::to_string_pretty(&store) {
+                let tmp = path.with_extension("json.kex-tmp");
+                if std::fs::write(&tmp, out).is_ok() {
+                    write_backup(path, &content);
+                    let _ = std::fs::rename(&tmp, path);
                 }
             }
         }
     }
-    Ok(())
 }
 
 /// Read-only preview of the resume command for a single tab, used by the frontend to show
@@ -650,6 +654,24 @@ mod tests {
         let original_content = std::fs::read_to_string(&store_path).unwrap();
 
         remove_panel_from_store("tab-1", &store_path);
+
+        let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
+        assert_eq!(bak_content, original_content);
+
+        let after: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(after.tabs.is_empty());
+    }
+
+    #[test]
+    fn detach_session_at_path_writes_backup_of_previous_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd_launch = dir.path().join("project");
+        let jsonl = dir.path().join("session.jsonl");
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, sample_tabs(&cwd_launch, &jsonl));
+        let original_content = std::fs::read_to_string(&store_path).unwrap();
+
+        detach_session_at_path(&store_path, "tab-1");
 
         let bak_content = std::fs::read_to_string(store_path.with_extension("json.bak")).unwrap();
         assert_eq!(bak_content, original_content);
