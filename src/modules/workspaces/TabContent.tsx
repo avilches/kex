@@ -199,6 +199,20 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const effectivePreviewMode: "overlay" | "split" | undefined =
     rawPM === true ? "overlay" : !rawPM ? undefined : (rawPM as "overlay" | "split");
 
+  // Shared by both the "editor" tab kind and the legacy-engine "markdown" render
+  // below: the view-options button is the same everywhere a markdown/html file
+  // can show a preview, and is disabled only in overlay (no editor visible at all).
+  const buildViewToggles = (path: string) => {
+    const ext = extOf(path);
+    return {
+      ext,
+      value: resolveEditorView(path, editorViewByExt),
+      onChange: (next: EditorViewSettings) => void setEditorViewForExt(ext, next),
+      onViewInSettings: () => void openFileTypesSettings(ext || undefined),
+      disabled: effectivePreviewMode === "overlay",
+    };
+  };
+
   const tabMarkdownEngine =
     tab.kind === "markdown" || tab.kind === "editor"
       ? resolveMarkdownEngine(tab.markdownEngine, markdownEnginePref)
@@ -265,17 +279,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       const ishtml = overrideLang ? isHtmlPath(`x.${overrideLang}`) : isHtmlPath(tab.path);
       const showPreviewToggle = ismd || ishtml;
 
-      const ext = extOf(tab.path);
-      const viewToggles = {
-        ext,
-        value: resolveEditorView(tab.path, editorViewByExt),
-        onChange: (next: EditorViewSettings) =>
-          void setEditorViewForExt(ext, next),
-        onViewInSettings: () => void openFileTypesSettings(ext || undefined),
-        // Overlay preview hides the editor entirely, so its view settings don't
-        // apply; split still shows the editor, so it stays enabled there.
-        disabled: effectivePreviewMode === "overlay",
-      };
+      const viewToggles = buildViewToggles(tab.path);
 
       return (
         <Suspense fallback={null}>
@@ -450,6 +454,8 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
                 }),
               }}
+              viewToggles={buildViewToggles(tab.path)}
+              globalToggles={globalToggles}
             />
             <div className="relative min-h-0 flex-1">
               <div className="absolute inset-0 invisible pointer-events-none">
