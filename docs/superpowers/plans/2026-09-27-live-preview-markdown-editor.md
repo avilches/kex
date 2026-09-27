@@ -381,6 +381,13 @@ the installed `@lezer/markdown@1.6.4` parser table: `ATXHeading1`..`ATXHeading6`
 `Link` (children `LinkMark` and `URL`), `BulletList`/`OrderedList` containing `ListItem` (child
 `ListMark`), `Task` (child `TaskMarker`, the literal 3 characters `[ ]` or `[x]`).
 
+**Known v1 gap, explicit:** Setext-style headings (`Title\n=====` or `Title\n-----`, parsed as
+`SetextHeading1`/`SetextHeading2`) are not decorated — only ATX headings (`# Title`) are. This is
+a real gap versus full CommonMark heading support, not an oversight to silently fix mid-task: note
+it in Task 11's `docs/FORK.md` entry. ATX is the style every other engine in this app's note-taking
+workflow produces and the one this evaluation is meant to judge; adding Setext support is a small,
+separable follow-up if the engine proves out.
+
 **Decision on "active line":** only marker *visibility* depends on whether the cursor/selection
 touches that line. The *styling* (bold/italic/heading-size/etc. CSS class) always applies to the
 content span, active line or not — this matches Obsidian, which keeps a line's formatting visible
@@ -507,10 +514,13 @@ describe("planLivePreview", () => {
   });
 
   it("emits a checkbox spec for a task item, checked and unchecked", () => {
+    // "- [ ] todo\n" is 11 chars (0-10), so line 2 starts at offset 11 and its
+    // "[x]" TaskMarker spans 13-16, not 12-15 - verified against a real parse,
+    // not hand-counted twice.
     const text = "- [ ] todo\n- [x] done\n";
     const result = plan(text);
     expect(result.checkboxes).toContainEqual({ from: 2, to: 5, checked: false });
-    expect(result.checkboxes).toContainEqual({ from: 12, to: 15, checked: true });
+    expect(result.checkboxes).toContainEqual({ from: 13, to: 16, checked: true });
   });
 
   it("keeps checkbox decorations even on the active line", () => {
@@ -519,23 +529,34 @@ describe("planLivePreview", () => {
     expect(result.checkboxes).toContainEqual({ from: 2, to: 5, checked: false });
   });
 
-  it("tolerates an embedded HTML block without error or decoration", () => {
+  it("styles an embedded HTML block as monospace, never as markdown, and never throws", () => {
     const text = '<div class="note">raw html, **not markdown** in here</div>\n\n# Real heading\n';
+    const headingStart = text.indexOf("# Real heading");
     expect(() => plan(text)).not.toThrow();
     const result = plan(text);
-    // Nothing inside the HTML block (offsets 0-60) is decorated; only the
-    // heading that follows it is.
-    expect(result.marks.every((m) => m.from >= 60)).toBe(true);
-    expect(result.hides.every((h) => h.from >= 60)).toBe(true);
+    const htmlMark = result.marks.find((m) => m.className === "cm-lp-html");
+    expect(htmlMark).toBeDefined();
+    expect(htmlMark?.from).toBe(0);
+    expect((htmlMark?.to ?? 0) <= headingStart).toBe(true);
+    const contentMarks = result.marks.filter((m) => m.className !== "cm-lp-html");
+    expect(contentMarks.every((m) => m.from >= headingStart)).toBe(true);
+    expect(result.hides.every((h) => h.from >= headingStart)).toBe(true);
+    expect(contentMarks).toContainEqual({
+      from: headingStart,
+      to: headingStart + "# Real heading".length,
+      className: "cm-lp-heading cm-lp-h1",
+    });
   });
 
-  it("never decorates content inside the frontmatter block", () => {
+  it("styles the frontmatter block as monospace, never as markdown", () => {
     const text = "---\ntitle: **not bold**\n---\n# Real Title\n";
     const fmEnd = "---\ntitle: **not bold**\n---\n".length;
     const result = plan(text, [], fmEnd);
-    expect(result.marks.every((m) => m.from >= fmEnd)).toBe(true);
+    expect(result.marks).toContainEqual({ from: 0, to: fmEnd, className: "cm-lp-frontmatter" });
+    const contentMarks = result.marks.filter((m) => m.className !== "cm-lp-frontmatter");
+    expect(contentMarks.every((m) => m.from >= fmEnd)).toBe(true);
     expect(result.hides.every((h) => h.from >= fmEnd)).toBe(true);
-    expect(result.marks).toContainEqual({
+    expect(contentMarks).toContainEqual({
       from: fmEnd,
       to: fmEnd + "# Real Title".length,
       className: "cm-lp-heading cm-lp-h1",
@@ -622,12 +643,24 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
   const hides: HideSpec[] = [];
   const checkboxes: CheckboxSpec[] = [];
 
+  // Frontmatter is never parsed as markdown (see the frontmatterEnd check inside
+  // enter() below, which skips it entirely); it still needs its own monospace
+  // styling, which nothing else in this function would otherwise apply.
+  if (frontmatterEnd > from) {
+    marks.push({ from: Math.max(from, 0), to: Math.min(to, frontmatterEnd), className: "cm-lp-frontmatter" });
+  }
+
   tree.iterate({
     from,
     to,
     enter(ref) {
       if (ref.from < frontmatterEnd) return;
       const node = ref.node;
+
+      if (node.type.name === "HTMLBlock" || node.type.name === "HTMLTag") {
+        marks.push({ from: node.from, to: node.to, className: "cm-lp-html" });
+        return;
+      }
 
       if (HEADING_NAMES.has(node.type.name)) {
         const level = node.type.name.slice(-1);
@@ -947,14 +980,23 @@ git commit -m "feat(markdown): wire the Live Preview planner into a CodeMirror V
 
 ### Task 7: Assemble the extension set and theme
 
+**Context:** `@uiw/react-codemirror`'s `<CodeMirror>` component defaults its own `theme` prop to
+`"light"` when that prop is not explicitly set, which pushes the library's stock light theme into
+the extension list ahead of anything passed via `extensions` — it does not just no-op. `EditorPane`
+(`src/modules/editor/EditorPane.tsx:549`) avoids this by passing `theme={themeExt}` as the
+component's own `theme` prop, which replaces that default branch instead of adding to it. This
+engine must do the same: `useEditorThemeExt()`'s result is passed as `<CodeMirror>`'s `theme` prop
+in Task 8, not folded into this function's returned extension array — otherwise the app's actual
+color theme would end up layered underneath the library's generic light theme.
+
 **Files:**
 - Create: `src/modules/markdown/codemirror/lib/markdownExtensions.ts`
 
 **Interfaces:**
-- Consumes: `livePreviewPlugin` (Task 6); `useEditorThemeExt` from
-  `src/modules/editor/lib/useEditorThemeExt.ts` (existing, unchanged, called by Task 9 and passed
-  in here as a parameter, since it is a React hook and this file is not a component).
-- Produces: `buildLivePreviewExtensions(themeExt: Extension): Extension[]`, consumed by Task 9.
+- Consumes: `livePreviewPlugin` (Task 6).
+- Produces: `buildLivePreviewExtensions(): Extension[]`, consumed by Task 8 (which separately
+  passes `useEditorThemeExt()`'s result as `<CodeMirror>`'s `theme` prop, not as part of this
+  array).
 
 - [ ] **Step 1: Implement**
 
@@ -966,12 +1008,12 @@ import { livePreviewPlugin } from "@/modules/markdown/codemirror/lib/livePreview
 
 // GFM (tables, task lists, strikethrough) plus subscript/superscript/emoji: the
 // `markdownLanguage` export already bundles these on top of CommonMark, so no
-// manual @lezer/markdown extension list is needed.
-export function buildLivePreviewExtensions(themeExt: Extension): Extension[] {
+// manual @lezer/markdown extension list is needed. Tables parse without error
+// but are not visually decorated in this version (see the design spec's scope).
+export function buildLivePreviewExtensions(): Extension[] {
   return [
     markdown({ base: markdownLanguage }),
     livePreviewPlugin,
-    themeExt,
     EditorView.lineWrapping,
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
@@ -1002,6 +1044,11 @@ export function buildLivePreviewExtensions(themeExt: Extension): Extension[] {
       ".cm-lp-link-text": { color: "var(--primary, #3b82f6)", textDecoration: "underline" },
       ".cm-lp-bullet": { color: "var(--muted-foreground)" },
       ".cm-lp-checkbox": { marginRight: "4px", cursor: "pointer" },
+      ".cm-lp-frontmatter": {
+        fontFamily: "var(--font-mono, monospace)",
+        backgroundColor: "color-mix(in srgb, var(--foreground) 4%, transparent)",
+      },
+      ".cm-lp-html": { fontFamily: "var(--font-mono, monospace)" },
     }),
   ];
 }
@@ -1023,7 +1070,8 @@ git commit -m "feat(markdown): assemble the Live Preview CodeMirror extension se
 - Test: `src/modules/markdown/codemirror/CodeMirrorEditor.test.tsx`
 
 **Interfaces:**
-- Consumes: `buildLivePreviewExtensions` (Task 7); `useEditorThemeExt` (existing).
+- Consumes: `buildLivePreviewExtensions` (Task 7, called with no arguments); `useEditorThemeExt`
+  (existing, its result passed as `<CodeMirror>`'s own `theme` prop, per Task 7's note).
 - Produces:
   ```typescript
   export type CodeMirrorEditorHandle = { focus(): void };
@@ -1065,6 +1113,34 @@ describe("CodeMirrorEditor", () => {
     expect(onChange).toHaveBeenCalledWith("Hi there");
     expect(view?.state.doc.toString()).toBe("Hi there");
   });
+
+  it("stays byte-identical after loading and after moving the cursor across every line (AC #4 round-trip)", () => {
+    const source =
+      '---\ntitle: Note\n---\n\n<div class="note">raw html</div>\n\n# Heading\n\n**bold** and _italic_ and `code`\n\n- [ ] a task\n- a bullet\n';
+    const onChange = vi.fn();
+    const { container } = render(<CodeMirrorEditor value={source} onChange={onChange} />);
+    const dom = container.querySelector(".cm-content") as HTMLElement;
+    const view = EditorView.findFromDOM(dom);
+    expect(view).not.toBeNull();
+    if (!view) return;
+
+    // Right after load: no edit happened, so the document must already equal
+    // the source exactly.
+    expect(view.state.doc.toString()).toBe(source);
+
+    // Move the cursor to the start of every line in turn (this is what drives
+    // the ViewPlugin's hide/reveal recompute in livePreviewPlugin) and assert
+    // the document text never changes as a side effect of that recompute.
+    for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo++) {
+      const linePos = view.state.doc.line(lineNo).from;
+      view.dispatch({ selection: { anchor: linePos } });
+      expect(view.state.doc.toString()).toBe(source);
+    }
+
+    // No edit was ever dispatched, so onChange (which only fires on
+    // update.docChanged) must never have been called.
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
 ```
 
@@ -1092,7 +1168,11 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
   function CodeMirrorEditor({ value, onChange }, ref) {
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const themeExt = useEditorThemeExt();
-    const extensions = useMemo(() => buildLivePreviewExtensions(themeExt), [themeExt]);
+    // Stable identity: buildLivePreviewExtensions() takes no arguments, so this
+    // only needs to run once, not on every theme change (the theme is a
+    // separate prop below, per Task 7's note on @uiw/react-codemirror's
+    // `theme` default).
+    const extensions = useMemo(() => buildLivePreviewExtensions(), []);
 
     useImperativeHandle(ref, () => ({
       focus: () => cmRef.current?.view?.focus(),
@@ -1103,6 +1183,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
         ref={cmRef}
         value={value}
         onChange={onChange}
+        theme={themeExt}
         height="100%"
         className="h-full w-full overflow-auto"
         basicSetup={{
@@ -1217,6 +1298,13 @@ export function MarkdownTab(props: Props): JSX.Element {
         {doc.status === "ready" ? (
           <CodeMirrorEditor ref={editorRef} value={doc.content} onChange={onChange} />
         ) : doc.status === "loading" || doc.status === "deleted" ? null : (
+          // MarkdownDocFallback is typed for MarkdownDocState (useMarkdownDocument's
+          // 5-variant union), not DocumentState (useDocument's 6-variant union, used
+          // here). Excluding "ready"/"loading"/"deleted" above narrows doc to exactly
+          // {binary}|{toolarge}|{error}, which today happens to match those variants'
+          // shapes in MarkdownDocState field-for-field, so this type-checks. If either
+          // union's shape for those three variants ever diverges, this breaks at
+          // compile time, not silently.
           <MarkdownDocFallback doc={doc} />
         )}
         {conflict && (
@@ -1323,7 +1411,9 @@ Add a divergence entry under the markdown-editor evaluation section (next to the
 ```markdown
 - Added a fourth `markdown` tab engine, "Live Preview" (CodeMirror 6, evaluation stage): edits the
   raw markdown text directly with Obsidian-style live-preview decorations, never reparsing to an
-  AST. Gaps vs TipTap/Milkdown: no outline panel, no toolbar, no read-only preview integration.
+  AST. Gaps vs TipTap/Milkdown: no outline panel, no toolbar, no read-only preview integration,
+  no decoration for GFM tables (parsed without error, shown as plain text) or Setext-style
+  headings (only ATX `#` headings are decorated).
 ```
 
 - [ ] **Step 3: `AGENTS.md`**
