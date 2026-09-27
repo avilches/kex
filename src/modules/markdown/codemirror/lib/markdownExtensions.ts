@@ -5,11 +5,11 @@ import { EditorView } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { linkClickHandler, livePreviewPlugin } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 
-// The user's code-syntax theme colors bare URLs arbitrarily; this engine does
-// not decorate them, so they should read as plain text.
 const LP_FOREGROUND_CLASSES = ["heading", "bold", "italic", "strike", "code", "codeblock"];
 const LP_TEXT_COLOR_SELECTORS = LP_FOREGROUND_CLASSES.flatMap((c) => [`.cm-lp-${c}`, `.cm-lp-${c} *`]).join(", ");
 
+// The user's code-syntax theme colors bare URLs arbitrarily; this engine does
+// not decorate them, so they should read as plain text.
 export const plainUrlHighlight = HighlightStyle.define([{ tag: tags.url, color: "var(--foreground) !important" }]);
 
 // GFM (tables, task lists, strikethrough) plus subscript/superscript/emoji: the
@@ -53,6 +53,8 @@ export function buildLivePreviewExtensions(): Extension[] {
       },
       ".cm-lp-link-text": { textDecoration: "underline" },
       [LP_TEXT_COLOR_SELECTORS]: { color: "var(--foreground) !important" },
+      // Same specificity as the rule above, so it must come after it for a link
+      // nested in bold or a heading (or bold nested in a link) to keep its color.
       ".cm-lp-link-text, .cm-lp-link-text *": { color: "var(--primary, #3b82f6) !important" },
       ".cm-lp-bullet": { color: "var(--muted-foreground)" },
       ".cm-lp-checkbox": { marginRight: "4px", cursor: "pointer" },
