@@ -455,6 +455,12 @@ sub/sup/color as rich marks, wiki-links, move-line/tab-indent shortcuts) was a d
 spec, not a surprise found while building: Crepe's own feature set does not cover them, and porting them was out of
 scope for an evaluation of the engine itself.
 
+- Added a fourth `markdown` tab engine, "Live Preview" (CodeMirror 6, evaluation stage): edits the raw markdown text
+  directly with Obsidian-style live-preview decorations, never reparsing to an AST. Gaps vs TipTap/Milkdown: no outline
+  panel, no toolbar, no read-only preview integration, no decoration for Setext-style headings (only ATX `#` headings
+  are decorated). GFM tables render as HTML tables off the active lines (only `[text](url)` is recognized inside a
+  cell); fenced code blocks are styled as a monospace block.
+
 ### Notes sidebar view
 
 HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as the vault. Three Tauri commands read the vault one level at a time (`notes_read_dirs`, `notes_read_heads`, `notes_paths_exist`); per-workspace UI state in `kex.json` at the workspace root. Not present upstream.

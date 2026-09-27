@@ -1,0 +1,287 @@
+// @vitest-environment happy-dom
+import { forceParsing, syntaxTreeAvailable } from "@codemirror/language";
+import { EditorSelection, EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  handleLinkMousedown,
+  linkClickHandler,
+  livePreviewPlugin,
+} from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
+
+const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
+
+// IS_MAC is read live at call time inside handleLinkMousedown, so mutating
+// this mocked module's property between tests is enough to flip branches;
+// no module reset or re-import is needed.
+const platformMock = vi.hoisted(() => ({ IS_MAC: false }));
+vi.mock("@/lib/platform", () => platformMock);
+
+function mount(doc: string, selection?: { anchor: number }) {
+  const state = EditorState.create({
+    doc,
+    selection: selection ? { anchor: selection.anchor } : undefined,
+    extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin],
+  });
+  return new EditorView({ state, parent: document.body });
+}
+
+describe("livePreviewPlugin", () => {
+  it("hides the heading marker when the cursor is elsewhere", () => {
+    const view = mount("# Title\n\nOther line", { anchor: 19 });
+    expect(view.dom.textContent).not.toContain("#");
+    expect(view.dom.textContent).toContain("Title");
+    view.destroy();
+  });
+
+  it("reveals the heading marker when the cursor is on that line", () => {
+    const view = mount("# Title\n\nOther line", { anchor: 3 });
+    expect(view.dom.textContent).toContain("# Title");
+    view.destroy();
+  });
+
+  it("renders a real checkbox input for a task item", () => {
+    const view = mount("- [ ] todo\n");
+    const checkbox = view.dom.querySelector('input[type="checkbox"]');
+    expect(checkbox).not.toBeNull();
+    expect((checkbox as HTMLInputElement).checked).toBe(false);
+    view.destroy();
+  });
+
+  it("toggles the underlying text when the checkbox is clicked", () => {
+    const view = mount("- [ ] todo\n");
+    const checkbox = view.dom.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    checkbox.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(view.state.doc.toString()).toBe("- [x] todo\n");
+    view.destroy();
+  });
+
+  it("reveals markers on every line holding a cursor and keeps other lines hidden", () => {
+    const doc = "**one**\n**two**\n**three**\n";
+    const state = EditorState.create({
+      doc,
+      selection: EditorSelection.create([EditorSelection.cursor(2), EditorSelection.cursor(18)]),
+      extensions: [EditorState.allowMultipleSelections.of(true), markdown({ base: markdownLanguage }), livePreviewPlugin],
+    });
+    const view = new EditorView({ state, parent: document.body });
+    expect(view.state.selection.ranges.length).toBe(2);
+    const lines = Array.from(view.dom.querySelectorAll(".cm-line")).map((l) => l.textContent);
+    expect(lines[0]).toBe("**one**");
+    expect(lines[1]).toBe("two");
+    expect(lines[2]).toBe("**three**");
+    view.destroy();
+  });
+
+  it("decorates content past the initial parse boundary once the background parse lands", () => {
+    // Few, long lines: past the ~3000-char initial parse, but still few enough
+    // lines to sit inside happy-dom's rendered viewport.
+    const filler = `${"plain filler prose ".repeat(40)}\n\n`.repeat(6);
+    const doc = `${filler}**late**\n`;
+    const view = mount(doc, { anchor: 0 });
+    const lateLine = () =>
+      Array.from(view.dom.querySelectorAll(".cm-line")).find((l) => l.textContent?.includes("late"));
+    // The initial synchronous parse stops well before the end of this document.
+    expect(syntaxTreeAvailable(view.state, doc.length)).toBe(false);
+    expect(lateLine()?.textContent).toBe("**late**");
+    // Finishing the parse dispatches a transaction that changes only the tree.
+    forceParsing(view, doc.length, 5000);
+    expect(syntaxTreeAvailable(view.state, doc.length)).toBe(true);
+    expect(lateLine()?.textContent).toBe("late");
+    view.destroy();
+  });
+
+  it("styles every line of a fenced code block as a line, blank lines included", () => {
+    const doc = "intro\n\n```js\nconst x = 1;\n\nlet y;\n```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const styled = Array.from(view.dom.querySelectorAll(".cm-lp-codeblock"));
+    expect(styled.map((el) => el.textContent)).toEqual(["```js", "const x = 1;", "", "let y;", "```"]);
+    expect(styled.every((el) => el.classList.contains("cm-line"))).toBe(true);
+    view.destroy();
+  });
+
+  it("never decorates the frontmatter block", () => {
+    const view = mount("---\ntitle: **not bold**\n---\n# Real\n", { anchor: 0 });
+    // The frontmatter's own ** stays literal; only "Real" (after the closing ---) is a heading.
+    const bodyText = view.dom.textContent ?? "";
+    expect(bodyText).toContain("title: **not bold**");
+    view.destroy();
+  });
+});
+
+describe("table widget", () => {
+  const TABLE =
+    "| Name | Link | N |\n" +
+    "|:---|:---:|---:|\n" +
+    "| a | [the docs](https://example.com) | 1 |\n" +
+    "| b |  | 2 |\n" +
+    "\nafter\n";
+
+  beforeEach(() => openUrl.mockClear());
+
+  it("renders an inactive table as a real <table> with its rows and cells", () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    const table = view.dom.querySelector("table");
+    expect(table).not.toBeNull();
+    const headerCells = Array.from(table?.querySelectorAll("thead th") ?? []).map((c) => c.textContent);
+    expect(headerCells).toEqual(["Name", "Link", "N"]);
+    const bodyRows = Array.from(table?.querySelectorAll("tbody tr") ?? []).map((r) =>
+      Array.from(r.querySelectorAll("td")).map((c) => c.textContent),
+    );
+    expect(bodyRows).toEqual([
+      ["a", "the docs", "1"],
+      ["b", "", "2"],
+    ]);
+    const aligns = Array.from(table?.querySelectorAll("thead th") ?? []).map(
+      (c) => (c as HTMLElement).style.textAlign,
+    );
+    expect(aligns).toEqual(["left", "center", "right"]);
+    expect(view.dom.textContent).not.toContain("|:---|");
+    view.destroy();
+  });
+
+  it("reveals the raw table source when the cursor moves onto one of its lines", () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    expect(view.dom.querySelector("table")).not.toBeNull();
+    view.dispatch({ selection: { anchor: TABLE.indexOf("| b") + 2 } });
+    expect(view.dom.querySelector("table")).toBeNull();
+    expect(view.dom.textContent).toContain("|:---|:---:|---:|");
+    view.dispatch({ selection: { anchor: TABLE.indexOf("after") } });
+    expect(view.dom.querySelector("table")).not.toBeNull();
+    view.destroy();
+  });
+
+  it("opens a cell link on a plain click without moving into the table", async () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    const link = view.dom.querySelector("table a") as HTMLAnchorElement;
+    expect(link.textContent).toBe("the docs");
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    link.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
+    expect(view.dom.querySelector("table")).not.toBeNull();
+    view.destroy();
+  });
+
+  it("does not open a cell link on a right-click", async () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    const link = view.dom.querySelector("table a") as HTMLAnchorElement;
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 2 });
+    link.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(openUrl).not.toHaveBeenCalled();
+    view.destroy();
+  });
+
+  it("blocks the webview's own middle-click navigation on a cell link", () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    const link = view.dom.querySelector("table a") as HTMLAnchorElement;
+    const event = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
+    link.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    view.destroy();
+  });
+});
+
+describe("linkClickHandler", () => {
+  beforeEach(() => openUrl.mockClear());
+
+  // happy-dom has no layout, so posAtCoords is stubbed to the offset under the
+  // pointer; everything after it (tree lookup, URL extraction, open) is real.
+  function mountLink(doc: string, pointerPos: number) {
+    const state = EditorState.create({
+      doc,
+      extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin, linkClickHandler],
+    });
+    const view = new EditorView({ state, parent: document.body });
+    vi.spyOn(view, "posAtCoords").mockReturnValue(pointerPos);
+    return view;
+  }
+
+  function mousedown(view: EditorView, init: MouseEventInit) {
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, ...init });
+    view.contentDOM.dispatchEvent(event);
+    return event;
+  }
+
+  const doc = "see [the docs](https://example.com) here\n";
+  const onLinkText = doc.indexOf("docs");
+
+  // CodeMirror's own mouse-selection handling also calls preventDefault on a
+  // mousedown it receives, so the negative cases call the handler directly to
+  // see exactly what this extension does.
+  function runHandler(view: EditorView, init: MouseEventInit) {
+    const event = new MouseEvent("mousedown", { cancelable: true, ...init });
+    const handled = handleLinkMousedown(event, view);
+    return { handled, prevented: event.defaultPrevented };
+  }
+
+  describe("modifier key by platform", () => {
+    afterEach(() => {
+      platformMock.IS_MAC = false;
+    });
+
+    it("on macOS opens on Cmd+click and ignores a Ctrl+click (the context-menu gesture)", async () => {
+      platformMock.IS_MAC = true;
+
+      const negView = mountLink(doc, onLinkText);
+      expect(runHandler(negView, { ctrlKey: true })).toEqual({ handled: false, prevented: false });
+      negView.destroy();
+
+      const posView = mountLink(doc, onLinkText);
+      const metaEvent = mousedown(posView, { metaKey: true });
+      expect(metaEvent.defaultPrevented).toBe(true);
+      await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
+      posView.destroy();
+    });
+
+    it("outside macOS opens on Ctrl+click and ignores a Cmd+click", async () => {
+      platformMock.IS_MAC = false;
+
+      const negView = mountLink(doc, onLinkText);
+      expect(runHandler(negView, { metaKey: true })).toEqual({ handled: false, prevented: false });
+      negView.destroy();
+
+      const posView = mountLink(doc, onLinkText);
+      const ctrlEvent = mousedown(posView, { ctrlKey: true });
+      expect(ctrlEvent.defaultPrevented).toBe(true);
+      await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
+      posView.destroy();
+    });
+  });
+
+  it("does not open anything on a plain click", async () => {
+    const view = mountLink(doc, onLinkText);
+    expect(runHandler(view, {})).toEqual({ handled: false, prevented: false });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(openUrl).not.toHaveBeenCalled();
+    view.destroy();
+  });
+
+  it("does not open anything on a right-click with Cmd or Ctrl held", async () => {
+    const view = mountLink(doc, onLinkText);
+    expect(runHandler(view, { metaKey: true, button: 2 })).toEqual({ handled: false, prevented: false });
+    expect(runHandler(view, { ctrlKey: true, button: 2 })).toEqual({ handled: false, prevented: false });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(openUrl).not.toHaveBeenCalled();
+    view.destroy();
+  });
+
+  it("does not open anything on Cmd+click outside a link or on a relative link", async () => {
+    // IS_MAC true so the modifier gate itself passes, exercising the
+    // link-lookup logic below it rather than the platform gate.
+    platformMock.IS_MAC = true;
+    const outside = mountLink(doc, 1);
+    expect(runHandler(outside, { metaKey: true })).toEqual({ handled: false, prevented: false });
+    outside.destroy();
+    const relative = "see [notes](./notes.md) here\n";
+    const rel = mountLink(relative, relative.indexOf("notes"));
+    expect(runHandler(rel, { metaKey: true })).toEqual({ handled: false, prevented: false });
+    rel.destroy();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(openUrl).not.toHaveBeenCalled();
+    platformMock.IS_MAC = false;
+  });
+});

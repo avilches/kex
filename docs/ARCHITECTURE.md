@@ -560,10 +560,14 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │   │                            render as plain code), `milkdownTheme.css` (CSS-variable overrides on top of
     │   │                            Crepe's own theme to match the Kex look), `testCrepe.ts` and `roundTrip.test.ts`
     │   │                            (the round-trip idempotence corpus, see `docs/MARKDOWN_GOTCHAS.md`).
-    │   │                            Both live tab shells are lazy-loaded as their own chunk (`MarkdownTab` for
-    │   │                            tiptap, `MilkdownTab` for milkdown) from `TabContent.tsx`, gated on the tab's
-    │   │                            resolved engine; opening a non-markdown tab, or a markdown tab on the other
-    │   │                            engine, never requests either chunk. `RichMarkdownEditor` and `MilkdownEditor`
+    │   │                            `codemirror/` is the evaluation-stage "Live Preview" engine: a CodeMirror 6
+    │   │                            editor that decorates raw markdown text in place (Obsidian-style hide/reveal of
+    │   │                            syntax markers on the active line) and never transforms the saved bytes. No
+    │   │                            outline, no toolbar, no read-only preview variant. See `docs/FORK.md` and
+    │   │                            `docs/superpowers/specs/2026-09-27-live-preview-markdown-editor-design.md`.
+    │   │                            All three live tab shells (`tiptap/MarkdownTab.tsx`, `milkdown/MilkdownTab.tsx`,
+    │   │                            `codemirror/MarkdownTab.tsx`) are lazy-loaded as their own chunk from `TabContent.tsx`,
+    │   │                            gated on the tab's resolved engine. `RichMarkdownEditor` and `MilkdownEditor`
     │   │                            are themselves further split into their own chunks, because each is imported
     │   │                            from two places (its own tab shell, and `MarkdownRenderPane` for the editor-tab
     │   │                            preview): see "Markdown editor chunks" in `docs/BUILD.md` for the measured split
