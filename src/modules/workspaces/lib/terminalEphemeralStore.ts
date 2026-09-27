@@ -22,6 +22,13 @@ export function getRunningCommandsSnapshot(): ReadonlyMap<string, string> {
   return snapshot;
 }
 
+// Per-tab selector: lets a component subscribe to the whole store's change
+// events but only re-render when ITS OWN entry changes, since primitives
+// compare by value under useSyncExternalStore (no snapshot map needed).
+export function getRunningCommand(tabId: string): string | null {
+  return runningCommands.get(tabId) ?? null;
+}
+
 export function setRunningCommand(tabId: string, cmd: string | null): void {
   if (cmd === null) {
     if (!runningCommands.has(tabId)) return;

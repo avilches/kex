@@ -1034,6 +1034,64 @@ export function disposeSession(leafId: string): void {
   }
 }
 
+// Push terminal-appearance preferences into the renderer pool exactly once
+// per change, regardless of how many terminals are mounted. Each apply*
+// function already loops over every slot in the pool, so subscribing once
+// at module scope (instead of once per useTerminalSession instance) turns
+// what used to be N identical full-pool passes (one per mounted terminal)
+// into a single pass. Newly created slots don't need this: createSlot reads
+// the current preferences directly (termOptions() in rendererPool.ts), so
+// this subscription only has to react to a LIVE change while terminals
+// already exist.
+let poolPreferencesSyncStarted = false;
+
+function startPoolPreferencesSync(): void {
+  if (poolPreferencesSyncStarted) return;
+  poolPreferencesSyncStarted = true;
+  let prev = usePreferencesStore.getState();
+  usePreferencesStore.subscribe((state) => {
+    if (state.terminalFontSize !== prev.terminalFontSize || state.zoomLevel !== prev.zoomLevel) {
+      applyFontSize(renderFontSize(state.terminalFontSize, state.zoomLevel));
+    }
+    if (state.terminalFontFamily !== prev.terminalFontFamily) {
+      applyFontFamily(state.terminalFontFamily);
+    }
+    if (state.terminalLetterSpacing !== prev.terminalLetterSpacing) {
+      applyLetterSpacing(state.terminalLetterSpacing);
+    }
+    if (state.terminalFontWeight !== prev.terminalFontWeight) {
+      applyFontWeight(state.terminalFontWeight);
+    }
+    if (state.terminalLineHeight !== prev.terminalLineHeight) {
+      applyLineHeight(state.terminalLineHeight);
+    }
+    if (state.terminalScrollback !== prev.terminalScrollback) {
+      applyScrollback(state.terminalScrollback);
+    }
+    if (state.terminalWebglEnabled !== prev.terminalWebglEnabled) {
+      applyWebglPreference(state.terminalWebglEnabled);
+    }
+    if (state.terminalCursorBlink !== prev.terminalCursorBlink) {
+      applyCursorBlink(state.terminalCursorBlink);
+    }
+    if (state.terminalCursorStyle !== prev.terminalCursorStyle) {
+      applyCursorStyle(state.terminalCursorStyle);
+    }
+    if (state.terminalCursorInactiveStyle !== prev.terminalCursorInactiveStyle) {
+      applyCursorInactiveStyle(state.terminalCursorInactiveStyle);
+    }
+    if (state.terminalCursorWidth !== prev.terminalCursorWidth) {
+      applyCursorWidth(state.terminalCursorWidth);
+    }
+    if (state.terminalScrollSensitivity !== prev.terminalScrollSensitivity) {
+      applyScrollSensitivity(state.terminalScrollSensitivity);
+    }
+    prev = state;
+  });
+}
+
+startPoolPreferencesSync();
+
 type Options = {
   leafId: string;
   container: React.RefObject<HTMLDivElement | null>;
@@ -1162,77 +1220,17 @@ export function useTerminalSession({
     return subscribeLeafScratchpad(leafId, cb);
   }, [leafId, blocks]);
 
-  const fontSize = usePreferencesStore((p) => p.terminalFontSize);
-  const zoomLevel = usePreferencesStore((p) => p.zoomLevel);
-  useEffect(() => {
-    applyFontSize(renderFontSize(fontSize, zoomLevel));
-  }, [fontSize, zoomLevel]);
-
-  const fontFamily = usePreferencesStore((p) => p.terminalFontFamily);
-  useEffect(() => {
-    applyFontFamily(fontFamily);
-  }, [fontFamily]);
-
-  const letterSpacing = usePreferencesStore((p) => p.terminalLetterSpacing);
-  useEffect(() => {
-    applyLetterSpacing(letterSpacing);
-  }, [letterSpacing]);
-
-  const fontWeight = usePreferencesStore((p) => p.terminalFontWeight);
-  useEffect(() => {
-    applyFontWeight(fontWeight);
-  }, [fontWeight]);
-
-  const lineHeight = usePreferencesStore((p) => p.terminalLineHeight);
-  useEffect(() => {
-    applyLineHeight(lineHeight);
-  }, [lineHeight]);
-
+  // Applying these to the renderer pool on change is handled once, at module
+  // scope, by startPoolPreferencesSync above; see its comment for why a
+  // per-instance effect here would redo the same full-pool pass once per
+  // mounted terminal.
   const scrollback = usePreferencesStore((p) => p.terminalScrollback);
-  useEffect(() => {
-    applyScrollback(scrollback);
-  }, [scrollback]);
-
   const backgroundMemoryBudgetMB = usePreferencesStore(
     (p) => p.terminalBackgroundMemoryBudgetMB,
   );
   useEffect(() => {
     scheduleParkedLeafSweep();
   }, [backgroundMemoryBudgetMB, scrollback]);
-
-  const webglPref = usePreferencesStore((p) => p.terminalWebglEnabled);
-  useEffect(() => {
-    applyWebglPreference(webglPref);
-  }, [webglPref]);
-
-  const cursorBlink = usePreferencesStore((p) => p.terminalCursorBlink);
-  useEffect(() => {
-    applyCursorBlink(cursorBlink);
-  }, [cursorBlink]);
-
-  const cursorStyle = usePreferencesStore((p) => p.terminalCursorStyle);
-  useEffect(() => {
-    applyCursorStyle(cursorStyle);
-  }, [cursorStyle]);
-
-  const cursorInactiveStyle = usePreferencesStore(
-    (p) => p.terminalCursorInactiveStyle,
-  );
-  useEffect(() => {
-    applyCursorInactiveStyle(cursorInactiveStyle);
-  }, [cursorInactiveStyle]);
-
-  const cursorWidth = usePreferencesStore((p) => p.terminalCursorWidth);
-  useEffect(() => {
-    applyCursorWidth(cursorWidth);
-  }, [cursorWidth]);
-
-  const scrollSensitivity = usePreferencesStore(
-    (p) => p.terminalScrollSensitivity,
-  );
-  useEffect(() => {
-    applyScrollSensitivity(scrollSensitivity);
-  }, [scrollSensitivity]);
 
   const wasFocusedRef = useRef(false);
   useEffect(() => {

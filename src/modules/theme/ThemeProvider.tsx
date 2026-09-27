@@ -7,8 +7,8 @@ import {
   useState,
 } from "react";
 import { useTauriUnlisten } from "@/lib/useTauriListen";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  loadPreferences,
   onPreferencesChange,
   setTheme as persistTheme,
   setThemeId as persistThemeId,
@@ -81,19 +81,19 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
       : window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
 
+  // usePreferencesStore's own init() (called once by App.tsx / SettingsApp.tsx)
+  // already does the IPC load; reading it here instead of calling
+  // loadPreferences() a second time halves the preference reads on startup.
+  const storeTheme = usePreferencesStore((s) => s.theme);
+  const storeThemeId = usePreferencesStore((s) => s.themeId);
+  const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
-    let alive = true;
-    void loadPreferences().then((p) => {
-      if (!alive) return;
-      setModeState(p.theme);
-      setThemeIdState(p.themeId);
-      writeFastMode(p.theme);
-      writeFastThemeId(p.themeId);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+    if (!prefsHydrated) return;
+    setModeState(storeTheme);
+    setThemeIdState(storeThemeId);
+    writeFastMode(storeTheme);
+    writeFastThemeId(storeThemeId);
+  }, [prefsHydrated, storeTheme, storeThemeId]);
 
   useTauriUnlisten(
     () =>

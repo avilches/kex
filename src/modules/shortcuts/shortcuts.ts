@@ -563,7 +563,7 @@ export function matchesShortcut(
   id: ShortcutId,
   userShortcuts?: Record<ShortcutId, KeyBinding[]>,
 ): boolean {
-  const sc = SHORTCUTS.find((s) => s.id === id);
+  const sc = SHORTCUTS_BY_ID.get(id);
   if (!sc) return false;
   const bindings = userShortcuts?.[id] || sc.defaultBindings;
   return bindings.some((b) => matchBinding(e, b, id));

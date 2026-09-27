@@ -100,6 +100,7 @@ import {
   collectDirKeys,
   flattenScmTree,
   type ScmDirNode,
+  type ScmTreeNode,
 } from "./scmTree";
 
 type Props = {
@@ -315,15 +316,27 @@ export const SourceControlPanel = memo(
           .filter(Boolean)
           .join(" · ");
 
+  // Built once per entries change and shared by allTreeDirKeys and rows below,
+  // instead of each of those two memos calling buildScmTree again for both
+  // staged and unstaged (4 builds per status change instead of 2).
+  const stagedTree = useMemo(
+    () => buildScmTree(scm.stagedEntries),
+    [scm.stagedEntries],
+  );
+  const unstagedTree = useMemo(
+    () => buildScmTree(scm.unstagedEntries),
+    [scm.unstagedEntries],
+  );
+
   const allTreeDirKeys = useMemo(
     () =>
       scmViewMode === "tree"
         ? [
-            ...collectDirKeys(buildScmTree(scm.stagedEntries), "staged/"),
-            ...collectDirKeys(buildScmTree(scm.unstagedEntries), "changes/"),
+            ...collectDirKeys(stagedTree, "staged/"),
+            ...collectDirKeys(unstagedTree, "changes/"),
           ]
         : [],
-    [scmViewMode, scm.stagedEntries, scm.unstagedEntries],
+    [scmViewMode, stagedTree, unstagedTree],
   );
   const allFoldersCollapsed =
     allTreeDirKeys.length > 0 &&
@@ -408,11 +421,11 @@ export const SourceControlPanel = memo(
     }
     if (scmViewMode === "tree") {
       const pushTree = (
-        entries: SourceControlEntry[],
+        tree: ScmTreeNode[],
         prefix: string,
         section: "staged" | "changes",
       ) => {
-        for (const r of flattenScmTree(buildScmTree(entries), treeCollapsed, prefix)) {
+        for (const r of flattenScmTree(tree, treeCollapsed, prefix)) {
           if (r.type === "dir") {
             result.push({ kind: "tree-dir", key: r.key, collapseKey: r.collapseKey, depth: r.depth, node: r.node, section });
           } else {
@@ -422,11 +435,11 @@ export const SourceControlPanel = memo(
       };
       if (scm.stagedEntries.length > 0) {
         result.push({ kind: "staged-header", key: "staged-header", count: scm.stagedEntries.length });
-        if (!stagedCollapsed) pushTree(scm.stagedEntries, "staged/", "staged");
+        if (!stagedCollapsed) pushTree(stagedTree, "staged/", "staged");
       }
       if (scm.unstagedEntries.length > 0) {
         result.push({ kind: "changes-header", key: "changes-header", count: scm.unstagedEntries.length });
-        if (!changesCollapsed) pushTree(scm.unstagedEntries, "changes/", "changes");
+        if (!changesCollapsed) pushTree(unstagedTree, "changes/", "changes");
       }
       return result;
     }
@@ -460,6 +473,8 @@ export const SourceControlPanel = memo(
     isDiverged,
     scm.stagedEntries,
     scm.unstagedEntries,
+    stagedTree,
+    unstagedTree,
     treeCollapsed,
     stagedCollapsed,
     changesCollapsed,

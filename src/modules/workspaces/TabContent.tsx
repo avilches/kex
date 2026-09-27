@@ -170,6 +170,17 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
     setLiveContent(initialContent);
   }, []);
 
+  // Stable reference: GitHistoryPane re-registers this handle in a
+  // useEffect keyed on it, so a fresh inline arrow function here would
+  // unregister and re-register on every TabContent render instead of only
+  // when the tab or the callback prop actually changes.
+  const handleGitHistorySearchHandle = useCallback(
+    (handle: GitHistorySearchHandle | null) => {
+      callbacks.onGitHistorySearchHandle?.(tab.id, handle);
+    },
+    [callbacks.onGitHistorySearchHandle, tab.id],
+  );
+
   // Cleanup debounce timer on unmount
   useEffect(() => {
     return () => {
@@ -504,7 +515,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
           <GitHistoryPane
             repoRoot={tab.repoRoot}
             onOpenCommitFile={(input: CommitFileDiffOpenInput) => callbacks.onOpenCommitFile?.(input)}
-            onSearchHandle={(handle: GitHistorySearchHandle | null) => callbacks.onGitHistorySearchHandle?.(tab.id, handle)}
+            onSearchHandle={handleGitHistorySearchHandle}
           />
         </Suspense>
       );
