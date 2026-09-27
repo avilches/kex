@@ -83,6 +83,7 @@ type Props = {
     value: EditorViewSettings;
     onChange: (next: EditorViewSettings) => void;
     onViewInSettings?: () => void;
+    disabled?: boolean;
   };
   globalToggles?: {
     value: EditorGlobalToggles;
@@ -274,7 +275,8 @@ export function EditorPathBar({
               <button
                 type="button"
                 title="View options"
-                className="order-last flex size-[22px] items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground"
+                disabled={viewToggles?.disabled}
+                className="order-last flex size-[22px] items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
               >
                 <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
               </button>

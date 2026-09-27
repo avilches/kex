@@ -272,6 +272,9 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
         onChange: (next: EditorViewSettings) =>
           void setEditorViewForExt(ext, next),
         onViewInSettings: () => void openFileTypesSettings(ext || undefined),
+        // Overlay preview hides the editor entirely, so its view settings don't
+        // apply; split still shows the editor, so it stays enabled there.
+        disabled: effectivePreviewMode === "overlay",
       };
 
       return (
@@ -296,8 +299,8 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                 onToggleSplit: () => callbacks.onToggleSplitPreview?.(tab.id),
                 isHtml: ishtml,
               } : undefined}
-              viewToggles={effectivePreviewMode == null ? viewToggles : undefined}
-              globalToggles={effectivePreviewMode == null ? globalToggles : undefined}
+              viewToggles={viewToggles}
+              globalToggles={globalToggles}
               overrideLanguage={tab.overrideLanguage}
               currentLanguageName={currentLanguageName}
               onLanguageChange={(lang) => {
