@@ -118,8 +118,10 @@ function buildLink(text: string, url: string): HTMLAnchorElement {
     e.preventDefault();
     openExternalUrl(url);
   });
-  // The webview must never navigate itself to the link.
+  // The webview must never navigate itself to the link. A middle-click fires
+  // auxclick, not click, so it needs its own listener.
   a.addEventListener("click", (e) => e.preventDefault());
+  a.addEventListener("auxclick", (e) => e.preventDefault());
   return a;
 }
 

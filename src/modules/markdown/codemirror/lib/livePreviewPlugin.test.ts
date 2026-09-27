@@ -174,6 +174,15 @@ describe("table widget", () => {
     expect(openUrl).not.toHaveBeenCalled();
     view.destroy();
   });
+
+  it("blocks the webview's own middle-click navigation on a cell link", () => {
+    const view = mount(TABLE, { anchor: TABLE.indexOf("after") });
+    const link = view.dom.querySelector("table a") as HTMLAnchorElement;
+    const event = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
+    link.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    view.destroy();
+  });
 });
 
 describe("linkClickHandler", () => {
@@ -273,5 +282,6 @@ describe("linkClickHandler", () => {
     rel.destroy();
     await new Promise((r) => setTimeout(r, 20));
     expect(openUrl).not.toHaveBeenCalled();
+    platformMock.IS_MAC = false;
   });
 });
