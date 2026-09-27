@@ -426,6 +426,12 @@ export function WorkspaceBar({
   const [dragStartStatus, setDragStartStatus] = useState<string | null | undefined>(undefined);
   const compact = width <= 80;
 
+  const shortcuts = usePreferencesStore((s) => s.shortcuts);
+  const newWorkspaceLabel = getShortcutLabel("workspace.new", shortcuts);
+  const newWorkspaceTitle = newWorkspaceLabel
+    ? `New workspace (${newWorkspaceLabel})`
+    : "New workspace";
+
   const groups = useMemo(
     () => groupWorkspaces(workspaces, workspaceStatuses),
     [workspaces, workspaceStatuses],
@@ -649,7 +655,7 @@ export function WorkspaceBar({
 
       <button
         type="button"
-        title="New workspace (Cmd+N)"
+        title={newWorkspaceTitle}
         onClick={onNew}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-border/60 text-lg text-muted-foreground transition-colors hover:border-border hover:text-foreground"
       >
