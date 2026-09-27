@@ -65,4 +65,22 @@ describe("buildLivePreviewExtensions", () => {
     expect(covered).toContain(".cm-lp-italic");
     view.destroy();
   });
+
+  // The general foreground rule and the link-text rule carry the same
+  // selector specificity, so only source order decides which color wins for
+  // a link nested inside bold text or a heading. Matching some !important
+  // color rule (the test above) isn't enough to catch a reorder; this checks
+  // the link rule specifically comes after the general one in the raw text.
+  it("keeps the link-text color rule after the general foreground rule in the stylesheet", () => {
+    const state = EditorState.create({ doc: "", extensions: buildLivePreviewExtensions() });
+    const view = new EditorView({ state, parent: document.body });
+    const rawCss = Array.from(document.querySelectorAll("style"))
+      .map((style) => style.textContent ?? "")
+      .join("\n");
+    const generalForegroundRuleIndex = rawCss.indexOf("cm-lp-heading, ");
+    const linkTextRuleIndex = rawCss.indexOf("cm-lp-link-text, ");
+    expect(generalForegroundRuleIndex).toBeGreaterThanOrEqual(0);
+    expect(linkTextRuleIndex).toBeGreaterThan(generalForegroundRuleIndex);
+    view.destroy();
+  });
 });
