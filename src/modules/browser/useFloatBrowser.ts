@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { useEffect } from "react";
+import { useTauriListen } from "@/lib/useTauriListen";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 import { allPanes } from "@/modules/workspaces/lib/splitNode";
 
@@ -20,41 +19,27 @@ export function useFloatBrowser({
   const originWindowLabel = getCurrentWebviewWindow().label;
 
   // Listen for dock-back events from floating windows
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    listen<DockEvent>("kex:float-dock", (e) => {
-      const { tabId, currentUrl } = e.payload;
-      const found = findTabGlobal(tabId);
-      if (!found) return;
-      updateTabData(found.workspace.id, tabId, (p) => ({
-        ...p,
-        floating: false,
-        url: currentUrl || (p.kind === "browser" ? p.url : ""),
-      }));
-    })
-      .then((u) => { unlisten = u; })
-      .catch((err) => console.error("[float-browser] dock listen failed:", err));
-    return () => { unlisten?.(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useTauriListen<DockEvent>("kex:float-dock", (e) => {
+    const { tabId, currentUrl } = e.payload;
+    const found = findTabGlobal(tabId);
+    if (!found) return;
+    updateTabData(found.workspace.id, tabId, (p) => ({
+      ...p,
+      floating: false,
+      url: currentUrl || (p.kind === "browser" ? p.url : ""),
+    }));
+  });
 
   // Listen for URL navigation events from floating windows
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    listen<NavigatedEvent>("kex:float-navigated", (e) => {
-      const { tabId, url } = e.payload;
-      const found = findTabGlobal(tabId);
-      if (!found) return;
-      updateTabData(found.workspace.id, tabId, (p) => ({
-        ...p,
-        url: url || (p.kind === "browser" ? p.url : ""),
-      }));
-    })
-      .then((u) => { unlisten = u; })
-      .catch((err) => console.error("[float-browser] navigated listen failed:", err));
-    return () => { unlisten?.(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useTauriListen<NavigatedEvent>("kex:float-navigated", (e) => {
+    const { tabId, url } = e.payload;
+    const found = findTabGlobal(tabId);
+    if (!found) return;
+    updateTabData(found.workspace.id, tabId, (p) => ({
+      ...p,
+      url: url || (p.kind === "browser" ? p.url : ""),
+    }));
+  });
 
   async function floatTab(
     tab: Tab & { kind: "browser" },
