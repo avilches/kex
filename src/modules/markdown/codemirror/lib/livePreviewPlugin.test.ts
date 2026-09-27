@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { forceParsing, syntaxTreeAvailable } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -41,6 +42,24 @@ describe("livePreviewPlugin", () => {
     const checkbox = view.dom.querySelector('input[type="checkbox"]') as HTMLInputElement;
     checkbox.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(view.state.doc.toString()).toBe("- [x] todo\n");
+    view.destroy();
+  });
+
+  it("decorates content past the initial parse boundary once the background parse lands", () => {
+    // Few, long lines: past the ~3000-char initial parse, but still few enough
+    // lines to sit inside happy-dom's rendered viewport.
+    const filler = `${"plain filler prose ".repeat(40)}\n\n`.repeat(6);
+    const doc = `${filler}**late**\n`;
+    const view = mount(doc, { anchor: 0 });
+    const lateLine = () =>
+      Array.from(view.dom.querySelectorAll(".cm-line")).find((l) => l.textContent?.includes("late"));
+    // The initial synchronous parse stops well before the end of this document.
+    expect(syntaxTreeAvailable(view.state, doc.length)).toBe(false);
+    expect(lateLine()?.textContent).toBe("**late**");
+    // Finishing the parse dispatches a transaction that changes only the tree.
+    forceParsing(view, doc.length, 5000);
+    expect(syntaxTreeAvailable(view.state, doc.length)).toBe(true);
+    expect(lateLine()?.textContent).toBe("late");
     view.destroy();
   });
 

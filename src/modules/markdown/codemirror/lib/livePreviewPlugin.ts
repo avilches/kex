@@ -91,7 +91,15 @@ export const livePreviewPlugin: Extension = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate): void {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      // The syntax-tree check catches the background parse that finishes a
+      // long document after open, which changes neither doc, selection, nor
+      // viewport.
+      if (
+        update.docChanged ||
+        update.selectionSet ||
+        update.viewportChanged ||
+        syntaxTree(update.startState) !== syntaxTree(update.state)
+      ) {
         this.decorations = buildDecorations(update.view);
       }
     }
