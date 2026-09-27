@@ -3,7 +3,7 @@
 use std::io::{BufRead, BufReader};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -144,6 +144,52 @@ fn parse_payload(json: &str) -> Option<Payload> {
     })
 }
 
+/// Directory `trigger-event.sh` spools undelivered hook events to when
+/// `send_ipc` cannot reach the socket (listener not accepting yet, crashed,
+/// or gone). Mirrors `session_hook_script_path` in `agent/mod.rs`.
+fn spool_dir() -> Option<PathBuf> {
+    Some(dirs::home_dir()?.join(".config").join("kex").join("spool"))
+}
+
+fn spool_path_for_tab(base: &Path, tab_id: &str) -> PathBuf {
+    base.join(format!("{tab_id}.jsonl"))
+}
+
+/// Replays any hook events spooled to disk by `trigger-event.sh` because a
+/// live `send_ipc` delivery failed, handing each line to `on_line` (in
+/// production, `dispatch`) in the order they were appended.
+///
+/// The file is removed only after every line has been handed off, so a crash
+/// mid-drain leaves it in place and the next listener start reprocesses the
+/// whole batch. That trades a possible duplicate delivery for never silently
+/// dropping an event, which matches how the rest of this module treats agent
+/// signals (at-least-once, not exactly-once).
+fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
+    let path = spool_path_for_tab(base, tab_id);
+    let contents = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+        Err(e) => {
+            log::warn!("[ipc] failed to read spool {path:?}: {e}");
+            return;
+        }
+    };
+
+    let lines: Vec<&str> = contents.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+    if !lines.is_empty() {
+        for line in &lines {
+            on_line(line);
+        }
+        log::debug!("[ipc] drained {} spooled event(s) for tab={tab_id}", lines.len());
+    }
+
+    if let Err(e) = std::fs::remove_file(&path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            log::warn!("[ipc] failed to remove drained spool {path:?}: {e}");
+        }
+    }
+}
+
 /// Creates the socket, then spawns the listener thread. Returns an IpcGuard
 /// that stops the thread and removes the socket file when dropped.
 pub fn spawn_listener(
@@ -186,6 +232,10 @@ fn run_listener(
     app: AppHandle,
     shutdown: Arc<AtomicBool>,
 ) {
+    if let Some(base) = spool_dir() {
+        drain_spool(&base, &tab_id, |line| dispatch(line, &tab_id, pty_id, &app));
+    }
+
     for stream in listener.incoming() {
         if shutdown.load(Ordering::SeqCst) {
             break;
@@ -575,6 +625,71 @@ mod tests {
         assert!(p.is_final);
         assert_eq!(p.turn_id.as_deref(), Some("t1"));
         assert_eq!(p.delta.as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn drain_spool_replays_lines_in_order_then_removes_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let tab_id = "tab-drain-1";
+        let path = spool_path_for_tab(dir.path(), tab_id);
+        std::fs::write(&path, "line-one\nline-two\nline-three\n").unwrap();
+
+        let mut seen = Vec::new();
+        drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
+
+        assert_eq!(seen, vec!["line-one", "line-two", "line-three"]);
+        assert!(!path.exists(), "spool file should be removed after a full drain");
+    }
+
+    #[test]
+    fn drain_spool_is_a_noop_when_no_spool_file_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut called = false;
+        drain_spool(dir.path(), "tab-missing", |_| called = true);
+        assert!(!called);
+    }
+
+    #[test]
+    fn drain_spool_skips_blank_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let tab_id = "tab-drain-2";
+        let path = spool_path_for_tab(dir.path(), tab_id);
+        std::fs::write(&path, "\n  \nreal-line\n\n").unwrap();
+
+        let mut seen = Vec::new();
+        drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
+        assert_eq!(seen, vec!["real-line"]);
+    }
+
+    #[test]
+    fn drain_spool_leaves_other_tabs_spool_files_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        let other_path = spool_path_for_tab(dir.path(), "tab-other");
+        std::fs::write(&other_path, "untouched\n").unwrap();
+
+        let mut called = false;
+        drain_spool(dir.path(), "tab-drain-3", |_| called = true);
+
+        assert!(!called);
+        assert!(other_path.exists());
+    }
+
+    #[test]
+    fn drain_spool_lines_parse_the_same_way_a_live_payload_does() {
+        // Proves a spooled line reaches dispatch's parsing exactly like a
+        // payload that arrived over the live socket: same parse_payload call,
+        // same JSON shape, same extracted event kind.
+        let dir = tempfile::tempdir().unwrap();
+        let tab_id = "tab-drain-4";
+        let path = spool_path_for_tab(dir.path(), tab_id);
+        let payload = r#"{"hook_event_name":"Stop","session_id":"s","transcript_path":"","cwd":"","stop_reason":"end_turn","last_assistant_message":"done"}"#;
+        std::fs::write(&path, format!("{payload}\n")).unwrap();
+
+        let mut events = Vec::new();
+        drain_spool(dir.path(), tab_id, |line| {
+            events.push(parse_payload(line).unwrap().event);
+        });
+        assert_eq!(events, vec!["Stop"]);
     }
 
     #[test]

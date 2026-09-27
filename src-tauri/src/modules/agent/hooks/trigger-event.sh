@@ -6,9 +6,29 @@
 PAYLOAD="$(cat)"
 EVENT="$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty')"
 
+# Caps the per-tab spool file so a tab that never reopens in Kex (and so
+# never drains it) can't grow the file without bound.
+MAX_SPOOL_LINES=200
+
+# Appends the undelivered payload to a per-tab spool file that Kex's IPC
+# listener replays on startup, so a failed send loses no event. Oldest lines
+# are dropped first once the cap is hit, keeping the most recent state.
+spool_event() {
+    local spool_dir="$HOME/.config/kex/spool"
+    local spool_file="$spool_dir/$KEX_TAB_ID.jsonl"
+    mkdir -p "$spool_dir" 2>/dev/null || return 0
+    printf '%s\n' "$PAYLOAD" >> "$spool_file"
+    local lines
+    lines="$(wc -l < "$spool_file" 2>/dev/null)"
+    if [ -n "$lines" ] && [ "$lines" -gt "$MAX_SPOOL_LINES" ]; then
+        tail -n "$MAX_SPOOL_LINES" "$spool_file" > "$spool_file.tmp" 2>/dev/null \
+            && mv "$spool_file.tmp" "$spool_file"
+    fi
+}
+
 # Send raw payload to KEX_IPC Unix socket.
 # Uses nc -U (BSD/OpenBSD netcat on macOS + most Linux), falls back to python3.
-# Fails silently if KEX_IPC is unset or socket is unavailable.
+# Spools the event to disk if KEX_IPC is set but neither delivery path works.
 send_ipc() {
     [ -n "$KEX_IPC" ] || return 0
     printf '%s\n' "$PAYLOAD" | nc -w 1 -U "$KEX_IPC" 2>/dev/null && return 0
@@ -21,7 +41,8 @@ try:
     s.sendall(sys.stdin.buffer.read())
 finally:
     s.close()
-" "$KEX_IPC" <<< "$PAYLOAD" 2>/dev/null || true
+" "$KEX_IPC" <<< "$PAYLOAD" 2>/dev/null && return 0
+    spool_event
 }
 
 handle_SessionStart() {
