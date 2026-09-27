@@ -18,14 +18,14 @@ describe("CodeMirrorEditor", () => {
     const source =
       '---\ntitle: Note\n---\n\n<div class="note">raw html</div>\n\n# Heading\n';
     const onChange = vi.fn();
-    render(<CodeMirrorEditor value={source} onChange={onChange} />);
+    render(<CodeMirrorEditor value={source} onChange={onChange} syncKey={1} />);
     expect(onChange).not.toHaveBeenCalled();
   });
 
   it("reports the exact text back through onChange after an edit, unchanged", () => {
     const onChange = vi.fn();
     const { container } = render(
-      <CodeMirrorEditor value="Hello" onChange={onChange} />,
+      <CodeMirrorEditor value="Hello" onChange={onChange} syncKey={1} />,
     );
     const dom = container.querySelector(".cm-content") as HTMLElement;
     const view = EditorView.findFromDOM(dom);
@@ -40,7 +40,7 @@ describe("CodeMirrorEditor", () => {
       '---\ntitle: Note\n---\n\n<div class="note">raw html</div>\n\n# Heading\n\n**bold** and _italic_ and `code`\n\n- [ ] a task\n- a bullet\n';
     const onChange = vi.fn();
     const { container } = render(
-      <CodeMirrorEditor value={source} onChange={onChange} />,
+      <CodeMirrorEditor value={source} onChange={onChange} syncKey={1} />,
     );
     const dom = container.querySelector(".cm-content") as HTMLElement;
     const view = EditorView.findFromDOM(dom);
@@ -63,5 +63,22 @@ describe("CodeMirrorEditor", () => {
     // No edit was ever dispatched, so onChange (which only fires on
     // update.docChanged) must never have been called.
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("replaces a discarded edit when reloaded with the same text under a new syncKey", () => {
+    const onChange = vi.fn();
+    const firstLoad = { content: "Original" };
+    const { container, rerender } = render(
+      <CodeMirrorEditor value={firstLoad.content} onChange={onChange} syncKey={firstLoad} />,
+    );
+    const view = EditorView.findFromDOM(container.querySelector(".cm-content") as HTMLElement);
+    expect(view).not.toBeNull();
+    if (!view) return;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "Discarded edit" } });
+    expect(view.state.doc.toString()).toBe("Discarded edit");
+
+    const reload = { content: "Original" };
+    rerender(<CodeMirrorEditor value={reload.content} onChange={onChange} syncKey={reload} />);
+    expect(view.state.doc.toString()).toBe("Original");
   });
 });

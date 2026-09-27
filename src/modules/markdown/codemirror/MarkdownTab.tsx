@@ -60,7 +60,12 @@ export function MarkdownTab(props: Props): JSX.Element {
       />
       <div className="relative min-h-0 flex-1">
         {doc.status === "ready" ? (
-          <CodeMirrorEditor ref={editorRef} value={doc.content} onChange={onChange} />
+          <CodeMirrorEditor
+            ref={editorRef}
+            value={doc.content}
+            syncKey={doc}
+            onChange={onChange}
+          />
         ) : doc.status === "loading" || doc.status === "deleted" ? null : (
           // MarkdownDocFallback is typed for MarkdownDocState (useMarkdownDocument's
           // 5-variant union), not DocumentState (useDocument's 6-variant union, used
