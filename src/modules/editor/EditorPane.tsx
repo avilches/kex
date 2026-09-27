@@ -25,6 +25,7 @@ import {
 } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { toast } from "sonner";
+import { formatBytes } from "@/lib/formatBytes";
 import { pathBasename } from "@/lib/pathUtils";
 import { Button } from "@/components/ui/button";
 import {
@@ -98,12 +99,6 @@ type Props = {
   /** Skips rendering the built-in conflict overlay; the parent renders one instead, driven by onConflictChange and the keepLocalChanges/reloadFromDisk handle methods. */
   hideConflictOverlay?: boolean;
 };
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
   function EditorPane({ path, tabId, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved, onClose, onConflictChange, hideConflictOverlay }, ref) {

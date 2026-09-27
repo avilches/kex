@@ -1,12 +1,6 @@
 import type { JSX } from "react";
+import { formatBytes } from "@/lib/formatBytes";
 import type { MarkdownDocState } from "@/modules/markdown/lib/useMarkdownDocument";
-
-// Mirrors EditorPane's formatting so the non-editable fallbacks read identically.
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
 
 export function MarkdownDocFallback({ doc }: { doc: MarkdownDocState }): JSX.Element | null {
   if (doc.status === "error") {
