@@ -1925,6 +1925,50 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    fn fetch_remote_never_executes_an_ext_transport_helper() {
+        // A remote URL of the form "ext::<command>" makes git execute an
+        // arbitrary program instead of speaking a network protocol.
+        // add_remote does not validate the URL scheme, so this proves the
+        // actual exploit path (a fetch through this app) is closed at the
+        // git invocation layer regardless of what URL got saved.
+        //
+        // The repo-local config is set to explicitly ALLOW the ext
+        // transport before fetching, simulating the exact scenario the bug
+        // report warns about (a user's own git config, or a platform
+        // default, that permits it). This must still be blocked: our own
+        // "-c protocol.ext.allow=never" is appended last on the command
+        // line, so it wins over any config file regardless of what the
+        // ambient environment allows. Without that override this test
+        // fails (verified manually while developing the fix).
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        git_init_with_commit(dir.path());
+
+        let marker = dir.path().join("pwned-marker");
+        let script = dir.path().join("pwn.sh");
+        std::fs::write(&script, format!("#!/bin/sh\ntouch \"{}\"\nexit 1\n", marker.display())).unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(dir.path()).unwrap();
+        let root = dir.path().to_string_lossy().into_owned();
+
+        let url = format!("ext::{}", script.display());
+        super::add_remote(&registry, &root, "origin", &url, &WorkspaceEnv::Local).unwrap();
+        Cmd::new("git")
+            .args(["config", "protocol.ext.allow", "always"])
+            .current_dir(dir.path())
+            .status()
+            .unwrap();
+
+        let result = super::fetch_remote(&registry, &root, "origin", &WorkspaceEnv::Local);
+        assert!(result.is_err(), "fetch through an ext:: remote must fail");
+        assert!(!marker.exists(), "the ext:: helper script must never run");
+    }
+
+    #[test]
     fn apply_numstat_does_not_break_on_binary_marker() {
         let mut files = vec![
             GitCommitFileChange {
