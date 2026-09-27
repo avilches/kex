@@ -16,6 +16,11 @@ describe("pickRenderer", () => {
     expect(pickRenderer("tiptap", true)).toBe("legacy");
     expect(pickRenderer("milkdown", true)).toBe("legacy");
   });
+
+  it("degrades the codemirror engine to the legacy renderer (no read-only variant)", () => {
+    expect(pickRenderer("codemirror", false)).toBe("legacy");
+    expect(pickRenderer("codemirror", true)).toBe("legacy");
+  });
 });
 
 describe("shouldDebounce", () => {
@@ -23,6 +28,10 @@ describe("shouldDebounce", () => {
     expect(shouldDebounce("legacy")).toBe(false);
     expect(shouldDebounce("tiptap")).toBe(true);
     expect(shouldDebounce("milkdown")).toBe(true);
+  });
+
+  it("does not debounce the codemirror engine, which renders through the legacy path", () => {
+    expect(shouldDebounce("codemirror")).toBe(false);
   });
 
   it("uses a delay short enough to feel live", () => {
