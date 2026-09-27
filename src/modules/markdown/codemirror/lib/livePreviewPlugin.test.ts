@@ -86,6 +86,15 @@ describe("livePreviewPlugin", () => {
     view.destroy();
   });
 
+  it("styles every line of a fenced code block as a line, blank lines included", () => {
+    const doc = "intro\n\n```js\nconst x = 1;\n\nlet y;\n```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const styled = Array.from(view.dom.querySelectorAll(".cm-lp-codeblock"));
+    expect(styled.map((el) => el.textContent)).toEqual(["```js", "const x = 1;", "", "let y;", "```"]);
+    expect(styled.every((el) => el.classList.contains("cm-line"))).toBe(true);
+    view.destroy();
+  });
+
   it("never decorates the frontmatter block", () => {
     const view = mount("---\ntitle: **not bold**\n---\n# Real\n", { anchor: 0 });
     // The frontmatter's own ** stays literal; only "Real" (after the closing ---) is a heading.

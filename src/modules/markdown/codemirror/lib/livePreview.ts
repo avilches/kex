@@ -12,11 +12,13 @@ export type TableSpec = {
   aligns: TableAlign[];
   rows: string[][];
 };
+export type CodeBlockSpec = { from: number; to: number };
 export type LivePreviewPlan = {
   marks: MarkSpec[];
   hides: HideSpec[];
   checkboxes: CheckboxSpec[];
   tables: TableSpec[];
+  codeBlocks: CodeBlockSpec[];
 };
 
 export type LivePreviewInput = {
@@ -52,6 +54,7 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
   const hides: HideSpec[] = [];
   const checkboxes: CheckboxSpec[] = [];
   const tables: TableSpec[] = [];
+  const codeBlocks: CodeBlockSpec[] = [];
 
   // Frontmatter is never parsed as markdown (see the frontmatterEnd check inside
   // enter() below, which skips it entirely); it still needs its own monospace
@@ -87,8 +90,10 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
         return;
       }
 
+      // A range, not a mark: a mark splits per line and skips blank lines, so
+      // the plugin styles each of its lines instead.
       if (node.type.name === "FencedCode") {
-        marks.push({ from: node.from, to: node.to, className: "cm-lp-codeblock" });
+        codeBlocks.push({ from: node.from, to: node.to });
         return false;
       }
 
@@ -147,7 +152,7 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
     },
   });
 
-  return { marks, hides, checkboxes, tables };
+  return { marks, hides, checkboxes, tables, codeBlocks };
 }
 
 export type TablePlanInput = {

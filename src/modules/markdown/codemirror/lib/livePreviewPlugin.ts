@@ -135,12 +135,15 @@ function frontmatterEndOf(state: EditorState): number {
   return frontmatterEnd(state.doc.sliceString(0, Math.min(state.doc.length, 4096)));
 }
 
+const codeBlockLine = Decoration.line({ class: "cm-lp-codeblock" });
+
 function buildDecorations(view: EditorView): DecorationSet {
   const { state } = view;
   const activeLines = activeLinesOf(state);
   const fmEnd = frontmatterEndOf(state);
 
   const decorations: { from: number; to: number; deco: Decoration }[] = [];
+  const codeLineStarts = new Set<number>();
   for (const { from, to } of view.visibleRanges) {
     const plan = planLivePreview({
       tree: syntaxTree(state),
@@ -163,8 +166,16 @@ function buildDecorations(view: EditorView): DecorationSet {
         deco: Decoration.replace({ widget: new CheckboxWidget(box.from, box.checked) }),
       });
     }
+    // Only the lines inside this visible range; a block straddling two ranges
+    // is visited twice, hence the set.
+    for (const block of plan.codeBlocks) {
+      const first = state.doc.lineAt(Math.max(block.from, from)).number;
+      const last = state.doc.lineAt(Math.min(block.to, to)).number;
+      for (let n = first; n <= last; n++) codeLineStarts.add(state.doc.line(n).from);
+    }
     // plan.tables is rendered by tableField: block widgets cannot come from a plugin.
   }
+  for (const pos of codeLineStarts) decorations.push({ from: pos, to: pos, deco: codeBlockLine });
 
   decorations.sort((a, b) => a.from - b.from || a.to - b.to);
   const builder = decorations.map((d) => d.deco.range(d.from, d.to));

@@ -61,12 +61,10 @@ export function buildLivePreviewExtensions(): Extension[] {
         backgroundColor: "color-mix(in srgb, var(--foreground) 4%, transparent)",
       },
       ".cm-lp-html": { fontFamily: "var(--font-mono, monospace)" },
+      // A line decoration: one flat background on every line reads as one block.
       ".cm-lp-codeblock": {
-        display: "inline-block",
         fontFamily: "var(--font-mono, monospace)",
         backgroundColor: "color-mix(in srgb, var(--foreground) 6%, transparent)",
-        borderRadius: "4px",
-        padding: "2px 0",
       },
       // Matches the TipTap engine's table styling (richMarkdown.css).
       ".cm-lp-table-wrap": { overflowX: "auto", padding: "4px 0" },

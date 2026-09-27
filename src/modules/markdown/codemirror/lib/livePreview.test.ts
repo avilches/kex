@@ -23,7 +23,7 @@ function plan(
 describe("planLivePreview", () => {
   it("returns nothing for plain prose", () => {
     const result = plan("Just a sentence with no markup.\n");
-    expect(result).toEqual({ marks: [], hides: [], checkboxes: [], tables: [] });
+    expect(result).toEqual({ marks: [], hides: [], checkboxes: [], tables: [], codeBlocks: [] });
   });
 
   it("styles a heading and hides its marker on an inactive line", () => {
@@ -137,7 +137,8 @@ describe("planLivePreview", () => {
     const text = "```js\nconst x = 1;\n**not bold** `x`\n```\n";
     for (const active of [[], [2]]) {
       const result = plan(text, active);
-      expect(result.marks).toEqual([{ from: 0, to: text.length - 1, className: "cm-lp-codeblock" }]);
+      expect(result.codeBlocks).toEqual([{ from: 0, to: text.length - 1 }]);
+      expect(result.marks).toEqual([]);
       expect(result.hides).toEqual([]);
       expect(result.checkboxes).toEqual([]);
     }
