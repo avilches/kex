@@ -115,31 +115,6 @@ impl WorkspaceRegistry {
     }
 }
 
-// `None` means "use bootstrapped default". `Some` is canonicalized to defeat
-// symlink/`..` traversal and must sit under an authorized root.
-pub fn authorize_spawn_cwd(
-    registry: &WorkspaceRegistry,
-    cwd: Option<&str>,
-    workspace: &WorkspaceEnv,
-) -> Result<Option<PathBuf>, String> {
-    let Some(cwd) = cwd.map(str::trim).filter(|s| !s.is_empty()) else {
-        return Ok(None);
-    };
-    let resolved = resolve_path(cwd, workspace);
-    let canonical =
-        std::fs::canonicalize(&resolved).map_err(|e| format!("cwd not accessible: {e}"))?;
-    if !canonical.is_dir() {
-        return Err(format!("cwd is not a directory: {}", canonical.display()));
-    }
-    if !registry.is_authorized(&canonical) {
-        return Err(format!(
-            "cwd is outside the authorized workspace: {}",
-            canonical.display()
-        ));
-    }
-    Ok(Some(canonical))
-}
-
 // User-initiated terminal spawn: canonicalize, require a real dir, and register
 // it as a root instead of rejecting paths outside existing roots.
 pub fn authorize_user_spawn_cwd(
@@ -804,79 +779,6 @@ mod auth_tests {
     }
 
     #[test]
-    fn authorize_spawn_cwd_accepts_none() {
-        let reg = WorkspaceRegistry::default();
-        assert!(authorize_spawn_cwd(&reg, None, &WorkspaceEnv::Local)
-            .unwrap()
-            .is_none());
-    }
-
-    #[test]
-    fn authorize_spawn_cwd_accepts_empty_string() {
-        let reg = WorkspaceRegistry::default();
-        assert!(authorize_spawn_cwd(&reg, Some("   "), &WorkspaceEnv::Local)
-            .unwrap()
-            .is_none());
-    }
-
-    #[test]
-    fn authorize_spawn_cwd_accepts_authorized_path() {
-        let dir = tempdir("ok");
-        let reg = WorkspaceRegistry::default();
-        reg.authorize(&dir).expect("authorize root");
-        let s = dir.to_string_lossy().into_owned();
-        let resolved = authorize_spawn_cwd(&reg, Some(&s), &WorkspaceEnv::Local)
-            .expect("authorized")
-            .expect("returned canonical");
-        assert_eq!(resolved, dir);
-    }
-
-    #[test]
-    fn authorize_spawn_cwd_accepts_subdir_of_authorized_root() {
-        let root = tempdir("subroot");
-        let sub = root.join("inside");
-        fs::create_dir_all(&sub).expect("subdir");
-        let canonical_sub = fs::canonicalize(&sub).expect("canon sub");
-        let reg = WorkspaceRegistry::default();
-        reg.authorize(&root).expect("authorize root");
-        let s = canonical_sub.to_string_lossy().into_owned();
-        let resolved = authorize_spawn_cwd(&reg, Some(&s), &WorkspaceEnv::Local)
-            .expect("subdir authorized")
-            .expect("returned canonical");
-        assert_eq!(resolved, canonical_sub);
-    }
-
-    #[test]
-    fn authorize_spawn_cwd_rejects_unauthorized_path() {
-        let allowed = tempdir("allowed");
-        let foreign = tempdir("foreign");
-        let reg = WorkspaceRegistry::default();
-        reg.authorize(&allowed).expect("authorize root");
-        let s = foreign.to_string_lossy().into_owned();
-        let err = authorize_spawn_cwd(&reg, Some(&s), &WorkspaceEnv::Local)
-            .expect_err("should reject unauthorized cwd");
-        assert!(err.contains("outside"), "got: {err}");
-    }
-
-    #[test]
-    fn authorize_spawn_cwd_rejects_missing_path() {
-        let mut missing = env::temp_dir();
-        missing.push(format!(
-            "kex-missing-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
-        let reg = WorkspaceRegistry::default();
-        let s = missing.to_string_lossy().into_owned();
-        let err = authorize_spawn_cwd(&reg, Some(&s), &WorkspaceEnv::Local)
-            .expect_err("should reject missing path");
-        assert!(err.contains("cwd not accessible"), "got: {err}");
-    }
-
-    #[test]
     fn authorize_user_spawn_cwd_registers_unauthorized_path() {
         let dir = tempdir("userspawn");
         let reg = WorkspaceRegistry::default();
@@ -898,23 +800,6 @@ mod auth_tests {
         let err = authorize_user_spawn_cwd(&reg, Some(&s), &WorkspaceEnv::Local)
             .expect_err("missing path must fail");
         assert!(err.contains("cwd not accessible"), "got: {err}");
-    }
-
-    #[test]
-    fn authorize_spawn_cwd_blocks_symlink_escape() {
-        let allowed = tempdir("symroot");
-        let outside = tempdir("symtarget");
-        let link = allowed.join("escape");
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(&outside, &link).expect("symlink");
-        #[cfg(windows)]
-        std::os::windows::fs::symlink_dir(&outside, &link).expect("symlink");
-        let reg = WorkspaceRegistry::default();
-        reg.authorize(&allowed).expect("authorize root");
-        let s = link.to_string_lossy().into_owned();
-        let err = authorize_spawn_cwd(&reg, Some(&s), &WorkspaceEnv::Local)
-            .expect_err("symlink-escape must be rejected");
-        assert!(err.contains("outside"), "got: {err}");
     }
 
     #[test]
