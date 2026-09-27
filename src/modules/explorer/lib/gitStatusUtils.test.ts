@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GitChangedFile, GitStatusSnapshot } from "@/lib/native";
 import {
   buildGitStatusMap,
+  gitStatusCategory,
   lookupGitStatus,
   repoRelativePath,
   statusCodeForFile,
@@ -110,5 +111,30 @@ describe("lookupGitStatus", () => {
   it("returns null for unchanged and out-of-repo paths", () => {
     expect(lookupGitStatus(map, "/repo", "/repo/src/b.ts")).toBeNull();
     expect(lookupGitStatus(map, "/repo", "/elsewhere/a.ts")).toBeNull();
+  });
+});
+
+describe("gitStatusCategory", () => {
+  it("maps each canonical code to its category", () => {
+    expect(gitStatusCategory("A")).toBe("added");
+    expect(gitStatusCategory("M")).toBe("modified");
+    expect(gitStatusCategory("D")).toBe("deleted");
+    expect(gitStatusCategory("R")).toBe("renamed");
+    expect(gitStatusCategory("U")).toBe("untracked");
+  });
+
+  it("groups copied with renamed and the raw ? with untracked", () => {
+    expect(gitStatusCategory("C")).toBe("renamed");
+    expect(gitStatusCategory("?")).toBe("untracked");
+  });
+
+  it("is case-insensitive and trims whitespace", () => {
+    expect(gitStatusCategory("a")).toBe("added");
+    expect(gitStatusCategory(" M ")).toBe("modified");
+  });
+
+  it("returns null for an unrecognized code", () => {
+    expect(gitStatusCategory("T")).toBeNull();
+    expect(gitStatusCategory("")).toBeNull();
   });
 });

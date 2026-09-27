@@ -39,7 +39,11 @@ import {
 } from "@/modules/explorer/lib/menuItemClass";
 import { joinPath } from "@/modules/explorer/lib/useFileTree";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
-import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
+import {
+  gitStatusCategory,
+  type GitStatusCategory,
+  type GitStatusCode,
+} from "@/modules/explorer/lib/gitStatusUtils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setScmViewMode } from "@/modules/settings/store";
 import {
@@ -179,15 +183,17 @@ function entriesUnderFolder(
 }
 
 
+const STATUS_TEXT_CLASS_BY_CATEGORY: Record<GitStatusCategory, string> = {
+  added: "text-emerald-500/85",
+  untracked: "text-teal-500/85",
+  modified: "text-amber-500/85",
+  deleted: "text-rose-500/85",
+  renamed: "text-sky-500/85",
+};
+
 function statusTextClass(code: string): string {
-  switch (code) {
-    case "A": return "text-emerald-500/85";
-    case "U": return "text-teal-500/85";
-    case "M": return "text-amber-500/85";
-    case "D": return "text-rose-500/85";
-    case "R": return "text-sky-500/85";
-    default: return "text-muted-foreground/60";
-  }
+  const category = gitStatusCategory(code);
+  return category ? STATUS_TEXT_CLASS_BY_CATEGORY[category] : "text-muted-foreground/60";
 }
 
 

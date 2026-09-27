@@ -14,6 +14,10 @@ import {
   type GitCommitFileChange,
   type GitLogEntry,
 } from "@/lib/native";
+import {
+  gitStatusCategory,
+  type GitStatusCategory,
+} from "@/modules/explorer/lib/gitStatusUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   Copy01Icon,
@@ -140,20 +144,18 @@ function compactDate(secs: number): string {
   return `${month} ${day} ${d.getFullYear()}`;
 }
 
+const STATUS_TONE_BY_CATEGORY: Partial<Record<GitStatusCategory, string>> = {
+  added: "text-emerald-600 dark:text-emerald-400",
+  modified: "text-amber-600 dark:text-amber-300",
+  deleted: "text-rose-600 dark:text-rose-400",
+  renamed: "text-sky-600 dark:text-sky-300",
+};
+
+// Commit diffs never carry an "untracked" status, so that category (and any
+// unrecognized code) falls back to the same muted tone as before.
 function statusTone(code: string): string {
-  switch (code.toUpperCase()) {
-    case "A":
-      return "text-emerald-600 dark:text-emerald-400";
-    case "M":
-      return "text-amber-600 dark:text-amber-300";
-    case "D":
-      return "text-rose-600 dark:text-rose-400";
-    case "R":
-    case "C":
-      return "text-sky-600 dark:text-sky-300";
-    default:
-      return "text-muted-foreground";
-  }
+  const category = gitStatusCategory(code);
+  return (category && STATUS_TONE_BY_CATEGORY[category]) || "text-muted-foreground";
 }
 
 function highlight(text: string, query: string): ReactNode {
