@@ -9,13 +9,22 @@ export function pathDirname(path: string): string {
   return p.slice(0, i);
 }
 
-export function pathBasename(path: string): string {
+export function pathBasename(
+  path: string,
+  opts?: { tolerateTrailingSlash?: boolean },
+): string {
   const p = normalizeSeparators(path);
+  if (opts?.tolerateTrailingSlash) {
+    const parts = p.split("/").filter(Boolean);
+    return parts.length > 0 ? parts[parts.length - 1] : path;
+  }
   const i = p.lastIndexOf("/");
   return i >= 0 ? p.slice(i + 1) : p;
 }
 
-// Vault-relative, forward-slash paths only: these two never see OS separators.
+// Relative, forward-slash paths only: these two never see OS separators.
+// Used for vault-relative note paths and git-relative status/commit paths alike,
+// where a top-level entry has no parent ("" rather than an OS-style "/" root).
 export function splitPath(relPath: string): [string, string] {
   const i = relPath.lastIndexOf("/");
   return i === -1 ? ["", relPath] : [relPath.slice(0, i), relPath.slice(i + 1)];

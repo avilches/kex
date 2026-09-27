@@ -25,7 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { pathBasename } from "@/lib/pathUtils";
+import { pathBasename, splitPath } from "@/lib/pathUtils";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
@@ -165,18 +165,6 @@ function isEntryRow(row: RowDescriptor): row is EntryRowDescriptor {
     row.kind === "changes-entry" ||
     row.kind === "tree-file"
   );
-}
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
-}
-
-function dirname(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index <= 0) return "";
-  return normalized.slice(0, index);
 }
 
 function entriesUnderFolder(
@@ -1349,9 +1337,9 @@ export const SourceControlPanel = memo(
                   `All ${scm.pendingDiscard.count} unstaged changes will be discarded. This can't be undone.`
                 )
               ) : scm.pendingDiscard?.untracked ? (
-                `"${basename(scm.pendingDiscard.label)}" is not tracked by git. It will be removed from disk. This can't be undone.`
+                `"${pathBasename(scm.pendingDiscard.label)}" is not tracked by git. It will be removed from disk. This can't be undone.`
               ) : scm.pendingDiscard ? (
-                `Your edits to "${basename(scm.pendingDiscard.label)}" will be lost. This can't be undone.`
+                `Your edits to "${pathBasename(scm.pendingDiscard.label)}" will be lost. This can't be undone.`
               ) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1684,12 +1672,12 @@ const EntryRow = memo(function EntryRow({
   const showDirname = row.kind !== "tree-file";
   const isSelected =
     selected?.path === entry.path && selected?.mode === entry.mode;
-  const fileName = basename(entry.path);
+  const [entryDir, fileName] = splitPath(entry.path);
   const iconUrl = fileIconUrl(fileName);
   const pathLabel = entry.originalPath
     ? `${entry.originalPath} → ${entry.path}`
     : showDirname
-      ? dirname(entry.path)
+      ? entryDir
       : null;
   const isStageBusy = actionBusy === `stage:${entry.path}`;
   const isUnstageBusy = actionBusy === `unstage:${entry.path}`;

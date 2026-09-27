@@ -43,6 +43,18 @@ describe("pathBasename", () => {
   it("returns empty string for trailing separator", () => {
     expect(pathBasename("/Users/foo/")).toBe("");
   });
+
+  it("tolerates a trailing separator when asked to", () => {
+    expect(pathBasename("/Users/foo/", { tolerateTrailingSlash: true })).toBe("foo");
+  });
+
+  it("tolerates a Windows drive root when asked to", () => {
+    expect(pathBasename("C:/", { tolerateTrailingSlash: true })).toBe("C:");
+  });
+
+  it("falls back to the raw input when nothing remains after tolerating separators", () => {
+    expect(pathBasename("/", { tolerateTrailingSlash: true })).toBe("/");
+  });
 });
 
 describe("segmentsFromCwd", () => {

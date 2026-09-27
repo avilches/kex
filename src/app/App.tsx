@@ -149,11 +149,7 @@ import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import { isAutofocusTab } from "@/modules/workspaces/lib/types";
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] ?? path;
-}
+import { pathBasename } from "@/lib/pathUtils";
 
 function toastSplitBlocked(
   reason: "pane-limit" | "too-narrow" | "too-short",
@@ -1094,10 +1090,12 @@ export default function App() {
   // ── Window title ──────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const project = explorerRoot ? basename(explorerRoot) : "";
+    const project = explorerRoot
+      ? pathBasename(explorerRoot, { tolerateTrailingSlash: true })
+      : "";
     const label = activeTab
       ? activeCwd
-        ? basename(activeCwd)
+        ? pathBasename(activeCwd, { tolerateTrailingSlash: true })
         : tabTitle(activeTab)
       : "";
     let title: string;

@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { splitPath } from "@/lib/pathUtils";
 import { cn } from "@/lib/utils";
 import {
   native,
@@ -84,18 +85,6 @@ type FilesEntry =
   | { state: "loading" }
   | { state: "loaded"; files: GitCommitFileChange[] }
   | { state: "error"; error: string };
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
-}
-
-function dirname(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index <= 0) return "";
-  return normalized.slice(0, index);
-}
 
 function normalizeError(error: unknown): string {
   if (typeof error === "string") return error;
@@ -984,8 +973,7 @@ const FileRow = memo(function FileRow({
   file: GitCommitFileChange;
   onOpen: (pin: boolean) => void;
 }) {
-  const fileName = basename(file.path);
-  const dir = dirname(file.path);
+  const [dir, fileName] = splitPath(file.path);
   const iconUrl = fileIconUrl(fileName);
   return (
     <button
