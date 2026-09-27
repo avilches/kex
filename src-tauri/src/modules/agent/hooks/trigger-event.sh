@@ -21,8 +21,13 @@ spool_event() {
     local lines
     lines="$(wc -l < "$spool_file" 2>/dev/null)"
     if [ -n "$lines" ] && [ "$lines" -gt "$MAX_SPOOL_LINES" ]; then
-        tail -n "$MAX_SPOOL_LINES" "$spool_file" > "$spool_file.tmp" 2>/dev/null \
-            && mv "$spool_file.tmp" "$spool_file"
+        # A fixed temp name would race two overlapping rotations (same tab,
+        # both crossing the line cap) onto the same file, letting one mv
+        # clobber the other's freshly-appended line. Suffix with our own PID
+        # so each rotation gets its own temp file.
+        local rotate_tmp="$spool_file.tmp.$$"
+        tail -n "$MAX_SPOOL_LINES" "$spool_file" > "$rotate_tmp" 2>/dev/null \
+            && mv "$rotate_tmp" "$spool_file"
     fi
 }
 

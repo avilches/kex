@@ -155,18 +155,51 @@ fn spool_path_for_tab(base: &Path, tab_id: &str) -> PathBuf {
     base.join(format!("{tab_id}.jsonl"))
 }
 
+/// The path a spool file is renamed to while being drained. See `drain_spool`
+/// for why the rename happens before reading.
+fn spool_draining_path_for_tab(base: &Path, tab_id: &str) -> PathBuf {
+    base.join(format!("{tab_id}.jsonl.draining"))
+}
+
 /// Replays any hook events spooled to disk by `trigger-event.sh` because a
 /// live `send_ipc` delivery failed, handing each line to `on_line` (in
 /// production, `dispatch`) in the order they were appended.
 ///
-/// The file is removed only after every line has been handed off, so a crash
-/// mid-drain leaves it in place and the next listener start reprocesses the
-/// whole batch. That trades a possible duplicate delivery for never silently
-/// dropping an event, which matches how the rest of this module treats agent
-/// signals (at-least-once, not exactly-once).
+/// Claims the spool file with a rename before reading it, rather than
+/// read-then-delete in place: a rename on the same filesystem is atomic, so
+/// any line `trigger-event.sh` appends after this point lands in a spool
+/// file created fresh by its next write, never in the file we just renamed
+/// away. Reading straight from the live path and deleting it afterwards
+/// would leave a window where a line appended between the read and the
+/// delete is silently dropped, exactly the bug this spool exists to
+/// prevent.
+///
+/// If a `.draining` file is already there, it is a leftover from a previous
+/// drain that crashed between the rename and the final `remove_file`; it is
+/// replayed first so those lines aren't lost, before claiming the live
+/// spool (if any) the same way.
 fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
+    let draining_path = spool_draining_path_for_tab(base, tab_id);
+    drain_file(&draining_path, tab_id, &mut on_line);
+
     let path = spool_path_for_tab(base, tab_id);
-    let contents = match std::fs::read_to_string(&path) {
+    if let Err(e) = std::fs::rename(&path, &draining_path) {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            log::warn!("[ipc] failed to claim spool {path:?} for draining: {e}");
+        }
+        return;
+    }
+    drain_file(&draining_path, tab_id, &mut on_line);
+}
+
+/// Reads `path` line by line, hands each non-blank line to `on_line`, then
+/// removes it. The file is removed only after every line has been handed
+/// off, so a crash mid-drain leaves it in place for the next attempt to
+/// replay. That trades a possible duplicate delivery for never silently
+/// dropping an event, which matches how the rest of this module treats
+/// agent signals (at-least-once, not exactly-once).
+fn drain_file(path: &Path, tab_id: &str, on_line: &mut impl FnMut(&str)) {
+    let contents = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
         Err(e) => {
@@ -183,7 +216,7 @@ fn drain_spool(base: &Path, tab_id: &str, mut on_line: impl FnMut(&str)) {
         log::debug!("[ipc] drained {} spooled event(s) for tab={tab_id}", lines.len());
     }
 
-    if let Err(e) = std::fs::remove_file(&path) {
+    if let Err(e) = std::fs::remove_file(path) {
         if e.kind() != std::io::ErrorKind::NotFound {
             log::warn!("[ipc] failed to remove drained spool {path:?}: {e}");
         }
@@ -672,6 +705,48 @@ mod tests {
 
         assert!(!called);
         assert!(other_path.exists());
+    }
+
+    #[test]
+    fn drain_spool_claims_the_file_by_rename_before_reading_it() {
+        // A drain that read-then-deleted the live path in place would have a
+        // window where a line appended between the read and the delete is
+        // lost. Renaming first means the live path is gone (and free for a
+        // fresh append) the instant the rename succeeds, before any line has
+        // even been read.
+        let dir = tempfile::tempdir().unwrap();
+        let tab_id = "tab-drain-rename";
+        let path = spool_path_for_tab(dir.path(), tab_id);
+        let draining_path = spool_draining_path_for_tab(dir.path(), tab_id);
+        std::fs::write(&path, "line-one\n").unwrap();
+
+        let mut seen = Vec::new();
+        drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
+
+        assert_eq!(seen, vec!["line-one"]);
+        assert!(!path.exists());
+        assert!(!draining_path.exists());
+    }
+
+    #[test]
+    fn drain_spool_replays_a_leftover_draining_file_from_a_crashed_drain() {
+        // Simulates a process that renamed the live spool to `.draining` on a
+        // previous run but crashed before finishing (or before removing the
+        // file), then wrote a new live spool file afterwards. Both must be
+        // replayed, oldest first, and neither should clobber the other.
+        let dir = tempfile::tempdir().unwrap();
+        let tab_id = "tab-drain-leftover";
+        let path = spool_path_for_tab(dir.path(), tab_id);
+        let draining_path = spool_draining_path_for_tab(dir.path(), tab_id);
+        std::fs::write(&draining_path, "leftover-line\n").unwrap();
+        std::fs::write(&path, "fresh-line\n").unwrap();
+
+        let mut seen = Vec::new();
+        drain_spool(dir.path(), tab_id, |line| seen.push(line.to_string()));
+
+        assert_eq!(seen, vec!["leftover-line", "fresh-line"]);
+        assert!(!path.exists());
+        assert!(!draining_path.exists());
     }
 
     #[test]
