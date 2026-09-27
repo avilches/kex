@@ -6,8 +6,8 @@ import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
-import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
+import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
+import { subscribe as subscribeOscTitles, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
@@ -123,10 +123,14 @@ function DraggableTab({
   const focusFilePath = tabFilePath(tab);
   const focusTarget =
     focusFilePath ?? (tab.kind === "terminal" ? (tab.cwd ?? null) : null);
-  const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
-  const runningCommand = tab.kind === "terminal" ? (runningCommandMap.get(tab.id) ?? null) : null;
-  const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
-  const oscTitle = tab.kind === "terminal" ? oscTitleMap.get(tab.id) : undefined;
+  const runningCommand = useSyncExternalStore(
+    subscribeToRunningCommands,
+    () => (tab.kind === "terminal" ? getRunningCommand(tab.id) : null),
+  );
+  const oscTitle = useSyncExternalStore(
+    subscribeOscTitles,
+    () => (tab.kind === "terminal" ? getOscTitle(tab.id) : undefined),
+  );
   const title = tabTitle(tab, runningCommand, oscTitle);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
