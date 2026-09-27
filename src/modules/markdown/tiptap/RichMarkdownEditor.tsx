@@ -1,4 +1,3 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
 import type { Editor, Extensions } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
@@ -25,6 +24,7 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { htmlToMarkdown } from "@/modules/markdown/lib/htmlToMarkdown";
+import { resolveMarkdownImageSrc } from "@/modules/markdown/lib/imageSrc";
 import { markdownToHtml } from "@/modules/markdown/lib/markdownToHtml";
 import type { WikiLinkContext, WikiLinkEntry } from "@/modules/markdown/lib/wikiLinks";
 import { CodeLangDropdown } from "@/modules/markdown/tiptap/CodeLangDropdown";
@@ -114,10 +114,6 @@ export type RichMarkdownEditorProps = {
 const EMPTY_WIKI_ENTRIES: WikiLinkEntry[] = [];
 const NOOP = () => {};
 
-function isAbsolutePath(p: string): boolean {
-  return p.startsWith("/") || p.startsWith("\\") || /^[a-zA-Z]:[\\/]/.test(p);
-}
-
 export const RichMarkdownEditor = forwardRef<
   RichMarkdownEditorHandle,
   RichMarkdownEditorProps
@@ -199,10 +195,7 @@ export const RichMarkdownEditor = forwardRef<
   }, [wikiEntries, wiki]);
 
   const resolveImageSrc = useCallback((src: string): string => {
-    if (/^(https?:|data:)/i.test(src)) return src;
-    if (isAbsolutePath(src)) return convertFileSrc(src);
-    const dir = filePathRef.current.split(/[\\/]/).slice(0, -1).join("/");
-    return convertFileSrc(dir ? `${dir}/${src}` : src);
+    return resolveMarkdownImageSrc(src, filePathRef.current);
   }, []);
 
   // Parse only on load / external reload, never per keystroke.

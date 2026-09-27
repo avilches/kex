@@ -1,7 +1,8 @@
 import { useEditorThemeExt } from "@/modules/editor/lib/useEditorThemeExt";
 import { buildLivePreviewExtensions } from "@/modules/markdown/codemirror/lib/markdownExtensions";
+import { resolveMarkdownImageSrc } from "@/modules/markdown/lib/imageSrc";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 
 export type CodeMirrorEditorHandle = { focus(): void };
 
@@ -12,17 +13,26 @@ type Props = {
   // its source; a change forces the view to show `value` even when that string
   // equals what @uiw/react-codemirror last compared against.
   syncKey: unknown;
+  // The markdown file's own path, so a relative image src resolves against
+  // its directory, same as RichMarkdownEditor.resolveImageSrc.
+  path: string;
 };
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
-  function CodeMirrorEditor({ value, onChange, syncKey }, ref) {
+  function CodeMirrorEditor({ value, onChange, syncKey, path }, ref) {
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const themeExt = useEditorThemeExt();
-    // Stable identity: buildLivePreviewExtensions() takes no arguments, so this
+    const pathRef = useRef(path);
+    pathRef.current = path;
+    const resolveImageSrc = useCallback(
+      (src: string): string => resolveMarkdownImageSrc(src, pathRef.current),
+      [],
+    );
+    // Stable identity: resolveImageSrc reads pathRef at call time, so this
     // only needs to run once, not on every theme change (the theme is a
     // separate prop below, per Task 7's note on @uiw/react-codemirror's
-    // `theme` default).
-    const extensions = useMemo(() => buildLivePreviewExtensions(), []);
+    // `theme` default) or every time the tab is pointed at a new path.
+    const extensions = useMemo(() => buildLivePreviewExtensions(resolveImageSrc), [resolveImageSrc]);
 
     // @uiw/react-codemirror only pushes `value` into the view when it differs,
     // by string equality, from what it last compared. After the user types and

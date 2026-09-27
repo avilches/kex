@@ -13,6 +13,7 @@ import { IS_MAC } from "@/lib/platform";
 import { isExternalUrl, openExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
 import { frontmatterEnd } from "@/modules/markdown/codemirror/lib/frontmatterEnd";
 import {
+  type ImageSpec,
   planLivePreview,
   planTables,
   type TableSpec,
@@ -44,6 +45,70 @@ class CheckboxWidget extends WidgetType {
     return input;
   }
 
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+class HrWidget extends WidgetType {
+  override eq(): boolean {
+    return true;
+  }
+
+  override toDOM(): HTMLElement {
+    const div = document.createElement("div");
+    div.className = "cm-lp-hr";
+    return div;
+  }
+
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+class BulletWidget extends WidgetType {
+  override eq(): boolean {
+    return true;
+  }
+
+  override toDOM(): HTMLElement {
+    const span = document.createElement("span");
+    span.className = "cm-lp-bullet-dot";
+    span.textContent = "•";
+    return span;
+  }
+
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
+class ImageWidget extends WidgetType {
+  private readonly key: string;
+
+  constructor(
+    private readonly alt: string,
+    private readonly src: string,
+  ) {
+    super();
+    this.key = `${alt}\u0000${src}`;
+  }
+
+  override eq(other: ImageWidget): boolean {
+    return other.key === this.key;
+  }
+
+  override toDOM(): HTMLElement {
+    const img = document.createElement("img");
+    img.src = this.src;
+    img.alt = this.alt;
+    img.className = "cm-lp-image";
+    img.loading = "lazy";
+    return img;
+  }
+
+  // Clicking an image places the cursor on its line, revealing the raw
+  // markdown for editing, same as clicking a table.
   override ignoreEvent(): boolean {
     return false;
   }
@@ -141,7 +206,11 @@ function frontmatterEndOf(state: EditorState): number {
 
 const codeBlockLine = Decoration.line({ class: "cm-lp-codeblock" });
 
-function buildDecorations(view: EditorView): DecorationSet {
+function imageWidgetOf(spec: ImageSpec, resolveImageSrc: (src: string) => string): ImageWidget {
+  return new ImageWidget(spec.alt, resolveImageSrc(spec.url));
+}
+
+function buildDecorations(view: EditorView, resolveImageSrc: (src: string) => string): DecorationSet {
   const { state } = view;
   const activeLines = activeLinesOf(state);
   const fmEnd = frontmatterEndOf(state);
@@ -168,6 +237,23 @@ function buildDecorations(view: EditorView): DecorationSet {
         from: box.from,
         to: box.to,
         deco: Decoration.replace({ widget: new CheckboxWidget(box.from, box.checked) }),
+      });
+    }
+    for (const hr of plan.hrs) {
+      decorations.push({ from: hr.from, to: hr.to, deco: Decoration.replace({ widget: new HrWidget() }) });
+    }
+    for (const bullet of plan.bullets) {
+      decorations.push({
+        from: bullet.from,
+        to: bullet.to,
+        deco: Decoration.replace({ widget: new BulletWidget() }),
+      });
+    }
+    for (const image of plan.images) {
+      decorations.push({
+        from: image.from,
+        to: image.to,
+        deco: Decoration.replace({ widget: imageWidgetOf(image, resolveImageSrc) }),
       });
     }
     // Only the lines inside this visible range; a block straddling two ranges
@@ -211,32 +297,36 @@ const tableField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-const inlinePlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
+function createInlinePlugin(resolveImageSrc: (src: string) => string): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
 
-    constructor(view: EditorView) {
-      this.decorations = buildDecorations(view);
-    }
-
-    update(update: ViewUpdate): void {
-      // The syntax-tree check catches the background parse that finishes a
-      // long document after open, which changes neither doc, selection, nor
-      // viewport.
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged ||
-        syntaxTree(update.startState) !== syntaxTree(update.state)
-      ) {
-        this.decorations = buildDecorations(update.view);
+      constructor(view: EditorView) {
+        this.decorations = buildDecorations(view, resolveImageSrc);
       }
-    }
-  },
-  { decorations: (v) => v.decorations },
-);
 
-export const livePreviewPlugin: Extension = [inlinePlugin, tableField];
+      update(update: ViewUpdate): void {
+        // The syntax-tree check catches the background parse that finishes a
+        // long document after open, which changes neither doc, selection, nor
+        // viewport.
+        if (
+          update.docChanged ||
+          update.selectionSet ||
+          update.viewportChanged ||
+          syntaxTree(update.startState) !== syntaxTree(update.state)
+        ) {
+          this.decorations = buildDecorations(update.view, resolveImageSrc);
+        }
+      }
+    },
+    { decorations: (v) => v.decorations },
+  );
+}
+
+export function livePreviewPlugin(resolveImageSrc: (src: string) => string): Extension {
+  return [createInlinePlugin(resolveImageSrc), tableField];
+}
 
 export function linkUrlAt(state: EditorState, pos: number): string | null {
   let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1);

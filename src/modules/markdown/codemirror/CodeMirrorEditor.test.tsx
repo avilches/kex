@@ -18,14 +18,14 @@ describe("CodeMirrorEditor", () => {
     const source =
       '---\ntitle: Note\n---\n\n<div class="note">raw html</div>\n\n# Heading\n';
     const onChange = vi.fn();
-    render(<CodeMirrorEditor value={source} onChange={onChange} syncKey={1} />);
+    render(<CodeMirrorEditor value={source} onChange={onChange} syncKey={1} path="/notes/test.md" />);
     expect(onChange).not.toHaveBeenCalled();
   });
 
   it("reports the exact text back through onChange after an edit, unchanged", () => {
     const onChange = vi.fn();
     const { container } = render(
-      <CodeMirrorEditor value="Hello" onChange={onChange} syncKey={1} />,
+      <CodeMirrorEditor value="Hello" onChange={onChange} syncKey={1} path="/notes/test.md" />,
     );
     const dom = container.querySelector(".cm-content") as HTMLElement;
     const view = EditorView.findFromDOM(dom);
@@ -40,7 +40,7 @@ describe("CodeMirrorEditor", () => {
       '---\ntitle: Note\n---\n\n<div class="note">raw html</div>\n\n# Heading\n\n**bold** and _italic_ and `code`\n\n- [ ] a task\n- a bullet\n';
     const onChange = vi.fn();
     const { container } = render(
-      <CodeMirrorEditor value={source} onChange={onChange} syncKey={1} />,
+      <CodeMirrorEditor value={source} onChange={onChange} syncKey={1} path="/notes/test.md" />,
     );
     const dom = container.querySelector(".cm-content") as HTMLElement;
     const view = EditorView.findFromDOM(dom);
@@ -69,7 +69,7 @@ describe("CodeMirrorEditor", () => {
     const onChange = vi.fn();
     const firstLoad = { content: "Original" };
     const { container, rerender } = render(
-      <CodeMirrorEditor value={firstLoad.content} onChange={onChange} syncKey={firstLoad} />,
+      <CodeMirrorEditor value={firstLoad.content} onChange={onChange} syncKey={firstLoad} path="/notes/test.md" />,
     );
     const view = EditorView.findFromDOM(container.querySelector(".cm-content") as HTMLElement);
     expect(view).not.toBeNull();
@@ -78,7 +78,7 @@ describe("CodeMirrorEditor", () => {
     expect(view.state.doc.toString()).toBe("Discarded edit");
 
     const reload = { content: "Original" };
-    rerender(<CodeMirrorEditor value={reload.content} onChange={onChange} syncKey={reload} />);
+    rerender(<CodeMirrorEditor value={reload.content} onChange={onChange} syncKey={reload} path="/notes/test.md" />);
     expect(view.state.doc.toString()).toBe("Original");
   });
 });

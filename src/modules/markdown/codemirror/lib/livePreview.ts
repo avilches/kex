@@ -13,12 +13,18 @@ export type TableSpec = {
   rows: string[][];
 };
 export type CodeBlockSpec = { from: number; to: number };
+export type HrSpec = { from: number; to: number };
+export type BulletSpec = { from: number; to: number };
+export type ImageSpec = { from: number; to: number; alt: string; url: string };
 export type LivePreviewPlan = {
   marks: MarkSpec[];
   hides: HideSpec[];
   checkboxes: CheckboxSpec[];
   tables: TableSpec[];
   codeBlocks: CodeBlockSpec[];
+  hrs: HrSpec[];
+  bullets: BulletSpec[];
+  images: ImageSpec[];
 };
 
 export type LivePreviewInput = {
@@ -55,6 +61,9 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
   const checkboxes: CheckboxSpec[] = [];
   const tables: TableSpec[] = [];
   const codeBlocks: CodeBlockSpec[] = [];
+  const hrs: HrSpec[] = [];
+  const bullets: BulletSpec[] = [];
+  const images: ImageSpec[] = [];
 
   // Frontmatter is never parsed as markdown (see the frontmatterEnd check inside
   // enter() below, which skips it entirely); it still needs its own monospace
@@ -94,6 +103,38 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
       // the plugin styles each of its lines instead.
       if (node.type.name === "FencedCode") {
         codeBlocks.push({ from: node.from, to: node.to });
+        if (!isActive(node, doc, activeLines)) {
+          for (const mark of node.getChildren("CodeMark")) {
+            hides.push({ from: mark.from, to: mark.to });
+          }
+        }
+        return false;
+      }
+
+      if (node.type.name === "HorizontalRule") {
+        if (!isActive(node, doc, activeLines)) {
+          hrs.push({ from: node.from, to: node.to });
+        }
+        return;
+      }
+
+      if (node.type.name === "Blockquote") {
+        marks.push({ from: node.from, to: node.to, className: "cm-lp-quote" });
+        return;
+      }
+
+      // Nested wherever the block parser placed the continuation line (not
+      // necessarily a direct child of Blockquote), so it is handled on its
+      // own rather than through hideMatchingChildren from the Blockquote case.
+      if (node.type.name === "QuoteMark") {
+        if (!isActive(node, doc, activeLines)) {
+          hides.push({ from: node.from, to: node.to });
+        }
+        return;
+      }
+
+      if (node.type.name === "Image") {
+        planImage(node, doc, activeLines, images);
         return false;
       }
 
@@ -139,6 +180,12 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
 
       if (node.type.name === "ListMark") {
         marks.push({ from: node.from, to: node.to, className: "cm-lp-bullet" });
+        // ListMark also covers an ordered item's "1." marker; only an
+        // unordered item's marker (-, * or +) becomes a real bullet glyph.
+        const isBulletList = node.parent?.parent?.type.name === "BulletList";
+        if (isBulletList && !isActive(node, doc, activeLines)) {
+          bullets.push({ from: node.from, to: node.to });
+        }
         return;
       }
 
@@ -152,7 +199,7 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
     },
   });
 
-  return { marks, hides, checkboxes, tables, codeBlocks };
+  return { marks, hides, checkboxes, tables, codeBlocks, hrs, bullets, images };
 }
 
 export type TablePlanInput = {
@@ -281,4 +328,22 @@ function planLink(
   if (textTo > textFrom) {
     marks.push({ from: textFrom, to: textTo, className: "cm-lp-link-text" });
   }
+}
+
+// An Image node's opening marker is the single two-char token "![", not "["
+// (LinkMark) followed by "!" text: the "!" has no node of its own.
+function planImage(
+  node: SyntaxNode,
+  doc: Text,
+  activeLines: ReadonlySet<number>,
+  images: ImageSpec[],
+): void {
+  if (isActive(node, doc, activeLines)) return;
+  const marks = node.getChildren("LinkMark");
+  const url = node.getChild("URL");
+  const openBracket = marks.find((m) => m.from === node.from);
+  const closeBracket = marks.find((m) => openBracket && m.from > openBracket.to);
+  if (!openBracket || !url) return;
+  const alt = doc.sliceString(openBracket.to, closeBracket ? closeBracket.from : url.from);
+  images.push({ from: node.from, to: node.to, alt, url: doc.sliceString(url.from, url.to) });
 }

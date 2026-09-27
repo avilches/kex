@@ -19,11 +19,13 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 const platformMock = vi.hoisted(() => ({ IS_MAC: false }));
 vi.mock("@/lib/platform", () => platformMock);
 
+const identitySrc = (src: string) => src;
+
 function mount(doc: string, selection?: { anchor: number }) {
   const state = EditorState.create({
     doc,
     selection: selection ? { anchor: selection.anchor } : undefined,
-    extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin],
+    extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin(identitySrc)],
   });
   return new EditorView({ state, parent: document.body });
 }
@@ -63,7 +65,11 @@ describe("livePreviewPlugin", () => {
     const state = EditorState.create({
       doc,
       selection: EditorSelection.create([EditorSelection.cursor(2), EditorSelection.cursor(18)]),
-      extensions: [EditorState.allowMultipleSelections.of(true), markdown({ base: markdownLanguage }), livePreviewPlugin],
+      extensions: [
+        EditorState.allowMultipleSelections.of(true),
+        markdown({ base: markdownLanguage }),
+        livePreviewPlugin(identitySrc),
+      ],
     });
     const view = new EditorView({ state, parent: document.body });
     expect(view.state.selection.ranges.length).toBe(2);
@@ -92,12 +98,93 @@ describe("livePreviewPlugin", () => {
     view.destroy();
   });
 
-  it("styles every line of a fenced code block as a line, blank lines included", () => {
+  it("styles every line of a fenced code block as a line, blank lines included, and hides its fence marks", () => {
     const doc = "intro\n\n```js\nconst x = 1;\n\nlet y;\n```\n\nafter\n";
     const view = mount(doc, { anchor: doc.indexOf("after") });
     const styled = Array.from(view.dom.querySelectorAll(".cm-lp-codeblock"));
-    expect(styled.map((el) => el.textContent)).toEqual(["```js", "const x = 1;", "", "let y;", "```"]);
+    // The ``` marks are hidden while the cursor is outside the block; the "js"
+    // language tag is not a fence mark, so it stays.
+    expect(styled.map((el) => el.textContent)).toEqual(["js", "const x = 1;", "", "let y;", ""]);
     expect(styled.every((el) => el.classList.contains("cm-line"))).toBe(true);
+    view.destroy();
+  });
+
+  it("reveals the fence marks once the cursor moves inside the code block", () => {
+    const doc = "```js\nconst x = 1;\n```\n";
+    const view = mount(doc, { anchor: doc.indexOf("const") });
+    const styled = Array.from(view.dom.querySelectorAll(".cm-lp-codeblock"));
+    expect(styled.map((el) => el.textContent)).toEqual(["```js", "const x = 1;", "```"]);
+    view.destroy();
+  });
+
+  it("replaces an inactive horizontal rule with a real <hr>-like widget, and reveals the raw dashes on its line", () => {
+    const doc = "before\n\n---\n\nafter\n";
+    const inactive = mount(doc, { anchor: doc.indexOf("after") });
+    expect(inactive.dom.textContent).not.toContain("---");
+    expect(inactive.dom.querySelector(".cm-lp-hr")).not.toBeNull();
+    inactive.destroy();
+
+    const active = mount(doc, { anchor: doc.indexOf("---") });
+    expect(active.dom.textContent).toContain("---");
+    expect(active.dom.querySelector(".cm-lp-hr")).toBeNull();
+    active.destroy();
+  });
+
+  it("italicizes a blockquote and hides its > marker except on the active line", () => {
+    const doc = "> line one\n> line two\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const quote = view.dom.querySelector(".cm-lp-quote");
+    expect(quote).not.toBeNull();
+    expect(view.dom.textContent).not.toContain(">");
+    expect(view.dom.textContent).toContain("line one");
+    expect(view.dom.textContent).toContain("line two");
+    view.destroy();
+
+    const active = mount(doc, { anchor: doc.indexOf("line two") });
+    expect(active.dom.textContent).toContain("> line two");
+    active.destroy();
+  });
+
+  it("replaces an inactive bullet marker with a dot but leaves an ordered marker as plain text", () => {
+    const doc = "- one\n1. two\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    expect(view.dom.querySelector(".cm-lp-bullet-dot")).not.toBeNull();
+    expect(view.dom.textContent).not.toContain("- one");
+    expect(view.dom.textContent).toContain("one");
+    expect(view.dom.textContent).toContain("1. two");
+    view.destroy();
+  });
+
+  it("reveals the raw bullet marker on its own active line", () => {
+    const doc = "- one\n- two\n";
+    const view = mount(doc, { anchor: doc.indexOf("two") });
+    expect(view.dom.textContent).toContain("- two");
+    view.destroy();
+  });
+
+  it("renders an inactive image as a real <img>, resolved through the given resolver", () => {
+    const doc = "before\n\n![a cat](cat.png)\n\nafter\n";
+    const resolve = vi.fn((src: string) => `resolved:${src}`);
+    const state = EditorState.create({
+      doc,
+      selection: { anchor: doc.indexOf("after") },
+      extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin(resolve)],
+    });
+    const view = new EditorView({ state, parent: document.body });
+    const img = view.dom.querySelector(".cm-lp-image") as HTMLImageElement;
+    expect(img).not.toBeNull();
+    expect(img.alt).toBe("a cat");
+    expect(img.src).toContain("resolved:cat.png");
+    expect(resolve).toHaveBeenCalledWith("cat.png");
+    expect(view.dom.textContent).not.toContain("![a cat]");
+    view.destroy();
+  });
+
+  it("shows the raw image markdown while the cursor is on its line", () => {
+    const doc = "![a cat](cat.png)\n";
+    const view = mount(doc, { anchor: 0 });
+    expect(view.dom.querySelector(".cm-lp-image")).toBeNull();
+    expect(view.dom.textContent).toContain("![a cat](cat.png)");
     view.destroy();
   });
 
@@ -193,7 +280,7 @@ describe("linkClickHandler", () => {
   function mountLink(doc: string, pointerPos: number) {
     const state = EditorState.create({
       doc,
-      extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin, linkClickHandler],
+      extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin(identitySrc), linkClickHandler],
     });
     const view = new EditorView({ state, parent: document.body });
     vi.spyOn(view, "posAtCoords").mockReturnValue(pointerPos);

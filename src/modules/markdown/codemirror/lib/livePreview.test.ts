@@ -23,7 +23,16 @@ function plan(
 describe("planLivePreview", () => {
   it("returns nothing for plain prose", () => {
     const result = plan("Just a sentence with no markup.\n");
-    expect(result).toEqual({ marks: [], hides: [], checkboxes: [], tables: [], codeBlocks: [] });
+    expect(result).toEqual({
+      marks: [],
+      hides: [],
+      checkboxes: [],
+      tables: [],
+      codeBlocks: [],
+      hrs: [],
+      bullets: [],
+      images: [],
+    });
   });
 
   it("styles a heading and hides its marker on an inactive line", () => {
@@ -93,6 +102,68 @@ describe("planLivePreview", () => {
     expect(result.marks.some((m) => m.className === "cm-lp-bullet")).toBe(true);
   });
 
+  it("plans a bullet-glyph replacement for an unordered marker on an inactive line", () => {
+    const text = "- one\n- two\n";
+    const result = plan(text);
+    expect(result.bullets).toEqual([
+      { from: 0, to: 1 },
+      { from: 6, to: 7 },
+    ]);
+  });
+
+  it("does not replace an unordered marker on its own active line", () => {
+    const text = "- one\n- two\n";
+    const result = plan(text, [2]);
+    expect(result.bullets).toEqual([{ from: 0, to: 1 }]);
+  });
+
+  it("never plans a bullet-glyph replacement for an ordered marker", () => {
+    const text = "1. one\n2. two\n";
+    const result = plan(text);
+    expect(result.bullets).toEqual([]);
+    expect(result.marks.some((m) => m.className === "cm-lp-bullet")).toBe(true);
+  });
+
+  it("styles a blockquote in full and hides its > marker on an inactive line", () => {
+    const text = "> quoted\n";
+    const result = plan(text);
+    expect(result.marks).toContainEqual({ from: 0, to: 8, className: "cm-lp-quote" });
+    expect(result.hides).toContainEqual({ from: 0, to: 1 });
+  });
+
+  it("reveals the > marker of a blockquote on its own active line, one line at a time", () => {
+    const text = "> line one\n> line two\n";
+    const secondMarker = text.indexOf(">", 1);
+    // Line 1 is inactive (its marker is hidden); line 2 is active (its own
+    // marker stays visible), even though both belong to the same Blockquote.
+    const result = plan(text, [2]);
+    expect(result.hides).toEqual([{ from: 0, to: 1 }]);
+    expect(result.hides.some((h) => h.from === secondMarker)).toBe(false);
+  });
+
+  it("plans a HorizontalRule replacement on an inactive line, never on its own active line", () => {
+    const text = "before\n\n---\n\nafter\n";
+    const hrFrom = text.indexOf("---");
+    const inactive = plan(text);
+    expect(inactive.hrs).toEqual([{ from: hrFrom, to: hrFrom + 3 }]);
+    const active = plan(text, [text.slice(0, hrFrom).split("\n").length]);
+    expect(active.hrs).toEqual([]);
+  });
+
+  it("plans an Image replacement with its alt text and URL on an inactive line", () => {
+    const text = "before\n\n![a cat](cat.png)\n\nafter\n";
+    const from = text.indexOf("![a cat]");
+    const to = text.indexOf("(cat.png)") + "(cat.png)".length;
+    const result = plan(text);
+    expect(result.images).toEqual([{ from, to, alt: "a cat", url: "cat.png" }]);
+  });
+
+  it("never plans an Image replacement on its own active line", () => {
+    const text = "![a cat](cat.png)\n";
+    const result = plan(text, [1]);
+    expect(result.images).toEqual([]);
+  });
+
   it("emits a checkbox spec for a task item, checked and unchecked", () => {
     // "- [ ] todo\n" is 11 chars (0-10), so line 2 starts at offset 11 and its
     // "[x]" TaskMarker spans 13-16, not 12-15 - verified against a real parse,
@@ -139,9 +210,28 @@ describe("planLivePreview", () => {
       const result = plan(text, active);
       expect(result.codeBlocks).toEqual([{ from: 0, to: text.length - 1 }]);
       expect(result.marks).toEqual([]);
-      expect(result.hides).toEqual([]);
       expect(result.checkboxes).toEqual([]);
     }
+  });
+
+  it("hides the opening and closing ``` fence marks while the cursor is outside the block", () => {
+    const text = "```js\nconst x = 1;\n```\n";
+    const openFrom = text.indexOf("```");
+    const closeFrom = text.lastIndexOf("```");
+    const result = plan(text);
+    expect(result.hides).toEqual(
+      expect.arrayContaining([
+        { from: openFrom, to: openFrom + 3 },
+        { from: closeFrom, to: closeFrom + 3 },
+      ]),
+    );
+    expect(result.hides.length).toBe(2);
+  });
+
+  it("reveals the fence marks while the cursor is on any line of the block", () => {
+    const text = "```js\nconst x = 1;\n```\n";
+    const result = plan(text, [2]);
+    expect(result.hides).toEqual([]);
   });
 
   const TABLE =

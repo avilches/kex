@@ -15,11 +15,11 @@ export const plainUrlHighlight = HighlightStyle.define([{ tag: tags.url, color: 
 // GFM (tables, task lists, strikethrough) plus subscript/superscript/emoji: the
 // `markdownLanguage` export already bundles these on top of CommonMark, so no
 // manual @lezer/markdown extension list is needed.
-export function buildLivePreviewExtensions(): Extension[] {
+export function buildLivePreviewExtensions(resolveImageSrc: (src: string) => string): Extension[] {
   return [
     markdown({ base: markdownLanguage }),
     syntaxHighlighting(plainUrlHighlight),
-    livePreviewPlugin,
+    livePreviewPlugin(resolveImageSrc),
     linkClickHandler,
     EditorView.lineWrapping,
     // The syntax highlighter nests its own colored span inside each lp span, and
@@ -53,11 +53,33 @@ export function buildLivePreviewExtensions(): Extension[] {
       },
       ".cm-lp-link-text": { textDecoration: "underline" },
       [LP_TEXT_COLOR_SELECTORS]: { color: "var(--foreground) !important" },
-      // Same specificity as the rule above, so it must come after it for a link
-      // nested in bold or a heading (or bold nested in a link) to keep its color.
+      // Same reason as LP_TEXT_COLOR_SELECTORS: the syntax highlighter's own
+      // nested span (ordered-list digits, unordered-list dash/star/plus, or a
+      // link inside a quote) otherwise sets its own color, beating this one.
+      ".cm-lp-bullet, .cm-lp-bullet *": { color: "var(--muted-foreground) !important" },
+      ".cm-lp-quote, .cm-lp-quote *": { color: "var(--muted-foreground) !important" },
+      // Same specificity as the two rules above, so it must come after them for
+      // a link nested in bold, a heading, or a quote (or bold nested in a link)
+      // to keep its color.
       ".cm-lp-link-text, .cm-lp-link-text *": { color: "var(--primary, #3b82f6) !important" },
-      ".cm-lp-bullet": { color: "var(--muted-foreground)" },
+      ".cm-lp-bullet-dot": { color: "var(--muted-foreground)" },
       ".cm-lp-checkbox": { marginRight: "4px", cursor: "pointer" },
+      ".cm-lp-quote": {
+        fontStyle: "italic",
+        borderLeft: "3px solid var(--primary)",
+        paddingLeft: "12px",
+      },
+      ".cm-lp-hr": {
+        display: "block",
+        height: "0",
+        margin: "0.5em 0",
+        borderTop: "1px solid var(--border)",
+      },
+      ".cm-lp-image": {
+        display: "block",
+        maxWidth: "100%",
+        borderRadius: "4px",
+      },
       ".cm-lp-frontmatter": {
         fontFamily: "var(--font-mono, monospace)",
         backgroundColor: "color-mix(in srgb, var(--foreground) 4%, transparent)",

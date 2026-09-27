@@ -119,6 +119,7 @@ export function MarkdownTab(props: Props): JSX.Element {
             value={doc.content}
             syncKey={doc}
             onChange={onChange}
+            path={props.path}
           />
         ) : doc.status === "loading" ? null : doc.status === "deleted" ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
