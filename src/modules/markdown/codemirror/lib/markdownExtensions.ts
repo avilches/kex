@@ -57,6 +57,14 @@ export function buildLivePreviewExtensions(): Extension[] {
         backgroundColor: "color-mix(in srgb, var(--foreground) 4%, transparent)",
       },
       ".cm-lp-html": { fontFamily: "var(--font-mono, monospace)" },
+      ".cm-lp-codeblock": {
+        display: "inline-block",
+        fontFamily: "var(--font-mono, monospace)",
+        color: "var(--foreground) !important",
+        backgroundColor: "color-mix(in srgb, var(--foreground) 6%, transparent)",
+        borderRadius: "4px",
+        padding: "2px 0",
+      },
     }),
   ];
 }

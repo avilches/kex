@@ -62,6 +62,11 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
         return;
       }
 
+      if (node.type.name === "FencedCode") {
+        marks.push({ from: node.from, to: node.to, className: "cm-lp-codeblock" });
+        return false;
+      }
+
       if (HEADING_NAMES.has(node.type.name)) {
         const level = node.type.name.slice(-1);
         marks.push({ from: node.from, to: node.to, className: `cm-lp-heading cm-lp-h${level}` });

@@ -133,6 +133,16 @@ describe("planLivePreview", () => {
     });
   });
 
+  it("styles a fenced code block as one block and never decorates its content", () => {
+    const text = "```js\nconst x = 1;\n**not bold** `x`\n```\n";
+    for (const active of [[], [2]]) {
+      const result = plan(text, active);
+      expect(result.marks).toEqual([{ from: 0, to: text.length - 1, className: "cm-lp-codeblock" }]);
+      expect(result.hides).toEqual([]);
+      expect(result.checkboxes).toEqual([]);
+    }
+  });
+
   it("styles the frontmatter block as monospace, never as markdown", () => {
     const text = "---\ntitle: **not bold**\n---\n# Real Title\n";
     const fmEnd = "---\ntitle: **not bold**\n---\n".length;
