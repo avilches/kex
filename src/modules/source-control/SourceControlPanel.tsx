@@ -42,7 +42,6 @@ import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import {
   gitStatusCategory,
   type GitStatusCategory,
-  type GitStatusCode,
 } from "@/modules/explorer/lib/gitStatusUtils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setScmViewMode } from "@/modules/settings/store";
@@ -1690,10 +1689,7 @@ const EntryRow = memo(function EntryRow({
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
   const disabled = actionBusy !== null;
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
-  const statusHex = gitStatusHexColor(
-    entry.statusCode as GitStatusCode,
-    gitColorScheme,
-  );
+  const statusHex = gitStatusHexColor(entry.statusCode, gitColorScheme);
   const absolutePath = repoRoot
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
     : null;

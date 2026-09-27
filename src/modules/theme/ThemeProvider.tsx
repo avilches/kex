@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useTauriUnlisten } from "@/lib/useTauriListen";
 import {
   loadPreferences,
   onPreferencesChange,
@@ -89,32 +90,40 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
       writeFastMode(p.theme);
       writeFastThemeId(p.themeId);
     });
-    const unlistenP = onPreferencesChange((key, value) => {
-      if (key === "theme" && (value === "system" || value === "light" || value === "dark")) {
-        setModeState(value);
-        writeFastMode(value);
-      } else if (key === "themeId" && typeof value === "string") {
-        setThemeIdState(value);
-        writeFastThemeId(value);
-      }
-    });
     return () => {
       alive = false;
-      void unlistenP.then((fn) => fn());
     };
   }, []);
+
+  useTauriUnlisten(
+    () =>
+      onPreferencesChange((key, value) => {
+        if (key === "theme" && (value === "system" || value === "light" || value === "dark")) {
+          setModeState(value);
+          writeFastMode(value);
+        } else if (key === "themeId" && typeof value === "string") {
+          setThemeIdState(value);
+          writeFastThemeId(value);
+        }
+      }),
+    [],
+  );
 
   useEffect(() => {
     let alive = true;
     void listCustomThemes().then((list) => { if (alive) setCustomThemes(list); });
-    const unlisten = onCustomThemesChange(() => {
-      void listCustomThemes().then((list) => setCustomThemes(list));
-    });
     return () => {
       alive = false;
-      void unlisten.then((fn) => fn());
     };
   }, []);
+
+  useTauriUnlisten(
+    () =>
+      onCustomThemesChange(() => {
+        void listCustomThemes().then((list) => setCustomThemes(list));
+      }),
+    [],
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

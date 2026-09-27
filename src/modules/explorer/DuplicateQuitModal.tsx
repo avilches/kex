@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,6 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { native } from "@/lib/native";
+import { useTauriListen } from "@/lib/useTauriListen";
 import { useDuplicateProgress } from "@/modules/explorer/lib/duplicateStore";
 
 export function DuplicateQuitModal() {
@@ -21,25 +21,18 @@ export function DuplicateQuitModal() {
   const [canceling, setCanceling] = useState(false);
   const progress = useDuplicateProgress();
 
-  useEffect(() => {
-    const ups = [
-      listen<{ name: string; copied: number; total: number }>(
-        "kex:duplicate-quit-prompt",
-        (e) => {
-          setPromptName(e.payload.name);
-          setCanceling(false);
-          setOpen(true);
-        },
-      ),
-      listen("kex:duplicate-quit-dismissed", () => setOpen(false)),
-      // The copy finished and the app is about to exit; hide the modal so it
-      // does not linger during the flush before process termination.
-      listen("kex:before-quit", () => setOpen(false)),
-    ];
-    return () => {
-      for (const up of ups) void up.then((u) => u());
-    };
-  }, []);
+  useTauriListen<{ name: string; copied: number; total: number }>(
+    "kex:duplicate-quit-prompt",
+    (e) => {
+      setPromptName(e.payload.name);
+      setCanceling(false);
+      setOpen(true);
+    },
+  );
+  useTauriListen("kex:duplicate-quit-dismissed", () => setOpen(false));
+  // The copy finished and the app is about to exit; hide the modal so it
+  // does not linger during the flush before process termination.
+  useTauriListen("kex:before-quit", () => setOpen(false));
 
   const name = progress?.name ?? promptName;
   const total = progress?.total ?? 0;

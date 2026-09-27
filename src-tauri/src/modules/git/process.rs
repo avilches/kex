@@ -91,7 +91,7 @@ pub fn ensure_git_available(workspace: &WorkspaceEnv) -> Result<()> {
 }
 
 fn check_git_availability(workspace: &WorkspaceEnv) -> Availability {
-    let output = match run_git_uncached(workspace, None, ["--version"], 10) {
+    let output = match run_git_impl(workspace, None, ["--version"], 10) {
         Ok(o) => o,
         Err(_) => return Availability::NotInstalled,
     };
@@ -231,10 +231,10 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    run_git_uncached(workspace, cwd, args, timeout_secs)
+    run_git_impl(workspace, cwd, args, timeout_secs)
 }
 
-fn run_git_uncached<I, S>(
+fn run_git_impl<I, S>(
     workspace: &WorkspaceEnv,
     cwd: Option<&str>,
     args_iter: I,

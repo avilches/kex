@@ -6,7 +6,12 @@ export function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
-function normalizeStatusCode(status: string): GitStatusCode {
+// Single normalization shared by every raw-git-status-to-badge mapping in the
+// app (source-control's staged/unstaged entries, git-history's per-commit
+// file list): collapses the raw single-letter codes git emits (which include
+// "?" for untracked and "C" for copied, with no dedicated category of its
+// own) down to the canonical GitStatusCode set.
+export function normalizeGitStatusCode(status: string): GitStatusCode {
   switch (status.trim().toUpperCase()) {
     case "?":
     case "U":
@@ -54,7 +59,7 @@ export function statusCodeForFile(file: GitChangedFile): GitStatusCode {
   if (file.indexStatus === "U" || file.worktreeStatus === "U") return "U";
   const primary = file.unstaged ? file.worktreeStatus : file.indexStatus;
   const fallback = file.unstaged ? file.indexStatus : file.worktreeStatus;
-  return normalizeStatusCode(primary !== " " ? primary : fallback);
+  return normalizeGitStatusCode(primary !== " " ? primary : fallback);
 }
 
 export function buildGitStatusMap(

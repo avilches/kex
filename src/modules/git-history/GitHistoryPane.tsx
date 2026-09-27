@@ -17,6 +17,7 @@ import {
 import {
   gitStatusCategory,
   type GitStatusCategory,
+  normalizeGitStatusCode,
 } from "@/modules/explorer/lib/gitStatusUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
@@ -1016,7 +1017,7 @@ const FileRow = memo(function FileRow({
         )}
         title={file.statusLabel}
       >
-        {file.status.toUpperCase()}
+        {normalizeGitStatusCode(file.status)}
       </span>
     </button>
   );

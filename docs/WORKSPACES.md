@@ -27,7 +27,7 @@ Workspace           — a named environment (local or WSL distro)
 - `color?: string | null` — optional workspace accent color (hex string or null)
 - `scripts?: Script[]` — list of saved scripts (command, name, optional cwd, optional tabId)
 - `activeScript?: string` — id of the currently selected script in the Run button
-- `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. The legacy `"pinned"` mode is migrated via `migrateWorkspace` in `workspaceState.ts` for backward compatibility. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
+- `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
 **Script running state.** `terminalEphemeralStore` (`src/modules/workspaces/lib/terminalEphemeralStore.ts`) has two independent sections:
 - `runningCommands` (`Map<tabId, string>`) — foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a script is involved.

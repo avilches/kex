@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { debouncedInvoke } from "./debouncedInvoke";
-import { migrateExplorerRootMode } from "./explorerRoot";
 import type { Tab, SplitNode, Workspace } from "./types";
 import {
   setSavedSidebarState,
@@ -24,11 +23,6 @@ type WindowEntry = {
 let cached: SavedState | null = null;
 
 export function sanitizeTab(p: Tab): Tab {
-  // Migrate the legacy "preview" tab kind (renamed to "browser") so sessions
-  // saved before the rename still restore.
-  if ((p as { kind: string }).kind === "preview") {
-    return { ...(p as object), kind: "browser" } as Tab;
-  }
   if (p.kind === "editor") return { ...p, dirty: false };
   return p;
 }
@@ -43,7 +37,6 @@ function sanitizeTree(node: SplitNode): SplitNode {
 export function sanitizeWorkspace(w: Workspace): Workspace {
   return {
     ...w,
-    explorerRootMode: migrateExplorerRootMode(w.explorerRootMode),
     showHidden: w.showHidden,
     paneTree: sanitizeTree(w.paneTree),
   };

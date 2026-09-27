@@ -2662,11 +2662,6 @@ export default function App() {
       if (id === "file.rename") {
         return sidebarRef.current?.isExplorerFocused() ?? false;
       }
-      if (id === "tab.lock") {
-        return (
-          activeTab?.kind !== "terminal" && activeTab?.kind !== "editor"
-        );
-      }
 
       return false;
     },
