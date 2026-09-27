@@ -8,7 +8,7 @@ type StatusLike = { id: string; label: string };
 
 export type WorkspaceGroup<T> = { id: string; label: string | null; items: T[] };
 
-export const NO_STATUS_GROUP_ID = "__none__";
+const NO_STATUS_GROUP_ID = "__none__";
 
 export function groupWorkspaces<T extends Grouped>(
   workspaces: T[],

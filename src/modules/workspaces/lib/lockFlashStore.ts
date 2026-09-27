@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react";
-
 type Snapshot = { tabId: string | null; seq: number };
 
 let tabId: string | null = null;
@@ -25,9 +23,4 @@ export function subscribeLockFlash(l: () => void): () => void {
 
 export function getLockFlashSnapshot(): Snapshot {
   return snapshot;
-}
-
-export function useLockFlash(id: string): boolean {
-  const snap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
-  return snap.tabId === id;
 }

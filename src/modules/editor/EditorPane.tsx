@@ -193,7 +193,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const cursorBlinkPref = usePreferencesStore((s) => s.editorCursorBlink);
     const cursorBlinkRatePref = usePreferencesStore((s) => s.editorCursorBlinkRate);
     const cursorStylePref = usePreferencesStore((s) => s.editorCursorStyle);
-    const languageRef = useRef<string | null>(null);
     const themeExt = useEditorThemeExt();
 
     const view = resolveEditorView(path, editorViewByExt);
@@ -339,8 +338,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }, [view.columnRuler]);
 
     useEffect(() => {
-      const ext = path.split(".").pop()?.toLowerCase() ?? null;
-      languageRef.current = ext;
       if (doc.status !== "ready") return;
       let cancelled = false;
       const resolve = async (): Promise<LanguageResult> => {

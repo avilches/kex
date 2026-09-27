@@ -106,7 +106,6 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     (s) => s.keepFolderLayoutOnChangeExplorerRoot,
   );
   const keepLayoutRef = useRef(keepLayout);
-  const gitDecorationsRef = useRef(true);
   const [nodes, setNodes] = useState<TreeState>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
@@ -165,7 +164,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       const entries = await invoke<DirEntry[]>("fs_read_dir", {
         path,
         showHidden,
-        gitDecorations: gitDecorationsRef.current,
+        gitDecorations: true,
         workspace: currentWorkspaceEnv(),
       });
 

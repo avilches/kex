@@ -45,7 +45,7 @@ export type EditorGlobalToggleKey =
   | "closeBrackets"
   | "autocompletion";
 
-export type EditorGlobalToggles = Record<EditorGlobalToggleKey, boolean>;
+type EditorGlobalToggles = Record<EditorGlobalToggleKey, boolean>;
 
 // Order mirrors the Settings window Editor group.
 const GLOBAL_TOGGLE_LABELS: [EditorGlobalToggleKey, string][] = [

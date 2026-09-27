@@ -48,7 +48,6 @@ type Props = {
   onSplitBrowserDown: () => void;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
-  onRenameFile?: (tabId: string, newName: string) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;

@@ -48,7 +48,7 @@ export type SourceControlEntry = {
 };
 
 
-export type PendingDiscard =
+type PendingDiscard =
   | { scope: "single"; count: 1; label: string; untracked: boolean }
   | { scope: "all"; count: number; label: string; untrackedCount: number };
 

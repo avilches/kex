@@ -10,7 +10,7 @@ import {
   type MenuStore,
 } from "@/modules/markdown/tiptap/lib/menuStore";
 
-export type SlashMenuState = {
+type SlashMenuState = {
   x: number;
   y: number;
   query: string;
@@ -18,7 +18,7 @@ export type SlashMenuState = {
   to: number;
 } | null;
 
-export type SlashCommand = {
+type SlashCommand = {
   label: string;
   aliases: string[];
   icon: string;

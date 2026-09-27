@@ -1,6 +1,6 @@
 import type { PaneNode, Tab } from "./types";
 
-export type DiffTab = Extract<Tab, { kind: "git-diff" | "git-commit-file" }>;
+type DiffTab = Extract<Tab, { kind: "git-diff" | "git-commit-file" }>;
 
 // What identifies "the same diff" regardless of the tab's id or preview
 // state: a working-tree diff by repo+path+mode, a commit diff by repo+sha+path.

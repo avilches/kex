@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react";
-
 const titles = new Map<string, string>();
 let snapshot: ReadonlyMap<string, string> = new Map();
 const listeners = new Set<() => void>();
@@ -46,9 +44,4 @@ export function _clearAll(): void {
   if (titles.size === 0) return;
   titles.clear();
   notify();
-}
-
-export function useOscTitle(tabId: string): string | undefined {
-  const snap = useSyncExternalStore(subscribe, getSnapshot);
-  return snap.get(tabId);
 }
