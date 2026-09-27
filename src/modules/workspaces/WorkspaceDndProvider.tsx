@@ -14,7 +14,7 @@ import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { tabForDroppedPath } from "./lib/dropTab";
-import { allPanes, findTabPane } from "./lib/splitNode";
+import { allPanes, findOpenPathTab, findTabPane } from "./lib/splitNode";
 import {
   insertIntoLeafScratchpad,
   leafCwd,
@@ -27,6 +27,8 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { basename, tabIcon, tabTitle } from "./lib/tabTitle";
 import type { Tab, Workspace } from "./lib/types";
 import type { UseWorkspacesReturn } from "./lib/useWorkspaces";
+
+const EDITOR_ONLY: ReadonlySet<Tab["kind"]> = new Set(["editor"]);
 
 type DraggingItem =
   | { kind: "tab"; tab: Tab; workspaceId: string }
@@ -230,13 +232,11 @@ export function WorkspaceDndProvider({
     // Folders open a fresh terminal at that cwd; files reuse an already-open editor.
     const makeTab = (): Tab => tabForDroppedPath(filePath, isDir);
 
-    let existingTabId: string | null = null;
-    if (!isDir) {
-      for (const pane of panes) {
-        const found = pane.tabs.find((p) => p.kind === "editor" && p.path === filePath);
-        if (found) { existingTabId = found.id; break; }
-      }
-    }
+    // Dropping a file always builds an "editor" tab (see tabForDroppedPath), so
+    // only that kind counts as already open here (never "markdown").
+    const existingTabId = isDir
+      ? null
+      : (findOpenPathTab(activeWs.paneTree, filePath, EDITOR_ONLY)?.tab.id ?? null);
 
     if (overId.startsWith("tab-insert:")) {
       const parts = overId.split(":");

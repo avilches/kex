@@ -9,6 +9,8 @@ pub mod watch;
 
 use std::path::Path;
 
+use crate::modules::workspace::WorkspaceEnv;
+
 /// The single canonical-to-display conversion: forward slashes, Windows
 /// verbatim `\\?\` prefix stripped. Route every such conversion through here.
 pub fn to_canon(p: impl AsRef<Path>) -> String {
@@ -22,6 +24,32 @@ pub fn to_canon(p: impl AsRef<Path>) -> String {
         // Backslashes are legal in Unix filenames; never rewrite them.
         s.into_owned()
     }
+}
+
+/// Renders `path` for display, rewriting it under the WSL root's own display
+/// prefix (e.g. `\\wsl.localhost\...`) when running against a WSL workspace,
+/// so the frontend shows the same path style the user picked it from.
+/// Falls back to a plain canonical path otherwise (or when `path` is not
+/// under `root_path`, which should not happen for a walk rooted there).
+pub fn display_path(
+    path: &Path,
+    root_path: &Path,
+    root_display: &str,
+    workspace: &WorkspaceEnv,
+) -> String {
+    if workspace.is_wsl() {
+        if let Ok(rel) = path.strip_prefix(root_path) {
+            let rel = to_canon(rel);
+            return if rel.is_empty() {
+                root_display.to_string()
+            } else if root_display.ends_with('/') {
+                format!("{root_display}{rel}")
+            } else {
+                format!("{root_display}/{rel}")
+            };
+        }
+    }
+    to_canon(path)
 }
 
 // Pure so it stays unit-testable on any host. `\\?\C:\x` -> `C:/x`.

@@ -10,6 +10,7 @@ export { useWorkspaceDnd } from "./WorkspaceDndProvider";
 export {
   allPaneIds,
   allPanes,
+  findOpenPathTab,
   findPane,
   findPaneInDirection,
   findTabPane,

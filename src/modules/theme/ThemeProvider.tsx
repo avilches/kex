@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import {
-  DEFAULT_THEME_ID,
   loadPreferences,
   onPreferencesChange,
   setTheme as persistTheme,
@@ -15,6 +14,7 @@ import {
   type ThemePref,
 } from "@/modules/settings/store";
 import { applyTheme } from "./applyTheme";
+import { DEFAULT_THEME_ID } from "./types";
 import {
   listCustomThemes,
   onCustomThemesChange,

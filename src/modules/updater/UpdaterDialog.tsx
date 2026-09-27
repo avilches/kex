@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { formatBytes } from "@/lib/formatBytes";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
 import { useUpdater } from "./useUpdater";
@@ -30,12 +31,6 @@ const DISTROS: { key: DistroKey; label: string }[] = [
   { key: "debian", label: "Debian / Ubuntu" },
   { key: "fedora", label: "Fedora / RHEL" },
 ];
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function UpdaterDialog() {
   const { status, install, dismiss } = useUpdater();

@@ -610,10 +610,11 @@ export const SHORTCUTS_BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
 export function getShortcutLabel(
   id: ShortcutId,
   userShortcuts: Partial<Record<ShortcutId, KeyBinding[]>>,
+  separator = " ",
 ): string | null {
   const shortcut = SHORTCUTS_BY_ID.get(id);
   if (!shortcut) return null;
   const bindings = userShortcuts[id] ?? shortcut.defaultBindings;
   const tokens = getBindingTokens(bindings?.[0]);
-  return tokens.length ? tokens.join(" ") : null;
+  return tokens.length ? tokens.join(separator) : null;
 }

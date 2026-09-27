@@ -78,9 +78,7 @@ const STATUS_PRESETS: { label: string; preset: readonly { label: string; color: 
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
-
-const INPUT_CLASS =
-  "h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
+import { INPUT_CLASS } from "../components/inputClass";
 
 function SortableStatusRow({
   index,

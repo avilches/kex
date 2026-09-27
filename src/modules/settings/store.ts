@@ -13,6 +13,7 @@ import {
   type MarkdownEngine,
   parseMarkdownEngine,
 } from "@/modules/markdown/lib/markdownEngine";
+import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 
 export type ThemePref = "system" | "light" | "dark";
 
@@ -64,8 +65,6 @@ export type CursorInactiveStyle =
   | "bar"
   | "underline"
   | "none";
-
-export const DEFAULT_THEME_ID = "kex-default";
 
 export const EDITOR_THEMES = [
   "kanagawa",
@@ -506,36 +505,28 @@ export function parseTextEditorMode(value: unknown): TextEditorMode {
   return "workspace-and-files";
 }
 
-async function writePref<T>(key: string, value: T): Promise<void> {
-  await store.set(key, value);
-  await store.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "general", key, value } satisfies PrefsChangedPayload);
+// Builds a per-store writer: persists the key, flushes it to disk, then
+// mirrors the change through the cross-window event (see PREFS_CHANGED_EVENT
+// above). Each store gets its own writer so a mistaken write can never target
+// the wrong LazyStore.
+function makeWriter(targetStore: LazyStore, storeId: StoreId) {
+  return async function write<T>(key: string, value: T): Promise<void> {
+    await targetStore.set(key, value);
+    await targetStore.save();
+    await emit(PREFS_CHANGED_EVENT, { store: storeId, key, value } satisfies PrefsChangedPayload);
+  };
 }
 
-async function writeTerminalPref<T>(key: string, value: T): Promise<void> {
-  await terminalStore.set(key, value);
-  await terminalStore.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "terminal", key, value } satisfies PrefsChangedPayload);
-}
-
-async function writeEditorPref<T>(key: string, value: T): Promise<void> {
-  await editorStore.set(key, value);
-  await editorStore.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "editor", key, value } satisfies PrefsChangedPayload);
-}
-
-async function writeToolsPref<T>(key: string, value: T): Promise<void> {
-  await toolsStore.set(key, value);
-  await toolsStore.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "tools", key, value } satisfies PrefsChangedPayload);
-}
+const writePref = makeWriter(store, "general");
+const writeTerminalPref = makeWriter(terminalStore, "terminal");
+const writeEditorPref = makeWriter(editorStore, "editor");
+const writeToolsPref = makeWriter(toolsStore, "tools");
+const writeShortcutsStorePref = makeWriter(shortcutsStore, "shortcuts");
 
 async function writeShortcutsPref(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
-  await shortcutsStore.set(KEY_SHORTCUTS, value);
-  await shortcutsStore.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "shortcuts", key: KEY_SHORTCUTS, value } satisfies PrefsChangedPayload);
+  await writeShortcutsStorePref(KEY_SHORTCUTS, value);
 }
 
 export async function loadPreferences(): Promise<Preferences> {
@@ -1310,32 +1301,31 @@ const STORE_PREF_KEY_MAPS: Record<StoreId, Record<string, PrefKey>> = {
   shortcuts: SHORTCUTS_PREF_KEY_MAP,
 };
 
+// Every LazyStore paired with the key map that decodes its raw keys into a
+// PrefKey, in the same order onPreferencesChange used to subscribe by hand.
+const STORES_WITH_MAPS: ReadonlyArray<[LazyStore, Record<string, PrefKey>]> = [
+  [store, GENERAL_PREF_KEY_MAP],
+  [terminalStore, TERMINAL_PREF_KEY_MAP],
+  [editorStore, EDITOR_PREF_KEY_MAP],
+  [toolsStore, TOOLS_PREF_KEY_MAP],
+  [shortcutsStore, SHORTCUTS_PREF_KEY_MAP],
+];
+
 /** Subscribe to changes from any window (settings -> main). */
 export async function onPreferencesChange(
   cb: (key: PrefKey, value: unknown) => void,
 ): Promise<UnlistenFn> {
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref/writeTerminalPref/writeEditorPref.
-  const unsubLocal = await store.onChange<unknown>((key, value) => {
-    const mapped = GENERAL_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
-  const unsubTerminal = await terminalStore.onChange<unknown>((key, value) => {
-    const mapped = TERMINAL_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
-  const unsubEditor = await editorStore.onChange<unknown>((key, value) => {
-    const mapped = EDITOR_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
-  const unsubTools = await toolsStore.onChange<unknown>((key, value) => {
-    const mapped = TOOLS_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
-  const unsubShortcuts = await shortcutsStore.onChange<unknown>((key, value) => {
-    const mapped = SHORTCUTS_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
+  const unsubs: UnlistenFn[] = [];
+  for (const [targetStore, map] of STORES_WITH_MAPS) {
+    unsubs.push(
+      await targetStore.onChange<unknown>((key, value) => {
+        const mapped = map[key];
+        if (mapped) cb(mapped, value);
+      }),
+    );
+  }
   const unsubEvent = await listen<PrefsChangedPayload>(
     PREFS_CHANGED_EVENT,
     (e) => {
@@ -1345,11 +1335,7 @@ export async function onPreferencesChange(
     },
   );
   return () => {
-    unsubLocal();
-    unsubTerminal();
-    unsubEditor();
-    unsubTools();
-    unsubShortcuts();
+    for (const unsub of unsubs) unsub();
     unsubEvent();
   };
 }

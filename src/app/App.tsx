@@ -75,6 +75,7 @@ import { useWorkspaceEnvStore } from "@/modules/workspace";
 import {
   allPanes,
   collectRunningTerminals,
+  findOpenPathTab,
   findPane,
   findPaneInDirection,
   findTabPane,
@@ -94,6 +95,7 @@ import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
+import { isBulkClosable } from "@/modules/workspaces/lib/tabClose";
 import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import { visibleWorkspaceOrder } from "@/modules/workspaces/lib/workspaceOrder";
@@ -1129,22 +1131,17 @@ export default function App() {
       if (!activeWorkspace) return undefined;
       const markdown = isMarkdownPath(path);
       // Check if already open (as editor or rendered markdown); activate it.
-      for (const pane of allPanes(activeWorkspace.paneTree)) {
-        const existing = pane.tabs.find(
-          (p) =>
-            (p.kind === "editor" || p.kind === "markdown") &&
-            (p as { path: string }).path === path,
-        );
-        if (existing) {
-          if (pin && existing.kind === "editor" && existing.preview) {
-            updateTabData(activeWorkspace.id, existing.id, (p) =>
-              p.kind === "editor" ? { ...p, preview: false } : p,
-            );
-          }
-          activateTab(activeWorkspace.id, existing.id);
-          flashTab(existing.id);
-          return existing.id;
+      const existingOpenTab = findOpenPathTab(activeWorkspace.paneTree, path);
+      if (existingOpenTab) {
+        const existing = existingOpenTab.tab;
+        if (pin && existing.kind === "editor" && existing.preview) {
+          updateTabData(activeWorkspace.id, existing.id, (p) =>
+            p.kind === "editor" ? { ...p, preview: false } : p,
+          );
         }
+        activateTab(activeWorkspace.id, existing.id);
+        flashTab(existing.id);
+        return existing.id;
       }
       const tabId = newTabId();
       const isPreview = !(pin ?? false);
@@ -1194,17 +1191,11 @@ export default function App() {
   const openNoteToSide = useCallback(
     (path: string) => {
       if (!activeWorkspace) return;
-      for (const pane of allPanes(activeWorkspace.paneTree)) {
-        const existing = pane.tabs.find(
-          (p) =>
-            (p.kind === "editor" || p.kind === "markdown") &&
-            (p as { path: string }).path === path,
-        );
-        if (existing) {
-          activateTab(activeWorkspace.id, existing.id);
-          flashTab(existing.id);
-          return;
-        }
+      const existingOpenTab = findOpenPathTab(activeWorkspace.paneTree, path);
+      if (existingOpenTab) {
+        activateTab(activeWorkspace.id, existingOpenTab.tab.id);
+        flashTab(existingOpenTab.tab.id);
+        return;
       }
       const i = path.lastIndexOf("/");
       splitPaneAndOpenTab(activeWorkspace.id, activeWorkspace.activePaneId, "right", {
@@ -1232,17 +1223,11 @@ export default function App() {
     (path: string, sourceTabId?: string) => {
       if (!activeWorkspace) return undefined;
       const markdown = isMarkdownPath(path);
-      for (const pane of allPanes(activeWorkspace.paneTree)) {
-        const existing = pane.tabs.find(
-          (p) =>
-            (p.kind === "editor" || p.kind === "markdown") &&
-            (p as { path: string }).path === path,
-        );
-        if (existing) {
-          activateTab(activeWorkspace.id, existing.id);
-          flashTab(existing.id);
-          return existing.id;
-        }
+      const existingOpenTab = findOpenPathTab(activeWorkspace.paneTree, path);
+      if (existingOpenTab) {
+        activateTab(activeWorkspace.id, existingOpenTab.tab.id);
+        flashTab(existingOpenTab.tab.id);
+        return existingOpenTab.tab.id;
       }
       const tabId = newTabId();
       const newTab = markdown
@@ -2273,18 +2258,14 @@ export default function App() {
   const handleCloseOtherTabs = useCallback(() => {
     if (!activePane || !activeTabId) return;
     const ids = activePane.tabs
-      .filter(
-        (p) => p.id !== activeTabId && !(p as { locked?: boolean }).locked,
-      )
+      .filter((p) => p.id !== activeTabId && isBulkClosable(p))
       .map((p) => p.id);
     if (ids.length) closeTabsRef.current(ids);
   }, [activePane, activeTabId]);
 
   const handleCloseAllTabs = useCallback(() => {
     if (!activePane) return;
-    const ids = activePane.tabs
-      .filter((p) => !(p as { locked?: boolean }).locked)
-      .map((p) => p.id);
+    const ids = activePane.tabs.filter(isBulkClosable).map((p) => p.id);
     if (ids.length) closeTabsRef.current(ids);
   }, [activePane]);
 

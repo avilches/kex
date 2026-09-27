@@ -19,16 +19,54 @@ use crate::modules::git::utils::{
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
-pub fn resolve_repo(
+/// Resolves `cwd` (workspace-relative) to an authorized directory and checks
+/// git is available there. Shared by every entry point that starts from a
+/// raw cwd string rather than an already-authorized repo root.
+fn authorize_cwd(
     registry: &WorkspaceRegistry,
     cwd: &str,
     workspace: &WorkspaceEnv,
-) -> Result<Option<GitRepoInfo>> {
+) -> Result<ResolvedGitDirectory> {
     let cwd = canonical_dir(registry, &dir_path_for(cwd, workspace), workspace)?;
     if !registry.is_authorized(&cwd.local_path) {
         return Err(GitError::PathOutsideWorkspace(cwd.local_path));
     }
     ensure_git_available(&cwd.workspace)?;
+    Ok(cwd)
+}
+
+/// Finds the repo root containing `cwd` (already authorized) and extends
+/// authorization to it, unless that root is a strict ancestor of `cwd`: a
+/// canonical_root strictly above cwd would otherwise silently escalate
+/// authorization beyond what the caller asked for. Returns `None` when `cwd`
+/// is not inside a git repo.
+fn resolve_repo_root(
+    registry: &WorkspaceRegistry,
+    cwd: &ResolvedGitDirectory,
+) -> Result<Option<ResolvedGitDirectory>> {
+    let Some(root_line) = git_stdout_line_opt(
+        &cwd.workspace,
+        &cwd.git_path,
+        ["rev-parse", "--show-toplevel"],
+    )?
+    else {
+        return Ok(None);
+    };
+    let canonical_root = canonical_dir(registry, &root_line, &cwd.workspace)?;
+    let cwd_path = Path::new(&cwd.local_path);
+    let root_path = Path::new(&canonical_root.local_path);
+    if !(cwd_path.starts_with(root_path) && cwd_path != root_path) {
+        let _ = registry.authorize(&canonical_root.local_path);
+    }
+    Ok(Some(canonical_root))
+}
+
+pub fn resolve_repo(
+    registry: &WorkspaceRegistry,
+    cwd: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Option<GitRepoInfo>> {
+    let cwd = authorize_cwd(registry, cwd, workspace)?;
     resolve_repo_in_authorized(registry, &cwd)
 }
 
@@ -48,22 +86,9 @@ fn resolve_repo_in_authorized(
     registry: &WorkspaceRegistry,
     cwd: &ResolvedGitDirectory,
 ) -> Result<Option<GitRepoInfo>> {
-    let Some(root_line) = git_stdout_line_opt(
-        &cwd.workspace,
-        &cwd.git_path,
-        ["rev-parse", "--show-toplevel"],
-    )?
-    else {
+    let Some(canonical_root) = resolve_repo_root(registry, cwd)? else {
         return Ok(None);
     };
-    let canonical_root = canonical_dir(registry, &root_line, &cwd.workspace)?;
-    // Guard: do not extend authorization to an ancestor of the already-authorized cwd.
-    // A canonical_root strictly above cwd would silently escalate scope.
-    let cwd_path = std::path::Path::new(&cwd.local_path);
-    let root_path = std::path::Path::new(&canonical_root.local_path);
-    if !(cwd_path.starts_with(root_path) && cwd_path != root_path) {
-        let _ = registry.authorize(&canonical_root.local_path);
-    }
 
     let head = match git_stdout_lines(
         &canonical_root.workspace,
@@ -107,30 +132,13 @@ pub fn panel_snapshot(
     cwd: &str,
     workspace: &WorkspaceEnv,
 ) -> Result<GitPanelSnapshot> {
-    let cwd = canonical_dir(registry, &dir_path_for(cwd, workspace), workspace)?;
-    if !registry.is_authorized(&cwd.local_path) {
-        return Err(GitError::PathOutsideWorkspace(cwd.local_path));
-    }
-    ensure_git_available(&cwd.workspace)?;
-    let Some(root_line) = git_stdout_line_opt(
-        &cwd.workspace,
-        &cwd.git_path,
-        ["rev-parse", "--show-toplevel"],
-    )?
-    else {
+    let cwd = authorize_cwd(registry, cwd, workspace)?;
+    let Some(canonical_root) = resolve_repo_root(registry, &cwd)? else {
         return Ok(GitPanelSnapshot {
             repo: None,
             status: None,
         });
     };
-    let canonical_root = canonical_dir(registry, &root_line, &cwd.workspace)?;
-    // Guard: do not extend authorization to an ancestor of the already-authorized cwd.
-    // A canonical_root strictly above cwd would silently escalate scope.
-    let cwd_path = std::path::Path::new(&cwd.local_path);
-    let root_path = std::path::Path::new(&canonical_root.local_path);
-    if !(cwd_path.starts_with(root_path) && cwd_path != root_path) {
-        let _ = registry.authorize(&canonical_root.local_path);
-    }
 
     let status = status_inner(&canonical_root)?;
     let repo = GitRepoInfo {

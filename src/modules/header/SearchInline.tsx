@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { KEY_SEP } from "@/lib/platform";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { getBindingTokens, SHORTCUTS } from "@/modules/shortcuts/shortcuts";
+import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { Cancel01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -61,12 +61,7 @@ export const SearchInline = forwardRef<SearchInlineHandle, Props>(
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
 
     const shortcutText = useMemo(() => {
-      const s = SHORTCUTS.find((s) => s.id === "search.focus");
-      if (!s) return "";
-      const bindings = userShortcuts["search.focus"] || s.defaultBindings;
-      if (!bindings || bindings.length === 0) return "";
-      const tokens = getBindingTokens(bindings[0]);
-      return tokens.join(KEY_SEP);
+      return getShortcutLabel("search.focus", userShortcuts, KEY_SEP) ?? "";
     }, [userShortcuts]);
 
     const baseLabel = target?.kind === "git-history" ? "Git search" : "Search";
