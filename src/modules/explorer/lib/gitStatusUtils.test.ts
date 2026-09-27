@@ -4,6 +4,7 @@ import {
   buildGitStatusMap,
   gitStatusCategory,
   lookupGitStatus,
+  normalizeGitStatusCode,
   repoRelativePath,
   statusCodeForFile,
 } from "./gitStatusUtils";
@@ -111,6 +112,35 @@ describe("lookupGitStatus", () => {
   it("returns null for unchanged and out-of-repo paths", () => {
     expect(lookupGitStatus(map, "/repo", "/repo/src/b.ts")).toBeNull();
     expect(lookupGitStatus(map, "/repo", "/elsewhere/a.ts")).toBeNull();
+  });
+});
+
+describe("normalizeGitStatusCode", () => {
+  // Shared by source-control (staged/unstaged entries) and git-history (per-
+  // commit file list) so both surfaces show the same canonical vocabulary
+  // instead of leaking git's raw single-letter codes.
+  it("maps untracked codes to U", () => {
+    expect(normalizeGitStatusCode("?")).toBe("U");
+    expect(normalizeGitStatusCode("u")).toBe("U");
+  });
+
+  it("maps copied to R, alongside renamed", () => {
+    expect(normalizeGitStatusCode("R")).toBe("R");
+    expect(normalizeGitStatusCode("C")).toBe("R");
+  });
+
+  it("passes through A/D as-is", () => {
+    expect(normalizeGitStatusCode("A")).toBe("A");
+    expect(normalizeGitStatusCode("D")).toBe("D");
+  });
+
+  it("is case-insensitive and trims whitespace", () => {
+    expect(normalizeGitStatusCode(" a ")).toBe("A");
+  });
+
+  it("falls back to M for any unrecognized code", () => {
+    expect(normalizeGitStatusCode("T")).toBe("M");
+    expect(normalizeGitStatusCode("")).toBe("M");
   });
 });
 

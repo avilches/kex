@@ -14,6 +14,10 @@ import {
   invalidateRepoDiffs,
   workingDiffKey,
 } from "@/modules/editor/lib/diffCache";
+import {
+  type GitStatusCode,
+  normalizeGitStatusCode,
+} from "@/modules/explorer/lib/gitStatusUtils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SourceControlSummary } from "./useSourceControl";
 
@@ -43,7 +47,7 @@ export type SourceControlEntry = {
   indexStatus: string;
   worktreeStatus: string;
   statusLabel: string;
-  statusCode: string;
+  statusCode: GitStatusCode;
   originalPath: string | null;
   untracked: boolean;
 };
@@ -104,32 +108,11 @@ type SourceControlPanelState = {
   commitAndPush: () => Promise<void>;
 };
 
-function normalizeStatusCode(status: string): string {
-  const code = status.trim().toUpperCase();
-  switch (code) {
-    case "?":
-      return "U";
-    case "A":
-      return "A";
-    case "M":
-      return "M";
-    case "D":
-      return "D";
-    case "R":
-    case "C":
-      return "R";
-    case "U":
-      return "U";
-    default:
-      return code || "M";
-  }
-}
-
-function statusCodeForMode(mode: DiffMode, file: GitChangedFile): string {
+function statusCodeForMode(mode: DiffMode, file: GitChangedFile): GitStatusCode {
   if (mode === "-" && file.untracked) return "U";
   const primary = mode === "+" ? file.indexStatus : file.worktreeStatus;
   const fallback = mode === "+" ? file.worktreeStatus : file.indexStatus;
-  return normalizeStatusCode(primary !== " " ? primary : fallback);
+  return normalizeGitStatusCode(primary !== " " ? primary : fallback);
 }
 
 function makeEntry(
