@@ -1,3 +1,10 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
@@ -25,6 +32,20 @@ const UI_FONT_PRESETS: { label: string; value: string }[] = [
   { label: "Trebuchet MS", value: "Trebuchet MS, sans-serif" },
   { label: "Custom...", value: "__custom__" },
 ];
+
+// Radix's Select treats an item value of "" as "no selection" (the trigger
+// renders blank instead of the item's label), so the "Default" preset's real
+// value ("") is mapped to this sentinel for the Select alone; setUiFont still
+// gets the real "" / preset value.
+const DEFAULT_FONT_SENTINEL = "__default__";
+
+function toSelectValue(presetValue: string): string {
+  return presetValue === "" ? DEFAULT_FONT_SENTINEL : presetValue;
+}
+
+function fromSelectValue(selectValue: string): string {
+  return selectValue === DEFAULT_FONT_SENTINEL ? "" : selectValue;
+}
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
@@ -74,17 +95,21 @@ export function AppearanceSection() {
       <div className="flex flex-col gap-2">
         <FieldLabel>UI Font</FieldLabel>
         <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <select
-            value={selectedPreset}
-            onChange={(e) => handlePresetChange(e.target.value)}
-            className={INPUT_CLASS}
+          <Select
+            value={toSelectValue(selectedPreset)}
+            onValueChange={(v) => handlePresetChange(fromSelectValue(v))}
           >
-            {UI_FONT_PRESETS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger size="sm" className="h-8 w-full text-[12.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {UI_FONT_PRESETS.map((p) => (
+                <SelectItem key={p.value} value={toSelectValue(p.value)} className="text-[12.5px]">
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {showCustomInput && (
             <input
               type="text"
