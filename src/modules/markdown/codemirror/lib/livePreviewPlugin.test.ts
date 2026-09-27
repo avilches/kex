@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { forceParsing, syntaxTreeAvailable } from "@codemirror/language";
-import { EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { describe, expect, it } from "vitest";
@@ -42,6 +42,22 @@ describe("livePreviewPlugin", () => {
     const checkbox = view.dom.querySelector('input[type="checkbox"]') as HTMLInputElement;
     checkbox.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(view.state.doc.toString()).toBe("- [x] todo\n");
+    view.destroy();
+  });
+
+  it("reveals markers on every line holding a cursor and keeps other lines hidden", () => {
+    const doc = "**one**\n**two**\n**three**\n";
+    const state = EditorState.create({
+      doc,
+      selection: EditorSelection.create([EditorSelection.cursor(2), EditorSelection.cursor(18)]),
+      extensions: [EditorState.allowMultipleSelections.of(true), markdown({ base: markdownLanguage }), livePreviewPlugin],
+    });
+    const view = new EditorView({ state, parent: document.body });
+    expect(view.state.selection.ranges.length).toBe(2);
+    const lines = Array.from(view.dom.querySelectorAll(".cm-line")).map((l) => l.textContent);
+    expect(lines[0]).toBe("**one**");
+    expect(lines[1]).toBe("two");
+    expect(lines[2]).toBe("**three**");
     view.destroy();
   });
 
