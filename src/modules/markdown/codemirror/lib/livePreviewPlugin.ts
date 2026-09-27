@@ -9,6 +9,7 @@ import {
   type ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
+import { IS_MAC } from "@/lib/platform";
 import { isExternalUrl, openExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
 import { frontmatterEnd } from "@/modules/markdown/codemirror/lib/frontmatterEnd";
 import {
@@ -246,10 +247,15 @@ export function linkUrlAt(state: EditorState, pos: number): string | null {
 
 // Cmd/Ctrl+click opens a link; a plain click only places the cursor, so the
 // link stays editable (Obsidian's live preview behaves the same way). Only the
-// primary button counts, so a right-click keeps its context menu.
+// primary button counts, so a right-click keeps its context menu. The
+// modifier itself is platform-gated, matching CodeMirror's own mod-click
+// convention: on macOS a Ctrl+click is the system's context-menu gesture
+// (WebKit reports it as an ordinary button-0 mousedown with ctrlKey set), so
+// only metaKey may open a link there; everywhere else only ctrlKey does.
 export function handleLinkMousedown(event: MouseEvent, view: EditorView): boolean {
   if (event.button !== 0) return false;
-  if (!event.metaKey && !event.ctrlKey) return false;
+  const modifierHeld = IS_MAC ? event.metaKey : event.ctrlKey;
+  if (!modifierHeld) return false;
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
   if (pos == null) return false;
   const url = linkUrlAt(view.state, pos);

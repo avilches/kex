@@ -3,7 +3,7 @@ import { forceParsing, syntaxTreeAvailable } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   handleLinkMousedown,
   linkClickHandler,
@@ -12,6 +12,12 @@ import {
 
 const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
+
+// IS_MAC is read live at call time inside handleLinkMousedown, so mutating
+// this mocked module's property between tests is enough to flip branches;
+// no module reset or re-import is needed.
+const platformMock = vi.hoisted(() => ({ IS_MAC: false }));
+vi.mock("@/lib/platform", () => platformMock);
 
 function mount(doc: string, selection?: { anchor: number }) {
   const state = EditorState.create({
@@ -194,21 +200,6 @@ describe("linkClickHandler", () => {
   const doc = "see [the docs](https://example.com) here\n";
   const onLinkText = doc.indexOf("docs");
 
-  it("opens the link URL on Cmd+click over the link text", async () => {
-    const view = mountLink(doc, onLinkText);
-    const event = mousedown(view, { metaKey: true });
-    expect(event.defaultPrevented).toBe(true);
-    await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
-    view.destroy();
-  });
-
-  it("opens the link URL on Ctrl+click too", async () => {
-    const view = mountLink(doc, onLinkText);
-    mousedown(view, { ctrlKey: true });
-    await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
-    view.destroy();
-  });
-
   // CodeMirror's own mouse-selection handling also calls preventDefault on a
   // mousedown it receives, so the negative cases call the handler directly to
   // see exactly what this extension does.
@@ -217,6 +208,40 @@ describe("linkClickHandler", () => {
     const handled = handleLinkMousedown(event, view);
     return { handled, prevented: event.defaultPrevented };
   }
+
+  describe("modifier key by platform", () => {
+    afterEach(() => {
+      platformMock.IS_MAC = false;
+    });
+
+    it("on macOS opens on Cmd+click and ignores a Ctrl+click (the context-menu gesture)", async () => {
+      platformMock.IS_MAC = true;
+
+      const negView = mountLink(doc, onLinkText);
+      expect(runHandler(negView, { ctrlKey: true })).toEqual({ handled: false, prevented: false });
+      negView.destroy();
+
+      const posView = mountLink(doc, onLinkText);
+      const metaEvent = mousedown(posView, { metaKey: true });
+      expect(metaEvent.defaultPrevented).toBe(true);
+      await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
+      posView.destroy();
+    });
+
+    it("outside macOS opens on Ctrl+click and ignores a Cmd+click", async () => {
+      platformMock.IS_MAC = false;
+
+      const negView = mountLink(doc, onLinkText);
+      expect(runHandler(negView, { metaKey: true })).toEqual({ handled: false, prevented: false });
+      negView.destroy();
+
+      const posView = mountLink(doc, onLinkText);
+      const ctrlEvent = mousedown(posView, { ctrlKey: true });
+      expect(ctrlEvent.defaultPrevented).toBe(true);
+      await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
+      posView.destroy();
+    });
+  });
 
   it("does not open anything on a plain click", async () => {
     const view = mountLink(doc, onLinkText);
@@ -236,6 +261,9 @@ describe("linkClickHandler", () => {
   });
 
   it("does not open anything on Cmd+click outside a link or on a relative link", async () => {
+    // IS_MAC true so the modifier gate itself passes, exercising the
+    // link-lookup logic below it rather than the platform gate.
+    platformMock.IS_MAC = true;
     const outside = mountLink(doc, 1);
     expect(runHandler(outside, { metaKey: true })).toEqual({ handled: false, prevented: false });
     outside.destroy();
