@@ -207,6 +207,23 @@ fn run_listener(
     log::debug!("[ipc] thread exiting tab={tab_id}");
 }
 
+/// Debug logging in `dispatch` below echoes free-text agent payload fields
+/// (prompt, message, diff deltas). A single "final" MessageDisplay for a
+/// long code review has been observed to carry 7000+ characters; left
+/// unbounded, a handful of such lines are enough to blow through the log
+/// rotation size and destroy the history that made those lines worth
+/// logging in the first place. Cap what actually reaches the log.
+const MAX_LOG_FIELD_LEN: usize = 250;
+
+fn truncate_for_log(s: &str, max: usize) -> String {
+    let char_count = s.chars().count();
+    if char_count <= max {
+        return s.to_string();
+    }
+    let truncated: String = s.chars().take(max).collect();
+    format!("{truncated}...({} more)", char_count - max)
+}
+
 fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     let Some(p) = parse_payload(json) else {
         log::debug!("[ipc] invalid JSON: {json}");
@@ -248,7 +265,11 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "UserPromptSubmit" => {
             let prompt = p.prompt.as_deref().unwrap_or("");
-            log::debug!("[ipc] UserPromptSubmit tab={tab_id} session={} prompt={prompt:?}", p.session_id);
+            log::debug!(
+                "[ipc] UserPromptSubmit tab={tab_id} session={} prompt={:?}",
+                p.session_id,
+                truncate_for_log(prompt, MAX_LOG_FIELD_LEN)
+            );
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "UserPromptSubmit",
@@ -269,7 +290,10 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 return;
             }
             let msg = p.notif_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] Notification tab={tab_id} type={notif_type:?} msg={msg:?}");
+            log::debug!(
+                "[ipc] Notification tab={tab_id} type={notif_type:?} msg={:?}",
+                truncate_for_log(msg, MAX_LOG_FIELD_LEN)
+            );
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "Notification",
@@ -282,7 +306,10 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         "Stop" => {
             let reason = p.stop_reason.as_deref().unwrap_or("");
             let last   = p.last_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] Stop tab={tab_id} reason={reason} last={last:?}");
+            log::debug!(
+                "[ipc] Stop tab={tab_id} reason={reason} last={:?}",
+                truncate_for_log(last, MAX_LOG_FIELD_LEN)
+            );
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "Stop",
@@ -294,7 +321,10 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         }
         "StopFailure" => {
             let err = p.error_message.as_deref().unwrap_or("");
-            log::debug!("[ipc] StopFailure tab={tab_id} err={err:?}");
+            log::debug!(
+                "[ipc] StopFailure tab={tab_id} err={:?}",
+                truncate_for_log(err, MAX_LOG_FIELD_LEN)
+            );
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "StopFailure",
@@ -322,7 +352,10 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             }
             let delta   = p.delta.as_deref().unwrap_or("");
             let turn_id = p.turn_id.as_deref().unwrap_or("");
-            log::debug!("[ipc] MessageDisplay tab={tab_id} turn={turn_id} delta={delta:?}");
+            log::debug!(
+                "[ipc] MessageDisplay tab={tab_id} turn={turn_id} delta={:?}",
+                truncate_for_log(delta, MAX_LOG_FIELD_LEN)
+            );
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "MessageDisplay",
@@ -346,6 +379,31 @@ mod tests {
     fn socket_path_for_id_is_short_enough() {
         let p = socket_path_for_pty_id(u32::MAX);
         assert!(p.to_str().unwrap().len() < 104);
+    }
+
+    #[test]
+    fn truncate_for_log_leaves_shorter_strings_untouched() {
+        assert_eq!(truncate_for_log("hello", 250), "hello");
+    }
+
+    #[test]
+    fn truncate_for_log_leaves_strings_at_the_limit_untouched() {
+        let s = "a".repeat(250);
+        assert_eq!(truncate_for_log(&s, 250), s);
+    }
+
+    #[test]
+    fn truncate_for_log_truncates_and_appends_a_remaining_count() {
+        let s = "a".repeat(300);
+        let truncated = truncate_for_log(&s, 250);
+        assert_eq!(truncated, format!("{}...(50 more)", "a".repeat(250)));
+    }
+
+    #[test]
+    fn truncate_for_log_counts_chars_not_bytes() {
+        let s = "é".repeat(300);
+        let truncated = truncate_for_log(&s, 250);
+        assert_eq!(truncated.chars().count(), 250 + "...(50 more)".chars().count());
     }
 
     #[test]

@@ -525,6 +525,12 @@ pub fn run() {
                 .level_for("kex_lib::modules::pty::agent_detect", tauri_plugin_log::log::LevelFilter::Debug)
                 .level_for("kex_lib::modules::pty::ipc", tauri_plugin_log::log::LevelFilter::Debug)
                 .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview))
+                // Default is KeepOne, which fs::remove_file()s the previous log with no
+                // backup, checked on every startup, so a log that filled up in the prior
+                // session is gone before the new one writes a byte. KeepSome(4) renames
+                // instead of deleting, keeping 4 archived logs alongside the active one.
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(4))
+                .max_file_size(1_000_000)
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
