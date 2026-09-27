@@ -1,8 +1,39 @@
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use portable_pty::CommandBuilder;
 
 use crate::modules::workspace::{self, WorkspaceEnv};
+
+/// The directory every shell integration script is written under
+/// (`~/.cache/kex/shell-integration`). Identical on every platform, so it
+/// lives here instead of being duplicated in the unix/windows submodules.
+fn integration_root() -> Result<PathBuf, String> {
+    let home = dirs::home_dir().ok_or_else(|| "could not resolve home dir".to_string())?;
+    let root = home.join(".cache").join("kex").join("shell-integration");
+    fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
+    Ok(root)
+}
+
+/// Writes `content` to `path` only if it differs from what is already there,
+/// via an atomic rename so a parallel shell startup never sources a
+/// half-written file. Identical on every platform.
+fn write_if_changed(path: &Path, content: &str) -> Result<(), String> {
+    if let Ok(existing) = fs::read_to_string(path) {
+        if existing == content {
+            return Ok(());
+        }
+    }
+    let mut tmp: OsString = path.as_os_str().to_owned();
+    tmp.push(".__kex_tmp__");
+    let tmp = PathBuf::from(tmp);
+    fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("rename {} -> {}: {e}", tmp.display(), path.display())
+    })
+}
 
 #[derive(serde::Serialize)]
 pub struct ShellInfo {
@@ -195,11 +226,12 @@ fn apply_common(
 
 #[cfg(unix)]
 mod unix {
-    use std::ffi::OsString;
     use std::fs;
     use std::path::{Path, PathBuf};
 
     use portable_pty::CommandBuilder;
+
+    use super::{integration_root, write_if_changed};
 
     const ZSHENV: &str = include_str!("scripts/zshenv.zsh");
     const ZPROFILE: &str = include_str!("scripts/zprofile.zsh");
@@ -357,13 +389,6 @@ mod unix {
         Ok(cmd)
     }
 
-    fn integration_root() -> Result<PathBuf, String> {
-        let home = dirs::home_dir().ok_or_else(|| "could not resolve home dir".to_string())?;
-        let root = home.join(".cache").join("kex").join("shell-integration");
-        fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
-        Ok(root)
-    }
-
     fn prepare_zdotdir() -> Result<PathBuf, String> {
         let dir = integration_root()?.join("zsh");
         fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
@@ -388,23 +413,6 @@ mod unix {
         fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
         write_if_changed(&dir.join("kex.fish"), FISH_INIT)?;
         Ok(())
-    }
-
-    fn write_if_changed(path: &Path, content: &str) -> Result<(), String> {
-        if let Ok(existing) = fs::read_to_string(path) {
-            if existing == content {
-                return Ok(());
-            }
-        }
-        // Atomic replace: a parallel shell startup must never source a half-written file.
-        let mut tmp: OsString = path.as_os_str().to_owned();
-        tmp.push(".__kex_tmp__");
-        let tmp = PathBuf::from(tmp);
-        fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
-        fs::rename(&tmp, path).map_err(|e| {
-            let _ = fs::remove_file(&tmp);
-            format!("rename {} -> {}: {e}", tmp.display(), path.display())
-        })
     }
 
     #[cfg(test)]
@@ -449,12 +457,13 @@ mod unix {
 
 #[cfg(windows)]
 mod windows {
-    use std::ffi::OsString;
     use std::fs;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     use crate::modules::workspace::WorkspaceEnv;
     use portable_pty::CommandBuilder;
+
+    use super::{integration_root, write_if_changed};
 
     const PROFILE_PS1: &str = include_str!("scripts/profile.ps1");
 
@@ -813,13 +822,6 @@ mod windows {
         Ok(())
     }
 
-    fn integration_root() -> Result<PathBuf, String> {
-        let home = dirs::home_dir().ok_or_else(|| "could not resolve home dir".to_string())?;
-        let root = home.join(".cache").join("kex").join("shell-integration");
-        fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
-        Ok(root)
-    }
-
     fn prepare_ps_profile() -> Result<PathBuf, String> {
         let dir = integration_root()?.join("powershell");
         fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
@@ -834,22 +836,6 @@ mod windows {
         let rc = dir.join("bashrc");
         write_if_changed(&rc, &normalize_script(super::bashrc_script()))?;
         Ok(rc)
-    }
-
-    fn write_if_changed(path: &Path, content: &str) -> Result<(), String> {
-        if let Ok(existing) = fs::read_to_string(path) {
-            if existing == content {
-                return Ok(());
-            }
-        }
-        let mut tmp: OsString = path.as_os_str().to_owned();
-        tmp.push(".__kex_tmp__");
-        let tmp = PathBuf::from(tmp);
-        fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
-        fs::rename(&tmp, path).map_err(|e| {
-            let _ = fs::remove_file(&tmp);
-            format!("rename {} -> {}: {e}", tmp.display(), path.display())
-        })
     }
 
     #[cfg(test)]
