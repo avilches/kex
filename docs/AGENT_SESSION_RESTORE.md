@@ -226,12 +226,16 @@ In `attachSession`, after the PTY is open:
 if plan = consumeRestorePlan(leafId):
   if plan.resumeCmd is non-empty:
     startRestored(leafId, workspaceId, plan.agent)
-    setTimeout(() => pty.write(plan.resumeCmd + "\r"), 200)
+    writeWhenShellReady(pty, " " + plan.resumeCmd + "\r")
   else:
     setRestoreError(leafId, workspaceId, plan.agent, plan.errorReason)
 ```
 
-The 200ms delay lets the shell finish its init sequence before the command is injected.
+`writeWhenShellReady` waits for the `kex:shell-ready` event of that PTY (the first `OSC 133;B`, which the shell only
+emits when it actually renders its interactive prompt; `133;A` is not usable because the init scripts call
+`_kex_precmd` once by hand while still sourcing the rc file) and only then writes. A 1500ms fallback covers shells
+without Kex integration. A fixed delay was unreliable: the resume command of the first PTY opened at startup was
+silently lost (see `WORKSPACES_GOTCHAS.md`, Bug 14). The same wait applies to a plain `persistentCommand`.
 
 ---
 

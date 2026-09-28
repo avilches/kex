@@ -845,3 +845,27 @@ pequeno dentro de el. Cuando se quiere restringir el arrastre a una zona concret
 cabecera) sin que el nodo medido sea esa misma zona, hay que separar `setNodeRef` (en el contenedor)
 de `attributes`/`listeners` (en el handle), llamando a `useSortable` una sola vez en el nivel que
 tiene acceso a ambos.
+
+## Bug 14: el comando de resume de la primera pestana al arrancar nunca se ejecutaba (RESUELTO)
+
+### Sintoma
+
+Al reabrir Kex con varias pestanas de Claude, siempre la misma (la primera por orden, PTY id=1) quedaba con un shell vacio: el plan de restore se calculaba bien (`Kex.log`: `restore plan: tab=... cmd="claude --resume '...'"`), el PTY se abria en el cwd correcto, pero no aparecia ningun `osc133 C: armed ... cmd= claude --resume ...` para ella, mientras las demas pestanas si lo mostraban 2-3 s despues de abrirse.
+
+### Pistas falsas descartadas
+
+- "Run on start" desactivado: `restoreOnRestart` era `true` en el JSON del workspace, y con el flag apagado el PTY no se habria abierto en el cwd del plan.
+- Sobrescritura de la sesion: el `session_id` de `agent-sessions.json` era el mismo antes y despues; el usuario lanzo `claude -c` a mano y este continuo justo esa conversacion.
+- Carrera de plan no cargado: los planes se sirven todos en una sola llamada IPC y `attachSession` espera a `restorePlansReady()`.
+
+### Causa raiz
+
+`attachSession` escribia el comando con un `setTimeout` ciego de 200 ms tras abrir el PTY, suponiendo que el shell ya leia stdin. La pestana activa es la unica que hace antes, de forma sincrona, `bindLeafToSlot` (creacion del contexto WebGL, en pleno arranque en frio de la GPU), y ademas se abren ~8 shells a la vez, asi que 200 ms no garantiza nada y el texto se perdia sin dejar rastro. No se pudo aislar el mecanismo exacto de la perdida, pero un delay fijo no puede ser fiable.
+
+### Fix
+
+Rust detecta el primer `OSC 133;B` de cada PTY (`Transition::ShellReady`) y emite `kex:shell-ready { id }`. `writeWhenShellReady` (`useTerminalSession.ts`) espera a ese evento (`shellReadyWaiter.ts`, con un listener global registrado al cargar el modulo y un `seen` para eventos que llegan antes de esperar) y con un fallback de 1500 ms. Se usa `133;B` y no `133;A` porque `zshrc.zsh`/`bashrc.bash` llaman a `_kex_precmd` a mano mientras aun se hace `source` del rc, asi que `A` sale antes de que el shell acepte input; `B` va dentro de `PS1` y solo sale al pintarse el prompt real.
+
+### Leccion
+
+Un `setTimeout` para "esperar a que el shell este listo" es una apuesta de timing; si el sistema ya emite una senal real de prompt listo, esperar a esa senal. Y ante un fallo que siempre cae en el mismo elemento del arranque, buscar que trabajo extra hace solo ese elemento antes de culpar a la carga general.
