@@ -1,6 +1,7 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
+import { agentRestoreDisabled } from "./lib/agentRestore";
 import { tabIcon, tabTitle } from "./lib/tabTitle";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -256,7 +257,15 @@ function DraggableTab({
             ? <span className="text-amber-500" title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>
                 <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />
               </span>
-            : <AgentIcon agent={agentSession!.agent} size={12} />
+            : agentRestoreDisabled(tab)
+              ? <span
+                  className="relative inline-flex"
+                  title="Won't be restored on restart (Run on start is off)"
+                >
+                  <AgentIcon agent={agentSession!.agent} size={12} />
+                  <span className="pointer-events-none absolute left-1/2 top-1/2 h-px w-[15px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-muted-foreground" />
+                </span>
+              : <AgentIcon agent={agentSession!.agent} size={12} />
           : tab.kind === "browser" && tab.floating
             ? <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
             : tabIcon(tab, workspaceId)}

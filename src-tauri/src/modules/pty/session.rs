@@ -16,6 +16,7 @@ use crate::modules::workspace::WorkspaceEnv;
 
 const AGENT_EVENT: &str = "kex:agent-signal";
 const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
+const SHELL_READY_EVENT: &str = "kex:shell-ready";
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +26,12 @@ struct AgentSessionMetaPayload<'a> {
     cwd_launch: &'a str,
     session_title: &'a str,
     model: &'a str,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShellReadyPayload {
+    id: u32,
 }
 
 // Flusher coalesces a short window after first-byte arrival so we send chunks,
@@ -225,6 +232,13 @@ pub fn spawn(
                             log::debug!("pty first byte after {}ms", spawn_at.elapsed().as_millis());
                         }
                         agent_detect.process(&buf[..n], |t| {
+                            // Shell readiness is orthogonal to agent detection (fires for
+                            // every PTY, armed or not) - route it to its own event and skip
+                            // the agent-signal plumbing below entirely.
+                            if matches!(t, Transition::ShellReady) {
+                                let _ = app_reader.emit(SHELL_READY_EVENT, ShellReadyPayload { id });
+                                return;
+                            }
                             // Events that carry session data - update store + emit meta to frontend
                             let session_data = match &t {
                                 Transition::SessionStart { tab_id, agent, session_id, transcript_path, cwd, session_title, model, .. } => {

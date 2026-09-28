@@ -226,12 +226,16 @@ In `attachSession`, after the PTY is open:
 if plan = consumeRestorePlan(leafId):
   if plan.resumeCmd is non-empty:
     startRestored(leafId, workspaceId, plan.agent)
-    setTimeout(() => pty.write(plan.resumeCmd + "\r"), 200)
+    writeWhenShellReady(pty, " " + plan.resumeCmd + "\r")
   else:
     setRestoreError(leafId, workspaceId, plan.agent, plan.errorReason)
 ```
 
-The 200ms delay lets the shell finish its init sequence before the command is injected.
+`writeWhenShellReady` waits for the `kex:shell-ready` event of that PTY (the first `OSC 133;B`, which the shell only
+emits when it actually renders its interactive prompt; `133;A` is not usable because the init scripts call
+`_kex_precmd` once by hand while still sourcing the rc file) and only then writes. A 1500ms fallback covers shells
+without Kex integration. A fixed delay was unreliable: the resume command of the first PTY opened at startup was
+silently lost (see `WORKSPACES_GOTCHAS.md`, Bug 14). The same wait applies to a plain `persistentCommand`.
 
 ---
 
@@ -272,6 +276,10 @@ surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side o
 - **Started elapsed**: how long ago the session started.
 - **Restore error**: shown when `restoreError` is set on the session (e.g. the resume command failed or the cwd was
   deleted). The tab title turns red and a `⚠` icon appears; the menu surfaces the error reason for diagnosis.
+
+The agent icon in the tab bar (`PaneTabBar.tsx`) gets a diagonal strike-through when the tab's "Run on start" is off
+(`agentRestoreDisabled`), meaning the live session will not come back on the next launch. It only shows while an
+agent is alive: a clean exit deletes the store entry, so there is no idle "saved session" state to represent.
 
 Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an agent is active) -- no HoverCard.
 
