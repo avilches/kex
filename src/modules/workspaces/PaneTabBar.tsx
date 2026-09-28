@@ -28,6 +28,7 @@ import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
+import { useTheme } from "@/modules/theme/ThemeProvider";
 import { tabFilePath } from "./lib/tabPath";
 
 type Props = {
@@ -139,11 +140,12 @@ function DraggableTab({
   const hasAgent = agentTabTitle?.hasAgent ?? false;
   const isRestoreError = agentSession?.restoreError ?? false;
 
+  const { resolvedMode } = useTheme();
   const tabColor = useMemo(() => {
     if (tab.kind !== "editor" || !gitStatusMap || !gitStatus) return null;
     const code = lookupGitStatus(gitStatusMap, gitStatus.repoRoot, tab.path);
-    return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode") : null;
-  }, [tab, gitStatusMap, gitStatus, gitColorScheme]);
+    return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode", resolvedMode) : null;
+  }, [tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode]);
 
   // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
   // Paths (cwd segments): truncate from the left so the deepest directory stays visible.

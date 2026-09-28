@@ -39,6 +39,7 @@ import {
 } from "@/modules/explorer/lib/menuItemClass";
 import { joinPath } from "@/modules/explorer/lib/useFileTree";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
+import { useTheme } from "@/modules/theme/ThemeProvider";
 import {
   gitStatusCategory,
   type GitStatusCategory,
@@ -184,9 +185,9 @@ function entriesUnderFolder(
 
 
 const STATUS_TEXT_CLASS_BY_CATEGORY: Record<GitStatusCategory, string> = {
-  added: "text-emerald-500/85",
+  added: "text-emerald-600 dark:text-emerald-500/85",
   untracked: "text-teal-500/85",
-  modified: "text-amber-500/85",
+  modified: "text-amber-600 dark:text-amber-500/85",
   deleted: "text-rose-500/85",
   renamed: "text-sky-500/85",
 };
@@ -1704,7 +1705,8 @@ const EntryRow = memo(function EntryRow({
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
   const disabled = actionBusy !== null;
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
-  const statusHex = gitStatusHexColor(entry.statusCode, gitColorScheme);
+  const { resolvedMode } = useTheme();
+  const statusHex = gitStatusHexColor(entry.statusCode, gitColorScheme, resolvedMode);
   const absolutePath = repoRoot
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
     : null;
