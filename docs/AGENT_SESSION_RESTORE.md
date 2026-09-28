@@ -277,6 +277,10 @@ surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side o
 - **Restore error**: shown when `restoreError` is set on the session (e.g. the resume command failed or the cwd was
   deleted). The tab title turns red and a `⚠` icon appears; the menu surfaces the error reason for diagnosis.
 
+The agent icon in the tab bar (`PaneTabBar.tsx`) gets a diagonal strike-through when the tab's "Run on start" is off
+(`agentRestoreDisabled`), meaning the live session will not come back on the next launch. It only shows while an
+agent is alive: a clean exit deletes the store entry, so there is no idle "saved session" state to represent.
+
 Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an agent is active) -- no HoverCard.
 
 ---
