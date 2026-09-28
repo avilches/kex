@@ -459,7 +459,41 @@ scope for an evaluation of the engine itself.
   directly with Obsidian-style live-preview decorations, never reparsing to an AST. Gaps vs TipTap/Milkdown: no outline
   panel, no toolbar, no read-only preview integration, no decoration for Setext-style headings (only ATX `#` headings
   are decorated). GFM tables render as HTML tables off the active lines (only `[text](url)` is recognized inside a
-  cell); fenced code blocks are styled as a monospace block.
+  cell); fenced code blocks are styled as a monospace block, with the fences and the language tag hidden off the block
+  and the code highlighted by that language (fence tags resolve against the editor's own language registry, lazily
+  loaded, exact name or extension match only). Blockquotes, list items and their task checkboxes are line decorations:
+  a quote draws one bar per nesting level on every line it spans (so the bar is continuous through wrapped and
+  consecutive lines, and the spaces around `>` markers are hidden with them), list lines are indented, and a task
+  item's checkbox replaces the bullet instead of sitting next to it. Cmd+S is routed by the tab shell itself, as in the
+  other engines, because the global `editor.save` handler only serves `editor` tabs. Consecutive source lines of one
+  paragraph are shown as one flowing text (CommonMark soft breaks) while the cursor is outside the paragraph; a blank
+  line, two trailing spaces or a trailing backslash still break it, and the raw lines come back when the cursor enters.
+  The joins replace line breaks, so they live in a state field (`joinField`), not in the viewport plugin. Reference
+  links (`[id]`, `[text][id]`, `[text][]`, `![alt][id]`) resolve against the `[id]: url "title"` definitions of the
+  whole document (label match is case-insensitive, first definition wins): the link shows its text with the title as a
+  tooltip and opens on Cmd/Ctrl+click like an inline link, and the definition line is hidden until the cursor is on it.
+  A bracketed word with no matching definition stays plain text. Text indented by four spaces is styled as a code
+  block like a fenced one. Tables are as wide as their content, not stretched to 100%, and images are laid out inline.
+  An inactive fenced block shows its language tag and a copy button (the same icons as the TipTap engine, shared in
+  `markdown/lib/codeCopyIcons.ts`) over the top right corner of its first code line: the two fence lines take no
+  height at all (`.cm-lp-fence-line`), and the raw fences come back when the cursor enters the block. All code, fenced
+  or indented (whose four-space indentation is hidden off the block), has the same 14px left padding, and its first and
+  last code lines carry the vertical padding. A task item's `[ ]` is plain editable text while the cursor is on its
+  line. Blocks nested in containers line up with them: a fenced or indented code block, a table or a quote inside a
+  list item sits at that item's text (the container's indentation is hidden on code lines and re-created as padding),
+  a quoted code block loses the `>` markers of all its lines, and a table inside a list item is rendered as a widget
+  (one inside a quote stays raw). Brackets that are not a link (`[TODO]`, `[[Wiki Link]]`) are plain text, an image that
+  fails to load shows its alt text, and the frontmatter is plain monospace text whatever the theme paints it as.
+  A code block's band is a background layer that starts where its container's text does (`--lp-code-left`), so in a
+  list item or a quote it is indented as a band and a quote's bars still run beside it. `<https://x.com>` (an
+  autolink), a bare `https://…`, `www.…` and an e-mail address are links (the angle brackets go off the active line);
+  the pointing hand over any link appears only while Cmd (Ctrl off macOS) is held, tracked as a `cm-lp-mod` class on
+  the editor, since a plain click just places the cursor. A table cell is read with the same markdown parser as the
+  document (`parseCellInline`): bold, italic, strikethrough, code, sub/superscript, links, autolinks and `<br>` all
+  render inside it; images and reference links inside a cell stay as typed. `~sub~` and `^sup^` are drawn as sub- and superscripts, H5/H6 are body-sized
+  and smaller than body text, plain text takes the heading color whatever the editor theme, and the task checkbox uses
+  the TipTap task-list box and tick. Raw HTML (`HTMLBlock`, `HTMLTag`) only gets the monospace font: its colors and
+  the italics of `<!-- comments -->` come from the editor theme's syntax highlighting, not from Live Preview.
 
 ### Notes sidebar view
 

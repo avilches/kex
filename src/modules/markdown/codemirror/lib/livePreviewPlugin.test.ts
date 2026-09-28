@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   handleLinkMousedown,
   linkClickHandler,
+  linkUrlAt,
   livePreviewPlugin,
 } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 
@@ -44,8 +45,9 @@ describe("livePreviewPlugin", () => {
     view.destroy();
   });
 
-  it("renders a real checkbox input for a task item", () => {
-    const view = mount("- [ ] todo\n");
+  it("renders a real checkbox input for a task item the cursor is not on", () => {
+    const doc = "- [ ] todo\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
     const checkbox = view.dom.querySelector('input[type="checkbox"]');
     expect(checkbox).not.toBeNull();
     expect((checkbox as HTMLInputElement).checked).toBe(false);
@@ -53,10 +55,11 @@ describe("livePreviewPlugin", () => {
   });
 
   it("toggles the underlying text when the checkbox is clicked", () => {
-    const view = mount("- [ ] todo\n");
+    const doc = "- [ ] todo\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
     const checkbox = view.dom.querySelector('input[type="checkbox"]') as HTMLInputElement;
     checkbox.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    expect(view.state.doc.toString()).toBe("- [x] todo\n");
+    expect(view.state.doc.toString()).toBe("- [x] todo\n\nafter\n");
     view.destroy();
   });
 
@@ -98,14 +101,45 @@ describe("livePreviewPlugin", () => {
     view.destroy();
   });
 
-  it("styles every line of a fenced code block as a line, blank lines included, and hides its fence marks", () => {
+  it("styles every code line of a fenced block as a line, blank lines included", () => {
     const doc = "intro\n\n```js\nconst x = 1;\n\nlet y;\n```\n\nafter\n";
     const view = mount(doc, { anchor: doc.indexOf("after") });
     const styled = Array.from(view.dom.querySelectorAll(".cm-lp-codeblock"));
-    // The ``` marks are hidden while the cursor is outside the block; the "js"
-    // language tag is not a fence mark, so it stays.
-    expect(styled.map((el) => el.textContent)).toEqual(["js", "const x = 1;", "", "let y;", ""]);
+    // The two fence lines are not code lines while the cursor is outside the block.
+    expect(styled.map((el) => el.textContent)).toEqual(["const x = 1;", "", "let y;"]);
     expect(styled.every((el) => el.classList.contains("cm-line"))).toBe(true);
+    view.destroy();
+  });
+
+  it("puts a copy button in the block header that copies the code and then confirms it", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const doc = "```js\nconst x = 1;\nlet y;\n```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    expect(view.dom.querySelector(".cm-lp-code-lang")?.textContent).toBe("js");
+    const button = view.dom.querySelector(".cm-lp-code-copy") as HTMLButtonElement;
+    button.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    expect(writeText).toHaveBeenCalledWith("const x = 1;\nlet y;");
+    await Promise.resolve();
+    expect(button.classList.contains("copied")).toBe(true);
+    view.destroy();
+  });
+
+  it("shows no language tag for a block without one, but still the copy button", () => {
+    const doc = "```\nplain\n```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    expect(view.dom.querySelector(".cm-lp-code-lang")).toBeNull();
+    expect(view.dom.querySelector(".cm-lp-code-copy")).not.toBeNull();
+    view.destroy();
+  });
+
+  it("renders subscript and superscript with their markers hidden", () => {
+    const doc = "H~2~O and X^2^\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    expect(view.dom.querySelector(".cm-lp-sub")?.textContent).toBe("2");
+    expect(view.dom.querySelector(".cm-lp-sup")?.textContent).toBe("2");
+    expect(view.dom.textContent).not.toContain("~");
+    expect(view.dom.textContent).not.toContain("^");
     view.destroy();
   });
 
@@ -130,7 +164,7 @@ describe("livePreviewPlugin", () => {
     active.destroy();
   });
 
-  it("italicizes a blockquote and hides its > marker except on the active line", () => {
+  it("marks a blockquote and hides its > marker except on the active line", () => {
     const doc = "> line one\n> line two\n\nafter\n";
     const view = mount(doc, { anchor: doc.indexOf("after") });
     const quote = view.dom.querySelector(".cm-lp-quote");
@@ -143,6 +177,308 @@ describe("livePreviewPlugin", () => {
     const active = mount(doc, { anchor: doc.indexOf("line two") });
     expect(active.dom.textContent).toContain("> line two");
     active.destroy();
+  });
+
+  it("shows a reference link as its label, with the definition's title as tooltip, and hides the definition line", () => {
+    const doc = 'Use [ref-id] now.\n\n[ref-id]: https://github.com "GitHub"\n\nend\n';
+    const view = mount(doc, { anchor: doc.indexOf("end") });
+    const link = view.dom.querySelector(".cm-lp-link-text") as HTMLElement;
+    expect(link.textContent).toBe("ref-id");
+    expect(link.getAttribute("title")).toBe("GitHub");
+    expect(view.dom.textContent).not.toContain("github.com");
+    expect(view.dom.textContent).not.toContain("[ref-id]");
+    view.destroy();
+
+    const active = mount(doc, { anchor: doc.indexOf("github") });
+    expect(active.dom.textContent).toContain('[ref-id]: https://github.com "GitHub"');
+    active.destroy();
+  });
+
+  it("finds the URL of a reference link for Cmd/Ctrl+click, and none for an undefined label", () => {
+    const doc = "Use [ref-id] and [TODO].\n\n[ref-id]: https://github.com\n";
+    const state = EditorState.create({ doc, extensions: [markdown({ base: markdownLanguage })] });
+    expect(linkUrlAt(state, doc.indexOf("ref-id") + 2)).toBe("https://github.com");
+    expect(linkUrlAt(state, doc.indexOf("TODO") + 1)).toBeNull();
+  });
+
+  it("finds the URL of an <autolink>, a bare URL, a www. address and an e-mail address for Cmd/Ctrl+click", () => {
+    const doc = "A <https://a.com> b https://b.com/x c www.c.com d me@d.com e ./no-es-externo\n";
+    const state = EditorState.create({ doc, extensions: [markdown({ base: markdownLanguage })] });
+    expect(linkUrlAt(state, doc.indexOf("a.com") + 2)).toBe("https://a.com");
+    expect(linkUrlAt(state, doc.indexOf("b.com") + 2)).toBe("https://b.com/x");
+    expect(linkUrlAt(state, doc.indexOf("www.c") + 2)).toBe("https://www.c.com");
+    expect(linkUrlAt(state, doc.indexOf("me@") + 2)).toBe("mailto:me@d.com");
+    expect(linkUrlAt(state, doc.indexOf("./no-es") + 3)).toBeNull();
+  });
+
+  it("does not treat the destination of an inline link as a second, bare link", () => {
+    const doc = "[texto](https://a.com/x)\n";
+    const state = EditorState.create({ doc, extensions: [markdown({ base: markdownLanguage })] });
+    expect(linkUrlAt(state, doc.indexOf("a.com") + 2)).toBe("https://a.com/x");
+    expect(linkUrlAt(state, 2)).toBe("https://a.com/x");
+  });
+
+  it("puts a class on the editor while the open-link modifier is held, and drops it when the key is released or focus is lost", () => {
+    const view = mount("text\n");
+    const key = (type: string, init: KeyboardEventInit) => window.dispatchEvent(new KeyboardEvent(type, init));
+    // IS_MAC is mocked false in this file, so Ctrl is the modifier.
+    key("keydown", { key: "Control", ctrlKey: true });
+    expect(view.dom.classList.contains("cm-lp-mod")).toBe(true);
+    key("keyup", { key: "Control", ctrlKey: false });
+    expect(view.dom.classList.contains("cm-lp-mod")).toBe(false);
+    key("keydown", { key: "Meta", metaKey: true });
+    expect(view.dom.classList.contains("cm-lp-mod")).toBe(false);
+    key("keydown", { key: "Control", ctrlKey: true });
+    window.dispatchEvent(new Event("blur"));
+    expect(view.dom.classList.contains("cm-lp-mod")).toBe(false);
+    view.destroy();
+  });
+
+  it("syncs the modifier class when the pointer moves over the editor, and removes its listeners on destroy", () => {
+    const view = mount("text\n");
+    view.dom.dispatchEvent(new MouseEvent("mousemove", { ctrlKey: true }));
+    expect(view.dom.classList.contains("cm-lp-mod")).toBe(true);
+    view.destroy();
+    expect(view.dom.classList.contains("cm-lp-mod")).toBe(false);
+    window.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true }));
+    expect(view.dom.classList.contains("cm-lp-mod")).toBe(false);
+  });
+
+  it("renders bold, italic, code, strikethrough, sub/superscript, links and line breaks inside a table cell", () => {
+    const doc =
+      "| A | B |\n|---|---|\n| **bold** and *it* | `code` ~~gone~~ H~2~O X^2^ |\n| [go](https://a.com) <https://b.com> | one<br>two |\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const cells = Array.from(view.dom.querySelectorAll(".cm-lp-table td"));
+    expect(cells[0].querySelector("strong")?.textContent).toBe("bold");
+    expect(cells[0].querySelector("em")?.textContent).toBe("it");
+    expect(cells[1].querySelector("code.cm-lp-code")?.textContent).toBe("code");
+    expect(cells[1].querySelector("del")?.textContent).toBe("gone");
+    expect(cells[1].querySelector(".cm-lp-sub")?.textContent).toBe("2");
+    expect(cells[1].querySelector(".cm-lp-sup")?.textContent).toBe("2");
+    const links = Array.from(cells[2].querySelectorAll("a")).map((a) => [a.textContent, a.getAttribute("href")]);
+    expect(links).toEqual([
+      ["go", "https://a.com"],
+      ["https://b.com", "https://b.com"],
+    ]);
+    expect(cells[3].querySelector("br")).not.toBeNull();
+    expect(view.dom.textContent).not.toContain("**");
+    view.destroy();
+  });
+
+  it("shows a link with a relative destination inside a table cell as its text, not as a link", () => {
+    const doc = "| A |\n|---|\n| [notes](./notes.md) |\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const cell = view.dom.querySelector(".cm-lp-table td");
+    expect(cell?.textContent).toBe("notes");
+    expect(cell?.querySelector("a")).toBeNull();
+    view.destroy();
+  });
+
+  it("styles text indented by four spaces as a code block, indentation hidden until the cursor is in it", () => {
+    const doc = "intro\n\n    const x = 1;\n\n    let y;\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const styled = Array.from(view.dom.querySelectorAll(".cm-lp-codeblock")).map((el) => el.textContent);
+    expect(styled).toEqual(["const x = 1;", "", "let y;"]);
+    view.destroy();
+
+    const active = mount(doc, { anchor: doc.indexOf("const") });
+    const raw = Array.from(active.dom.querySelectorAll(".cm-lp-codeblock")).map((el) => el.textContent);
+    expect(raw).toEqual(["    const x = 1;", "", "    let y;"]);
+    active.destroy();
+  });
+
+  it("marks brackets that are not a link, so the theme's link color can be taken back", () => {
+    const doc = "Plain [TODO] and [[Wiki Link]] and [real](https://x.com).\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const notlinks = Array.from(view.dom.querySelectorAll(".cm-lp-notlink")).map((el) => el.textContent);
+    expect(notlinks).toContain("[TODO]");
+    expect(view.dom.querySelectorAll(".cm-lp-link-text").length).toBe(1);
+    expect(view.dom.querySelector(".cm-lp-link-text")?.textContent).toBe("real");
+    view.destroy();
+  });
+
+  it("replaces an image that fails to load with its alt text, or a fallback word without one", () => {
+    const doc = "Pic ![Rota](./no-existe.png) and ![](./otra.png) here\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const imgs = Array.from(view.dom.querySelectorAll("img.cm-lp-image"));
+    expect(imgs.length).toBe(2);
+    for (const img of imgs) img.dispatchEvent(new Event("error"));
+    const broken = Array.from(view.dom.querySelectorAll(".cm-lp-image-broken")).map((el) => el.textContent);
+    expect(broken).toEqual(["Rota", "image"]);
+    expect(view.dom.querySelector("img.cm-lp-image")).toBeNull();
+    view.destroy();
+  });
+
+  it("indents a code block nested in a list item by its list depth, with the container indentation hidden", () => {
+    const doc = "- item\n\n  ```js\n  const x = 1;\n  ```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const code = view.dom.querySelector(".cm-lp-codeblock") as HTMLElement;
+    expect(code.textContent).toBe("const x = 1;");
+    expect(code.classList.contains("cm-lp-list-code")).toBe(true);
+    expect(code.classList.contains("cm-lp-list")).toBe(false);
+    expect(code.getAttribute("style")).toContain("--lp-list-depth: 1");
+    view.destroy();
+  });
+
+  it("shows a quoted code block without any stray > markers, and with them back once the cursor is in", () => {
+    const doc = "> Cita:\n>\n> ```python\n> print(1)\n> ```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    expect(view.dom.textContent).not.toContain(">");
+    view.destroy();
+
+    const active = mount(doc, { anchor: doc.indexOf("print") });
+    expect(active.dom.textContent).toContain("> print(1)");
+    expect(active.dom.textContent).toContain("> ```python");
+    active.destroy();
+  });
+
+  it("renders a table inside a list item as a widget carrying the item's depth", () => {
+    const doc = "1. Tabla:\n\n   | A | B |\n   |---|---|\n   | 1 | 2 |\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const wrap = view.dom.querySelector(".cm-lp-table-wrap") as HTMLElement;
+    expect(wrap).not.toBeNull();
+    expect(wrap.style.getPropertyValue("--lp-list-depth")).toBe("1");
+    expect(view.dom.textContent).not.toContain("|");
+    view.destroy();
+
+    const active = mount(doc, { anchor: doc.indexOf("| 1") });
+    expect(active.dom.querySelector(".cm-lp-table-wrap")).toBeNull();
+    expect(active.dom.textContent).toContain("| A | B |");
+    active.destroy();
+  });
+
+  it("marks the lines of code no language highlights as plain, and only those", () => {
+    const doc = "```js\na\n```\n\n```\nb\n```\n\n    c\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const plain = Array.from(view.dom.querySelectorAll(".cm-lp-codeblock")).map((l) => [
+      l.textContent,
+      l.classList.contains("cm-lp-code-plain"),
+    ]);
+    expect(plain).toEqual([
+      ["a", false],
+      ["b", true],
+      ["c", true],
+    ]);
+    view.destroy();
+  });
+
+  it("gives a rendered block's first and last code line their padding, and none to indented lines between", () => {
+    const doc = "```js\nfirst\nmiddle\nlast\n```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const code = Array.from(view.dom.querySelectorAll(".cm-lp-codeblock"));
+    expect(code.map((l) => l.classList.contains("cm-lp-code-first"))).toEqual([true, false, false]);
+    expect(code.map((l) => l.classList.contains("cm-lp-code-last"))).toEqual([false, false, true]);
+    view.destroy();
+  });
+
+  it("collapses a rendered block's two fence lines, and lets the raw fences back in once the cursor enters", () => {
+    const doc = "```js\ncode\n```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const fences = Array.from(view.dom.querySelectorAll(".cm-lp-fence-line"));
+    expect(fences.length).toBe(2);
+    expect(fences[0].querySelector(".cm-lp-code-header")).not.toBeNull();
+    expect(fences[1].textContent).toBe("");
+    view.destroy();
+
+    const active = mount(doc, { anchor: doc.indexOf("code") });
+    expect(active.dom.querySelector(".cm-lp-fence-line")).toBeNull();
+    expect(active.dom.querySelector(".cm-lp-code-header")).toBeNull();
+    active.destroy();
+  });
+
+  it("shows the lines of a paragraph as one text, and separate raw lines once the cursor is in it", () => {
+    const doc = "one\ntwo\nthree\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const lines = Array.from(view.dom.querySelectorAll(".cm-line")).map((l) => l.textContent);
+    expect(lines).toEqual(["one two three", "", "after", ""]);
+    view.destroy();
+
+    const active = mount(doc, { anchor: doc.indexOf("two") });
+    const rawLines = Array.from(active.dom.querySelectorAll(".cm-line")).map((l) => l.textContent);
+    expect(rawLines.slice(0, 3)).toEqual(["one", "two", "three"]);
+    active.destroy();
+  });
+
+  it("joins the lines of a quote into one bar-carrying line, with no stray markers", () => {
+    const doc = "> one\n> two\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const quote = Array.from(view.dom.querySelectorAll(".cm-lp-quote-line"));
+    expect(quote.map((l) => l.textContent)).toEqual(["one two"]);
+    view.destroy();
+  });
+
+  it("gives each quote line a bar per nesting level, whatever spaces separate the markers", () => {
+    const doc = ">  first\n>  >    second\nlazy\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const lines = Array.from(view.dom.querySelectorAll(".cm-lp-quote-line"));
+    // "second" and its lazy continuation "lazy" are one paragraph, so they show as one line.
+    expect(lines.map((l) => l.textContent)).toEqual(["first", "second lazy"]);
+    expect(lines.map((l) => l.getAttribute("style")?.replace(/;$/, ""))).toEqual([
+      "--lp-quote-depth: 1",
+      "--lp-quote-depth: 2",
+    ]);
+    view.destroy();
+  });
+
+  it("carries each list line's nesting depth as a custom property", () => {
+    const doc = "- one\n  - two\n1. three\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const lines = Array.from(view.dom.querySelectorAll(".cm-lp-list"));
+    expect(lines.map((l) => l.getAttribute("style")?.replace(/;$/, ""))).toEqual([
+      "--lp-list-depth: 1",
+      "--lp-list-depth: 2",
+      "--lp-list-depth: 1",
+    ]);
+    view.destroy();
+  });
+
+  it("gives a quote inside a list item its indent as a custom property, and none to a list inside a quote", () => {
+    const doc = "- item\n\n  > quoted\n\n> - inside\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const quotes = Array.from(view.dom.querySelectorAll(".cm-lp-quote-line"));
+    const styles = quotes.map((q) => q.getAttribute("style") ?? "");
+    expect(styles[0]).toContain("--lp-quote-indent: 1");
+    expect(styles[1]).not.toContain("--lp-quote-indent");
+    view.destroy();
+  });
+
+  it("keeps both custom properties on a list line inside a quote", () => {
+    const doc = "> - one\n>   - two\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const line = view.dom.querySelectorAll(".cm-lp-list.cm-lp-quote-line")[1];
+    const style = line?.getAttribute("style") ?? "";
+    expect(style).toContain("--lp-quote-depth: 1");
+    expect(style).toContain("--lp-list-depth: 2");
+    view.destroy();
+  });
+
+  it("puts a heading's spacing class on its line, by level", () => {
+    const doc = "# One\n\n## Two\n\ntext\n";
+    const view = mount(doc, { anchor: doc.indexOf("text") });
+    expect(view.dom.querySelector(".cm-lp-hl1")?.textContent).toBe("One");
+    expect(view.dom.querySelector(".cm-lp-hl2")?.textContent).toBe("Two");
+    expect(view.dom.querySelectorAll(".cm-lp-heading-line").length).toBe(2);
+    view.destroy();
+  });
+
+  it("puts a task item's checkbox where a plain item's bullet is, with no bullet or dash of its own", () => {
+    const doc = "- plain\n- [ ] task\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const lines = Array.from(view.dom.querySelectorAll(".cm-line"));
+    expect(lines[0].querySelector(".cm-lp-bullet-dot")).not.toBeNull();
+    expect(lines[1].querySelector(".cm-lp-bullet-dot")).toBeNull();
+    expect(lines[1].querySelector(".cm-lp-checkbox")).not.toBeNull();
+    expect(lines[1].textContent).toBe(" task");
+    view.destroy();
+  });
+
+  it("shows a task item as plain editable text while its line is active", () => {
+    const doc = "- [ ] task\n";
+    const view = mount(doc, { anchor: 4 });
+    const line = view.dom.querySelector(".cm-line") as HTMLElement;
+    expect(line.textContent).toBe("- [ ] task");
+    expect(line.querySelector(".cm-lp-checkbox")).toBeNull();
+    view.destroy();
   });
 
   it("replaces an inactive bullet marker with a dot but leaves an ordered marker as plain text", () => {
