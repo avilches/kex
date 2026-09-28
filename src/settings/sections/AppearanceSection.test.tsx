@@ -1,8 +1,12 @@
 // @vitest-environment happy-dom
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AppearanceSection } from "./AppearanceSection";
+
+vi.mock("@/modules/theme/ThemeProvider", () => ({
+  useTheme: () => ({ resolvedMode: "dark" }),
+}));
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
