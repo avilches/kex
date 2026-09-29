@@ -20,7 +20,6 @@ const state = {
   mode: (params.get("mode") === "light" ? "light" : "dark") as ThemeMode,
   scheme: (params.get("scheme") === "jetbrains" ? "jetbrains" : "vscode") as Scheme,
   view: (params.get("view") === "app" ? "app" : "swatches") as "app" | "swatches",
-  focus: (params.get("focus") === "editor" ? "editor" : "terminal") as PaneKind,
   custom: null as Theme | null,
 };
 
@@ -294,7 +293,7 @@ function editorBody(focused: boolean): HTMLElement {
       selection: { anchor: 68, head: 82 },
     }),
   });
-  if (focused) requestAnimationFrame(() => view.focus());
+  view.dom.classList.toggle("cm-focused", focused);
   return host;
 }
 
@@ -329,24 +328,31 @@ function pane(kind: PaneKind, focused: boolean): HTMLElement {
   );
 }
 
-function appView(): HTMLElement {
-  const mk = (kind: PaneKind) => {
-    const p = pane(kind, state.focus === kind);
-    p.onclick = () => set({ focus: kind });
-    return p;
-  };
+function appFrame(focus: PaneKind): HTMLElement {
   return h(
     "div",
-    { class: "flex h-[680px] overflow-hidden rounded-lg border border-border bg-background", "data-view": "app" },
+    { class: "flex h-[520px] overflow-hidden rounded-lg border border-border bg-background", "data-view": "app", "data-focus": focus },
     workspaceBar(),
     h("div", { class: "overflow-auto" }, sidebar()),
     h(
       "div",
       { class: "flex min-w-0 flex-1 flex-col gap-2 p-2" },
       header(),
-      h("div", { class: "flex min-h-0 flex-1 gap-2" }, mk("terminal"), mk("editor")),
-      h("div", { class: "flex items-center gap-3 rounded bg-card px-2 py-1 text-[11px] text-muted-foreground" }, h("span", {}, "main"), h("span", {}, "2 changed"), h("span", { class: "ml-auto" }, "click a pane to move focus")),
+      h("div", { class: "flex min-h-0 flex-1 gap-2" }, pane("terminal", focus === "terminal"), pane("editor", focus === "editor")),
+      h("div", { class: "flex items-center gap-3 rounded bg-card px-2 py-1 text-[11px] text-muted-foreground" }, h("span", {}, "main"), h("span", {}, "2 changed")),
     ),
+  );
+}
+
+// Both focus states at once, so nothing needs to be clicked to see them.
+function appView(): HTMLElement {
+  const titled = (title: string, frame: HTMLElement) =>
+    h("div", { class: "mb-4" }, h("div", { class: "mb-1 text-[11px] text-muted-foreground" }, title), frame);
+  return h(
+    "div",
+    {},
+    titled("Terminal pane focused, editor pane unfocused", appFrame("terminal")),
+    titled("Editor pane focused, terminal pane unfocused", appFrame("editor")),
   );
 }
 
@@ -410,7 +416,7 @@ function dump(): Record<string, string> {
 
 function set(patch: Partial<typeof state>): void {
   Object.assign(state, patch);
-  const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme, view: state.view, focus: state.focus });
+  const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme, view: state.view });
   history.replaceState(null, "", `?${q}`);
   render();
 }
