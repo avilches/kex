@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const hoisted = vi.hoisted(() => ({
   fsChangedHandlers: [] as ((paths: string[]) => void)[],
   windowListeners: new Map<string, (event: { payload: unknown }) => void>(),
+  handles: new Map<string, { save(): Promise<void>; cycleView(): void; toggleOutline(): void }>(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -43,8 +44,10 @@ vi.mock("@/modules/editor", async () => {
   };
 });
 vi.mock("@/modules/markdown/MarkdownPreviewPane", () => ({
-  MarkdownPreviewPane: ({ content }: { content: string }) => (
-    <div data-testid="preview-pane">{content}</div>
+  MarkdownPreviewPane: ({ content, path }: { content: string; path: string }) => (
+    <div data-testid="preview-pane" data-path={path}>
+      {content}
+    </div>
   ),
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { warning: vi.fn(), error: vi.fn() }) }));
@@ -59,10 +62,19 @@ vi.mock("@/modules/editor/lib/useEditorThemeExt", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { IS_MAC } from "@/lib/platform";
 import { MarkdownTab } from "@/modules/markdown/codemirror/MarkdownTab";
 
 const PATH = "/notes/a.md";
+
+const callbacks = {
+  registerMarkdownHandle: (
+    id: string,
+    h: { save(): Promise<void>; cycleView(): void; toggleOutline(): void } | null,
+  ) => {
+    if (h) hoisted.handles.set(id, h);
+    else hoisted.handles.delete(id);
+  },
+};
 
 async function flush() {
   await act(async () => {
@@ -77,6 +89,7 @@ describe("Live Preview MarkdownTab", () => {
     vi.clearAllMocks();
     hoisted.fsChangedHandlers = [];
     hoisted.windowListeners.clear();
+    hoisted.handles.clear();
   });
 
   it("shows the conflict overlay when the file changes on disk while the tab is dirty", async () => {
@@ -104,24 +117,20 @@ describe("Live Preview MarkdownTab", () => {
     expect(view?.state.doc.toString()).toBe("# Hello\nlocal edit\n");
   });
 
-  it("saves to disk on the save shortcut, since the global handler ignores markdown tabs", async () => {
+  it("saves to disk through the handle the global save shortcut calls", async () => {
     vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# Hello\n", size: 8 });
     const { container } = render(
-      <MarkdownTab tabId="tab-save" path={PATH} visible focused={false} callbacks={{}} />,
+      <MarkdownTab tabId="tab-save" path={PATH} visible focused={false} callbacks={callbacks} />,
     );
     await flush();
 
-    const content = container.querySelector(".cm-content") as HTMLElement;
-    const view = EditorView.findFromDOM(content);
+    const view = EditorView.findFromDOM(container.querySelector(".cm-content") as HTMLElement);
     act(() => {
       view?.dispatch({ changes: { from: view.state.doc.length, insert: "edited\n" } });
     });
-    act(() => {
-      content.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "s", metaKey: IS_MAC, ctrlKey: !IS_MAC, bubbles: true }),
-      );
+    await act(async () => {
+      await hoisted.handles.get("tab-save")?.save();
     });
-    await flush();
 
     expect(invoke).toHaveBeenCalledWith(
       "fs_write_file",
@@ -176,10 +185,12 @@ describe("Live Preview MarkdownTab", () => {
 
   describe("view modes and outline", () => {
     let tabSeq = 0;
+    const handle = () => hoisted.handles.get(`tab-modes-${tabSeq}`);
     const setup = async (content = "# One\n\nbody\n\n## Two\n") => {
+      tabSeq++;
       vi.mocked(invoke).mockResolvedValue({ kind: "text", content, size: content.length });
       const utils = render(
-        <MarkdownTab tabId={`tab-modes-${++tabSeq}`} path={PATH} visible focused={false} callbacks={{}} />,
+        <MarkdownTab tabId={`tab-modes-${tabSeq}`} path={PATH} visible focused={false} callbacks={callbacks} />,
       );
       await flush();
       const viewOf = () =>
@@ -249,20 +260,9 @@ describe("Live Preview MarkdownTab", () => {
       expect(view?.state.doc.lineAt(view.state.selection.main.head).number).toBe(5);
     });
 
-    it("the cycle-view shortcut rotates Source, Rich and Preview without changing the tab", async () => {
-      const { container } = await setup();
-      const press = () =>
-        act(() => {
-          (container.querySelector(".cm-content") ?? container.firstElementChild)?.dispatchEvent(
-            new KeyboardEvent("keydown", {
-              key: "v",
-              shiftKey: true,
-              metaKey: IS_MAC,
-              ctrlKey: !IS_MAC,
-              bubbles: true,
-            }),
-          );
-        });
+    it("the cycle-view handle rotates Source, Rich and Preview without changing the tab", async () => {
+      await setup();
+      const press = () => act(() => handle()?.cycleView());
       const pressed = () =>
         ["Source", "Rich", "Preview"].find(
           (n) => screen.getByRole("button", { name: n }).getAttribute("aria-pressed") === "true",
@@ -274,6 +274,42 @@ describe("Live Preview MarkdownTab", () => {
       expect(pressed()).toBe("Source");
       press();
       expect(pressed()).toBe("Rich");
+    });
+
+    it("keeps the focus inside the tab when cycling into and out of Preview", async () => {
+      const { container } = await setup();
+      act(() => handle()?.cycleView());
+      expect(document.activeElement).toBe(screen.getByTestId("preview-pane").parentElement);
+      act(() => handle()?.cycleView());
+      expect(container.contains(document.activeElement)).toBe(true);
+    });
+
+    it("the outline handle toggles the Outline and is a no-op in Preview", async () => {
+      await setup();
+      act(() => handle()?.toggleOutline());
+      expect(screen.getByRole("button", { name: "One" })).not.toBeNull();
+      act(() => handle()?.toggleOutline());
+      expect(screen.queryByRole("button", { name: "One" })).toBeNull();
+      click("Preview");
+      act(() => handle()?.toggleOutline());
+      click("Rich");
+      expect(screen.queryByRole("button", { name: "One" })).toBeNull();
+    });
+
+    it("gives Preview the file path and the text typed while the Outline was closed", async () => {
+      const { viewOf } = await setup("Hello");
+      act(() => viewOf()?.dispatch({ changes: { from: 5, insert: "!" } }));
+      act(() => handle()?.cycleView());
+      const pane = screen.getByTestId("preview-pane");
+      expect(pane.getAttribute("data-path")).toBe(PATH);
+      expect(pane.textContent).toBe("Hello!");
+    });
+
+    it("keeps the Outline in sync with typing while it is open", async () => {
+      const { viewOf } = await setup("# One\n");
+      act(() => handle()?.toggleOutline());
+      act(() => viewOf()?.dispatch({ changes: { from: 5, insert: "\n## Fresh\n" } }));
+      expect(screen.getByRole("button", { name: "Fresh" })).not.toBeNull();
     });
 
     it("hides the Outline button in Preview", async () => {

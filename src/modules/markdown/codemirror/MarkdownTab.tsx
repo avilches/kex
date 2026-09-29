@@ -1,7 +1,6 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
   type JSX,
-  type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -25,8 +24,6 @@ import { OutlinePanel } from "@/modules/markdown/lib/OutlinePanel";
 import { headingsFromMarkdown } from "@/modules/markdown/lib/outline";
 import { nextViewMode } from "@/modules/markdown/lib/viewCycle";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import type { TabCallbacks } from "@/modules/workspaces/TabContent";
 
 type Props = {
@@ -47,6 +44,7 @@ const VIEW_MODES: { mode: ViewMode; label: string }[] = [
 
 export function MarkdownTab(props: Props): JSX.Element {
   const editorRef = useRef<CodeMirrorEditorHandle>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("rich");
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [edit, setEdit] = useState<{ doc: unknown; text: string } | null>(null);
@@ -62,17 +60,39 @@ export function MarkdownTab(props: Props): JSX.Element {
   useBackgroundConflictToast(conflict, props.visible, props.path);
 
   // useDocument only republishes `doc` on load/reload, so the text the user has
-  // typed since then is tracked here, tied to the doc it was typed against; a
-  // reload swaps `doc` and the stale edit is ignored. Preview and Outline read
-  // it, and a remounted editor starts from it.
+  // typed since then is kept in a ref, tied to the doc it was typed against (a
+  // reload swaps `doc` and the stale edit is ignored). Only Preview and the
+  // Outline read it, so it becomes state, and re-renders the tab, only while
+  // one of them is showing or right as it opens.
+  const latestEditRef = useRef<{ doc: unknown; text: string } | null>(null);
+  const docRef = useRef(doc);
+  docRef.current = doc;
+  const viewModeRef = useRef(viewMode);
+  viewModeRef.current = viewMode;
+  const outlineOpenRef = useRef(outlineOpen);
+  outlineOpenRef.current = outlineOpen;
   const liveContent = doc.status === "ready" ? (edit && edit.doc === doc ? edit.text : doc.content) : "";
   const handleChange = useCallback(
     (next: string) => {
       onChange(next);
-      setEdit({ doc, text: next });
+      latestEditRef.current = { doc: docRef.current, text: next };
+      if (outlineOpenRef.current || viewModeRef.current === "preview") setEdit(latestEditRef.current);
     },
-    [onChange, doc],
+    [onChange],
   );
+  const selectMode = useCallback((next: ViewMode) => {
+    if (next === "preview") setEdit(latestEditRef.current);
+    setViewMode(next);
+  }, []);
+  const cycleView = useCallback(
+    () => selectMode(nextViewMode(VIEW_MODES.map((v) => v.mode), viewModeRef.current)),
+    [selectMode],
+  );
+  const toggleOutline = useCallback(() => {
+    if (viewModeRef.current === "preview") return;
+    if (!outlineOpenRef.current) setEdit(latestEditRef.current);
+    setOutlineOpen((v) => !v);
+  }, []);
   const headings = useMemo(
     () => (outlineOpen && viewMode !== "preview" ? headingsFromMarkdown(liveContent) : []),
     [outlineOpen, viewMode, liveContent],
@@ -128,38 +148,37 @@ export function MarkdownTab(props: Props): JSX.Element {
 
   const saveRef = useRef(save);
   saveRef.current = save;
-  const registerMarkdownSaveHandlerRef = useRef(props.callbacks.registerMarkdownSaveHandler);
-  registerMarkdownSaveHandlerRef.current = props.callbacks.registerMarkdownSaveHandler;
+  const registerMarkdownHandleRef = useRef(props.callbacks.registerMarkdownHandle);
+  registerMarkdownHandleRef.current = props.callbacks.registerMarkdownHandle;
+  const cycleViewRef = useRef(cycleView);
+  cycleViewRef.current = cycleView;
+  const toggleOutlineRef = useRef(toggleOutline);
+  toggleOutlineRef.current = toggleOutline;
   useEffect(() => {
-    registerMarkdownSaveHandlerRef.current?.(props.tabId, () => saveRef.current());
-    return () => registerMarkdownSaveHandlerRef.current?.(props.tabId, null);
+    registerMarkdownHandleRef.current?.(props.tabId, {
+      save: () => saveRef.current(),
+      cycleView: () => cycleViewRef.current(),
+      toggleOutline: () => toggleOutlineRef.current(),
+    });
+    return () => registerMarkdownHandleRef.current?.(props.tabId, null);
   }, [props.tabId]);
 
   useEffect(() => {
     if (props.focused) editorRef.current?.focus();
   }, [props.focused]);
 
-  // The global editor.save handler only serves `editor` tabs, so a markdown tab
-  // routes its own save key.
-  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const handleKeyDown = useCallback(
-    (e: ReactKeyboardEvent) => {
-      if (matchesShortcut(e.nativeEvent, "editor.cycleView", userShortcuts)) {
-        e.preventDefault();
-        setViewMode((m) => nextViewMode(VIEW_MODES.map((v) => v.mode), m));
-        return;
-      }
-      if (!matchesShortcut(e.nativeEvent, "editor.save", userShortcuts)) return;
-      e.preventDefault();
-      saveRef.current().catch((err) =>
-        toast.error("Save failed", { description: err instanceof Error ? err.message : String(err) }),
-      );
-    },
-    [userShortcuts],
-  );
+  // Switching to Preview unmounts the focused editor; without this the focus
+  // would fall back to the document body, outside the tab.
+  const appliedModeRef = useRef(viewMode);
+  useEffect(() => {
+    if (appliedModeRef.current === viewMode) return;
+    appliedModeRef.current = viewMode;
+    if (viewMode === "preview") previewRef.current?.focus();
+    else editorRef.current?.focus();
+  }, [viewMode]);
 
   return (
-    <div className="flex h-full w-full flex-col" onKeyDownCapture={handleKeyDown}>
+    <div className="flex h-full w-full flex-col">
       <EditorPathBar
         path={props.path}
         tabId={props.tabId}
@@ -179,7 +198,7 @@ export function MarkdownTab(props: Props): JSX.Element {
               <button
                 type="button"
                 title="Toggle outline"
-                onClick={() => setOutlineOpen((v) => !v)}
+                onClick={toggleOutline}
                 className={cn(
                   "flex size-[22px] items-center justify-center rounded outline-none transition-colors focus-visible:outline-none",
                   outlineOpen ? "text-foreground" : "text-muted-foreground hover:text-foreground",
@@ -211,7 +230,7 @@ export function MarkdownTab(props: Props): JSX.Element {
                   key={mode}
                   type="button"
                   aria-pressed={viewMode === mode}
-                  onClick={() => setViewMode(mode)}
+                  onClick={() => selectMode(mode)}
                   className={cn(
                     "px-2 py-0.5 outline-none transition-colors focus-visible:outline-none",
                     viewMode === mode ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
@@ -226,7 +245,9 @@ export function MarkdownTab(props: Props): JSX.Element {
       />
       <div className="relative min-h-0 flex-1">
         {doc.status === "ready" && viewMode === "preview" ? (
-          <MarkdownPreviewPane content={liveContent} />
+          <div ref={previewRef} tabIndex={-1} className="h-full outline-none">
+            <MarkdownPreviewPane content={liveContent} path={props.path} />
+          </div>
         ) : doc.status === "ready" ? (
           <div className="flex h-full min-h-0">
             <div className="min-w-0 flex-1">
