@@ -277,13 +277,7 @@ export function MarkdownTab(props: Props): JSX.Element {
             </div>
           </div>
         ) : (
-          // MarkdownDocFallback is typed for MarkdownDocState (useMarkdownDocument's
-          // 5-variant union), not DocumentState (useDocument's 6-variant union, used
-          // here). Excluding "ready"/"loading"/"deleted" above narrows doc to exactly
-          // {binary}|{toolarge}|{error}, which today happens to match those variants'
-          // shapes in MarkdownDocState field-for-field, so this type-checks. If either
-          // union's shape for those three variants ever diverges, this breaks at
-          // compile time, not silently.
+          // Narrowed to {binary}|{toolarge}|{error}, the states MarkdownDocFallback covers.
           <MarkdownDocFallback doc={doc} />
         )}
         {conflict && (
