@@ -140,7 +140,7 @@ export function MarkdownTab(props: Props): JSX.Element {
   }, [props.focused]);
 
   // The global editor.save handler only serves `editor` tabs, so a markdown tab
-  // routes its own save key, same as the TipTap and Milkdown shells.
+  // routes its own save key.
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const handleKeyDown = useCallback(
     (e: ReactKeyboardEvent) => {
