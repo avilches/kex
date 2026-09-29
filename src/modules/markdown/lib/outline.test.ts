@@ -25,4 +25,19 @@ describe("headingsFromMarkdown", () => {
     const md = "# A\n\n```\n# no\n```\n\n## B\n";
     expect(headingsFromMarkdown(md).map((h) => h.line)).toEqual([0, 6]);
   });
+
+  it("ignores lines inside YAML frontmatter", () => {
+    const md = "---\n# comment\ntitle: x\n---\n# Real\n";
+    expect(headingsFromMarkdown(md).map((h) => [h.text, h.line])).toEqual([["Real", 4]]);
+  });
+
+  it("does not close a fence with a shorter run or a different character", () => {
+    const md = "````\n```\n# inside\n~~~~\n# still inside\n````\n# after\n";
+    expect(headingsFromMarkdown(md).map((h) => h.text)).toEqual(["after"]);
+  });
+
+  it("keeps a tilde fence open until a tilde fence closes it", () => {
+    const md = "~~~\n```\n# inside\n~~~\n# after\n";
+    expect(headingsFromMarkdown(md).map((h) => h.text)).toEqual(["after"]);
+  });
 });
