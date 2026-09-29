@@ -78,6 +78,31 @@ dar con la causa raiz, anadir una entrada nueva al GOTCHAS del subsistema corres
 si no existe, siguiendo el formato de `WORKSPACES_GOTCHAS.md`: Sintoma, pistas falsas descartadas,
 causa raiz, fix, leccion) antes de dar la tarea por terminada.
 
+### Cambios de theme: verificar siempre en la pagina de preview
+
+Cualquier peticion sobre themes (cambiar un color, ajustar contraste, anadir un theme nuevo, tocar
+`inactivePaneDim`, los colores de git o del terminal) se hace y se comprueba en la pagina
+`theme-preview.html`, no arrancando la app ni con capturas de pantalla:
+
+1. Arrancar `pnpm dev` (en un worktree, con `--port <libre>` si el 1420 esta ocupado) y abrir
+   `http://localhost:<puerto>/theme-preview.html?theme=<id>&mode=light|dark&view=swatches|app`.
+   `view=swatches` lista cada superficie y cada token con su hex; `view=app` monta una
+   aproximacion de la aplicacion (WorkspaceBar, Sidebar, Header, terminal y editor en paneles con
+   y sin foco).
+2. Editar `src/modules/theme/themes/*.ts`; Vite recarga la pagina solo. Leer el resultado con
+   `window.kexThemePreview.dump()` (hex de todos los tokens y de los colores de git) o con los
+   atributos `data-hex`, nunca con una captura: Dark Reader falsea los colores en Chrome.
+3. Comprobar siempre los DOS modos (light y dark) y, si el cambio afecta al terminal o al editor,
+   tambien el estado con foco y sin foco (`inactivePaneDim`).
+4. Un theme nuevo debe verse bien en la pagina antes de darlo por terminado.
+
+**Mantener la pagina al dia:** si se anade o cambia un componente o un estilo que use colores de
+tema (una superficie nueva, un token nuevo en `ThemeColors`/`applyTheme.ts`, un estado nuevo como
+otro chip de agente), hay que reflejarlo en `src/theme-preview/main.ts` en el mismo commit: la
+lista `TOKENS`, la superficie correspondiente y la vista `app`. Las superficies de la pagina son
+aproximaciones que copian las clases de los componentes reales, asi que no se actualizan solas.
+Detalle de uso en `docs/BUILD.md`, seccion "Theme preview page".
+
 ### Sin compatibilidad hacia atras
 
 Nunca anadir codigo de migracion, shims, fallbacks de clave antigua, ni ningun mecanismo de compatibilidad hacia atras. Si se renombra un campo JSON, se cambia una API interna, o se reestructura el store, los usuarios simplemente parten de los valores por defecto. No hay excepciones.
