@@ -1,6 +1,7 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
+import { agentRestoreDisabled } from "./lib/agentRestore";
 import { tabIcon, tabTitle } from "./lib/tabTitle";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -28,6 +29,7 @@ import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
+import { useTheme } from "@/modules/theme/ThemeProvider";
 import { tabFilePath } from "./lib/tabPath";
 
 type Props = {
@@ -139,11 +141,12 @@ function DraggableTab({
   const hasAgent = agentTabTitle?.hasAgent ?? false;
   const isRestoreError = agentSession?.restoreError ?? false;
 
+  const { resolvedMode } = useTheme();
   const tabColor = useMemo(() => {
     if (tab.kind !== "editor" || !gitStatusMap || !gitStatus) return null;
     const code = lookupGitStatus(gitStatusMap, gitStatus.repoRoot, tab.path);
-    return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode") : null;
-  }, [tab, gitStatusMap, gitStatus, gitColorScheme]);
+    return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode", resolvedMode) : null;
+  }, [tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode]);
 
   // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
   // Paths (cwd segments): truncate from the left so the deepest directory stays visible.
@@ -256,7 +259,15 @@ function DraggableTab({
             ? <span className="text-amber-500" title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>
                 <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />
               </span>
-            : <AgentIcon agent={agentSession!.agent} size={12} />
+            : agentRestoreDisabled(tab)
+              ? <span
+                  className="relative inline-flex"
+                  title="Won't be restored on restart (Run on start is off)"
+                >
+                  <AgentIcon agent={agentSession!.agent} size={12} />
+                  <span className="pointer-events-none absolute left-1/2 top-1/2 h-px w-[15px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-muted-foreground" />
+                </span>
+              : <AgentIcon agent={agentSession!.agent} size={12} />
           : tab.kind === "browser" && tab.floating
             ? <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
             : tabIcon(tab, workspaceId)}

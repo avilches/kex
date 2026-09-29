@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { consumeRestorePlan, restorePlansReady } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
@@ -24,6 +25,7 @@ import {
 } from "./osc-handlers";
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
 import { openPty, type PtySession } from "./pty-bridge";
+import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
 import {
   type BlockMatch,
   BlockDecorations,
@@ -131,6 +133,28 @@ type Session = {
 };
 
 const sessions = new Map<string, Session>();
+
+// Fallback only for shells without Kex's OSC 133 integration (custom shell
+// override): the real signal is the first interactive prompt.
+const SHELL_READY_FALLBACK_MS = 1500;
+
+listen<{ id: number }>("kex:shell-ready", (e) => markShellReady(e.payload.id)).catch(
+  (err) => console.warn("[kex] shell-ready listener failed:", err),
+);
+
+async function writeWhenShellReady(
+  s: Session,
+  leafId: string,
+  pty: PtySession,
+  data: string,
+): Promise<void> {
+  const t0 = performance.now();
+  await waitForShellReady(pty.id, SHELL_READY_FALLBACK_MS);
+  const waited = Math.round(performance.now() - t0);
+  if (s.disposed || s.pty !== pty) return;
+  console.debug(`[kex] run-on-start write tab=${leafId} pty=${pty.id} waited=${waited}ms`);
+  void pty.write(data);
+}
 
 // Recency-ordered leaves kept "parked" (hidden, but their terminal and
 // buffer stay alive) instead of being released and rebuilt from a
@@ -919,19 +943,14 @@ function attachSession(
           if (!runOnStart) return;
           if (plan) {
             if (plan.resumeCmd) {
-              setTimeout(() => {
-                s.pty?.write(" " + plan.resumeCmd + "\r");
-              }, 200);
+              void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
             } else if (plan.errorReason) {
               console.error(`[kex] session restore failed for tab ${leafId} (${plan.agent}): ${plan.errorReason}`);
               useAgentStore.getState().setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
             }
             // else: no command, no error - PTY just opened at plan.cwdLaunch, nothing to do
           } else if (s.persistentCommand) {
-            const cmd = s.persistentCommand;
-            setTimeout(() => {
-              s.pty?.write(cmd + "\r");
-            }, 300);
+            void writeWhenShellReady(s, leafId, pty, s.persistentCommand + "\r");
           }
         })
         .catch((e) => {

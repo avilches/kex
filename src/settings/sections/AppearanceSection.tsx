@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
+import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -14,6 +16,7 @@ import {
   setUiFont,
   setZoomLevel,
 } from "@/modules/settings/store";
+import { useTheme } from "@/modules/theme/ThemeProvider";
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
@@ -188,26 +191,29 @@ export function AppearanceSection() {
 }
 
 type GitPreviewEntry =
-  | { name: string; label: string; color: { vscode: string; jetbrains: string }; kind?: "normal" }
-  | { name: string; label: string; kind: "ignored" | "clean" };
+  | { name: string; label: GitStatusCode }
+  | { name: string; label: ""; kind: "ignored" | "clean" };
 
 const GIT_PREVIEW_ENTRIES: GitPreviewEntry[] = [
-  { name: "no_changes.html", label: "",  kind: "clean" },
-  { name: "file_modified.ts", label: "M", color: { vscode: "#E2C08D", jetbrains: "#6897BB" } },
-  { name: "new_file.rs",   label: "A", color: { vscode: "#81B88B", jetbrains: "#629755" } },
-  { name: "untracked.java",  label: "U", color: { vscode: "#73C991", jetbrains: "#C75450" } },
-  { name: "deleted.md",    label: "D", color: { vscode: "#C74E39", jetbrains: "#9E9E9E" } },
-  { name: "renamed.tsx",   label: "R", color: { vscode: "#73C991", jetbrains: "#6897BB" } },
-  { name: "ignored.log",   label: "I", kind: "ignored" },
+  { name: "no_changes.html", label: "", kind: "clean" },
+  { name: "file_modified.ts", label: "M" },
+  { name: "new_file.rs", label: "A" },
+  { name: "untracked.java", label: "U" },
+  { name: "deleted.md", label: "D" },
+  { name: "renamed.tsx", label: "R" },
+  { name: "ignored.log", label: "", kind: "ignored" },
 ];
 
 function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
+  const { resolvedMode } = useTheme();
   return (
     <div className="flex flex-col gap-px">
       {GIT_PREVIEW_ENTRIES.map((entry) => {
-        const isIgnored = entry.kind === "ignored";
-        const isClean = entry.kind === "clean";
-        const color = !isIgnored && !isClean && "color" in entry ? entry.color[scheme] : undefined;
+        const kind = "kind" in entry ? entry.kind : undefined;
+        const isIgnored = kind === "ignored";
+        const isClean = kind === "clean";
+        const color =
+          entry.label ? gitStatusHexColor(entry.label, scheme, resolvedMode) ?? undefined : undefined;
         const iconUrl = fileIconUrl(entry.name);
         return (
           <div key={entry.name} className="flex items-center gap-1.5">
