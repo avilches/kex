@@ -258,10 +258,8 @@ Deep-dive into the workspace rendering stack and terminal slot pool:
 
 ### `docs/SCRATCHPAD.md`
 
-Single reference for the scratchpad's binary state model (`Session.scratchpadOpen`), the transient
-resume mark (`scratchpadResume`), and every focus/close path that touches a terminal leaf, including
-the `requestLeafFocus` invariant. Update whenever the scratchpad's focus model, its close/open paths,
-or the resume semantics change.
+Single reference for the scratchpad's binary state model (`Session.scratchpadOpen`), and every focus/close path that touches a terminal leaf, including
+the `requestLeafFocus` invariant. Update whenever the scratchpad's focus model, or its close/open paths change.
 
 ### `docs/FORK.md`
 

@@ -144,9 +144,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
-  const scratchpadInNewTerminals = usePreferencesStore(
-    (s) => s.scratchpadInNewTerminals,
-  );
 
   const [currentLanguageName, setCurrentLanguageName] = useState<string>(() =>
     tab.kind === "editor" ? resolveDisplayName(tab.path) : "",
@@ -257,7 +254,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
               restoreOnRestart={tab.restoreOnRestart}
               persistentCommand={tab.persistentCommand}
               initialScratchpadEnabled={
-                tab.scratchpadEnabled ?? scratchpadInNewTerminals
+                tab.scratchpadEnabled ?? false
               }
               onSearchReady={callbacks.onSearchReady}
               onExit={callbacks.onExit}

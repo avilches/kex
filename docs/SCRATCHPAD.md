@@ -44,61 +44,26 @@ single tab that held the scratchpad focus at quit** has `scratchpadEnabled: true
 On restore, `TabContent.tsx` seeds the initial value:
 
 ```ts
-initialScratchpadEnabled={tab.scratchpadEnabled ?? scratchpadInNewTerminals}
+initialScratchpadEnabled={tab.scratchpadEnabled ?? false}
 ```
 
-The `scratchpadInNewTerminals` preference (Settings > Terminal, default on) only applies when the tab
-has never written the field itself, i.e. genuinely new terminals, not restored ones. A restored tab
-whose field is explicitly `false` stays closed even if the preference is on.
+A terminal that has never written the field (a genuinely new one) starts with the scratchpad closed.
+A restored tab reopens it only if it held the scratchpad when the app quit.
 
 ---
 
-## 2. The resume mark (`scratchpadResume`)
+## 2. No resume mark, no visibility preferences
 
-`Session.scratchpadResume` is a **transient, in-memory-only** boolean, never persisted, never written
-to `Tab`. It exists to answer one question: "if the user comes back to this leaf, should the
-scratchpad reopen?" It only matters when the opt-in preference `scratchpadRememberFocus` (Settings >
-Terminal, default **off**) is on.
+The scratchpad only ever appears when the user presses its shortcut (`Cmd+U`, `terminal.scratchpad`).
+Nothing reopens it on its own: a new terminal starts with it closed, and leaving a tab, pane or
+workspace closes it for good. The `scratchpadInNewTerminals` and `scratchpadRememberFocus` preferences
+and the transient `Session.scratchpadResume` mark that backed them were removed (TASK-776). The only
+setting left is `scratchpadEnterSends` (Enter vs Shift+Enter to send), which does not affect when the
+bar shows.
 
-### Leave vs. dismiss
-
-`closeScratchpadState(s, leafId, reason)` takes a `ScratchpadCloseReason`:
-
-| Reason | Meaning | Effect on `scratchpadResume` |
-|---|---|---|
-| `"leave"` | Abandon-close: tab/pane/workspace switch, transient chrome (dropdown/dialog/context menu) closing, blur to somewhere else | Set to `usePreferencesStore.getState().scratchpadRememberFocus` (only if this call is the one that actually closes it; never clobbers an existing mark on an already-closed leaf) |
-| `"dismiss"` | Deliberate close: Escape, the `Cmd+U` toggle, clicking the terminal of the already-focused leaf | Always cleared, even if the scratchpad was already closed, so a dismiss can never leave a stale mark behind |
-
-Call sites, by reason:
-
-- `"leave"`: `leaveLeafScratchpad(leafId)`, called from the textarea `onBlur` guard, the
-  workspace-switch effect, the sentinel effect, `leaveActivePaneScratchpad`, and
-  `scratchpadLeafsToClose` (via `onActivateTabStable`).
-- `"dismiss"`: `closeScratchpad(leafId)` (Escape handler, and the close branch of `toggleScratchpad`) and
-  `setLeafTerminalFocused(leafId)` when it fires on an already-focused leaf (clicking the terminal of
-  the tab you're already on).
-
-A fresh open (`openScratchpadState`) always clears `scratchpadResume` too: a mark is only meaningful
-while the scratchpad is closed.
-
-### Consuming the mark
-
-`requestLeafFocus` (section 3) is the only place that reads `scratchpadResume`:
-
-```ts
-if (s.scratchpadOpen) {
-  requestScratchpadFocus(s);
-} else if (s.scratchpadResume && usePreferencesStore.getState().scratchpadRememberFocus) {
-  openScratchpadState(s, leafId);
-} else {
-  focusSlot(leafId);
-}
-```
-
-Both the mark-setting side (`closeScratchpadState`) and the mark-consuming side (`requestLeafFocus`)
-read `scratchpadRememberFocus` **live** from the preferences store, not a snapshot taken when the mark
-was set. If the user turns the preference off after a mark was set, `requestLeafFocus` falls through
-to focusing the terminal and the stale mark just sits inert until a later dismiss or open clears it.
+Consequently `closeScratchpadState(s, leafId)` has a single behavior, whatever the trigger (Escape,
+the toggle, clicking the terminal, or leaving the leaf). There is no "leave" vs "dismiss" distinction
+any more.
 
 ---
 
@@ -112,20 +77,19 @@ Scope note: the focused-transition effect that drives most of this invariant is 
 (`if (gained && !blocks) requestLeafFocus(leafId);`); block-mode terminals have their own focus
 handling, out of this doc's scope.
 
-Why this is load-bearing: `requestLeafFocus` is the one place that implements the three-way decision
-(scratchpad open -> focus scratchpad; scratchpad closed with a live resume mark -> reopen and consume
-it; otherwise -> focus the terminal). Any call site that bypasses it and does its own
-"`scratchpadOpen ? focusScratchpad() : focusTerminal()`" inline silently forks the resume semantics for
-whatever gesture routes through it, and this has happened **twice**, in two different subsystems,
-each requiring its own investigation and fix:
+Why this is load-bearing: `requestLeafFocus` is the one place that implements the decision
+(scratchpad open -> focus scratchpad; otherwise -> focus the terminal). Any call site that bypasses it
+and does its own "`scratchpadOpen ? focusScratchpad() : focusTerminal()`" inline silently forks the
+focus semantics for whatever gesture routes through it, and this has happened **twice**, in two
+different subsystems, each requiring its own investigation and fix:
 
 - **The focused-transition effect** (`useTerminalSession.ts`, the effect on `visible`/`focused`
   props, around the `gained = visible && focused && !wasFocusedRef.current` guard) used to inline
   `s.scratchpadOpen ? requestScratchpadFocus(s) : focusSlot(leafId)` directly. This is the actual path
   that moves DOM focus on a **keyboard** pane switch (`focusPane` only updates React state; it never
-  touches the DOM). Because it predated the resume mark, it never consulted `scratchpadResume`, so
-  returning to a pane by keyboard silently ignored a pending resume mark while every other entry point
-  (bell, RunButton, OpenInEditorButton, Radix `onCloseAutoFocus`) honored it correctly. Fixed in
+  touches the DOM). Being an inline copy, it drifted from `requestLeafFocus` when the resume mark
+  (since removed) was added, so returning to a pane by keyboard ignored the mark while every other
+  entry point (bell, RunButton, OpenInEditorButton, Radix `onCloseAutoFocus`) honored it. Fixed in
   `731b110` (`fix(terminal): route focused-transition focus through requestLeafFocus`); documented as
   Addendum 6 in `WORKSPACES_GOTCHAS.md` Bug 7.
 - **The script run/stop path** (`runWorkspaceConfig`/`stopWorkspaceConfig` in `App.tsx`) originally
@@ -188,7 +152,7 @@ all of it:
     dropdown content brings focus back to the textarea when it closes.
   - `if (next && containerRef.current?.contains(next)) return;` guards a focus move that stays within
     the bar itself (e.g. Tab to the settings button), which is also not a "leave".
-  - Otherwise: `leaveLeafScratchpad(leafId)`, a `"leave"` close.
+  - Otherwise: `leaveLeafScratchpad(leafId)`.
 
   Separately, the container's `onMouseDown` calls `e.preventDefault()` when the click target is inside
   `containerRef` but is not the textarea itself (i.e. a click on the bar's own padding/hint area). This
@@ -197,21 +161,20 @@ all of it:
 - **`setLeafTerminalFocused(leafId)`**: called when the terminal grid gains real DOM focus (a
   leaf-scoped `focusin`). Guard: `if (!s.focusedNow) return;`. **This is the crux of the
   focus-vs-pane-switch distinction.** A click on the terminal of the leaf that is already focused is a
-  deliberate dismiss (user went back to the terminal on purpose): the scratchpad closes, mark cleared.
+  deliberate dismiss (user went back to the terminal on purpose): the scratchpad closes.
   A click on the terminal of a leaf that is **not yet focused** is a mouse pane/tab switch, not a
-  dismiss, and must not clear the resume mark; the function returns early because `s.focusedNow` is
-  still `false` at that point.
+  dismiss; the function returns early because `s.focusedNow` is still `false` at that point.
 
   This is reliable because of native event ordering: xterm's `focusin` fires **during the mousedown's
   default action**, which happens before React commits the `activePaneId`/`activeTabId` state change
   that would flip `focusedNow` to `true`. So at the moment `setLeafTerminalFocused` runs on a
   cross-leaf click, `s.focusedNow` still reflects the *old* focus state (false for the leaf being
   clicked into). The later focused-transition effect (section 3) runs after that commit, sees
-  `focused` actually become `true`, and is the one that (via `requestLeafFocus`) can still honor a
-  pending resume mark, exactly like a keyboard switch.
-- **Escape**: `ScratchpadBar.tsx`'s `onKeyDown` calls `closeScratchpad(leafId)`, a `"dismiss"`.
+  `focused` actually become `true`, and focuses the leaf via `requestLeafFocus`, exactly like a
+  keyboard switch.
+- **Escape**: `ScratchpadBar.tsx`'s `onKeyDown` calls `closeScratchpad(leafId)`.
 - **Toggle shortcut (`Cmd+U`, `terminal.scratchpad`)**: `App.tsx`'s shortcut handler calls
-  `toggleScratchpad(leafId)`; its close branch is a `"dismiss"`.
+  `toggleScratchpad(leafId)`; its close branch calls `closeScratchpadState` and focuses the terminal.
 - **`onActivateTabStable`** (`App.tsx`): before calling `activateTab`, runs the pure
   `scratchpadLeafsToClose` (`src/modules/workspaces/lib/scratchpadLeave.ts`) and calls
   `leaveLeafScratchpad` on every leaf it returns: the tab being left in the target pane (same-pane tab
@@ -293,9 +256,7 @@ without re-deriving them:
 
 ## 7. If you touch this, verify that
 
-Live-test matrix (manual; there is no automated end-to-end focus test). Test with
-`scratchpadRememberFocus` **both off (default) and on**: several of these only diverge with it on.
-Always test against a freshly started `pnpm tauri dev` (see the HMR gotcha above), never a
+Live-test matrix (manual; there is no automated end-to-end focus test). Always test against a freshly started `pnpm tauri dev` (see the HMR gotcha above), never a
 hot-reloaded session.
 
 - [ ] Tab switch by keyboard (`tab.next`/`tab.prev` or similar) focuses the right side (scratchpad if
@@ -318,13 +279,11 @@ hot-reloaded session.
 - [ ] Opening then closing a chrome interruption (RunButton dropdown, OpenInEditorButton dropdown,
       WorkspaceBar workspace context menu, notification bell) restores focus to the active tab.
 - [ ] Cmd+Tab away and back (OS focus regain) restores focus to the active tab.
-- [ ] Escape, the toggle shortcut, and clicking the terminal of the already-focused tab all dismiss
-      the scratchpad (and, with `scratchpadRememberFocus` on, never leave a resume mark).
-- [ ] With `scratchpadRememberFocus` on: leaving a tab whose scratchpad was open (any close path in
-      section 4 marked `"leave"`) and returning to it (any path in section 3) reopens and focuses the
-      scratchpad.
-- [ ] With `scratchpadRememberFocus` off: the same sequence just focuses the terminal, and no mark
-      ever lingers to reopen later if the preference is turned on afterward.
+- [ ] Escape, the toggle shortcut, and clicking the terminal of the already-focused tab all close
+      the scratchpad.
+- [ ] A new terminal opens with the scratchpad closed; only the shortcut opens it.
+- [ ] Leaving a tab whose scratchpad was open (any close path in section 4) and returning to it (any
+      path in section 3) focuses the terminal, never the scratchpad.
 
 ---
 
@@ -332,7 +291,7 @@ hot-reloaded session.
 
 | File | What it is |
 |---|---|
-| `src/modules/terminal/lib/useTerminalSession.ts` | Owns `Session.scratchpadOpen`/`scratchpadResume`, the open/close/leave/dismiss primitives, `requestLeafFocus`, and the focused-transition effect |
+| `src/modules/terminal/lib/useTerminalSession.ts` | Owns `Session.scratchpadOpen`, the open/close/leave primitives, `requestLeafFocus`, and the focused-transition effect |
 | `src/modules/terminal/ScratchpadBar.tsx` | The textarea component: mount/unmount focus registration, blur guards, Escape/Enter handling, drag-and-drop target, settings dropdown |
 | `src/modules/terminal/TerminalPane.tsx` | Renders `<ScratchpadBar>` conditionally on `scratchpadOpen && focused`; wires `initialScratchpadEnabled`/`onScratchpadEnabled` |
 | `src/modules/terminal/lib/pendingFocus.ts` | Pure helper (`shouldFireOnRegister`) for a focus request that arrives before `ScratchpadBar` has mounted and registered its focus callback |
@@ -347,7 +306,7 @@ hot-reloaded session.
 | `src/app/components/RunButton.tsx` | Dropdown `onCloseAutoFocus` -> `onRestoreFocus` |
 | `src/modules/external-editors/OpenInEditorButton.tsx` | Dropdown `onCloseAutoFocus` -> `onRestoreFocus` |
 | `src/modules/terminal/lib/rendererPool.ts` | `scheduleUnhide` calls `adapter.focusLeaf` (`requestLeafFocus`) after a slot rebind or GPU retry, only when the leaf is the focused one |
-| `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadInNewTerminals`, `scratchpadRememberFocus`, `scratchpadEnterSends` |
-| `src/modules/settings/store.ts` | Preference keys/defaults: `scratchpadEnterSends` (default `true`), `scratchpadInNewTerminals` (default `true`), `scratchpadRememberFocus` (default `false`) |
+| `src/settings/sections/TerminalSection.tsx` | Settings UI for `scratchpadEnterSends` |
+| `src/modules/settings/store.ts` | Preference key/default: `scratchpadEnterSends` (default `true`) |
 | `src/modules/workspaces/WorkspaceDndProvider.tsx` | Drag-and-drop of explorer paths onto the scratchpad bar (`handleScratchpadDrop`, collision priority): see `WORKSPACES.md`'s drag-and-drop section for the full mechanism |
 | `docs/WORKSPACES_GOTCHAS.md` | Bug 7 and its six addenda: the full history of how this model was arrived at |

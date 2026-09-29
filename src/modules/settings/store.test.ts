@@ -145,10 +145,6 @@ describe("DEFAULT_PREFERENCES", () => {
   it("scratchpadEnterSends defaults to true", () => {
     expect(DEFAULT_PREFERENCES.scratchpadEnterSends).toBe(true);
   });
-
-  it("scratchpadInNewTerminals defaults to true", () => {
-    expect(DEFAULT_PREFERENCES.scratchpadInNewTerminals).toBe(true);
-  });
 });
 
 describe("diffViewMode", () => {
@@ -163,12 +159,6 @@ describe("PREF_KEY_MAP", () => {
   // anything unmapped. Regression guard for the scratchpad Enter=Send toggle.
   it("maps scratchpadEnterSends so its toggle reaches subscribers", () => {
     expect(PREF_KEY_MAP.scratchpadEnterSends).toBe("scratchpadEnterSends");
-  });
-
-  it("maps scratchpadInNewTerminals so its toggle reaches subscribers", () => {
-    expect(PREF_KEY_MAP.scratchpadInNewTerminals).toBe(
-      "scratchpadInNewTerminals",
-    );
   });
 });
 

@@ -99,7 +99,7 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **Link detection.** URLs in terminal output are clickable and open in the system browser.
 
-**Scratchpad bar.** A per-terminal input bar (`terminal.scratchpad`, default `Cmd+U`) to compose multi-line text and send it to the shell without typing at the prompt, with drag-and-drop of explorer paths and an Enter / Shift+Enter send-mode preference. Its state is a single binary flag, `scratchpadOpen`: existence and focus are the same thing, there is no "open but unfocused" state. See [SCRATCHPAD.md](SCRATCHPAD.md) for the full model, every focus/close path, and the opt-in `scratchpadRememberFocus` resume behavior.
+**Scratchpad bar.** A per-terminal input bar (`terminal.scratchpad`, default `Cmd+U`) to compose multi-line text and send it to the shell without typing at the prompt, with drag-and-drop of explorer paths and an Enter / Shift+Enter send-mode preference. Its state is a single binary flag, `scratchpadOpen`: existence and focus are the same thing, there is no "open but unfocused" state. See [SCRATCHPAD.md](SCRATCHPAD.md) for the full model, and every focus/close path. It only ever appears when its shortcut is pressed.
 
 **True color and 256-color.** The xterm.js WebGL renderer supports the full color space. The terminal color palette is driven by the active app theme, not hardcoded.
 
