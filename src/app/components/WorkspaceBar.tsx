@@ -33,7 +33,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
+import {
+  readableTextOn,
+  resolveWorkspaceColor,
+} from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import {
   ContextMenu,
@@ -223,17 +226,19 @@ function SortableWorkspaceItem({
             ? "h-9 justify-center text-[12px]"
             : "h-9 gap-2 px-2.5 text-[12px]",
           active
-            ? displayColor !== null
-              ? "text-white"
-              : "text-foreground"
-            : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
+            ? "text-foreground"
+            : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
         )}
         style={
           active
             ? displayColor !== null
               ? {
                   backgroundColor: displayColor,
-                  boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
+                  color: readableTextOn(displayColor),
+                  boxShadow:
+                    readableTextOn(displayColor) === "#ffffff"
+                      ? "inset 0 0 0 1px rgba(255, 255, 255, 0.4)"
+                      : "inset 0 0 0 1px rgba(0, 0, 0, 0.25)",
                 }
               : {
                   backgroundColor: "var(--muted)",
@@ -971,7 +976,10 @@ export function WorkspaceBar({
                     )}
                     style={
                       displayColor
-                        ? { backgroundColor: displayColor, color: "white" }
+                        ? {
+                            backgroundColor: displayColor,
+                            color: readableTextOn(displayColor),
+                          }
                         : {
                             backgroundColor: "var(--muted)",
                             color: "var(--foreground)",
