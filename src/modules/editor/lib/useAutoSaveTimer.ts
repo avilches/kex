@@ -8,10 +8,9 @@ export function reportAutoSaveError(e: unknown): void {
   });
 }
 
-// Shared between useDocument.ts (Source mode / the plain editor tab) and
-// useMarkdownDocument.ts (Rich mode): both debounce a save the same amount of
-// time after a dirty edit, and both need the latest autoSave/autoSaveDelay
-// preference in a callback without retriggering effects that depend on it.
+// Debounces a save after a dirty edit, and hands callbacks the latest
+// autoSave/autoSaveDelay preference without retriggering effects that depend
+// on it.
 export function useAutoSaveTimer(autoSave: boolean, autoSaveDelay: number) {
   const autoSaveRef = useRef({ autoSave, autoSaveDelay });
   autoSaveRef.current = { autoSave, autoSaveDelay };

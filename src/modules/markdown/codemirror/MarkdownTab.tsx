@@ -104,7 +104,7 @@ export function MarkdownTab(props: Props): JSX.Element {
     reloadRef.current = reload;
   }, [reload]);
 
-  // Same external-change wiring as useMarkdownDocument: fs:file-written only
+  // External-change wiring: fs:file-written only
   // catches another Kex tab/window saving this path (our own saves are tagged
   // source: "editor"); real external edits arrive on fs:changed from the
   // native watcher on the parent directory.
