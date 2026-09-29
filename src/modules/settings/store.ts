@@ -264,7 +264,7 @@ const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
 const KEY_CUSTOM_EDITORS = "custom";
 const KEY_DETECTED_EDITORS = "tools";
 
-export const TERMINAL_FONT_SIZE_DEFAULT = 13;
+export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
 export const TERMINAL_FONT_SIZE_MAX = 18;
 
@@ -278,6 +278,7 @@ export const LETTER_SPACING_MIN = -4;
 export const LETTER_SPACING_MAX = 4;
 export const LETTER_SPACING_STEP = 0.5;
 export const LETTER_SPACING_DEFAULT = 0;
+export const TERMINAL_LETTER_SPACING_DEFAULT = -0.5;
 
 export const LINE_HEIGHT_MIN = 0.8;
 export const LINE_HEIGHT_MAX = 1.8;
@@ -384,7 +385,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalFontFamily: "",
   terminalShell: "",
   terminalFontWeight: "normal",
-  terminalLetterSpacing: LETTER_SPACING_DEFAULT,
+  terminalLetterSpacing: TERMINAL_LETTER_SPACING_DEFAULT,
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
   terminalLineHeight: TERMINAL_LINE_HEIGHT_DEFAULT,
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
@@ -892,7 +893,7 @@ export async function setTerminalLetterSpacing(value: number): Promise<void> {
       LETTER_SPACING_MIN,
       LETTER_SPACING_MAX,
       LETTER_SPACING_STEP,
-      LETTER_SPACING_DEFAULT,
+      TERMINAL_LETTER_SPACING_DEFAULT,
     ),
   );
 }
