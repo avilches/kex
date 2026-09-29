@@ -58,6 +58,7 @@ export const EDITOR_THEMES = [
   "github-light",
   "xcode-dark",
   "xcode-light",
+  "darcula",
 ] as const;
 
 export type EditorThemeId = (typeof EDITOR_THEMES)[number];
@@ -95,6 +96,7 @@ export const EDITOR_THEME_MODE: Record<EditorThemeId, "light" | "dark"> = {
   "github-light": "light",
   "xcode-dark": "dark",
   "xcode-light": "light",
+  darcula: "dark",
 };
 
 export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
@@ -120,6 +122,7 @@ export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
   "github-light": "GitHub Light",
   "xcode-dark": "Xcode Dark",
   "xcode-light": "Xcode Light",
+  darcula: "Darcula",
 };
 
 type PaneSplitLimit = { width: number; height: number };
