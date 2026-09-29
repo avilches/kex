@@ -427,8 +427,8 @@ survives as the Preview mode and as the overlay/split preview of an `editor` tab
 
 - `editor.markdown.toggleView`, `editor.html.toggleView` and `markdown.toggleSource` (Cmd+Shift+M) were replaced by one
   `editor.cycleView` (Cmd+Shift+V). Previously the global markdown toggle always won the keydown race and threw a
-  markdown tab out to a plain editor tab; now the global handler steps aside for `markdown` tabs and the shell of the
-  markdown tab rotates its own modes.
+  markdown tab out to a plain editor tab; now the global handler calls the handle the active markdown tab registers, which rotates its
+  modes from anywhere in the window.
 
 ### Notes sidebar view
 

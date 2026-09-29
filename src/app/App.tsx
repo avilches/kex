@@ -12,7 +12,8 @@ import { newGroupId, newTabId } from "@/lib/ids";
 import { useZoom } from "@/lib/useZoom";
 import { useUiFont } from "@/lib/useUiFont";
 import { useEditorFont } from "@/modules/editor/lib/useEditorFont";
-import { isMarkdownPath, isHtmlPath } from "@/lib/utils";
+import { isMarkdownPath } from "@/lib/utils";
+import { isPreviewableEditorTab } from "@/modules/workspaces/lib/previewableTab";
 import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -85,6 +86,7 @@ import {
   siblingPane,
   type DiffIdentity,
   type Tab,
+  type MarkdownTabHandle,
   type TabCallbacks,
   type Rect,
   useWorkspaces,
@@ -237,7 +239,6 @@ export default function App() {
     validateScriptTabs,
     setScriptPaneId,
     setTerminalRunningCommand,
-    setTabView,
     toggleOverlayPreview,
     toggleSplitPreview,
     findTabGlobal,
@@ -333,9 +334,7 @@ export default function App() {
   const terminalHandles = useRef<Map<string, TerminalPaneHandle>>(new Map());
   const scriptCommandSeen = useRef<Set<string>>(new Set());
   const editorHandles = useRef<Map<string, EditorPaneHandle>>(new Map());
-  const markdownSaveHandlers = useRef<Map<string, () => Promise<void>>>(
-    new Map(),
-  );
+  const markdownHandles = useRef<Map<string, MarkdownTabHandle>>(new Map());
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   activeWorkspaceIdRef.current = activeWorkspaceId;
   const closeTabsRef = useRef<(tabIds: string[]) => Promise<boolean>>(() =>
@@ -1871,9 +1870,9 @@ export default function App() {
   // ── Close guards ──────────────────────────────────────────────────────────
 
   const saveTab = useCallback(async (tabId: string) => {
-    const markdownSave = markdownSaveHandlers.current.get(tabId);
-    if (markdownSave) {
-      await markdownSave();
+    const markdownHandle = markdownHandles.current.get(tabId);
+    if (markdownHandle) {
+      await markdownHandle.save();
       return;
     }
     await editorHandles.current.get(tabId)?.save();
@@ -1886,7 +1885,7 @@ export default function App() {
     if (!usePreferencesStore.getState().editorAutoSave) return;
     const tabIds = new Set([
       ...editorHandles.current.keys(),
-      ...markdownSaveHandlers.current.keys(),
+      ...markdownHandles.current.keys(),
     ]);
     await Promise.all(
       [...tabIds].map((tabId) => saveTab(tabId).catch(() => {})),
@@ -2231,10 +2230,6 @@ export default function App() {
         const found = findTabGlobal(tabId);
         if (found) closeTab(found.workspace.id, tabId);
       },
-      onSetMarkdownView: (tabId, mode) => {
-        const found = findTabGlobal(tabId);
-        if (found) setTabView(found.workspace.id, tabId, mode);
-      },
       onToggleOverlayPreview: (tabId) => {
         const found = findTabGlobal(tabId);
         if (found) toggleOverlayPreview(found.workspace.id, tabId);
@@ -2256,9 +2251,9 @@ export default function App() {
         }
         if (tabId === activeTabId) setActiveEditorHandle(h);
       },
-      registerMarkdownSaveHandler: (tabId, save) => {
-        if (save) markdownSaveHandlers.current.set(tabId, save);
-        else markdownSaveHandlers.current.delete(tabId);
+      registerMarkdownHandle: (tabId, handle) => {
+        if (handle) markdownHandles.current.set(tabId, handle);
+        else markdownHandles.current.delete(tabId);
       },
       onBrowserUrlChange: (tabId, url) => {
         const found = findTabGlobal(tabId);
@@ -2370,7 +2365,6 @@ export default function App() {
       setTerminalTabCwd,
       setWorkspaceCwd,
       setTerminalRunningCommand,
-      setTabView,
       toggleOverlayPreview,
       toggleSplitPreview,
       updateTabData,
@@ -2652,24 +2646,33 @@ export default function App() {
       },
       "editor.cycleView": () => {
         if (!activeTab || !activeTabId || !activeWorkspaceId) return;
-        if (
-          activeTab.kind === "editor" &&
-          (isMarkdownPath(activeTab.path) || isHtmlPath(activeTab.path))
-        ) {
+        if (isPreviewableEditorTab(activeTab)) {
           toggleOverlayPreview(activeWorkspaceId, activeTabId);
+        } else if (activeTab.kind === "markdown") {
+          markdownHandles.current.get(activeTabId)?.cycleView();
         }
+      },
+      "markdown.toggleOutline": () => {
+        if (activeTab?.kind !== "markdown" || !activeTabId) return;
+        markdownHandles.current.get(activeTabId)?.toggleOutline();
       },
       "editor.preview.toggleSplit": () => {
         if (!activeTab || !activeTabId || !activeWorkspaceId) return;
-        if (
-          activeTab.kind === "editor" &&
-          (isMarkdownPath(activeTab.path) || isHtmlPath(activeTab.path))
-        ) {
+        if (isPreviewableEditorTab(activeTab)) {
           toggleSplitPreview(activeWorkspaceId, activeTabId);
         }
       },
       "editor.save": () => {
         if (!activeTabId) return;
+        const markdownHandle = markdownHandles.current.get(activeTabId);
+        if (markdownHandle) {
+          markdownHandle.save().catch((err) =>
+            toast.error("Save failed", {
+              description: err instanceof Error ? err.message : String(err),
+            }),
+          );
+          return;
+        }
         const handle = editorHandles.current.get(activeTabId);
         if (handle) void handle.save();
       },
@@ -2862,22 +2865,17 @@ export default function App() {
       if (id === "editor.undo" || id === "editor.redo") {
         return activeTab?.kind !== "editor";
       }
-      // A markdown tab is disabled here on purpose: the event falls through to
-      // that tab's own shell, which cycles the modes of its engine.
       if (id === "editor.cycleView") {
-        return !(
-          activeTab?.kind === "editor" &&
-          (isMarkdownPath(activeTab.path) || isHtmlPath(activeTab.path))
-        );
+        return !(isPreviewableEditorTab(activeTab) || activeTab?.kind === "markdown");
+      }
+      if (id === "markdown.toggleOutline") {
+        return activeTab?.kind !== "markdown";
       }
       if (id === "editor.preview.toggleSplit") {
-        return !(
-          activeTab?.kind === "editor" &&
-          (isMarkdownPath(activeTab.path) || isHtmlPath(activeTab.path))
-        );
+        return !isPreviewableEditorTab(activeTab);
       }
       if (id === "editor.save") {
-        return activeTab?.kind !== "editor";
+        return activeTab?.kind !== "editor" && activeTab?.kind !== "markdown";
       }
       if (id === "terminal.clear") {
         const target =

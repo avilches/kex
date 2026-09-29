@@ -165,7 +165,7 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
               from: opening.from,
               to: info ? info.to : opening.to,
               lang: info ? doc.sliceString(info.from, info.to).trim() : "",
-              code: openLine.to + 1 <= bodyEnd ? doc.sliceString(openLine.to + 1, bodyEnd) : "",
+              code: fencedCodeText(node, doc, openLine.number, bodyEnd),
             });
           }
           if (closing) hides.push({ from: closing.from, to: closing.to });
@@ -379,6 +379,28 @@ function listDepthOf(node: SyntaxNode): number {
   let depth = 0;
   for (let p = node.parent; p; p = p.parent) if (p.type.name === "ListItem") depth++;
   return depth;
+}
+
+// The code a fenced block holds, one line per CodeText: whatever its container
+// put in front of a line (a quote marker, a list indent) is not part of it.
+function fencedCodeText(block: SyntaxNode, doc: Text, openLineNo: number, bodyEnd: number): string {
+  const firstBody = openLineNo + 1;
+  if (firstBody > doc.lines || doc.line(firstBody).from > bodyEnd) return "";
+  const starts = new Map<number, number>();
+  // A CodeText runs across lines when no container marker interrupts it.
+  for (const text of block.getChildren("CodeText")) {
+    starts.set(doc.lineAt(text.from).from, text.from);
+    for (let n = doc.lineAt(text.from).number + 1; n <= doc.lineAt(text.to).number; n++) {
+      starts.set(doc.line(n).from, doc.line(n).from);
+    }
+  }
+  const lines: string[] = [];
+  for (let n = firstBody; n <= doc.lineAt(bodyEnd).number; n++) {
+    const line = doc.line(n);
+    const from = starts.get(line.from);
+    lines.push(from === undefined ? "" : doc.sliceString(from, line.to));
+  }
+  return lines.join("\n");
 }
 
 // The parser strips the indentation a code line gets from its container (four

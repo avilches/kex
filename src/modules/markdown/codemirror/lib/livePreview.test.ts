@@ -378,6 +378,21 @@ describe("planLivePreview", () => {
     expect(plan("```\n```\n").codeHeaders).toEqual([{ from: 0, to: 3, lang: "", code: "" }]);
   });
 
+  it("copies only the code of a fenced block inside a quote", () => {
+    const [header] = plan("> ```js\n> const a = 1;\n>\n> b();\n> ```\n").codeHeaders;
+    expect(header.code).toBe("const a = 1;\n\nb();");
+  });
+
+  it("copies only the code of a fenced block nested in a list item", () => {
+    const [header] = plan("- item\n\n  ```js\n  a();\n    b();\n  ```\n").codeHeaders;
+    expect(header.code).toBe("a();\n  b();");
+  });
+
+  it("keeps the text of a fence that never closes", () => {
+    const [header] = plan("```\nx\ny").codeHeaders;
+    expect(header.code).toBe("x\ny");
+  });
+
   it("reads an unterminated block's code up to the end of the document", () => {
     expect(plan("```py\nprint(1)\nprint(2)").codeHeaders).toEqual([
       { from: 0, to: 5, lang: "py", code: "print(1)\nprint(2)" },

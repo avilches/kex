@@ -73,6 +73,12 @@ type CommitFileDiffOpenInput = {
   pin: boolean;
 };
 
+export type MarkdownTabHandle = {
+  save(): Promise<void>;
+  cycleView(): void;
+  toggleOutline(): void;
+};
+
 export type TabCallbacks = {
   // Terminal callbacks
   onSearchReady?: (tabId: string, addon: SearchAddon) => void;
@@ -85,16 +91,12 @@ export type TabCallbacks = {
   onEditorDirtyChange?: (tabId: string, dirty: boolean) => void;
   onEditorClose?: (tabId: string) => void;
   registerEditorHandle?: (tabId: string, handle: EditorPaneHandle | null) => void;
-  // A markdown tab's EditorPane (Source mode) only exists while that mode is
-  // active, so registerEditorHandle can't be relied on to save it while in
-  // Rich mode. This registers the tab's own save (mode-aware) independently
-  // of whether Source is currently mounted.
-  registerMarkdownSaveHandler?: (tabId: string, save: (() => Promise<void>) | null) => void;
+  // A markdown tab registers its own save, view cycle and outline toggle, so
+  // the global shortcuts and the close guards reach it whatever has focus.
+  registerMarkdownHandle?: (tabId: string, handle: MarkdownTabHandle | null) => void;
   // Preview callbacks
   onToggleOverlayPreview?: (tabId: string) => void;
   onToggleSplitPreview?: (tabId: string) => void;
-  // Markdown callbacks
-  onSetMarkdownView?: (tabId: string, mode: "rendered" | "raw") => void;
   // Browser callbacks
   onBrowserUrlChange?: (tabId: string, url: string) => void;
   registerBrowserHandle?: (tabId: string, handle: BrowserPaneHandle | null) => void;
@@ -362,7 +364,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   style={effectivePreviewMode === "split" ? { left: "calc(50% + 1px)" } : undefined}
                 >
                   {ismd && (
-                    <MarkdownPreviewPane content={liveContent} />
+                    <MarkdownPreviewPane content={liveContent} path={tab.path} />
                   )}
                   {ishtml && <HtmlPreviewPane content={liveContent} path={tab.path} />}
                 </div>
