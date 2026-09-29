@@ -1,3 +1,5 @@
+import { withReadableText } from "./readableColors";
+import { getBuiltinTheme } from "./themes";
 import type { Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
 
 const COLOR_VAR: Record<keyof ThemeColors, string> = {
@@ -72,7 +74,10 @@ export function applyTheme(theme: Theme, mode: ThemeMode): void {
   const colors = variant.colors;
   const terminal = variant.terminal;
   for (const v of ALL_VARS) root.style.removeProperty(v);
-  if (colors) writeColors(root, colors);
+  if (colors) {
+    const isBuiltin = getBuiltinTheme(theme.id) === theme;
+    writeColors(root, isBuiltin ? withReadableText(colors) : colors);
+  }
   if (terminal) writeTerminal(root, terminal);
   lastApplied = theme.id;
 }
