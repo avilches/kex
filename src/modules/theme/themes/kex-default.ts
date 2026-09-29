@@ -8,6 +8,11 @@ export const kexDefault: Theme = {
   variants: {
     light: {
       colors: {
+        background: "#FFFFFF",
+        muted: "#F1F3F3",
+        mutedForeground: "#67787C",
+        primary: "#3C6FED",
+        primaryForeground: "#F9FBFB",
         sidebar: "#FCFCFC",
         border: "#E9EAEE",
         input: "#E9EAEE",
@@ -21,6 +26,13 @@ export const kexDefault: Theme = {
         card: "#363636",
         popover: "#363636",
         sidebar: "#2D2D2D",
+        secondary: "#484848",
+        muted: "#484848",
+        mutedForeground: "#9CA8AB",
+        primary: "#3C6FED",
+        primaryForeground: "#F9FBFB",
+        accent: "#484848",
+        sidebarAccent: "#484848",
       },
       terminal: {
         background: "#2B2B2B",

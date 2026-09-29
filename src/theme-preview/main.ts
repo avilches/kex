@@ -148,7 +148,7 @@ function workspaceBar(): HTMLElement {
       {
         class: active
           ? "flex h-9 items-center justify-center rounded-lg bg-primary text-[12px] text-primary-foreground"
-          : "flex h-9 items-center justify-center rounded-lg bg-muted/40 text-[12px] text-muted-foreground",
+          : "flex h-9 items-center justify-center rounded-lg bg-foreground/[0.09] text-[12px] text-muted-foreground",
       },
       label,
     );
@@ -360,11 +360,17 @@ function controls(): HTMLElement {
   const themes = [...listBuiltinThemes(), ...(state.custom ? [state.custom] : [])];
   const select = h("select", { class: "rounded border border-border bg-transparent px-2 py-1 text-[12px]" });
   for (const t of themes) {
-    const o = h("option", { value: t.id }, t.name);
-    if (t.id === state.themeId) o.selected = true;
-    select.append(o);
+    for (const mode of ["dark", "light"] as const) {
+      if (!t.variants[mode]) continue;
+      const o = h("option", { value: `${t.id}|${mode}` }, `${t.name} ${mode}`);
+      if (t.id === state.themeId && mode === state.mode) o.selected = true;
+      select.append(o);
+    }
   }
-  select.onchange = () => set({ themeId: select.value });
+  select.onchange = () => {
+    const [themeId, mode] = select.value.split("|");
+    set({ themeId, mode: mode as ThemeMode });
+  };
   const btn = (label: string, on: boolean, fn: () => void) => {
     const b = h("button", { class: `rounded border border-border px-2 py-1 text-[12px] ${on ? "bg-primary text-primary-foreground" : ""}` }, label);
     b.onclick = fn;
@@ -387,8 +393,6 @@ function controls(): HTMLElement {
     { class: "mb-4 flex flex-col gap-2" },
     h("div", { class: "flex flex-wrap items-center gap-2" },
       select,
-      btn("dark", state.mode === "dark", () => set({ mode: "dark" })),
-      btn("light", state.mode === "light", () => set({ mode: "light" })),
       btn("vscode", state.scheme === "vscode", () => set({ scheme: "vscode" })),
       btn("jetbrains", state.scheme === "jetbrains", () => set({ scheme: "jetbrains" })),
       btn("swatches view", state.view === "swatches", () => set({ view: "swatches" })),

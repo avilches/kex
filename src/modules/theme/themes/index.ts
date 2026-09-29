@@ -11,12 +11,14 @@ import { nord } from "./nord";
 import { rosePine } from "./rose-pine";
 import { sage } from "./sage";
 import { solarized } from "./solarized";
+import { jetbrainsClassic } from "./jetbrains-classic";
 import { kexDefault } from "./kex-default";
 import { tide } from "./tide";
 import { tokyoNight } from "./tokyo-night";
 
 const BUILTIN: Theme[] = [
   kexDefault,
+  jetbrainsClassic,
   claude,
   kanagawa,
   kanagawaDragon,
