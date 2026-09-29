@@ -17,8 +17,16 @@ Control, History, Notes), tab bar with agent chips, terminal (background, select
 ANSI), a real CodeMirror editor with the theme's paired editor theme, buttons/badges, and every CSS
 token. It is dev only and not part of `pnpm build`.
 
-- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains`. A user theme can be pasted as
-  JSON in the textarea (validated with `validateTheme`).
+- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app&focus=terminal|editor`.
+  A user theme can be pasted as JSON in the textarea (validated with `validateTheme`).
+- Two views. `swatches` lists every surface plus a terminal and an editor pane each in focused and
+  unfocused state. `app` is an approximation of the real window (WorkspaceBar, Sidebar, Header, a
+  terminal pane and an editor pane side by side, status strip); clicking a pane moves focus. An
+  unfocused pane is drawn like `PaneView` does: a black overlay at the theme's
+  `inactivePaneDim[kind]` opacity (each pane prints its `data-dim`), and only the focused pane's
+  tab gets the `tab-focus-indicator` bar. Terminal panes show prompt, command output in ANSI colors,
+  a selection and the cursor (filled when focused, hollow when not); editor panes are a real
+  CodeMirror with the theme's paired editor theme, a selection and the active line.
 - Colors are verifiable without screenshots (Dark Reader rewrites backgrounds in screenshots): each
   swatch prints its hex as text and carries `data-token` / `data-hex`, and
   `window.kexThemePreview.dump()` returns every token plus the git status colors as a
