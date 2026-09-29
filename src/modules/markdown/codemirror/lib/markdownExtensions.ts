@@ -138,7 +138,6 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
         backgroundColor: "var(--foreground)",
         verticalAlign: "middle",
       },
-      // The same box and tick as the TipTap engine's task list (richMarkdown.css).
       ".cm-lp-checkbox": {
         appearance: "none",
         WebkitAppearance: "none",
@@ -300,7 +299,6 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
         borderColor: "var(--primary)",
         background: "color-mix(in srgb, var(--primary) 12%, transparent)",
       },
-      // Matches the TipTap engine's table styling (richMarkdown.css).
       // Starts where a line's text does (its 6px padding), plus the indent of the
       // list item the table sits in, like the code blocks above.
       ".cm-lp-table-wrap": {

@@ -343,21 +343,17 @@ The terminal and the code editor (CodeMirror) each expose independent "Font fami
 
 ### 4.9 Markdown tabs are editable by default
 
-Opening a `.md` file mounts a rich editor, not a read-only preview: TipTap (`markdownEngine: "tiptap"`, the default) or, if chosen in Settings or already sealed onto the tab, Milkdown (`markdownEngine: "milkdown"`, evaluation-stage, see `docs/FORK.md`). The legacy Streamdown preview is still available behind `markdownEngine: "legacy"` for users who only want rendering. This is a behavior change from earlier Kex versions, where `markdown` tabs were preview-only and editing required the `Rendered | Edit` toggle to switch to the raw CodeMirror `editor` tab kind (see 7. Frontend module map, "Tab kinds"). That raw toggle still exists (`Mod+Shift+M`, source mode inside either rich editor's own shell) but is no longer the only way to edit a note.
+Opening a `.md` file mounts Live Preview, a CodeMirror 6 editor that decorates the raw markdown text in place (`modules/markdown/codemirror/`). It is the only markdown engine: the TipTap and Milkdown WYSIWYG editors, the Streamdown-only "legacy" engine and the per-tab `markdownEngine` field were removed, so there is no engine setting and no engine sealed onto a tab. A tab persisted by an older version simply ignores the unknown field. Earlier Kex versions had preview-only `markdown` tabs where editing required the `Rendered | Edit` toggle; that toggle still exists as `editor.cycleView` (see 7. Frontend module map, "Tab kinds").
 
-The engine is a per-tab field, not a global switch applied retroactively: `sealMarkdownEngine` (`lib/sealMarkdownEngine.ts`) stamps it onto a `markdown` or markdown-path `editor` tab the first time one is created without it, from the current Settings preference at that moment. Two tabs on the same file with different `markdownEngine` values (hand-edited into the workspace JSON, or opened before and after a preference change) are independent live tabs that each render with their own engine; changing the Settings default never touches a tab that already has one sealed. `resolveMarkdownEngine` (`lib/markdownEngine.ts`) is the single fallback path: an unset or unrecognized engine string (a typo in a hand-edited workspace JSON, or an engine value from a Kex version that no longer knows it) resolves to the current preference instead of failing to render.
+The tab has three modes, chosen in the path bar and rotated by `editor.cycleView` (`lib/viewCycle.ts`): Source (raw text), Rich (the Live Preview decorations) and Preview (read-only `MarkdownPreviewPane`, Streamdown). Source and Rich share one CodeMirror view and only toggle the decorations through a `Compartment`, so cursor, scroll and undo history survive the switch; Preview unmounts the view.
 
-### 4.10 Buffer ownership: `useMarkdownDocument` and the disk sync point
+### 4.10 Buffer ownership: `useDocument`
 
-`useMarkdownDocument` (`modules/markdown/lib/useMarkdownDocument.ts`), reached through the shared `useMarkdownTabController` (`lib/useMarkdownTabController.ts`), is the single owner of a markdown tab's in-memory content, for both Rich and Source mode and for either rich engine. Neither the rich editor instance (TipTap or Milkdown) nor the CodeMirror source view holds its own independent source of truth; each renders from and writes back to this one buffer. Disk is the synchronization point when switching modes: toggling Rich <-> Source does not hand content directly from one editor instance to the other in memory: it round-trips through the buffer's serialized markdown, the same string that would be written to disk. This keeps the two views from silently diverging (e.g. a construct one rich engine can represent but the markdown serializer would lossily flatten) and makes "what does Source mode show" always answerable as "the current buffer, serialized," not "whatever the rich editor's internal document model happens to contain right now."
+The tab reads and writes its file through the same `useDocument` hook (`modules/editor/lib/useDocument.ts`) as a plain `editor` tab, so the CodeMirror document is the single source of truth for the text. `MarkdownTab` keeps only the text typed since the last load, tied to the `doc` it was typed against (a reload swaps `doc` and the stale edit is ignored), so Preview and Outline can read it and a remounted editor starts from it.
 
 ### 4.11 Save round-trip policy
 
-Saving a markdown tab follows three rules to avoid gratuitous disk writes and content drift:
-
-- **Skip-if-equal.** A save that would write byte-identical content to what is already on disk is a no-op: opening and closing a note without editing it never touches its mtime.
-- **Dirty-only writes.** Autosave and the close-tab guard only write when the buffer differs from the last-saved snapshot; the dirty dot tracks this same comparison.
-- **Frontmatter is an opaque, byte-preserved prefix.** `lib/frontmatter.ts` splits the YAML frontmatter block off the top of the file before conversion and reattaches it verbatim on save. The rich editor and the markdown-it round trip never see or reformat frontmatter, which guarantees a note's frontmatter (key order, quoting style, comments) survives edits it never asked to be touched, even though TipTap's own document model would happily normalize it away.
+Live Preview never converts the text: it hides and decorates syntax markers but the document is the file's bytes, so opening a note and saving it without editing writes the same bytes, and frontmatter (key order, quoting, comments) is never reformatted. `lib/frontmatter.ts` only tells the decorations where the frontmatter block ends. Autosave and the close-tab guard only write when the buffer differs from the last-saved snapshot.
 
 ---
 
@@ -483,8 +479,7 @@ src/
     │   └── block/                 — Block overlay, shell input, mode machine, history
     ├── editor/                    — CodeMirror 6 stack, diffs. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter, indent size 1-12, indent with tabs) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. The per-extension settings are surfaced only in the editor overlay `[...]` menu. Global editor settings (scroll past end, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + blink rate + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences applied via CodeMirror compartments so they update live without rebuilding editor state; the global toggles appear in both the `[...]` menu and the Settings window. A few preferences are JSON-only (no UI). In `settings-general.json`: `workspacePaneLimit`, `paneSplitLimit`,
 `keepFolderLayoutOnChangeExplorerRoot`. In `settings-editor.json`: `editorHighlightActiveLine`,
-`editorAutoSaveDelay`, `markdownWikiLinks` (default `false`; enables `[[note]]`
-autocomplete, resolution, and click-navigation in the rich editor).
+`editorAutoSaveDelay`.
     ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)
     │   ├── components/            — NotificationBell
     │   ├── lib/                   — route, notify, agentIcon, agentSessionRestore
@@ -513,8 +508,7 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │                                (Cmd+Shift+V) serves every editor view: on an `editor` tab over a .md/.html
     │                                the global handler toggles raw/overlay; on a `markdown` tab the global
     │                                `isDisabled` yields, so the tab shell rotates its engine's own modes
-    │                                (`lib/viewCycle.ts`: Rich/Source for tiptap and milkdown, Source/Rich/Preview
-    │                                for Live Preview). `editor.preview.toggleSplit` has no default binding.
+    │                                (`lib/viewCycle.ts`: Source/Rich/Preview). `editor.preview.toggleSplit` has no default binding.
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image
     ├── settings/                  — Settings store, preferences, window opener.
     │                                The `Preferences` type includes `workspaceStatuses: WorkspaceStatus[]`
@@ -522,64 +516,25 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │                                `settings-general.json`, synced cross-window via `GENERAL_PREF_KEY_MAP`).
     │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
     ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
-    ├── markdown/                  : Markdown tab (`kind: "markdown"`) and the editor-tab preview (`kind: "editor"`
-    │   │                            with `previewMode: "overlay" | "split"`), both driven by the per-tab
-    │   │                            `markdownEngine` field (`"tiptap" | "milkdown" | "codemirror"`, sealed onto the tab
-    │   │                            the first time it needs one by `lib/sealMarkdownEngine.ts` so a hand-edited or
-    │   │                            already-open tab never reinterprets when the Settings default changes later).
-    │   │                            `MarkdownRenderPane.tsx` is the single read-only render switch: it debounces the
-    │   │                            live body (`lib/renderEngine.ts`: `pickRenderer`, `shouldDebounce`) and mounts
-    │   │                            `MarkdownPreviewPane` (legacy Streamdown), `RichMarkdownEditor` (tiptap) or
-    │   │                            `MilkdownEditor` (milkdown) in read-only mode; a Crepe init failure flips it to
-    │   │                            the legacy renderer for that preview only, never blanking it. Used from both the
-    │   │                            editor-tab overlay/split preview and, historically, nowhere else: the two live
-    │   │                            editors (`tiptap/MarkdownTab.tsx`, `milkdown/MilkdownTab.tsx`) render their own
-    │   │                            editable instance directly, not through this pane.
-    │   │                            `lib/` is the pure conversion core shared by every mode: `frontmatter.ts`
-    │   │                            (byte-preserved prefix split/rejoin), `markdownToHtml.ts` / `htmlToMarkdown.ts`
-    │   │                            (round-trip via `markdown-it`), `documentBuffer.ts` (dirty tracking against a
-    │   │                            load-time baseline, so reformatting alone never reaches disk: see
-    │   │                            `docs/MARKDOWN_GOTCHAS.md` bug 2), `useMarkdownDocument.ts` and
-    │   │                            `useMarkdownTabController.ts` (buffer ownership plus the mode/save/shortcut
-    │   │                            plan shared by both live tab shells), `markdownEngine.ts` (the type, its
-    │   │                            constant list and `resolveMarkdownEngine`, the one place all three engine
-    │   │                            names are spelled), `wikiLinks.ts` (`[[note]]` resolution), `callouts.ts`.
-    │   │                            `tiptap/` is the default TipTap 3 WYSIWYG editor: `MarkdownTab.tsx` (tab shell,
-    │   │                            owns the Rich/Source toggle), `RichMarkdownEditor.tsx` (the `useEditor` instance
-    │   │                            and extension list), `Toolbar.tsx`, `OutlinePanel.tsx`, `SlashMenu.tsx`,
-    │   │                            `FindBar.tsx`, `WikiLinkMenu.tsx`, `CodeLangDropdown.tsx`, `MathModal.tsx`, and
-    │   │                            `extensions/` (one file per TipTap extension: callout, details, table, math,
-    │   │                            mermaid, wikiLink, codeBlock, slashCommands, headingShortcuts, noteSearch, rawComment, …).
-    │   │                            `milkdown/` is the evaluation-stage Milkdown Crepe editor (see `docs/FORK.md`
-    │   │                            for why it exists and its parity gaps against tiptap): `MilkdownTab.tsx` (tab
-    │   │                            shell, same Rich/Source toggle and outline button as tiptap's),
-    │   │                            `MilkdownEditor.tsx` (mounts `Crepe`, overrides its heading-id generator to
-    │   │                            agree with `outline.ts`'s slugs, exposes `serialize`/`scrollToHeading`/
-    │   │                            `replaceContent` via a ref handle), `slugifyHeadingText` (in `lib/outline.ts`),
-    │   │                            `baselineGate.ts` (when it is safe to register the
-    │   │                            just-loaded serialization as the dirty-tracking baseline: only once Crepe's
-    │   │                            own `onReady` has fired for the current instance, since `Crepe.create()`
-    │   │                            resolves after mount), `mermaidFence.ts` (`hasMermaidFence`, detector kept for
-    │   │                            a future compatible plugin, unused by the editor today since mermaid fences
-    │   │                            render as plain code), `milkdownTheme.css` (CSS-variable overrides on top of
-    │   │                            Crepe's own theme to match the Kex look), `testCrepe.ts` and `roundTrip.test.ts`
-    │   │                            (the round-trip idempotence corpus, see `docs/MARKDOWN_GOTCHAS.md`).
-    │   │                            `codemirror/` is the evaluation-stage "Live Preview" engine: a CodeMirror 6
-    │   │                            editor that decorates raw markdown text in place (Obsidian-style hide/reveal of
-    │   │                            syntax markers on the active line) and never transforms the saved bytes. Three
-    │   │                            view modes in the path bar: Source and Rich share one CodeMirror view (a
-    │   │                            `Compartment` toggles the decorations, so cursor, scroll and undo survive the
-    │   │                            switch) and Preview swaps it for the read-only `MarkdownPreviewPane`. An Outline
-    │   │                            panel (`lib/outline.ts` `headingsFromMarkdown`, `lib/OutlinePanel.tsx`, shared with
-    │   │                            milkdown) jumps to a heading by its 0-based `line`. No toolbar. See `docs/FORK.md` and
+    ├── markdown/                  : Live Preview, the only markdown engine. Used by the `markdown` tab kind
+    │   │                            and, through `MarkdownPreviewPane.tsx` (read-only Streamdown), by the
+    │   │                            editor-tab overlay/split preview (`kind: "editor"` with
+    │   │                            `previewMode: "overlay" | "split"`).
+    │   │                            `codemirror/` is the engine: `MarkdownTab.tsx` (tab shell with the
+    │   │                            Source / Rich / Preview modes and the Outline), `CodeMirrorEditor.tsx` and
+    │   │                            `lib/` (the decorations: `livePreview.ts` plans them, `livePreviewPlugin.ts`
+    │   │                            applies them, `markdownExtensions.ts` holds the theme). It edits the raw
+    │   │                            markdown text in place (Obsidian-style hide/reveal of syntax markers on the
+    │   │                            active line) and never transforms the saved bytes. Source and Rich share one
+    │   │                            CodeMirror view (a `Compartment` toggles the decorations, so cursor, scroll and
+    │   │                            undo survive the switch) and Preview swaps it for `MarkdownPreviewPane`. The
+    │   │                            tab shell is lazy-loaded as its own chunk from `TabContent.tsx`; see
+    │   │                            "Markdown editor chunks" in `docs/BUILD.md`. See `docs/FORK.md` and
     │   │                            `docs/superpowers/specs/2026-09-27-live-preview-markdown-editor-design.md`.
-    │   │                            All three live tab shells (`tiptap/MarkdownTab.tsx`, `milkdown/MilkdownTab.tsx`,
-    │   │                            `codemirror/MarkdownTab.tsx`) are lazy-loaded as their own chunk from `TabContent.tsx`,
-    │   │                            gated on the tab's resolved engine. `RichMarkdownEditor` and `MilkdownEditor`
-    │   │                            are themselves further split into their own chunks, because each is imported
-    │   │                            from two places (its own tab shell, and `MarkdownRenderPane` for the editor-tab
-    │   │                            preview): see "Markdown editor chunks" in `docs/BUILD.md` for the measured split
-    │   │                            and the known eager-chunk leak.
+    │   │                            `lib/` holds the shared pure pieces: `frontmatter.ts` (where the frontmatter
+    │   │                            block ends), `outline.ts` + `OutlinePanel.tsx` (`headingsFromMarkdown`, jump to a
+    │   │                            heading by its 0-based `line`), `imageSrc.ts` (local image path resolution),
+    │   │                            `codeCopyIcons.ts`, `viewCycle.ts` and `MarkdownDocFallback.tsx`.
     ├── notes/                     — HelixNotes-style notes view for the Sidebar (visible only when the workspace
     │                                defines a `workspaceRoot`). Two resizable columns: Quick Access (pinned notes, dnd-kit
     │                                reorder) plus folder tree, and a sortable note list (`modified | title | created | custom`,

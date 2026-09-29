@@ -15,7 +15,3 @@ export function splitFrontmatter(raw: string): FrontmatterSplit {
   const end = open[0].length + close.index + close[0].length;
   return { frontmatter: raw.slice(0, end), body: raw.slice(end) };
 }
-
-export function joinFrontmatter(frontmatter: string, body: string): string {
-  return frontmatter + body;
-}

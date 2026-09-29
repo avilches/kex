@@ -1972,11 +1972,8 @@ export default function App() {
               preview: ep.preview,
             });
           } else if (tab.kind === "markdown") {
-            // A markdown tab in Source mode mounts an EditorPane internally
-            // (MilkdownTab / MarkdownTab register it via registerEditorHandle),
-            // so it needs the same file-sync coverage as a real "editor" tab.
-            // In Rich mode no handle is registered and reload() is simply a
-            // no-op, so listing it here unconditionally is harmless.
+            // A markdown tab is synced like a real "editor" tab; when it has no
+            // registered editor handle, reload() is a no-op.
             acc.push({
               kind: "editor",
               id: tab.id,

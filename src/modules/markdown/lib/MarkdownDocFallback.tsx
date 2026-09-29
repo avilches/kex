@@ -1,8 +1,12 @@
 import type { JSX } from "react";
 import { formatBytes } from "@/lib/formatBytes";
-import type { MarkdownDocState } from "@/modules/markdown/lib/useMarkdownDocument";
 
-export function MarkdownDocFallback({ doc }: { doc: MarkdownDocState }): JSX.Element | null {
+export type MarkdownDocFallbackState =
+  | { status: "binary"; size: number }
+  | { status: "toolarge"; size: number; limit: number }
+  | { status: "error"; message: string };
+
+export function MarkdownDocFallback({ doc }: { doc: MarkdownDocFallbackState }): JSX.Element | null {
   if (doc.status === "error") {
     return (
       <div className="flex h-full items-center justify-center px-6 text-center text-xs text-destructive">

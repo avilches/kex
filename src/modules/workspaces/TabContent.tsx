@@ -15,7 +15,6 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
 import { resolveDisplayName } from "@/modules/editor/lib/languageResolver";
-import { resolveMarkdownEngine } from "@/modules/markdown/lib/markdownEngine";
 import {
   setEditorAutoSave,
   setEditorAutocompletion,
@@ -37,8 +36,8 @@ const EditorPane = lazy(() =>
 const GitDiffPane = lazy(() =>
   import("@/modules/editor/GitDiffPane").then((m) => ({ default: m.GitDiffPane as ComponentType<any> })),
 );
-const MarkdownRenderPane = lazy(() =>
-  import("@/modules/markdown/MarkdownRenderPane").then((m) => ({ default: m.MarkdownRenderPane as ComponentType<any> })),
+const MarkdownPreviewPane = lazy(() =>
+  import("@/modules/markdown/MarkdownPreviewPane").then((m) => ({ default: m.MarkdownPreviewPane as ComponentType<any> })),
 );
 const HtmlPreviewPane = lazy(() =>
   import("@/modules/html-preview/HtmlPreviewPane").then((m) => ({ default: m.HtmlPreviewPane as ComponentType<any> })),
@@ -50,12 +49,6 @@ const GitHistoryPane = lazy(() =>
   import("@/modules/git-history/GitHistoryPane").then((m) => ({ default: m.GitHistoryPane as ComponentType<any> })),
 );
 const MarkdownTab = lazy(() =>
-  import("@/modules/markdown/tiptap/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
-);
-const MilkdownTab = lazy(() =>
-  import("@/modules/markdown/milkdown/MilkdownTab").then((m) => ({ default: m.MilkdownTab as ComponentType<any> })),
-);
-const CodeMirrorMarkdownTab = lazy(() =>
   import("@/modules/markdown/codemirror/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
 );
 
@@ -149,7 +142,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
-  const markdownEnginePref = usePreferencesStore((s) => s.markdownEngine);
   const scratchpadInNewTerminals = usePreferencesStore(
     (s) => s.scratchpadInNewTerminals,
   );
@@ -219,11 +211,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       disabled: effectivePreviewMode === "overlay",
     };
   };
-
-  const tabMarkdownEngine =
-    tab.kind === "markdown" || tab.kind === "editor"
-      ? resolveMarkdownEngine(tab.markdownEngine, markdownEnginePref)
-      : markdownEnginePref;
 
   const prevEffectivePreviewModeRef = useRef<"overlay" | "split" | undefined>(undefined);
   useEffect(() => {
@@ -375,12 +362,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   style={effectivePreviewMode === "split" ? { left: "calc(50% + 1px)" } : undefined}
                 >
                   {ismd && (
-                    <MarkdownRenderPane
-                      content={liveContent}
-                      engine={tabMarkdownEngine}
-                      filePath={tab.path}
-                      workspaceRoot={workspaceRoot}
-                    />
+                    <MarkdownPreviewPane content={liveContent} />
                   )}
                   {ishtml && <HtmlPreviewPane content={liveContent} path={tab.path} />}
                 </div>
@@ -423,23 +405,9 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       );
 
     case "markdown":
-      if (tabMarkdownEngine === "tiptap") {
-        return (
-          <Suspense fallback={null}>
-            <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
-          </Suspense>
-        );
-      }
-      if (tabMarkdownEngine === "milkdown") {
-        return (
-          <Suspense fallback={null}>
-            <MilkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
-          </Suspense>
-        );
-      }
       return (
         <Suspense fallback={null}>
-          <CodeMirrorMarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
+          <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
         </Suspense>
       );
 

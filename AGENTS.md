@@ -132,23 +132,17 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
   `workspace-state.json` via `tauri-plugin-store`, debounced 300ms on every change.
 - **source-control/** — git status / stage / commit panel and diff workflow.
 - **git-history/** — commit graph rail, refs, per-commit file diffs.
-- **markdown/**: the `markdown` tab kind and the read-only editor-tab preview, both switching on the per-tab
-  `markdownEngine` (`"tiptap" | "milkdown" | "codemirror"`, resolved via `lib/markdownEngine.ts`, sealed onto a tab
-  once by `lib/sealMarkdownEngine.ts`). `MarkdownRenderPane.tsx` is the single read-only render switch used by the
-  preview. `tiptap/` is the default rich editor (lazy chunk `MarkdownTab`) with source-mode toggle, toolbar,
-  outline, slash commands. `milkdown/` is an evaluation-stage second rich engine on `@milkdown/crepe` (lazy chunk
-  `MilkdownTab`; see `docs/FORK.md` for its parity gaps against tiptap, notably no mermaid rendering and no
-  local-image path resolution). `codemirror/` is a fourth evaluation-stage engine (lazy chunk `MarkdownTab`)
-  built directly on CodeMirror 6: it never parses to an AST, only decorates the raw text (see `docs/FORK.md`). Both
-  `RichMarkdownEditor` and `MilkdownEditor` split into their own chunk since each is shared between its tab shell
-  and the preview (`docs/BUILD.md`, "Markdown editor chunks"). The pure markdown conversion core (`lib/`: frontmatter,
-  markdownToHtml, htmlToMarkdown, documentBuffer, wikiLinks, `useMarkdownTabController`) is shared by every engine and mode.
+- **markdown/**: Live Preview, the only markdown engine (`codemirror/`, lazy chunk `MarkdownTab`), built directly on
+  CodeMirror 6: it never parses to an AST, only decorates the raw text (see `docs/FORK.md`). The `markdown` tab has
+  Source, Rich (the decorations) and Preview modes plus an Outline; Source and Rich share one CodeMirror view.
+  `MarkdownPreviewPane.tsx` is the read-only Streamdown render, used by the Preview mode and by the overlay/split
+  preview of an `editor` tab over a `.md` (`docs/BUILD.md`, "Markdown editor chunks"). `lib/` holds the shared pure
+  pieces: frontmatter, outline, image path resolution, view-mode cycling.
 - **notes/** — notes view for the Sidebar (Quick Access + folder tree + sortable note list).
   Functional core in `lib/` (`notesConfig.ts` for the `kex.json` `notes` namespace, `noteSort.ts`);
   IO hooks `useNotesState` (config) / `useNotesDirs` (per-folder cache, backed by `notes_read_dirs`)
   / `useQuickAccessHeads` (backed by `notes_read_heads`). Mounted from `Sidebar.tsx` only when the
-  workspace has a `workspaceRoot`. Opens each note as a `markdown` tab, so notes render in the rich
-  editor above.
+  workspace has a `workspaceRoot`. Opens each note as a `markdown` tab, so notes render in Live Preview.
 - **workspace/** — workspace environment switching (Local + WSL distros).
 - **theme/** — custom theme engine (no `next-themes`). `ThemeProvider` + `applyTheme` write CSS variables; built-in
   presets in `themes/` (kex-default, nord, tide, catppuccin, tokyo-night, caffeine, claude, gruvbox, sage, rose-pine),
@@ -261,14 +255,6 @@ Deep-dive into the workspace rendering stack and terminal slot pool:
 - **`docs/WORKSPACES_GOTCHAS.md`** — bugs that were non-obvious to diagnose, with root cause, failed attempts, and
   confirmed fix. Add an entry whenever a bug in this subsystem takes more than one attempt to fix, so it is not
   re-discovered.
-
-### `docs/MARKDOWN_GOTCHAS.md`
-
-The three layers of the markdown save path (`markdownToHtml` -> ProseMirror document -> `htmlToMarkdown`)
-and the fidelity bugs already diagnosed in each, plus the happy-dom test traps. Read it before
-investigating any "opening and saving a .md rewrites the file" report, and add an entry whenever such a
-bug takes more than one attempt to fix. ProseMirror silently drops any DOM construct no schema rule
-claims, so a lost construct usually needs a `data-*` sentinel plus a TipTap node that reclaims it.
 
 ### `docs/SCRATCHPAD.md`
 

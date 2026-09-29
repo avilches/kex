@@ -1,4 +1,3 @@
-import type { MarkdownEngine } from "@/modules/markdown/lib/markdownEngine";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type { ExplorerRootMode };
 
@@ -29,10 +28,9 @@ export type Tab =
       preview: boolean;
       previewMode?: "overlay" | "split";
       overrideLanguage?: string | null;
-      markdownEngine?: MarkdownEngine;
     })
   | (TabCommon & { kind: "browser"; url: string; floating?: boolean })
-  | (TabCommon & { kind: "markdown"; path: string; dirty?: boolean; markdownEngine?: MarkdownEngine })
+  | (TabCommon & { kind: "markdown"; path: string; dirty?: boolean })
   | (TabCommon & { kind: "git-diff"; path: string; repoRoot: string; mode: "-" | "+"; originalPath: string | null; preview: boolean })
   | (TabCommon & { kind: "git-history"; repoRoot: string })
   | (TabCommon & { kind: "git-commit-file"; repoRoot: string; sha: string; path: string; originalPath: string | null; preview: boolean });

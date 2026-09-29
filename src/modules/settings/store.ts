@@ -9,10 +9,6 @@ import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
-import {
-  type MarkdownEngine,
-  parseMarkdownEngine,
-} from "@/modules/markdown/lib/markdownEngine";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 
 export type ThemePref = "system" | "light" | "dark";
@@ -29,7 +25,6 @@ export type DiffViewMode = "unified" | "split";
 
 export type TextEditorMode = "file-only" | "workspace-and-files";
 
-export type { MarkdownEngine } from "@/modules/markdown/lib/markdownEngine";
 
 export type CursorStyle = "bar" | "block" | "underline";
 
@@ -175,8 +170,6 @@ export type Preferences = {
   editorBracketMatching: boolean;
   editorCloseBrackets: boolean;
   editorAutocompletion: boolean;
-  markdownEngine: MarkdownEngine;
-  markdownWikiLinks: boolean; // JSON-only: no settings UI, edit settings-editor.json
   tabBarStyle: TabBarStyle;
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
@@ -257,8 +250,6 @@ const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "highlightActiveLine";
 const KEY_EDITOR_BRACKET_MATCHING = "bracketMatching";
 const KEY_EDITOR_CLOSE_BRACKETS = "closeBrackets";
 const KEY_EDITOR_AUTOCOMPLETION = "autocompletion";
-const KEY_MARKDOWN_ENGINE = "markdownEngine";
-const KEY_MARKDOWN_WIKI_LINKS = "markdownWikiLinks";
 
 // Shortcuts store
 const KEY_SHORTCUTS = "shortcuts";
@@ -414,8 +405,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorBracketMatching: true,
   editorCloseBrackets: true,
   editorAutocompletion: true,
-  markdownEngine: "tiptap",
-  markdownWikiLinks: false,
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
@@ -679,10 +668,6 @@ export async function loadPreferences(): Promise<Preferences> {
     editorAutocompletion:
       getEditor<boolean>(KEY_EDITOR_AUTOCOMPLETION) ??
       DEFAULT_PREFERENCES.editorAutocompletion,
-    markdownEngine: parseMarkdownEngine(getEditor(KEY_MARKDOWN_ENGINE)),
-    markdownWikiLinks:
-      getEditor<boolean>(KEY_MARKDOWN_WIKI_LINKS) ??
-      DEFAULT_PREFERENCES.markdownWikiLinks,
     tabBarStyle: (() => {
       const v = getGeneral<string>(KEY_TAB_BAR_STYLE);
       return v === "connected" || v === "pill" ? v : DEFAULT_PREFERENCES.tabBarStyle;
@@ -742,8 +727,6 @@ export async function loadPreferences(): Promise<Preferences> {
 
   // Persist JSON-only editor keys so they're discoverable in settings-editor.json.
   const editorConfigDefaults: [string, unknown][] = [];
-  if (!editorMap.has(KEY_MARKDOWN_ENGINE)) editorConfigDefaults.push([KEY_MARKDOWN_ENGINE, DEFAULT_PREFERENCES.markdownEngine]);
-  if (!editorMap.has(KEY_MARKDOWN_WIKI_LINKS)) editorConfigDefaults.push([KEY_MARKDOWN_WIKI_LINKS, DEFAULT_PREFERENCES.markdownWikiLinks]);
   if (editorConfigDefaults.length > 0) {
     void Promise.all(editorConfigDefaults.map(([k, v]) => editorStore.set(k, v))).then(() => editorStore.save());
   }
@@ -1130,10 +1113,6 @@ export async function setDiffViewMode(value: DiffViewMode): Promise<void> {
   await writeEditorPref(KEY_DIFF_VIEW_MODE, value);
 }
 
-export async function setMarkdownEngine(value: MarkdownEngine): Promise<void> {
-  await writeEditorPref(KEY_MARKDOWN_ENGINE, value);
-}
-
 export async function setEditorBracketMatching(value: boolean): Promise<void> {
   await writeEditorPref(KEY_EDITOR_BRACKET_MATCHING, value);
 }
@@ -1227,8 +1206,6 @@ const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
   [KEY_EDITOR_CLOSE_BRACKETS]: "editorCloseBrackets",
   [KEY_EDITOR_AUTOCOMPLETION]: "editorAutocompletion",
-  [KEY_MARKDOWN_ENGINE]: "markdownEngine",
-  [KEY_MARKDOWN_WIKI_LINKS]: "markdownWikiLinks",
 };
 
 const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {
