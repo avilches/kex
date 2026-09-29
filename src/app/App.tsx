@@ -2653,17 +2653,12 @@ export default function App() {
           useFileRenameStore.getState().trigger(activeTabId);
         }
       },
-      "editor.markdown.toggleView": () => {
+      "editor.cycleView": () => {
         if (!activeTab || !activeTabId || !activeWorkspaceId) return;
-        if (activeTab.kind === "editor" && isMarkdownPath(activeTab.path)) {
-          toggleOverlayPreview(activeWorkspaceId, activeTabId);
-        } else if (activeTab.kind === "markdown") {
-          setTabView(activeWorkspaceId, activeTabId, "raw");
-        }
-      },
-      "editor.html.toggleView": () => {
-        if (!activeTab || !activeTabId || !activeWorkspaceId) return;
-        if (activeTab.kind === "editor" && isHtmlPath(activeTab.path)) {
+        if (
+          activeTab.kind === "editor" &&
+          (isMarkdownPath(activeTab.path) || isHtmlPath(activeTab.path))
+        ) {
           toggleOverlayPreview(activeWorkspaceId, activeTabId);
         }
       },
@@ -2870,14 +2865,13 @@ export default function App() {
       if (id === "editor.undo" || id === "editor.redo") {
         return activeTab?.kind !== "editor";
       }
-      if (id === "editor.markdown.toggleView") {
+      // A markdown tab is disabled here on purpose: the event falls through to
+      // that tab's own shell, which cycles the modes of its engine.
+      if (id === "editor.cycleView") {
         return !(
-          activeTab?.kind === "markdown" ||
-          (activeTab?.kind === "editor" && isMarkdownPath(activeTab.path))
+          activeTab?.kind === "editor" &&
+          (isMarkdownPath(activeTab.path) || isHtmlPath(activeTab.path))
         );
-      }
-      if (id === "editor.html.toggleView") {
-        return !(activeTab?.kind === "editor" && isHtmlPath(activeTab.path));
       }
       if (id === "editor.preview.toggleSplit") {
         return !(

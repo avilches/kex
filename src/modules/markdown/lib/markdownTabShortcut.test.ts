@@ -27,10 +27,8 @@ describe("routeMarkdownShortcut", () => {
     expect(routeMarkdownShortcut(eventFor("editor.save"), {}, true)).toBe("save");
   });
 
-  it("routes the source toggle", () => {
-    expect(routeMarkdownShortcut(eventFor("markdown.toggleSource"), {}, true)).toBe(
-      "toggleSource",
-    );
+  it("routes the view cycle", () => {
+    expect(routeMarkdownShortcut(eventFor("editor.cycleView"), {}, true)).toBe("cycleView");
   });
 
   it("routes the outline toggle only when the caller supports it", () => {

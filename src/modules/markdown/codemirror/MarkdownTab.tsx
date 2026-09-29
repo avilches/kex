@@ -23,6 +23,7 @@ import { MarkdownPreviewPane } from "@/modules/markdown/MarkdownPreviewPane";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
 import { OutlinePanel } from "@/modules/markdown/lib/OutlinePanel";
 import { headingsFromMarkdown } from "@/modules/markdown/lib/outline";
+import { nextViewMode } from "@/modules/markdown/lib/viewCycle";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
@@ -143,6 +144,11 @@ export function MarkdownTab(props: Props): JSX.Element {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const handleKeyDown = useCallback(
     (e: ReactKeyboardEvent) => {
+      if (matchesShortcut(e.nativeEvent, "editor.cycleView", userShortcuts)) {
+        e.preventDefault();
+        setViewMode((m) => nextViewMode(VIEW_MODES.map((v) => v.mode), m));
+        return;
+      }
       if (!matchesShortcut(e.nativeEvent, "editor.save", userShortcuts)) return;
       e.preventDefault();
       saveRef.current().catch((err) =>

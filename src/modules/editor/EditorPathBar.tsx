@@ -117,8 +117,7 @@ export function EditorPathBar({
   trailing,
 }: Props) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const shortcutId = view?.isHtml ? "editor.html.toggleView" : "editor.markdown.toggleView";
-  const toggleLabel = view ? getShortcutLabel(shortcutId, userShortcuts) : null;
+  const toggleLabel = view ? getShortcutLabel("editor.cycleView", userShortcuts) : null;
   const showToggles = !!viewToggles;
   const onToggleSplit = view?.onToggleSplit;
   const v = viewToggles?.value;

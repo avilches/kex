@@ -249,6 +249,33 @@ describe("Live Preview MarkdownTab", () => {
       expect(view?.state.doc.lineAt(view.state.selection.main.head).number).toBe(5);
     });
 
+    it("the cycle-view shortcut rotates Source, Rich and Preview without changing the tab", async () => {
+      const { container } = await setup();
+      const press = () =>
+        act(() => {
+          (container.querySelector(".cm-content") ?? container.firstElementChild)?.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key: "v",
+              shiftKey: true,
+              metaKey: IS_MAC,
+              ctrlKey: !IS_MAC,
+              bubbles: true,
+            }),
+          );
+        });
+      const pressed = () =>
+        ["Source", "Rich", "Preview"].find(
+          (n) => screen.getByRole("button", { name: n }).getAttribute("aria-pressed") === "true",
+        );
+      expect(pressed()).toBe("Rich");
+      press();
+      expect(pressed()).toBe("Preview");
+      press();
+      expect(pressed()).toBe("Source");
+      press();
+      expect(pressed()).toBe("Rich");
+    });
+
     it("hides the Outline button in Preview", async () => {
       await setup();
       click("Preview");
