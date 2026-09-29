@@ -167,12 +167,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
     debounceRef.current = setTimeout(() => setLiveContent(content), 300);
   }, []);
 
-  // Seed liveContent immediately when EditorPane first loads the file from disk
-  // (onContentChange only fires on user edits, not on initial load).
-  const handleReady = useCallback((initialContent: string) => {
-    setLiveContent(initialContent);
-  }, []);
-
   // Stable reference: GitHistoryPane re-registers this handle in a
   // useEffect keyed on it, so a fresh inline arrow function here would
   // unregister and re-register on every TabContent render instead of only
@@ -213,8 +207,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const effectivePreviewMode: "overlay" | "split" | undefined =
     rawPM === true ? "overlay" : !rawPM ? undefined : (rawPM as "overlay" | "split");
 
-  // Shared by both the "editor" tab kind and the legacy-engine "markdown" render
-  // below: the view-options button is the same everywhere a markdown/html file
+  // Used by the "editor" tab kind: the view-options button is the same everywhere a markdown/html file
   // can show a preview, and is disabled only in overlay (no editor visible at all).
   const buildViewToggles = (path: string) => {
     const ext = extOf(path);
@@ -444,62 +437,9 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
           </Suspense>
         );
       }
-      if (tabMarkdownEngine === "codemirror") {
-        return (
-          <Suspense fallback={null}>
-            <CodeMirrorMarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
-          </Suspense>
-        );
-      }
       return (
         <Suspense fallback={null}>
-          <div className="flex h-full w-full flex-col">
-            <EditorPathBar
-              path={tab.path}
-              tabId={tab.id}
-              workspaceRoot={workspaceRoot}
-              home={home}
-              gitRootPath={gitRootPath}
-              onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
-              onFocusOnExplorer={callbacks.onFocusOnExplorer}
-              onRenameFile={callbacks.onRenameFile}
-              onSetAsRoot={callbacks.onSetAsRoot}
-              onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
-              onRevealInTerminal={callbacks.onRevealInTerminal}
-              onAddToGitignore={callbacks.onAddToGitignore}
-              view={{
-                mode: "overlay",
-                onToggleOverlay: () => callbacks.onSetMarkdownView?.(tab.id, "raw"),
-                onToggleSplit: () => callbacks.onUpdateTab?.(tab.id, (p) => {
-                  if (p.kind !== "markdown") return p;
-                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
-                }),
-              }}
-              viewToggles={buildViewToggles(tab.path)}
-              globalToggles={globalToggles}
-            />
-            <div className="relative min-h-0 flex-1">
-              <div className="absolute inset-0 invisible pointer-events-none">
-                <EditorPane
-                  ref={(h: EditorPaneHandle | null) => {
-                    (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
-                  }}
-                  path={tab.path}
-                  tabId={tab.id}
-                  onContentChange={handleContentChange}
-                  onReady={handleReady}
-                />
-              </div>
-              <div className="absolute inset-0" style={{ zIndex: 5 }}>
-                <MarkdownRenderPane
-                  content={liveContent}
-                  engine={tabMarkdownEngine}
-                  filePath={tab.path}
-                  workspaceRoot={workspaceRoot}
-                />
-              </div>
-            </div>
-          </div>
+          <CodeMirrorMarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
         </Suspense>
       );
 

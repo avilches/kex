@@ -219,12 +219,6 @@ export function EditorSection() {
               </label>
             </div>
             <div className="flex items-center gap-2">
-              <RadioGroupItem value="legacy" id="markdown-engine-legacy" />
-              <label htmlFor="markdown-engine-legacy" className="cursor-pointer text-[12px]">
-                Preview only
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
               <RadioGroupItem value="codemirror" id="markdown-engine-codemirror" />
               <label htmlFor="markdown-engine-codemirror" className="cursor-pointer text-[12px]">
                 Live Preview
