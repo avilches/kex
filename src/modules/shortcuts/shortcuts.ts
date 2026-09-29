@@ -59,11 +59,9 @@ export type ShortcutId =
   | "settings.open"
   | "editor.undo"
   | "editor.redo"
-  | "editor.markdown.toggleView"
+  | "editor.cycleView"
   | "editor.save"
-  | "editor.html.toggleView"
   | "editor.preview.toggleSplit"
-  | "markdown.toggleSource"
   | "markdown.toggleOutline"
   | "path.copy"
   | "notifications.jumpToLast";
@@ -447,8 +445,8 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ key: "F5" }],
   },
   {
-    id: "editor.markdown.toggleView",
-    label: "Toggle Markdown Preview",
+    id: "editor.cycleView",
+    label: "Cycle editor view",
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "v" }],
   },
@@ -459,22 +457,10 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, key: "s" }],
   },
   {
-    id: "editor.html.toggleView",
-    label: "Toggle HTML preview",
-    group: "Editor",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "v" }],
-  },
-  {
     id: "editor.preview.toggleSplit",
     label: "Toggle split preview",
     group: "Editor",
     defaultBindings: [],
-  },
-  {
-    id: "markdown.toggleSource",
-    label: "Markdown: Toggle Rich/Source",
-    group: "Editor",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "m" }],
   },
   {
     id: "markdown.toggleOutline",

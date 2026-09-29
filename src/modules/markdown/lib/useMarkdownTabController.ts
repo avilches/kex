@@ -70,7 +70,7 @@ export function useMarkdownTabController(opts: {
         );
         return true;
       }
-      if (action === "toggleSource") {
+      if (action === "cycleView") {
         void toggleMode();
         return true;
       }

@@ -3,7 +3,7 @@ import type { ShortcutId, KeyBinding } from "@/modules/shortcuts/shortcuts";
 
 export type MarkdownTabMode = "rich" | "source";
 
-export type MarkdownTabAction = "save" | "toggleSource" | "toggleOutline";
+export type MarkdownTabAction = "save" | "cycleView" | "toggleOutline";
 
 export type SavePlan = { flushRich: boolean; saveDoc: boolean; saveSource: boolean };
 
@@ -28,7 +28,7 @@ export function routeMarkdownShortcut(
 ): MarkdownTabAction | null {
   const shortcuts = userShortcuts as Record<ShortcutId, KeyBinding[]>;
   if (matchesShortcut(e, "editor.save", shortcuts)) return "save";
-  if (matchesShortcut(e, "markdown.toggleSource", shortcuts)) return "toggleSource";
+  if (matchesShortcut(e, "editor.cycleView", shortcuts)) return "cycleView";
   if (hasOutline && matchesShortcut(e, "markdown.toggleOutline", shortcuts)) {
     return "toggleOutline";
   }
