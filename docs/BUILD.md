@@ -17,11 +17,12 @@ Control, History, Notes), tab bar with agent chips, terminal (background, select
 ANSI), a real CodeMirror editor with the theme's paired editor theme, buttons/badges, and every CSS
 token. It is dev only and not part of `pnpm build`.
 
-- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app&focus=terminal|editor`.
+- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app`.
   A user theme can be pasted as JSON in the textarea (validated with `validateTheme`).
-- Two views. `swatches` lists every surface plus a terminal and an editor pane each in focused and
-  unfocused state. `app` is an approximation of the real window (WorkspaceBar, Sidebar, Header, a
-  terminal pane and an editor pane side by side, status strip); clicking a pane moves focus. An
+- Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists
+  every surface plus a terminal and an editor pane each in focused and unfocused state. `app` stacks
+  two approximations of the real window (WorkspaceBar, Sidebar, Header, a terminal pane and an editor
+  pane side by side, status strip): one with the terminal focused, one with the editor focused. An
   unfocused pane is drawn like `PaneView` does: a black overlay at the theme's
   `inactivePaneDim[kind]` opacity (each pane prints its `data-dim`), and only the focused pane's
   tab gets the `tab-focus-indicator` bar. Terminal panes show prompt, command output in ANSI colors,
