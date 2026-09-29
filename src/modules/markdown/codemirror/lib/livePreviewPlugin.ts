@@ -10,15 +10,20 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { IS_MAC } from "@/lib/platform";
-import { isExternalUrl, openExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
+import { autolinkHref, isExternalUrl, openExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
 import { frontmatterEnd } from "@/modules/markdown/codemirror/lib/frontmatterEnd";
+import { CHECK_ICON, COPY_ICON } from "@/modules/markdown/lib/codeCopyIcons";
 import {
   type ImageSpec,
+  linkDefinitions,
+  NOT_BARE_URL_PARENTS,
   planLivePreview,
+  planParagraphJoins,
   planTables,
+  resolveReference,
   type TableSpec,
 } from "@/modules/markdown/codemirror/lib/livePreview";
-import { cellSegments } from "@/modules/markdown/codemirror/lib/tableCellInline";
+import { type CellNode, parseCellInline } from "@/modules/markdown/codemirror/lib/tableCellInline";
 
 class CheckboxWidget extends WidgetType {
   constructor(
@@ -66,6 +71,71 @@ class HrWidget extends WidgetType {
   }
 }
 
+// Stands in for the opening fence of an inactive code block: the language on
+// the right, then a copy button.
+class CodeHeaderWidget extends WidgetType {
+  constructor(
+    private readonly lang: string,
+    private readonly code: string,
+  ) {
+    super();
+  }
+
+  override eq(other: CodeHeaderWidget): boolean {
+    return other.lang === this.lang && other.code === this.code;
+  }
+
+  override toDOM(): HTMLElement {
+    const header = document.createElement("span");
+    header.className = "cm-lp-code-header";
+    if (this.lang) {
+      const label = document.createElement("span");
+      label.className = "cm-lp-code-lang";
+      label.textContent = this.lang;
+      header.appendChild(label);
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cm-lp-code-copy";
+    button.title = "Copy code";
+    button.innerHTML = COPY_ICON;
+    button.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      navigator.clipboard.writeText(this.code).then(
+        () => {
+          button.innerHTML = CHECK_ICON;
+          button.classList.add("copied");
+          setTimeout(() => {
+            button.innerHTML = COPY_ICON;
+            button.classList.remove("copied");
+          }, 1500);
+        },
+        () => {},
+      );
+    });
+    header.appendChild(button);
+    return header;
+  }
+
+  // The button owns its clicks; a click anywhere else on the header puts the
+  // cursor on the fence line, which reveals the raw fence to edit.
+  override ignoreEvent(event: Event): boolean {
+    return event.target instanceof Element && event.target.closest("button") !== null;
+  }
+}
+
+class SoftBreakWidget extends WidgetType {
+  override eq(): boolean {
+    return true;
+  }
+
+  override toDOM(): HTMLElement {
+    const span = document.createElement("span");
+    span.textContent = " ";
+    return span;
+  }
+}
+
 class BulletWidget extends WidgetType {
   override eq(): boolean {
     return true;
@@ -74,7 +144,6 @@ class BulletWidget extends WidgetType {
   override toDOM(): HTMLElement {
     const span = document.createElement("span");
     span.className = "cm-lp-bullet-dot";
-    span.textContent = "•";
     return span;
   }
 
@@ -89,22 +158,35 @@ class ImageWidget extends WidgetType {
   constructor(
     private readonly alt: string,
     private readonly src: string,
+    private readonly title: string | undefined,
   ) {
     super();
-    this.key = `${alt}\u0000${src}`;
+    this.key = `${alt}\u0000${src}\u0000${title ?? ""}`;
   }
 
   override eq(other: ImageWidget): boolean {
     return other.key === this.key;
   }
 
+  // The img sits in a wrapper because a failed load swaps the img for its alt
+  // text, and CodeMirror must keep hold of the same root element.
   override toDOM(): HTMLElement {
+    const wrap = document.createElement("span");
     const img = document.createElement("img");
     img.src = this.src;
     img.alt = this.alt;
+    if (this.title) img.title = this.title;
     img.className = "cm-lp-image";
     img.loading = "lazy";
-    return img;
+    img.addEventListener("error", () => {
+      const broken = document.createElement("span");
+      broken.className = "cm-lp-image-broken";
+      broken.textContent = this.alt || "image";
+      if (this.title) broken.title = this.title;
+      wrap.replaceChildren(broken);
+    });
+    wrap.appendChild(img);
+    return wrap;
   }
 
   // Clicking an image places the cursor on its line, revealing the raw
@@ -119,7 +201,7 @@ class TableWidget extends WidgetType {
 
   constructor(private readonly spec: TableSpec) {
     super();
-    this.key = JSON.stringify([spec.headers, spec.aligns, spec.rows]);
+    this.key = JSON.stringify([spec.listDepth, spec.headers, spec.aligns, spec.rows]);
   }
 
   // Positions are left out on purpose: the DOM depends only on the content, so
@@ -136,6 +218,9 @@ class TableWidget extends WidgetType {
     const { headers, aligns, rows } = this.spec;
     const wrap = document.createElement("div");
     wrap.className = "cm-lp-table-wrap";
+    // Where a line's own text starts (its 6px padding), plus the indent of the
+    // list item the table belongs to, so it lines up with that item's text.
+    wrap.style.setProperty("--lp-list-depth", String(this.spec.listDepth));
     const table = document.createElement("table");
     table.className = "cm-lp-table";
     const thead = table.createTHead().insertRow();
@@ -159,25 +244,55 @@ class TableWidget extends WidgetType {
 function buildCell(tag: "th" | "td", text: string, align: TableSpec["aligns"][number]): HTMLElement {
   const cell = document.createElement(tag);
   if (align) cell.style.textAlign = align;
-  for (const segment of cellSegments(text)) {
-    if (segment.type === "text") {
-      cell.appendChild(document.createTextNode(segment.value));
-    } else if (isExternalUrl(segment.url)) {
-      cell.appendChild(buildLink(segment.text, segment.url));
-    } else {
-      cell.appendChild(document.createTextNode(segment.text));
-    }
-  }
+  appendCellNodes(cell, parseCellInline(text));
   return cell;
 }
 
-function buildLink(text: string, url: string): HTMLAnchorElement {
+const CELL_TAGS = { strong: "strong", em: "em", del: "del", sub: "span", sup: "span" } as const;
+
+function appendCellNodes(parent: HTMLElement, nodes: CellNode[]): void {
+  for (const node of nodes) {
+    switch (node.type) {
+      case "text":
+        parent.appendChild(document.createTextNode(node.value));
+        break;
+      case "br":
+        parent.appendChild(document.createElement("br"));
+        break;
+      case "code": {
+        const code = document.createElement("code");
+        code.className = "cm-lp-code";
+        code.textContent = node.value;
+        parent.appendChild(code);
+        break;
+      }
+      case "link":
+        // Only an external destination is a link; anything else (a relative
+        // path, an anchor) shows its text, as elsewhere in the engine.
+        if (isExternalUrl(node.url)) {
+          const a = buildLink(node.url);
+          appendCellNodes(a, node.children);
+          parent.appendChild(a);
+        } else {
+          appendCellNodes(parent, node.children);
+        }
+        break;
+      default: {
+        const el = document.createElement(CELL_TAGS[node.type]);
+        if (node.type === "sub" || node.type === "sup") el.className = `cm-lp-${node.type}`;
+        appendCellNodes(el, node.children);
+        parent.appendChild(el);
+      }
+    }
+  }
+}
+
+function buildLink(url: string): HTMLAnchorElement {
   const a = document.createElement("a");
   a.href = url;
   a.target = "_blank";
   a.rel = "noopener noreferrer";
   a.className = "cm-lp-link-text";
-  a.textContent = text;
   a.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
@@ -204,10 +319,60 @@ function frontmatterEndOf(state: EditorState): number {
   return frontmatterEnd(state.doc.sliceString(0, Math.min(state.doc.length, 4096)));
 }
 
-const codeBlockLine = Decoration.line({ class: "cm-lp-codeblock" });
+// Everything a line's own decoration can carry. A line gets exactly one
+// decoration, built from all of it, because two line decorations each setting
+// `style` would depend on how CodeMirror merges the attribute.
+type LineTraits = {
+  code?: boolean;
+  plain?: boolean;
+  codeFirst?: boolean;
+  codeLast?: boolean;
+  fence?: boolean;
+  quote?: number;
+  quoteIndent?: number;
+  list?: number;
+  heading?: number;
+};
+
+const lineDecoCache = new Map<string, Decoration>();
+
+// Depths reach the stylesheet as custom properties: one bar per quote level,
+// one indent step per list level below the first.
+function lineDecoration(t: LineTraits): Decoration {
+  const flags = [t.code, t.plain, t.codeFirst, t.codeLast, t.fence].map((b) => (b ? 1 : 0)).join("");
+  const key = `${flags}|${t.quote ?? 0}|${t.quoteIndent ?? 0}|${t.list ?? 0}|${t.heading ?? 0}`;
+  let deco = lineDecoCache.get(key);
+  if (!deco) {
+    const classes: string[] = [];
+    const styles: string[] = [];
+    if (t.code) classes.push("cm-lp-codeblock");
+    if (t.plain) classes.push("cm-lp-code-plain");
+    if (t.codeFirst) classes.push("cm-lp-code-first");
+    if (t.codeLast) classes.push("cm-lp-code-last");
+    if (t.fence) classes.push("cm-lp-fence-line");
+    if (t.quote) {
+      classes.push("cm-lp-quote-line");
+      styles.push(`--lp-quote-depth: ${t.quote}`);
+      if (t.quoteIndent) styles.push(`--lp-quote-indent: ${t.quoteIndent}`);
+    }
+    if (t.list) {
+      // A code line in a list is indented by its own rule, and must not pick up
+      // the vertical padding of a list line.
+      classes.push(t.code ? "cm-lp-list-code" : "cm-lp-list");
+      styles.push(`--lp-list-depth: ${t.list}`);
+    }
+    if (t.heading) classes.push("cm-lp-heading-line", `cm-lp-hl${t.heading}`);
+    deco = Decoration.line({
+      class: classes.join(" "),
+      ...(styles.length > 0 ? { attributes: { style: styles.join("; ") } } : {}),
+    });
+    lineDecoCache.set(key, deco);
+  }
+  return deco;
+}
 
 function imageWidgetOf(spec: ImageSpec, resolveImageSrc: (src: string) => string): ImageWidget {
-  return new ImageWidget(spec.alt, resolveImageSrc(spec.url));
+  return new ImageWidget(spec.alt, resolveImageSrc(spec.url), spec.title);
 }
 
 function buildDecorations(view: EditorView, resolveImageSrc: (src: string) => string): DecorationSet {
@@ -216,7 +381,21 @@ function buildDecorations(view: EditorView, resolveImageSrc: (src: string) => st
   const fmEnd = frontmatterEndOf(state);
 
   const decorations: { from: number; to: number; deco: Decoration }[] = [];
-  const codeLineStarts = new Set<number>();
+  // A quote marker on a continuation line lies inside a joined line break, and
+  // two replace decorations must not overlap.
+  const joined: [number, number][] = [];
+  state.field(joinField).between(0, state.doc.length, (from, to) => {
+    joined.push([from, to]);
+  });
+  const lineTraits = new Map<number, LineTraits>();
+  const traitsOf = (start: number): LineTraits => {
+    let t = lineTraits.get(start);
+    if (!t) {
+      t = {};
+      lineTraits.set(start, t);
+    }
+    return t;
+  };
   for (const { from, to } of view.visibleRanges) {
     const plan = planLivePreview({
       tree: syntaxTree(state),
@@ -227,16 +406,28 @@ function buildDecorations(view: EditorView, resolveImageSrc: (src: string) => st
       frontmatterEnd: fmEnd,
     });
     for (const mark of plan.marks) {
-      decorations.push({ from: mark.from, to: mark.to, deco: Decoration.mark({ class: mark.className }) });
+      decorations.push({
+        from: mark.from,
+        to: mark.to,
+        deco: Decoration.mark({ class: mark.className, ...(mark.title ? { attributes: { title: mark.title } } : {}) }),
+      });
     }
     for (const hide of plan.hides) {
+      if (joined.some(([f, t]) => hide.from >= f && hide.to <= t)) continue;
       decorations.push({ from: hide.from, to: hide.to, deco: Decoration.replace({}) });
     }
     for (const box of plan.checkboxes) {
       decorations.push({
-        from: box.from,
+        from: box.replaceFrom,
         to: box.to,
         deco: Decoration.replace({ widget: new CheckboxWidget(box.from, box.checked) }),
+      });
+    }
+    for (const header of plan.codeHeaders) {
+      decorations.push({
+        from: header.from,
+        to: header.to,
+        deco: Decoration.replace({ widget: new CodeHeaderWidget(header.lang, header.code) }),
       });
     }
     for (const hr of plan.hrs) {
@@ -261,15 +452,55 @@ function buildDecorations(view: EditorView, resolveImageSrc: (src: string) => st
     for (const block of plan.codeBlocks) {
       const first = state.doc.lineAt(Math.max(block.from, from)).number;
       const last = state.doc.lineAt(Math.min(block.to, to)).number;
-      for (let n = first; n <= last; n++) codeLineStarts.add(state.doc.line(n).from);
+      // The padding of a block's first and last code line is judged on the
+      // whole block, not on the part inside this range; collapsed fence lines
+      // are not code lines.
+      const collapsed = new Set(block.collapsed ?? []);
+      const isCode = (n: number) => !collapsed.has(state.doc.line(n).from);
+      let firstCode = state.doc.lineAt(block.from).number;
+      let lastCode = state.doc.lineAt(block.to).number;
+      while (firstCode < lastCode && !isCode(firstCode)) firstCode++;
+      while (lastCode > firstCode && !isCode(lastCode)) lastCode--;
+      for (let n = first; n <= last; n++) {
+        const t = traitsOf(state.doc.line(n).from);
+        if (isCode(n)) {
+          t.code = true;
+          if (block.plain) t.plain = true;
+          if (n === firstCode) t.codeFirst = true;
+          if (n === lastCode) t.codeLast = true;
+        } else {
+          t.fence = true;
+        }
+      }
     }
+    for (const { from: start, depth } of plan.listLines) {
+      const t = traitsOf(start);
+      t.list = Math.max(depth, t.list ?? 0);
+    }
+    for (const { from: start, depth, indent } of plan.quoteLines) {
+      const t = traitsOf(start);
+      t.quote = Math.max(depth, t.quote ?? 0);
+      t.quoteIndent = Math.min(indent, t.quoteIndent ?? indent);
+    }
+    for (const { from: start, level } of plan.headingLines) traitsOf(start).heading = level;
     // plan.tables is rendered by tableField: block widgets cannot come from a plugin.
   }
-  for (const pos of codeLineStarts) decorations.push({ from: pos, to: pos, deco: codeBlockLine });
+  for (const [pos, traits] of lineTraits) decorations.push({ from: pos, to: pos, deco: lineDecoration(traits) });
 
   decorations.sort((a, b) => a.from - b.from || a.to - b.to);
   const builder = decorations.map((d) => d.deco.range(d.from, d.to));
   return Decoration.set(builder, true);
+}
+
+function buildJoinDecorations(state: EditorState): DecorationSet {
+  const joins = planParagraphJoins({
+    tree: syntaxTree(state),
+    doc: state.doc,
+    activeLines: activeLinesOf(state),
+    frontmatterEnd: frontmatterEndOf(state),
+  });
+  const widget = new SoftBreakWidget();
+  return Decoration.set(joins.map((j) => Decoration.replace({ widget }).range(j.from, j.to)));
 }
 
 function buildTableDecorations(state: EditorState): DecorationSet {
@@ -291,6 +522,18 @@ const tableField = StateField.define<DecorationSet>({
   update(value, tr) {
     if (tr.docChanged || tr.selection || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
       return buildTableDecorations(tr.state);
+    }
+    return value;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+// Replacing a line break is also state-field only, like the block table widgets.
+const joinField = StateField.define<DecorationSet>({
+  create: buildJoinDecorations,
+  update(value, tr) {
+    if (tr.docChanged || tr.selection || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
+      return buildJoinDecorations(tr.state);
     }
     return value;
   },
@@ -324,17 +567,70 @@ function createInlinePlugin(resolveImageSrc: (src: string) => string): Extension
   );
 }
 
+// The pointing hand over a link appears only while the modifier that opens it
+// (Cmd on macOS, Ctrl elsewhere, as in handleLinkMousedown) is held, and says so
+// through a class on the editor. Keys are read on the window because the
+// modifier is often pressed with the pointer already over the link; the pointer
+// itself resyncs it on the way in, and losing focus releases it.
+const modifierCursor = ViewPlugin.fromClass(
+  class {
+    constructor(private readonly view: EditorView) {
+      window.addEventListener("keydown", this.sync);
+      window.addEventListener("keyup", this.sync);
+      window.addEventListener("blur", this.release);
+      view.dom.addEventListener("mousemove", this.sync);
+    }
+
+    private readonly sync = (e: KeyboardEvent | MouseEvent): void => {
+      this.view.dom.classList.toggle("cm-lp-mod", IS_MAC ? e.metaKey : e.ctrlKey);
+    };
+
+    private readonly release = (): void => {
+      this.view.dom.classList.remove("cm-lp-mod");
+    };
+
+    destroy(): void {
+      window.removeEventListener("keydown", this.sync);
+      window.removeEventListener("keyup", this.sync);
+      window.removeEventListener("blur", this.release);
+      this.view.dom.removeEventListener("mousemove", this.sync);
+      this.release();
+    }
+  },
+);
+
 export function livePreviewPlugin(resolveImageSrc: (src: string) => string): Extension {
-  return [createInlinePlugin(resolveImageSrc), tableField];
+  return [createInlinePlugin(resolveImageSrc), modifierCursor, tableField, joinField];
 }
 
+// Where the link under `pos` points: an inline or reference link, an
+// `<autolink>` or a bare URL. Null when there is no link, or it is not external.
 export function linkUrlAt(state: EditorState, pos: number): string | null {
-  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1);
-  while (node && node.type.name !== "Link") node = node.parent;
-  const urlNode = node?.getChild("URL");
-  if (!urlNode) return null;
-  const url = state.doc.sliceString(urlNode.from, urlNode.to);
-  return isExternalUrl(url) ? url : null;
+  const external = (url: string | undefined): string | null => (url && isExternalUrl(url) ? url : null);
+  const text = (node: SyntaxNode): string => state.doc.sliceString(node.from, node.to);
+  for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1); node; node = node.parent) {
+    const name = node.type.name;
+    if (name === "Link") {
+      const urlNode = node.getChild("URL");
+      return external(
+        urlNode
+          ? text(urlNode)
+          : resolveReference(
+              node,
+              state.doc,
+              linkDefinitions(syntaxTree(state), state.doc, frontmatterEndOf(state)),
+            )?.url,
+      );
+    }
+    if (name === "Autolink") {
+      const urlNode = node.getChild("URL");
+      return urlNode ? external(autolinkHref(text(urlNode))) : null;
+    }
+    if (name === "URL" && !NOT_BARE_URL_PARENTS.has(node.parent?.type.name ?? "")) {
+      return external(autolinkHref(text(node)));
+    }
+  }
+  return null;
 }
 
 // Cmd/Ctrl+click opens a link; a plain click only places the cursor, so the

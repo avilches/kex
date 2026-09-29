@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { isExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
+import { autolinkHref, isExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
+
+describe("autolinkHref", () => {
+  it("keeps an http(s) or mailto URL, adds https:// to www. and mailto: to an address", () => {
+    expect(autolinkHref("https://example.com/a?b=1")).toBe("https://example.com/a?b=1");
+    expect(autolinkHref("mailto:me@x.com")).toBe("mailto:me@x.com");
+    expect(autolinkHref("www.example.com")).toBe("https://www.example.com");
+    expect(autolinkHref("me@example.com")).toBe("mailto:me@example.com");
+  });
+
+  it("leaves anything else as it is, so isExternalUrl can reject it", () => {
+    expect(autolinkHref("./notes.md")).toBe("./notes.md");
+    expect(isExternalUrl(autolinkHref("javascript:alert(1)"))).toBe(false);
+  });
+});
 
 describe("isExternalUrl", () => {
   it("accepts http, https and mailto destinations", () => {

@@ -1,5 +1,5 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { type JSX, useEffect, useRef } from "react";
+import { type JSX, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { pathBasename } from "@/lib/pathUtils";
@@ -12,6 +12,8 @@ import {
 } from "@/modules/markdown/codemirror/CodeMirrorEditor";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
 import type { TabCallbacks } from "@/modules/workspaces/TabContent";
 
 type Props = {
@@ -96,8 +98,22 @@ export function MarkdownTab(props: Props): JSX.Element {
     if (props.focused) editorRef.current?.focus();
   }, [props.focused]);
 
+  // The global editor.save handler only serves `editor` tabs, so a markdown tab
+  // routes its own save key, same as the TipTap and Milkdown shells.
+  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const handleKeyDown = useCallback(
+    (e: ReactKeyboardEvent) => {
+      if (!matchesShortcut(e.nativeEvent, "editor.save", userShortcuts)) return;
+      e.preventDefault();
+      saveRef.current().catch((err) =>
+        toast.error("Save failed", { description: err instanceof Error ? err.message : String(err) }),
+      );
+    },
+    [userShortcuts],
+  );
+
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex h-full w-full flex-col" onKeyDownCapture={handleKeyDown}>
       <EditorPathBar
         path={props.path}
         tabId={props.tabId}

@@ -50,6 +50,7 @@ vi.mock("@/modules/editor/lib/useEditorThemeExt", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
+import { IS_MAC } from "@/lib/platform";
 import { MarkdownTab } from "@/modules/markdown/codemirror/MarkdownTab";
 
 const PATH = "/notes/a.md";
@@ -92,6 +93,31 @@ describe("Live Preview MarkdownTab", () => {
 
     expect(screen.getByText(/changed on disk/)).not.toBeNull();
     expect(view?.state.doc.toString()).toBe("# Hello\nlocal edit\n");
+  });
+
+  it("saves to disk on the save shortcut, since the global handler ignores markdown tabs", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "# Hello\n", size: 8 });
+    const { container } = render(
+      <MarkdownTab tabId="tab-save" path={PATH} visible focused={false} callbacks={{}} />,
+    );
+    await flush();
+
+    const content = container.querySelector(".cm-content") as HTMLElement;
+    const view = EditorView.findFromDOM(content);
+    act(() => {
+      view?.dispatch({ changes: { from: view.state.doc.length, insert: "edited\n" } });
+    });
+    act(() => {
+      content.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "s", metaKey: IS_MAC, ctrlKey: !IS_MAC, bubbles: true }),
+      );
+    });
+    await flush();
+
+    expect(invoke).toHaveBeenCalledWith(
+      "fs_write_file",
+      expect.objectContaining({ path: PATH, content: "# Hello\nedited\n" }),
+    );
   });
 
   it("reloads silently on an external change while the tab is clean", async () => {
