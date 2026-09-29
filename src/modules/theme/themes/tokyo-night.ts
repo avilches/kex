@@ -3,8 +3,8 @@ import type { Theme } from "../types";
 export const tokyoNight: Theme = {
   id: "tokyo-night",
   name: "Tokyo Night",
-  description: "Calm, blue-leaning dark theme.",
-  editorTheme: { dark: "tokyo-night" },
+  description: "Calm, blue-leaning theme with a Day light variant.",
+  editorTheme: { dark: "tokyo-night", light: "github-light" },
   variants: {
     dark: {
       colors: {
@@ -47,6 +47,47 @@ export const tokyoNight: Theme = {
         ],
       },
       inactivePaneDim: { terminal: 0.12 },
+    },
+    light: {
+      colors: {
+        background: "#e1e2e7",
+        foreground: "#3760bf",
+        card: "#d0d5e3",
+        cardForeground: "#3760bf",
+        popover: "#d0d5e3",
+        popoverForeground: "#3760bf",
+        primary: "#2e7de9",
+        primaryForeground: "#e1e2e7",
+        secondary: "#c4c8da",
+        secondaryForeground: "#3760bf",
+        muted: "#c4c8da",
+        mutedForeground: "#6172b0",
+        accent: "#c4c8da",
+        accentForeground: "#3760bf",
+        destructive: "#f52a65",
+        border: "rgba(55,96,191,0.14)",
+        input: "rgba(55,96,191,0.2)",
+        ring: "#2e7de9",
+        sidebar: "#d0d5e3",
+        sidebarForeground: "#3760bf",
+        sidebarPrimary: "#2e7de9",
+        sidebarPrimaryForeground: "#e1e2e7",
+        sidebarAccent: "#c4c8da",
+        sidebarAccentForeground: "#3760bf",
+        sidebarBorder: "rgba(55,96,191,0.14)",
+        sidebarRing: "#2e7de9",
+      },
+      terminal: {
+        cursor: "#3760bf",
+        cursorAccent: "#e1e2e7",
+        selection: "rgba(183,193,227,0.8)",
+        ansi: [
+          "#b4b5b9", "#f52a65", "#587539", "#8c6c3e",
+          "#2e7de9", "#9854f1", "#007197", "#6172b0",
+          "#a1a6c5", "#ff4774", "#5c8524", "#a27629",
+          "#358aff", "#a463ff", "#007ea8", "#3760bf",
+        ],
+      },
     },
   },
 };
