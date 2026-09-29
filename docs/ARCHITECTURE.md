@@ -519,7 +519,7 @@ autocomplete, resolution, and click-navigation in the rich editor).
     ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  : Markdown tab (`kind: "markdown"`) and the editor-tab preview (`kind: "editor"`
     │   │                            with `previewMode: "overlay" | "split"`), both driven by the per-tab
-    │   │                            `markdownEngine` field (`"tiptap" | "milkdown" | "legacy"`, sealed onto the tab
+    │   │                            `markdownEngine` field (`"tiptap" | "milkdown" | "codemirror"`, sealed onto the tab
     │   │                            the first time it needs one by `lib/sealMarkdownEngine.ts` so a hand-edited or
     │   │                            already-open tab never reinterprets when the Settings default changes later).
     │   │                            `MarkdownRenderPane.tsx` is the single read-only render switch: it debounces the
@@ -550,9 +550,8 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │   │                            shell, same Rich/Source toggle and outline button as tiptap's),
     │   │                            `MilkdownEditor.tsx` (mounts `Crepe`, overrides its heading-id generator to
     │   │                            agree with `outline.ts`'s slugs, exposes `serialize`/`scrollToHeading`/
-    │   │                            `replaceContent` via a ref handle), `OutlinePanel.tsx` (same look as tiptap's,
-    │   │                            no editor coupling), `outline.ts` (`headingsFromMarkdown`,
-    │   │                            `slugifyHeadingText`), `baselineGate.ts` (when it is safe to register the
+    │   │                            `replaceContent` via a ref handle), `slugifyHeadingText` (in `lib/outline.ts`),
+    │   │                            `baselineGate.ts` (when it is safe to register the
     │   │                            just-loaded serialization as the dirty-tracking baseline: only once Crepe's
     │   │                            own `onReady` has fired for the current instance, since `Crepe.create()`
     │   │                            resolves after mount), `mermaidFence.ts` (`hasMermaidFence`, detector kept for
@@ -562,8 +561,12 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │   │                            (the round-trip idempotence corpus, see `docs/MARKDOWN_GOTCHAS.md`).
     │   │                            `codemirror/` is the evaluation-stage "Live Preview" engine: a CodeMirror 6
     │   │                            editor that decorates raw markdown text in place (Obsidian-style hide/reveal of
-    │   │                            syntax markers on the active line) and never transforms the saved bytes. No
-    │   │                            outline, no toolbar, no read-only preview variant. See `docs/FORK.md` and
+    │   │                            syntax markers on the active line) and never transforms the saved bytes. Three
+    │   │                            view modes in the path bar: Source and Rich share one CodeMirror view (a
+    │   │                            `Compartment` toggles the decorations, so cursor, scroll and undo survive the
+    │   │                            switch) and Preview swaps it for the read-only `MarkdownPreviewPane`. An Outline
+    │   │                            panel (`lib/outline.ts` `headingsFromMarkdown`, `lib/OutlinePanel.tsx`, shared with
+    │   │                            milkdown) jumps to a heading by its 0-based `line`. No toolbar. See `docs/FORK.md` and
     │   │                            `docs/superpowers/specs/2026-09-27-live-preview-markdown-editor-design.md`.
     │   │                            All three live tab shells (`tiptap/MarkdownTab.tsx`, `milkdown/MilkdownTab.tsx`,
     │   │                            `codemirror/MarkdownTab.tsx`) are lazy-loaded as their own chunk from `TabContent.tsx`,

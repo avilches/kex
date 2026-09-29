@@ -133,7 +133,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **source-control/** — git status / stage / commit panel and diff workflow.
 - **git-history/** — commit graph rail, refs, per-commit file diffs.
 - **markdown/**: the `markdown` tab kind and the read-only editor-tab preview, both switching on the per-tab
-  `markdownEngine` (`"tiptap" | "milkdown" | "codemirror" | "legacy"`, resolved via `lib/markdownEngine.ts`, sealed onto a tab
+  `markdownEngine` (`"tiptap" | "milkdown" | "codemirror"`, resolved via `lib/markdownEngine.ts`, sealed onto a tab
   once by `lib/sealMarkdownEngine.ts`). `MarkdownRenderPane.tsx` is the single read-only render switch used by the
   preview. `tiptap/` is the default rich editor (lazy chunk `MarkdownTab`) with source-mode toggle, toolbar,
   outline, slash commands. `milkdown/` is an evaluation-stage second rich engine on `@milkdown/crepe` (lazy chunk

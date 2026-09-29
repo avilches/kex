@@ -32,13 +32,31 @@ export const plainUrlHighlight = HighlightStyle.define([{ tag: tags.url, color: 
 // GFM (tables, task lists, strikethrough) plus subscript/superscript/emoji: the
 // `markdownLanguage` export already bundles these on top of CommonMark, so no
 // manual @lezer/markdown extension list is needed.
-export function buildLivePreviewExtensions(resolveImageSrc: (src: string) => string): Extension[] {
+export function buildMarkdownBaseExtensions(): Extension[] {
   return [
     markdown({ base: markdownLanguage, codeLanguages }),
+    EditorView.lineWrapping,
+    EditorView.theme({
+      "&, &.cm-editor, &.cm-editor.cm-focused": {
+        backgroundColor: "transparent !important",
+        outline: "none",
+        padding: "8px 16px",
+      },
+      ".cm-scroller": { fontFamily: "var(--font-mono, monospace)", fontSize: "13px", lineHeight: "1.6" },
+      ".cm-content": { caretColor: "var(--foreground)" },
+    }),
+  ];
+}
+
+export function buildLivePreviewExtensions(resolveImageSrc: (src: string) => string): Extension[] {
+  return [...buildMarkdownBaseExtensions(), ...buildLiveDecorationExtensions(resolveImageSrc)];
+}
+
+export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => string): Extension[] {
+  return [
     syntaxHighlighting(plainUrlHighlight),
     livePreviewPlugin(resolveImageSrc),
     linkClickHandler,
-    EditorView.lineWrapping,
     // The syntax highlighter nests its own colored span inside each lp span, and
     // an element's own color always beats an inherited one, so the color rules
     // also target descendants (`.cm-lp-x *`), with !important to beat the theme.

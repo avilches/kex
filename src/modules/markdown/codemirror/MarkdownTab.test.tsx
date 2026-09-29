@@ -36,8 +36,17 @@ vi.mock("@/modules/editor", async () => {
   const { useBackgroundConflictToast } = await import(
     "@/modules/editor/lib/useBackgroundConflictToast"
   );
-  return { EditorPathBar: () => null, ReloadConflictOverlay, useBackgroundConflictToast };
+  return {
+    EditorPathBar: ({ trailing }: { trailing?: React.ReactNode }) => <>{trailing}</>,
+    ReloadConflictOverlay,
+    useBackgroundConflictToast,
+  };
 });
+vi.mock("@/modules/markdown/MarkdownPreviewPane", () => ({
+  MarkdownPreviewPane: ({ content }: { content: string }) => (
+    <div data-testid="preview-pane">{content}</div>
+  ),
+}));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { warning: vi.fn(), error: vi.fn() }) }));
 vi.mock("@/modules/workspace", () => ({ currentWorkspaceEnv: () => undefined }));
 vi.mock("@/modules/settings/preferences", () => ({
@@ -163,5 +172,87 @@ describe("Live Preview MarkdownTab", () => {
       screen.getByText("Close tab").click();
     });
     expect(onEditorClose).toHaveBeenCalledWith("tab-3");
+  });
+
+  describe("view modes and outline", () => {
+    let tabSeq = 0;
+    const setup = async (content = "# One\n\nbody\n\n## Two\n") => {
+      vi.mocked(invoke).mockResolvedValue({ kind: "text", content, size: content.length });
+      const utils = render(
+        <MarkdownTab tabId={`tab-modes-${++tabSeq}`} path={PATH} visible focused={false} callbacks={{}} />,
+      );
+      await flush();
+      const viewOf = () =>
+        EditorView.findFromDOM(utils.container.querySelector(".cm-content") as HTMLElement);
+      return { ...utils, viewOf };
+    };
+    const click = (name: string) =>
+      act(() => {
+        screen.getByRole("button", { name }).click();
+      });
+
+    it("starts in Rich, with the Live Preview decorations on", async () => {
+      const { container } = await setup();
+      expect(container.querySelector(".cm-lp-h1")).not.toBeNull();
+      expect(screen.getByRole("button", { name: "Rich" }).getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("Source shows the raw markdown without decorations, on the same view", async () => {
+      const { container, viewOf } = await setup();
+      const view = viewOf();
+      act(() => view?.dispatch({ selection: { anchor: 3 } }));
+      click("Source");
+      expect(container.querySelector(".cm-lp-h1")).toBeNull();
+      expect(viewOf()).toBe(view);
+      expect(view?.state.selection.main.anchor).toBe(3);
+      click("Rich");
+      expect(container.querySelector(".cm-lp-h1")).not.toBeNull();
+      expect(viewOf()).toBe(view);
+      expect(view?.state.selection.main.anchor).toBe(3);
+    });
+
+    it("Source and Rich keep the undo history across the switch", async () => {
+      const { viewOf } = await setup("abc");
+      const view = viewOf();
+      act(() => view?.dispatch({ changes: { from: 3, insert: "d" }, userEvent: "input.type" }));
+      click("Source");
+      click("Rich");
+      expect(viewOf()?.state.doc.toString()).toBe("abcd");
+      const { undo } = await import("@codemirror/commands");
+      act(() => {
+        if (view) undo(view);
+      });
+      expect(view?.state.doc.toString()).toBe("abc");
+    });
+
+    it("Preview unmounts the editor, renders the unsaved text read-only, and Rich brings it back", async () => {
+      const { container, viewOf } = await setup("Hello");
+      act(() => viewOf()?.dispatch({ changes: { from: 5, insert: " world" } }));
+      click("Preview");
+      expect(container.querySelector(".cm-content")).toBeNull();
+      expect(screen.getByTestId("preview-pane").textContent).toBe("Hello world");
+      click("Rich");
+      expect(viewOf()?.state.doc.toString()).toBe("Hello world");
+    });
+
+    it("Outline lists the headings and clicking one moves the cursor to its line", async () => {
+      const { viewOf } = await setup();
+      expect(screen.queryByRole("button", { name: "Two" })).toBeNull();
+      act(() => {
+        screen.getByTitle("Toggle outline").click();
+      });
+      expect(screen.getByRole("button", { name: "One" })).not.toBeNull();
+      act(() => {
+        screen.getByRole("button", { name: "Two" }).click();
+      });
+      const view = viewOf();
+      expect(view?.state.doc.lineAt(view.state.selection.main.head).number).toBe(5);
+    });
+
+    it("hides the Outline button in Preview", async () => {
+      await setup();
+      click("Preview");
+      expect(screen.queryByTitle("Toggle outline")).toBeNull();
+    });
   });
 });

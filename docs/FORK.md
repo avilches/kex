@@ -456,8 +456,9 @@ spec, not a surprise found while building: Crepe's own feature set does not cove
 scope for an evaluation of the engine itself.
 
 - Added a fourth `markdown` tab engine, "Live Preview" (CodeMirror 6, evaluation stage): edits the raw markdown text
-  directly with Obsidian-style live-preview decorations, never reparsing to an AST. Gaps vs TipTap/Milkdown: no outline
-  panel, no toolbar, no read-only preview integration, no decoration for Setext-style headings (only ATX `#` headings
+  directly with Obsidian-style live-preview decorations, never reparsing to an AST. It has Source / Rich / Preview modes and an Outline panel
+  (the `legacy` "Preview only" engine was removed; its read-only view is now the Preview mode). Gaps vs TipTap/Milkdown:
+  no toolbar, no decoration for Setext-style headings (only ATX `#` headings
   are decorated). GFM tables render as HTML tables off the active lines (only `[text](url)` is recognized inside a
   cell); fenced code blocks are styled as a monospace block, with the fences and the language tag hidden off the block
   and the code highlighted by that language (fence tags resolve against the editor's own language registry, lazily

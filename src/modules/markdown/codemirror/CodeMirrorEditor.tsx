@@ -1,10 +1,23 @@
 import { useEditorThemeExt } from "@/modules/editor/lib/useEditorThemeExt";
-import { buildLivePreviewExtensions } from "@/modules/markdown/codemirror/lib/markdownExtensions";
+import {
+  buildLiveDecorationExtensions,
+  buildMarkdownBaseExtensions,
+} from "@/modules/markdown/codemirror/lib/markdownExtensions";
 import { resolveMarkdownImageSrc } from "@/modules/markdown/lib/imageSrc";
+import { Compartment } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 
-export type CodeMirrorEditorHandle = { focus(): void };
+export type CodeMirrorEditorHandle = {
+  focus(): void;
+  // 0-based line; puts the cursor at its start and scrolls it to the top.
+  scrollToLine(line: number): void;
+};
+
+// "source" shows the raw markdown; "rich" adds the Live Preview decorations.
+// Both share the same view, so cursor, scroll and undo history survive a switch.
+export type CodeMirrorEditorMode = "source" | "rich";
 
 type Props = {
   value: string;
@@ -16,10 +29,11 @@ type Props = {
   // The markdown file's own path, so a relative image src resolves against
   // its directory, same as RichMarkdownEditor.resolveImageSrc.
   path: string;
+  mode?: CodeMirrorEditorMode;
 };
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
-  function CodeMirrorEditor({ value, onChange, syncKey, path }, ref) {
+  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich" }, ref) {
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const themeExt = useEditorThemeExt();
     const pathRef = useRef(path);
@@ -28,11 +42,30 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
       (src: string): string => resolveMarkdownImageSrc(src, pathRef.current),
       [],
     );
-    // Stable identity: resolveImageSrc reads pathRef at call time, so this
-    // only needs to run once, not on every theme change (the theme is a
-    // separate prop below, per Task 7's note on @uiw/react-codemirror's
-    // `theme` default) or every time the tab is pointed at a new path.
-    const extensions = useMemo(() => buildLivePreviewExtensions(resolveImageSrc), [resolveImageSrc]);
+    const liveExtensions = useMemo(() => buildLiveDecorationExtensions(resolveImageSrc), [resolveImageSrc]);
+    const liveCompartment = useMemo(() => new Compartment(), []);
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
+    // Stable identity: @uiw/react-codemirror reconfigures the whole view when
+    // this array changes, which would drop the compartment's current content.
+    // The initial mode is read through a ref and later switches go through
+    // the effect below.
+    const extensions = useMemo(
+      () => [
+        ...buildMarkdownBaseExtensions(),
+        liveCompartment.of(modeRef.current === "rich" ? liveExtensions : []),
+      ],
+      [liveCompartment, liveExtensions],
+    );
+
+    const appliedModeRef = useRef(mode);
+    useEffect(() => {
+      if (appliedModeRef.current === mode) return;
+      appliedModeRef.current = mode;
+      cmRef.current?.view?.dispatch({
+        effects: liveCompartment.reconfigure(mode === "rich" ? liveExtensions : []),
+      });
+    }, [mode, liveCompartment, liveExtensions]);
 
     // @uiw/react-codemirror only pushes `value` into the view when it differs,
     // by string equality, from what it last compared. After the user types and
@@ -56,6 +89,16 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
 
     useImperativeHandle(ref, () => ({
       focus: () => cmRef.current?.view?.focus(),
+      scrollToLine: (line) => {
+        const view = cmRef.current?.view;
+        if (!view) return;
+        const target = view.state.doc.line(Math.min(Math.max(line + 1, 1), view.state.doc.lines));
+        view.dispatch({
+          selection: { anchor: target.from },
+          effects: EditorView.scrollIntoView(target.from, { y: "start" }),
+        });
+        view.focus();
+      },
     }));
 
     return (
