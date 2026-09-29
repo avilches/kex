@@ -19,6 +19,8 @@ const state = {
   themeId: params.get("theme") ?? "kex-default",
   mode: (params.get("mode") === "light" ? "light" : "dark") as ThemeMode,
   scheme: (params.get("scheme") === "jetbrains" ? "jetbrains" : "vscode") as Scheme,
+  view: (params.get("view") === "app" ? "app" : "swatches") as "app" | "swatches",
+  focus: (params.get("focus") === "editor" ? "editor" : "terminal") as PaneKind,
   custom: null as Theme | null,
 };
 
@@ -47,6 +49,8 @@ const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
 // Any CSS color (oklch, rgba, hex...) to "#rrggbb" or "#rrggbbaa", read back
 // from a real pixel so the text never depends on how the browser serializes it.
 function toHex(css: string): string {
+  const ref = /^var\(--([\w-]+)\)$/.exec(css);
+  if (ref) css = tokenValue(ref[1]);
   ctx.clearRect(0, 0, 1, 1);
   ctx.fillStyle = "#000";
   ctx.fillStyle = css;
@@ -238,37 +242,112 @@ function tabBar(): HTMLElement {
   );
 }
 
-function terminal(): HTMLElement {
+type PaneKind = "terminal" | "editor";
+
+function dimFor(kind: PaneKind): number {
+  return currentTheme().variants[state.mode]?.inactivePaneDim?.[kind] ?? 0;
+}
+
+function ansi(name: string, text: string): HTMLElement {
+  return h("span", { style: `color:var(--terminal-ansi-${name})`, "data-ansi": name }, text);
+}
+
+function terminalBody(focused: boolean): HTMLElement {
   const v = (n: string) => `var(--terminal-${n})`;
   const line = (...kids: (Node | string)[]) => h("div", { class: "whitespace-pre" }, ...kids);
-  const colors = (from: number) =>
+  const prompt = () => [ansi("green", "~/kex"), " ", ansi("blue", "main"), " ❯ "];
+  const cursor = h("span", {
+    style: focused
+      ? `background:${v("cursor")};color:${v("cursor-accent")}`
+      : `outline:1px solid ${v("cursor")};outline-offset:-1px`,
+    "data-part": "cursor",
+  }, " ");
+  const chips = (from: number) =>
     ANSI_NAMES.slice(from, from + 8).map((n) =>
       h("span", { style: `background:${v(`ansi-${n}`)};color:${v("background")}`, class: "px-1", "data-ansi": n }, n.replace("bright-", "b-").slice(0, 5)),
     );
   return h(
     "div",
-    { class: "rounded-md border border-border p-2 font-mono text-[12px]", style: `background:${v("background")};color:${v("foreground")}` },
-    h("div", { class: "mb-1 font-sans text-[10px] uppercase tracking-wide opacity-60" }, "Terminal"),
-    line("$ ls -la  ", h("span", { style: `background:${v("selection")}` }, "selected text"), "  ", h("span", { style: `background:${v("cursor")};color:${v("cursor-accent")}` }, " ")),
-    line(...colors(0)),
-    line(...colors(8)),
+    { class: "p-2 font-mono text-[12px] leading-[1.5]", style: `background:${v("background")};color:${v("foreground")}` },
+    line(...prompt(), "git status"),
+    line("On branch main"),
+    line("Changes not staged for commit:"),
+    line(ansi("red", "        modified:   src/app.ts")),
+    line(ansi("green", "        new file:   src/theme.ts")),
+    line(ansi("yellow", "warning:"), " LF will be replaced by CRLF"),
+    line(...prompt(), "pnpm test ", h("span", { style: `background:${v("selection")}`, "data-part": "selection" }, "--watch"), cursor),
+    line(...chips(0)),
+    line(...chips(8)),
   );
 }
 
-async function editor(): Promise<HTMLElement> {
+function editorBody(focused: boolean): HTMLElement {
   const theme = currentTheme();
   const pair = theme.editorTheme?.[state.mode] ?? theme.editorTheme?.dark;
   const id = isEditorThemeId(pair) ? pair : state.mode === "light" ? "github-light" : "atomone";
-  const host = h("div", { class: "overflow-hidden rounded-md border border-border" });
-  new EditorView({
+  const host = h("div", { "data-editor-theme": id });
+  const view = new EditorView({
     parent: host,
     state: EditorState.create({
-      doc: "export function greet(name: string) {\n  // active line + gutter\n  return `hello ${name}`;\n}\n",
+      doc: 'import { greet } from "./greet";\n\nexport function main(name: string) {\n  // active line + selection\n  const msg = greet(name);\n  return `hello ${msg}` + 42;\n}\n',
       extensions: [lineNumbers(), highlightActiveLine(), javascript({ typescript: true }), EDITOR_THEME_EXT[id]],
-      selection: { anchor: 16, head: 21 },
+      selection: { anchor: 68, head: 82 },
     }),
   });
-  return h("div", {}, h("div", { class: "mb-1 text-[10px] uppercase tracking-wide text-muted-foreground" }, `Editor (CodeMirror theme: ${id})`), host);
+  if (focused) requestAnimationFrame(() => view.focus());
+  return host;
+}
+
+// Mirrors PaneView: an unfocused pane gets a black overlay at the theme's
+// inactivePaneDim[kind] opacity over its tab strip and content; the focused
+// pane's active tab gets the tab-focus-indicator bar.
+function pane(kind: PaneKind, focused: boolean): HTMLElement {
+  const dim = focused ? 0 : dimFor(kind);
+  const overlay = (): Node | string =>
+    dim > 0 ? h("div", { class: "pointer-events-none absolute inset-0 z-10 bg-black", style: `opacity:${dim}` }) : "";
+  const strip = h(
+    "div",
+    { class: "relative flex items-center gap-1 border-b border-border bg-card px-1 py-1 text-[12px]" },
+    h(
+      "div",
+      { class: "relative rounded bg-background px-2 py-1 text-foreground" },
+      focused ? h("span", { class: "absolute inset-x-0 top-0 h-0.5 rounded-t bg-tab-focus-indicator" }) : "",
+      kind === "terminal" ? "zsh" : "main.ts",
+    ),
+    h("div", { class: "px-2 py-1 text-muted-foreground" }, kind === "terminal" ? "server" : "greet.ts"),
+    overlay(),
+  );
+  const body = h("div", { class: "relative" }, kind === "terminal" ? terminalBody(focused) : editorBody(focused), overlay());
+  return h(
+    "div",
+    {
+      class: "min-w-0 flex-1 overflow-hidden rounded-md border border-border",
+      "data-pane": kind, "data-focused": String(focused), "data-dim": String(dim),
+    },
+    strip, body,
+    h("div", { class: "border-t border-border bg-card px-2 py-0.5 font-mono text-[10px] text-muted-foreground" }, `${kind} ${focused ? "focused" : "unfocused"}, dim ${dim}`),
+  );
+}
+
+function appView(): HTMLElement {
+  const mk = (kind: PaneKind) => {
+    const p = pane(kind, state.focus === kind);
+    p.onclick = () => set({ focus: kind });
+    return p;
+  };
+  return h(
+    "div",
+    { class: "flex h-[680px] overflow-hidden rounded-lg border border-border bg-background", "data-view": "app" },
+    workspaceBar(),
+    h("div", { class: "overflow-auto" }, sidebar()),
+    h(
+      "div",
+      { class: "flex min-w-0 flex-1 flex-col gap-2 p-2" },
+      header(),
+      h("div", { class: "flex min-h-0 flex-1 gap-2" }, mk("terminal"), mk("editor")),
+      h("div", { class: "flex items-center gap-3 rounded bg-card px-2 py-1 text-[11px] text-muted-foreground" }, h("span", {}, "main"), h("span", {}, "2 changed"), h("span", { class: "ml-auto" }, "click a pane to move focus")),
+    ),
+  );
 }
 
 function controls(): HTMLElement {
@@ -306,6 +385,8 @@ function controls(): HTMLElement {
       btn("light", state.mode === "light", () => set({ mode: "light" })),
       btn("vscode", state.scheme === "vscode", () => set({ scheme: "vscode" })),
       btn("jetbrains", state.scheme === "jetbrains", () => set({ scheme: "jetbrains" })),
+      btn("swatches view", state.view === "swatches", () => set({ view: "swatches" })),
+      btn("app view", state.view === "app", () => set({ view: "app" })),
     ),
     area, load, err,
   );
@@ -329,9 +410,9 @@ function dump(): Record<string, string> {
 
 function set(patch: Partial<typeof state>): void {
   Object.assign(state, patch);
-  const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme });
+  const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme, view: state.view, focus: state.focus });
   history.replaceState(null, "", `?${q}`);
-  void render();
+  render();
 }
 
 const root = document.getElementById("preview-root")!;
@@ -339,7 +420,7 @@ const style = document.createElement("style");
 style.textContent = "html,body{overflow:auto!important;height:auto!important}";
 document.head.append(style);
 
-async function render(): Promise<void> {
+function render(): void {
   const theme = currentTheme();
   document.documentElement.classList.toggle("dark", state.mode === "dark");
   document.documentElement.classList.toggle("light", state.mode === "light");
@@ -354,7 +435,12 @@ async function render(): Promise<void> {
     "div",
     { class: "flex flex-wrap items-start gap-3" },
     workspaceBar(), sidebar(),
-    h("div", { class: "flex min-w-[380px] flex-1 flex-col gap-3" }, header(), tabBar(), terminal(), await editor()),
+    h(
+      "div",
+      { class: "flex min-w-[380px] flex-1 flex-col gap-3" },
+      header(), tabBar(),
+      h("div", { class: "grid grid-cols-1 gap-3 xl:grid-cols-2" }, pane("terminal", true), pane("terminal", false), pane("editor", true), pane("editor", false)),
+    ),
   );
   const buttons = h(
     "div",
@@ -374,8 +460,9 @@ async function render(): Promise<void> {
       { class: "min-h-screen bg-background p-4 text-foreground" },
       h("h1", { class: "mb-3 text-[15px] font-semibold" }, `${theme.name} / ${state.mode}`),
       controls(),
-      section("Surfaces", surfaces),
-      section("Buttons and badges", buttons),
+      ...(state.view === "app"
+        ? [section("App (approximation of the real layout)", appView())]
+        : [section("Surfaces", surfaces), section("Buttons and badges", buttons)]),
       section("Tokens (declared value read back as hex)", tokenGrid),
     ),
   );
@@ -387,4 +474,4 @@ declare global {
   }
 }
 window.kexThemePreview = { dump, set };
-void render();
+render();
