@@ -1,4 +1,5 @@
-export type OutlineHeading = { text: string; level: number; id: string };
+// `line` is the 0-based line of the heading in the source markdown.
+export type OutlineHeading = { text: string; level: number; id: string; line: number };
 
 // Shared with MilkdownEditor's heading-id-generator override so DOM ids and
 // outline ids agree on the base slug (Milkdown's default generator keeps
@@ -15,7 +16,9 @@ export function headingsFromMarkdown(md: string): OutlineHeading[] {
   const out: OutlineHeading[] = [];
   const counts = new Map<string, number>();
   let inFence = false;
-  for (const line of md.split("\n")) {
+  const lines = md.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (/^(```|~~~)/.test(line.trim())) {
       inFence = !inFence;
       continue;
@@ -27,7 +30,7 @@ export function headingsFromMarkdown(md: string): OutlineHeading[] {
     const base = slugifyHeadingText(text);
     const n = counts.get(base) ?? 0;
     counts.set(base, n + 1);
-    out.push({ text, level: m[1].length, id: n === 0 ? base : `${base}-${n}` });
+    out.push({ text, level: m[1].length, id: n === 0 ? base : `${base}-${n}`, line: i });
   }
   return out;
 }

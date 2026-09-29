@@ -7,7 +7,7 @@ import {
   headingsFromMarkdown,
   slugifyHeadingText,
   type OutlineHeading,
-} from "@/modules/markdown/milkdown/outline";
+} from "@/modules/markdown/lib/outline";
 import "@/modules/markdown/milkdown/milkdownTheme.css";
 
 export type MilkdownEditorHandle = {

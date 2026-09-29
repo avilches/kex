@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { JSX } from "react";
-import type { OutlineHeading } from "@/modules/markdown/milkdown/outline";
+import type { OutlineHeading } from "@/modules/markdown/lib/outline";
 
 export function OutlinePanel({
   headings,
@@ -8,7 +8,7 @@ export function OutlinePanel({
   onClose,
 }: {
   headings: OutlineHeading[];
-  onNavigate: (id: string) => void;
+  onNavigate: (heading: OutlineHeading) => void;
   onClose: () => void;
 }): JSX.Element {
   return (
@@ -50,7 +50,7 @@ export function OutlinePanel({
               <button
                 key={h.id}
                 type="button"
-                onClick={() => onNavigate(h.id)}
+                onClick={() => onNavigate(h)}
                 className={cn(
                   "block w-full truncate py-1 pr-2.5 text-left text-[12px] text-muted-foreground hover:text-foreground",
                 )}
