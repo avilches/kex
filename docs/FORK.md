@@ -496,6 +496,13 @@ scope for an evaluation of the engine itself.
   the TipTap task-list box and tick. Raw HTML (`HTMLBlock`, `HTMLTag`) only gets the monospace font: its colors and
   the italics of `<!-- comments -->` come from the editor theme's syntax highlighting, not from Live Preview.
 
+### Single cycle-view shortcut
+
+- `editor.markdown.toggleView`, `editor.html.toggleView` and `markdown.toggleSource` (Cmd+Shift+M) were replaced by one
+  `editor.cycleView` (Cmd+Shift+V). Previously the global markdown toggle always won the keydown race and threw a
+  markdown tab out to a plain editor tab; now the global handler steps aside for `markdown` tabs and the shell of each
+  engine rotates its own modes.
+
 ### Notes sidebar view
 
 HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as the vault. Three Tauri commands read the vault one level at a time (`notes_read_dirs`, `notes_read_heads`, `notes_paths_exist`); per-workspace UI state in `kex.json` at the workspace root. Not present upstream.

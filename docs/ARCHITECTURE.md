@@ -509,7 +509,12 @@ autocomplete, resolution, and click-navigation in the rich editor).
     │                                ScriptState>), tracking which terminal tabs are running a script command.
     │                                Set by `runWorkspaceConfig` in App.tsx; cleared by OSC 133;D
     │                                (`onRunningCommand` with cmd=null). Never persisted.
-    ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts
+    ├── shortcuts/                 — Global keymap registry, useGlobalShortcuts. One `editor.cycleView`
+    │                                (Cmd+Shift+V) serves every editor view: on an `editor` tab over a .md/.html
+    │                                the global handler toggles raw/overlay; on a `markdown` tab the global
+    │                                `isDisabled` yields, so the tab shell rotates its engine's own modes
+    │                                (`lib/viewCycle.ts`: Rich/Source for tiptap and milkdown, Source/Rich/Preview
+    │                                for Live Preview). `editor.preview.toggleSplit` has no default binding.
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image
     ├── settings/                  — Settings store, preferences, window opener.
     │                                The `Preferences` type includes `workspaceStatuses: WorkspaceStatus[]`
