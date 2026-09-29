@@ -9,7 +9,7 @@ export type MarkdownRenderer = "legacy" | "tiptap" | "milkdown";
 // engine has no read-only preview variant at all (see the Live Preview design
 // spec), so it always degrades the same way a failed rich engine would.
 export function pickRenderer(engine: MarkdownEngine, failed: boolean): MarkdownRenderer {
-  if (failed || engine === "legacy" || engine === "codemirror") return "legacy";
+  if (failed || engine === "codemirror") return "legacy";
   return engine;
 }
 
@@ -17,5 +17,5 @@ export function pickRenderer(engine: MarkdownEngine, failed: boolean): MarkdownR
 // cheap and keeps the live text it always had. codemirror always renders
 // through the legacy path (see pickRenderer), so it never needs the debounce.
 export function shouldDebounce(engine: MarkdownEngine): boolean {
-  return engine !== "legacy" && engine !== "codemirror";
+  return engine !== "codemirror";
 }

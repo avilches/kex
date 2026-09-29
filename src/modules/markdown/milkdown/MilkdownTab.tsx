@@ -9,8 +9,8 @@ import {
   MilkdownEditor,
   type MilkdownEditorHandle,
 } from "@/modules/markdown/milkdown/MilkdownEditor";
-import { OutlinePanel } from "@/modules/markdown/milkdown/OutlinePanel";
-import type { OutlineHeading } from "@/modules/markdown/milkdown/outline";
+import { OutlinePanel } from "@/modules/markdown/lib/OutlinePanel";
+import type { OutlineHeading } from "@/modules/markdown/lib/outline";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
 import type { TabCallbacks } from "@/modules/workspaces/TabContent";
 
@@ -209,7 +209,7 @@ export function MilkdownTab(props: Props): JSX.Element {
             {outlineOpen && (
               <OutlinePanel
                 headings={headings}
-                onNavigate={(id) => milkRef.current?.scrollToHeading(id)}
+                onNavigate={(h) => milkRef.current?.scrollToHeading(h.id)}
                 onClose={() => setOutlineOpen(false)}
               />
             )}

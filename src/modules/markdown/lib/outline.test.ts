@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { headingsFromMarkdown } from "@/modules/markdown/milkdown/outline";
+import { headingsFromMarkdown } from "@/modules/markdown/lib/outline";
 
 describe("headingsFromMarkdown", () => {
   it("extracts levels and slugs", () => {
     expect(headingsFromMarkdown("# One\n\n## Two words\n")).toEqual([
-      { text: "One", level: 1, id: "one" },
-      { text: "Two words", level: 2, id: "two-words" },
+      { text: "One", level: 1, id: "one", line: 0 },
+      { text: "Two words", level: 2, id: "two-words", line: 2 },
     ]);
   });
 
@@ -19,5 +19,10 @@ describe("headingsFromMarkdown", () => {
 
   it("strips trailing closing hashes", () => {
     expect(headingsFromMarkdown("## Title ##\n")[0].text).toBe("Title");
+  });
+
+  it("reports the 0-based line of each heading, skipping fenced ones", () => {
+    const md = "# A\n\n```\n# no\n```\n\n## B\n";
+    expect(headingsFromMarkdown(md).map((h) => h.line)).toEqual([0, 6]);
   });
 });

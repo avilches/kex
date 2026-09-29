@@ -1,9 +1,8 @@
-export type MarkdownEngine = "tiptap" | "milkdown" | "legacy" | "codemirror";
+export type MarkdownEngine = "tiptap" | "milkdown" | "codemirror";
 
 export const MARKDOWN_ENGINES: readonly MarkdownEngine[] = [
   "tiptap",
   "milkdown",
-  "legacy",
   "codemirror",
 ] as const;
 
@@ -13,7 +12,6 @@ function isEngine(value: unknown): value is MarkdownEngine {
   return (
     value === "tiptap" ||
     value === "milkdown" ||
-    value === "legacy" ||
     value === "codemirror"
   );
 }

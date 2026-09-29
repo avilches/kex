@@ -1,5 +1,13 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { type JSX, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef } from "react";
+import {
+  type JSX,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { pathBasename } from "@/lib/pathUtils";
@@ -10,7 +18,11 @@ import {
   CodeMirrorEditor,
   type CodeMirrorEditorHandle,
 } from "@/modules/markdown/codemirror/CodeMirrorEditor";
+import { cn } from "@/lib/utils";
+import { MarkdownPreviewPane } from "@/modules/markdown/MarkdownPreviewPane";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
+import { OutlinePanel } from "@/modules/markdown/lib/OutlinePanel";
+import { headingsFromMarkdown } from "@/modules/markdown/lib/outline";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { matchesShortcut } from "@/modules/shortcuts/shortcuts";
@@ -24,8 +36,19 @@ type Props = {
   callbacks: TabCallbacks;
 };
 
+type ViewMode = "source" | "rich" | "preview";
+
+const VIEW_MODES: { mode: ViewMode; label: string }[] = [
+  { mode: "source", label: "Source" },
+  { mode: "rich", label: "Rich" },
+  { mode: "preview", label: "Preview" },
+];
+
 export function MarkdownTab(props: Props): JSX.Element {
   const editorRef = useRef<CodeMirrorEditorHandle>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("rich");
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [edit, setEdit] = useState<{ doc: unknown; text: string } | null>(null);
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
 
   const { doc, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate } =
@@ -36,6 +59,23 @@ export function MarkdownTab(props: Props): JSX.Element {
     });
 
   useBackgroundConflictToast(conflict, props.visible, props.path);
+
+  // useDocument only republishes `doc` on load/reload, so the text the user has
+  // typed since then is tracked here, tied to the doc it was typed against; a
+  // reload swaps `doc` and the stale edit is ignored. Preview and Outline read
+  // it, and a remounted editor starts from it.
+  const liveContent = doc.status === "ready" ? (edit && edit.doc === doc ? edit.text : doc.content) : "";
+  const handleChange = useCallback(
+    (next: string) => {
+      onChange(next);
+      setEdit({ doc, text: next });
+    },
+    [onChange, doc],
+  );
+  const headings = useMemo(
+    () => (outlineOpen && viewMode !== "preview" ? headingsFromMarkdown(liveContent) : []),
+    [outlineOpen, viewMode, liveContent],
+  );
 
   const path = props.path;
   const reloadRef = useRef(reload);
@@ -127,16 +167,80 @@ export function MarkdownTab(props: Props): JSX.Element {
         onNewWorkspaceFromFolder={props.callbacks.onNewWorkspaceFromFolder}
         onRevealInTerminal={props.callbacks.onRevealInTerminal}
         onAddToGitignore={props.callbacks.onAddToGitignore}
+        trailing={
+          <>
+            {viewMode !== "preview" && (
+              <button
+                type="button"
+                title="Toggle outline"
+                onClick={() => setOutlineOpen((v) => !v)}
+                className={cn(
+                  "flex size-[22px] items-center justify-center rounded outline-none transition-colors focus-visible:outline-none",
+                  outlineOpen ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-label="Outline"
+                >
+                  <path d="M8 6h13" />
+                  <path d="M8 12h13" />
+                  <path d="M8 18h13" />
+                  <path d="M3 6h.01" />
+                  <path d="M3 12h.01" />
+                  <path d="M3 18h.01" />
+                </svg>
+              </button>
+            )}
+            <div className="flex items-center overflow-hidden rounded border border-border/60 text-[11px]">
+              {VIEW_MODES.map(({ mode, label }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={viewMode === mode}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    "px-2 py-0.5 outline-none transition-colors focus-visible:outline-none",
+                    viewMode === mode ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </>
+        }
       />
       <div className="relative min-h-0 flex-1">
-        {doc.status === "ready" ? (
-          <CodeMirrorEditor
-            ref={editorRef}
-            value={doc.content}
-            syncKey={doc}
-            onChange={onChange}
-            path={props.path}
-          />
+        {doc.status === "ready" && viewMode === "preview" ? (
+          <MarkdownPreviewPane content={liveContent} />
+        ) : doc.status === "ready" ? (
+          <div className="flex h-full min-h-0">
+            <div className="min-w-0 flex-1">
+              <CodeMirrorEditor
+                ref={editorRef}
+                value={liveContent}
+                syncKey={doc}
+                onChange={handleChange}
+                path={props.path}
+                mode={viewMode === "source" ? "source" : "rich"}
+              />
+            </div>
+            {outlineOpen && (
+              <OutlinePanel
+                headings={headings}
+                onNavigate={(h) => editorRef.current?.scrollToLine(h.line)}
+                onClose={() => setOutlineOpen(false)}
+              />
+            )}
+          </div>
         ) : doc.status === "loading" ? null : doc.status === "deleted" ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <div className="text-sm text-foreground">This file was deleted from disk</div>

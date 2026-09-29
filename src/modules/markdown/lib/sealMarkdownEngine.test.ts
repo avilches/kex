@@ -30,7 +30,7 @@ describe("sealMarkdownEngine", () => {
   });
 
   it("never overwrites an engine the tab already carries", () => {
-    const explicit: Tab = { ...markdownTab, markdownEngine: "legacy" };
+    const explicit: Tab = { ...markdownTab, markdownEngine: "codemirror" };
     expect(sealMarkdownEngine(explicit, "milkdown")).toBe(explicit);
   });
 });
