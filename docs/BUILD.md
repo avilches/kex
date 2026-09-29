@@ -18,7 +18,8 @@ ANSI), a real CodeMirror editor with the theme's paired editor theme, buttons/ba
 token. It is dev only and not part of `pnpm build`.
 
 - URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app`.
-  A user theme can be pasted as JSON in the textarea (validated with `validateTheme`).
+  A user theme can be pasted as JSON in the textarea (validated with `validateTheme`). The selector
+  lists every theme twice ("Nord dark", "Nord light"), so there is no separate dark/light button.
 - Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists
   every surface plus a terminal and an editor pane each in focused and unfocused state. `app` stacks
   two approximations of the real window (WorkspaceBar, Sidebar, Header, a terminal pane and an editor
