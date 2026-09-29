@@ -8,6 +8,27 @@ pnpm tauri dev         # frontend (Vite, port 1420) + Rust (cargo run)
 pnpm dev               # frontend only (no Rust)
 ```
 
+### Theme preview page
+
+`pnpm dev` also serves `http://localhost:1420/theme-preview.html` (`theme-preview.html` +
+`src/theme-preview/main.ts`), a vanilla-DOM page (no React tree, no Tauri `invoke`) that applies a
+theme through the real `applyTheme` and shows WorkspaceBar, Header, Sidebar (Explorer, Source
+Control, History, Notes), tab bar with agent chips, terminal (background, selection, cursor, 16
+ANSI), a real CodeMirror editor with the theme's paired editor theme, buttons/badges, and every CSS
+token. It is dev only and not part of `pnpm build`.
+
+- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains`. A user theme can be pasted as
+  JSON in the textarea (validated with `validateTheme`).
+- Colors are verifiable without screenshots (Dark Reader rewrites backgrounds in screenshots): each
+  swatch prints its hex as text and carries `data-token` / `data-hex`, and
+  `window.kexThemePreview.dump()` returns every token plus the git status colors as a
+  `{name: "#rrggbb"}` object (`set({themeId, mode, scheme})` switches from code).
+- Agent workflow: edit `src/modules/theme/themes/*.ts`, Vite reloads the page, then read
+  `kexThemePreview.dump()` (or the `data-hex` attributes) to confirm the result. Surface layouts are
+  approximations that mirror the real components' classes; the colors come from the same tokens.
+- Vite's watcher ignores only this checkout's own `.claude/` (`vite.config.ts`), so hot reload also
+  works when running from `.claude/worktrees/<branch>`.
+
 ## Quality checks
 
 ```bash

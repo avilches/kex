@@ -166,7 +166,9 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
     watch: {
       ignored: [
         "**/src-tauri/**",
-        "**/.claude/**",
+        // Anchored to this checkout's own .claude: a "**/.claude/**" glob also
+        // matches the whole project path when it lives in .claude/worktrees/.
+        path.resolve(__dirname, ".claude/**"),
         "**/docs/**",
         "**/.superpowers/**",
       ],
