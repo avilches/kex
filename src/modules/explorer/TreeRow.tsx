@@ -50,6 +50,7 @@ import {
 } from "./lib/contextActions";
 import { gitignoreEntryFor } from "./lib/gitignore";
 import { gitStatusHexColor } from "./lib/gitStatusColor";
+import { useTheme } from "@/modules/theme/ThemeProvider";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
@@ -148,6 +149,7 @@ function EntryRowImpl(props: EntryRowProps) {
   } = props;
 
   const { draggingItem } = useWorkspaceDnd();
+  const { resolvedMode } = useTheme();
   const dragSource =
     draggingItem?.kind === "file" && !draggingItem.paneOnly
       ? draggingItem.path
@@ -296,7 +298,7 @@ function EntryRowImpl(props: EntryRowProps) {
                 !gitignored && gitStatusCode
                   ? {
                       color:
-                        gitStatusHexColor(gitStatusCode, gitColorScheme) ??
+                        gitStatusHexColor(gitStatusCode, gitColorScheme, resolvedMode) ??
                         undefined,
                       textDecoration:
                         gitStatusCode === "D" ? "line-through" : undefined,

@@ -773,7 +773,7 @@ const CommitRow = memo(function CommitRow({
         {totalStat > 0 ? (
           <span className="inline-flex items-center gap-1">
             {commit.insertions > 0 ? (
-              <span className="font-semibold text-emerald-600/85 dark:text-emerald-400/85">
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400/85">
                 +{commit.insertions}
               </span>
             ) : null}
