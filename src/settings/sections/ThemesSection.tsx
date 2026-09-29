@@ -32,7 +32,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useMemo, useRef, useState } from "react";
+import { resolvePreviewThemeId } from "@/modules/theme/editorThemePreview";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
 const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIcon }[] = [
@@ -40,6 +41,8 @@ const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIco
   { id: "light", label: "Light", icon: Sun03Icon },
   { id: "dark", label: "Dark", icon: Moon02Icon },
 ];
+
+const EditorThemePreview = lazy(() => import("../components/EditorThemePreview"));
 
 export function ThemesSection() {
   const { themeId, setThemeId, resolvedMode, customThemes, mode, setMode } = useTheme();
@@ -67,6 +70,9 @@ export function ThemesSection() {
   };
 
   const editorThemePref = usePreferencesStore((s) => s.editorTheme);
+  const [editorMenuOpen, setEditorMenuOpen] = useState(false);
+  const [highlightedEditorTheme, setHighlightedEditorTheme] =
+    useState<EditorThemePref | null>(null);
 
   const handleThemeFiles = async (files: FileList | null) => {
     setImportError(null);
@@ -264,12 +270,20 @@ export function ThemesSection() {
           <Select
             value={editorThemePref}
             onValueChange={(v) => void setEditorTheme(v as EditorThemePref)}
+            onOpenChange={(open) => {
+              setEditorMenuOpen(open);
+              if (!open) setHighlightedEditorTheme(null);
+            }}
           >
             <SelectTrigger size="sm" className="h-8 w-44 text-[12px]">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={EDITOR_THEME_AUTO} className="text-[12px]">
+            <SelectContent position="popper" align="end">
+              <SelectItem
+                value={EDITOR_THEME_AUTO}
+                className="text-[12px]"
+                onFocus={() => setHighlightedEditorTheme(EDITOR_THEME_AUTO)}
+              >
                 Auto (match app theme)
               </SelectItem>
               <SelectSeparator />
@@ -285,6 +299,7 @@ export function ThemesSection() {
                     value={id}
                     disabled={EDITOR_THEME_MODE[id] !== resolvedMode}
                     className="text-[12px]"
+                    onFocus={() => setHighlightedEditorTheme(id)}
                   >
                     {EDITOR_THEME_LABELS[id]}
                   </SelectItem>
@@ -292,6 +307,21 @@ export function ThemesSection() {
             </SelectContent>
           </Select>
         </div>
+        {editorMenuOpen ? (
+          <div className="mr-48">
+            <Suspense fallback={null}>
+              <EditorThemePreview
+                themeId={resolvePreviewThemeId(
+                  highlightedEditorTheme,
+                  editorThemePref,
+                  themeId,
+                  customThemes,
+                  resolvedMode,
+                )}
+              />
+            </Suspense>
+          </div>
+        ) : null}
       </div>
     </div>
   );
