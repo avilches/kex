@@ -3,7 +3,6 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { isMarkdownPath } from "@/lib/utils";
-import { sealMarkdownEngine } from "@/modules/markdown/lib/sealMarkdownEngine";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
@@ -484,7 +483,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   ): string => {
     const freshPaneId = newPaneId();
     const freshSplitId = newSplitId();
-    const sealedTab = sealMarkdownEngine(withNewTabAutofocus(tab), usePreferencesStore.getState().markdownEngine);
+    const sealedTab = withNewTabAutofocus(tab);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -503,7 +502,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Tab operations ────────────────────────────────────────────────────────
 
   const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
-    const newTab = sealMarkdownEngine(withNewTabAutofocus(tab), usePreferencesStore.getState().markdownEngine);
+    const newTab = withNewTabAutofocus(tab);
     recordActivation(paneId, newTab.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -600,7 +599,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, [openTab, activeWorkspaceId]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
-    const sealedTab = sealMarkdownEngine(newTab, usePreferencesStore.getState().markdownEngine);
+    const sealedTab = newTab;
     recordActivation(paneId, sealedTab.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -651,11 +650,11 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const setTabView = useCallback((workspaceId: string, tabId: string, mode: "rendered" | "raw") => {
     updateTabData(workspaceId, tabId, (p) => {
       if (mode === "raw" && p.kind === "markdown" && isMarkdownPath(p.path)) {
-        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
+        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, locked: p.locked, autofocus: p.autofocus };
       }
       if (mode === "rendered" && p.kind === "editor" && isMarkdownPath(p.path)) {
         if (p.dirty) return p;
-        return { id: p.id, kind: "markdown", path: p.path, title: p.title, locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
+        return { id: p.id, kind: "markdown", path: p.path, title: p.title, locked: p.locked, autofocus: p.autofocus };
       }
       return p;
     });

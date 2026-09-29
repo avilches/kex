@@ -1,9 +1,6 @@
 // `line` is the 0-based line of the heading in the source markdown.
 export type OutlineHeading = { text: string; level: number; id: string; line: number };
 
-// Shared with MilkdownEditor's heading-id-generator override so DOM ids and
-// outline ids agree on the base slug (Milkdown's default generator keeps
-// punctuation, which scrollToHeading would otherwise never match).
 export function slugifyHeadingText(text: string): string {
   return text
     .toLowerCase()

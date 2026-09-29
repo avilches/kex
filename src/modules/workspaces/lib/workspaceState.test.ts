@@ -25,7 +25,7 @@ describe("sanitizeWorkspace", () => {
     expect(pane.activeTabId).toBeNull();
   });
 
-  it("keeps two same-path markdown tabs with different engines", () => {
+  it("keeps two markdown tabs open on the same path", () => {
     const w: Workspace = {
       id: "ws-1",
       title: "W",
@@ -35,8 +35,8 @@ describe("sanitizeWorkspace", () => {
         id: "pane-1",
         activeTabId: "tab-1",
         tabs: [
-          { id: "tab-1", kind: "markdown", path: "/n/a.md", markdownEngine: "tiptap" },
-          { id: "tab-2", kind: "markdown", path: "/n/a.md", markdownEngine: "milkdown" },
+          { id: "tab-1", kind: "markdown", path: "/n/a.md" },
+          { id: "tab-2", kind: "markdown", path: "/n/a.md" },
         ],
       },
     };
@@ -44,9 +44,6 @@ describe("sanitizeWorkspace", () => {
     const out = sanitizeWorkspace(w);
     const pane = out.paneTree as Extract<Workspace["paneTree"], { kind: "pane" }>;
     expect(pane.tabs).toHaveLength(2);
-    expect(pane.tabs.map((t) => (t.kind === "markdown" ? t.markdownEngine : undefined))).toEqual([
-      "tiptap",
-      "milkdown",
-    ]);
+    expect(pane.tabs.map((t) => t.id)).toEqual(["tab-1", "tab-2"]);
   });
 });
