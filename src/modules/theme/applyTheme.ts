@@ -64,7 +64,11 @@ const ALL_VARS: readonly string[] = [
 
 let lastApplied: string | null = null;
 
-export function applyTheme(theme: Theme, mode: ThemeMode): void {
+export function applyTheme(
+  theme: Theme,
+  mode: ThemeMode,
+  terminalOverride?: TerminalPalette,
+): void {
   const root = document.documentElement;
   const variant = theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light;
   if (!variant) {
@@ -72,7 +76,7 @@ export function applyTheme(theme: Theme, mode: ThemeMode): void {
     return;
   }
   const colors = variant.colors;
-  const terminal = variant.terminal;
+  const terminal = terminalOverride ?? variant.terminal;
   for (const v of ALL_VARS) root.style.removeProperty(v);
   if (colors) {
     const isBuiltin = getBuiltinTheme(theme.id) === theme;

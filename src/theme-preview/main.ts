@@ -7,7 +7,8 @@ import { applyTheme } from "@/modules/theme/applyTheme";
 import { listBuiltinThemes } from "@/modules/theme/themes";
 import { validateTheme } from "@/modules/theme/validateTheme";
 import { EDITOR_THEME_EXT } from "@/modules/editor/lib/themes";
-import { isEditorThemeId } from "@/modules/settings/store";
+import { isEditorThemeId, TERMINAL_THEME_AUTO } from "@/modules/settings/store";
+import { resolveTerminalPalette, terminalThemeOptions } from "@/modules/theme/resolveTerminalTheme";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import type { Theme, ThemeMode } from "@/modules/theme/types";
@@ -20,6 +21,7 @@ const state = {
   mode: (params.get("mode") === "light" ? "light" : "dark") as ThemeMode,
   scheme: (params.get("scheme") === "jetbrains" ? "jetbrains" : "vscode") as Scheme,
   view: (params.get("view") === "app" ? "app" : "swatches") as "app" | "swatches",
+  terminal: params.get("terminal") ?? TERMINAL_THEME_AUTO,
   custom: null as Theme | null,
 };
 
@@ -371,6 +373,13 @@ function controls(): HTMLElement {
     const [themeId, mode] = select.value.split("|");
     set({ themeId, mode: mode as ThemeMode });
   };
+  const terminalSelect = h("select", { class: "rounded border border-border bg-transparent px-2 py-1 text-[12px]", title: "Terminal theme" });
+  terminalSelect.append(h("option", { value: TERMINAL_THEME_AUTO }, "terminal: auto"));
+  for (const o of terminalThemeOptions(themes, state.mode)) {
+    terminalSelect.append(h("option", { value: o.id }, `terminal: ${o.name}`));
+  }
+  terminalSelect.value = state.terminal;
+  terminalSelect.onchange = () => set({ terminal: terminalSelect.value });
   const btn = (label: string, on: boolean, fn: () => void) => {
     const b = h("button", { class: `rounded border border-border px-2 py-1 text-[12px] ${on ? "bg-primary text-primary-foreground" : ""}` }, label);
     b.onclick = fn;
@@ -393,6 +402,7 @@ function controls(): HTMLElement {
     { class: "mb-4 flex flex-col gap-2" },
     h("div", { class: "flex flex-wrap items-center gap-2" },
       select,
+      terminalSelect,
       btn("vscode", state.scheme === "vscode", () => set({ scheme: "vscode" })),
       btn("jetbrains", state.scheme === "jetbrains", () => set({ scheme: "jetbrains" })),
       btn("swatches view", state.view === "swatches", () => set({ view: "swatches" })),
@@ -402,8 +412,12 @@ function controls(): HTMLElement {
   );
 }
 
+function allThemes(): Theme[] {
+  return [...listBuiltinThemes(), ...(state.custom ? [state.custom] : [])];
+}
+
 function currentTheme(): Theme {
-  const all = [...listBuiltinThemes(), ...(state.custom ? [state.custom] : [])];
+  const all = allThemes();
   return all.find((t) => t.id === state.themeId) ?? all[0];
 }
 
@@ -420,7 +434,7 @@ function dump(): Record<string, string> {
 
 function set(patch: Partial<typeof state>): void {
   Object.assign(state, patch);
-  const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme, view: state.view });
+  const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme, view: state.view, terminal: state.terminal });
   history.replaceState(null, "", `?${q}`);
   render();
 }
@@ -434,8 +448,13 @@ function render(): void {
   const theme = currentTheme();
   document.documentElement.classList.toggle("dark", state.mode === "dark");
   document.documentElement.classList.toggle("light", state.mode === "light");
-  applyTheme(theme, state.mode);
+  applyTheme(
+    theme,
+    state.mode,
+    resolveTerminalPalette(state.terminal, theme, allThemes(), state.mode),
+  );
   document.documentElement.dataset.previewTheme = theme.id;
+  document.documentElement.dataset.previewTerminal = state.terminal;
   document.documentElement.dataset.previewMode = state.mode;
 
   const tokenGrid = h("div", { class: "grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-3" });

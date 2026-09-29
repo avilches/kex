@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorTheme,
+  setTerminalTheme,
+  TERMINAL_THEME_AUTO,
   EDITOR_THEME_AUTO,
   EDITOR_THEME_LABELS,
   EDITOR_THEME_MODE,
@@ -33,6 +35,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { resolvePreviewThemeId } from "@/modules/theme/editorThemePreview";
+import {
+  resolveTerminalPalette,
+  terminalThemeOptions,
+} from "@/modules/theme/resolveTerminalTheme";
+import { TerminalThemePreview } from "../components/TerminalThemePreview";
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
@@ -45,7 +52,8 @@ const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIco
 const EditorThemePreview = lazy(() => import("../components/EditorThemePreview"));
 
 export function ThemesSection() {
-  const { themeId, setThemeId, resolvedMode, customThemes, mode, setMode } = useTheme();
+  const { themeId, setThemeId, resolvedMode, customThemes, mode, setMode, resolvedTheme } =
+    useTheme();
   const builtinThemes = listBuiltinThemes();
   const themes = useMemo(
     () => [...builtinThemes, ...customThemes],
@@ -70,6 +78,13 @@ export function ThemesSection() {
   };
 
   const editorThemePref = usePreferencesStore((s) => s.editorTheme);
+  const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
+  const [terminalMenuOpen, setTerminalMenuOpen] = useState(false);
+  const [highlightedTerminalTheme, setHighlightedTerminalTheme] = useState<string | null>(null);
+  const terminalOptions = useMemo(
+    () => terminalThemeOptions(themes, resolvedMode),
+    [themes, resolvedMode],
+  );
   const [editorMenuOpen, setEditorMenuOpen] = useState(false);
   const [highlightedEditorTheme, setHighlightedEditorTheme] =
     useState<EditorThemePref | null>(null);
@@ -320,6 +335,58 @@ export function ThemesSection() {
                 )}
               />
             </Suspense>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[12px]">Terminal theme</span>
+            <span className="text-[11px] text-muted-foreground">
+              Colors of the terminal only. Auto follows the app theme.
+            </span>
+          </div>
+          <Select
+            value={terminalThemePref}
+            onValueChange={(v) => void setTerminalTheme(v)}
+            onOpenChange={(open) => {
+              setTerminalMenuOpen(open);
+              if (!open) setHighlightedTerminalTheme(null);
+            }}
+          >
+            <SelectTrigger size="sm" className="h-8 w-44 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="end">
+              <SelectItem
+                value={TERMINAL_THEME_AUTO}
+                className="text-[12px]"
+                onFocus={() => setHighlightedTerminalTheme(TERMINAL_THEME_AUTO)}
+              >
+                Auto (match app theme)
+              </SelectItem>
+              <SelectSeparator />
+              {terminalOptions.map((o) => (
+                <SelectItem
+                  key={o.id}
+                  value={o.id}
+                  className="text-[12px]"
+                  onFocus={() => setHighlightedTerminalTheme(o.id)}
+                >
+                  {o.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {terminalMenuOpen ? (
+          <div className="mr-48">
+            <TerminalThemePreview
+              palette={resolveTerminalPalette(
+                highlightedTerminalTheme ?? terminalThemePref,
+                resolvedTheme,
+                themes,
+                resolvedMode,
+              )}
+            />
           </div>
         ) : null}
       </div>
