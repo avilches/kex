@@ -4,7 +4,7 @@ import type {
   CursorInactiveStyle,
   CursorStyle,
 } from "@/modules/settings/store";
-import { buildTerminalTheme } from "@/styles/terminalTheme";
+import { buildTerminalTheme, currentMinimumContrastRatio } from "@/styles/terminalTheme";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -200,7 +200,7 @@ function termOptions() {
     // and emoji ranges are excluded by xterm itself).
     customGlyphs: true,
     rescaleOverlappingGlyphs: true,
-    minimumContrastRatio: 1,
+    minimumContrastRatio: currentMinimumContrastRatio(),
   };
 }
 
@@ -957,8 +957,10 @@ export function applyScrollSensitivity(value: number): void {
 
 export function applyTheme(): void {
   const theme = buildTerminalTheme();
+  const ratio = currentMinimumContrastRatio();
   for (const slot of slots) {
     slot.term.options.theme = theme;
+    slot.term.options.minimumContrastRatio = ratio;
   }
 }
 
