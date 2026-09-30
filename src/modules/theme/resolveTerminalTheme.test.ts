@@ -99,6 +99,39 @@ describe("resolveTerminalPalette borrowing from a theme without terminal colors"
   });
 });
 
+describe("resolveTerminalPalette defaults come from the palette's own mode", () => {
+  const kexLike: Theme = {
+    id: "kex-like",
+    name: "Kex like",
+    variants: {
+      dark: {
+        colors: { background: "#2b2b2b" },
+        terminal: { background: "#2b2b2b", selection: "rgba(64,140,255,0.35)" },
+      },
+      light: { colors: { background: "#ffffff" } },
+    },
+  };
+
+  it("a dark palette lent to light mode keeps light text and cursor", () => {
+    const p = resolveTerminalPalette("auto", kexLike, [kexLike], "light");
+    expect(p?.background).toBe("#2b2b2b");
+    expect(p?.foreground).toBe("#fafafa");
+    expect(p?.cursor).toBe("#fafafa");
+    expect(p?.cursorAccent).toBe("#2b2b2b");
+  });
+
+  it("a light palette lent to dark mode keeps dark text and cursor", () => {
+    const lightOnly: Theme = {
+      id: "light-only",
+      name: "Light only",
+      variants: { dark: {}, light: { colors: { background: "#ffffff" }, terminal: { ansi: ansi("#f") } } },
+    };
+    const p = resolveTerminalPalette("auto", lightOnly, [lightOnly], "dark");
+    expect(p?.foreground).toBe("#0a0a0a");
+    expect(p?.cursor).toBe("#0a0a0a");
+  });
+});
+
 describe("terminalThemeOptions", () => {
   it("lists the themes with an ANSI palette in some mode", () => {
     expect(terminalThemeOptions(catalog, "dark").map((o) => o.id)).toEqual(["app", "other"]);

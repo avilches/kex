@@ -5,24 +5,34 @@ import type { TerminalPalette, Theme, ThemeMode } from "./types";
  * The palette of a theme for a mode. A theme with no terminal palette in this
  * mode lends the one of its other mode: a dark terminal on a light theme is
  * fine. Surface colors the palette leaves out default to the UI colors of the
- * variant it comes from, as they do when that theme is active, so they never
- * fall back to the current app theme's.
+ * variant it comes from and, when that variant defines none either, to fixed
+ * values of that variant's own mode, so they never resolve against the current
+ * app theme's (a dark palette lent to light mode would get dark text).
  */
+const MODE_DEFAULTS: Record<ThemeMode, { background: string; foreground: string; selection: string }> = {
+  dark: { background: "#0a0a0a", foreground: "#fafafa", selection: "rgba(255,255,255,0.2)" },
+  light: { background: "#ffffff", foreground: "#0a0a0a", selection: "rgba(0,0,0,0.15)" },
+};
+
 function paletteOf(theme: Theme | undefined, mode: ThemeMode): TerminalPalette | undefined {
   if (!theme) return undefined;
   const own = theme.variants[mode];
-  const other = theme.variants[mode === "dark" ? "light" : "dark"];
+  const otherMode: ThemeMode = mode === "dark" ? "light" : "dark";
+  const other = theme.variants[otherMode];
   const variant = own?.terminal ? own : other?.terminal ? other : undefined;
   const terminal = variant?.terminal;
   if (!variant || !terminal) return undefined;
   const c = variant.colors;
+  const d = MODE_DEFAULTS[own?.terminal ? mode : otherMode];
+  const background = terminal.background ?? c?.background ?? d.background;
+  const foreground = terminal.foreground ?? c?.foreground ?? d.foreground;
   return {
     ...terminal,
-    background: terminal.background ?? c?.background,
-    foreground: terminal.foreground ?? c?.foreground,
-    cursor: terminal.cursor ?? c?.foreground,
-    cursorAccent: terminal.cursorAccent ?? c?.background,
-    selection: terminal.selection ?? c?.accent,
+    background,
+    foreground,
+    cursor: terminal.cursor ?? foreground,
+    cursorAccent: terminal.cursorAccent ?? background,
+    selection: terminal.selection ?? c?.accent ?? d.selection,
   };
 }
 
