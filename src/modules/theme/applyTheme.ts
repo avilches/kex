@@ -70,6 +70,7 @@ export function applyTheme(
   theme: Theme,
   mode: ThemeMode,
   terminalOverride?: TerminalPalette,
+  editorOverride?: EditorSurface,
 ): void {
   const root = document.documentElement;
   const variant = theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light;
@@ -85,7 +86,8 @@ export function applyTheme(
     writeColors(root, isBuiltin ? withReadableText(colors) : colors);
   }
   if (terminal) writeTerminal(root, terminal);
-  if (variant.editor) writeEditor(root, variant.editor);
+  const editor = editorOverride ?? variant.editor;
+  if (editor) writeEditor(root, editor);
   lastApplied = theme.id;
 }
 

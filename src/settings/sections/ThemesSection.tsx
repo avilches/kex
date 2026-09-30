@@ -27,6 +27,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { resolvePreviewThemeId } from "@/modules/theme/editorThemePreview";
+import { resolveEditorSurface } from "@/modules/theme/resolveEditorSurface";
 import {
   resolveTerminalPalette,
   terminalThemeOptions,
@@ -341,6 +342,12 @@ export function ThemesSection() {
                 themeId,
                 customThemes,
                 resolvedMode,
+              )}
+              surface={resolveEditorSurface(
+                highlightedEditorTheme ?? editorThemePref,
+                resolvedTheme,
+                resolvedMode,
+                () => undefined,
               )}
             />
           </Suspense>
