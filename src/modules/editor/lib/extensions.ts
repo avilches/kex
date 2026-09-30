@@ -81,8 +81,8 @@ export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
     columnRulerCompartment.of(columnRulerExt(cfg.view.columnRuler)),
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
-        backgroundColor: "transparent !important",
-        color: "var(--foreground)",
+        backgroundColor: "var(--editor-background) !important",
+        color: "var(--editor-foreground)",
         outline: "none",
         padding: "8px",
         paddingRight: "0",
@@ -95,7 +95,7 @@ export function buildSharedExtensions(cfg: SharedExtConfig): Extension[] {
         backgroundColor: "transparent !important",
       },
       ".cm-content": {
-        caretColor: "var(--foreground)",
+        caretColor: "var(--editor-foreground)",
         backgroundColor: "transparent !important",
         paddingRight: "8px",
       },

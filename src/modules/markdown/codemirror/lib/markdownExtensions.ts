@@ -38,7 +38,7 @@ export function buildMarkdownBaseExtensions(): Extension[] {
     EditorView.lineWrapping,
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
-        backgroundColor: "transparent !important",
+        backgroundColor: "var(--editor-background) !important",
         outline: "none",
         padding: "8px 16px",
       },

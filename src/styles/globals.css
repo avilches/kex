@@ -150,6 +150,8 @@
 }
 
 :root {
+  --editor-background: var(--background);
+  --editor-foreground: var(--foreground);
   --terminal-background: var(--background);
   --terminal-foreground: var(--foreground);
   --terminal-cursor: var(--foreground);

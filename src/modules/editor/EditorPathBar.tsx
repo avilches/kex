@@ -187,7 +187,7 @@ export function EditorPathBar({
     return ordered;
   })();
   return (
-    <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
+    <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-[var(--editor-background)] px-2 text-[11px]">
       <EditorPathBreadcrumb
         path={path}
         tabId={tabId}
