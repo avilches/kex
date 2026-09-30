@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { isEditorThemeId } from "@/modules/settings/store";
+import { contrastRatio } from "../readableColors";
+import { resolveTerminalPalette } from "../resolveTerminalTheme";
 import { listBuiltinThemes } from "./index";
+
+const rgb = (hex: string | undefined): [number, number, number] => {
+  expect(hex).toMatch(/^#[0-9a-fA-F]{6}$/);
+  return [1, 3, 5].map((i) => parseInt(hex!.slice(i, i + 2), 16)) as [number, number, number];
+};
 
 describe("built-in themes", () => {
   it.each(listBuiltinThemes().map((t) => [t.id, t] as const))(
@@ -18,4 +25,15 @@ describe("built-in themes", () => {
       expect(isEditorThemeId(theme.editorTheme?.light)).toBe(true);
     },
   );
+
+  const cases = listBuiltinThemes().flatMap((t) =>
+    (["dark", "light"] as const).map((mode) => [`${t.id} ${mode}`, t, mode] as const),
+  );
+
+  it.each(cases)("%s resolves a terminal palette with readable text and cursor", (_id, theme, mode) => {
+    const p = resolveTerminalPalette("auto", theme, listBuiltinThemes(), mode);
+    const bg = rgb(p?.background);
+    expect(contrastRatio(rgb(p?.foreground), bg)).toBeGreaterThanOrEqual(4);
+    expect(contrastRatio(rgb(p?.cursor), bg)).toBeGreaterThanOrEqual(3);
+  });
 });
