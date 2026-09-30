@@ -148,11 +148,13 @@ internet la versión oficial del otro modo (Kanagawa Dragon tiene la suya en Lot
 a partir de la paleta original, con las reglas 1 y 2. Si la versión del otro modo ya existe como tema
 de la misma familia se reutiliza importándola, sin copiar valores (`light: kanagawa.variants.light`) y
 se empareja `editorTheme.light`. `themes/themes.test.ts` falla si un tema incluido no cumple esto.
-- **El terminal es la excepción:** no hace falta crear una paleta de terminal para el modo que no la
-  tiene. Un terminal oscuro sobre un tema claro es válido: si un modo no define `terminal`, se usa la
-  paleta del otro modo, con los colores de fondo, texto, cursor y selección de esa misma variante
-  (`resolveTerminalPalette`, `paletteOf`). La lista de "Terminal theme" ofrece los temas con paleta en
-  cualquiera de los dos modos.
+- **En Auto, editor y terminal siguen el modo del tema.** Cada tema incluido define en cada modo su
+  propia paleta de terminal (16 colores ANSI más fondo, texto, cursor y selección) con un fondo de la
+  misma luminosidad que el modo, y empareja un tema de editor del mismo modo (`EDITOR_THEME_MODE`). Si el
+  original no trae uno, se crea (Kex Default tiene el suyo en claro y en oscuro). `themes/themes.test.ts`
+  falla si un tema no lo cumple. Un terminal oscuro sobre un tema claro solo es válido si el usuario lo
+  elige a mano; `paletteOf` (`resolveTerminalPalette`) conserva ese recurso de prestar la paleta del otro
+  modo para los temas propios del usuario, que sí pueden traer un solo modo.
 - **Terminal claro y programas hechos para fondo oscuro:** los programas pintan blanco o amarillo claro,
   que desaparece sobre un fondo claro. No se arregla retocando la paleta: xterm sube el contraste solo
   en modo claro (`minimumContrastRatio` 4.5, `minimumContrastRatioFor`); en oscuro se queda en 1 para
