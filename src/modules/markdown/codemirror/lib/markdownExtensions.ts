@@ -1,10 +1,10 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { Prec, type Extension } from "@codemirror/state";
+import { EditorState, type Extension, Prec } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { codeLanguages } from "@/modules/markdown/codemirror/lib/codeLanguages";
-import { linkClickHandler, livePreviewPlugin } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
+import { linkClickHandler, livePreviewPlugin, staticPreview } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 
 // "codeblock" is left out on purpose: its lines carry the language highlighting
 // of a tagged fence, and no theme colors the text of an untagged one.
@@ -50,6 +50,18 @@ export function buildMarkdownBaseExtensions(): Extension[] {
 
 export function buildLivePreviewExtensions(resolveImageSrc: (src: string) => string): Extension[] {
   return [...buildMarkdownBaseExtensions(), ...buildLiveDecorationExtensions(resolveImageSrc)];
+}
+
+// The read-only Preview mode: the Live Preview look with no line ever shown raw,
+// where a plain click (not Cmd/Ctrl+click) opens a link.
+export function buildStaticPreviewExtensions(resolveImageSrc: (src: string) => string): Extension[] {
+  return [
+    ...buildLivePreviewExtensions(resolveImageSrc),
+    staticPreview.of(true),
+    EditorState.readOnly.of(true),
+    EditorView.editable.of(false),
+    EditorView.theme({ ".cm-lp-link-text, .cm-lp-link-text *": { cursor: "pointer" } }),
+  ];
 }
 
 export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => string): Extension[] {

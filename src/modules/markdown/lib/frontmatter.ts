@@ -15,3 +15,12 @@ export function splitFrontmatter(raw: string): FrontmatterSplit {
   const end = open[0].length + close.index + close[0].length;
   return { frontmatter: raw.slice(0, end), body: raw.slice(end) };
 }
+
+// The Preview shows the frontmatter as a fenced code block rather than hiding it.
+export function frontmatterAsCodeBlock(raw: string): string {
+  const { frontmatter, body } = splitFrontmatter(raw);
+  if (!frontmatter) return raw;
+  const inner = frontmatter.replace(OPEN_RE, "").replace(/\r?\n?---\r?\n?$/, "");
+  const fence = inner.includes("```") ? "~~~~" : "```";
+  return `${fence}yaml\n${inner}\n${fence}\n${body}`;
+}

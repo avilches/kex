@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitFrontmatter } from "@/modules/markdown/lib/frontmatter";
+import { frontmatterAsCodeBlock, splitFrontmatter } from "@/modules/markdown/lib/frontmatter";
 
 describe("splitFrontmatter", () => {
   it("splits a standard frontmatter block including delimiters", () => {
@@ -24,5 +24,23 @@ describe("splitFrontmatter", () => {
     const { frontmatter, body } = splitFrontmatter(raw);
     expect(frontmatter + body).toBe(raw);
     expect(body).toBe("body\r\n");
+  });
+});
+
+describe("frontmatterAsCodeBlock", () => {
+  it("wraps the frontmatter in a yaml fence and keeps the body", () => {
+    expect(frontmatterAsCodeBlock("---\ntitle: Foo\n---\n\n# Hello\n")).toBe(
+      "```yaml\ntitle: Foo\n```\n\n# Hello\n",
+    );
+  });
+
+  it("handles a closing delimiter without a trailing newline and an empty block", () => {
+    expect(frontmatterAsCodeBlock("---\na: 1\n---")).toBe("```yaml\na: 1\n```\n");
+    expect(frontmatterAsCodeBlock("---\n---\nx")).toBe("```yaml\n\n```\nx");
+  });
+
+  it("leaves a file without frontmatter alone and avoids clashing with backticks inside", () => {
+    expect(frontmatterAsCodeBlock("# Hi\n")).toBe("# Hi\n");
+    expect(frontmatterAsCodeBlock("---\nk: ```\n---\nx")).toBe("~~~~yaml\nk: ```\n~~~~\nx");
   });
 });

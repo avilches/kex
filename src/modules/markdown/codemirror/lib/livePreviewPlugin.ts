@@ -1,6 +1,6 @@
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
-import { type EditorState, type Extension, StateField } from "@codemirror/state";
+import { type EditorState, type Extension, Facet, StateField } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -44,6 +44,7 @@ class CheckboxWidget extends WidgetType {
     input.className = "cm-lp-checkbox";
     input.addEventListener("mousedown", (e) => {
       e.preventDefault();
+      if (view.state.readOnly) return;
       const insert = this.checked ? " " : "x";
       view.dispatch({ changes: { from: this.from + 1, to: this.from + 2, insert } });
     });
@@ -305,8 +306,13 @@ function buildLink(url: string): HTMLAnchorElement {
   return a;
 }
 
+// A read-only view has no line being edited, so every line renders decorated
+// and nothing shows its raw syntax.
+export const staticPreview = Facet.define<boolean, boolean>({ combine: (values) => values.some(Boolean) });
+
 function activeLinesOf(state: EditorState): Set<number> {
   const activeLines = new Set<number>();
+  if (state.facet(staticPreview)) return activeLines;
   for (const range of state.selection.ranges) {
     const startLine = state.doc.lineAt(range.from).number;
     const endLine = state.doc.lineAt(range.to).number;
@@ -643,7 +649,7 @@ export function linkUrlAt(state: EditorState, pos: number): string | null {
 export function handleLinkMousedown(event: MouseEvent, view: EditorView): boolean {
   if (event.button !== 0) return false;
   const modifierHeld = IS_MAC ? event.metaKey : event.ctrlKey;
-  if (!modifierHeld) return false;
+  if (!modifierHeld && !view.state.facet(staticPreview)) return false;
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
   if (pos == null) return false;
   const url = linkUrlAt(view.state, pos);
