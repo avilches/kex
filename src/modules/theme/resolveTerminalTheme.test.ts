@@ -33,8 +33,28 @@ describe("resolveTerminalPalette", () => {
     expect(resolveTerminalPalette("other", app, catalog, "dark")?.background).toBe("#222222");
   });
 
-  it("falls back to the app palette when the choice has none for this mode", () => {
-    expect(resolveTerminalPalette("other", app, catalog, "light")?.background).toBe("#eeeeee");
+  it("a theme with a palette in only one mode lends it to the other mode", () => {
+    expect(resolveTerminalPalette("other", app, catalog, "light")?.background).toBe("#222222");
+  });
+
+  it("auto uses the app theme's other-mode palette, with that mode's UI colors", () => {
+    const darkOnly: Theme = {
+      id: "dark-only",
+      name: "Dark only",
+      variants: {
+        dark: {
+          colors: { background: "#101010", foreground: "#dddddd" },
+          terminal: { ansi: ansi("#e") },
+        },
+        light: { colors: { background: "#ffffff" } },
+      },
+    };
+    const p = resolveTerminalPalette("auto", darkOnly, [darkOnly], "light");
+    expect(p?.background).toBe("#101010");
+    expect(p?.foreground).toBe("#dddddd");
+  });
+
+  it("falls back to the app palette when the choice has no palette in any mode", () => {
     expect(resolveTerminalPalette("plain", app, catalog, "dark")?.background).toBe("#111111");
   });
 
@@ -80,8 +100,8 @@ describe("resolveTerminalPalette borrowing from a theme without terminal colors"
 });
 
 describe("terminalThemeOptions", () => {
-  it("lists only themes with an ANSI palette in the mode", () => {
+  it("lists the themes with an ANSI palette in some mode", () => {
     expect(terminalThemeOptions(catalog, "dark").map((o) => o.id)).toEqual(["app", "other"]);
-    expect(terminalThemeOptions(catalog, "light").map((o) => o.id)).toEqual(["app"]);
+    expect(terminalThemeOptions(catalog, "light").map((o) => o.id)).toEqual(["app", "other"]);
   });
 });

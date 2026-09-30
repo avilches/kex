@@ -2,20 +2,19 @@ import { TERMINAL_THEME_AUTO } from "@/modules/settings/store";
 import type { TerminalPalette, Theme, ThemeMode } from "./types";
 
 /**
- * The palette a concrete choice lends to the terminal, or undefined when the
- * theme is unknown or has no terminal palette for this exact mode (a light
- * mode must never receive a dark-only palette). Surface colors the palette
- * leaves out default to the lender's own UI colors, as they do when that theme
- * is active, so they never fall back to the current app theme's.
+ * The palette of a theme for a mode. A theme with no terminal palette in this
+ * mode lends the one of its other mode: a dark terminal on a light theme is
+ * fine. Surface colors the palette leaves out default to the UI colors of the
+ * variant it comes from, as they do when that theme is active, so they never
+ * fall back to the current app theme's.
  */
-function borrowedPalette(
-  id: string,
-  catalog: Theme[],
-  mode: ThemeMode,
-): TerminalPalette | undefined {
-  const variant = catalog.find((t) => t.id === id)?.variants[mode];
+function paletteOf(theme: Theme | undefined, mode: ThemeMode): TerminalPalette | undefined {
+  if (!theme) return undefined;
+  const own = theme.variants[mode];
+  const other = theme.variants[mode === "dark" ? "light" : "dark"];
+  const variant = own?.terminal ? own : other?.terminal ? other : undefined;
   const terminal = variant?.terminal;
-  if (!terminal) return undefined;
+  if (!variant || !terminal) return undefined;
   const c = variant.colors;
   return {
     ...terminal,
@@ -28,8 +27,9 @@ function borrowedPalette(
 }
 
 /**
- * Terminal palette to apply. "auto", an unknown id (a deleted custom theme) or
- * a theme without a palette for this mode all fall back to the app theme's own.
+ * Terminal palette to apply. "auto" uses the app theme's own; a concrete id
+ * borrows that theme's. An unknown id (a deleted custom theme) or a theme with
+ * no palette at all falls back to the app theme's.
  */
 export function resolveTerminalPalette(
   pref: string,
@@ -38,21 +38,23 @@ export function resolveTerminalPalette(
   mode: ThemeMode,
 ): TerminalPalette | undefined {
   if (pref !== TERMINAL_THEME_AUTO) {
-    const borrowed = borrowedPalette(pref, catalog, mode);
+    const borrowed = paletteOf(
+      catalog.find((t) => t.id === pref),
+      mode,
+    );
     if (borrowed) return borrowed;
   }
-  const variant = appTheme.variants[mode] ?? appTheme.variants.dark ?? appTheme.variants.light;
-  return variant?.terminal;
+  return paletteOf(appTheme, mode);
 }
 
 export type TerminalThemeOption = { id: string; name: string };
 
-/** Catalog entries that carry a terminal palette for the given mode. */
+/** Catalog entries that carry a terminal palette in some mode. */
 export function terminalThemeOptions(
   catalog: Theme[],
   mode: ThemeMode,
 ): TerminalThemeOption[] {
   return catalog
-    .filter((t) => t.variants[mode]?.terminal?.ansi !== undefined)
+    .filter((t) => paletteOf(t, mode)?.ansi !== undefined)
     .map((t) => ({ id: t.id, name: t.name }));
 }
