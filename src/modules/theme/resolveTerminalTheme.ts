@@ -4,14 +4,27 @@ import type { TerminalPalette, Theme, ThemeMode } from "./types";
 /**
  * The palette a concrete choice lends to the terminal, or undefined when the
  * theme is unknown or has no terminal palette for this exact mode (a light
- * mode must never receive a dark-only palette).
+ * mode must never receive a dark-only palette). Surface colors the palette
+ * leaves out default to the lender's own UI colors, as they do when that theme
+ * is active, so they never fall back to the current app theme's.
  */
 function borrowedPalette(
   id: string,
   catalog: Theme[],
   mode: ThemeMode,
 ): TerminalPalette | undefined {
-  return catalog.find((t) => t.id === id)?.variants[mode]?.terminal;
+  const variant = catalog.find((t) => t.id === id)?.variants[mode];
+  const terminal = variant?.terminal;
+  if (!terminal) return undefined;
+  const c = variant.colors;
+  return {
+    ...terminal,
+    background: terminal.background ?? c?.background,
+    foreground: terminal.foreground ?? c?.foreground,
+    cursor: terminal.cursor ?? c?.foreground,
+    cursorAccent: terminal.cursorAccent ?? c?.background,
+    selection: terminal.selection ?? c?.accent,
+  };
 }
 
 /**
