@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import type { SearchAddon } from "@xterm/addon-search";
 import {
@@ -77,6 +78,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const containerRef = useRef<HTMLDivElement>(null);
     const downYRef = useRef<number | null>(null);
     const { resolvedMode, themeId, customThemes } = useTheme();
+    const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
 
     const session = useTerminalSession({
       leafId: tabId,
@@ -99,7 +101,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       // Defer one frame so CSS-variable token resolution sees the new class.
       const id = requestAnimationFrame(() => session.applyTheme());
       return () => cancelAnimationFrame(id);
-    }, [resolvedMode, themeId, customThemes, session]);
+    }, [resolvedMode, themeId, customThemes, terminalThemePref, session]);
 
     useImperativeHandle(
       ref,
@@ -165,7 +167,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
                 leafId={tabId}
                 mode={session.blockMode}
                 focused={focused}
-                themeKey={`${themeId}:${resolvedMode}`}
+                themeKey={`${themeId}:${resolvedMode}:${terminalThemePref}`}
                 onSubmit={(text) => submitToLeaf(tabId, text)}
                 onInterrupt={() => interruptLeaf(tabId)}
                 getCwd={() => leafCwd(tabId)}

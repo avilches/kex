@@ -211,6 +211,8 @@ Hooks must be installed via "Set up Claude Code" (notification bell popover) for
 
 **Theme editor.** You can create and edit themes in-app. Changes are live-previewed. Custom themes are persisted to the settings store and can be exported as JSON files to share.
 
+**Terminal theme is independent.** The `terminalTheme` preference (`settings-general.json`) is `"auto"` (default: the active app theme's own terminal palette) or the id of any built-in or custom app theme, whose terminal palette (16 ANSI, background, foreground, cursor, selection) is borrowed without duplicating its values. `resolveTerminalPalette` (`modules/theme/resolveTerminalTheme.ts`, pure) picks the palette and falls back to the app theme's when the id is unknown or that theme has no palette for the current mode, so a light mode never gets a dark-only palette; `ThemeProvider` passes the result to `applyTheme`, which writes the `--terminal-*` variables, so only the terminal changes. `inactivePaneDim` still comes from the app theme (it is a black overlay, independent of the terminal background). Settings > Themes shows a palette sample while the dropdown is open, without persisting until an option is chosen. The Editor theme dropdown works the same way, mounting a lazy read-only CodeMirror sample only while open (`resolvePreviewThemeId`).
+
 **Editor theme is independent.** The editor theme is a separate setting from the app theme. You can have a Catppuccin app theme with a GitHub Light editor theme.
 
 **Terminal palette follows app theme.** The xterm.js ANSI color palette (colors 0-15) is derived from the active app theme, so the terminal colors are consistent with the UI.

@@ -1,16 +1,10 @@
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorTheme,
+  setTerminalTheme,
+  TERMINAL_THEME_AUTO,
   EDITOR_THEME_AUTO,
   EDITOR_THEME_LABELS,
   EDITOR_THEME_MODE,
@@ -32,7 +26,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useMemo, useRef, useState } from "react";
+import { resolvePreviewThemeId } from "@/modules/theme/editorThemePreview";
+import {
+  resolveTerminalPalette,
+  terminalThemeOptions,
+} from "@/modules/theme/resolveTerminalTheme";
+import { TerminalThemePreview } from "../components/TerminalThemePreview";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
 const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIcon }[] = [
@@ -41,8 +41,59 @@ const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIco
   { id: "dark", label: "Dark", icon: Moon02Icon },
 ];
 
+const EditorThemePreview = lazy(() => import("../components/EditorThemePreview"));
+
+type Choice = { id: string; label: string };
+
+function ChoiceGroup({
+  title,
+  description,
+  options,
+  value,
+  onSelect,
+  onHover,
+  children,
+}: {
+  title: string;
+  description: string;
+  options: Choice[];
+  value: string;
+  onSelect: (id: string) => void;
+  onHover: (id: string | null) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
+      <div className="flex min-w-0 flex-col">
+        <span className="text-[12px]">{title}</span>
+        <span className="text-[11px] text-muted-foreground">{description}</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5" onMouseLeave={() => onHover(null)}>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onSelect(o.id)}
+            onMouseEnter={() => onHover(o.id)}
+            className={cn(
+              "h-7 rounded-md border px-2.5 text-[11.5px] transition-all",
+              value === o.id
+                ? "border-foreground/60 bg-card ring-1 ring-foreground/20"
+                : "border-border/60 bg-transparent hover:border-border",
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function ThemesSection() {
-  const { themeId, setThemeId, resolvedMode, customThemes, mode, setMode } = useTheme();
+  const { themeId, setThemeId, resolvedMode, customThemes, mode, setMode, resolvedTheme } =
+    useTheme();
   const builtinThemes = listBuiltinThemes();
   const themes = useMemo(
     () => [...builtinThemes, ...customThemes],
@@ -67,6 +118,26 @@ export function ThemesSection() {
   };
 
   const editorThemePref = usePreferencesStore((s) => s.editorTheme);
+  const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
+  const [highlightedTerminalTheme, setHighlightedTerminalTheme] = useState<string | null>(null);
+  const terminalChoiceOptions = useMemo(
+    () => [
+      { id: TERMINAL_THEME_AUTO, label: "Auto" },
+      ...terminalThemeOptions(themes, resolvedMode).map((o) => ({ id: o.id, label: o.name })),
+    ],
+    [themes, resolvedMode],
+  );
+  const editorOptions = useMemo(
+    () => [
+      { id: EDITOR_THEME_AUTO as string, label: "Auto" },
+      ...[...EDITOR_THEMES]
+        .filter((id) => EDITOR_THEME_MODE[id] === resolvedMode)
+        .map((id) => ({ id: id as string, label: EDITOR_THEME_LABELS[id] })),
+    ],
+    [resolvedMode],
+  );
+  const [highlightedEditorTheme, setHighlightedEditorTheme] =
+    useState<EditorThemePref | null>(null);
 
   const handleThemeFiles = async (files: FileList | null) => {
     setImportError(null);
@@ -254,44 +325,43 @@ export function ThemesSection() {
             );
           })}
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-          <div className="flex min-w-0 flex-col">
-            <span className="text-[12px]">Editor theme</span>
-            <span className="text-[11px] text-muted-foreground">
-              Syntax colors for the code editor. Auto follows the app theme.
-            </span>
-          </div>
-          <Select
-            value={editorThemePref}
-            onValueChange={(v) => void setEditorTheme(v as EditorThemePref)}
-          >
-            <SelectTrigger size="sm" className="h-8 w-44 text-[12px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={EDITOR_THEME_AUTO} className="text-[12px]">
-                Auto (match app theme)
-              </SelectItem>
-              <SelectSeparator />
-              {[...EDITOR_THEMES]
-                .sort(
-                  (a, b) =>
-                    (EDITOR_THEME_MODE[a] === resolvedMode ? 0 : 1) -
-                    (EDITOR_THEME_MODE[b] === resolvedMode ? 0 : 1),
-                )
-                .map((id) => (
-                  <SelectItem
-                    key={id}
-                    value={id}
-                    disabled={EDITOR_THEME_MODE[id] !== resolvedMode}
-                    className="text-[12px]"
-                  >
-                    {EDITOR_THEME_LABELS[id]}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <ChoiceGroup
+          title="Editor theme"
+          description="Syntax colors for the code editor. Auto follows the app theme."
+          options={editorOptions}
+          value={editorThemePref}
+          onSelect={(v) => void setEditorTheme(v as EditorThemePref)}
+          onHover={(v) => setHighlightedEditorTheme(v as EditorThemePref | null)}
+        >
+          <Suspense fallback={<div className="h-40" />}>
+            <EditorThemePreview
+              themeId={resolvePreviewThemeId(
+                highlightedEditorTheme,
+                editorThemePref,
+                themeId,
+                customThemes,
+                resolvedMode,
+              )}
+            />
+          </Suspense>
+        </ChoiceGroup>
+        <ChoiceGroup
+          title="Terminal theme"
+          description="Colors of the terminal only. Auto follows the app theme."
+          options={terminalChoiceOptions}
+          value={terminalThemePref}
+          onSelect={(v) => void setTerminalTheme(v)}
+          onHover={setHighlightedTerminalTheme}
+        >
+          <TerminalThemePreview
+            palette={resolveTerminalPalette(
+              highlightedTerminalTheme ?? terminalThemePref,
+              resolvedTheme,
+              themes,
+              resolvedMode,
+            )}
+          />
+        </ChoiceGroup>
       </div>
     </div>
   );

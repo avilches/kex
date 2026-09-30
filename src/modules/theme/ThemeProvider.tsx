@@ -20,7 +20,8 @@ import {
   listCustomThemes,
   onCustomThemesChange,
 } from "./customThemes";
-import { getBuiltinTheme, getDefaultTheme } from "./themes";
+import { getBuiltinTheme, getDefaultTheme, listBuiltinThemes } from "./themes";
+import { resolveTerminalPalette } from "./resolveTerminalTheme";
 import type { Theme } from "./types";
 
 export type { Theme };
@@ -141,10 +142,18 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
     root.classList.add(resolvedMode);
   }, [resolvedMode]);
 
+  const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
   const effectiveId = previewId ?? themeId;
   useEffect(() => {
-    applyTheme(resolveTheme(effectiveId, customThemes), resolvedMode);
-  }, [effectiveId, resolvedMode, customThemes]);
+    const appTheme = resolveTheme(effectiveId, customThemes);
+    const terminal = resolveTerminalPalette(
+      terminalThemePref,
+      appTheme,
+      [...listBuiltinThemes(), ...customThemes],
+      resolvedMode,
+    );
+    applyTheme(appTheme, resolvedMode, terminal);
+  }, [effectiveId, resolvedMode, customThemes, terminalThemePref]);
 
   const setMode = useCallback((next: ThemePref) => {
     setModeState(next);

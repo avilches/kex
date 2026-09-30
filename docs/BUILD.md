@@ -17,7 +17,9 @@ Control, History, Notes), tab bar with agent chips, terminal (background, select
 ANSI), a real CodeMirror editor with the theme's paired editor theme, buttons/badges, and every CSS
 token. It is dev only and not part of `pnpm build`.
 
-- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app`.
+- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app&terminal=auto|<theme id>`.
+  `terminal` mirrors the "Terminal theme" preference: the terminal panes use that theme's palette
+  while the rest of the page keeps `theme`.
   A user theme can be pasted as JSON in the textarea (validated with `validateTheme`). The selector
   lists every theme twice ("Nord dark", "Nord light"), so there is no separate dark/light button.
 - Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists

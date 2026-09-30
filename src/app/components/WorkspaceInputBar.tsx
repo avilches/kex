@@ -1,4 +1,5 @@
 import { useBlockController } from "@/modules/terminal/lib/blockController";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import { lazy, Suspense } from "react";
 
@@ -11,7 +12,8 @@ type Props = {
 
 export function WorkspaceInputBar({ isBlockTab, activeLeafId }: Props) {
   const { resolvedMode, themeId, customThemes } = useTheme();
-  const themeKey = `${resolvedMode}:${themeId}:${customThemes.length}`;
+  const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
+  const themeKey = `${resolvedMode}:${themeId}:${customThemes.length}:${terminalThemePref}`;
   const controller = useBlockController(isBlockTab ? activeLeafId : null);
   const blockMode = controller?.blockMode ?? "prompt";
 

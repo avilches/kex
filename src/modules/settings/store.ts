@@ -65,6 +65,9 @@ export type EditorThemeId = (typeof EDITOR_THEMES)[number];
 
 /** "auto" follows the active app theme's editorTheme pairing (resolved live). */
 export const EDITOR_THEME_AUTO = "auto" as const;
+
+/** "auto" uses the active app theme's terminal palette; otherwise an app theme id whose palette is borrowed. */
+export const TERMINAL_THEME_AUTO = "auto";
 export type EditorThemePref = typeof EDITOR_THEME_AUTO | EditorThemeId;
 
 export function isEditorThemeId(v: unknown): v is EditorThemeId {
@@ -130,6 +133,7 @@ type PaneSplitLimit = { width: number; height: number };
 export type Preferences = {
   theme: ThemePref;
   themeId: string;
+  terminalTheme: string;
   editorTheme: EditorThemePref;
   editorFontFamily: string;
   editorFontSize: number;
@@ -196,6 +200,7 @@ const TOOLS_STORE_PATH = "settings-tools.json";
 // General store keys
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
+const KEY_TERMINAL_THEME = "terminalTheme";
 const KEY_AUTOSTART = "autostart";
 const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
@@ -362,6 +367,7 @@ export function parseCursorInactiveStyle(value: unknown): CursorInactiveStyle {
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   themeId: DEFAULT_THEME_ID,
+  terminalTheme: TERMINAL_THEME_AUTO,
   editorTheme: EDITOR_THEME_AUTO,
   editorFontFamily: "",
   editorFontSize: EDITOR_FONT_SIZE_DEFAULT,
@@ -511,6 +517,8 @@ export async function loadPreferences(): Promise<Preferences> {
   const result: Preferences = {
     theme: parseThemePref(getGeneral<string>(KEY_THEME)),
     themeId: getGeneral<string>(KEY_THEME_ID) ?? DEFAULT_PREFERENCES.themeId,
+    terminalTheme:
+      getGeneral<string>(KEY_TERMINAL_THEME) ?? DEFAULT_PREFERENCES.terminalTheme,
     editorTheme: ((): EditorThemePref => {
       const stored = getEditor<string>(KEY_EDITOR_THEME);
       if (stored === EDITOR_THEME_AUTO || isEditorThemeId(stored)) return stored;
@@ -746,6 +754,10 @@ export async function setTheme(value: ThemePref): Promise<void> {
 
 export async function setThemeId(value: string): Promise<void> {
   await writePref(KEY_THEME_ID, value);
+}
+
+export async function setTerminalTheme(value: string): Promise<void> {
+  await writePref(KEY_TERMINAL_THEME, value);
 }
 
 export async function setEditorTheme(value: EditorThemePref): Promise<void> {
@@ -1136,6 +1148,7 @@ export type PrefKey = keyof Preferences;
 const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_THEME]: "theme",
   [KEY_THEME_ID]: "themeId",
+  [KEY_TERMINAL_THEME]: "terminalTheme",
   [KEY_AUTOSTART]: "autostart",
   [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
