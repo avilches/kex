@@ -34,7 +34,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  readableTextOn,
+  chipColorOnWhite,
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
@@ -233,12 +233,9 @@ function SortableWorkspaceItem({
           active
             ? displayColor !== null
               ? {
-                  backgroundColor: displayColor,
-                  color: readableTextOn(displayColor),
-                  boxShadow:
-                    readableTextOn(displayColor) === "#ffffff"
-                      ? "inset 0 0 0 1px rgba(255, 255, 255, 0.4)"
-                      : "inset 0 0 0 1px rgba(0, 0, 0, 0.25)",
+                  backgroundColor: chipColorOnWhite(displayColor),
+                  color: "#ffffff",
+                  boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
                 }
               : {
                   backgroundColor: "var(--muted)",
@@ -977,8 +974,8 @@ export function WorkspaceBar({
                     style={
                       displayColor
                         ? {
-                            backgroundColor: displayColor,
-                            color: readableTextOn(displayColor),
+                            backgroundColor: chipColorOnWhite(displayColor),
+                            color: "#ffffff",
                           }
                         : {
                             backgroundColor: "var(--muted)",

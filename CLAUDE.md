@@ -119,7 +119,7 @@ se pagó una vez.
   cada superficie debe leerse, el borde debe verse sobre su fondo y un chip sin seleccionar debe
   distinguirse del fondo. Se ajustan hasta que la preview lo confirme, en los DOS modos.
 - Para el texto de un color con fondo variable (chips de workspace, botones) no se pone blanco ni
-  negro a mano: `readableTextOn` en `modules/workspaces/lib/workspaceColor.ts`.
+  negro a mano: `chipColorOnWhite` en `modules/workspaces/lib/workspaceColor.ts` (texto siempre blanco, y el color del fondo se oscurece lo justo para llegar a 4.5).
 
 **2. Fondo del terminal y del editor: se eligen a propósito, no se heredan por accidente.**
 - `colors.background` es el fondo de la interfaz. El fondo del terminal es `terminal.background` y el

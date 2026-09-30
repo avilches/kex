@@ -58,12 +58,20 @@ function relativeLuminance(hex: string): number {
   return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
 
-// Picks the text color with the higher WCAG contrast on a solid workspace color.
-export function readableTextOn(hex: string): "#ffffff" | "#000000" {
-  const l = relativeLuminance(hex);
-  const white = 1.05 / (l + 0.05);
-  const black = (l + 0.05) / 0.05;
-  return white >= black ? "#ffffff" : "#000000";
+const MIN_CONTRAST_WITH_WHITE = 4.5;
+
+// The active chip always carries white text. A workspace color too light for
+// that is darkened toward black just enough to reach the contrast, which keeps
+// its hue; a color that already reaches it is returned as is.
+export function chipColorOnWhite(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  for (let t = 0; t <= 1; t += 0.01) {
+    const shade = `#${[r, g, b]
+      .map((v) => Math.round(v! * (1 - t)).toString(16).padStart(2, "0"))
+      .join("")}`;
+    if (1.05 / (relativeLuminance(shade) + 0.05) >= MIN_CONTRAST_WITH_WHITE) return shade;
+  }
+  return "#000000";
 }
 
 export function randomVibrantColor(): string {

@@ -3,7 +3,7 @@ import {
   WORKSPACE_COLOR_PALETTE,
   idHue,
   initialColorForId,
-  readableTextOn,
+  chipColorOnWhite,
   resolveWorkspaceColor,
 } from "./workspaceColor";
 
@@ -38,29 +38,34 @@ describe("resolveWorkspaceColor", () => {
   });
 });
 
-describe("readableTextOn", () => {
-  test("dark colors keep white text", () => {
-    expect(readableTextOn("#1e3a8a")).toBe("#ffffff");
-    expect(readableTextOn("#6d28d9")).toBe("#ffffff");
+describe("chipColorOnWhite", () => {
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  const contrastWithWhite = (hex: string) => 1.05 / (lum(hex) + 0.05);
+
+  test("a color that already reaches 4.5 with white is unchanged", () => {
+    expect(chipColorOnWhite("#1e3a8a")).toBe("#1e3a8a");
+    expect(chipColorOnWhite("#6d28d9")).toBe("#6d28d9");
   });
-  test("light and mid-tone colors get black text", () => {
-    expect(readableTextOn("#eab308")).toBe("#000000");
-    expect(readableTextOn("#22c55e")).toBe("#000000");
-    expect(readableTextOn("#ec4899")).toBe("#000000");
+  test("a lighter color is darkened until white reaches 4.5", () => {
+    const out = chipColorOnWhite("#ec4899");
+    expect(out).not.toBe("#ec4899");
+    expect(contrastWithWhite(out)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastWithWhite(out)).toBeLessThan(4.7);
   });
-  test("every palette color reaches 4.5 contrast", () => {
-    const lum = (hex: string) => {
-      const [r, g, b] = [1, 3, 5].map((i) => {
-        const v = parseInt(hex.slice(i, i + 2), 16) / 255;
-        return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-      });
-      return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
-    };
+  test("darkening keeps the hue: the strongest channel stays the strongest", () => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(chipColorOnWhite("#ec4899").slice(i, i + 2), 16));
+    expect(r).toBeGreaterThan(b!);
+    expect(b).toBeGreaterThan(g!);
+  });
+  test("every palette color reaches 4.5 with white", () => {
     for (const bg of WORKSPACE_COLOR_PALETTE) {
-      const a = lum(bg);
-      const b = lum(readableTextOn(bg));
-      const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-      expect(ratio).toBeGreaterThanOrEqual(4.5);
+      expect(contrastWithWhite(chipColorOnWhite(bg))).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
