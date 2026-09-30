@@ -1,6 +1,6 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import type { Extension } from "@codemirror/state";
+import { Prec, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { codeLanguages } from "@/modules/markdown/codemirror/lib/codeLanguages";
@@ -60,7 +60,9 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
     // The syntax highlighter nests its own colored span inside each lp span, and
     // an element's own color always beats an inherited one, so the color rules
     // also target descendants (`.cm-lp-x *`), with !important to beat the theme.
-    EditorView.theme({
+    // Prec.high: the base theme sets the scroller font too, and at equal
+    // precedence the earlier extension wins, which kept Rich monospace.
+    Prec.high(EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
         backgroundColor: "transparent !important",
         outline: "none",
@@ -320,6 +322,6 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
         fontWeight: "600",
       },
       ".cm-lp-table a": { cursor: "pointer" },
-    }),
+    })),
   ];
 }
