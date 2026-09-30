@@ -153,6 +153,11 @@ se empareja `editorTheme.light`. `themes/themes.test.ts` falla si un tema inclui
   paleta del otro modo, con los colores de fondo, texto, cursor y selección de esa misma variante
   (`resolveTerminalPalette`, `paletteOf`). La lista de "Terminal theme" ofrece los temas con paleta en
   cualquiera de los dos modos.
+- **Terminal claro y programas hechos para fondo oscuro:** los programas pintan blanco o amarillo claro,
+  que desaparece sobre un fondo claro. No se arregla retocando la paleta: xterm sube el contraste solo
+  en modo claro (`minimumContrastRatio` 4.5, `minimumContrastRatioFor`); en oscuro se queda en 1 para
+  no alterar los colores del tema. Al probar un tema claro se mira un diff o la salida de un programa
+  con colores claros, no solo el prompt.
 
 **4. Un tema de editor nuevo (CodeMirror)** se da de alta en `EDITOR_THEMES`, `EDITOR_THEME_MODE` y
 `EDITOR_THEME_LABELS` (`settings/store.ts`) y en `EDITOR_THEME_EXT` (`editor/lib/themes.ts`), y el
