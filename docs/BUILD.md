@@ -112,14 +112,12 @@ Manual `manualChunks` splits the bundle to keep the initial load fast:
 - `codemirror` — CodeMirror core, themes, vim
 - `cm-lang-<name>` — each CodeMirror language pack (loaded on demand by `languageResolver.ts`)
 - `cm-legacy-<name>` — each legacy mode
-- `streamdown` — markdown streaming renderer
 
 ### Markdown editor chunks
 
 Live Preview is the only markdown engine, and both of its surfaces sit behind separate `import()` boundaries so a plain
 terminal session never pays for them: the `markdown` tab shell (`src/modules/markdown/codemirror/MarkdownTab.tsx`,
-which pulls in the Live Preview decorations) and the read-only preview (`MarkdownPreviewPane`, which is where the
-`streamdown` chunk above loads from). Neither loads at app startup. `TabContent.tsx` lazy-imports the tab shell for a
+which pulls in the Live Preview decorations) and the read-only preview (`MarkdownPreviewPane`, a read-only CodeMirror view). Neither loads at app startup. `TabContent.tsx` lazy-imports the tab shell for a
 `markdown` tab and the preview pane for the overlay/split preview of an `editor` tab over a `.md` file.
 
 Measured on a real `pnpm build` (2026-09-29), gzip sizes with `gzip -9`; Vite/Rolldown does not print gzip sizes by
@@ -128,8 +126,7 @@ default:
 | Chunk | Trigger | Measured size (gzip / raw) |
 |---|---|---|
 | `MarkdownTab` (Live Preview tab shell and its decorations) | First `markdown` tab mount | 12.6 kB / 39.3 kB |
-| `MarkdownPreviewPane` (thin shell around Streamdown) | First Preview mode or editor-tab overlay/split preview of a `.md` | 0.6 kB / 1.0 kB |
-| `streamdown` | Same trigger as `MarkdownPreviewPane` | 134.1 kB / 448.9 kB |
+| `MarkdownPreviewPane` (read-only CodeMirror shell) | First Preview mode or editor-tab overlay/split preview of a `.md` | not re-measured after Streamdown was removed |
 
 The eager `react` chunk measures 207.8 kB raw. Nothing under `src/modules/markdown/` is imported from the eager graph.
 

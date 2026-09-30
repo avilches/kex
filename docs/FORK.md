@@ -380,8 +380,8 @@ Settings selector (`markdownEngine`). All three were removed in favor of "Live P
 engine, together with their npm dependencies (`@tiptap/*`, `@milkdown/*`, `mermaid`, `katex`, `lowlight`,
 `highlight.js`, `markdown-it` and its plugins), the engine Settings selector, the `markdownEngine` field of a tab and
 the `markdownWikiLinks` preference. What was lost with them: the toolbar, slash commands, visual wiki-links and
-mermaid/KaTeX rendering; they can be rebuilt on Live Preview if they are ever missed. The read-only Streamdown render
-survives as the Preview mode and as the overlay/split preview of an `editor` tab. See `docs/ARCHITECTURE.md`
+mermaid/KaTeX rendering; they can be rebuilt on Live Preview if they are ever missed. The Preview mode and the overlay/split preview of an `editor` tab are
+the same Live Preview extensions in a read-only view (Streamdown and its dependency were removed). See `docs/ARCHITECTURE.md`
 (Frontend module map, `markdown/`; 4.9-4.11) and `docs/BUILD.md` (Markdown editor chunks).
 
 - "Live Preview" (CodeMirror 6) edits the raw markdown text directly with Obsidian-style live-preview decorations,

@@ -349,7 +349,7 @@ The terminal and the code editor (CodeMirror) each expose independent "Font fami
 
 Opening a `.md` file mounts Live Preview, a CodeMirror 6 editor that decorates the raw markdown text in place (`modules/markdown/codemirror/`). It is the only markdown engine: the TipTap and Milkdown WYSIWYG editors, the Streamdown-only "legacy" engine and the per-tab `markdownEngine` field were removed, so there is no engine setting and no engine sealed onto a tab. A tab persisted by an older version simply ignores the unknown field. Earlier Kex versions had preview-only `markdown` tabs where editing required a `Rendered | Edit` toggle; that toggle no longer exists, its keyboard gesture is now `editor.cycleView`, which rotates the modes of the tab (see 7. Frontend module map, "Tab kinds").
 
-The tab has three modes, chosen in the path bar and rotated by `editor.cycleView` (`lib/viewCycle.ts`): Source (raw text), Rich (the Live Preview decorations) and Preview (read-only `MarkdownPreviewPane`, Streamdown). A markdown tab registers a handle (`registerMarkdownHandle`: `save`, `cycleView`, `toggleOutline`) that the global `editor.cycleView`, `editor.save` and `markdown.toggleOutline` handlers call for the active tab, so they work whatever has focus (unlike a keydown on the tab, which is lost when Preview unmounts the editor). Source and Rich share one CodeMirror view and only toggle the decorations through a `Compartment`, so cursor, scroll and undo history survive the switch; Preview unmounts the view.
+The tab has three modes, chosen in the path bar and rotated by `editor.cycleView` (`lib/viewCycle.ts`): Source (raw text), Rich (the Live Preview decorations) and Preview (read-only `MarkdownPreviewPane`: the Live Preview extensions with no line ever active, frontmatter shown as a fenced code block, link definitions hidden and a plain click opening a link). A markdown tab registers a handle (`registerMarkdownHandle`: `save`, `cycleView`, `toggleOutline`) that the global `editor.cycleView`, `editor.save` and `markdown.toggleOutline` handlers call for the active tab, so they work whatever has focus (unlike a keydown on the tab, which is lost when Preview unmounts the editor). Source and Rich share one CodeMirror view and only toggle the decorations through a `Compartment`, so cursor, scroll and undo history survive the switch; Preview unmounts the view.
 
 ### 4.10 Buffer ownership: `useDocument`
 
@@ -433,7 +433,6 @@ Tauri plugins used: `store`, `updater`, `window-state`, `autostart`, `os`, `noti
 | `motion` | latest | Animations (Framer Motion successor) |
 | `react-resizable-panels` | `4.x` | Resizable layout panels |
 | Sonner | `2.x` | Toast notifications |
-| `streamdown` | `2.x` | Markdown streaming renderer |
 | Biome | `2.x` | Linter and formatter |
 | vitest | `4.x` | Unit tests |
 
@@ -521,7 +520,7 @@ src/
     │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
     ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  : Live Preview, the only markdown engine. Used by the `markdown` tab kind
-    │   │                            and, through `MarkdownPreviewPane.tsx` (read-only Streamdown), by the
+    │   │                            and, through `MarkdownPreviewPane.tsx` (read-only Live Preview), by the
     │   │                            editor-tab overlay/split preview (`kind: "editor"` with
     │   │                            `previewMode: "overlay" | "split"`).
     │   │                            `codemirror/` is the engine: `MarkdownTab.tsx` (tab shell with the

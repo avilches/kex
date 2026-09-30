@@ -122,8 +122,6 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
             id.includes("@replit/codemirror")
           )
             return "codemirror";
-          if (id.includes("/streamdown/") || id.includes("@streamdown/"))
-            return "streamdown";
           if (
             id.includes("/node_modules/react-dom/") ||
             id.includes("/node_modules/react/") ||

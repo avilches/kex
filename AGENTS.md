@@ -135,7 +135,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **markdown/**: Live Preview, the only markdown engine (`codemirror/`, lazy chunk `MarkdownTab`), built directly on
   CodeMirror 6: it never parses to an AST, only decorates the raw text (see `docs/FORK.md`). The `markdown` tab has
   Source, Rich (the decorations) and Preview modes plus an Outline; Source and Rich share one CodeMirror view.
-  `MarkdownPreviewPane.tsx` is the read-only Streamdown render, used by the Preview mode and by the overlay/split
+  `MarkdownPreviewPane.tsx` is the read-only render (the same Live Preview extensions with no active line), used by the Preview mode and by the overlay/split
   preview of an `editor` tab over a `.md` (`docs/BUILD.md`, "Markdown editor chunks"). `lib/` holds the shared pure
   pieces: frontmatter, outline, image path resolution, view-mode cycling.
 - **notes/** — notes view for the Sidebar (Quick Access + folder tree + sortable note list).
