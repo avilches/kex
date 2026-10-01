@@ -23,8 +23,18 @@ import { TerminalThemePreview } from "./TerminalThemePreview";
 
 const EditorThemePreview = lazy(() => import("./EditorThemePreview"));
 
-const COLUMNS = "grid grid-cols-[170px_minmax(0,1fr)_minmax(0,1fr)] gap-2";
+const COLUMNS = "grid grid-cols-[170px_minmax(0,1fr)_minmax(0,1fr)] gap-0";
 const PREVIEW_BOX = "h-[84px] overflow-hidden rounded-md";
+
+/** Border around a selected cell; neighbours that are selected too join into one outline. */
+function frame(selected: boolean, leftSelected: boolean, rightSelected: boolean) {
+  return cn(
+    "rounded-lg border border-transparent",
+    selected && "border-foreground/50 bg-card/60",
+    selected && leftSelected && "rounded-l-none border-l-transparent",
+    selected && rightSelected && "rounded-r-none border-r-transparent",
+  );
+}
 
 type Props = {
   themes: Theme[];
@@ -97,19 +107,21 @@ function CellHover({
 
 function Cell({
   info,
-  on,
+  selected,
+  frameClass,
   locked,
   onPick,
   preview,
 }: {
   info: SurfaceInfo | undefined;
-  on: boolean;
+  selected: boolean;
+  frameClass: string;
   locked: boolean;
   onPick: () => void;
   preview: React.ReactNode;
 }) {
   if (!info) {
-    return <div className="px-2 py-1.5 text-[11.5px] text-muted-foreground/60">-</div>;
+    return <div className={cn(frameClass, "px-2 py-1.5 text-[11.5px] text-muted-foreground/60")}>-</div>;
   }
   const shared = info.sharedWith.length > 0;
   return (
@@ -120,20 +132,13 @@ function Cell({
         onClick={onPick}
         title={shared ? `Also used by ${info.sharedWith.join(", ")}` : "Its own"}
         className={cn(
-          "flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[11.5px] transition-colors",
-          locked ? "cursor-default opacity-50" : "hover:bg-muted/60",
+          frameClass,
+          "flex min-w-0 items-center px-2 py-1.5 text-left text-[11.5px] transition-colors",
+          locked ? "cursor-default" : "hover:bg-muted/60",
+          locked && !selected && "opacity-50",
         )}
       >
-        <span
-          className={cn(
-            "size-[11px] shrink-0 rounded-full border-[1.5px]",
-            on ? "border-foreground bg-foreground [box-shadow:inset_0_0_0_2px_var(--card)]" : "border-muted-foreground/60",
-          )}
-        />
         <span className="truncate">{info.label}</span>
-        {shared ? (
-          <span className="ml-auto shrink-0 text-[9.5px] text-muted-foreground">shared</span>
-        ) : null}
       </button>
     </CellHover>
   );
@@ -197,11 +202,11 @@ export function ThemeTable({
   return (
     <div className="flex flex-col gap-2.5">
       <div className={COLUMNS}>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">{activeTheme.name}</span>
           <ShellPreview theme={activeTheme} mode={mode} />
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">
             {rows.find((r) => r.editorId === activeEditorId)?.info.editor.label ?? activeEditorId}
           </span>
@@ -214,7 +219,7 @@ export function ThemeTable({
             </Suspense>
           </div>
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">
             {themes.find((t) => t.id === (terminalAuto ? themeId : terminalPref))?.name ??
               activeTheme.name}
@@ -257,16 +262,12 @@ export function ThemeTable({
         {rows.map(({ theme: t, info, editorId }) => {
           const active = t.id === themeId;
           const isCustom = customIds.has(t.id);
+          const themeSel = active;
+          const editorSel = editorAuto ? active : editorId === editorPref;
+          const terminalSel = info.terminal !== undefined && (terminalAuto ? active : t.id === terminalPref);
           return (
-            <div
-              key={t.id}
-              className={cn(
-                COLUMNS,
-                "group items-center rounded-lg border bg-card/40 p-0.5",
-                active ? "border-foreground/50 ring-1 ring-foreground/15" : "border-border/60",
-              )}
-            >
-              <div className="flex min-w-0 items-center gap-1">
+            <div key={t.id} className={cn(COLUMNS, "group items-center")}>
+              <div className={cn(frame(themeSel, false, editorSel), "flex min-w-0 items-center gap-1")}>
                 <button
                   type="button"
                   onClick={() => onSelectTheme(t.id)}
@@ -298,7 +299,8 @@ export function ThemeTable({
               </div>
               <Cell
                 info={info.editor}
-                on={editorAuto ? active : editorId === editorPref}
+                selected={editorSel}
+                frameClass={frame(editorSel, themeSel, terminalSel)}
                 locked={editorAuto}
                 onPick={() => {
                   setLastEditor(editorId);
@@ -312,7 +314,8 @@ export function ThemeTable({
               />
               <Cell
                 info={info.terminal}
-                on={terminalAuto ? active : t.id === terminalPref}
+                selected={terminalSel}
+                frameClass={frame(terminalSel, editorSel, false)}
                 locked={terminalAuto}
                 onPick={() => {
                   setLastTerminal(t.id);
@@ -328,29 +331,30 @@ export function ThemeTable({
             Editor only
           </div>
         ) : null}
-        {extraEditors.map((id) => (
-          <div
-            key={id}
-            className={cn(COLUMNS, "items-center rounded-lg border border-border/60 bg-card/40 p-0.5")}
-          >
-            <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
-            <Cell
-              info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
-              on={!editorAuto && id === editorPref}
-              locked={editorAuto}
-              onPick={() => {
-                setLastEditor(id);
-                void setEditorTheme(id);
-              }}
-              preview={
-                <Suspense fallback={<div className="h-40" />}>
-                  <EditorThemePreview themeId={id} surface={editorSurface(id, activeTheme)} />
-                </Suspense>
-              }
-            />
-            <span />
-          </div>
-        ))}
+        {extraEditors.map((id) => {
+          const sel = !editorAuto && id === editorPref;
+          return (
+            <div key={id} className={cn(COLUMNS, "items-center")}>
+              <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
+              <Cell
+                info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
+                selected={sel}
+                frameClass={frame(sel, false, false)}
+                locked={editorAuto}
+                onPick={() => {
+                  setLastEditor(id);
+                  void setEditorTheme(id);
+                }}
+                preview={
+                  <Suspense fallback={<div className="h-40" />}>
+                    <EditorThemePreview themeId={id} surface={editorSurface(id, activeTheme)} />
+                  </Suspense>
+                }
+              />
+              <span />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
