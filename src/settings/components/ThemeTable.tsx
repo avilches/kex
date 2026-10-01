@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   EDITOR_THEME_AUTO,
+  EDITOR_THEME_LABELS,
   isEditorThemeId,
   setEditorTheme,
   setTerminalTheme,
@@ -12,7 +13,7 @@ import type { EditorThemeId } from "@/modules/settings/store";
 import { resolveEditorSurface } from "@/modules/theme/resolveEditorSurface";
 import { resolveEditorThemeId } from "@/modules/theme/resolveEditorTheme";
 import { paletteOf, resolveTerminalPalette } from "@/modules/theme/resolveTerminalTheme";
-import { themeSurfaceInfo, type SurfaceInfo } from "@/modules/theme/themeSurfaceInfo";
+import { themeSurfaceInfo, unpairedEditorThemes, type SurfaceInfo } from "@/modules/theme/themeSurfaceInfo";
 import type { Theme, ThemeMode } from "@/modules/theme/types";
 import { Edit02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -168,7 +169,9 @@ export function ThemeTable({
     [themes, mode],
   );
 
-  const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
+  const extraEditors = useMemo(() => unpairedEditorThemes(themes, mode), [themes, mode]);
+
+  const activeEditorId =resolveEditorThemeId(editorPref, themeId, themes, mode);
   const editorSurface = (id: EditorThemeId, app: Theme) =>
     resolveEditorSurface(id, app, mode, () => undefined);
 
@@ -320,6 +323,34 @@ export function ThemeTable({
             </div>
           );
         })}
+        {extraEditors.length > 0 ? (
+          <div className="px-2 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Editor only
+          </div>
+        ) : null}
+        {extraEditors.map((id) => (
+          <div
+            key={id}
+            className={cn(COLUMNS, "items-center rounded-lg border border-border/60 bg-card/40 p-0.5")}
+          >
+            <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
+            <Cell
+              info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
+              on={!editorAuto && id === editorPref}
+              locked={editorAuto}
+              onPick={() => {
+                setLastEditor(id);
+                void setEditorTheme(id);
+              }}
+              preview={
+                <Suspense fallback={<div className="h-40" />}>
+                  <EditorThemePreview themeId={id} surface={editorSurface(id, activeTheme)} />
+                </Suspense>
+              }
+            />
+            <span />
+          </div>
+        ))}
       </div>
     </div>
   );

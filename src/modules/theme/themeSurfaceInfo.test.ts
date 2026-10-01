@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { listBuiltinThemes } from "./themes";
-import { themeSurfaceInfo } from "./themeSurfaceInfo";
+import { EDITOR_THEME_MODE } from "@/modules/settings/store";
+import { themeSurfaceInfo, unpairedEditorThemes } from "./themeSurfaceInfo";
 import type { Theme } from "./types";
 
 const palette = (bg: string) => ({
@@ -53,6 +54,19 @@ describe("themeSurfaceInfo", () => {
     const b = mk("b", "github-light", "#111111");
     expect(themeSurfaceInfo(a, [a, b], "dark").editor.sharedWith).toEqual([]);
     expect(themeSurfaceInfo(a, [a, b], "light").editor.sharedWith).toEqual(["B"]);
+  });
+
+  it("lists the editor themes of the mode that no app theme pairs", () => {
+    const a = mk("a", "nord", "#000000");
+    const unpaired = unpairedEditorThemes([a], "dark");
+    expect(unpaired).toContain("dracula");
+    expect(unpaired).not.toContain("nord");
+    expect(unpaired).not.toContain("github-light");
+  });
+
+  it("only lists editor themes of the requested mode", () => {
+    const unpaired = unpairedEditorThemes(listBuiltinThemes(), "light");
+    for (const id of unpaired) expect(EDITOR_THEME_MODE[id]).toBe("light");
   });
 
   it("gives every builtin theme an editor and a terminal in both modes", () => {
