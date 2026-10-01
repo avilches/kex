@@ -15,10 +15,9 @@ import { resolveEditorThemeId } from "@/modules/theme/resolveEditorTheme";
 import { paletteOf, resolveTerminalPalette } from "@/modules/theme/resolveTerminalTheme";
 import { themeSurfaceInfo, unpairedEditorThemes, type SurfaceInfo } from "@/modules/theme/themeSurfaceInfo";
 import type { Theme, ThemeMode } from "@/modules/theme/types";
-import { Edit02Icon } from "@hugeicons/core-free-icons";
+import { Edit02Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { HoverCard } from "radix-ui";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { TerminalThemePreview } from "./TerminalThemePreview";
 
 const EditorThemePreview = lazy(() => import("./EditorThemePreview"));
@@ -77,70 +76,50 @@ function ShellPreview({ theme, mode }: { theme: Theme; mode: ThemeMode }) {
   );
 }
 
-function CellHover({
-  disabled,
-  content,
-  children,
-}: {
-  disabled?: boolean;
-  content: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <HoverCard.Root openDelay={150} closeDelay={50}>
-      <HoverCard.Trigger asChild>{children}</HoverCard.Trigger>
-      {disabled ? null : (
-        <HoverCard.Portal>
-          <HoverCard.Content
-            side="bottom"
-            align="start"
-            sideOffset={6}
-            className="z-50 w-[330px] rounded-lg border border-border bg-popover p-2 shadow-xl"
-          >
-            {content}
-          </HoverCard.Content>
-        </HoverCard.Portal>
-      )}
-    </HoverCard.Root>
-  );
-}
-
 function Cell({
   info,
   selected,
   frameClass,
   locked,
   onPick,
-  preview,
+  onPeek,
 }: {
   info: SurfaceInfo | undefined;
   selected: boolean;
   frameClass: string;
   locked: boolean;
   onPick: () => void;
-  preview: React.ReactNode;
+  onPeek: (open: boolean) => void;
 }) {
   if (!info) {
     return <div className={cn(frameClass, "px-2 py-1.5 text-[11.5px] text-muted-foreground/60")}>-</div>;
   }
   const shared = info.sharedWith.length > 0;
   return (
-    <CellHover content={preview}>
+    <div className={cn(frameClass, "group/cell flex min-w-0 items-center")}>
       <button
         type="button"
         disabled={locked}
         onClick={onPick}
         title={shared ? `Also used by ${info.sharedWith.join(", ")}` : "Its own"}
         className={cn(
-          frameClass,
-          "flex min-w-0 items-center px-2 py-1.5 text-left text-[11.5px] transition-colors",
+          "flex min-w-0 flex-1 items-center rounded-md px-2 py-1.5 text-left text-[11.5px] transition-colors",
           locked ? "cursor-default" : "hover:bg-muted/60",
           locked && !selected && "opacity-50",
         )}
       >
         <span className="truncate">{info.label}</span>
       </button>
-    </CellHover>
+      <span
+        role="img"
+        aria-label={`Preview ${info.label}`}
+        onMouseEnter={() => onPeek(true)}
+        onMouseLeave={() => onPeek(false)}
+        className="mr-1 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover/cell:opacity-100"
+      >
+        <HugeiconsIcon icon={ViewIcon} size={12} strokeWidth={1.75} />
+      </span>
+    </div>
   );
 }
 
@@ -164,6 +143,16 @@ export function ThemeTable({
     terminalAuto ? null : terminalPref,
   );
 
+  type Peek = { kind: "editor"; id: EditorThemeId; app: Theme } | { kind: "terminal"; app: Theme };
+  const [peek, setPeek] = useState<Peek | null>(null);
+  const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(peekTimer.current), []);
+  const peekHandler = (next: Peek) => (open: boolean) => {
+    clearTimeout(peekTimer.current);
+    if (!open) return setPeek(null);
+    peekTimer.current = setTimeout(() => setPeek(next), 150);
+  };
+
   const rows = useMemo(
     () =>
       themes.map((t) => ({
@@ -176,7 +165,7 @@ export function ThemeTable({
 
   const extraEditors = useMemo(() => unpairedEditorThemes(themes, mode), [themes, mode]);
 
-  const activeEditorId =resolveEditorThemeId(editorPref, themeId, themes, mode);
+  const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
   const editorSurface = (id: EditorThemeId, app: Theme) =>
     resolveEditorSurface(id, app, mode, () => undefined);
 
@@ -200,7 +189,33 @@ export function ThemeTable({
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="relative flex flex-col gap-2.5">
+      <div className={cn(COLUMNS, "items-center px-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground")}>
+        <span className="px-2">Theme</span>
+        <div className="flex items-center justify-between px-2">
+          <span>Editor</span>
+          <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
+            <Checkbox
+              id="editor-auto"
+              checked={editorAuto}
+              onCheckedChange={(v) => toggleEditorAuto(v === true)}
+            />
+            Auto
+          </label>
+        </div>
+        <div className="flex items-center justify-between px-2">
+          <span>Terminal</span>
+          <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
+            <Checkbox
+              id="terminal-auto"
+              checked={terminalAuto}
+              onCheckedChange={(v) => toggleTerminalAuto(v === true)}
+            />
+            Auto
+          </label>
+        </div>
+      </div>
+
       <div className={COLUMNS}>
         <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">{activeTheme.name}</span>
@@ -229,32 +244,6 @@ export function ThemeTable({
               palette={resolveTerminalPalette(terminalPref, activeTheme, themes, mode)}
             />
           </div>
-        </div>
-      </div>
-
-      <div className={cn(COLUMNS, "items-center px-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground")}>
-        <span className="px-2">Theme</span>
-        <div className="flex items-center justify-between px-2">
-          <span>Editor</span>
-          <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
-            <Checkbox
-              id="editor-auto"
-              checked={editorAuto}
-              onCheckedChange={(v) => toggleEditorAuto(v === true)}
-            />
-            Auto
-          </label>
-        </div>
-        <div className="flex items-center justify-between px-2">
-          <span>Terminal</span>
-          <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
-            <Checkbox
-              id="terminal-auto"
-              checked={terminalAuto}
-              onCheckedChange={(v) => toggleTerminalAuto(v === true)}
-            />
-            Auto
-          </label>
         </div>
       </div>
 
@@ -306,11 +295,7 @@ export function ThemeTable({
                   setLastEditor(editorId);
                   void setEditorTheme(editorId);
                 }}
-                preview={
-                  <Suspense fallback={<div className="h-40" />}>
-                    <EditorThemePreview themeId={editorId} surface={editorSurface(editorId, t)} />
-                  </Suspense>
-                }
+                onPeek={peekHandler({ kind: "editor", id: editorId, app: t })}
               />
               <Cell
                 info={info.terminal}
@@ -321,7 +306,7 @@ export function ThemeTable({
                   setLastTerminal(t.id);
                   void setTerminalTheme(t.id);
                 }}
-                preview={<TerminalThemePreview palette={paletteOf(t, mode)} />}
+                onPeek={peekHandler({ kind: "terminal", app: t })}
               />
             </div>
           );
@@ -345,17 +330,24 @@ export function ThemeTable({
                   setLastEditor(id);
                   void setEditorTheme(id);
                 }}
-                preview={
-                  <Suspense fallback={<div className="h-40" />}>
-                    <EditorThemePreview themeId={id} surface={editorSurface(id, activeTheme)} />
-                  </Suspense>
-                }
+                onPeek={peekHandler({ kind: "editor", id, app: activeTheme })}
               />
               <span />
             </div>
           );
         })}
       </div>
+      {peek ? (
+        <div className="pointer-events-none absolute top-7 right-0 left-[170px] z-50 rounded-lg border border-border bg-popover p-2 shadow-xl">
+          {peek.kind === "editor" ? (
+            <Suspense fallback={<div className="h-40" />}>
+              <EditorThemePreview themeId={peek.id} surface={editorSurface(peek.id, peek.app)} />
+            </Suspense>
+          ) : (
+            <TerminalThemePreview palette={paletteOf(peek.app, mode)} />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
