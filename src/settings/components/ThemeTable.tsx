@@ -17,7 +17,8 @@ import { themeSurfaceInfo, unpairedEditorThemes, type SurfaceInfo } from "@/modu
 import type { Theme, ThemeMode } from "@/modules/theme/types";
 import { Edit02Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { HoverCard } from "radix-ui";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { TerminalThemePreview } from "./TerminalThemePreview";
 
 const EditorThemePreview = lazy(() => import("./EditorThemePreview"));
@@ -76,20 +77,31 @@ function ShellPreview({ theme, mode }: { theme: Theme; mode: ThemeMode }) {
   );
 }
 
+function EditorPeek({ id, app, mode }: { id: EditorThemeId; app: Theme; mode: ThemeMode }) {
+  return (
+    <Suspense fallback={<div className="h-56" />}>
+      <EditorThemePreview
+        themeId={id}
+        surface={resolveEditorSurface(id, app, mode, () => undefined)}
+      />
+    </Suspense>
+  );
+}
+
 function Cell({
   info,
   selected,
   frameClass,
   locked,
   onPick,
-  onPeek,
+  preview,
 }: {
   info: SurfaceInfo | undefined;
   selected: boolean;
   frameClass: string;
   locked: boolean;
   onPick: () => void;
-  onPeek: (open: boolean) => void;
+  preview: React.ReactNode;
 }) {
   if (!info) {
     return <div className={cn(frameClass, "px-2 py-1.5 text-[11.5px] text-muted-foreground/60")}>-</div>;
@@ -110,15 +122,28 @@ function Cell({
       >
         <span className="truncate">{info.label}</span>
       </button>
-      <span
-        role="img"
-        aria-label={`Preview ${info.label}`}
-        onMouseEnter={() => onPeek(true)}
-        onMouseLeave={() => onPeek(false)}
-        className="mr-1 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover/cell:opacity-100"
-      >
-        <HugeiconsIcon icon={ViewIcon} size={12} strokeWidth={1.75} />
-      </span>
+      <HoverCard.Root openDelay={150} closeDelay={80}>
+        <HoverCard.Trigger asChild>
+          <span
+            role="img"
+            aria-label={`Preview ${info.label}`}
+            className="mr-1 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover/cell:opacity-100"
+          >
+            <HugeiconsIcon icon={ViewIcon} size={12} strokeWidth={1.75} />
+          </span>
+        </HoverCard.Trigger>
+        <HoverCard.Portal>
+          <HoverCard.Content
+            side="bottom"
+            align="center"
+            sideOffset={8}
+            collisionPadding={12}
+            className="z-50 w-[480px] max-w-[calc(100vw-24px)] rounded-lg border border-border bg-popover p-2.5 shadow-xl"
+          >
+            {preview}
+          </HoverCard.Content>
+        </HoverCard.Portal>
+      </HoverCard.Root>
     </div>
   );
 }
@@ -143,16 +168,6 @@ export function ThemeTable({
     terminalAuto ? null : terminalPref,
   );
 
-  type Peek = { kind: "editor"; id: EditorThemeId; app: Theme } | { kind: "terminal"; app: Theme };
-  const [peek, setPeek] = useState<Peek | null>(null);
-  const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(peekTimer.current), []);
-  const peekHandler = (next: Peek) => (open: boolean) => {
-    clearTimeout(peekTimer.current);
-    if (!open) return setPeek(null);
-    peekTimer.current = setTimeout(() => setPeek(next), 150);
-  };
-
   const rows = useMemo(
     () =>
       themes.map((t) => ({
@@ -166,8 +181,6 @@ export function ThemeTable({
   const extraEditors = useMemo(() => unpairedEditorThemes(themes, mode), [themes, mode]);
 
   const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
-  const editorSurface = (id: EditorThemeId, app: Theme) =>
-    resolveEditorSurface(id, app, mode, () => undefined);
 
   const toggleEditorAuto = (auto: boolean) => {
     if (auto) {
@@ -189,7 +202,7 @@ export function ThemeTable({
   };
 
   return (
-    <div className="relative flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2.5">
       <div className={cn(COLUMNS, "items-center px-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground")}>
         <span className="px-2">Theme</span>
         <div className="flex items-center justify-between px-2">
@@ -295,7 +308,7 @@ export function ThemeTable({
                   setLastEditor(editorId);
                   void setEditorTheme(editorId);
                 }}
-                onPeek={peekHandler({ kind: "editor", id: editorId, app: t })}
+                preview={<EditorPeek id={editorId} app={t} mode={mode} />}
               />
               <Cell
                 info={info.terminal}
@@ -306,7 +319,7 @@ export function ThemeTable({
                   setLastTerminal(t.id);
                   void setTerminalTheme(t.id);
                 }}
-                onPeek={peekHandler({ kind: "terminal", app: t })}
+                preview={<TerminalThemePreview palette={paletteOf(t, mode)} />}
               />
             </div>
           );
@@ -330,24 +343,13 @@ export function ThemeTable({
                   setLastEditor(id);
                   void setEditorTheme(id);
                 }}
-                onPeek={peekHandler({ kind: "editor", id, app: activeTheme })}
+                preview={<EditorPeek id={id} app={activeTheme} mode={mode} />}
               />
               <span />
             </div>
           );
         })}
       </div>
-      {peek ? (
-        <div className="pointer-events-none absolute top-7 right-0 left-[170px] z-50 rounded-lg border border-border bg-popover p-2 shadow-xl">
-          {peek.kind === "editor" ? (
-            <Suspense fallback={<div className="h-40" />}>
-              <EditorThemePreview themeId={peek.id} surface={editorSurface(peek.id, peek.app)} />
-            </Suspense>
-          ) : (
-            <TerminalThemePreview palette={paletteOf(peek.app, mode)} />
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }
