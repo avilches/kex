@@ -1,0 +1,326 @@
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  EDITOR_THEME_AUTO,
+  isEditorThemeId,
+  setEditorTheme,
+  setTerminalTheme,
+  TERMINAL_THEME_AUTO,
+} from "@/modules/settings/store";
+import type { EditorThemeId } from "@/modules/settings/store";
+import { resolveEditorSurface } from "@/modules/theme/resolveEditorSurface";
+import { resolveEditorThemeId } from "@/modules/theme/resolveEditorTheme";
+import { paletteOf, resolveTerminalPalette } from "@/modules/theme/resolveTerminalTheme";
+import { themeSurfaceInfo, type SurfaceInfo } from "@/modules/theme/themeSurfaceInfo";
+import type { Theme, ThemeMode } from "@/modules/theme/types";
+import { Edit02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { HoverCard } from "radix-ui";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { TerminalThemePreview } from "./TerminalThemePreview";
+
+const EditorThemePreview = lazy(() => import("./EditorThemePreview"));
+
+const COLUMNS = "grid grid-cols-[170px_minmax(0,1fr)_minmax(0,1fr)] gap-2";
+const PREVIEW_BOX = "h-[84px] overflow-hidden rounded-md";
+
+type Props = {
+  themes: Theme[];
+  themeId: string;
+  customIds: Set<string>;
+  mode: ThemeMode;
+  activeTheme: Theme;
+  onSelectTheme: (id: string) => void;
+  onEditTheme: (id: string) => void;
+  onRemoveTheme: (id: string) => void;
+};
+
+function Swatch({ theme, mode }: { theme: Theme; mode: ThemeMode }) {
+  const c = (theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light)?.colors;
+  const chips = [c?.background, c?.primary ?? c?.accent, c?.foreground];
+  return (
+    <span className="flex shrink-0 gap-0.5">
+      {chips.map((color, i) => (
+        <i
+          key={i}
+          className="block h-4 w-[7px] rounded-[2px] border border-border/40"
+          style={{ background: color ?? "var(--muted)" }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function ShellPreview({ theme, mode }: { theme: Theme; mode: ThemeMode }) {
+  const c = (theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light)?.colors;
+  return (
+    <div
+      className={cn(PREVIEW_BOX, "border border-border/60 p-2 text-[10.5px] leading-[1.5]")}
+      style={{ background: c?.sidebar ?? c?.background, color: c?.foreground }}
+    >
+      <div style={{ color: c?.primary ?? c?.accent }}>■ Explorer</div>
+      <div>■ Source Control</div>
+      <div>■ Notes</div>
+    </div>
+  );
+}
+
+function CellHover({
+  disabled,
+  content,
+  children,
+}: {
+  disabled?: boolean;
+  content: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <HoverCard.Root openDelay={150} closeDelay={50}>
+      <HoverCard.Trigger asChild>{children}</HoverCard.Trigger>
+      {disabled ? null : (
+        <HoverCard.Portal>
+          <HoverCard.Content
+            side="bottom"
+            align="start"
+            sideOffset={6}
+            className="z-50 w-[330px] rounded-lg border border-border bg-popover p-2 shadow-xl"
+          >
+            {content}
+          </HoverCard.Content>
+        </HoverCard.Portal>
+      )}
+    </HoverCard.Root>
+  );
+}
+
+function Cell({
+  info,
+  on,
+  locked,
+  onPick,
+  preview,
+}: {
+  info: SurfaceInfo | undefined;
+  on: boolean;
+  locked: boolean;
+  onPick: () => void;
+  preview: React.ReactNode;
+}) {
+  if (!info) {
+    return <div className="px-2 py-1.5 text-[11.5px] text-muted-foreground/60">-</div>;
+  }
+  const shared = info.sharedWith.length > 0;
+  return (
+    <CellHover content={preview}>
+      <button
+        type="button"
+        disabled={locked}
+        onClick={onPick}
+        title={shared ? `Also used by ${info.sharedWith.join(", ")}` : "Its own"}
+        className={cn(
+          "flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[11.5px] transition-colors",
+          locked ? "cursor-default opacity-50" : "hover:bg-muted/60",
+        )}
+      >
+        <span
+          className={cn(
+            "size-[11px] shrink-0 rounded-full border-[1.5px]",
+            on ? "border-foreground bg-foreground [box-shadow:inset_0_0_0_2px_var(--card)]" : "border-muted-foreground/60",
+          )}
+        />
+        <span className="truncate">{info.label}</span>
+        {shared ? (
+          <span className="ml-auto shrink-0 text-[9.5px] text-muted-foreground">shared</span>
+        ) : null}
+      </button>
+    </CellHover>
+  );
+}
+
+export function ThemeTable({
+  themes,
+  themeId,
+  customIds,
+  mode,
+  activeTheme,
+  onSelectTheme,
+  onEditTheme,
+  onRemoveTheme,
+}: Props) {
+  const editorPref = usePreferencesStore((s) => s.editorTheme);
+  const terminalPref = usePreferencesStore((s) => s.terminalTheme);
+  const editorAuto = editorPref === EDITOR_THEME_AUTO;
+  const terminalAuto = terminalPref === TERMINAL_THEME_AUTO;
+
+  const [lastEditor, setLastEditor] = useState<string | null>(editorAuto ? null : editorPref);
+  const [lastTerminal, setLastTerminal] = useState<string | null>(
+    terminalAuto ? null : terminalPref,
+  );
+
+  const rows = useMemo(
+    () =>
+      themes.map((t) => ({
+        theme: t,
+        info: themeSurfaceInfo(t, themes, mode),
+        editorId: resolveEditorThemeId("auto", t.id, themes, mode),
+      })),
+    [themes, mode],
+  );
+
+  const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
+  const editorSurface = (id: EditorThemeId, app: Theme) =>
+    resolveEditorSurface(id, app, mode, () => undefined);
+
+  const toggleEditorAuto = (auto: boolean) => {
+    if (auto) {
+      if (!editorAuto) setLastEditor(editorPref);
+      void setEditorTheme(EDITOR_THEME_AUTO);
+    } else {
+      const back = lastEditor && isEditorThemeId(lastEditor) ? lastEditor : activeEditorId;
+      void setEditorTheme(back);
+    }
+  };
+  const toggleTerminalAuto = (auto: boolean) => {
+    if (auto) {
+      if (!terminalAuto) setLastTerminal(terminalPref);
+      void setTerminalTheme(TERMINAL_THEME_AUTO);
+    } else {
+      const back = lastTerminal && themes.some((t) => t.id === lastTerminal) ? lastTerminal : themeId;
+      void setTerminalTheme(back);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className={COLUMNS}>
+        <div className="flex flex-col gap-1">
+          <span className="px-0.5 text-[11px] font-medium">{activeTheme.name}</span>
+          <ShellPreview theme={activeTheme} mode={mode} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="px-0.5 text-[11px] font-medium">
+            {rows.find((r) => r.editorId === activeEditorId)?.info.editor.label ?? activeEditorId}
+          </span>
+          <div className={cn(PREVIEW_BOX, "border border-border/60 text-[10.5px]")}>
+            <Suspense fallback={null}>
+              <EditorThemePreview
+                themeId={activeEditorId}
+                surface={resolveEditorSurface(editorPref, activeTheme, mode, () => undefined)}
+              />
+            </Suspense>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="px-0.5 text-[11px] font-medium">
+            {themes.find((t) => t.id === (terminalAuto ? themeId : terminalPref))?.name ??
+              activeTheme.name}
+          </span>
+          <div className={PREVIEW_BOX}>
+            <TerminalThemePreview
+              palette={resolveTerminalPalette(terminalPref, activeTheme, themes, mode)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className={cn(COLUMNS, "items-center px-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground")}>
+        <span className="px-2">Theme</span>
+        <div className="flex items-center justify-between px-2">
+          <span>Editor</span>
+          <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
+            <Checkbox
+              id="editor-auto"
+              checked={editorAuto}
+              onCheckedChange={(v) => toggleEditorAuto(v === true)}
+            />
+            Auto
+          </label>
+        </div>
+        <div className="flex items-center justify-between px-2">
+          <span>Terminal</span>
+          <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
+            <Checkbox
+              id="terminal-auto"
+              checked={terminalAuto}
+              onCheckedChange={(v) => toggleTerminalAuto(v === true)}
+            />
+            Auto
+          </label>
+        </div>
+      </div>
+
+      <div className="flex max-h-[340px] flex-col gap-1 overflow-y-auto pr-0.5">
+        {rows.map(({ theme: t, info, editorId }) => {
+          const active = t.id === themeId;
+          const isCustom = customIds.has(t.id);
+          return (
+            <div
+              key={t.id}
+              className={cn(
+                COLUMNS,
+                "group items-center rounded-lg border bg-card/40 p-0.5",
+                active ? "border-foreground/50 ring-1 ring-foreground/15" : "border-border/60",
+              )}
+            >
+              <div className="flex min-w-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onSelectTheme(t.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted/60"
+                >
+                  <Swatch theme={t} mode={mode} />
+                  <span className="truncate text-[12px] font-medium">{t.name}</span>
+                </button>
+                {isCustom ? (
+                  <span className="flex shrink-0 opacity-0 transition group-hover:opacity-100">
+                    <button
+                      type="button"
+                      aria-label={`Edit ${t.name}`}
+                      className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={() => onEditTheme(t.id)}
+                    >
+                      <HugeiconsIcon icon={Edit02Icon} size={11} strokeWidth={1.75} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${t.name}`}
+                      className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"
+                      onClick={() => onRemoveTheme(t.id)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ) : null}
+              </div>
+              <Cell
+                info={info.editor}
+                on={editorAuto ? active : editorId === editorPref}
+                locked={editorAuto}
+                onPick={() => {
+                  setLastEditor(editorId);
+                  void setEditorTheme(editorId);
+                }}
+                preview={
+                  <Suspense fallback={<div className="h-40" />}>
+                    <EditorThemePreview themeId={editorId} surface={editorSurface(editorId, t)} />
+                  </Suspense>
+                }
+              />
+              <Cell
+                info={info.terminal}
+                on={terminalAuto ? active : t.id === terminalPref}
+                locked={terminalAuto}
+                onPick={() => {
+                  setLastTerminal(t.id);
+                  void setTerminalTheme(t.id);
+                }}
+                preview={<TerminalThemePreview palette={paletteOf(t, mode)} />}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
