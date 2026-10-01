@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { warn } from "@tauri-apps/plugin-log";
 import { toast } from "sonner";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -84,7 +85,10 @@ export function pruneOrphanedPlans(knownTabIds: Set<string>): void {
   }
   if (import.meta.env.DEV) {
     const msg = describeOrphans(loadedPlanCount, orphaned);
-    if (msg) toast.warning(msg, { duration: 20_000 });
+    if (msg) {
+      void warn(`[agent-session] ${msg}`);
+      toast.warning(msg, { duration: 20_000 });
+    }
   }
 }
 
@@ -94,6 +98,8 @@ export function watchResume(plan: RestorePlan): void {
   if (!import.meta.env.DEV) return;
   setTimeout(() => {
     if (hasResumed(useAgentStore.getState().sessions[plan.tabId])) return;
-    toast.warning(describeSilentResume(plan), { duration: 20_000 });
+    const msg = describeSilentResume(plan);
+    void warn(`[agent-session] ${msg}`);
+    toast.warning(msg, { duration: 20_000 });
   }, RESUME_CHECK_MS);
 }

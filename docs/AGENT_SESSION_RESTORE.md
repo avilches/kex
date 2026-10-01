@@ -352,5 +352,8 @@ Sonner toast. The pure logic is in `agents/lib/restoreCheck.ts`; the toasts are 
   via `kex:agent-session-meta`). The timer starts when the tab's terminal spawns, so a plan in a workspace that is never
   opened is not a failure.
 
+Each toast is also written to `Kex.log` (`user-data/logs-dev/Kex.log`) as a `WARN` line starting with
+`[agent-session]`, so the log can be searched for it after the toast is gone.
+
 It cannot see a session that was never recorded in the store (hook without `KEX_TAB_ID`, `agentNotifications` off,
 `-p`): that session is not among the N plans to begin with.
