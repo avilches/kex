@@ -268,7 +268,7 @@ export function ThemeTable({
           const editorSel = editorAuto ? active : editorId === editorPref;
           const terminalSel = info.terminal !== undefined && (terminalAuto ? active : t.id === terminalPref);
           return (
-            <div key={t.id} className={cn(COLUMNS, "group items-center")}>
+            <div key={t.id} className={cn(COLUMNS, "group items-stretch")}>
               <div className={cn(frame(themeSel, false, editorSel), "flex min-w-0 items-center gap-1")}>
                 <button
                   type="button"
@@ -332,7 +332,7 @@ export function ThemeTable({
         {extraEditors.map((id) => {
           const sel = !editorAuto && id === editorPref;
           return (
-            <div key={id} className={cn(COLUMNS, "items-center")}>
+            <div key={id} className={cn(COLUMNS, "items-stretch")}>
               <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
               <Cell
                 info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
