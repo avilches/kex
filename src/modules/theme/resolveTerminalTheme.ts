@@ -14,7 +14,7 @@ const MODE_DEFAULTS: Record<ThemeMode, { background: string; foreground: string;
   light: { background: "#ffffff", foreground: "#0a0a0a", selection: "rgba(0,0,0,0.15)" },
 };
 
-function paletteOf(theme: Theme | undefined, mode: ThemeMode): TerminalPalette | undefined {
+export function paletteOf(theme: Theme | undefined, mode: ThemeMode): TerminalPalette | undefined {
   if (!theme) return undefined;
   const own = theme.variants[mode];
   const otherMode: ThemeMode = mode === "dark" ? "light" : "dark";

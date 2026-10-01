@@ -15,6 +15,7 @@ import { useTheme } from "@/modules/theme";
 import { deleteCustomTheme, saveCustomTheme } from "@/modules/theme/customThemes";
 import { listBuiltinThemes } from "@/modules/theme/themes";
 import { validateTheme } from "@/modules/theme/validateTheme";
+import { themeSurfaceInfo, type SurfaceInfo } from "@/modules/theme/themeSurfaceInfo";
 import { deleteThemeFile, emitThemeEdit } from "@/modules/theme/themeFiles";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import {
@@ -45,6 +46,20 @@ const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIco
 const EditorThemePreview = lazy(() => import("../components/EditorThemePreview"));
 
 type Choice = { id: string; label: string };
+
+function SurfaceLine({ kind, info }: { kind: string; info: SurfaceInfo | undefined }) {
+  if (!info) return null;
+  const shared = info.sharedWith.length > 0;
+  return (
+    <span
+      className="truncate text-[10.5px] text-muted-foreground"
+      title={shared ? `Also used by ${info.sharedWith.join(", ")}` : `${kind} theme of its own`}
+    >
+      {kind}: {info.label}
+      {shared ? ` (shared with ${info.sharedWith.length})` : ""}
+    </span>
+  );
+}
 
 function ChoiceGroup({
   title,
@@ -257,6 +272,7 @@ export function ThemesSection() {
             const swatchMuted = c?.muted ?? "var(--muted)";
             const selected = themeId === t.id;
             const isCustom = customIds.has(t.id);
+            const surfaces = themeSurfaceInfo(t, themes, resolvedMode);
             return (
               <button
                 key={t.id}
@@ -295,6 +311,8 @@ export function ThemesSection() {
                       {t.description}
                     </span>
                   ) : null}
+                  <SurfaceLine kind="Editor" info={surfaces.editor} />
+                  <SurfaceLine kind="Terminal" info={surfaces.terminal} />
                 </div>
                 {isCustom ? (
                   <span className="ml-1 flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
