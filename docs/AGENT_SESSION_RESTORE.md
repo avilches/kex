@@ -339,3 +339,18 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | `KEX_TAB_ID` not set in shell | Hook exits silently; session not recorded |
 | `agent_session_restore_plan` IPC fails | `loadRestorePlans` catches and sets an empty Map; no crash |
 | Resume command fails inside terminal | User sees the error in the terminal; `⚠` stays until user types |
+
+### Dev-only restore check (`pnpm tauri dev`)
+
+Two failures leave no trace in the UI, so dev builds (`import.meta.env.DEV`, absent from production) warn with a
+Sonner toast. The pure logic is in `agents/lib/restoreCheck.ts`; the toasts are fired from `agentSessionRestore.ts`.
+
+- **Plan whose tab no longer exists.** `pruneOrphanedPlans` already dropped it silently; now a toast says how many of
+  the N loaded plans were lost and which tabs.
+- **Resume command that never reports a session.** `watchResume` runs after the command is written to the PTY and, 30 s
+  later (`RESUME_CHECK_MS`), toasts if `sessions[tabId].meta.sessionId` is still empty (it is filled by `SessionStart`
+  via `kex:agent-session-meta`). The timer starts when the tab's terminal spawns, so a plan in a workspace that is never
+  opened is not a failure.
+
+It cannot see a session that was never recorded in the store (hook without `KEX_TAB_ID`, `agentNotifications` off,
+`-p`): that session is not among the N plans to begin with.
