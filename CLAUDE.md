@@ -170,8 +170,8 @@ tema de app lo empareja en `editorTheme: { dark, light }`.
   elegida a mano gana siempre sobre el tema de app, así que "el terminal no cambia" casi siempre es un
   valor distinto de `auto`. Se prueba con las dos preferencias en Auto.
 - La Kex instalada (`/Applications/Kex.app`) no lleva los cambios de una rama: se prueba con
-  `pnpm tauri dev` desde el worktree, y si el puerto 1420 está ocupado se cambian `beforeDevCommand` y
-  `devUrl` en `src-tauri/tauri.conf.json` y se revierte antes del commit.
+  `pnpm tauri dev` desde el worktree. Cada worktree usa su propio puerto de Vite (lo elige
+  `scripts/tauri.mjs` y lo imprime al arrancar), así que no hace falta tocar `tauri.conf.json`.
 - Se mira siempre el editor de código, el markdown en Source, Rich y Preview, el terminal, las
   muestras de Settings (Editor theme y Terminal theme) y las barras de ruta, en dark y en light.
 

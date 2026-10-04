@@ -2,10 +2,19 @@ fn main() {
     // `pnpm tauri dev` compiles with the debug profile, `pnpm tauri build` with release.
     // Give the dev build its own identifier so it writes settings/logs to a separate
     // directory instead of the one the installed .app uses day to day.
+    // The dev server port is picked per checkout by scripts/tauri.mjs; the dev build
+    // has to load that same URL, so it travels in the same injected config.
+    println!("cargo:rerun-if-env-changed=KEX_DEV_PORT");
     if std::env::var("PROFILE").as_deref() == Ok("debug") {
+        let port = std::env::var("KEX_DEV_PORT")
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(1420);
         println!(
             "cargo:rustc-env=TAURI_CONFIG={}",
-            r#"{"identifier":"app.betauer.kex.dev","productName":"Kex Dev"}"#
+            format!(
+                r#"{{"identifier":"app.betauer.kex.dev","productName":"Kex Dev","build":{{"devUrl":"http://localhost:{port}"}}}}"#
+            )
         );
     }
 

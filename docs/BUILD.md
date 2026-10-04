@@ -4,13 +4,21 @@
 
 ```bash
 pnpm install
-pnpm tauri dev         # frontend (Vite, port 1420) + Rust (cargo run)
-pnpm dev               # frontend only (no Rust)
+pnpm tauri dev         # frontend (Vite) + Rust (cargo run); the port is picked per checkout
+pnpm dev               # frontend only (no Rust), port 1420
 ```
+
+`pnpm tauri dev` goes through `scripts/tauri.mjs`, which picks the Vite port so several checkouts
+(one per worktree) can run the app at the same time. The main checkout gets 1420 and each worktree
+under `.claude/worktrees/` gets a port in 1421-1920 derived from its path (stable between runs, the
+next free one if taken). The script prints it (`[kex] dev server on port N`) and passes it as
+`KEX_DEV_PORT` to Vite (`vite.config.ts`), to the Tauri CLI as `--config` (`devUrl`) and to
+`src-tauri/build.rs`, which bakes the same URL into the dev build. Exporting `KEX_DEV_PORT` yourself
+overrides the choice, and a bare `pnpm dev` honors it too, defaulting to 1420.
 
 ### Theme preview page
 
-`pnpm dev` also serves `http://localhost:1420/theme-preview.html` (`theme-preview.html` +
+`pnpm dev` also serves `http://localhost:1420/theme-preview.html` (on the port Vite prints if `KEX_DEV_PORT` is set; `theme-preview.html` +
 `src/theme-preview/main.ts`), a vanilla-DOM page (no React tree, no Tauri `invoke`) that applies a
 theme through the real `applyTheme` and shows WorkspaceBar, Header, Sidebar (Explorer, Source
 Control, History, Notes), tab bar with agent chips, terminal (background, selection, cursor, 16
