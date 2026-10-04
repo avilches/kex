@@ -26,13 +26,41 @@ const EditorThemePreview = lazy(() => import("./EditorThemePreview"));
 const COLUMNS = "grid grid-cols-[170px_minmax(0,1fr)_minmax(0,1fr)] gap-0";
 const PREVIEW_BOX = "h-[84px] overflow-hidden rounded-md";
 
-/** Border around a selected cell; neighbours that are selected too join into one outline. */
-function frame(selected: boolean, leftSelected: boolean, rightSelected: boolean) {
-  return cn(
-    "rounded-lg border border-transparent",
-    selected && "border-foreground/50 bg-card/60",
-    selected && leftSelected && "rounded-l-none border-l-transparent",
-    selected && rightSelected && "rounded-r-none border-r-transparent",
+const CELL = "relative rounded-lg";
+const FIRST_COLUMN = "170px";
+
+function columnLeft(i: number) {
+  if (i === 0) return "0px";
+  if (i === 1) return FIRST_COLUMN;
+  return `calc(${FIRST_COLUMN} + (100% - ${FIRST_COLUMN}) / 2)`;
+}
+
+function columnWidth(from: number, to: number) {
+  const side = `(100% - ${FIRST_COLUMN}) / 2`;
+  const firstColumn = from === 0 ? 1 : 0;
+  const sides = to - from - firstColumn;
+  return `calc(${firstColumn ? FIRST_COLUMN : "0px"} + ${sides} * ${side})`;
+}
+
+/** One outline per run of adjacent selected cells, so joined cells share a single border. */
+function SelectionOutline({ selected }: { selected: boolean[] }) {
+  const runs: [number, number][] = [];
+  selected.forEach((on, i) => {
+    if (!on) return;
+    const last = runs[runs.length - 1];
+    if (last && last[1] === i) last[1] = i + 1;
+    else runs.push([i, i + 1]);
+  });
+  return (
+    <>
+      {runs.map(([from, to]) => (
+        <div
+          key={from}
+          className="pointer-events-none absolute inset-y-0 rounded-lg border border-foreground/50 bg-card/60"
+          style={{ left: columnLeft(from), width: columnWidth(from, to) }}
+        />
+      ))}
+    </>
   );
 }
 
@@ -252,8 +280,9 @@ export function ThemeTable({
           const editorSel = editorAuto ? active : t.id === editorRowId;
           const terminalSel = info.terminal !== undefined && (terminalAuto ? active : t.id === terminalPref);
           return (
-            <div key={t.id} className={cn(COLUMNS, "group items-stretch")}>
-              <div className={cn(frame(themeSel, false, editorSel), "flex min-w-0 items-center gap-1")}>
+            <div key={t.id} className={cn(COLUMNS, "group relative items-stretch")}>
+              <SelectionOutline selected={[themeSel, editorSel, terminalSel]} />
+              <div className={cn(CELL, "flex min-w-0 items-center gap-1")}>
                 <button
                   type="button"
                   onClick={() => selectTheme(t.id)}
@@ -285,7 +314,7 @@ export function ThemeTable({
               </div>
               <Cell
                 info={info.editor}
-                frameClass={frame(editorSel, themeSel, terminalSel)}
+                frameClass={CELL}
                 onPick={() => {
                   setPickedEditorRow(t.id);
                   void setEditorTheme(editorId);
@@ -294,7 +323,7 @@ export function ThemeTable({
               />
               <Cell
                 info={info.terminal}
-                frameClass={frame(terminalSel, editorSel, false)}
+                frameClass={CELL}
                                 onPick={() => {
                   void setTerminalTheme(t.id);
                 }}
@@ -311,11 +340,12 @@ export function ThemeTable({
         {extraEditors.map((id) => {
           const sel = !editorAuto && id === editorPref;
           return (
-            <div key={id} className={cn(COLUMNS, "items-stretch")}>
+            <div key={id} className={cn(COLUMNS, "relative items-stretch")}>
+              <SelectionOutline selected={[false, sel, false]} />
               <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
               <Cell
                 info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
-                frameClass={frame(sel, false, false)}
+                frameClass={CELL}
                                 onPick={() => {
                   void setEditorTheme(id);
                 }}
