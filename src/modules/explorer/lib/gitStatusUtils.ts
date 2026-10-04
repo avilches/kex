@@ -6,7 +6,12 @@ export function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
-function normalizeStatusCode(status: string): GitStatusCode {
+// Single normalization shared by every raw-git-status-to-badge mapping in the
+// app (source-control's staged/unstaged entries, git-history's per-commit
+// file list): collapses the raw single-letter codes git emits (which include
+// "?" for untracked and "C" for copied, with no dedicated category of its
+// own) down to the canonical GitStatusCode set.
+export function normalizeGitStatusCode(status: string): GitStatusCode {
   switch (status.trim().toUpperCase()) {
     case "?":
     case "U":
@@ -23,12 +28,38 @@ function normalizeStatusCode(status: string): GitStatusCode {
   }
 }
 
+export type GitStatusCategory = "added" | "modified" | "deleted" | "renamed" | "untracked";
+
+// Single classification shared by every status-to-color/class mapping in the app
+// (gitStatusHexColor, statusTextClass, statusTone): renamed and copied share a
+// category, as do untracked and the raw "?" git emits for it. Returns null for
+// any code outside this set so each presentational mapping keeps its own
+// fallback instead of silently defaulting to "modified".
+export function gitStatusCategory(code: string): GitStatusCategory | null {
+  switch (code.trim().toUpperCase()) {
+    case "A":
+      return "added";
+    case "M":
+      return "modified";
+    case "D":
+      return "deleted";
+    case "R":
+    case "C":
+      return "renamed";
+    case "U":
+    case "?":
+      return "untracked";
+    default:
+      return null;
+  }
+}
+
 export function statusCodeForFile(file: GitChangedFile): GitStatusCode {
   if (file.untracked) return "U";
   if (file.indexStatus === "U" || file.worktreeStatus === "U") return "U";
   const primary = file.unstaged ? file.worktreeStatus : file.indexStatus;
   const fallback = file.unstaged ? file.indexStatus : file.worktreeStatus;
-  return normalizeStatusCode(primary !== " " ? primary : fallback);
+  return normalizeGitStatusCode(primary !== " " ? primary : fallback);
 }
 
 export function buildGitStatusMap(

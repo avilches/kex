@@ -68,7 +68,7 @@ describe("runCloseQueue", () => {
     expect(closed).toEqual(["a"]);
   });
 
-  it("cancel on a busy terminal stops the whole queue", async () => {
+  it("cancel on a busy terminal stops the whole queue and reports it", async () => {
     const { deps, closed } = makeDeps(
       { a: { kind: "terminal" }, b: { kind: "terminal" } },
       {
@@ -76,8 +76,15 @@ describe("runCloseQueue", () => {
         askTerminalClose: async () => ({ type: "cancel" }),
       },
     );
-    await runCloseQueue(["a", "b"], deps);
+    const allClosed = await runCloseQueue(["a", "b"], deps);
     expect(closed).toEqual([]);
+    expect(allClosed).toBe(false);
+  });
+
+  it("reports true when every tab closes without cancelling", async () => {
+    const { deps } = makeDeps({ a: { kind: "terminal" }, b: { kind: "editor", dirty: false } });
+    const allClosed = await runCloseQueue(["a", "b"], deps);
+    expect(allClosed).toBe(true);
   });
 
   it("dont-ask-again disables the setting and closes the rest silently", async () => {
@@ -181,5 +188,39 @@ describe("runCloseQueue", () => {
     );
     await expect(runCloseQueue(["a"], deps)).rejects.toThrow("write failed");
     expect(closed).toEqual([]);
+  });
+
+  it("asks before closing a dirty markdown tab, same as a dirty editor tab", async () => {
+    const ask = vi.fn(async () => ({ type: "save" }) as const);
+    const { deps, closed, saved } = makeDeps(
+      { a: { kind: "markdown", dirty: true } },
+      { isAutoSaveEnabled: () => false, askEditorClose: ask },
+    );
+    const allClosed = await runCloseQueue(["a"], deps);
+    expect(ask).toHaveBeenCalledWith("a");
+    expect(saved).toEqual(["a"]);
+    expect(closed).toEqual(["a"]);
+    expect(allClosed).toBe(true);
+  });
+
+  it("cancelling the close of a dirty markdown tab stops the whole run", async () => {
+    const { deps, closed } = makeDeps(
+      { a: { kind: "markdown", dirty: true }, b: { kind: "editor", dirty: false } },
+      { askEditorClose: async () => ({ type: "cancel" }) },
+    );
+    const allClosed = await runCloseQueue(["a", "b"], deps);
+    expect(closed).toEqual([]);
+    expect(allClosed).toBe(false);
+  });
+
+  it("closes a clean markdown tab without asking", async () => {
+    const ask = vi.fn();
+    const { deps, closed } = makeDeps(
+      { a: { kind: "markdown", dirty: false } },
+      { askEditorClose: ask as never },
+    );
+    await runCloseQueue(["a"], deps);
+    expect(ask).not.toHaveBeenCalled();
+    expect(closed).toEqual(["a"]);
   });
 });

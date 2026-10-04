@@ -1,4 +1,10 @@
-import type { Theme, ThemeColors, ThemeVariant, TerminalPalette } from "./types";
+import type {
+  EditorSurface,
+  Theme,
+  ThemeColors,
+  ThemeVariant,
+  TerminalPalette,
+} from "./types";
 
 export type ValidationResult =
   | { ok: true; theme: Theme }
@@ -148,13 +154,29 @@ function parseTerminal(raw: unknown, path: string): TerminalPalette | string {
   return out;
 }
 
+function parseEditor(raw: unknown, path: string): EditorSurface | string {
+  if (raw === undefined) return {};
+  if (!isObj(raw)) return `${path} must be an object`;
+  const out: EditorSurface = {};
+  for (const k of ["background", "foreground"] as const) {
+    const v = raw[k];
+    if (v === undefined) continue;
+    if (!isStr(v)) return `${path}.${k} must be a string`;
+    if (!isValidColor(v)) return `${path}.${k} is not a valid CSS color`;
+    out[k] = v;
+  }
+  return out;
+}
+
 function parseVariant(raw: unknown, path: string): ThemeVariant | string {
   if (!isObj(raw)) return `${path} must be an object`;
   const colors = parseColors(raw.colors, `${path}.colors`);
   if (typeof colors === "string") return colors;
   const terminal = parseTerminal(raw.terminal, `${path}.terminal`);
   if (typeof terminal === "string") return terminal;
-  const variant: ThemeVariant = { colors, terminal };
+  const editor = parseEditor(raw.editor, `${path}.editor`);
+  if (typeof editor === "string") return editor;
+  const variant: ThemeVariant = { colors, terminal, editor };
   if (isObj(raw.inactivePaneDim)) {
     const dim: Record<string, number> = {};
     for (const [k, v] of Object.entries(raw.inactivePaneDim as Record<string, unknown>)) {

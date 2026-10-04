@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { joinFrontmatter, splitFrontmatter } from "@/modules/markdown/lib/frontmatter";
+import { splitFrontmatter } from "@/modules/markdown/lib/frontmatter";
 
 describe("splitFrontmatter", () => {
   it("splits a standard frontmatter block including delimiters", () => {
@@ -24,12 +24,5 @@ describe("splitFrontmatter", () => {
     const { frontmatter, body } = splitFrontmatter(raw);
     expect(frontmatter + body).toBe(raw);
     expect(body).toBe("body\r\n");
-  });
-
-  it("round-trips byte-exact through joinFrontmatter", () => {
-    for (const raw of ["---\na: 1\n---\nbody", "no fm at all", "", "---\n---\nx"]) {
-      const { frontmatter, body } = splitFrontmatter(raw);
-      expect(joinFrontmatter(frontmatter, body)).toBe(raw);
-    }
   });
 });

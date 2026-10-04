@@ -1,6 +1,4 @@
 import { cn } from "@/lib/utils";
-import { getShortcutLabel, type ShortcutId } from "@/modules/shortcuts";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ReactNode } from "react";
 
 // Keycap styling shared by the block watermark hints and the scratchpad bar.
@@ -20,29 +18,5 @@ export function Kbd({
     >
       {children}
     </kbd>
-  );
-}
-
-// Renders the live binding of a shortcut as one keycap per token. Empty when the
-// shortcut has no binding on this platform.
-export function ShortcutKeys({
-  id,
-  className,
-}: {
-  id: ShortcutId;
-  className?: string;
-}) {
-  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const label = getShortcutLabel(id, userShortcuts) ?? "";
-  // Binding tokens are distinct (each modifier appears once plus the key).
-  const tokens = label ? label.split(" ") : [];
-  return (
-    <>
-      {tokens.map((t) => (
-        <Kbd key={t} className={className}>
-          {t}
-        </Kbd>
-      ))}
-    </>
   );
 }

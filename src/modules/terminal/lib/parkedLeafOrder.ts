@@ -22,3 +22,16 @@ export function evictOverflow(order: string[], budget: number): string[] {
   if (excess <= 0) return [];
   return order.splice(0, excess);
 }
+
+// Whether an id evicted from the LRU should actually have its slot released.
+// A leaf can enter alt-screen (or blocks) after it was parked, while still
+// hidden: by eviction time it's exempt from this LRU, same as one that never
+// entered it via the non-blocks/non-alt-screen guard at park time, so its
+// slot must survive.
+export function shouldEvictParkedLeaf(session: {
+  hasSlot: boolean;
+  visibleNow: boolean;
+  blocks: boolean;
+}, isAltScreen: boolean): boolean {
+  return session.hasSlot && !session.visibleNow && !session.blocks && !isAltScreen;
+}

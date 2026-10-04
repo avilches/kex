@@ -38,19 +38,6 @@ export function resolveWorkspaceColor(
   return color;
 }
 
-/**
- * Resolves the display color for a status.
- * Unlike workspace color, there is no "no color" (null) option -- statuses always show a color.
- * Falls back to a stable color derived from the status ID when no explicit color is set.
- */
-export function resolveStatusColor(color: string | undefined, id: string): string {
-  return color ?? initialColorForId(id);
-}
-
-export function randomStatusColor(): string {
-  return WORKSPACE_COLOR_PALETTE[Math.floor(Math.random() * WORKSPACE_COLOR_PALETTE.length)]!;
-}
-
 function hslToHex(h: number, s: number, l: number): string {
   const sl = s / 100;
   const ll = l / 100;
@@ -61,6 +48,30 @@ function hslToHex(h: number, s: number, l: number): string {
     return Math.round(255 * c).toString(16).padStart(2, "0");
   };
   return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function relativeLuminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+const MIN_CONTRAST_WITH_WHITE = 4.5;
+
+// The active chip always carries white text. A workspace color too light for
+// that is darkened toward black just enough to reach the contrast, which keeps
+// its hue; a color that already reaches it is returned as is.
+export function chipColorOnWhite(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  for (let t = 0; t <= 1; t += 0.01) {
+    const shade = `#${[r, g, b]
+      .map((v) => Math.round(v! * (1 - t)).toString(16).padStart(2, "0"))
+      .join("")}`;
+    if (1.05 / (relativeLuminance(shade) + 0.05) >= MIN_CONTRAST_WITH_WHITE) return shade;
+  }
+  return "#000000";
 }
 
 export function randomVibrantColor(): string {

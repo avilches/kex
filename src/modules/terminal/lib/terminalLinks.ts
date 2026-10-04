@@ -2,20 +2,41 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ILink, ILinkProvider, Terminal } from "@xterm/xterm";
 import { dispatchFileLink, getLeafCwd } from "@/modules/terminal/lib/terminalLinkBridge";
 
-const pathExistsCache = new Map<string, boolean>();
+// Short TTL, not an indefinite cache: a hovered path can be created (or
+// deleted) seconds later, e.g. while a build is generating it, so both
+// outcomes must eventually be re-checked rather than sticking forever.
+const PATH_EXISTS_TTL_MS = 5_000;
+// Repeated hovers over noisy output (many distinct non-path regex matches)
+// must not grow this map without bound; cap it and evict the oldest entry
+// (Map iteration order is insertion order) instead of adding real LRU bookkeeping.
+const PATH_EXISTS_CACHE_MAX = 500;
 
-async function pathExists(absPath: string): Promise<boolean> {
+type PathExistsEntry = { exists: boolean; expiresAt: number };
+const pathExistsCache = new Map<string, PathExistsEntry>();
+
+function cachePathExists(absPath: string, exists: boolean): void {
+  if (pathExistsCache.size >= PATH_EXISTS_CACHE_MAX && !pathExistsCache.has(absPath)) {
+    const oldestKey = pathExistsCache.keys().next().value;
+    if (oldestKey !== undefined) pathExistsCache.delete(oldestKey);
+  }
+  pathExistsCache.set(absPath, { exists, expiresAt: Date.now() + PATH_EXISTS_TTL_MS });
+}
+
+export async function pathExists(absPath: string): Promise<boolean> {
   const cached = pathExistsCache.get(absPath);
-  if (cached !== undefined) return cached;
+  if (cached && cached.expiresAt > Date.now()) return cached.exists;
   try {
     await invoke("fs_stat", { path: absPath });
-    pathExistsCache.set(absPath, true);
+    cachePathExists(absPath, true);
     return true;
   } catch {
-    // Don't cache failures: the file may not exist yet (e.g. being generated)
-    // and caching false would prevent detecting it on the next hover.
+    cachePathExists(absPath, false);
     return false;
   }
+}
+
+export function _clearPathExistsCacheForTests(): void {
+  pathExistsCache.clear();
 }
 
 export function parseFileUri(uri: string): string {

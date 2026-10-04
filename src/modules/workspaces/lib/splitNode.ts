@@ -33,6 +33,28 @@ export function findTabPane(
   return findTabPane(tree.first, tabId) ?? findTabPane(tree.second, tabId);
 }
 
+const OPEN_PATH_KINDS: ReadonlySet<Tab["kind"]> = new Set(["editor", "markdown"]);
+
+/**
+ * Finds a tab already open with the given file path, searching every pane.
+ * Only "editor" and "markdown" tabs carry a plain `path`, so those are the
+ * only kinds considered by default; pass `kinds` to narrow the search (e.g.
+ * to "editor" only, when the caller never opens a "markdown" tab itself).
+ */
+export function findOpenPathTab(
+  tree: SplitNode,
+  path: string,
+  kinds: ReadonlySet<Tab["kind"]> = OPEN_PATH_KINDS,
+): { pane: PaneNode; tab: Tab } | null {
+  for (const pane of allPanes(tree)) {
+    const tab = pane.tabs.find(
+      (t) => kinds.has(t.kind) && (t as { path: string }).path === path,
+    );
+    if (tab) return { pane, tab };
+  }
+  return null;
+}
+
 export function firstPaneId(tree: SplitNode): string {
   if (tree.kind === "pane") return tree.id;
   return firstPaneId(tree.first);

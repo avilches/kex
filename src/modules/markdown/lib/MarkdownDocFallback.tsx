@@ -1,14 +1,12 @@
 import type { JSX } from "react";
-import type { MarkdownDocState } from "@/modules/markdown/lib/useMarkdownDocument";
+import { formatBytes } from "@/lib/formatBytes";
 
-// Mirrors EditorPane's formatting so the non-editable fallbacks read identically.
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
+export type MarkdownDocFallbackState =
+  | { status: "binary"; size: number }
+  | { status: "toolarge"; size: number; limit: number }
+  | { status: "error"; message: string };
 
-export function MarkdownDocFallback({ doc }: { doc: MarkdownDocState }): JSX.Element | null {
+export function MarkdownDocFallback({ doc }: { doc: MarkdownDocFallbackState }): JSX.Element | null {
   if (doc.status === "error") {
     return (
       <div className="flex h-full items-center justify-center px-6 text-center text-xs text-destructive">

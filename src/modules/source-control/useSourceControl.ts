@@ -1,3 +1,4 @@
+import { normalizeError } from "@/lib/errors";
 import {
   native,
   type GitRepoInfo,
@@ -7,6 +8,11 @@ import { listenFsChanged } from "@/modules/explorer/lib/watch";
 import { useWorkspaceEnvStore, workspaceScopeKey } from "@/modules/workspace";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { canReuseResolvedRepo, isContextSwitching } from "./repoReuse";
+import {
+  mergeRefreshMode,
+  shouldUpgradeInflightRefresh,
+  type SourceControlRefreshMode,
+} from "./refreshMode";
 
 const AUTO_FETCH_THROTTLE_MS = 5 * 60_000;
 const AUTO_FETCH_LRU_LIMIT = 16;
@@ -15,13 +21,13 @@ const FOCUS_REFRESH_MIN_INTERVAL_MS = 1500;
 // path is unchanged (a re-fired effect, not a navigation to a different folder).
 const SC_STATUS_TTL_MS = 2000;
 
-export type SourceControlRefreshMode = "auto" | "always" | "never";
-export type SourceControlRemoteAction = "fetch" | "pull" | "push";
-export type SourceControlRemoteActionMode =
+export type { SourceControlRefreshMode } from "./refreshMode";
+type SourceControlRemoteAction = "fetch" | "pull" | "push";
+type SourceControlRemoteActionMode =
   | "contextual"
   | SourceControlRemoteAction;
 
-export type SourceControlRemoteActionResult = {
+type SourceControlRemoteActionResult = {
   ok: boolean;
   action: SourceControlRemoteAction | null;
   error?: string;
@@ -58,7 +64,7 @@ export type SourceControlSummary = {
   clearRemoteError: () => void;
 };
 
-export type SourceControlRemoteIndicator = {
+type SourceControlRemoteIndicator = {
   visible: boolean;
   label: string;
   title: string;
@@ -75,15 +81,6 @@ type SourceControlSummaryState = {
   busyAction: SourceControlRemoteAction | null;
   lastRemoteError: string | null;
 };
-
-function normalizeError(error: unknown): string {
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  return "Unknown source control error";
-}
 
 function getContextualAction(
   status: GitStatusSnapshot | null,
@@ -174,6 +171,10 @@ export function useSourceControl(
   const requestIdRef = useRef(0);
   const inflightRef = useRef<Promise<void> | null>(null);
   const inflightModeRef = useRef<SourceControlRefreshMode>("never");
+  // A refresh mode queued while another run is in flight and not aggressive
+  // enough to justify a second concurrent run; drained by the in-flight run
+  // itself right before it clears inflightRef. See refresh() below.
+  const pendingModeRef = useRef<SourceControlRefreshMode | null>(null);
   const autoFetchByRepoRef = useRef(new Map<string, number>());
   const enabledRef = useRef(enabled);
   const lastRefreshAtRef = useRef(0);
@@ -328,7 +329,7 @@ export function useSourceControl(
             status = await native.gitStatus(repo.repoRoot);
             if (requestId !== requestIdRef.current) return;
           } catch (error) {
-            nextRemoteError = normalizeError(error);
+            nextRemoteError = normalizeError(error, "Unknown source control error");
           }
         }
 
@@ -351,7 +352,7 @@ export function useSourceControl(
           hasRepo: false,
           status: null,
           isLoading: false,
-          localError: normalizeError(error),
+          localError: normalizeError(error, "Unknown source control error"),
         }));
       } finally {
         lastRefreshAtRef.current = Date.now();
@@ -360,28 +361,72 @@ export function useSourceControl(
     [contextPath, workspaceKey],
   );
 
+  // Always the latest doRefresh, read by the trailing-rerun drain loop below
+  // so a run queued against an older contextPath/workspaceKey still executes
+  // with the current one once it actually fires. Plain assignment during
+  // render, not an effect: doRefresh only closes over refs plus contextPath/
+  // workspaceKey, so keeping this in sync a render early (before any effect
+  // runs) is safe and matches the "latest ref" pattern already used elsewhere
+  // in this codebase (e.g. RichMarkdownEditor.tsx).
+  const doRefreshRef = useRef(doRefresh);
+  doRefreshRef.current = doRefresh;
+
   const refresh = useCallback(
-    async (options?: { remote?: SourceControlRefreshMode }) => {
+    (options?: { remote?: SourceControlRefreshMode }): Promise<void> => {
       const remoteMode = options?.remote ?? "never";
+
+      const startRun = (mode: SourceControlRefreshMode): Promise<void> => {
+        inflightModeRef.current = mode;
+        // Definite-assignment assertion: `run` is assigned the instant the
+        // IIFE call below returns its pending promise, before the async body
+        // resumes past its first `await` and reaches the `run` reference.
+        let run!: Promise<void>;
+        run = (async () => {
+          try {
+            await doRefreshRef.current(mode);
+            // Drain any request(s) that queued while this run (or a chain of
+            // trailing runs before it) was executing, so none of them is
+            // silently dropped: a contextPath switch that lands mid-flight
+            // still resolves, and a post stage/unstage reconcile still gets a
+            // status read that postdates the mutation.
+            while (pendingModeRef.current !== null) {
+              const nextMode = pendingModeRef.current;
+              pendingModeRef.current = null;
+              inflightModeRef.current = nextMode;
+              await doRefreshRef.current(nextMode);
+            }
+          } finally {
+            // Cleanup lives inside the async body (not chained as a `.finally()`
+            // on the returned promise) so it runs in the same synchronous
+            // continuation as the while loop's exit check, with no microtask
+            // gap in between where another refresh() could observe a stale
+            // inflightRef and queue its request into a pendingModeRef nobody
+            // will drain again.
+            if (inflightRef.current === run) {
+              inflightRef.current = null;
+              inflightModeRef.current = "never";
+            }
+          }
+        })();
+        inflightRef.current = run;
+        return run;
+      };
+
       const inflight = inflightRef.current;
       if (inflight) {
-        const cur = inflightModeRef.current;
-        const upgrade =
-          (cur === "never" && remoteMode !== "never") ||
-          (cur === "auto" && remoteMode === "always");
-        if (!upgrade) return inflight;
-      }
-      inflightModeRef.current = remoteMode;
-      const run = doRefresh(remoteMode).finally(() => {
-        if (inflightRef.current === run) {
-          inflightRef.current = null;
-          inflightModeRef.current = "never";
+        if (shouldUpgradeInflightRefresh(inflightModeRef.current, remoteMode)) {
+          return startRun(remoteMode);
         }
-      });
-      inflightRef.current = run;
-      return run;
+        // A run is already in flight and this request isn't aggressive enough
+        // to justify a second concurrent one. Queue it as a trailing rerun
+        // instead of returning the stale in-flight promise and dropping it.
+        pendingModeRef.current = mergeRefreshMode(pendingModeRef.current, remoteMode);
+        return inflight;
+      }
+
+      return startRun(remoteMode);
     },
-    [doRefresh],
+    [],
   );
 
   const runRemoteAction = useCallback(
@@ -423,7 +468,7 @@ export function useSourceControl(
         await refresh({ remote: "never" });
         return { ok: true, action };
       } catch (error) {
-        const message = normalizeError(error);
+        const message = normalizeError(error, "Unknown source control error");
         setState((current) => ({ ...current, lastRemoteError: message }));
         await refresh({ remote: "never" }).catch(() => {});
         return { ok: false, action, error: message };

@@ -46,8 +46,6 @@ export const EDITOR_CATALOG: CatalogEntry[] = [
   { id: "xcode", name: "Xcode", group: "Other IDEs", type: "workspace" },
 ];
 
-export const EDITOR_GROUPS: EditorGroup[] = ["Other IDEs", "VS Code", "JetBrains", "Text Editors"];
-
 const CATALOG_MAP = new Map(EDITOR_CATALOG.map((e) => [e.id, e]));
 
 /** Returns the target type for a known editor id; defaults to "file" for unknowns. */

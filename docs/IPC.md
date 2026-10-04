@@ -142,6 +142,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `window_save_sidebar(label, open, view, side, width)` | Persist the per-window sidebar chrome (open, active view, dock side, width percentage) into the `workspaces.json` index only, without rewriting the workspace bodies. Lightweight so it can fire on every view switch or resize (the frontend debounces it ~250ms) |
 | `window_save_workspace_bar(label, width)` | Persist the workspace bar pixel width for a given window label into the `workspaces.json` index. Called on every drag resize (debounced in the frontend); separate from the sidebar state persisted by `window_save_sidebar` so the two can change independently. |
 | `get_launch_dir` | Return the CLI launch directory (drained on first call) |
+| `get_build_info` | Return `{ hash, branch }`, both baked in at compile time by `build.rs` (`env!("KEX_GIT_HASH")` / `env!("KEX_GIT_BRANCH")`), each `"unknown"` if unavailable at build time (no `.git`, or a detached `HEAD` for `branch`). Shown in Settings > About; the branch is only displayed there in dev builds (`productName` "Kex Dev") |
 | `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
@@ -171,7 +172,7 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 
 **OSC 133 C (shell integration)** — the PTY reader detects the sequence `OSC 133;C;<cmd> ST` emitted by the shell init scripts at each prompt. This arms the `AgentDetector` and produces the `started` signal. This path is always active once shell integration is loaded.
 
-**Unix socket IPC (hook events)** — Claude Code hooks call `trigger-event.sh` on each hook event. The script sends the raw JSON payload to a per-session Unix domain socket at `/tmp/kex-ipc-{pty_id}.sock` (path exposed via `KEX_IPC` env var). The Rust listener (`pty/ipc.rs`) reads the JSON and emits Tauri events:
+**Unix socket IPC (hook events)** — Claude Code hooks call `trigger-event.sh` on each hook event. The script sends the raw JSON payload to a per-session Unix domain socket at `kex-ipc-{pty_id}.sock` (path exposed via `KEX_IPC` env var). The socket lives under `XDG_RUNTIME_DIR` when available, otherwise under an owner-only (0700) `kex-ipc-{uid}` subdirectory of the system temp dir that Kex creates itself, and the socket file itself is forced to 0600; this keeps another local user on a shared machine from pre-creating the path (denial of service) or connecting to inject forged agent events. The Rust listener (`pty/ipc.rs`) reads the JSON and emits Tauri events:
 
 | Hook event | Tauri event | Notes |
 |---|---|---|
@@ -183,6 +184,8 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 | `StopFailure` | `kex:agent-signal` kind=`StopFailure` | Includes `error_message` as `message` |
 | `PermissionRequest` | `kex:agent-signal` kind=`PermissionRequest` | Includes `tool_name` as `toolName` |
 | `MessageDisplay` | `kex:agent-signal` kind=`MessageDisplay` | Only on `final: true` chunks; `delta` as `message` |
+
+Independent of agents, the PTY reader emits `kex:shell-ready` (`{ id }`, the PTY id) once per PTY, on the first `OSC 133;B` (`AgentDetector` -> `Transition::ShellReady`, handled in `session.rs` before the agent-signal plumbing). The frontend (`shellReadyWaiter.ts`) uses it to know when it is safe to inject a "Run on start" command.
 
 The socket is created in `session::spawn()` before the child process starts, so `KEX_IPC` is always set when the shell reads its environment. The socket file is removed when the `IpcGuard` drops (PTY session closed).
 

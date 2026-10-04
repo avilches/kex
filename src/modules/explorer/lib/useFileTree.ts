@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { pathDirname, pathBasename } from "@/lib/pathUtils";
+import { pathDirname, pathBasename, pathJoin } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 import { suggestDuplicateName } from "@/modules/explorer/lib/duplicateName";
 import { isCopying } from "@/modules/explorer/lib/duplicateStore";
@@ -13,6 +13,7 @@ import {
   planPaste,
   resolveDestDir,
 } from "@/modules/explorer/lib/clipboardPaste";
+import { isUnder } from "@/modules/workspaces/lib/explorerRoot";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
 export type DirEntry = {
@@ -44,10 +45,7 @@ export type PendingDuplicate = {
   suggestedName: string;
 };
 
-export function joinPath(parent: string, name: string): string {
-  if (parent.endsWith("/")) return `${parent}${name}`;
-  return `${parent}/${name}`;
-}
+export const joinPath = pathJoin;
 
 export const dirname = pathDirname;
 
@@ -70,10 +68,6 @@ function recallExpansion(root: string): string[] {
   expansionCache.delete(root);
   expansionCache.set(root, v);
   return v;
-}
-
-function isUnder(key: string, root: string): boolean {
-  return key === root || key.startsWith(`${root}/`);
 }
 
 // mtime/size are ignored on purpose: the tree never renders them, so a watcher
@@ -106,7 +100,6 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     (s) => s.keepFolderLayoutOnChangeExplorerRoot,
   );
   const keepLayoutRef = useRef(keepLayout);
-  const gitDecorationsRef = useRef(true);
   const [nodes, setNodes] = useState<TreeState>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
@@ -165,7 +158,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       const entries = await invoke<DirEntry[]>("fs_read_dir", {
         path,
         showHidden,
-        gitDecorations: gitDecorationsRef.current,
+        gitDecorations: true,
         workspace: currentWorkspaceEnv(),
       });
 

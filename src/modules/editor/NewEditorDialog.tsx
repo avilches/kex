@@ -12,6 +12,7 @@ import { File02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
+import { pathJoin } from "@/lib/pathUtils";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 
 type Props = {
@@ -20,11 +21,6 @@ type Props = {
   rootPath: string | null;
   onCreated: (path: string) => void;
 };
-
-function joinPath(parent: string, name: string): string {
-  if (parent.endsWith("/")) return `${parent}${name}`;
-  return `${parent}/${name}`;
-}
 
 export function NewEditorDialog({
   open,
@@ -67,7 +63,7 @@ export function NewEditorDialog({
     }
     const path = trimmed.startsWith("/")
       ? trimmed
-      : joinPath(rootPath, trimmed);
+      : pathJoin(rootPath, trimmed);
     try {
       await invoke("fs_create_file", { path, workspace: currentWorkspaceEnv() });
       onCreated(path);
@@ -109,7 +105,7 @@ export function NewEditorDialog({
           <div className="text-xs text-destructive">{error}</div>
         ) : (
           <div className="text-xs text-muted-foreground truncate">
-            {rootPath ? joinPath(rootPath, name.trim() || "…") : "—"}
+            {rootPath ? pathJoin(rootPath, name.trim() || "…") : "—"}
           </div>
         )}
         <DialogFooter>

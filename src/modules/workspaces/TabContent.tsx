@@ -1,7 +1,12 @@
 import { cn, isMarkdownPath, isHtmlPath } from "@/lib/utils";
 import type { EditorPaneHandle } from "@/modules/editor/EditorPane";
 import type { GitHistorySearchHandle } from "@/modules/git-history/GitHistoryPane";
-import { EditorPathBar, type EditorGlobalToggleKey } from "@/modules/editor";
+import {
+  EditorPathBar,
+  ReloadConflictOverlay,
+  useBackgroundConflictToast,
+  type EditorGlobalToggleKey,
+} from "@/modules/editor";
 import { useEditorChrome } from "./EditorChromeContext";
 import type { BrowserPaneHandle } from "@/modules/browser/BrowserPane";
 import { TerminalPane, type TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
@@ -10,7 +15,6 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { type ComponentType, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { extOf, resolveEditorView, type EditorViewSettings } from "@/modules/editor/lib/editorViewSettings";
 import { resolveDisplayName } from "@/modules/editor/lib/languageResolver";
-import { resolveMarkdownEngine } from "@/modules/markdown/lib/markdownEngine";
 import {
   setEditorAutoSave,
   setEditorAutocompletion,
@@ -32,8 +36,8 @@ const EditorPane = lazy(() =>
 const GitDiffPane = lazy(() =>
   import("@/modules/editor/GitDiffPane").then((m) => ({ default: m.GitDiffPane as ComponentType<any> })),
 );
-const MarkdownRenderPane = lazy(() =>
-  import("@/modules/markdown/MarkdownRenderPane").then((m) => ({ default: m.MarkdownRenderPane as ComponentType<any> })),
+const MarkdownPreviewPane = lazy(() =>
+  import("@/modules/markdown/MarkdownPreviewPane").then((m) => ({ default: m.MarkdownPreviewPane as ComponentType<any> })),
 );
 const HtmlPreviewPane = lazy(() =>
   import("@/modules/html-preview/HtmlPreviewPane").then((m) => ({ default: m.HtmlPreviewPane as ComponentType<any> })),
@@ -45,10 +49,7 @@ const GitHistoryPane = lazy(() =>
   import("@/modules/git-history/GitHistoryPane").then((m) => ({ default: m.GitHistoryPane as ComponentType<any> })),
 );
 const MarkdownTab = lazy(() =>
-  import("@/modules/markdown/tiptap/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
-);
-const MilkdownTab = lazy(() =>
-  import("@/modules/markdown/milkdown/MilkdownTab").then((m) => ({ default: m.MilkdownTab as ComponentType<any> })),
+  import("@/modules/markdown/codemirror/MarkdownTab").then((m) => ({ default: m.MarkdownTab as ComponentType<any> })),
 );
 
 const GLOBAL_TOGGLE_SETTERS: Record<
@@ -69,6 +70,13 @@ type CommitFileDiffOpenInput = {
   subject: string;
   path: string;
   originalPath: string | null;
+  pin: boolean;
+};
+
+export type MarkdownTabHandle = {
+  save(): Promise<void>;
+  cycleView(): void;
+  toggleOutline(): void;
 };
 
 export type TabCallbacks = {
@@ -83,11 +91,12 @@ export type TabCallbacks = {
   onEditorDirtyChange?: (tabId: string, dirty: boolean) => void;
   onEditorClose?: (tabId: string) => void;
   registerEditorHandle?: (tabId: string, handle: EditorPaneHandle | null) => void;
+  // A markdown tab registers its own save, view cycle and outline toggle, so
+  // the global shortcuts and the close guards reach it whatever has focus.
+  registerMarkdownHandle?: (tabId: string, handle: MarkdownTabHandle | null) => void;
   // Preview callbacks
   onToggleOverlayPreview?: (tabId: string) => void;
   onToggleSplitPreview?: (tabId: string) => void;
-  // Markdown callbacks
-  onSetMarkdownView?: (tabId: string, mode: "rendered" | "raw") => void;
   // Browser callbacks
   onBrowserUrlChange?: (tabId: string, url: string) => void;
   registerBrowserHandle?: (tabId: string, handle: BrowserPaneHandle | null) => void;
@@ -98,6 +107,8 @@ export type TabCallbacks = {
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   // Tab data update (used by tab bar lock/restore toggles)
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  // Prev/next file navigation inside an open git-diff tab
+  onNavigateGitDiffTab?: (tabId: string, direction: "prev" | "next") => void;
   // File rename (editor/markdown tabs - renames the file on disk)
   onRenameFile?: (tabId: string, newName: string) => void;
   // Reveal an editor/markdown/git file in the explorer tree
@@ -123,6 +134,8 @@ type Props = {
 export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab, onDockBrowserTab, onFocusFloatBrowserTab, onNavigateFloatBrowserTab }: Props) {
   const terminalRef = useRef<TerminalPaneHandle>(null);
   const editorRef = useRef<EditorPaneHandle>(null);
+  const [editorConflict, setEditorConflict] = useState(false);
+  useBackgroundConflictToast(editorConflict, visible, tab.kind === "editor" ? tab.path : "");
   const browserRef = useRef<BrowserPaneHandle>(null);
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
   const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
@@ -131,10 +144,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const closeBrackets = usePreferencesStore((s) => s.editorCloseBrackets);
   const autocompletion = usePreferencesStore((s) => s.editorAutocompletion);
   const scrollPastEnd = usePreferencesStore((s) => s.editorScrollPastEnd);
-  const markdownEnginePref = usePreferencesStore((s) => s.markdownEngine);
-  const scratchpadInNewTerminals = usePreferencesStore(
-    (s) => s.scratchpadInNewTerminals,
-  );
 
   const [currentLanguageName, setCurrentLanguageName] = useState<string>(() =>
     tab.kind === "editor" ? resolveDisplayName(tab.path) : "",
@@ -149,11 +158,16 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
     debounceRef.current = setTimeout(() => setLiveContent(content), 300);
   }, []);
 
-  // Seed liveContent immediately when EditorPane first loads the file from disk
-  // (onContentChange only fires on user edits, not on initial load).
-  const handleReady = useCallback((initialContent: string) => {
-    setLiveContent(initialContent);
-  }, []);
+  // Stable reference: GitHistoryPane re-registers this handle in a
+  // useEffect keyed on it, so a fresh inline arrow function here would
+  // unregister and re-register on every TabContent render instead of only
+  // when the tab or the callback prop actually changes.
+  const handleGitHistorySearchHandle = useCallback(
+    (handle: GitHistorySearchHandle | null) => {
+      callbacks.onGitHistorySearchHandle?.(tab.id, handle);
+    },
+    [callbacks.onGitHistorySearchHandle, tab.id],
+  );
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -184,10 +198,18 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
   const effectivePreviewMode: "overlay" | "split" | undefined =
     rawPM === true ? "overlay" : !rawPM ? undefined : (rawPM as "overlay" | "split");
 
-  const tabMarkdownEngine =
-    tab.kind === "markdown" || tab.kind === "editor"
-      ? resolveMarkdownEngine(tab.markdownEngine, markdownEnginePref)
-      : markdownEnginePref;
+  // Used by the "editor" tab kind: the view-options button is the same everywhere a markdown/html file
+  // can show a preview, and is disabled only in overlay (no editor visible at all).
+  const buildViewToggles = (path: string) => {
+    const ext = extOf(path);
+    return {
+      ext,
+      value: resolveEditorView(path, editorViewByExt),
+      onChange: (next: EditorViewSettings) => void setEditorViewForExt(ext, next),
+      onViewInSettings: () => void openFileTypesSettings(ext || undefined),
+      disabled: effectivePreviewMode === "overlay",
+    };
+  };
 
   const prevEffectivePreviewModeRef = useRef<"overlay" | "split" | undefined>(undefined);
   useEffect(() => {
@@ -232,7 +254,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
               restoreOnRestart={tab.restoreOnRestart}
               persistentCommand={tab.persistentCommand}
               initialScratchpadEnabled={
-                tab.scratchpadEnabled ?? scratchpadInNewTerminals
+                tab.scratchpadEnabled ?? false
               }
               onSearchReady={callbacks.onSearchReady}
               onExit={callbacks.onExit}
@@ -250,14 +272,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       const ishtml = overrideLang ? isHtmlPath(`x.${overrideLang}`) : isHtmlPath(tab.path);
       const showPreviewToggle = ismd || ishtml;
 
-      const ext = extOf(tab.path);
-      const viewToggles = {
-        ext,
-        value: resolveEditorView(tab.path, editorViewByExt),
-        onChange: (next: EditorViewSettings) =>
-          void setEditorViewForExt(ext, next),
-        onViewInSettings: () => void openFileTypesSettings(ext || undefined),
-      };
+      const viewToggles = buildViewToggles(tab.path);
 
       return (
         <Suspense fallback={null}>
@@ -281,8 +296,8 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                 onToggleSplit: () => callbacks.onToggleSplitPreview?.(tab.id),
                 isHtml: ishtml,
               } : undefined}
-              viewToggles={effectivePreviewMode == null ? viewToggles : undefined}
-              globalToggles={effectivePreviewMode == null ? globalToggles : undefined}
+              viewToggles={viewToggles}
+              globalToggles={globalToggles}
               overrideLanguage={tab.overrideLanguage}
               currentLanguageName={currentLanguageName}
               onLanguageChange={(lang) => {
@@ -318,6 +333,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                     callbacks.registerEditorHandle?.(tab.id, h);
                   }}
                   path={tab.path}
+                  tabId={tab.id}
                   onDirtyChange={(dirty: boolean) =>
                     callbacks.onEditorDirtyChange?.(tab.id, dirty)
                   }
@@ -325,6 +341,8 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   onContentChange={handleContentChange}
                   overrideLanguage={tab.overrideLanguage}
                   onLanguageResolved={setCurrentLanguageName}
+                  onConflictChange={setEditorConflict}
+                  hideConflictOverlay={effectivePreviewMode != null}
                 />
               </div>
 
@@ -343,15 +361,21 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   style={effectivePreviewMode === "split" ? { left: "calc(50% + 1px)" } : undefined}
                 >
                   {ismd && (
-                    <MarkdownRenderPane
-                      content={liveContent}
-                      engine={tabMarkdownEngine}
-                      filePath={tab.path}
-                      workspaceRoot={workspaceRoot}
-                    />
+                    <MarkdownPreviewPane content={liveContent} path={tab.path} />
                   )}
                   {ishtml && <HtmlPreviewPane content={liveContent} path={tab.path} />}
                 </div>
+              )}
+
+              {/* Dual layout (split/overlay): the conflict overlay spans the
+                  whole tab instead of just the editor's own half, or it'd
+                  render off-center against the preview pane sitting next to it. */}
+              {effectivePreviewMode != null && editorConflict && (
+                <ReloadConflictOverlay
+                  path={tab.path}
+                  onKeep={() => editorRef.current?.keepLocalChanges()}
+                  onReload={() => editorRef.current?.reloadFromDisk()}
+                />
               )}
             </div>
           </div>
@@ -380,66 +404,9 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
       );
 
     case "markdown":
-      if (tabMarkdownEngine === "tiptap") {
-        return (
-          <Suspense fallback={null}>
-            <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
-          </Suspense>
-        );
-      }
-      if (tabMarkdownEngine === "milkdown") {
-        return (
-          <Suspense fallback={null}>
-            <MilkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
-          </Suspense>
-        );
-      }
       return (
         <Suspense fallback={null}>
-          <div className="flex h-full w-full flex-col">
-            <EditorPathBar
-              path={tab.path}
-              tabId={tab.id}
-              workspaceRoot={workspaceRoot}
-              home={home}
-              gitRootPath={gitRootPath}
-              onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
-              onFocusOnExplorer={callbacks.onFocusOnExplorer}
-              onRenameFile={callbacks.onRenameFile}
-              onSetAsRoot={callbacks.onSetAsRoot}
-              onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}
-              onRevealInTerminal={callbacks.onRevealInTerminal}
-              onAddToGitignore={callbacks.onAddToGitignore}
-              view={{
-                mode: "overlay",
-                onToggleOverlay: () => callbacks.onSetMarkdownView?.(tab.id, "raw"),
-                onToggleSplit: () => callbacks.onUpdateTab?.(tab.id, (p) => {
-                  if (p.kind !== "markdown") return p;
-                  return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, previewMode: "split", locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
-                }),
-              }}
-            />
-            <div className="relative min-h-0 flex-1">
-              <div className="absolute inset-0 invisible pointer-events-none">
-                <EditorPane
-                  ref={(h: EditorPaneHandle | null) => {
-                    (editorRef as React.MutableRefObject<EditorPaneHandle | null>).current = h;
-                  }}
-                  path={tab.path}
-                  onContentChange={handleContentChange}
-                  onReady={handleReady}
-                />
-              </div>
-              <div className="absolute inset-0" style={{ zIndex: 5 }}>
-                <MarkdownRenderPane
-                  content={liveContent}
-                  engine={tabMarkdownEngine}
-                  filePath={tab.path}
-                  workspaceRoot={workspaceRoot}
-                />
-              </div>
-            </div>
-          </div>
+          <MarkdownTab tabId={tab.id} path={tab.path} visible={visible} focused={focused} callbacks={callbacks} />
         </Suspense>
       );
 
@@ -449,9 +416,9 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
           <GitDiffPane
             source={{ kind: "working", repoRoot: tab.repoRoot, path: tab.path, mode: tab.mode, originalPath: tab.originalPath }}
             active={visible}
-            workspaceRoot={workspaceRoot}
-            home={home}
-            onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
+            onNavigateDiff={(direction: "prev" | "next") =>
+              callbacks.onNavigateGitDiffTab?.(tab.id, direction)
+            }
           />
         </Suspense>
       );
@@ -463,9 +430,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
           <GitDiffPane
             source={{ kind: "commit", repoRoot: tab.repoRoot, sha: tab.sha, path: tab.path, originalPath: tab.originalPath }}
             active={visible}
-            workspaceRoot={workspaceRoot}
-            home={home}
-            onRevealPath={(p: string) => callbacks.onFocusOnExplorer?.(p)}
           />
         </Suspense>
       );
@@ -477,7 +441,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
           <GitHistoryPane
             repoRoot={tab.repoRoot}
             onOpenCommitFile={(input: CommitFileDiffOpenInput) => callbacks.onOpenCommitFile?.(input)}
-            onSearchHandle={(handle: GitHistorySearchHandle | null) => callbacks.onGitHistorySearchHandle?.(tab.id, handle)}
+            onSearchHandle={handleGitHistorySearchHandle}
           />
         </Suspense>
       );

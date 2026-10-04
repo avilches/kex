@@ -1,4 +1,6 @@
-import type { Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
+import { withReadableText } from "./readableColors";
+import { getBuiltinTheme } from "./themes";
+import type { EditorSurface, Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
 
 const COLOR_VAR: Record<keyof ThemeColors, string> = {
   background: "--background",
@@ -52,6 +54,8 @@ const ANSI_VARS: readonly string[] = [
 
 const ALL_VARS: readonly string[] = [
   ...Object.values(COLOR_VAR),
+  "--editor-background",
+  "--editor-foreground",
   "--terminal-background",
   "--terminal-foreground",
   "--terminal-cursor",
@@ -62,7 +66,12 @@ const ALL_VARS: readonly string[] = [
 
 let lastApplied: string | null = null;
 
-export function applyTheme(theme: Theme, mode: ThemeMode): void {
+export function applyTheme(
+  theme: Theme,
+  mode: ThemeMode,
+  terminalOverride?: TerminalPalette,
+  editorOverride?: EditorSurface,
+): void {
   const root = document.documentElement;
   const variant = theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light;
   if (!variant) {
@@ -70,14 +79,19 @@ export function applyTheme(theme: Theme, mode: ThemeMode): void {
     return;
   }
   const colors = variant.colors;
-  const terminal = variant.terminal;
+  const terminal = terminalOverride ?? variant.terminal;
   for (const v of ALL_VARS) root.style.removeProperty(v);
-  if (colors) writeColors(root, colors);
+  if (colors) {
+    const isBuiltin = getBuiltinTheme(theme.id) === theme;
+    writeColors(root, isBuiltin ? withReadableText(colors) : colors);
+  }
   if (terminal) writeTerminal(root, terminal);
+  const editor = editorOverride ?? variant.editor;
+  if (editor) writeEditor(root, editor);
   lastApplied = theme.id;
 }
 
-export function clearTheme(): void {
+function clearTheme(): void {
   if (lastApplied === null) return;
   const root = document.documentElement;
   for (const v of ALL_VARS) root.style.removeProperty(v);
@@ -89,6 +103,11 @@ function writeColors(root: HTMLElement, c: ThemeColors): void {
     const v = c[k];
     if (v) root.style.setProperty(COLOR_VAR[k], v);
   }
+}
+
+function writeEditor(root: HTMLElement, e: EditorSurface): void {
+  if (e.background) root.style.setProperty("--editor-background", e.background);
+  if (e.foreground) root.style.setProperty("--editor-foreground", e.foreground);
 }
 
 function writeTerminal(root: HTMLElement, t: TerminalPalette): void {

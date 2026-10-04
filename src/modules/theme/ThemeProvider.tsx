@@ -6,24 +6,27 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useTauriUnlisten } from "@/lib/useTauriListen";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  DEFAULT_THEME_ID,
-  loadPreferences,
+  EDITOR_THEME_AUTO,
   onPreferencesChange,
   setTheme as persistTheme,
   setThemeId as persistThemeId,
   type ThemePref,
 } from "@/modules/settings/store";
 import { applyTheme } from "./applyTheme";
+import { DEFAULT_THEME_ID } from "./types";
 import {
   listCustomThemes,
   onCustomThemesChange,
 } from "./customThemes";
-import { getBuiltinTheme, getDefaultTheme } from "./themes";
-import type { Theme } from "./types";
+import { getBuiltinTheme, getDefaultTheme, listBuiltinThemes } from "./themes";
+import { resolveEditorSurface } from "./resolveEditorSurface";
+import { resolveTerminalPalette } from "./resolveTerminalTheme";
+import type { EditorSurface, Theme } from "./types";
 
 export type { Theme };
-export type ThemeModePref = ThemePref;
 
 type ThemeProviderProps = {
   children: React.ReactNode;
@@ -81,41 +84,49 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
       : window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
 
+  // usePreferencesStore's own init() (called once by App.tsx / SettingsApp.tsx)
+  // already does the IPC load; reading it here instead of calling
+  // loadPreferences() a second time halves the preference reads on startup.
+  const storeTheme = usePreferencesStore((s) => s.theme);
+  const storeThemeId = usePreferencesStore((s) => s.themeId);
+  const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   useEffect(() => {
-    let alive = true;
-    void loadPreferences().then((p) => {
-      if (!alive) return;
-      setModeState(p.theme);
-      setThemeIdState(p.themeId);
-      writeFastMode(p.theme);
-      writeFastThemeId(p.themeId);
-    });
-    const unlistenP = onPreferencesChange((key, value) => {
-      if (key === "theme" && (value === "system" || value === "light" || value === "dark")) {
-        setModeState(value);
-        writeFastMode(value);
-      } else if (key === "themeId" && typeof value === "string") {
-        setThemeIdState(value);
-        writeFastThemeId(value);
-      }
-    });
-    return () => {
-      alive = false;
-      void unlistenP.then((fn) => fn());
-    };
-  }, []);
+    if (!prefsHydrated) return;
+    setModeState(storeTheme);
+    setThemeIdState(storeThemeId);
+    writeFastMode(storeTheme);
+    writeFastThemeId(storeThemeId);
+  }, [prefsHydrated, storeTheme, storeThemeId]);
+
+  useTauriUnlisten(
+    () =>
+      onPreferencesChange((key, value) => {
+        if (key === "theme" && (value === "system" || value === "light" || value === "dark")) {
+          setModeState(value);
+          writeFastMode(value);
+        } else if (key === "themeId" && typeof value === "string") {
+          setThemeIdState(value);
+          writeFastThemeId(value);
+        }
+      }),
+    [],
+  );
 
   useEffect(() => {
     let alive = true;
     void listCustomThemes().then((list) => { if (alive) setCustomThemes(list); });
-    const unlisten = onCustomThemesChange(() => {
-      void listCustomThemes().then((list) => setCustomThemes(list));
-    });
     return () => {
       alive = false;
-      void unlisten.then((fn) => fn());
     };
   }, []);
+
+  useTauriUnlisten(
+    () =>
+      onCustomThemesChange(() => {
+        void listCustomThemes().then((list) => setCustomThemes(list));
+      }),
+    [],
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -133,10 +144,37 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
     root.classList.add(resolvedMode);
   }, [resolvedMode]);
 
+  const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
+  const editorThemePref = usePreferencesStore((s) => s.editorTheme);
   const effectiveId = previewId ?? themeId;
+  const [editorSurface, setEditorSurface] = useState<EditorSurface | undefined>();
   useEffect(() => {
-    applyTheme(resolveTheme(effectiveId, customThemes), resolvedMode);
-  }, [effectiveId, resolvedMode, customThemes]);
+    if (editorThemePref === EDITOR_THEME_AUTO) {
+      setEditorSurface(undefined);
+      return;
+    }
+    let alive = true;
+    void import("@/modules/editor/lib/editorThemeSurface").then((m) => {
+      if (alive) setEditorSurface(m.readEditorThemeSurface(editorThemePref));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [editorThemePref]);
+  useEffect(() => {
+    const appTheme = resolveTheme(effectiveId, customThemes);
+    const terminal = resolveTerminalPalette(
+      terminalThemePref,
+      appTheme,
+      [...listBuiltinThemes(), ...customThemes],
+      resolvedMode,
+    );
+    const editor =
+      editorThemePref === EDITOR_THEME_AUTO
+        ? resolveEditorSurface(editorThemePref, appTheme, resolvedMode, () => undefined)
+        : editorSurface;
+    applyTheme(appTheme, resolvedMode, terminal, editor);
+  }, [effectiveId, resolvedMode, customThemes, terminalThemePref, editorThemePref, editorSurface]);
 
   const setMode = useCallback((next: ThemePref) => {
     setModeState(next);

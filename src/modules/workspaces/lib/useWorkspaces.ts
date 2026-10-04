@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import { isMarkdownPath } from "@/lib/utils";
-import { sealMarkdownEngine } from "@/modules/markdown/lib/sealMarkdownEngine";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
@@ -37,7 +35,8 @@ export function captureClosedEntry(
 export function buildReopenedTab(tab: Tab, newId: string): Tab {
   const base = { ...tab, id: newId };
   if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
-  if (base.kind === "terminal" || base.kind === "git-diff") return { ...base, locked: false };
+  if (base.kind === "git-diff" || base.kind === "git-commit-file") return { ...base, preview: false, locked: false };
+  if (base.kind === "terminal") return { ...base, locked: false };
   return base;
 }
 
@@ -136,13 +135,13 @@ export function applyGitConfig(
   );
 }
 
-export function applyWorkspaceStatus(
+export function applyWorkspaceGroup(
   workspaces: Workspace[],
   workspaceId: string,
-  statusId: string | null | undefined,
+  groupId: string | null | undefined,
 ): Workspace[] {
   return workspaces.map((w) =>
-    w.id === workspaceId ? { ...w, statusId: statusId ?? undefined } : w,
+    w.id === workspaceId ? { ...w, groupId: groupId ?? undefined } : w,
   );
 }
 
@@ -160,8 +159,8 @@ export function tabInsertionIndex(
 }
 
 // A new workspace is inserted right after the active one and inherits its
-// status, so it lands in the same sidebar group (groupWorkspaces filters by
-// status preserving array order, so array adjacency == in-group adjacency).
+// group, so it lands in the same sidebar group (groupWorkspaces filters by
+// group preserving array order, so array adjacency == in-group adjacency).
 export function insertWorkspaceAfterActive(
   workspaces: Workspace[],
   activeWorkspaceId: string,
@@ -170,7 +169,7 @@ export function insertWorkspaceAfterActive(
   const activeIdx = workspaces.findIndex((w) => w.id === activeWorkspaceId);
   if (activeIdx === -1) return [...workspaces, newWorkspace];
   const active = workspaces[activeIdx]!;
-  const placed = active.statusId ? { ...newWorkspace, statusId: active.statusId } : newWorkspace;
+  const placed = active.groupId ? { ...newWorkspace, groupId: active.groupId } : newWorkspace;
   const next = [...workspaces];
   next.splice(activeIdx + 1, 0, placed);
   return next;
@@ -500,7 +499,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   ): string => {
     const freshPaneId = newPaneId();
     const freshSplitId = newSplitId();
-    const sealedTab = sealMarkdownEngine(withNewTabAutofocus(tab), usePreferencesStore.getState().markdownEngine);
+    const sealedTab = withNewTabAutofocus(tab);
     setWorkspaces((prev) =>
       prev.map((w) => {
         if (w.id !== workspaceId) return w;
@@ -519,7 +518,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Tab operations ────────────────────────────────────────────────────────
 
   const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
-    const newTab = sealMarkdownEngine(withNewTabAutofocus(tab), usePreferencesStore.getState().markdownEngine);
+    const newTab = withNewTabAutofocus(tab);
     recordActivation(paneId, newTab.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -622,7 +621,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, [openTab, activeWorkspaceId]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
-    const sealedTab = sealMarkdownEngine(newTab, usePreferencesStore.getState().markdownEngine);
+    const sealedTab = newTab;
     recordActivation(paneId, sealedTab.id);
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -666,22 +665,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const setTerminalRunningCommand = useCallback((_workspaceId: string, tabId: string, cmd: string | null) => {
     setRunningCommand(tabId, cmd);
   }, []);
-
-  // Flip a markdown file tab between its rendered view (kind "markdown") and
-  // the raw editor (kind "editor"), preserving id/path/title. Switching to
-  // rendered is a no-op while the editor has unsaved changes.
-  const setTabView = useCallback((workspaceId: string, tabId: string, mode: "rendered" | "raw") => {
-    updateTabData(workspaceId, tabId, (p) => {
-      if (mode === "raw" && p.kind === "markdown" && isMarkdownPath(p.path)) {
-        return { id: p.id, kind: "editor", path: p.path, title: p.title, dirty: false, preview: false, locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
-      }
-      if (mode === "rendered" && p.kind === "editor" && isMarkdownPath(p.path)) {
-        if (p.dirty) return p;
-        return { id: p.id, kind: "markdown", path: p.path, title: p.title, locked: p.locked, autofocus: p.autofocus, markdownEngine: p.markdownEngine };
-      }
-      return p;
-    });
-  }, [updateTabData]);
 
   const toggleOverlayPreview = useCallback((workspaceId: string, tabId: string) => {
     updateTabData(workspaceId, tabId, (p) => {
@@ -761,8 +744,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const setWorkspaceStatus = useCallback((workspaceId: string, statusId: string | null) => {
-    setWorkspaces((prev) => applyWorkspaceStatus(prev, workspaceId, statusId));
+  const setWorkspaceGroup = useCallback((workspaceId: string, groupId: string | null) => {
+    setWorkspaces((prev) => applyWorkspaceGroup(prev, workspaceId, groupId));
   }, []);
 
   const addScript = useCallback((workspaceId: string, config: Script) => {
@@ -921,7 +904,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceTitle,
     setWorkspaceColor,
     setWorkspaceIcon,
-    setWorkspaceStatus,
+    setWorkspaceGroup,
     addScript,
     updateScript,
     removeScript,
@@ -930,7 +913,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setScriptPaneId,
     validateScriptTabs,
     setTerminalRunningCommand,
-    setTabView,
     toggleOverlayPreview,
     toggleSplitPreview,
     findTabGlobal,

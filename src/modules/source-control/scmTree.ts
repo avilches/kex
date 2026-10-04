@@ -1,6 +1,7 @@
+import { pathBasename } from "@/lib/pathUtils";
 import type { SourceControlEntry } from "./useSourceControlPanel";
 
-export type ScmFileNode = { type: "file"; entry: SourceControlEntry };
+type ScmFileNode = { type: "file"; entry: SourceControlEntry };
 export type ScmDirNode = {
   type: "dir";
   name: string;
@@ -21,11 +22,6 @@ type RawNode = {
 
 function emptyRaw(): RawNode {
   return { dirs: new Map(), files: [] };
-}
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
 }
 
 function byNameCI(a: string, b: string): number {
@@ -52,7 +48,9 @@ function buildChildren(raw: RawNode, parentFull: string): ScmTreeNode[] {
     type: "file" as const,
     entry,
   }));
-  files.sort((a, b) => byNameCI(basename(a.entry.path), basename(b.entry.path)));
+  files.sort((a, b) =>
+    byNameCI(pathBasename(a.entry.path), pathBasename(b.entry.path)),
+  );
 
   return [...dirs, ...files];
 }

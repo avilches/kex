@@ -1,6 +1,6 @@
 import type { AgentNotification, AgentSession } from "./types";
 
-export type AgentEntryVisual = "attention" | "working" | "error";
+type AgentEntryVisual = "attention" | "working" | "error";
 
 export type AgentEntry = {
   tabId: string;

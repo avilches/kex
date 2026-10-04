@@ -163,19 +163,6 @@ export class BlockDecorations {
     return r ? this.toMeta(this.entries[i], r) : null;
   }
 
-  read(block: BlockMeta): BlockContext {
-    const e = this.entries.find((x) => x.id === block.id);
-    const r = e ? this.rangeOf(e) : null;
-    const start = r ? r.start : block.startLine;
-    const end = r ? r.end : block.endLine;
-    return {
-      command: block.command,
-      cwd: block.cwd,
-      exitCode: block.exitCode,
-      output: readRangeText(this.term, start, end),
-    };
-  }
-
   readById(id: string): BlockContext | null {
     const e = this.entries.find((x) => x.id === id);
     if (!e) return null;
@@ -234,15 +221,6 @@ export class BlockDecorations {
     } catch {}
     this.searchDeco = null;
     this.searchMarker = null;
-  }
-
-  commandLines(): number[] {
-    const lines: number[] = [];
-    for (const e of this.entries) {
-      if (!e.startMarker.isDisposed && e.startMarker.line >= 0)
-        lines.push(e.startMarker.line);
-    }
-    return lines;
   }
 
   visibleBlocks(): VisibleBlocks {

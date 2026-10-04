@@ -25,7 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { pathBasename } from "@/lib/pathUtils";
+import { pathBasename, splitPath } from "@/lib/pathUtils";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
@@ -39,7 +39,11 @@ import {
 } from "@/modules/explorer/lib/menuItemClass";
 import { joinPath } from "@/modules/explorer/lib/useFileTree";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
-import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
+import { useTheme } from "@/modules/theme/ThemeProvider";
+import {
+  gitStatusCategory,
+  type GitStatusCategory,
+} from "@/modules/explorer/lib/gitStatusUtils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setScmViewMode } from "@/modules/settings/store";
 import {
@@ -72,9 +76,11 @@ import { currentWorkspaceEnv } from "@/modules/workspace";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  forwardRef,
   memo,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -95,6 +101,7 @@ import {
   collectDirKeys,
   flattenScmTree,
   type ScmDirNode,
+  type ScmTreeNode,
 } from "./scmTree";
 
 type Props = {
@@ -111,10 +118,23 @@ type Props = {
     mode: "+" | "-";
     originalPath: string | null;
     title?: string;
-  }) => void;
+  }, pin: boolean) => void;
   onOpenFile?: (absolutePath: string, pin?: boolean) => void;
   onNavigateToWorktree?: (path: string) => void;
   workspaceCwd?: string | null;
+};
+
+export type SourceControlPanelHandle = {
+  // Resolves the prev/next entry after (repoRoot, path, mode) in the exact
+  // order this panel renders (list or tree, staged followed by unstaged,
+  // skipping collapsed sections/folders), selects and focuses it here, and
+  // returns it so the caller can update its diff tab. Returns null if
+  // repoRoot doesn't match what this panel is currently showing, the
+  // starting entry isn't found, or there is no such neighbor.
+  navigateEntry: (
+    input: { repoRoot: string; path: string; mode: "-" | "+" },
+    direction: "prev" | "next",
+  ) => { path: string; originalPath: string | null; mode: "-" | "+" } | null;
 };
 
 const ROW_HEIGHTS = {
@@ -139,16 +159,17 @@ type RowDescriptor =
     }
   | { kind: "tree-file"; key: string; depth: number; entry: SourceControlEntry };
 
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
-}
+type EntryRowDescriptor = Extract<
+  RowDescriptor,
+  { kind: "staged-entry" } | { kind: "changes-entry" } | { kind: "tree-file" }
+>;
 
-function dirname(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index <= 0) return "";
-  return normalized.slice(0, index);
+function isEntryRow(row: RowDescriptor): row is EntryRowDescriptor {
+  return (
+    row.kind === "staged-entry" ||
+    row.kind === "changes-entry" ||
+    row.kind === "tree-file"
+  );
 }
 
 function entriesUnderFolder(
@@ -163,31 +184,37 @@ function entriesUnderFolder(
 }
 
 
+const STATUS_TEXT_CLASS_BY_CATEGORY: Record<GitStatusCategory, string> = {
+  added: "text-emerald-600 dark:text-emerald-500/85",
+  untracked: "text-teal-500/85",
+  modified: "text-amber-600 dark:text-amber-500/85",
+  deleted: "text-rose-500/85",
+  renamed: "text-sky-500/85",
+};
+
 function statusTextClass(code: string): string {
-  switch (code) {
-    case "A": return "text-emerald-500/85";
-    case "U": return "text-teal-500/85";
-    case "M": return "text-amber-500/85";
-    case "D": return "text-rose-500/85";
-    case "R": return "text-sky-500/85";
-    default: return "text-muted-foreground/60";
-  }
+  const category = gitStatusCategory(code);
+  return category ? STATUS_TEXT_CLASS_BY_CATEGORY[category] : "text-muted-foreground/60";
 }
 
 
-export const SourceControlPanel = memo(function SourceControlPanel({
-  open,
-  sourceControl,
-  pushOnCommit,
-  onPushOnCommitChange,
-  gitWorkspaceId,
-  savedCommitMessage,
-  onCommitMessagePersist,
-  onOpenDiff,
-  onOpenFile,
-  onNavigateToWorktree,
-  workspaceCwd,
-}: Props) {
+export const SourceControlPanel = memo(
+  forwardRef<SourceControlPanelHandle, Props>(function SourceControlPanel(
+    {
+      open,
+      sourceControl,
+      pushOnCommit,
+      onPushOnCommitChange,
+      gitWorkspaceId,
+      savedCommitMessage,
+      onCommitMessagePersist,
+      onOpenDiff,
+      onOpenFile,
+      onNavigateToWorktree,
+      workspaceCwd,
+    }: Props,
+    ref,
+  ) {
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff, {
     workspaceId: gitWorkspaceId,
     savedCommitMessage,
@@ -290,15 +317,27 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           .filter(Boolean)
           .join(" · ");
 
+  // Built once per entries change and shared by allTreeDirKeys and rows below,
+  // instead of each of those two memos calling buildScmTree again for both
+  // staged and unstaged (4 builds per status change instead of 2).
+  const stagedTree = useMemo(
+    () => buildScmTree(scm.stagedEntries),
+    [scm.stagedEntries],
+  );
+  const unstagedTree = useMemo(
+    () => buildScmTree(scm.unstagedEntries),
+    [scm.unstagedEntries],
+  );
+
   const allTreeDirKeys = useMemo(
     () =>
       scmViewMode === "tree"
         ? [
-            ...collectDirKeys(buildScmTree(scm.stagedEntries), "staged/"),
-            ...collectDirKeys(buildScmTree(scm.unstagedEntries), "changes/"),
+            ...collectDirKeys(stagedTree, "staged/"),
+            ...collectDirKeys(unstagedTree, "changes/"),
           ]
         : [],
-    [scmViewMode, scm.stagedEntries, scm.unstagedEntries],
+    [scmViewMode, stagedTree, unstagedTree],
   );
   const allFoldersCollapsed =
     allTreeDirKeys.length > 0 &&
@@ -383,11 +422,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     }
     if (scmViewMode === "tree") {
       const pushTree = (
-        entries: SourceControlEntry[],
+        tree: ScmTreeNode[],
         prefix: string,
         section: "staged" | "changes",
       ) => {
-        for (const r of flattenScmTree(buildScmTree(entries), treeCollapsed, prefix)) {
+        for (const r of flattenScmTree(tree, treeCollapsed, prefix)) {
           if (r.type === "dir") {
             result.push({ kind: "tree-dir", key: r.key, collapseKey: r.collapseKey, depth: r.depth, node: r.node, section });
           } else {
@@ -397,11 +436,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       };
       if (scm.stagedEntries.length > 0) {
         result.push({ kind: "staged-header", key: "staged-header", count: scm.stagedEntries.length });
-        if (!stagedCollapsed) pushTree(scm.stagedEntries, "staged/", "staged");
+        if (!stagedCollapsed) pushTree(stagedTree, "staged/", "staged");
       }
       if (scm.unstagedEntries.length > 0) {
         result.push({ kind: "changes-header", key: "changes-header", count: scm.unstagedEntries.length });
-        if (!changesCollapsed) pushTree(scm.unstagedEntries, "changes/", "changes");
+        if (!changesCollapsed) pushTree(unstagedTree, "changes/", "changes");
       }
       return result;
     }
@@ -435,10 +474,40 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     isDiverged,
     scm.stagedEntries,
     scm.unstagedEntries,
+    stagedTree,
+    unstagedTree,
     treeCollapsed,
     stagedCollapsed,
     changesCollapsed,
   ]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      navigateEntry: (input, direction) => {
+        if (scm.repo?.repoRoot !== input.repoRoot) return null;
+        const entryRows = rows.filter(isEntryRow);
+        const index = entryRows.findIndex(
+          (r) => r.entry.path === input.path && r.entry.mode === input.mode,
+        );
+        if (index === -1) return null;
+        const targetRow =
+          entryRows[direction === "prev" ? index - 1 : index + 1];
+        if (!targetRow) return null;
+        scm.selectExternal({
+          path: targetRow.entry.path,
+          mode: targetRow.entry.mode,
+        });
+        setFocusedRowKey(targetRow.key);
+        return {
+          path: targetRow.entry.path,
+          originalPath: targetRow.entry.originalPath,
+          mode: targetRow.entry.mode,
+        };
+      },
+    }),
+    [scm.repo?.repoRoot, scm.selectExternal, rows],
+  );
 
   const rowKeyToIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -580,7 +649,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           const entry = focusedEntry();
           if (entry) {
             event.preventDefault();
-            void scm.selectEntry(entry);
+            void scm.selectEntry(entry, true);
           }
           break;
         }
@@ -780,6 +849,27 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         <header className="flex shrink-0 items-start gap-1 border-b border-border/60 px-1.5 py-1">
           {scm.repo ? (
             <div className="flex flex-1 min-w-0 flex-col gap-1">
+              {scm.worktreeCount > 1 && onNavigateToWorktree ? (
+                <div className="min-w-0 max-w-full">
+                  <WorktreePicker
+                    label={
+                      scm.repo.isWorktree
+                        ? `Worktree: ${pathBasename(scm.repo.repoRoot)}`
+                        : "Main worktree"
+                    }
+                    path={scm.repo.repoRoot}
+                    onFetchWorktrees={scm.fetchWorktrees}
+                    onSelect={onNavigateToWorktree}
+                  />
+                </div>
+              ) : (
+                <span
+                  title={scm.repo.repoRoot}
+                  className="inline-flex w-fit max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
+                >
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap [direction:rtl]">{scm.repo.repoRoot}</span>
+                </span>
+              )}
               <div className="flex h-6 min-w-0 items-center gap-1.5">
                 <BranchPicker
                   currentBranch={repoLabel}
@@ -854,27 +944,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   />
                 </div>
               </div>
-              {scm.worktreeCount > 1 && onNavigateToWorktree ? (
-                <div className="min-w-0 max-w-full">
-                  <WorktreePicker
-                    label={
-                      scm.repo.isWorktree
-                        ? `Worktree: ${pathBasename(scm.repo.repoRoot)}`
-                        : "Main worktree"
-                    }
-                    path={scm.repo.repoRoot}
-                    onFetchWorktrees={scm.fetchWorktrees}
-                    onSelect={onNavigateToWorktree}
-                  />
-                </div>
-              ) : (
-                <span
-                  title={scm.repo.repoRoot}
-                  className="inline-flex w-fit max-w-full min-w-0 items-center gap-1 rounded bg-muted/55 px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground"
-                >
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap [direction:rtl]">{scm.repo.repoRoot}</span>
-                </span>
-              )}
             </div>
           ) : (
             <span className="flex h-6 items-center px-1 text-[12px] font-medium text-muted-foreground">
@@ -1289,9 +1358,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   `All ${scm.pendingDiscard.count} unstaged changes will be discarded. This can't be undone.`
                 )
               ) : scm.pendingDiscard?.untracked ? (
-                `"${basename(scm.pendingDiscard.label)}" is not tracked by git. It will be removed from disk. This can't be undone.`
+                `"${pathBasename(scm.pendingDiscard.label)}" is not tracked by git. It will be removed from disk. This can't be undone.`
               ) : scm.pendingDiscard ? (
-                `Your edits to "${basename(scm.pendingDiscard.label)}" will be lost. This can't be undone.`
+                `Your edits to "${pathBasename(scm.pendingDiscard.label)}" will be lost. This can't be undone.`
               ) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1311,7 +1380,8 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       </AlertDialog>
     </TooltipProvider>
   );
-});
+  }),
+);
 
 function PanelCenter({
   title,
@@ -1371,7 +1441,7 @@ type RowRendererProps = {
   onStageFolder: (node: ScmDirNode) => void;
   onUnstageFolder: (node: ScmDirNode) => void;
   onDiscardFolder: (node: ScmDirNode) => void;
-  onSelectEntry: (entry: SourceControlEntry) => Promise<void>;
+  onSelectEntry: (entry: SourceControlEntry, pin: boolean) => Promise<void>;
   onStageEntry: (entry: SourceControlEntry) => Promise<void>;
   onUnstageEntry: (entry: SourceControlEntry) => Promise<void>;
   onDiscardEntry: (entry: SourceControlEntry) => void;
@@ -1623,23 +1693,20 @@ const EntryRow = memo(function EntryRow({
   const showDirname = row.kind !== "tree-file";
   const isSelected =
     selected?.path === entry.path && selected?.mode === entry.mode;
-  const fileName = basename(entry.path);
+  const [entryDir, fileName] = splitPath(entry.path);
   const iconUrl = fileIconUrl(fileName);
   const pathLabel = entry.originalPath
     ? `${entry.originalPath} → ${entry.path}`
     : showDirname
-      ? dirname(entry.path)
+      ? entryDir
       : null;
   const isStageBusy = actionBusy === `stage:${entry.path}`;
   const isUnstageBusy = actionBusy === `unstage:${entry.path}`;
   const isDiscardBusy = actionBusy === `discard:${entry.path}`;
   const disabled = actionBusy !== null;
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
-  const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
-  const statusHex = gitStatusHexColor(
-    entry.statusCode as GitStatusCode,
-    gitColorScheme,
-  );
+  const { resolvedMode } = useTheme();
+  const statusHex = gitStatusHexColor(entry.statusCode, gitColorScheme, resolvedMode);
   const absolutePath = repoRoot
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
     : null;
@@ -1671,10 +1738,10 @@ const EntryRow = memo(function EntryRow({
             type="button"
             onClick={() => {
               onFocusRow(row.key);
-              if (previewOnClick) void onSelectEntry(entry);
+              void onSelectEntry(entry, false);
             }}
             onDoubleClick={() => {
-              if (!previewOnClick) void onSelectEntry(entry);
+              void onSelectEntry(entry, true);
             }}
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
           >
@@ -1770,7 +1837,7 @@ const EntryRow = memo(function EntryRow({
           className={COMPACT_ITEM}
           onSelect={() => {
             onFocusRow(row.key);
-            void onSelectEntry(entry);
+            void onSelectEntry(entry, true);
           }}
         >
           <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />

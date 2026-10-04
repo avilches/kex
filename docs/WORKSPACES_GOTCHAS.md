@@ -635,3 +635,237 @@ Cuando un dato "en vivo" de un agente parece faltar en un sitio pero sobra en ot
 como lo obtiene el sitio que **si** funciona antes de asumir que hace falta un canal de datos nuevo
 (nuevo campo en un store, nuevo evento IPC). Aqui el dato ya existia y ya estaba persistido
 (`oscTitleStore`); el bug era de prioridad de fuentes en un componente, no de falta de plumbing.
+
+## Bug 10: cambiar de pestana entre terminales seguia lento tras aparcar en vez de liberar (RESUELTO)
+
+### Sintoma
+
+Tras anadir el presupuesto de memoria para terminales aparcados (ver el propio TASK-761: mantener
+vivos el terminal y su buffer al ocultar una pestana, soltando solo el contexto WebGL), el usuario
+seguia notando el mismo parón al alternar entre pestanas de terminal, sobre todo con muchas sesiones
+de agente abiertas a la vez. Entre pestanas de editor iba rapido; solo entre terminales dolia.
+
+### Pistas falsas descartadas
+
+- Recrear el contexto WebGL al volver a mostrar la pestana (`attachWebgl`): medido en 4-9ms,
+  insignificante.
+- El tamano del historial de scroll (`bufferLines`): medido identico con 68 y con 2068 lineas de
+  buffer, mismo coste. No es proporcional al scrollback.
+- Perder el contexto WebGL en si (`WEBGL_lose_context`/`loseContext()`): medido en 0.0ms siempre.
+
+### Causa raiz
+
+`disposeSlotWebgl` (llamada por `parkLeafSlot` en cada ocultacion) llama a `addon.dispose()`, el
+metodo propio de `WebglAddon` de `@xterm/addon-webgl`. Ese `dispose()` registra un disposable que
+llama incondicionalmente a `renderService.setRenderer(core._createRenderer())` +
+`renderService.handleResize(...)`: reconstruye un `DomRenderer` completo (el renderer DOM de
+reserva de xterm, documentado en su propio codigo como "not meant to be particularly fast"). Su
+constructor crea un elemento DOM por cada fila *visible* del terminal, un `WidthCache` con sus
+propios elementos auxiliares, e inyecta una hoja de estilos nueva — coste fijo proporcional a
+`term.rows`, no al historial, medido en 50-65ms consistentes. Ese `DomRenderer` nunca llega a
+pintar nada: en cuanto la pestana vuelve a ser visible, `attachWebgl` crea un contexto nuevo y lo
+descarta sin usarlo. Confirmado leyendo el codigo fuente instalado de `@xterm/addon-webgl@0.19.0`
+(la version estable que usa Kex) y comparado con la beta mas reciente publicada en npm en el
+momento de la investigacion (`0.20.0-beta.300`, descargada del tarball del registro): identico en
+ambas, no es un bug con parche pendiente en una version mas nueva.
+
+### Fix
+
+`parkLeafSlot` ya no llama a `disposeSlotWebgl` de forma sincrona: llama a `scheduleWebglReap`, el
+mismo mecanismo de margen de gracia (`WEBGL_REAP_GRACE_MS = 30s`) que ya usaba `detachSlotFromLeaf`
+para slots totalmente libres. `refreshLeafSlot` (la pestana aparcada vuelve a ser visible) llama a
+`cancelWebglReap` antes de nada, asi que un cambio de pestana rapido nunca llega a pagar el coste de
+reconstruir el `DomRenderer`: solo lo paga una pestana que se queda de verdad oculta el margen
+completo. El guardian del propio temporizador (`if (slot.currentLeafId === null) disposeSlotWebgl`)
+se elimino: como todo camino que reclama el slot antes de que salte el timer lo cancela primero (
+`bindSlot`/`rewireSlot` para un slot idle recuperado, `refreshLeafSlot` para uno aparcado), si el
+timer llega a disparar es siempre seguro destruir el contexto, aparcado o no. El filtro de eviccion
+de `attachWebgl` bajo presion de `WEBGL_MAX_CONTEXTS` paso de mirar solo `currentLeafId === null` a
+mirar `webglReapTimer !== null`: un slot aparcado en tiempo de gracia es tan buen candidato a perder
+su contexto bajo presion como uno totalmente libre.
+
+### Leccion
+
+Un arreglo de rendimiento que solo mueve el coste de sitio (de "reescribir el snapshot" a "llamar a
+`dispose()` de un addon de terceros") puede reproducir el mismo sintoma por una via completamente
+distinta si no se mide el propio addon. Medir con `performance.now()` en cada frontera de la funcion
+sospechosa, no solo en la propia, encontro que el coste no estaba ni en nuestro codigo de aparcado
+ni en la perdida del contexto del navegador, sino en un efecto colateral documentado (pero facil de
+pasar por alto) de una libreria de terceros.
+
+---
+
+## Bug 11: el menu de tres puntos del editor no aparecia al abrir un .md por primera vez (RESUELTO)
+
+### Sintoma
+
+Al arreglar que el boton de tres puntos (ajustes de vista del editor, en `EditorPathBar`) dejara de
+desmontarse al entrar en preview/split, el usuario seguia sin verlo la primera vez que abria un
+`.md`: aparecia el ojo y el boton de panel dividido, ya en modo preview, pero no el de tres puntos.
+En cuanto pulsaba cualquiera de los dos botones, el de tres puntos aparecia y ya no volvia a
+desaparecer nunca, se hiciera lo que se hiciera despues.
+
+### Pistas falsas descartadas
+
+- Vite HMR mostrando un render antiguo de una pestana ya montada antes del cambio (patron ya
+  documentado en `AGENTS.md`): descartado porque el usuario reprodujo el fallo tras matar el proceso
+  y arrancar `pnpm tauri dev` en frio.
+- Un problema de timing en el primer render (settings aun no hidratados, viewToggles llegando
+  `undefined` un instante): descartado con una traza (`console.log` temporal en `EditorPathBar`) que
+  mostro `showToggles: false` de forma estable, no solo en el primer tick.
+
+### Causa raiz
+
+Abrir un `.md` desde el explorador crea una pestana `kind: "markdown"`, no `kind: "editor"`. Ese tipo
+de pestana tiene tres motores de render distintos segun `markdownEngine` (`tiptap`, `milkdown`,
+"legacy"): el legacy es el que se activa por defecto en este repo y monta su **propio** `EditorPathBar`
+directamente en `TabContent.tsx` (rama `case "markdown"`, la que no usa `MarkdownTab.tsx`), con un
+`view={{ mode: "overlay", ... }}` fijo pero sin pasar nunca `viewToggles` ni `globalToggles`. El
+arreglo anterior solo habia tocado la rama `case "editor"`, que es donde aterriza la pestana **tras**
+pulsar el ojo o el panel dividido (`onSetMarkdownView`/`onUpdateTab` convierten la pestana de
+`markdown` a `editor`), asi que a partir de ese clic ya usaba el `viewToggles` siempre montado. La
+pestana legacy en si nunca lo tuvo.
+
+### Fix
+
+`buildViewToggles(path)` en `TabContent.tsx` concentra el calculo (antes vivia solo dentro del `case
+"editor"`) y se llama desde las dos ramas que montan un `EditorPathBar` para un archivo markdown: el
+`case "editor"` y el render legacy de `case "markdown"`. Como `effectivePreviewMode` ya vale
+`"overlay"` fijo para cualquier pestana `kind: "markdown"`, el mismo helper deja el boton disabled
+ahi automaticamente, sin condicion extra.
+
+### Leccion
+
+Un tab `kind` puede tener mas de un componente que monta la misma barra compartida (`EditorPathBar`)
+de forma independiente; arreglar la version mas obvia (la que ya usa el usuario tras un clic) no
+implica haber cubierto la que se ve **antes** de ese clic. Antes de dar un fix de una barra compartida
+por completo, `grep -rn "<EditorPathBar"` para listar todos los que la montan, no solo el que
+disparo el reporte original.
+
+---
+
+## Bug 12: crear un segundo grupo del WorkspaceBar borraba el grupo recien creado (RESUELTO)
+
+### Sintoma
+
+Al introducir los grupos de workspace por ventana (TASK-768, sustituyendo el antiguo "status"
+global), crear un grupo nuevo desde "Move to group" -> "New" funcionaba la primera vez: se podia
+escribir el nombre. Pero al crear un SEGUNDO grupo nuevo (sobre un workspace que ya pertenecia a
+otro grupo), el grupo recien creado desaparecia de la barra en cuanto se confirmaba, dejando el
+workspace suelto en la seccion "sin grupo", y ningun intento posterior de "New" volvia a funcionar.
+
+### Pistas falsas descartadas
+
+- Un bug de foco/Popover en `SortableGroupHeader` (el mismo patron que ya usa el rename de
+  workspace, calcado sin cambios de logica): descartado porque el nombre SI llega a escribirse y
+  persistirse (`onRenameGroup` se ejecuta), solo el grupo desaparece despues.
+- Colision de IDs de `newGroupId()`: descartado, 6 bytes de `crypto.getRandomValues` por grupo, sin
+  reutilizacion posible en una sesion.
+- Un problema del `SortableContext` exterior anadido para poder arrastrar cabeceras de grupo:
+  descartado tras revisar que `useSortable` resuelve siempre al `SortableContext` mas cercano, y los
+  items de un grupo siguen anidados en su propio contexto interior, sin tocar el exterior.
+
+### Causa raiz
+
+`handleSetGroup` (en `App.tsx`) leia `workspaces` — el array de React, capturado por el closure del
+`useCallback` — para decidir si el grupo de origen del workspace se habia quedado vacio y debia
+podarse. Pero `setWorkspaceGroup(workspaceId, groupId)` solo *programa* la actualizacion: el array
+`workspaces` que ve el resto de la misma funcion, en el mismo evento sincrono, sigue siendo el de
+ANTES del cambio (React no aplica el nuevo estado hasta el siguiente render). Para un workspace que
+aun no tenia grupo, `prevGroupId` era `null` y una guarda evitaba podar nada — de ahi que la
+PRIMERA creacion funcionara siempre. Pero al mover un workspace YA agrupado a un grupo nuevo,
+`pruneEmptyGroups` se ejecutaba sobre ese array desactualizado: el grupo de origen seguia
+"pareciendo usado" (el workspace aun no habia salido de el, segun ese snapshot) asi que NO se
+podaba, mientras que el grupo nuevo no aparecia usado por nadie (el snapshot no sabe que el
+workspace acaba de entrar en el) asi que SI se podaba, borrando exactamente el grupo que se
+acababa de crear. Reproducido de forma determinista con un script que simula la secuencia exacta de
+`handleCreateGroup` -> `handleSetGroup` -> poda usando solo las funciones puras, sin necesidad de
+arrancar la app.
+
+### Fix
+
+Nueva funcion pura `reconcileGroupsAfterMove(groups, workspacesBeforeMove, workspaceId, nextGroupId)`
+en `workspaceOrder.ts`: en vez de que el llamador intente adivinar o esperar a que `workspaces` ya
+refleje el movimiento, la propia funcion aplica el movimiento sobre la copia que recibe (`.map` puro,
+sin depender de ningun estado de React) y solo despues llama a `pruneEmptyGroups` sobre ese
+resultado. `handleSetGroup` le pasa el `workspaces` capturado tal cual, ANTES de aplicar nada, y la
+funcion se encarga de calcular el "despues" ella misma — asi ya no importa en que momento del ciclo
+de React se lea el closure, porque nunca se confia en que ya se haya actualizado. `handleCommitGroupMove`
+(el que se dispara al soltar un drag) no necesito este mismo tratamiento: para cuando el drag
+termina, los cambios de grupo en vivo (`handlePreviewGroup`, durante el `dragOver`) ya se aplicaron
+en renders previos y separados en el tiempo, asi que ahi `workspaces` si esta al dia.
+
+### Leccion
+
+Cuando un handler necesita decidir algo basandose en "el estado tal y como quedara" justo despues de
+programar un cambio con un setter de React, no leer el estado de React para eso: calcular el
+resultado con una funcion pura que reciba el estado ANTERIOR explicito y aplique el cambio ella
+misma. Cualquier atajo que asuma "total, para cuando se ejecute esta linea ya se habra aplicado" es
+una apuesta sobre el orden de re-render de React, no un hecho garantizado en el mismo evento
+sincrono. El primer intento de una feature que solo se prueba con el caso mas simple (un workspace
+sin grupo previo) puede ocultar durante un rato un bug que solo aparece al repetir la accion sobre
+estado ya no-trivial.
+
+---
+
+## Bug 13: arrastrar la cabecera de un grupo para reordenar hacia un "swap" raro (RESUELTO)
+
+### Sintoma
+
+Arrastrar la cabecera de un grupo del WorkspaceBar para reordenarlo respecto a otro grupo (TASK-768)
+producia un reordenamiento que parecia intercambiar posiciones de forma brusca en vez de deslizar
+los grupos de por medio, sobre todo notorio cuando los grupos involucrados tenian un numero muy
+distinto de workspaces dentro.
+
+### Causa raiz
+
+`useSortable` se llamaba dentro de `SortableGroupHeader`, y su `setNodeRef` solo se aplicaba al
+`<button>` de la cabecera, no al bloque completo del grupo (cabecera + su lista variable de
+workspaces). dnd-kit mide el nodo que recibe `setNodeRef` para calcular, con la estrategia
+`verticalListSortingStrategy`, cuanto debe desplazarse cada elemento durante el arrastre. Al medir
+solo la cabecera (una altura fija y pequeña, igual para todos los grupos) pero reordenar en realidad
+bloques de altura muy distinta (cabecera mas N workspaces), los calculos de desplazamiento no
+correspondian con el tamano real de lo que se movia en el DOM, y el resultado visual parecia un
+intercambio en vez de un deslizamiento proporcional.
+
+### Fix
+
+Patron oficial de dnd-kit para "drag handles": `useSortable` se llama una unica vez en un nuevo
+componente contenedor, `SortableGroupBlock`, cuyo `setNodeRef`/`style` se aplican al `<div>` que
+envuelve la cabecera Y los workspaces del grupo (el bloque completo, con su altura real). Los
+`attributes`/`listeners` que activan el arrastre se pasan hacia abajo como props a
+`SortableGroupHeader`, que los aplica solo a su `<button>`: asi el punto de agarre sigue siendo
+unicamente la cabecera, pero lo que dnd-kit mide y anima es el bloque entero.
+
+### Leccion
+
+En una lista de dnd-kit con elementos de tamano variable, el nodo que recibe `setNodeRef` de
+`useSortable` debe ser el que ocupa el espacio real que se reordena, no un "handle" visual mas
+pequeno dentro de el. Cuando se quiere restringir el arrastre a una zona concreta (un icono, una
+cabecera) sin que el nodo medido sea esa misma zona, hay que separar `setNodeRef` (en el contenedor)
+de `attributes`/`listeners` (en el handle), llamando a `useSortable` una sola vez en el nivel que
+tiene acceso a ambos.
+
+## Bug 14: el comando de resume de la primera pestana al arrancar nunca se ejecutaba (RESUELTO)
+
+### Sintoma
+
+Al reabrir Kex con varias pestanas de Claude, siempre la misma (la primera por orden, PTY id=1) quedaba con un shell vacio: el plan de restore se calculaba bien (`Kex.log`: `restore plan: tab=... cmd="claude --resume '...'"`), el PTY se abria en el cwd correcto, pero no aparecia ningun `osc133 C: armed ... cmd= claude --resume ...` para ella, mientras las demas pestanas si lo mostraban 2-3 s despues de abrirse.
+
+### Pistas falsas descartadas
+
+- "Run on start" desactivado: `restoreOnRestart` era `true` en el JSON del workspace, y con el flag apagado el PTY no se habria abierto en el cwd del plan.
+- Sobrescritura de la sesion: el `session_id` de `agent-sessions.json` era el mismo antes y despues; el usuario lanzo `claude -c` a mano y este continuo justo esa conversacion.
+- Carrera de plan no cargado: los planes se sirven todos en una sola llamada IPC y `attachSession` espera a `restorePlansReady()`.
+
+### Causa raiz
+
+`attachSession` escribia el comando con un `setTimeout` ciego de 200 ms tras abrir el PTY, suponiendo que el shell ya leia stdin. La pestana activa es la unica que hace antes, de forma sincrona, `bindLeafToSlot` (creacion del contexto WebGL, en pleno arranque en frio de la GPU), y ademas se abren ~8 shells a la vez, asi que 200 ms no garantiza nada y el texto se perdia sin dejar rastro. No se pudo aislar el mecanismo exacto de la perdida, pero un delay fijo no puede ser fiable.
+
+### Fix
+
+Rust detecta el primer `OSC 133;B` de cada PTY (`Transition::ShellReady`) y emite `kex:shell-ready { id }`. `writeWhenShellReady` (`useTerminalSession.ts`) espera a ese evento (`shellReadyWaiter.ts`, con un listener global registrado al cargar el modulo y un `seen` para eventos que llegan antes de esperar) y con un fallback de 1500 ms. Se usa `133;B` y no `133;A` porque `zshrc.zsh`/`bashrc.bash` llaman a `_kex_precmd` a mano mientras aun se hace `source` del rc, asi que `A` sale antes de que el shell acepte input; `B` va dentro de `PS1` y solo sale al pintarse el prompt real.
+
+### Leccion
+
+Un `setTimeout` para "esperar a que el shell este listo" es una apuesta de timing; si el sistema ya emite una senal real de prompt listo, esperar a esa senal. Y ante un fallo que siempre cae en el mismo elemento del arranque, buscar que trabajo extra hace solo ese elemento antes de culpar a la carga general.

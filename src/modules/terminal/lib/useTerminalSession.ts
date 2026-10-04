@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { consumeRestorePlan, restorePlansReady } from "@/modules/agents/lib/agentSessionRestore";
+import { listen } from "@tauri-apps/api/event";
+import { consumeRestorePlan, restorePlansReady, watchResume } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -7,7 +8,12 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DormantRing } from "./dormantRing";
 import { estimateParkedTerminalBudget } from "./backgroundMemoryBudget";
-import { drop as dropParkedLeaf, evictOverflow, touch as touchParkedLeaf } from "./parkedLeafOrder";
+import {
+  drop as dropParkedLeaf,
+  evictOverflow,
+  shouldEvictParkedLeaf,
+  touch as touchParkedLeaf,
+} from "./parkedLeafOrder";
 import { shouldFireOnRegister } from "./pendingFocus";
 import type { BlockMode } from "../block/lib/modeMachine";
 import {
@@ -19,6 +25,7 @@ import {
 } from "./osc-handlers";
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
 import { openPty, type PtySession } from "./pty-bridge";
+import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
 import {
   type BlockMatch,
   BlockDecorations,
@@ -112,10 +119,6 @@ type Session = {
   // switching tabs or workspaces, Escape, Cmd+U) closes it; visibility is
   // derived directly from this flag (scratchpadOpen && the tab is focused).
   scratchpadOpen: boolean;
-  // Transient resume mark, never persisted: set when the scratchpad is left
-  // open (abandon-close) with scratchpadRememberFocus on; consumed by
-  // requestLeafFocus to reopen it. Any deliberate dismiss clears it.
-  scratchpadResume: boolean;
   scratchpadFocus: (() => void) | null;
   // A focus request arrived before ScratchpadBar mounted and registered
   // scratchpadFocus (restore, or a just-created terminal). Consumed as soon
@@ -126,6 +129,28 @@ type Session = {
 };
 
 const sessions = new Map<string, Session>();
+
+// Fallback only for shells without Kex's OSC 133 integration (custom shell
+// override): the real signal is the first interactive prompt.
+const SHELL_READY_FALLBACK_MS = 1500;
+
+listen<{ id: number }>("kex:shell-ready", (e) => markShellReady(e.payload.id)).catch(
+  (err) => console.warn("[kex] shell-ready listener failed:", err),
+);
+
+async function writeWhenShellReady(
+  s: Session,
+  leafId: string,
+  pty: PtySession,
+  data: string,
+): Promise<void> {
+  const t0 = performance.now();
+  await waitForShellReady(pty.id, SHELL_READY_FALLBACK_MS);
+  const waited = Math.round(performance.now() - t0);
+  if (s.disposed || s.pty !== pty) return;
+  console.debug(`[kex] run-on-start write tab=${leafId} pty=${pty.id} waited=${waited}ms`);
+  void pty.write(data);
+}
 
 // Recency-ordered leaves kept "parked" (hidden, but their terminal and
 // buffer stay alive) instead of being released and rebuilt from a
@@ -156,7 +181,8 @@ function enforceParkedLeafBudget(): void {
   const evicted = evictOverflow(parkedLeaves, parkedLeafBudget());
   for (const id of evicted) {
     const es = sessions.get(id);
-    if (es && es.hasSlot && !es.visibleNow) unbindLeafFromSlot(id, es);
+    if (!es || !shouldEvictParkedLeaf(es, isLeafAltScreen(id))) continue;
+    unbindLeafFromSlot(id, es);
   }
 }
 
@@ -370,43 +396,20 @@ function requestScratchpadFocus(s: Session): void {
   else s.scratchpadFocusPending = true;
 }
 
-// "leave" = abandon-close (blur to chrome, tab/pane/workspace switch, the
-// sentinel effect): marks scratchpadResume when scratchpadRememberFocus is on,
-// but only when this call is the one that actually closes it (never
-// clobbers/creates a mark on an already-closed leaf, e.g. a duplicate blur).
-// "dismiss" = deliberate close (Escape, Cmd+U, clicking the terminal): always
-// clears scratchpadResume, even if the scratchpad was already closed, so a
-// dismiss can never leave a stale mark behind.
-type ScratchpadCloseReason = "leave" | "dismiss";
-
 // State-only close: clears scratchpadOpen without touching where focus goes
 // next. Used when focus is already headed elsewhere (the terminal just
 // gained it, or a different tab/workspace is about to) so this never steals
 // focus back.
-function closeScratchpadState(
-  s: Session,
-  leafId: string,
-  reason: ScratchpadCloseReason,
-): void {
-  if (!s.scratchpadOpen) {
-    if (reason === "dismiss") s.scratchpadResume = false;
-    return;
-  }
+function closeScratchpadState(s: Session, leafId: string): void {
+  if (!s.scratchpadOpen) return;
   s.scratchpadOpen = false;
   s.scratchpadFocusPending = false;
-  s.scratchpadResume =
-    reason === "leave" &&
-    usePreferencesStore.getState().scratchpadRememberFocus;
   notifyScratchpad(leafId);
   notifyScratchpadEnabled(leafId);
 }
 
-// Shared open path: used by toggleScratchpad's open branch and by
-// requestLeafFocus when consuming a resume mark. A fresh open always
-// obsoletes any pending resume mark.
 function openScratchpadState(s: Session, leafId: string): void {
   s.scratchpadOpen = true;
-  s.scratchpadResume = false;
   notifyScratchpad(leafId);
   notifyScratchpadEnabled(leafId);
   requestScratchpadFocus(s);
@@ -418,7 +421,7 @@ export function toggleScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s || s.shellExited) return;
   if (s.scratchpadOpen) {
-    closeScratchpadState(s, leafId, "dismiss");
+    closeScratchpadState(s, leafId);
     focusSlot(leafId);
   } else {
     openScratchpadState(s, leafId);
@@ -428,7 +431,7 @@ export function toggleScratchpad(leafId: string): void {
 export function closeScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
-  closeScratchpadState(s, leafId, "dismiss");
+  closeScratchpadState(s, leafId);
   focusSlot(leafId);
 }
 
@@ -438,7 +441,7 @@ export function closeScratchpad(leafId: string): void {
 export function leaveLeafScratchpad(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
-  closeScratchpadState(s, leafId, "leave");
+  closeScratchpadState(s, leafId);
 }
 
 export function setLeafScratchpadFocus(
@@ -457,21 +460,16 @@ export function setLeafScratchpadFocus(
 
 // Called when the terminal grid gains real DOM focus (a leaf-scoped focusin
 // on its container). A click on the terminal of the leaf that was ALREADY
-// focused dismisses its scratchpad (and clears any resume mark): the user
-// deliberately went back to the terminal. A click on the terminal of a leaf
-// that was NOT focused is a mouse pane/tab switch, not a dismiss -- at this
-// point s.focusedNow is still false, because focusin fires during the
-// mousedown's default action, before React commits the activePaneId/tab
-// change that would flip it. Skip the clear so the focused-transition effect
-// (which runs after that commit and sets focusedNow=true) can still consume a
-// pending resume mark via requestLeafFocus, exactly like a keyboard switch.
+// focused dismisses its scratchpad: the user deliberately went back to the
+// terminal. A click on the terminal of a leaf that was NOT focused is a mouse
+// pane/tab switch, not a dismiss -- at this point s.focusedNow is still
+// false, because focusin fires during the mousedown's default action, before
+// React commits the activePaneId/tab change that would flip it.
 export function setLeafTerminalFocused(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
   if (!s.focusedNow) return;
-  s.scratchpadResume = false;
-  if (!s.scratchpadOpen) return;
-  closeScratchpadState(s, leafId, "dismiss");
+  closeScratchpadState(s, leafId);
 }
 
 export function setLeafScratchpadInsert(
@@ -585,21 +583,12 @@ export function ptyIdForTab(tabId: string): number | null {
 // menu closing, OS window regaining focus, notification bell closing).
 // scratchpadOpen already IS "should this leaf's scratchpad have focus right
 // now" -- there's no separate "which side" to remember, since anything that
-// took focus away from the scratchpad already closed it. The one exception is
-// a pending resume mark (scratchpadRememberFocus): reopen and consume it.
+// took focus away from the scratchpad already closed it.
 export function requestLeafFocus(leafId: string): void {
   const s = sessions.get(leafId);
   if (!s) return;
   if (s.scratchpadOpen) {
     requestScratchpadFocus(s);
-  } else if (
-    // Read live: if the preference was turned off after the mark was set,
-    // this branch is skipped and the mark stays inert until a later dismiss
-    // or open clears it.
-    s.scratchpadResume &&
-    usePreferencesStore.getState().scratchpadRememberFocus
-  ) {
-    openScratchpadState(s, leafId);
   } else {
     focusSlot(leafId);
   }
@@ -700,7 +689,6 @@ function ensureSession(
     everSubmitted: false,
     altScreenAtRelease: false,
     scratchpadOpen: initialScratchpadEnabled,
-    scratchpadResume: false,
     scratchpadFocus: null,
     scratchpadFocusPending: false,
     scratchpadInsert: null,
@@ -913,19 +901,15 @@ function attachSession(
           if (!runOnStart) return;
           if (plan) {
             if (plan.resumeCmd) {
-              setTimeout(() => {
-                s.pty?.write(" " + plan.resumeCmd + "\r");
-              }, 200);
+              void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
+              watchResume(plan);
             } else if (plan.errorReason) {
               console.error(`[kex] session restore failed for tab ${leafId} (${plan.agent}): ${plan.errorReason}`);
               useAgentStore.getState().setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
             }
             // else: no command, no error - PTY just opened at plan.cwdLaunch, nothing to do
           } else if (s.persistentCommand) {
-            const cmd = s.persistentCommand;
-            setTimeout(() => {
-              s.pty?.write(cmd + "\r");
-            }, 300);
+            void writeWhenShellReady(s, leafId, pty, s.persistentCommand + "\r");
           }
         })
         .catch((e) => {
@@ -1027,6 +1011,64 @@ export function disposeSession(leafId: string): void {
     }
   }
 }
+
+// Push terminal-appearance preferences into the renderer pool exactly once
+// per change, regardless of how many terminals are mounted. Each apply*
+// function already loops over every slot in the pool, so subscribing once
+// at module scope (instead of once per useTerminalSession instance) turns
+// what used to be N identical full-pool passes (one per mounted terminal)
+// into a single pass. Newly created slots don't need this: createSlot reads
+// the current preferences directly (termOptions() in rendererPool.ts), so
+// this subscription only has to react to a LIVE change while terminals
+// already exist.
+let poolPreferencesSyncStarted = false;
+
+function startPoolPreferencesSync(): void {
+  if (poolPreferencesSyncStarted) return;
+  poolPreferencesSyncStarted = true;
+  let prev = usePreferencesStore.getState();
+  usePreferencesStore.subscribe((state) => {
+    if (state.terminalFontSize !== prev.terminalFontSize || state.zoomLevel !== prev.zoomLevel) {
+      applyFontSize(renderFontSize(state.terminalFontSize, state.zoomLevel));
+    }
+    if (state.terminalFontFamily !== prev.terminalFontFamily) {
+      applyFontFamily(state.terminalFontFamily);
+    }
+    if (state.terminalLetterSpacing !== prev.terminalLetterSpacing) {
+      applyLetterSpacing(state.terminalLetterSpacing);
+    }
+    if (state.terminalFontWeight !== prev.terminalFontWeight) {
+      applyFontWeight(state.terminalFontWeight);
+    }
+    if (state.terminalLineHeight !== prev.terminalLineHeight) {
+      applyLineHeight(state.terminalLineHeight);
+    }
+    if (state.terminalScrollback !== prev.terminalScrollback) {
+      applyScrollback(state.terminalScrollback);
+    }
+    if (state.terminalWebglEnabled !== prev.terminalWebglEnabled) {
+      applyWebglPreference(state.terminalWebglEnabled);
+    }
+    if (state.terminalCursorBlink !== prev.terminalCursorBlink) {
+      applyCursorBlink(state.terminalCursorBlink);
+    }
+    if (state.terminalCursorStyle !== prev.terminalCursorStyle) {
+      applyCursorStyle(state.terminalCursorStyle);
+    }
+    if (state.terminalCursorInactiveStyle !== prev.terminalCursorInactiveStyle) {
+      applyCursorInactiveStyle(state.terminalCursorInactiveStyle);
+    }
+    if (state.terminalCursorWidth !== prev.terminalCursorWidth) {
+      applyCursorWidth(state.terminalCursorWidth);
+    }
+    if (state.terminalScrollSensitivity !== prev.terminalScrollSensitivity) {
+      applyScrollSensitivity(state.terminalScrollSensitivity);
+    }
+    prev = state;
+  });
+}
+
+startPoolPreferencesSync();
 
 type Options = {
   leafId: string;
@@ -1156,77 +1198,17 @@ export function useTerminalSession({
     return subscribeLeafScratchpad(leafId, cb);
   }, [leafId, blocks]);
 
-  const fontSize = usePreferencesStore((p) => p.terminalFontSize);
-  const zoomLevel = usePreferencesStore((p) => p.zoomLevel);
-  useEffect(() => {
-    applyFontSize(renderFontSize(fontSize, zoomLevel));
-  }, [fontSize, zoomLevel]);
-
-  const fontFamily = usePreferencesStore((p) => p.terminalFontFamily);
-  useEffect(() => {
-    applyFontFamily(fontFamily);
-  }, [fontFamily]);
-
-  const letterSpacing = usePreferencesStore((p) => p.terminalLetterSpacing);
-  useEffect(() => {
-    applyLetterSpacing(letterSpacing);
-  }, [letterSpacing]);
-
-  const fontWeight = usePreferencesStore((p) => p.terminalFontWeight);
-  useEffect(() => {
-    applyFontWeight(fontWeight);
-  }, [fontWeight]);
-
-  const lineHeight = usePreferencesStore((p) => p.terminalLineHeight);
-  useEffect(() => {
-    applyLineHeight(lineHeight);
-  }, [lineHeight]);
-
+  // Applying these to the renderer pool on change is handled once, at module
+  // scope, by startPoolPreferencesSync above; see its comment for why a
+  // per-instance effect here would redo the same full-pool pass once per
+  // mounted terminal.
   const scrollback = usePreferencesStore((p) => p.terminalScrollback);
-  useEffect(() => {
-    applyScrollback(scrollback);
-  }, [scrollback]);
-
   const backgroundMemoryBudgetMB = usePreferencesStore(
     (p) => p.terminalBackgroundMemoryBudgetMB,
   );
   useEffect(() => {
     scheduleParkedLeafSweep();
   }, [backgroundMemoryBudgetMB, scrollback]);
-
-  const webglPref = usePreferencesStore((p) => p.terminalWebglEnabled);
-  useEffect(() => {
-    applyWebglPreference(webglPref);
-  }, [webglPref]);
-
-  const cursorBlink = usePreferencesStore((p) => p.terminalCursorBlink);
-  useEffect(() => {
-    applyCursorBlink(cursorBlink);
-  }, [cursorBlink]);
-
-  const cursorStyle = usePreferencesStore((p) => p.terminalCursorStyle);
-  useEffect(() => {
-    applyCursorStyle(cursorStyle);
-  }, [cursorStyle]);
-
-  const cursorInactiveStyle = usePreferencesStore(
-    (p) => p.terminalCursorInactiveStyle,
-  );
-  useEffect(() => {
-    applyCursorInactiveStyle(cursorInactiveStyle);
-  }, [cursorInactiveStyle]);
-
-  const cursorWidth = usePreferencesStore((p) => p.terminalCursorWidth);
-  useEffect(() => {
-    applyCursorWidth(cursorWidth);
-  }, [cursorWidth]);
-
-  const scrollSensitivity = usePreferencesStore(
-    (p) => p.terminalScrollSensitivity,
-  );
-  useEffect(() => {
-    applyScrollSensitivity(scrollSensitivity);
-  }, [scrollSensitivity]);
 
   const wasFocusedRef = useRef(false);
   useEffect(() => {

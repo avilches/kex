@@ -43,9 +43,15 @@ export type TerminalPalette = Partial<{
   ];
 }>;
 
+export type EditorSurface = Partial<{
+  background: string;
+  foreground: string;
+}>;
+
 export type ThemeVariant = {
   colors?: ThemeColors;
   terminal?: TerminalPalette;
+  editor?: EditorSurface;
   inactivePaneDim?: Record<string, number>;
 };
 

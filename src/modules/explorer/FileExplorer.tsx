@@ -163,7 +163,7 @@ function rootModeInfo(
   }
 }
 
-type Row =
+export type Row =
   | {
       kind: "entry";
       key: string;
@@ -201,10 +201,13 @@ const ROW_HEIGHT = 24;
 const OVERSCAN = 8;
 
 
+// Builds the row LIST from file-tree structure alone (entries, expansion,
+// pending create/rename/duplicate) with gitStatusCode always null. Git status
+// is decorated afterwards by decorateGitStatus, kept out of this walk so a
+// git status snapshot changing does not re-run the recursive tree walk.
 function buildRows(
   rootPath: string,
   tree: ReturnType<typeof useFileTree>,
-  lookup: (path: string) => GitStatusCode | null,
   fsNav: { filesystem: boolean; canNavigateUp: boolean },
 ): { rows: Row[]; entryIndexByPath: Map<string, number> } {
   const rows: Row[] = [];
@@ -238,7 +241,8 @@ function buildRows(
       const expanded = isDir && tree.expanded.has(path);
       const isRenaming = tree.renaming === path;
       const gitignored = parentIgnored || entry.gitignored;
-      const gitStatusCode = gitignored ? null : lookup(path);
+      // Decorated afterwards by decorateGitStatus; see its call site.
+      const gitStatusCode: GitStatusCode | null = null;
       if (isRenaming) {
         rows.push({
           kind: "rename",
@@ -326,6 +330,25 @@ function buildRows(
 
   walk(rootPath, 0, false);
   return { rows, entryIndexByPath };
+}
+
+// Flat pass that attaches the current git status code to each entry/rename
+// row, without re-walking the tree. Returns the same array reference when no
+// row's code actually changed, so a git status poll that doesn't affect this
+// explorer's visible paths doesn't produce a new rows identity either.
+export function decorateGitStatus(
+  rows: Row[],
+  lookup: (path: string) => GitStatusCode | null,
+): Row[] {
+  let changed = false;
+  const next = rows.map((row) => {
+    if (row.kind !== "entry" && row.kind !== "rename") return row;
+    const gitStatusCode = row.gitignored ? null : lookup(row.path);
+    if (gitStatusCode === row.gitStatusCode) return row;
+    changed = true;
+    return { ...row, gitStatusCode };
+  });
+  return changed ? next : rows;
 }
 
 export const FileExplorer = memo(
@@ -429,13 +452,13 @@ export const FileExplorer = memo(
     // refetch window (nodes stay "loaded" with old entries until Rust responds).
     const showHiddenToggledForRef = useRef<string | null>(null);
 
-    const { rows, entryIndexByPath } = useMemo(() => {
+    const { rows: structuralRows, entryIndexByPath } = useMemo(() => {
       if (!rootPath)
         return {
           rows: [] as Row[],
           entryIndexByPath: new Map<string, number>(),
         };
-      return buildRows(rootPath, tree, lookupGitStatus, {
+      return buildRows(rootPath, tree, {
         filesystem: rootMode === "filesystem",
         canNavigateUp,
       });
@@ -451,8 +474,15 @@ export const FileExplorer = memo(
       tree.renaming,
       tree.pendingCreate,
       tree.pendingDuplicate,
-      lookupGitStatus,
     ]);
+
+    // Kept separate from the memo above: a git status snapshot changing must
+    // not re-run the recursive tree walk, only re-decorate the already-built
+    // rows (see decorateGitStatus).
+    const rows = useMemo(
+      () => decorateGitStatus(structuralRows, lookupGitStatus),
+      [structuralRows, lookupGitStatus],
+    );
 
     const isDirAt = useCallback(
       (path: string): boolean | undefined => {

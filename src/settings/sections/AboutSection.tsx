@@ -3,6 +3,7 @@ import { useUpdater } from "@/modules/updater";
 import { GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getName, getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { arch, platform } from "@tauri-apps/plugin-os";
 import { useEffect, useState } from "react";
@@ -24,6 +25,9 @@ export function AboutSection() {
   const [version, setVersion] = useState("");
   const [name, setName] = useState("Kex");
   const [build, setBuild] = useState("");
+  const [gitHash, setGitHash] = useState("");
+  const [gitBranch, setGitBranch] = useState("");
+  const isDev = name === "Kex Dev";
   const { status, check, install } = useUpdater({ autoCheck: false });
   const checking = status.kind === "checking";
   const downloading = status.kind === "downloading";
@@ -54,6 +58,12 @@ export function AboutSection() {
   useEffect(() => {
     void getVersion().then(setVersion);
     void getName().then(setName);
+    void invoke<{ hash: string; branch: string }>("get_build_info").then(
+      ({ hash, branch }) => {
+        setGitHash(hash);
+        setGitBranch(branch);
+      },
+    );
     try {
       const p = platform();
       const a = arch();
@@ -87,6 +97,13 @@ export function AboutSection() {
         <dt className="text-muted-foreground">Build</dt>
         <dd className="font-mono text-[11.5px]">
           {build ? `${build} · v${version}` : `v${version}`}
+          {gitHash && gitHash !== "unknown"
+            ? ` (${gitHash}${
+                isDev && gitBranch && gitBranch !== "unknown"
+                  ? ` · ${gitBranch}`
+                  : ""
+              })`
+            : ""}
         </dd>
 
         <dt className="text-muted-foreground">Bundle ID</dt>
@@ -103,7 +120,7 @@ export function AboutSection() {
             className="inline-flex items-center gap-1.5 rounded-md text-[12px] underline-offset-2 hover:text-foreground hover:underline"
           >
             <HugeiconsIcon icon={GithubIcon} size={12} strokeWidth={1.75} />
-            crynta/terax-ai
+            avilches/kex
           </button>
         </dd>
         <dt className="text-muted-foreground">Website</dt>

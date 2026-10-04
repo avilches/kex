@@ -1,6 +1,7 @@
 import { atomone } from "@uiw/codemirror-theme-atomone";
 import { aura } from "@uiw/codemirror-theme-aura";
 import { copilot } from "@uiw/codemirror-theme-copilot";
+import { darcula } from "@uiw/codemirror-theme-darcula";
 import { githubDark, githubLight } from "@uiw/codemirror-theme-github";
 import { gruvboxDark } from "@uiw/codemirror-theme-gruvbox-dark";
 import { nord } from "@uiw/codemirror-theme-nord";
@@ -46,4 +47,5 @@ export const EDITOR_THEME_EXT: Record<EditorThemeId, Extension> = {
   "github-light": githubLight,
   "xcode-dark": xcodeDark,
   "xcode-light": xcodeLight,
+  darcula,
 };

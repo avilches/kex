@@ -1,6 +1,3 @@
-import { info } from "@tauri-apps/plugin-log";
-import { useSyncExternalStore } from "react";
-
 const titles = new Map<string, string>();
 let snapshot: ReadonlyMap<string, string> = new Map();
 const listeners = new Set<() => void>();
@@ -35,7 +32,6 @@ export function setOscTitle(tabId: string, title: string): void {
   if (titles.get(tabId) === cleaned) return;
   titles.set(tabId, cleaned);
   notify();
-  void info(`[oscTitle] tab=${tabId} title=${JSON.stringify(cleaned)} listeners=${listeners.size}`);
 }
 
 export function clearOscTitle(tabId: string): void {
@@ -48,9 +44,4 @@ export function _clearAll(): void {
   if (titles.size === 0) return;
   titles.clear();
   notify();
-}
-
-export function useOscTitle(tabId: string): string | undefined {
-  const snap = useSyncExternalStore(subscribe, getSnapshot);
-  return snap.get(tabId);
 }

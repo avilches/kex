@@ -4,7 +4,7 @@ import type {
   CursorInactiveStyle,
   CursorStyle,
 } from "@/modules/settings/store";
-import { buildTerminalTheme } from "@/styles/terminalTheme";
+import { buildTerminalTheme, currentMinimumContrastRatio } from "@/styles/terminalTheme";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -35,7 +35,7 @@ export type SlotAdapter = {
   focusLeaf(leafId: string): void;
 };
 
-export type LeafBridge = {
+type LeafBridge = {
   writeToPty(data: string): void;
   resizePty(cols: number, rows: number): void;
   // Force a SIGWINCH on the underlying PTY at the given dims. Implemented
@@ -200,7 +200,7 @@ function termOptions() {
     // and emoji ranges are excluded by xterm itself).
     customGlyphs: true,
     rescaleOverlappingGlyphs: true,
-    minimumContrastRatio: 1,
+    minimumContrastRatio: currentMinimumContrastRatio(),
   };
 }
 
@@ -386,6 +386,20 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
     !slot.webglAddon || performance.now() - slot.lastUsedAt > SLOT_STALE_MS;
   slot.currentLeafId = p.leafId;
   slot.lastUsedAt = performance.now();
+
+  // Restore per-leaf terminal state a previous occupant may have mutated
+  // directly (never through applyX broadcasts, so it survives past that
+  // leaf's own detach/dispose): block mode disables the helper textarea at
+  // the prompt (applyBlockMode) and BlockDecorations hides the inactive
+  // cursor for the whole terminal instance. Neither is undone when a blocks
+  // tab closes, so an unreset slot recycled into a plain terminal would
+  // start with a keyboard-dead textarea or the wrong cursor style.
+  if (slot.term.textarea) slot.term.textarea.disabled = false;
+  const cursorInactiveStyle =
+    usePreferencesStore.getState().terminalCursorInactiveStyle;
+  if (slot.term.options.cursorInactiveStyle !== cursorInactiveStyle) {
+    slot.term.options.cursorInactiveStyle = cursorInactiveStyle;
+  }
 
   cancelPendingUnhide(slot);
   cancelWebglReap(slot);
@@ -606,12 +620,19 @@ function detachSlotFromLeaf(slot: Slot): void {
   scheduleSlotReap(slot);
 }
 
+// Used both when a slot is fully detached (currentLeafId === null, waiting to
+// be recycled or reaped for good) and when a leaf is merely parked (hidden,
+// but still owns the slot -- see parkLeafSlot). Either way, every path that
+// reclaims this slot before the grace period elapses -- bindSlot/rewireSlot
+// for a slot picked up again, and refreshLeafSlot for a parked leaf shown
+// again -- cancels this timer first. If it still fires, nobody reclaimed it
+// in time, so it's always safe to dispose regardless of currentLeafId.
 function scheduleWebglReap(slot: Slot): void {
   cancelWebglReap(slot);
   if (!slot.webglAddon) return;
   slot.webglReapTimer = setTimeout(() => {
     slot.webglReapTimer = null;
-    if (slot.currentLeafId === null) disposeSlotWebgl(slot);
+    disposeSlotWebgl(slot);
   }, WEBGL_REAP_GRACE_MS);
 }
 
@@ -693,13 +714,18 @@ function attachWebgl(slot: Slot): void {
   if (slot.webglAddon || !slot.term.element) return;
   if (!usePreferencesStore.getState().terminalWebglEnabled) return;
 
-  // Before creating a new context, proactively reap the oldest idle slot's
-  // context if we are at the limit. If all slots are active, bail out to avoid
-  // evicting a visible terminal.
+  // Before creating a new context, proactively reap the oldest context that
+  // is already on borrowed time: either a fully idle slot, or a parked one
+  // whose teardown parkLeafSlot deferred via scheduleWebglReap (below). A
+  // pending webglReapTimer is exactly "nobody is looking at this context
+  // right now, safe to take back under pressure" regardless of which of the
+  // two reasons scheduled it. If none qualify, every context is genuinely in
+  // front of the user right now; bail out to avoid evicting a visible
+  // terminal.
   const liveCount = slots.filter((s) => !!s.webglAddon).length;
   if (liveCount >= WEBGL_MAX_CONTEXTS) {
     const oldest = slots
-      .filter((s) => s.currentLeafId === null && !!s.webglAddon)
+      .filter((s) => s.webglReapTimer !== null && !!s.webglAddon)
       .sort((a, b) => a.lastUsedAt - b.lastUsedAt)[0];
     if (oldest) {
       cancelWebglReap(oldest);
@@ -931,8 +957,10 @@ export function applyScrollSensitivity(value: number): void {
 
 export function applyTheme(): void {
   const theme = buildTerminalTheme();
+  const ratio = currentMinimumContrastRatio();
   for (const slot of slots) {
     slot.term.options.theme = theme;
+    slot.term.options.minimumContrastRatio = ratio;
   }
 }
 
@@ -973,14 +1001,37 @@ export function isLeafAltScreen(leafId: string): boolean {
   return slot ? isAltScreen(slot) : false;
 }
 
+// TASK-761 follow-up, not wired in yet (see docs/WORKSPACES_GOTCHAS.md and the
+// task notes for the full measurement). disposeSlotWebgl calls the webgl
+// addon's own dispose(), which -- per @xterm/addon-webgl's own
+// WebglAddon.ts, confirmed unchanged in both the current stable release and
+// the latest beta (0.20.0-beta.300) -- unconditionally rebuilds a full
+// DomRenderer as its fallback-on-dispose contract: one DOM row element per
+// *visible* row, its own WidthCache, a freshly injected stylesheet. That
+// DomRenderer is discarded unused the moment the leaf is shown again and
+// attachWebgl recreates a webgl context, so every ordinary hide paid a fixed
+// ~50-65ms (proportional to term.rows, not to scrollback) for a renderer
+// nobody ever painted with -- reproducing the same class of cost this task
+// was meant to eliminate, just through xterm.js's own dispose path instead
+// of ours.
+//
+// Fix: reuse the exact same deferred-teardown machinery already used for
+// slots that are fully detached (scheduleWebglReap/cancelWebglReap,
+// WEBGL_REAP_GRACE_MS) instead of disposing synchronously. refreshLeafSlot
+// cancels the pending reap the moment the leaf is shown again, so a quick
+// tab switch never pays the DomRenderer-rebuild cost at all. See the
+// attachWebgl eviction filter above: a pending webglReapTimer is what makes
+// both a genuinely idle slot AND a parked one fair game to reclaim under the
+// WEBGL_MAX_CONTEXTS cap.
 export function parkLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
-  if (slot) disposeSlotWebgl(slot);
+  if (slot) scheduleWebglReap(slot);
 }
 
 export function refreshLeafSlot(leafId: string): void {
   const slot = slots.find((s) => s.currentLeafId === leafId);
   if (!slot) return;
+  cancelWebglReap(slot);
   if (usePreferencesStore.getState().terminalWebglEnabled && !slot.webglAddon) {
     attachWebgl(slot);
   }

@@ -63,8 +63,6 @@ import {
   setTerminalLineHeight,
   setTerminalNewFolderMode,
   setTerminalScratchpadEnterSends,
-  setTerminalScratchpadInNewTerminals,
-  setTerminalScratchpadRememberFocus,
   setTerminalScrollSensitivity,
   setTerminalScrollback,
   setTerminalShell,
@@ -123,12 +121,6 @@ export function TerminalSection() {
   );
   const scratchpadEnterSends = usePreferencesStore(
     (s) => s.scratchpadEnterSends,
-  );
-  const scratchpadInNewTerminals = usePreferencesStore(
-    (s) => s.scratchpadInNewTerminals,
-  );
-  const scratchpadRememberFocus = usePreferencesStore(
-    (s) => s.scratchpadRememberFocus,
   );
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
   const terminalNewFolderMode = usePreferencesStore(
@@ -247,28 +239,6 @@ export function TerminalSection() {
 
       <div className="flex flex-col gap-2">
         <FieldLabel>Scratchpad</FieldLabel>
-        <SettingRow
-          title="Enable scratchpad in new terminals"
-          description="New terminals open with the scratchpad bar visible. A small input under the terminal to compose and send text without typing in the shell."
-        >
-          <Switch
-            checked={scratchpadInNewTerminals}
-            onCheckedChange={(v) =>
-              void setTerminalScratchpadInNewTerminals(v)
-            }
-          />
-        </SettingRow>
-        <SettingRow
-          title="Remember scratchpad focus"
-          description="Reopen the scratchpad when returning to a tab that had it focused. Esc, the toggle shortcut and clicking the terminal dismiss it for that tab."
-        >
-          <Switch
-            checked={scratchpadRememberFocus}
-            onCheckedChange={(v) =>
-              void setTerminalScratchpadRememberFocus(v)
-            }
-          />
-        </SettingRow>
         <SettingRow
           title={
             scratchpadEnterSends

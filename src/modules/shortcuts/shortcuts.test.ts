@@ -323,3 +323,20 @@ test("view.zenMode old Cmd+Shift+Z binding no longer matches", () => {
   } as unknown as KeyboardEvent;
   expect(matchesShortcut(e, "view.zenMode")).toBe(false);
 });
+
+describe("editor view shortcuts", () => {
+  it("has a single editor.cycleView on the mod+shift+v default and no per-type variants", () => {
+    const ids = SHORTCUTS.map((x) => x.id as string);
+    expect(ids.filter((id) => id === "editor.cycleView")).toHaveLength(1);
+    for (const gone of ["editor.markdown.toggleView", "editor.html.toggleView", "markdown.toggleSource"]) {
+      expect(ids).not.toContain(gone);
+    }
+    const entry = SHORTCUTS.find((x) => x.id === "editor.cycleView");
+    expect(entry?.group).toBe("Editor");
+    expect(entry?.defaultBindings).toEqual([{ [MOD_PROP]: true, shift: true, key: "v" }]);
+  });
+
+  it("keeps the split preview available with no default binding", () => {
+    expect(SHORTCUTS.find((x) => x.id === "editor.preview.toggleSplit")?.defaultBindings).toEqual([]);
+  });
+});

@@ -18,7 +18,14 @@ import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setTerminalScratchpadEnterSends } from "@/modules/settings/store";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { SCRATCHPAD_DROP_PREFIX } from "./lib/scratchpadPath";
 import {
   closeScratchpad,
@@ -108,6 +115,10 @@ export function ScratchpadBar({ leafId }: Props) {
     },
     [leafId],
   );
+
+  useLayoutEffect(() => {
+    if (textareaRef.current) autoResize(textareaRef.current);
+  }, []);
 
   useEffect(() => {
     const el = textareaRef.current;

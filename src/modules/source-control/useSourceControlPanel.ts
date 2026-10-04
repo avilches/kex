@@ -1,3 +1,4 @@
+import { normalizeError } from "@/lib/errors";
 import {
   native,
   type GitBranchInfo,
@@ -13,6 +14,10 @@ import {
   invalidateRepoDiffs,
   workingDiffKey,
 } from "@/modules/editor/lib/diffCache";
+import {
+  type GitStatusCode,
+  normalizeGitStatusCode,
+} from "@/modules/explorer/lib/gitStatusUtils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SourceControlSummary } from "./useSourceControl";
 
@@ -42,13 +47,13 @@ export type SourceControlEntry = {
   indexStatus: string;
   worktreeStatus: string;
   statusLabel: string;
-  statusCode: string;
+  statusCode: GitStatusCode;
   originalPath: string | null;
   untracked: boolean;
 };
 
 
-export type PendingDiscard =
+type PendingDiscard =
   | { scope: "single"; count: 1; label: string; untracked: boolean }
   | { scope: "all"; count: number; label: string; untrackedCount: number };
 
@@ -85,7 +90,8 @@ type SourceControlPanelState = {
   worktreeCount: number;
   setCommitMessage: (value: string) => void;
   refresh: () => Promise<void>;
-  selectEntry: (entry: SourceControlEntry) => Promise<void>;
+  selectEntry: (entry: SourceControlEntry, pin: boolean) => Promise<void>;
+  selectExternal: (nextSelection: DiffSelection) => void;
   stageEntry: (entry: SourceControlEntry) => Promise<void>;
   unstageEntry: (entry: SourceControlEntry) => Promise<void>;
   requestDiscardEntry: (entry: SourceControlEntry) => void;
@@ -102,41 +108,11 @@ type SourceControlPanelState = {
   commitAndPush: () => Promise<void>;
 };
 
-function normalizeError(error: unknown): string {
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  return "Unknown source control error";
-}
-
-function normalizeStatusCode(status: string): string {
-  const code = status.trim().toUpperCase();
-  switch (code) {
-    case "?":
-      return "U";
-    case "A":
-      return "A";
-    case "M":
-      return "M";
-    case "D":
-      return "D";
-    case "R":
-    case "C":
-      return "R";
-    case "U":
-      return "U";
-    default:
-      return code || "M";
-  }
-}
-
-function statusCodeForMode(mode: DiffMode, file: GitChangedFile): string {
+function statusCodeForMode(mode: DiffMode, file: GitChangedFile): GitStatusCode {
   if (mode === "-" && file.untracked) return "U";
   const primary = mode === "+" ? file.indexStatus : file.worktreeStatus;
   const fallback = mode === "+" ? file.worktreeStatus : file.indexStatus;
-  return normalizeStatusCode(primary !== " " ? primary : fallback);
+  return normalizeGitStatusCode(primary !== " " ? primary : fallback);
 }
 
 function makeEntry(
@@ -284,7 +260,7 @@ export function useSourceControlPanel(
         mode: DiffMode;
         originalPath: string | null;
         title?: string;
-      }) => void)
+      }, pin: boolean) => void)
     | null,
   commitDraft: CommitDraftParams,
 ): SourceControlPanelState {
@@ -477,7 +453,7 @@ export function useSourceControlPanel(
         setActionMessage(`Switched to ${localName}`);
         await summary.refresh({ remote: "never" });
       } catch (error) {
-        setActionError(normalizeError(error));
+        setActionError(normalizeError(error, "Unknown source control error"));
         throw error;
       } finally {
         setLocalActionBusy(null);
@@ -497,7 +473,7 @@ export function useSourceControlPanel(
         setActionMessage(`Created and switched to ${name}`);
         await summary.refresh({ remote: "never" });
       } catch (error) {
-        setActionError(normalizeError(error));
+        setActionError(normalizeError(error, "Unknown source control error"));
         throw error;
       } finally {
         setLocalActionBusy(null);
@@ -519,7 +495,7 @@ export function useSourceControlPanel(
         setSelectedRemote(name);
         setActionMessage(`Remote "${name}" added`);
       } catch (error) {
-        setActionError(normalizeError(error));
+        setActionError(normalizeError(error, "Unknown source control error"));
         throw error;
       } finally {
         setLocalActionBusy(null);
@@ -529,13 +505,13 @@ export function useSourceControlPanel(
   );
 
   const openSelection = useCallback(
-    (sel: DiffSelection, repoRoot: string, file: GitChangedFile | undefined) => {
+    (sel: DiffSelection, repoRoot: string, file: GitChangedFile | undefined, pin: boolean) => {
       onOpenDiff?.({
         path: sel.path,
         repoRoot,
         mode: sel.mode,
         originalPath: file?.originalPath ?? null,
-      });
+      }, pin);
     },
     [onOpenDiff],
   );
@@ -643,10 +619,12 @@ export function useSourceControlPanel(
   }, [panelState, loadRemotes, loadWorktreeStatus]);
 
   const selectEntry = useCallback(
-    async (entry: SourceControlEntry) => {
+    async (entry: SourceControlEntry, pin: boolean) => {
       if (!repo) return;
       const nextSelection: DiffSelection = { path: entry.path, mode: entry.mode };
-      if (sameSelection(selected, nextSelection)) {
+      // A pin (double click, or the "Open Diff" menu action) must still fix the
+      // tab in place even when re-clicking the file that is already selected.
+      if (!pin && sameSelection(selected, nextSelection)) {
         setActionError(null);
         setActionMessage(null);
         setSelectionTransition("none");
@@ -657,10 +635,21 @@ export function useSourceControlPanel(
       setActionMessage(null);
       setSelectionTransition("none");
       const file = status?.changedFiles.find((c) => c.path === entry.path);
-      openSelection(nextSelection, repo.repoRoot, file);
+      openSelection(nextSelection, repo.repoRoot, file, pin);
     },
     [openSelection, repo, selected, status],
   );
+
+  // Mirrors the selection side effects of selectEntry, minus openSelection:
+  // this is for a diff tab already open elsewhere (e.g. prev/next navigation
+  // in GitDiffPane) telling this panel which file it's now showing, not for
+  // the panel itself opening a new diff tab.
+  const selectExternal = useCallback((nextSelection: DiffSelection) => {
+    setSelected(nextSelection);
+    setActionError(null);
+    setActionMessage(null);
+    setSelectionTransition("none");
+  }, []);
 
   const runMutation = useCallback(
     async (
@@ -682,7 +671,7 @@ export function useSourceControlPanel(
         await ipc();
         scheduleReconcile();
       } catch (error) {
-        setActionError(normalizeError(error));
+        setActionError(normalizeError(error, "Unknown source control error"));
         cancelReconcile();
         await summary.refresh({ remote: "never" }).catch(() => {});
       } finally {
@@ -847,7 +836,7 @@ export function useSourceControlPanel(
       invalidateRepoDiffs(repo.repoRoot);
       await summary.refresh({ remote: "never" });
     } catch (error) {
-      setActionError(normalizeError(error));
+      setActionError(normalizeError(error, "Unknown source control error"));
     } finally {
       setLocalActionBusy(null);
     }
@@ -890,7 +879,7 @@ export function useSourceControlPanel(
         setActionError(pushResult.error);
       }
     } catch (error) {
-      setActionError(normalizeError(error));
+      setActionError(normalizeError(error, "Unknown source control error"));
       setLocalActionBusy(null);
     }
   }, [commitMessage, repo, summary, setCommitMessage, flushCommitMessage]);
@@ -953,6 +942,7 @@ export function useSourceControlPanel(
     setCommitMessage,
     refresh,
     selectEntry,
+    selectExternal,
     stageEntry,
     unstageEntry,
     requestDiscardEntry,

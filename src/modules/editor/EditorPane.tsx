@@ -25,6 +25,7 @@ import {
 } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { toast } from "sonner";
+import { formatBytes } from "@/lib/formatBytes";
 import { pathBasename } from "@/lib/pathUtils";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,7 @@ import { resolveLanguage, type LanguageResult } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 import { useDocument } from "./lib/useDocument";
 import { cursorBlinkExt, cursorStyleExt } from "./lib/cursorExtensions";
+import { ReloadConflictOverlay } from "./ReloadConflictOverlay";
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
@@ -74,10 +76,15 @@ export type EditorPaneHandle = {
   getContent: () => string | null;
   /** Insert text at the end of the document as a normal edit (marks dirty). */
   insertAtEnd: (text: string) => void;
+  /** Dismiss a pending reload conflict, keeping the dirty buffer as-is. */
+  keepLocalChanges: () => void;
+  /** Resolve a pending reload conflict by discarding the buffer for disk. */
+  reloadFromDisk: () => void;
 };
 
 type Props = {
   path: string;
+  tabId: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onContentChange?: (content: string) => void;
@@ -87,20 +94,25 @@ type Props = {
   onLanguageResolved?: (name: string) => void;
   /** Called when the user closes the tab from within the pane (e.g. the deleted-file state). */
   onClose?: () => void;
+  /** Reports a pending reload conflict so a parent with its own layout (e.g. a dual editor+preview split) can render the blocking overlay itself instead. */
+  onConflictChange?: (conflict: boolean) => void;
+  /** Skips rendering the built-in conflict overlay; the parent renders one instead, driven by onConflictChange and the keepLocalChanges/reloadFromDisk handle methods. */
+  hideConflictOverlay?: boolean;
 };
 
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved, onClose }, ref) {
-    const { doc, onChange, save, reload, recreate } = useDocument({
-      path,
-      onDirtyChange,
-    });
+  function EditorPane({ path, tabId, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved, onClose, onConflictChange, hideConflictOverlay }, ref) {
+    const { doc, onChange, save, reload, recreate, conflict, keepLocalChanges, reloadFromDisk } =
+      useDocument({
+        path,
+        tabId,
+        onDirtyChange,
+      });
+    const onConflictChangeRef = useRef(onConflictChange);
+    onConflictChangeRef.current = onConflictChange;
+    useEffect(() => {
+      onConflictChangeRef.current?.(conflict);
+    }, [conflict]);
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const onContentChangeRef = useRef(onContentChange);
@@ -122,6 +134,51 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         onReadyRef.current?.(doc.content);
       }
     }, [doc]);
+
+    // @uiw/react-codemirror only forces a view update when its `value` prop
+    // differs, by string equality, from what it last compared. Typing (and
+    // saving, see useDocument's saveNow) never updates doc.content, so a
+    // reload that restores text equal to doc.content's last value looks
+    // unchanged to that check even though CodeMirror's own live view has
+    // since diverged (from the user's typing, or from a save that only
+    // touched the buffer ref) -- the stale text is then left on screen
+    // instead of being replaced. `doc` is a fresh object on every load/
+    // reload, so keying off its identity (not its string content) and
+    // comparing against the view's actual current text forces the correct
+    // sync in that case too.
+    const lastSyncedDocRef = useRef<typeof doc | null>(null);
+    useEffect(() => {
+      if (doc.status !== "ready" || doc === lastSyncedDocRef.current) return;
+      lastSyncedDocRef.current = doc;
+      const view = cmRef.current?.view;
+      if (!view) return;
+      const current = view.state.doc.toString();
+      if (current === doc.content) return;
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: doc.content },
+      });
+    }, [doc]);
+
+    // Typing never touches doc.content (see useDocument's onChange, which only
+    // updates its own buffer ref), so a "ready" doc.content change after the
+    // first one only happens on a disk reload. Report it through onContentChange
+    // too, or a live preview pane fed by that callback goes stale after an
+    // external edit while its source EditorPane still updates correctly.
+    const readyContentRef = useRef<string | null>(null);
+    useEffect(() => {
+      if (doc.status !== "ready") {
+        readyContentRef.current = null;
+        return;
+      }
+      if (readyContentRef.current === null) {
+        readyContentRef.current = doc.content;
+        return;
+      }
+      if (doc.content !== readyContentRef.current) {
+        readyContentRef.current = doc.content;
+        onContentChangeRef.current?.(doc.content);
+      }
+    }, [doc]);
     const editorViewByExt = usePreferencesStore((s) => s.editorViewByExt);
     const scrollPastEndPref = usePreferencesStore((s) => s.editorScrollPastEnd);
     const highlightActiveLinePref = usePreferencesStore((s) => s.editorHighlightActiveLine);
@@ -131,7 +188,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const cursorBlinkPref = usePreferencesStore((s) => s.editorCursorBlink);
     const cursorBlinkRatePref = usePreferencesStore((s) => s.editorCursorBlinkRate);
     const cursorStylePref = usePreferencesStore((s) => s.editorCursorStyle);
-    const languageRef = useRef<string | null>(null);
     const themeExt = useEditorThemeExt();
 
     const view = resolveEditorView(path, editorViewByExt);
@@ -150,11 +206,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const pendingLineRef = useRef<number | null>(null);
     const statusRef = useRef(doc.status);
     statusRef.current = doc.status;
+    const conflictRef = useRef(conflict);
+    conflictRef.current = conflict;
 
+    // A pending reload conflict blocks the pane behind an overlay (built-in or
+    // the parent's own, per hideConflictOverlay): focusing the editor
+    // underneath would let typed input reach a buffer the user believes is
+    // frozen, so a goto-line request just waits without dismissing the line.
     const applyPendingGoto = useCallback(() => {
       const cmView = cmRef.current?.view;
       const line = pendingLineRef.current;
-      if (!cmView || line == null || statusRef.current !== "ready") return;
+      if (!cmView || line == null || statusRef.current !== "ready" || conflictRef.current) return;
       const target = Math.max(1, Math.min(line, cmView.state.doc.lines));
       const at = cmView.state.doc.line(target).from;
       cmView.dispatch({
@@ -166,8 +228,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }, []);
 
     useEffect(() => {
-      if (doc.status === "ready") applyPendingGoto();
-    }, [doc.status, applyPendingGoto]);
+      if (doc.status === "ready" && !conflict) applyPendingGoto();
+    }, [doc.status, conflict, applyPendingGoto]);
 
     const extensions = useMemo(
       () => {
@@ -271,8 +333,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }, [view.columnRuler]);
 
     useEffect(() => {
-      const ext = path.split(".").pop()?.toLowerCase() ?? null;
-      languageRef.current = ext;
       if (doc.status !== "ready") return;
       let cancelled = false;
       const resolve = async (): Promise<LanguageResult> => {
@@ -355,8 +415,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             changes: { from: v.state.doc.length, insert: text },
           });
         },
+        keepLocalChanges,
+        reloadFromDisk,
       }),
-      [path, applyPendingGoto],
+      [path, applyPendingGoto, keepLocalChanges, reloadFromDisk],
     );
 
     if (doc.status === "loading") {
@@ -471,7 +533,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }
 
     return (
-      <div className="flex h-full min-h-0 flex-col zoom-exempt">
+      <div className="relative flex h-full min-h-0 flex-col zoom-exempt">
         <CodeMirror
           ref={cmRef}
           value={doc.content}
@@ -492,6 +554,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             searchKeymap: true,
           }}
         />
+        {conflict && !hideConflictOverlay && (
+          <ReloadConflictOverlay
+            path={path}
+            onKeep={keepLocalChanges}
+            onReload={reloadFromDisk}
+          />
+        )}
       </div>
     );
   },

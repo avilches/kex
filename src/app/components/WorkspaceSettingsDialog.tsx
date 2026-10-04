@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import {
   Cancel01Icon,
@@ -36,19 +36,15 @@ import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules
 import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
-  resolveStatusColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
 import type { Workspace, Script } from "@/modules/workspaces/lib/types";
-import type { WorkspaceStatus } from "@/modules/settings/store";
 
 type Props = {
   workspaces: Workspace[];
-  workspaceStatuses: WorkspaceStatus[];
   onSetTitle: (id: string, title: string) => void;
   onSetColor: (id: string, color: string | null) => void;
   onSetIcon: (id: string, icon: string | null) => void;
-  onSetStatus: (id: string, statusId: string | null) => void;
   onSetWorkspaceRoot: (id: string, path: string | undefined) => void;
   onAddScript: (id: string, config: Script) => void;
   onUpdateScript: (id: string, configId: string, patch: Partial<Script>) => void;
@@ -317,23 +313,6 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
   const [cwdValue, setCwdValue] = useState(ws.workspaceRoot ?? "");
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
   const [titleValue, setTitleValue] = useState(ws.title ?? "");
-  const [statusExpanded, setStatusExpanded] = useState(false);
-  const [hiddenStatusCount, setHiddenStatusCount] = useState(0);
-  const statusContainerRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const el = statusContainerRef.current;
-    if (!el || statusExpanded || props.workspaceStatuses.length <= 18) {
-      setHiddenStatusCount(0);
-      return;
-    }
-    const bottom = el.getBoundingClientRect().bottom;
-    let count = 0;
-    for (const child of el.children) {
-      if ((child as HTMLElement).getBoundingClientRect().top >= bottom) count++;
-    }
-    setHiddenStatusCount(count);
-  }, [props.workspaceStatuses, statusExpanded]);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const cwdInputRef = useRef<HTMLInputElement>(null);
 
@@ -408,62 +387,6 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
               }}
             />
           </div>
-
-          {props.workspaceStatuses.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium">Status</label>
-              <div
-                ref={statusContainerRef}
-                className={cn(
-                  "flex flex-wrap items-center gap-1.5 overflow-hidden",
-                  !statusExpanded && props.workspaceStatuses.length > 18 && "max-h-[108px]",
-                )}
-              >
-                <button
-                  type="button"
-                  title="No status"
-                  onClick={() => props.onSetStatus(ws.id, null)}
-                  className={cn(
-                    "size-6 rounded-full border-2 flex items-center justify-center bg-muted text-muted-foreground transition-colors",
-                    !ws.statusId
-                      ? "border-foreground"
-                      : "border-transparent hover:border-muted-foreground/50",
-                  )}
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-                </button>
-                {props.workspaceStatuses.map((s) => {
-                  const sColor = resolveStatusColor(s.color, s.id);
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => props.onSetStatus(ws.id, s.id)}
-                      className="rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all"
-                      style={{
-                        borderColor: sColor,
-                        backgroundColor: `${sColor}26`,
-                        color: sColor,
-                        outline: ws.statusId === s.id ? `2px solid ${sColor}` : "none",
-                        outlineOffset: "1px",
-                      }}
-                    >
-                      {s.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {props.workspaceStatuses.length > 18 && (statusExpanded || hiddenStatusCount > 0) && (
-                <button
-                  type="button"
-                  onClick={() => setStatusExpanded((v) => !v)}
-                  className="self-end text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {statusExpanded ? "Show less" : `Show ${hiddenStatusCount} more`}
-                </button>
-              )}
-            </div>
-          )}
 
           {/* Working Directory */}
           <div className="flex flex-col gap-1.5">

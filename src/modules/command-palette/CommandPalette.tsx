@@ -8,11 +8,11 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  getBindingTokens,
-  SHORTCUTS_BY_ID,
+  getShortcutLabel,
   type KeyBinding,
   type ShortcutId,
 } from "@/modules/shortcuts";
@@ -317,7 +317,7 @@ export function CommandPalette({
                         className="text-[12.5px]"
                       >
                         <img
-                          src={fileIconUrl(basename(hit.rel))}
+                          src={fileIconUrl(pathBasename(hit.rel))}
                           alt=""
                           className="size-4 shrink-0"
                         />
@@ -525,18 +525,9 @@ function EmptyHint() {
   );
 }
 
-function basename(rel: string): string {
-  const parts = rel.split(/[\\/]/);
-  return parts[parts.length - 1] || rel;
-}
-
 function formatShortcut(
   shortcutId: ShortcutId | undefined,
   userShortcuts: Record<ShortcutId, KeyBinding[]>,
 ): string | null {
-  if (!shortcutId) return null;
-  const shortcut = SHORTCUTS_BY_ID.get(shortcutId);
-  const bindings = userShortcuts[shortcutId] ?? shortcut?.defaultBindings;
-  const tokens = getBindingTokens(bindings?.[0]);
-  return tokens.length ? tokens.join(" ") : null;
+  return shortcutId ? getShortcutLabel(shortcutId, userShortcuts) : null;
 }

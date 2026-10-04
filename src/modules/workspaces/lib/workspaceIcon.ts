@@ -206,18 +206,6 @@ export const WORKSPACE_ICON_PALETTE = [
 
 export const PALETTE_PAGE_SIZE = 32;
 
-export type WorkspaceIconName = (typeof WORKSPACE_ICON_PALETTE)[number]["name"];
-
-// Cache for the full icon library, loaded on demand
-let allIconsCache: Record<string, IconSvgElement> | null = null;
-
-export async function loadAllIcons(): Promise<Record<string, IconSvgElement>> {
-  if (!allIconsCache) {
-    allIconsCache = await import("@hugeicons/core-free-icons") as Record<string, IconSvgElement>;
-  }
-  return allIconsCache;
-}
-
 export type IconSearchResult = { name: string; label: string; icon: IconSvgElement };
 
 export function searchIcons(query: string, limit = 6): IconSearchResult[] {
@@ -243,6 +231,5 @@ export function searchIcons(query: string, limit = 6): IconSearchResult[] {
 
 export function getWorkspaceIcon(name: string): IconSvgElement | null {
   const palette = WORKSPACE_ICON_PALETTE.find((e) => e.name === name);
-  if (palette) return palette.icon as IconSvgElement;
-  return (allIconsCache?.[name] as IconSvgElement) ?? null;
+  return palette ? (palette.icon as IconSvgElement) : null;
 }

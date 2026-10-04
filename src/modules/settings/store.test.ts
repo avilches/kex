@@ -13,10 +13,9 @@ import {
   parseCursorStyle,
   parseScmViewMode,
   parseTerminalNewFolderMode,
+  parseThemePref,
   DEFAULT_PREFERENCES,
   PREF_KEY_MAP,
-  parseWorkspaceStatuses,
-  DEFAULT_WORKSPACE_STATUSES,
 } from "./store";
 
 describe("clampToStep", () => {
@@ -102,6 +101,24 @@ describe("scmViewMode", () => {
   });
 });
 
+describe("parseThemePref", () => {
+  it("accepts light and dark", () => {
+    expect(parseThemePref("light")).toBe("light");
+    expect(parseThemePref("dark")).toBe("dark");
+  });
+
+  it("falls back to system for anything else, including a colliding editor theme id", () => {
+    expect(parseThemePref("system")).toBe("system");
+    expect(parseThemePref(undefined)).toBe("system");
+    expect(parseThemePref(null)).toBe("system");
+    // Regression guard for TASK-575: settings-editor.json stores its theme
+    // under the same unprefixed "theme" key ("nord", "kanagawa", ...). If the
+    // general and editor stores were ever merged again, that value must not
+    // be accepted as a valid ThemePref.
+    expect(parseThemePref("nord")).toBe("system");
+  });
+});
+
 describe("terminalNewFolderMode", () => {
   it("defaults to context", () => {
     expect(DEFAULT_PREFERENCES.terminalNewFolderMode).toBe("context");
@@ -128,10 +145,6 @@ describe("DEFAULT_PREFERENCES", () => {
   it("scratchpadEnterSends defaults to true", () => {
     expect(DEFAULT_PREFERENCES.scratchpadEnterSends).toBe(true);
   });
-
-  it("scratchpadInNewTerminals defaults to true", () => {
-    expect(DEFAULT_PREFERENCES.scratchpadInNewTerminals).toBe(true);
-  });
 });
 
 describe("diffViewMode", () => {
@@ -147,73 +160,5 @@ describe("PREF_KEY_MAP", () => {
   it("maps scratchpadEnterSends so its toggle reaches subscribers", () => {
     expect(PREF_KEY_MAP.scratchpadEnterSends).toBe("scratchpadEnterSends");
   });
-
-  it("maps scratchpadInNewTerminals so its toggle reaches subscribers", () => {
-    expect(PREF_KEY_MAP.scratchpadInNewTerminals).toBe(
-      "scratchpadInNewTerminals",
-    );
-  });
 });
 
-describe("parseWorkspaceStatuses", () => {
-  it("returns DEFAULT_WORKSPACE_STATUSES when value is not an array", () => {
-    expect(parseWorkspaceStatuses(undefined)).toEqual(DEFAULT_WORKSPACE_STATUSES);
-    expect(parseWorkspaceStatuses(null)).toEqual(DEFAULT_WORKSPACE_STATUSES);
-    expect(parseWorkspaceStatuses("foo")).toEqual(DEFAULT_WORKSPACE_STATUSES);
-    expect(parseWorkspaceStatuses(42)).toEqual(DEFAULT_WORKSPACE_STATUSES);
-  });
-
-  it("filters out items with missing or non-string id/label", () => {
-    const input = [
-      { id: "a", label: "A" },
-      { id: "", label: "B" },
-      { id: "c" },
-      { label: "D" },
-      { id: "e", label: "E" },
-    ];
-    expect(parseWorkspaceStatuses(input)).toEqual([
-      { id: "a", label: "A" },
-      { id: "e", label: "E" },
-    ]);
-  });
-
-  it("returns an empty array when all items are invalid", () => {
-    expect(parseWorkspaceStatuses([{ id: "", label: "bad" }])).toEqual([]);
-  });
-
-  it("accepts a valid array as-is", () => {
-    const input = [{ id: "archived", label: "Archived" }];
-    expect(parseWorkspaceStatuses(input)).toEqual(input);
-  });
-
-  it("preserves a valid color string", () => {
-    const input = [{ id: "a", label: "A", color: "#3b82f6" }];
-    expect(parseWorkspaceStatuses(input)).toEqual(input);
-  });
-
-  it("filters out items with a non-string color", () => {
-    const input = [{ id: "a", label: "A", color: 123 }];
-    expect(parseWorkspaceStatuses(input)).toEqual([]);
-  });
-
-  it("accepts items where color is absent", () => {
-    const input = [{ id: "a", label: "A" }];
-    expect(parseWorkspaceStatuses(input)).toEqual([{ id: "a", label: "A" }]);
-  });
-});
-
-describe("DEFAULT_WORKSPACE_STATUSES", () => {
-  it("contains the five predefined statuses in order with colors", () => {
-    const ids = DEFAULT_WORKSPACE_STATUSES.map((s) => s.id);
-    expect(ids).toEqual([
-      "archived",
-      "work-in-progress",
-      "on-hold",
-      "canceled",
-      "completed",
-    ]);
-    for (const s of DEFAULT_WORKSPACE_STATUSES) {
-      expect(s.color).toMatch(/^#[0-9a-fA-F]{6}$/);
-    }
-  });
-});

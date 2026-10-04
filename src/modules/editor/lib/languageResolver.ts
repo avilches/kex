@@ -1,4 +1,5 @@
 import type { Extension } from "@codemirror/state";
+import { pathBasename } from "@/lib/pathUtils";
 import {
   extensionMap,
   filenameMap,
@@ -15,8 +16,7 @@ export interface LanguageResult {
 const cache = new Map<string, LanguageResult | null>();
 
 function basenameOf(filename: string): string {
-  const lower = filename.toLowerCase();
-  return lower.split(/[\\/]/).pop() ?? lower;
+  return pathBasename(filename).toLowerCase();
 }
 
 function extOf(base: string): string | null {
@@ -84,8 +84,4 @@ export async function resolveLanguage(
   };
   cache.set(key, result);
   return result;
-}
-
-export function preloadLanguages(filenames: string[]): void {
-  for (const f of filenames) void resolveLanguage(f).catch(() => {});
 }

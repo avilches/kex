@@ -59,11 +59,9 @@ export type ShortcutId =
   | "settings.open"
   | "editor.undo"
   | "editor.redo"
-  | "editor.markdown.toggleView"
+  | "editor.cycleView"
   | "editor.save"
-  | "editor.html.toggleView"
   | "editor.preview.toggleSplit"
-  | "markdown.toggleSource"
   | "markdown.toggleOutline"
   | "path.copy"
   | "notifications.jumpToLast";
@@ -446,14 +444,9 @@ export const SHORTCUTS: Shortcut[] = [
     group: "View",
     defaultBindings: [{ key: "F5" }],
   },
-  // Editor entries are display-only: CodeMirror's historyKeymap binds these
-  // keys natively. We register them here so the shortcuts dialog can surface
-  // them — they don't have App-level handlers, so `useGlobalShortcuts` falls
-  // through without `preventDefault`, leaving CodeMirror to handle the event.
-  // Also excluded from the customization UI in ShortcutsSection.
   {
-    id: "editor.markdown.toggleView",
-    label: "Toggle Markdown Preview",
+    id: "editor.cycleView",
+    label: "Cycle editor view",
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "v" }],
   },
@@ -464,22 +457,10 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, key: "s" }],
   },
   {
-    id: "editor.html.toggleView",
-    label: "Toggle HTML preview",
-    group: "Editor",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "v" }],
-  },
-  {
     id: "editor.preview.toggleSplit",
     label: "Toggle split preview",
     group: "Editor",
     defaultBindings: [],
-  },
-  {
-    id: "markdown.toggleSource",
-    label: "Markdown: Toggle Rich/Source",
-    group: "Editor",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "m" }],
   },
   {
     id: "markdown.toggleOutline",
@@ -568,7 +549,7 @@ export function matchesShortcut(
   id: ShortcutId,
   userShortcuts?: Record<ShortcutId, KeyBinding[]>,
 ): boolean {
-  const sc = SHORTCUTS.find((s) => s.id === id);
+  const sc = SHORTCUTS_BY_ID.get(id);
   if (!sc) return false;
   const bindings = userShortcuts?.[id] || sc.defaultBindings;
   return bindings.some((b) => matchBinding(e, b, id));
@@ -610,10 +591,11 @@ export const SHORTCUTS_BY_ID = new Map(SHORTCUTS.map((s) => [s.id, s]));
 export function getShortcutLabel(
   id: ShortcutId,
   userShortcuts: Partial<Record<ShortcutId, KeyBinding[]>>,
+  separator = " ",
 ): string | null {
   const shortcut = SHORTCUTS_BY_ID.get(id);
   if (!shortcut) return null;
   const bindings = userShortcuts[id] ?? shortcut.defaultBindings;
   const tokens = getBindingTokens(bindings?.[0]);
-  return tokens.length ? tokens.join(" ") : null;
+  return tokens.length ? tokens.join(separator) : null;
 }

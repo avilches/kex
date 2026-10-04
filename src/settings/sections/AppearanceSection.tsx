@@ -1,5 +1,14 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
+import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -7,14 +16,13 @@ import {
   setUiFont,
   setZoomLevel,
 } from "@/modules/settings/store";
+import { useTheme } from "@/modules/theme/ThemeProvider";
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
-
-const INPUT_CLASS =
-  "h-8 w-full rounded border border-border bg-transparent px-2.5 text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring";
+import { INPUT_CLASS } from "../components/inputClass";
 
 const UI_FONT_PRESETS: { label: string; value: string }[] = [
   { label: "Default (Inter)", value: "" },
@@ -28,6 +36,20 @@ const UI_FONT_PRESETS: { label: string; value: string }[] = [
   { label: "Custom...", value: "__custom__" },
 ];
 
+// Radix's Select treats an item value of "" as "no selection" (the trigger
+// renders blank instead of the item's label), so the "Default" preset's real
+// value ("") is mapped to this sentinel for the Select alone; setUiFont still
+// gets the real "" / preset value.
+const DEFAULT_FONT_SENTINEL = "__default__";
+
+function toSelectValue(presetValue: string): string {
+  return presetValue === "" ? DEFAULT_FONT_SENTINEL : presetValue;
+}
+
+function fromSelectValue(selectValue: string): string {
+  return selectValue === DEFAULT_FONT_SENTINEL ? "" : selectValue;
+}
+
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
 const ZOOM_STEP = 0.05;
@@ -36,10 +58,23 @@ export function AppearanceSection() {
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const uiFont = usePreferencesStore((s) => s.uiFont);
+  const hydrated = usePreferencesStore((s) => s.hydrated);
 
   const isCustom = uiFont !== "" && !UI_FONT_PRESETS.some((p) => p.value === uiFont && p.value !== "__custom__");
   const [showCustomInput, setShowCustomInput] = useState(isCustom);
   const [customValue, setCustomValue] = useState(isCustom ? uiFont : "");
+
+  // Preferences hydrate asynchronously, so a mount before hydration finishes
+  // captures the pre-hydration uiFont ("") via the useState initializers
+  // above. Resync once the real value is in, or a custom font saved earlier
+  // renders as the default preset with no way to see or edit its value.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: isCustom/uiFont are read fresh from the store once hydrated flips true, not tracked as their own trigger
+  useEffect(() => {
+    if (hydrated) {
+      setShowCustomInput(isCustom);
+      setCustomValue(isCustom ? uiFont : "");
+    }
+  }, [hydrated]);
 
   const selectedPreset = isCustom ? "__custom__" : uiFont;
 
@@ -63,17 +98,21 @@ export function AppearanceSection() {
       <div className="flex flex-col gap-2">
         <FieldLabel>UI Font</FieldLabel>
         <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <select
-            value={selectedPreset}
-            onChange={(e) => handlePresetChange(e.target.value)}
-            className={INPUT_CLASS}
+          <Select
+            value={toSelectValue(selectedPreset)}
+            onValueChange={(v) => handlePresetChange(fromSelectValue(v))}
           >
-            {UI_FONT_PRESETS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger size="sm" className="h-8 w-full text-[12.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {UI_FONT_PRESETS.map((p) => (
+                <SelectItem key={p.value} value={toSelectValue(p.value)} className="text-[12.5px]">
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {showCustomInput && (
             <input
               type="text"
@@ -152,26 +191,29 @@ export function AppearanceSection() {
 }
 
 type GitPreviewEntry =
-  | { name: string; label: string; color: { vscode: string; jetbrains: string }; kind?: "normal" }
-  | { name: string; label: string; kind: "ignored" | "clean" };
+  | { name: string; label: GitStatusCode }
+  | { name: string; label: ""; kind: "ignored" | "clean" };
 
 const GIT_PREVIEW_ENTRIES: GitPreviewEntry[] = [
-  { name: "no_changes.html", label: "",  kind: "clean" },
-  { name: "file_modified.ts", label: "M", color: { vscode: "#E2C08D", jetbrains: "#6897BB" } },
-  { name: "new_file.rs",   label: "A", color: { vscode: "#81B88B", jetbrains: "#629755" } },
-  { name: "untracked.java",  label: "U", color: { vscode: "#73C991", jetbrains: "#C75450" } },
-  { name: "deleted.md",    label: "D", color: { vscode: "#C74E39", jetbrains: "#9E9E9E" } },
-  { name: "renamed.tsx",   label: "R", color: { vscode: "#73C991", jetbrains: "#6897BB" } },
-  { name: "ignored.log",   label: "I", kind: "ignored" },
+  { name: "no_changes.html", label: "", kind: "clean" },
+  { name: "file_modified.ts", label: "M" },
+  { name: "new_file.rs", label: "A" },
+  { name: "untracked.java", label: "U" },
+  { name: "deleted.md", label: "D" },
+  { name: "renamed.tsx", label: "R" },
+  { name: "ignored.log", label: "", kind: "ignored" },
 ];
 
 function GitColorPreview({ scheme }: { scheme: "vscode" | "jetbrains" }) {
+  const { resolvedMode } = useTheme();
   return (
     <div className="flex flex-col gap-px">
       {GIT_PREVIEW_ENTRIES.map((entry) => {
-        const isIgnored = entry.kind === "ignored";
-        const isClean = entry.kind === "clean";
-        const color = !isIgnored && !isClean && "color" in entry ? entry.color[scheme] : undefined;
+        const kind = "kind" in entry ? entry.kind : undefined;
+        const isIgnored = kind === "ignored";
+        const isClean = kind === "clean";
+        const color =
+          entry.label ? gitStatusHexColor(entry.label, scheme, resolvedMode) ?? undefined : undefined;
         const iconUrl = fileIconUrl(entry.name);
         return (
           <div key={entry.name} className="flex items-center gap-1.5">

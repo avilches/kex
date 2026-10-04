@@ -45,7 +45,7 @@ export type EditorGlobalToggleKey =
   | "closeBrackets"
   | "autocompletion";
 
-export type EditorGlobalToggles = Record<EditorGlobalToggleKey, boolean>;
+type EditorGlobalToggles = Record<EditorGlobalToggleKey, boolean>;
 
 // Order mirrors the Settings window Editor group.
 const GLOBAL_TOGGLE_LABELS: [EditorGlobalToggleKey, string][] = [
@@ -83,6 +83,7 @@ type Props = {
     value: EditorViewSettings;
     onChange: (next: EditorViewSettings) => void;
     onViewInSettings?: () => void;
+    disabled?: boolean;
   };
   globalToggles?: {
     value: EditorGlobalToggles;
@@ -116,8 +117,7 @@ export function EditorPathBar({
   trailing,
 }: Props) {
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const shortcutId = view?.isHtml ? "editor.html.toggleView" : "editor.markdown.toggleView";
-  const toggleLabel = view ? getShortcutLabel(shortcutId, userShortcuts) : null;
+  const toggleLabel = view ? getShortcutLabel("editor.cycleView", userShortcuts) : null;
   const showToggles = !!viewToggles;
   const onToggleSplit = view?.onToggleSplit;
   const v = viewToggles?.value;
@@ -187,7 +187,7 @@ export function EditorPathBar({
     return ordered;
   })();
   return (
-    <div className="flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 text-[11px]">
+    <div className="surface-editor flex h-6 w-full shrink-0 items-center gap-2 border-b border-border/60 bg-[var(--editor-background)] px-2 text-[11px]">
       <EditorPathBreadcrumb
         path={path}
         tabId={tabId}
@@ -274,7 +274,8 @@ export function EditorPathBar({
               <button
                 type="button"
                 title="View options"
-                className="order-last flex size-[22px] items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground"
+                disabled={viewToggles?.disabled}
+                className="order-last flex size-[22px] items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
               >
                 <HugeiconsIcon icon={MoreHorizontalIcon} size={12} />
               </button>

@@ -46,14 +46,15 @@ hook events the same way:
 
 1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
    managed by Kex).
-2. Reads the full JSON payload from stdin and extracts `hook_event_name` via `jq`, only to pick the handler and to
-   log it. `jq` is not used to build anything downstream.
-3. Appends the full payload to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` (uncapped, for field
-   discovery; see TASK-734).
-4. Forwards the JSON payload byte for byte, unmodified, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
+2. Reads the full JSON payload from stdin and extracts `hook_event_name` via `jq`, only to pick the handler.
+   `jq` is not used to build anything downstream. The script no longer writes the payload to disk: an earlier
+   version dumped it unbounded to `/tmp/kex-hook-<event>.log` and `/tmp/kex-tab-<tab_id>.log` for field discovery,
+   which on a multi-user Linux box was readable by other local users, a `/tmp` symlink-attack target, and grew
+   without rotation (TASK-557); removed with no replacement since nothing depended on it.
+3. Forwards the JSON payload byte for byte, unmodified, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
    falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, or
    `KEX_IPC` is unset, the event is silently dropped (`|| true`); there is no retry or spool (TASK-730).
-5. `pty/ipc.rs::run_listener`, one thread per PTY listening on `$TMPDIR/kex-ipc-<pty_id>.sock`, reads the JSON
+4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `$TMPDIR/kex-ipc-<pty_id>.sock`, reads the JSON
    directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
    `kex:agent-session-meta`; for every other event (`UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`,
    `SessionEnd`, `PermissionRequest`, `MessageDisplay`) it emits `kex:agent-signal` directly with a `kind` matching
@@ -230,12 +231,16 @@ In `attachSession`, after the PTY is open:
 if plan = consumeRestorePlan(leafId):
   if plan.resumeCmd is non-empty:
     startRestored(leafId, workspaceId, plan.agent)
-    setTimeout(() => pty.write(plan.resumeCmd + "\r"), 200)
+    writeWhenShellReady(pty, " " + plan.resumeCmd + "\r")
   else:
     setRestoreError(leafId, workspaceId, plan.agent, plan.errorReason)
 ```
 
-The 200ms delay lets the shell finish its init sequence before the command is injected.
+`writeWhenShellReady` waits for the `kex:shell-ready` event of that PTY (the first `OSC 133;B`, which the shell only
+emits when it actually renders its interactive prompt; `133;A` is not usable because the init scripts call
+`_kex_precmd` once by hand while still sourcing the rc file) and only then writes. A 1500ms fallback covers shells
+without Kex integration. A fixed delay was unreliable: the resume command of the first PTY opened at startup was
+silently lost (see `WORKSPACES_GOTCHAS.md`, Bug 14). The same wait applies to a plain `persistentCommand`.
 
 ### Reopening a closed terminal tab
 
@@ -298,6 +303,10 @@ surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side o
 - **Restore error**: shown when `restoreError` is set on the session (e.g. the resume command failed or the cwd was
   deleted). The tab title turns red and a `⚠` icon appears; the menu surfaces the error reason for diagnosis.
 
+The agent icon in the tab bar (`PaneTabBar.tsx`) gets a diagonal strike-through when the tab's "Run on start" is off
+(`agentRestoreDisabled`), meaning the live session will not come back on the next launch. It only shows while an
+agent is alive: a clean exit deletes the store entry, so there is no idle "saved session" state to represent.
+
 Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an agent is active) -- no HoverCard.
 
 ---
@@ -317,6 +326,33 @@ Actions:
 
 ---
 
+## Diagnosing a failed restore with Kex.log
+
+`kex_lib::modules::agent`, `kex_lib::modules::pty::agent_detect` and `kex_lib::modules::pty::ipc` all log at
+`Debug` (see the `tauri_plugin_log::Builder` in `lib.rs`), which covers every step of the hook and restore-planner
+path above: hook payloads arriving over the Unix socket (`pty::ipc::dispatch`), `SessionStart` recording, and the
+`OSC 133;C` launch-command stash.
+
+The log file is reachable without hunting for the OS-specific path: `user-data/logs/Kex.log` (a symlink to
+`~/Library/Logs/app.betauer.kex/Kex.log` on macOS, see the root `AGENTS.md`/`CLAUDE.md` for the other platforms).
+`user-data/logs-dev` is the equivalent for a `pnpm tauri dev` build.
+
+Two things to check if the log looks unhelpful right after a restore failure:
+
+- **The file is empty or was just created.** Until TASK-769, the rotation policy was `RotationStrategy::KeepOne`,
+  which deletes the previous log with no backup, and does so as soon as the app starts (the size check runs before
+  the new session writes anything) — so a log that had already grown past `max_file_size` in the *previous* session,
+  the one that actually failed to restore, was gone before you could open it. Kex now rotates with
+  `RotationStrategy::KeepSome(4)`, which renames the oversized file instead of deleting it: look for
+  `Kex_<date>.log` siblings next to the active `Kex.log` in the same directory and check those too, not just
+  the current file.
+- **`prompt`/`msg`/`last`/`err`/`delta` fields look cut off.** `pty::ipc::dispatch` truncates these free-text agent
+  payload fields to `MAX_LOG_FIELD_LEN` (250 characters) before logging them, appending `...(N more)` when it does.
+  This is intentional (a single long `MessageDisplay` delta was observed to reach 7000+ characters, and unbounded logging
+  of a handful of those was enough to blow through the rotation size); it is not a truncation happening elsewhere in
+  the restore path, and the full untruncated value was still delivered over IPC and handled by the frontend, it is
+  only the log line that is short.
+
 ## Error cases
 
 | Case | Behaviour |
@@ -329,3 +365,21 @@ Actions:
 | `KEX_TAB_ID` not set in shell | Hook exits silently; session not recorded |
 | `agent_session_restore_plan` IPC fails | `loadRestorePlans` catches and sets an empty Map; no crash |
 | Resume command fails inside terminal | User sees the error in the terminal; `⚠` stays until user types |
+
+### Dev-only restore check (`pnpm tauri dev`)
+
+Two failures leave no trace in the UI, so dev builds (`import.meta.env.DEV`, absent from production) warn with a
+Sonner toast. The pure logic is in `agents/lib/restoreCheck.ts`; the toasts are fired from `agentSessionRestore.ts`.
+
+- **Plan whose tab no longer exists.** `pruneOrphanedPlans` already dropped it silently; now a toast says how many of
+  the N loaded plans were lost and which tabs.
+- **Resume command that never reports a session.** `watchResume` runs after the command is written to the PTY and, 30 s
+  later (`RESUME_CHECK_MS`), toasts if `sessions[tabId].meta.sessionId` is still empty (it is filled by `SessionStart`
+  via `kex:agent-session-meta`). The timer starts when the tab's terminal spawns, so a plan in a workspace that is never
+  opened is not a failure.
+
+Each toast is also written to `Kex.log` (`user-data/logs-dev/Kex.log`) as a `WARN` line starting with
+`[agent-session]`, so the log can be searched for it after the toast is gone.
+
+It cannot see a session that was never recorded in the store (hook without `KEX_TAB_ID`, `agentNotifications` off,
+`-p`): that session is not among the N plans to begin with.

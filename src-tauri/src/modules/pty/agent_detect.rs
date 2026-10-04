@@ -48,6 +48,9 @@ fn percent_decode(s: &[u8]) -> String {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Transition {
     Started { agent: String, cmd_string: String },
+    // First real interactive prompt (OSC 133;B) seen on this PTY. Independent
+    // of agent detection: fires for every shell, armed or not, exactly once.
+    ShellReady,
     // Llevan session data - Rust los usa para record_session + emit meta
     SessionStart {
         tab_id: String,
@@ -111,6 +114,8 @@ impl Transition {
                 AgentSignal { id, kind: "exited", agent: None, message: None, tool_name: None, prompt: None },
             Transition::SessionStart { .. } =>
                 unreachable!("SessionStart is handled before into_signal"),
+            Transition::ShellReady =>
+                unreachable!("ShellReady is handled before into_signal"),
         }
     }
 }
@@ -132,6 +137,7 @@ pub struct AgentDetector {
     armed: bool,
     status: Status,
     current_agent: String,
+    shell_ready_emitted: bool,
 }
 
 impl AgentDetector {
@@ -147,6 +153,7 @@ impl AgentDetector {
             armed: false,
             status: Status::Idle,
             current_agent: String::new(),
+            shell_ready_emitted: false,
         }
     }
 
@@ -381,6 +388,13 @@ impl AgentDetector {
 
     fn handle_osc133<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
         match pt.first() {
+            Some(b'B') => {
+                if !self.shell_ready_emitted {
+                    self.shell_ready_emitted = true;
+                    log::debug!("[shell] osc133 B: shell ready (first interactive prompt)");
+                    emit(Transition::ShellReady);
+                }
+            }
             Some(b'C') => {
                 let cmd = pt.strip_prefix(b"C;").unwrap_or(b"");
                 if is_print_mode(cmd) {
@@ -737,6 +751,26 @@ mod tests {
         );
         assert_eq!(end, vec![Transition::SessionEnd { reason: "".into() }]);
         assert!(run(&mut d, &osc("133;D;0")).is_empty());
+    }
+
+    #[test]
+    fn emits_shell_ready_on_first_prompt_b() {
+        let mut d = AgentDetector::new();
+        assert_eq!(run(&mut d, &osc("133;B")), vec![Transition::ShellReady]);
+    }
+
+    #[test]
+    fn shell_ready_emits_only_once() {
+        let mut d = AgentDetector::new();
+        assert_eq!(run(&mut d, &osc("133;B")), vec![Transition::ShellReady]);
+        assert!(run(&mut d, &osc("133;B")).is_empty());
+    }
+
+    #[test]
+    fn shell_ready_does_not_require_an_armed_agent() {
+        let mut d = AgentDetector::new();
+        // No 133;C ever seen (no agent running) - still signals shell readiness.
+        assert_eq!(run(&mut d, &osc("133;B")), vec![Transition::ShellReady]);
     }
 
     #[test]

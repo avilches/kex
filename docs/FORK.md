@@ -268,9 +268,10 @@ Closing a tab with autosave on saves silently instead of prompting, and the dirt
 ### Browser tab (renamed from "preview")
 
 The web pane is a real browser (address bar, navigation, reload), so the panel `kind` and its module were renamed
-`preview` → `browser` (`src/modules/browser/`, `BrowserPane`, `BrowserPaneHandle`). Sessions saved before the rename
-are migrated on load in `sanitizePanel` (`kind: "preview"` → `"browser"`). The editor `preview` boolean (ephemeral
-tabs) and the markdown preview pane are unrelated and unchanged.
+`preview` → `browser` (`src/modules/browser/`, `BrowserPane`, `BrowserPaneHandle`). Per the no-backward-compat rule,
+sessions saved before the rename are not migrated: a persisted `kind: "preview"` tab no longer matches any case in
+`TabContent`'s exhaustive switch, so it renders blank until the user closes it. The editor `preview` boolean
+(ephemeral tabs) and the markdown preview pane are unrelated and unchanged.
 
 ### Floating browser windows
 
@@ -371,88 +372,63 @@ Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell com
 - **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active script of the current workspace, toggling based on the current isRunning state.
 - **Startup validation** (`validateScriptPanels`): on mount, App.tsx collects all living tab ids and calls `validateScriptPanels` for each workspace, clearing `tabId` references that no longer exist (stale from a previous session).
 
-### Rich markdown editor (WYSIWYG)
+### Markdown editing: Live Preview is the only engine
 
-Rich markdown editor (WYSIWYG) ported from HelixNotes (TipTap 3): tasks, tables, callouts, details, math (KaTeX),
-mermaid, slash commands, outline, find-in-note, optional wiki-links; Streamdown preview retained behind
-`markdownEngine: "legacy"`. Excluded from the port: AI menu, secret blocks, PDF embeds, task metadata. Not present in
-upstream Terax (which has no markdown-specific editing surface at all). See `docs/ARCHITECTURE.md` (Frontend module
-map, `markdown/`; 4.9-4.11) and `docs/BUILD.md` (Markdown editor chunks) for the module layout, buffer ownership
-model, and bundle impact.
+Kex briefly carried three markdown engines side by side: a rich WYSIWYG editor ported from HelixNotes (TipTap 3), an
+evaluation-stage second one on Milkdown Crepe, and the Streamdown-only "legacy" preview, chosen per tab from a
+Settings selector (`markdownEngine`). All three were removed in favor of "Live Preview", which is now the only
+engine, together with their npm dependencies (`@tiptap/*`, `@milkdown/*`, `mermaid`, `katex`, `lowlight`,
+`highlight.js`, `markdown-it` and its plugins), the engine Settings selector, the `markdownEngine` field of a tab and
+the `markdownWikiLinks` preference. What was lost with them: the toolbar, slash commands, visual wiki-links and
+mermaid/KaTeX rendering; they can be rebuilt on Live Preview if they are ever missed. The read-only Streamdown render
+survives as the Preview mode and as the overlay/split preview of an `editor` tab. See `docs/ARCHITECTURE.md`
+(Frontend module map, `markdown/`; 4.9-4.11) and `docs/BUILD.md` (Markdown editor chunks).
 
-### Milkdown markdown engine (evaluation)
+- "Live Preview" (CodeMirror 6) edits the raw markdown text directly with Obsidian-style live-preview decorations,
+  never reparsing to an AST. It has Source / Rich / Preview modes and an Outline panel. Known gaps: no toolbar, no
+  slash commands, no diagram or math rendering, no decoration for Setext-style headings (only ATX `#` headings
+  are decorated). GFM tables render as HTML tables off the active lines (only `[text](url)` is recognized inside a
+  cell); fenced code blocks are styled as a monospace block, with the fences and the language tag hidden off the block
+  and the code highlighted by that language (fence tags resolve against the editor's own language registry, lazily
+  loaded, exact name or extension match only). Blockquotes, list items and their task checkboxes are line decorations:
+  a quote draws one bar per nesting level on every line it spans (so the bar is continuous through wrapped and
+  consecutive lines, and the spaces around `>` markers are hidden with them), list lines are indented, and a task
+  item's checkbox replaces the bullet instead of sitting next to it. Cmd+S is routed by the tab shell itself, because the global `editor.save` handler only serves `editor` tabs. Consecutive source lines of one
+  paragraph are shown as one flowing text (CommonMark soft breaks) while the cursor is outside the paragraph; a blank
+  line, two trailing spaces or a trailing backslash still break it, and the raw lines come back when the cursor enters.
+  The joins replace line breaks, so they live in a state field (`joinField`), not in the viewport plugin. Reference
+  links (`[id]`, `[text][id]`, `[text][]`, `![alt][id]`) resolve against the `[id]: url "title"` definitions of the
+  whole document (label match is case-insensitive, first definition wins): the link shows its text with the title as a
+  tooltip and opens on Cmd/Ctrl+click like an inline link, and the definition line is hidden until the cursor is on it.
+  A bracketed word with no matching definition stays plain text. Text indented by four spaces is styled as a code
+  block like a fenced one. Tables are as wide as their content, not stretched to 100%, and images are laid out inline.
+  An inactive fenced block shows its language tag and a copy button (icons in
+  `markdown/lib/codeCopyIcons.ts`) over the top right corner of its first code line: the two fence lines take no
+  height at all (`.cm-lp-fence-line`), and the raw fences come back when the cursor enters the block. All code, fenced
+  or indented (whose four-space indentation is hidden off the block), has the same 14px left padding, and its first and
+  last code lines carry the vertical padding. A task item's `[ ]` is plain editable text while the cursor is on its
+  line. Blocks nested in containers line up with them: a fenced or indented code block, a table or a quote inside a
+  list item sits at that item's text (the container's indentation is hidden on code lines and re-created as padding),
+  a quoted code block loses the `>` markers of all its lines, and a table inside a list item is rendered as a widget
+  (one inside a quote stays raw). Brackets that are not a link (`[TODO]`, `[[Wiki Link]]`) are plain text, an image that
+  fails to load shows its alt text, and the frontmatter is plain monospace text whatever the theme paints it as.
+  A code block's band is a background layer that starts where its container's text does (`--lp-code-left`), so in a
+  list item or a quote it is indented as a band and a quote's bars still run beside it. `<https://x.com>` (an
+  autolink), a bare `https://…`, `www.…` and an e-mail address are links (the angle brackets go off the active line);
+  the pointing hand over any link appears only while Cmd (Ctrl off macOS) is held, tracked as a `cm-lp-mod` class on
+  the editor, since a plain click just places the cursor. A table cell is read with the same markdown parser as the
+  document (`parseCellInline`): bold, italic, strikethrough, code, sub/superscript, links, autolinks and `<br>` all
+  render inside it; images and reference links inside a cell stay as typed. `~sub~` and `^sup^` are drawn as sub- and superscripts, H5/H6 are body-sized
+  and smaller than body text, plain text takes the heading color whatever the editor theme, and the task checkbox is a
+  drawn box and tick. Raw HTML (`HTMLBlock`, `HTMLTag`) only gets the monospace font: its colors and
+  the italics of `<!-- comments -->` come from the editor theme's syntax highlighting, not from Live Preview.
 
-A second rich engine, `markdownEngine: "milkdown"`, sits alongside TipTap as a third selectable value (Settings >
-Editor > Markdown editor; default stays TipTap). It is an **evaluation-stage** addition: the goal was to find out
-whether Milkdown's Crepe editor is a viable alternative to the TipTap port above, not to replace it. Not present in
-upstream Terax. Built on `@milkdown/crepe` + `@milkdown/kit` 7.22.1. See `docs/ARCHITECTURE.md` (Frontend module map,
-`markdown/`, the `milkdown/` entry) and `docs/BUILD.md` (Markdown editor chunks) for the module layout and bundle
-impact, and `docs/MARKDOWN_GOTCHAS.md` for the round-trip corpus findings engine-by-engine.
+### Single cycle-view shortcut
 
-Feature parity against the TipTap engine, as actually shipped (not as originally planned):
-
-| Capability | tiptap | milkdown |
-|---|---|---|
-| Headings, lists, blockquotes, hr | yes | yes |
-| Task lists (clickable) | yes | yes (GFM) |
-| Tables | yes (resizable) | yes (Crepe table block) |
-| Code blocks + language picker + copy | yes | yes (Crepe CodeMirror feature) |
-| Math KaTeX inline and block | yes | yes (Crepe Latex) |
-| Mermaid diagram rendering | yes | **no**, see below |
-| Slash commands | yes | yes (BlockEdit) |
-| Toolbar | fixed toolbar | floating selection toolbar |
-| Outline panel | yes, navigates correctly for repeated heading text | yes, but navigation to a repeated heading's second-plus occurrence is unreliable, see below |
-| Source mode toggle | yes | yes (same shortcut) |
-| In-note find | yes (FindBar) | no (use Source mode) |
-| Callouts | yes | no (rendered as blockquote) |
-| Details/summary | yes | no |
-| Highlight, underline, sub/sup, color | yes | no (raw HTML preserved on round trip, not editable as rich marks) |
-| Wiki-links (pref-gated) | yes | no |
-| Move-line and tab-indent shortcuts | yes | no custom port (Crepe's own keymap applies) |
-| Images from a relative or absolute local path | yes (`resolveImageSrc` rewrites to a `convertFileSrc` asset URL before the HTML ever reaches the editor) | **not wired up in this integration, but fixable**, see below |
-| Dirty, autosave, external reload | yes | yes (same `useMarkdownTabController`/`useMarkdownDocument` hook, engine-agnostic) |
-| Read-only preview for an editor tab (`MarkdownRenderPane`) | yes | yes |
-
-Three gaps are called out individually because they differ from what the design spec assumed going in:
-
-- **Mermaid renders as a plain code block, not a diagram, and this is permanent, not a v1 gap.** The plan's original
-  parity matrix assumed `@milkdown/plugin-diagram` would give milkdown mermaid support "via plugin-diagram, escape
-  hatch decision 8." That escape hatch was taken for the opposite reason than expected: the plugin does not merely
-  have a version conflict, it **does not render diagrams at all**. Reading its `src/node.ts` in full shows the node
-  schema recognizes ` ```mermaid ` fences and calls `mermaid.initialize()`, but `toDOM` only sets `dom.textContent =
-  code`; there is no `NodeView`, no call to `mermaid.render()` or `mermaid.run()`, anywhere in the package or in
-  `@milkdown/components`. Wiring it in would have added a second, older mermaid major (`plugin-diagram@7.7.0` depends
-  on mermaid `^10.9.0`, resolving alongside the existing `11.15.0`) for a plugin that would show raw unstyled fence
-  text with no diagram. It was removed instead; mermaid fences render as an ordinary code block in the milkdown
-  engine, matching legacy/pre-fork behavior. `hasMermaidFence` (`milkdown/mermaidFence.ts`) still exists, unused, so a
-  future compatible plugin has a tested detector to build on.
-- **Outline navigation to a repeated heading is unreliable, by construction, not by bug.** Milkdown's own heading-id
-  generator was overridden (`MilkdownEditor.tsx`) to use the same base slug as the outline's `headingsFromMarkdown`
-  (`slugifyHeadingText`), so a document's first occurrence of a heading text navigates correctly. But
-  `headingsFromMarkdown` disambiguates a second occurrence with its own counter (`-1`, `-2`, ...), while the override
-  passed to Crepe does not reproduce that counter (Crepe's own internal dedup suffix, if it applies one, does not
-  match it either). A document with two headings that share exact text will therefore navigate correctly to the first
-  and miss on the second. Documented as a known, accepted gap rather than chased further; punctuation in heading text
-  (e.g. `# Intro: Overview`) is unaffected, since both sides strip it identically.
-- **Local image paths are not wired up in this integration, but the fix is a single missing constructor option, not
-  a deeper gap in the engine.** The TipTap engine resolves every local image path (relative or absolute) through
-  `resolveImageSrc` in `RichMarkdownEditor.tsx`, which calls Tauri's `convertFileSrc` before the HTML ever reaches
-  the editor; without that rewrite, a plain relative path resolves against the webview's own origin, not the note's
-  directory, and an absolute filesystem path is not a valid web URL at all. Crepe has the same hook: its
-  `Feature.ImageBlock` config accepts `proxyDomURL: (url: string) => Promise<string> | string`
-  (`@milkdown/crepe/lib/types/feature/image-block/index.d.ts`), and `ImageBlock` is one of Crepe's features enabled
-  by default. `MilkdownEditor.tsx` simply never passes it: `new Crepe({ root, defaultValue })` has no
-  `features`/`featureConfigs` argument, so `proxyDomURL` stays unset and Crepe falls back to the raw URL from the
-  markdown, unresolved. This was not exercised against a live app in this evaluation (no GUI in this environment);
-  it is flagged here from reading the code, not from a confirmed reproduction, and is the first thing to check in
-  the manual pass (`docs/MILKDOWN_CHECKLIST.md`). Wiring `proxyDomURL` to the same logic `resolveImageSrc` already
-  has is out of scope for this evaluation task, but is not new architecture: it is filling in one config option
-  Crepe already exposes for exactly this purpose.
-
-Everything else in the "no" column above (in-note find, callouts as rich marks, details/summary, highlight/underline/
-sub/sup/color as rich marks, wiki-links, move-line/tab-indent shortcuts) was a deliberate v1 scope cut in the design
-spec, not a surprise found while building: Crepe's own feature set does not cover them, and porting them was out of
-scope for an evaluation of the engine itself.
+- `editor.markdown.toggleView`, `editor.html.toggleView` and `markdown.toggleSource` (Cmd+Shift+M) were replaced by one
+  `editor.cycleView` (Cmd+Shift+V). Previously the global markdown toggle always won the keydown race and threw a
+  markdown tab out to a plain editor tab; now the global handler calls the handle the active markdown tab registers, which rotates its
+  modes from anywhere in the window.
 
 ### Notes sidebar view
 
@@ -463,7 +439,7 @@ HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as
 - **Note metadata** — title from frontmatter `title:` field, first H1, or file stem (in that precedence); mtime and created date from frontmatter `created:` field, btime, or mtime (in that precedence). UI shows only the first 2 KB of each note (120-char snippet for previews).
 - **Config persistence** — all view state (`quickAccess`, `sortMode`, `folderOrder`, `expandedFolders`, `groupByDate`, `selectedFolder`) lives in `kex.json` at the workspace root under the `notes` namespace (vault-relative forward-slash paths). `folderOrder` maps a folder path to the ordered file names inside it, and the folder tree is collapsed unless a folder is listed in `expandedFolders`. There is no vault-wide scan and no scan cap: the view keeps a per-folder cache seeded from the vault root, the folders expanded in the tree and the selected folder, reads one directory level at a time through `notes_read_dirs`, and registers exactly those directories with the non-recursive filesystem watcher, which it did not do before this work (it only learned of an external change when the file explorer happened to have the same directory open). A change invalidates the changed folder plus its parent and grandparent, since a folder's note count and expand arrow live in its parent's payload. Dead folders and dead file names are pruned when the view activates, by asking the filesystem directly for each recorded path (`notes_paths_exist`), so a folder that is gitignored but still on disk is no longer indistinguishable from a deleted one. Read-modify-write strategy preserves foreign namespaces; invalid or missing `kex.json` falls back to defaults without overwriting until the first mutation.
 - **Immutable .md files** — Kex never writes frontmatter, metadata, or any other data into user `.md` files. State is stored exclusively in `kex.json`.
-- **Opens into the rich editor** — clicking a note creates a `markdown` tab, so notes render in the TipTap editor described above.
+- **Opens into the rich editor** — clicking a note creates a `markdown` tab, so notes render in Live Preview.
 
 ---
 

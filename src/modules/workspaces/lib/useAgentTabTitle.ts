@@ -3,11 +3,11 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import {
   subscribe as subscribeOscTitles,
-  getSnapshot as getOscTitlesSnapshot,
+  getOscTitle,
 } from "@/modules/terminal/lib/oscTitleStore";
 import { agentAwareTabTitle, tabTitle } from "./tabTitle";
 import {
-  getRunningCommandsSnapshot,
+  getRunningCommand,
   subscribeToRunningCommands,
 } from "./terminalEphemeralStore";
 import type { Tab } from "./types";
@@ -20,17 +20,20 @@ export type AgentTabTitleInfo = {
 };
 
 export function useAgentTabTitle(tab: Tab | null): AgentTabTitleInfo | null {
-  const runningCommandMap = useSyncExternalStore(
+  // Per-tab selectors: only this tab's entry re-renders the component, not
+  // every terminal's running command / OSC title change.
+  const runningCommand = useSyncExternalStore(
     subscribeToRunningCommands,
-    getRunningCommandsSnapshot,
+    () => (tab?.kind === "terminal" ? getRunningCommand(tab.id) : null),
   );
-  const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
+  const oscTitle = useSyncExternalStore(
+    subscribeOscTitles,
+    () => (tab?.kind === "terminal" ? getOscTitle(tab.id) : undefined),
+  );
   const agentSession = useAgentStore((s) => (tab ? s.sessions[tab.id] : undefined));
 
   if (!tab) return null;
 
-  const runningCommand = tab.kind === "terminal" ? (runningCommandMap.get(tab.id) ?? null) : null;
-  const oscTitle = tab.kind === "terminal" ? oscTitleMap.get(tab.id) : undefined;
   const hasAgent = !!agentSession && tab.kind === "terminal";
   const sessionTitle = agentSession?.meta?.sessionTitle;
   const baseTitle = tabTitle(tab, runningCommand, oscTitle);

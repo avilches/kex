@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { parentDir } from "@/modules/explorer/lib/watch";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 
 type Options = {
@@ -9,11 +10,6 @@ type Options = {
   isDir: (path: string) => boolean | undefined;
   onCopied: (destDir: string) => void;
 };
-
-function parentDir(path: string): string {
-  const i = path.lastIndexOf("/");
-  return i > 0 ? path.slice(0, i) : path;
-}
 
 // Tauri reports the drop point in physical pixels on some platforms; scale down
 // only when it overflows the logical viewport (mirrors the terminal drop).

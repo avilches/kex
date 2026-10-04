@@ -27,6 +27,7 @@ describe("tabFilePath", () => {
       repoRoot: "/repo",
       mode: "+",
       originalPath: null,
+      preview: false,
     };
     expect(tabFilePath(p)).toBe("/repo/src/x.ts");
   });
@@ -39,6 +40,7 @@ describe("tabFilePath", () => {
       repoRoot: "/repo",
       mode: "+",
       originalPath: null,
+      preview: false,
     };
     expect(tabFilePath(p)).toBe("/repo/src/x.ts");
   });
@@ -51,6 +53,7 @@ describe("tabFilePath", () => {
       repoRoot: "/repo",
       sha: "abc",
       originalPath: null,
+      preview: false,
     };
     expect(tabFilePath(p)).toBe("/repo/src/x.ts");
   });

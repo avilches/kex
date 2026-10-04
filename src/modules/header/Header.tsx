@@ -3,7 +3,8 @@ import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { NotificationBell } from "@/modules/agents";
 import { OpenInEditorButton, type OpenInEditorTarget } from "@/modules/external-editors";
-import type { Tab, Script, Workspace } from "@/modules/workspaces/lib/types";
+import type { Tab, Script, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
+import { DevBranchBadge } from "./DevBranchBadge";
 import { WorkspaceTitle } from "./WorkspaceTitle";
 import { RunButton } from "@/app/components/RunButton";
 import {
@@ -40,6 +41,7 @@ type Props = {
   onOpenRunSettings: () => void;
   activeWorkspace: Workspace | null;
   activeTab: Tab | null;
+  groups: WorkspaceGroup[];
   onRestoreFocus: () => void;
 };
 
@@ -65,6 +67,7 @@ export function Header({
   onOpenRunSettings,
   activeWorkspace,
   activeTab,
+  groups,
   onRestoreFocus,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -141,9 +144,11 @@ export function Header({
 
       {IS_MAC && <span className="mr-1 h-full w-px shrink-0 bg-border/70" />}
 
-      <WorkspaceTitle workspace={activeWorkspace} tab={activeTab} />
+      <WorkspaceTitle workspace={activeWorkspace} tab={activeTab} groups={groups} />
 
       <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
+
+      <DevBranchBadge />
 
       <RunButton
         scripts={scripts}

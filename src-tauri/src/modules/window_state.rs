@@ -26,6 +26,14 @@ impl Default for WindowGeometry {
     }
 }
 
+/// A named group of workspaces in the WorkspaceBar, persisted per OS window.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceGroupEntry {
+    pub id: String,
+    pub label: String,
+}
+
 /// Sidebar chrome state, persisted per OS window in the index file.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,7 +56,9 @@ pub struct WindowEntry {
     #[serde(default)]
     pub workspace_bar_width: Option<u32>,
     #[serde(default)]
-    pub collapsed_status_groups: Vec<String>,
+    pub collapsed_groups: Vec<String>,
+    #[serde(default)]
+    pub groups: Vec<WorkspaceGroupEntry>,
 }
 
 impl Default for WindowEntry {
@@ -59,7 +69,8 @@ impl Default for WindowEntry {
             active_index: 0,
             sidebar: None,
             workspace_bar_width: None,
-            collapsed_status_groups: Vec::new(),
+            collapsed_groups: Vec::new(),
+            groups: Vec::new(),
         }
     }
 }
@@ -89,7 +100,9 @@ struct IndexEntry {
     #[serde(default)]
     workspace_bar_width: Option<u32>,
     #[serde(default)]
-    collapsed_status_groups: Vec<String>,
+    collapsed_groups: Vec<String>,
+    #[serde(default)]
+    groups: Vec<WorkspaceGroupEntry>,
 }
 
 /// On-disk index file (`workspaces.json`). `BTreeMap` so serialization is
@@ -227,7 +240,8 @@ impl WindowStateManager {
                     active_index: ie.active_index,
                     sidebar: ie.sidebar.clone(),
                     workspace_bar_width: ie.workspace_bar_width,
-                    collapsed_status_groups: ie.collapsed_status_groups.clone(),
+                    collapsed_groups: ie.collapsed_groups.clone(),
+                    groups: ie.groups.clone(),
                 },
             );
         }
@@ -296,7 +310,8 @@ impl WindowStateManager {
                     active_index: entry.active_index,
                     sidebar: entry.sidebar.clone(),
                     workspace_bar_width: entry.workspace_bar_width,
-                    collapsed_status_groups: entry.collapsed_status_groups.clone(),
+                    collapsed_groups: entry.collapsed_groups.clone(),
+                    groups: entry.groups.clone(),
                 },
             );
         }
@@ -408,10 +423,17 @@ impl WindowStateManager {
         }
     }
 
-    pub fn update_collapsed_status_groups(&self, label: &str, ids: Vec<String>) {
+    pub fn update_collapsed_groups(&self, label: &str, ids: Vec<String>) {
         let mut inner = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = inner.windows.get_mut(label) {
-            entry.collapsed_status_groups = ids;
+            entry.collapsed_groups = ids;
+        }
+    }
+
+    pub fn update_groups(&self, label: &str, groups: Vec<WorkspaceGroupEntry>) {
+        let mut inner = self.inner.write().expect("window state lock poisoned");
+        if let Some(entry) = inner.windows.get_mut(label) {
+            entry.groups = groups;
         }
     }
 }
@@ -749,5 +771,59 @@ mod tests {
             },
         );
         assert!(mgr.get_entry("w-ghost").is_none());
+    }
+
+    #[test]
+    fn update_groups_persists_and_reloads() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let mgr = WindowStateManager::new(path.clone());
+        mgr.add_window("w-1".to_string());
+        mgr.update_groups(
+            "w-1",
+            vec![
+                WorkspaceGroupEntry { id: "grp-a".to_string(), label: "Group A".to_string() },
+                WorkspaceGroupEntry { id: "grp-b".to_string(), label: "Group B".to_string() },
+            ],
+        );
+        mgr.save();
+
+        let mgr2 = WindowStateManager::new(path);
+        assert!(mgr2.load());
+        let groups = mgr2.get_entry("w-1").unwrap().groups;
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].id, "grp-a");
+        assert_eq!(groups[0].label, "Group A");
+        assert_eq!(groups[1].id, "grp-b");
+    }
+
+    #[test]
+    fn update_groups_on_unknown_label_is_noop() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WindowStateManager::new(dir.path().join("state.json"));
+        mgr.update_groups(
+            "w-ghost",
+            vec![WorkspaceGroupEntry { id: "grp-a".to_string(), label: "A".to_string() }],
+        );
+        assert!(mgr.get_entry("w-ghost").is_none());
+    }
+
+    #[test]
+    fn entry_without_groups_field_deserializes_to_empty() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("workspaces.json");
+        let index = serde_json::json!({
+            "version": INDEX_VERSION,
+            "windows": { "w-1": {
+                "width": 1280, "height": 800, "maximized": false,
+                "workspaceIds": [], "activeIndex": 0
+            } },
+            "windowOrder": ["w-1"],
+            "focusedWindow": "w-1"
+        });
+        std::fs::write(&path, serde_json::to_string(&index).unwrap()).unwrap();
+        let mgr = WindowStateManager::new(path);
+        assert!(mgr.load());
+        assert!(mgr.get_entry("w-1").unwrap().groups.is_empty());
     }
 }

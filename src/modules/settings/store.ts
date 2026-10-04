@@ -9,40 +9,11 @@ import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
-import {
-  type MarkdownEngine,
-  parseMarkdownEngine,
-} from "@/modules/markdown/lib/markdownEngine";
+import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 
 export type ThemePref = "system" | "light" | "dark";
 
-export type TabBarStyle = "connected" | "pill";
-
-export type WorkspaceStatus = { id: string; label: string; color?: string };
-
-export const DEFAULT_WORKSPACE_STATUSES: WorkspaceStatus[] = [
-  { id: "archived",         label: "Archived",         color: "#14b8a6" },
-  { id: "work-in-progress", label: "Work in progress", color: "#3b82f6" },
-  { id: "on-hold",          label: "On hold",           color: "#f97316" },
-  { id: "canceled",         label: "Canceled",          color: "#ef4444" },
-  { id: "completed",        label: "Completed",         color: "#22c55e" },
-];
-
-export function parseWorkspaceStatuses(value: unknown): WorkspaceStatus[] {
-  if (!Array.isArray(value)) return DEFAULT_WORKSPACE_STATUSES;
-  return (value as unknown[]).filter(
-    (item): item is WorkspaceStatus =>
-      item !== null &&
-      typeof item === "object" &&
-      typeof (item as WorkspaceStatus).id === "string" &&
-      (item as WorkspaceStatus).id.length > 0 &&
-      typeof (item as WorkspaceStatus).label === "string" &&
-      (
-        (item as WorkspaceStatus).color === undefined ||
-        typeof (item as WorkspaceStatus).color === "string"
-      ),
-  );
-}
+type TabBarStyle = "connected" | "pill";
 
 export type GitColorScheme = "vscode" | "jetbrains";
 
@@ -54,7 +25,6 @@ export type DiffViewMode = "unified" | "split";
 
 export type TextEditorMode = "file-only" | "workspace-and-files";
 
-export type { MarkdownEngine } from "@/modules/markdown/lib/markdownEngine";
 
 export type CursorStyle = "bar" | "block" | "underline";
 
@@ -64,8 +34,6 @@ export type CursorInactiveStyle =
   | "bar"
   | "underline"
   | "none";
-
-export const DEFAULT_THEME_ID = "kex-default";
 
 export const EDITOR_THEMES = [
   "kanagawa",
@@ -90,12 +58,16 @@ export const EDITOR_THEMES = [
   "github-light",
   "xcode-dark",
   "xcode-light",
+  "darcula",
 ] as const;
 
 export type EditorThemeId = (typeof EDITOR_THEMES)[number];
 
 /** "auto" follows the active app theme's editorTheme pairing (resolved live). */
 export const EDITOR_THEME_AUTO = "auto" as const;
+
+/** "auto" uses the active app theme's terminal palette; otherwise an app theme id whose palette is borrowed. */
+export const TERMINAL_THEME_AUTO = "auto";
 export type EditorThemePref = typeof EDITOR_THEME_AUTO | EditorThemeId;
 
 export function isEditorThemeId(v: unknown): v is EditorThemeId {
@@ -127,6 +99,7 @@ export const EDITOR_THEME_MODE: Record<EditorThemeId, "light" | "dark"> = {
   "github-light": "light",
   "xcode-dark": "dark",
   "xcode-light": "light",
+  darcula: "dark",
 };
 
 export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
@@ -152,14 +125,17 @@ export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
   "github-light": "GitHub Light",
   "xcode-dark": "Xcode Dark",
   "xcode-light": "Xcode Light",
+  darcula: "Darcula",
 };
 
-export type PaneSplitLimit = { width: number; height: number };
+type PaneSplitLimit = { width: number; height: number };
 
 export type Preferences = {
   theme: ThemePref;
   themeId: string;
+  terminalTheme: string;
   editorTheme: EditorThemePref;
+  themeAuto: boolean;
   editorFontFamily: string;
   editorFontSize: number;
   editorLetterSpacing: number;
@@ -202,21 +178,16 @@ export type Preferences = {
   editorBracketMatching: boolean;
   editorCloseBrackets: boolean;
   editorAutocompletion: boolean;
-  markdownEngine: MarkdownEngine;
-  markdownWikiLinks: boolean; // JSON-only: no settings UI, edit settings-editor.json
   tabBarStyle: TabBarStyle;
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
   keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
-  scratchpadInNewTerminals: boolean;
-  scratchpadRememberFocus: boolean;
   textEditorMode: TextEditorMode;
   preferredFileEditorId: string | null;
   preferredWorkspaceEditorId: string | null;
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
-  workspaceStatuses: WorkspaceStatus[];
   randomWorkspaceColor: boolean;
   uiFont: string;
 };
@@ -230,6 +201,8 @@ const TOOLS_STORE_PATH = "settings-tools.json";
 // General store keys
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
+const KEY_TERMINAL_THEME = "terminalTheme";
+const KEY_THEME_AUTO = "themeAuto";
 const KEY_AUTOSTART = "autostart";
 const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
@@ -244,7 +217,6 @@ const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
-const KEY_WORKSPACE_STATUSES = "workspaceStatuses";
 const KEY_RANDOM_WORKSPACE_COLOR = "randomWorkspaceColor";
 
 // Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
@@ -265,8 +237,6 @@ const KEY_TERMINAL_CURSOR_WIDTH = "cursorWidth";
 const KEY_TERMINAL_SCROLL_SENSITIVITY = "scrollSensitivity";
 const KEY_TERMINAL_NEW_FOLDER_MODE = "newFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
-const KEY_SCRATCHPAD_IN_NEW_TERMINALS = "scratchpadInNewTerminals";
-const KEY_SCRATCHPAD_REMEMBER_FOCUS = "scratchpadRememberFocus";
 
 // Editor store keys — no "editor" prefix since the file is already settings-editor.json
 const KEY_EDITOR_THEME = "theme";
@@ -286,8 +256,6 @@ const KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE = "highlightActiveLine";
 const KEY_EDITOR_BRACKET_MATCHING = "bracketMatching";
 const KEY_EDITOR_CLOSE_BRACKETS = "closeBrackets";
 const KEY_EDITOR_AUTOCOMPLETION = "autocompletion";
-const KEY_MARKDOWN_ENGINE = "markdownEngine";
-const KEY_MARKDOWN_WIKI_LINKS = "markdownWikiLinks";
 
 // Shortcuts store
 const KEY_SHORTCUTS = "shortcuts";
@@ -299,7 +267,7 @@ const KEY_PREFERRED_WORKSPACE_EDITOR_ID = "preferredWorkspaceEditorId";
 const KEY_CUSTOM_EDITORS = "custom";
 const KEY_DETECTED_EDITORS = "tools";
 
-export const TERMINAL_FONT_SIZE_DEFAULT = 13;
+export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
 export const TERMINAL_FONT_SIZE_MAX = 18;
 
@@ -313,6 +281,7 @@ export const LETTER_SPACING_MIN = -4;
 export const LETTER_SPACING_MAX = 4;
 export const LETTER_SPACING_STEP = 0.5;
 export const LETTER_SPACING_DEFAULT = 0;
+export const TERMINAL_LETTER_SPACING_DEFAULT = -0.5;
 
 export const LINE_HEIGHT_MIN = 0.8;
 export const LINE_HEIGHT_MAX = 1.8;
@@ -400,7 +369,9 @@ export function parseCursorInactiveStyle(value: unknown): CursorInactiveStyle {
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   themeId: DEFAULT_THEME_ID,
+  terminalTheme: TERMINAL_THEME_AUTO,
   editorTheme: EDITOR_THEME_AUTO,
+  themeAuto: true,
   editorFontFamily: "",
   editorFontSize: EDITOR_FONT_SIZE_DEFAULT,
   editorLetterSpacing: LETTER_SPACING_DEFAULT,
@@ -419,7 +390,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalFontFamily: "",
   terminalShell: "",
   terminalFontWeight: "normal",
-  terminalLetterSpacing: LETTER_SPACING_DEFAULT,
+  terminalLetterSpacing: TERMINAL_LETTER_SPACING_DEFAULT,
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
   terminalLineHeight: TERMINAL_LINE_HEIGHT_DEFAULT,
   terminalScrollback: TERMINAL_SCROLLBACK_DEFAULT,
@@ -443,21 +414,16 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorBracketMatching: true,
   editorCloseBrackets: true,
   editorAutocompletion: true,
-  markdownEngine: "tiptap",
-  markdownWikiLinks: false,
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
   keepFolderLayoutOnChangeExplorerRoot: false,
   scratchpadEnterSends: true,
-  scratchpadInNewTerminals: true,
-  scratchpadRememberFocus: false,
   textEditorMode: "workspace-and-files",
   preferredFileEditorId: null,
   preferredWorkspaceEditorId: null,
   customEditors: [],
   detectedEditors: [],
-  workspaceStatuses: DEFAULT_WORKSPACE_STATUSES,
   randomWorkspaceColor: true,
   uiFont: "",
 };
@@ -491,6 +457,10 @@ export function parseScmViewMode(value: unknown): ScmViewMode {
   return value === "list" ? "list" : "tree";
 }
 
+export function parseThemePref(value: unknown): ThemePref {
+  return value === "light" || value === "dark" ? value : "system";
+}
+
 export function parseTerminalNewFolderMode(value: unknown): TerminalNewFolderMode {
   if (value === "home") return "home";
   if (value === "workspace") return "workspace";
@@ -502,36 +472,28 @@ export function parseTextEditorMode(value: unknown): TextEditorMode {
   return "workspace-and-files";
 }
 
-async function writePref<T>(key: string, value: T): Promise<void> {
-  await store.set(key, value);
-  await store.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "general", key, value } satisfies PrefsChangedPayload);
+// Builds a per-store writer: persists the key, flushes it to disk, then
+// mirrors the change through the cross-window event (see PREFS_CHANGED_EVENT
+// above). Each store gets its own writer so a mistaken write can never target
+// the wrong LazyStore.
+function makeWriter(targetStore: LazyStore, storeId: StoreId) {
+  return async function write<T>(key: string, value: T): Promise<void> {
+    await targetStore.set(key, value);
+    await targetStore.save();
+    await emit(PREFS_CHANGED_EVENT, { store: storeId, key, value } satisfies PrefsChangedPayload);
+  };
 }
 
-async function writeTerminalPref<T>(key: string, value: T): Promise<void> {
-  await terminalStore.set(key, value);
-  await terminalStore.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "terminal", key, value } satisfies PrefsChangedPayload);
-}
-
-async function writeEditorPref<T>(key: string, value: T): Promise<void> {
-  await editorStore.set(key, value);
-  await editorStore.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "editor", key, value } satisfies PrefsChangedPayload);
-}
-
-async function writeToolsPref<T>(key: string, value: T): Promise<void> {
-  await toolsStore.set(key, value);
-  await toolsStore.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "tools", key, value } satisfies PrefsChangedPayload);
-}
+const writePref = makeWriter(store, "general");
+const writeTerminalPref = makeWriter(terminalStore, "terminal");
+const writeEditorPref = makeWriter(editorStore, "editor");
+const writeToolsPref = makeWriter(toolsStore, "tools");
+const writeShortcutsStorePref = makeWriter(shortcutsStore, "shortcuts");
 
 async function writeShortcutsPref(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
-  await shortcutsStore.set(KEY_SHORTCUTS, value);
-  await shortcutsStore.save();
-  await emit(PREFS_CHANGED_EVENT, { store: "shortcuts", key: KEY_SHORTCUTS, value } satisfies PrefsChangedPayload);
+  await writeShortcutsStorePref(KEY_SHORTCUTS, value);
 }
 
 export async function loadPreferences(): Promise<Preferences> {
@@ -543,93 +505,106 @@ export async function loadPreferences(): Promise<Preferences> {
     toolsStore.entries(),
     shortcutsStore.get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS),
   ]);
-  const map = new Map<string, unknown>([...entries, ...terminalEntries, ...editorEntries, ...toolsEntries]);
-  const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
+  // Kept as separate per-store maps, never merged into one: terminal and editor
+  // share unprefixed key names (fontFamily, fontSize, letterSpacing, lineHeight,
+  // cursorBlink, cursorStyle) and general vs editor both use "theme", so a single
+  // merged map would let one store's value silently overwrite another's.
+  const generalMap = new Map<string, unknown>(entries);
+  const terminalMap = new Map<string, unknown>(terminalEntries);
+  const editorMap = new Map<string, unknown>(editorEntries);
+  const toolsMap = new Map<string, unknown>(toolsEntries);
+  const getGeneral = <T>(k: string): T | undefined => generalMap.get(k) as T | undefined;
+  const getTerminal = <T>(k: string): T | undefined => terminalMap.get(k) as T | undefined;
+  const getEditor = <T>(k: string): T | undefined => editorMap.get(k) as T | undefined;
+  const getTools = <T>(k: string): T | undefined => toolsMap.get(k) as T | undefined;
   const result: Preferences = {
-    theme: get<ThemePref>(KEY_THEME) ?? DEFAULT_PREFERENCES.theme,
-    themeId: get<string>(KEY_THEME_ID) ?? DEFAULT_PREFERENCES.themeId,
+    theme: parseThemePref(getGeneral<string>(KEY_THEME)),
+    themeId: getGeneral<string>(KEY_THEME_ID) ?? DEFAULT_PREFERENCES.themeId,
+    terminalTheme:
+      getGeneral<string>(KEY_TERMINAL_THEME) ?? DEFAULT_PREFERENCES.terminalTheme,
+    themeAuto: getGeneral<boolean>(KEY_THEME_AUTO) ?? DEFAULT_PREFERENCES.themeAuto,
     editorTheme: ((): EditorThemePref => {
-      const stored = get<string>(KEY_EDITOR_THEME);
+      const stored = getEditor<string>(KEY_EDITOR_THEME);
       if (stored === EDITOR_THEME_AUTO || isEditorThemeId(stored)) return stored;
       return DEFAULT_PREFERENCES.editorTheme;
     })(),
     editorFontFamily:
-      get<string>(KEY_EDITOR_FONT_FAMILY) ??
+      getEditor<string>(KEY_EDITOR_FONT_FAMILY) ??
       DEFAULT_PREFERENCES.editorFontFamily,
     editorFontSize:
-      get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
+      getEditor<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
     editorLetterSpacing:
-      get<number>(KEY_EDITOR_LETTER_SPACING) ??
+      getEditor<number>(KEY_EDITOR_LETTER_SPACING) ??
       DEFAULT_PREFERENCES.editorLetterSpacing,
     editorLineHeight:
-      get<number>(KEY_EDITOR_LINE_HEIGHT) ??
+      getEditor<number>(KEY_EDITOR_LINE_HEIGHT) ??
       DEFAULT_PREFERENCES.editorLineHeight,
-    autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
+    autostart: getGeneral<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
     autofocusNewTabs:
-      get<boolean>(KEY_AUTOFOCUS_NEW_TABS) ??
+      getGeneral<boolean>(KEY_AUTOFOCUS_NEW_TABS) ??
       DEFAULT_PREFERENCES.autofocusNewTabs,
     explorerGitColorScheme: (() => {
-      const v = get<string>(KEY_EXPLORER_GIT_COLOR_SCHEME);
+      const v = getGeneral<string>(KEY_EXPLORER_GIT_COLOR_SCHEME);
       if (v === "vscode" || v === "jetbrains") return v;
       return DEFAULT_PREFERENCES.explorerGitColorScheme;
     })(),
-    scmViewMode: parseScmViewMode(get<string>(KEY_SCM_VIEW_MODE)),
+    scmViewMode: parseScmViewMode(getGeneral<string>(KEY_SCM_VIEW_MODE)),
     terminalWebglEnabled:
-      get<boolean>(KEY_TERMINAL_WEBGL_ENABLED) ??
+      getTerminal<boolean>(KEY_TERMINAL_WEBGL_ENABLED) ??
       DEFAULT_PREFERENCES.terminalWebglEnabled,
     terminalCursorBlink:
-      get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
+      getTerminal<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
       DEFAULT_PREFERENCES.terminalCursorBlink,
     editorCursorBlink:
-      get<boolean>(KEY_EDITOR_CURSOR_BLINK) ??
+      getEditor<boolean>(KEY_EDITOR_CURSOR_BLINK) ??
       DEFAULT_PREFERENCES.editorCursorBlink,
     editorCursorBlinkRate: clampToStep(
-      get<number>(KEY_EDITOR_CURSOR_BLINK_RATE) ??
+      getEditor<number>(KEY_EDITOR_CURSOR_BLINK_RATE) ??
         DEFAULT_PREFERENCES.editorCursorBlinkRate,
       EDITOR_BLINK_RATE_MIN,
       EDITOR_BLINK_RATE_MAX,
       EDITOR_BLINK_RATE_STEP,
       EDITOR_BLINK_RATE_DEFAULT,
     ),
-    editorCursorStyle: parseCursorStyle(get<string>(KEY_EDITOR_CURSOR_STYLE)),
+    editorCursorStyle: parseCursorStyle(getEditor<string>(KEY_EDITOR_CURSOR_STYLE)),
     warnOnCloseTabWithRunningProcess:
-      get<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
+      getTerminal<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
       DEFAULT_PREFERENCES.warnOnCloseTabWithRunningProcess,
     warnOnCloseWorkspace:
-      get<boolean>(KEY_WARN_ON_CLOSE_WORKSPACE) ??
+      getGeneral<boolean>(KEY_WARN_ON_CLOSE_WORKSPACE) ??
       DEFAULT_PREFERENCES.warnOnCloseWorkspace,
     terminalFontFamily:
-      get<string>(KEY_TERMINAL_FONT_FAMILY) ??
+      getTerminal<string>(KEY_TERMINAL_FONT_FAMILY) ??
       DEFAULT_PREFERENCES.terminalFontFamily,
     terminalShell:
-      get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
+      getTerminal<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
     terminalFontWeight: coerceFontWeight(
-      get<string>(KEY_TERMINAL_FONT_WEIGHT) ??
+      getTerminal<string>(KEY_TERMINAL_FONT_WEIGHT) ??
         DEFAULT_PREFERENCES.terminalFontWeight,
     ),
     terminalLetterSpacing:
-      get<number>(KEY_TERMINAL_LETTER_SPACING) ??
+      getTerminal<number>(KEY_TERMINAL_LETTER_SPACING) ??
       DEFAULT_PREFERENCES.terminalLetterSpacing,
     terminalFontSize:
-      get<number>(KEY_TERMINAL_FONT_SIZE) ??
+      getTerminal<number>(KEY_TERMINAL_FONT_SIZE) ??
       DEFAULT_PREFERENCES.terminalFontSize,
     terminalLineHeight:
-      get<number>(KEY_TERMINAL_LINE_HEIGHT) ??
+      getTerminal<number>(KEY_TERMINAL_LINE_HEIGHT) ??
       DEFAULT_PREFERENCES.terminalLineHeight,
     terminalScrollback: clampScrollback(
-      get<number>(KEY_TERMINAL_SCROLLBACK) ??
+      getTerminal<number>(KEY_TERMINAL_SCROLLBACK) ??
         DEFAULT_PREFERENCES.terminalScrollback,
     ),
     terminalBackgroundMemoryBudgetMB: clampBackgroundMemoryBudget(
-      get<number>(KEY_TERMINAL_BACKGROUND_MEMORY_BUDGET) ??
+      getTerminal<number>(KEY_TERMINAL_BACKGROUND_MEMORY_BUDGET) ??
         DEFAULT_PREFERENCES.terminalBackgroundMemoryBudgetMB,
     ),
-    terminalCursorStyle: parseCursorStyle(get<string>(KEY_TERMINAL_CURSOR_STYLE)),
+    terminalCursorStyle: parseCursorStyle(getTerminal<string>(KEY_TERMINAL_CURSOR_STYLE)),
     terminalCursorInactiveStyle: parseCursorInactiveStyle(
-      get<string>(KEY_TERMINAL_CURSOR_INACTIVE_STYLE),
+      getTerminal<string>(KEY_TERMINAL_CURSOR_INACTIVE_STYLE),
     ),
     terminalCursorWidth: clampToStep(
-      get<number>(KEY_TERMINAL_CURSOR_WIDTH) ??
+      getTerminal<number>(KEY_TERMINAL_CURSOR_WIDTH) ??
         DEFAULT_PREFERENCES.terminalCursorWidth,
       CURSOR_WIDTH_MIN,
       CURSOR_WIDTH_MAX,
@@ -637,7 +612,7 @@ export async function loadPreferences(): Promise<Preferences> {
       CURSOR_WIDTH_DEFAULT,
     ),
     terminalScrollSensitivity: clampToStep(
-      get<number>(KEY_TERMINAL_SCROLL_SENSITIVITY) ??
+      getTerminal<number>(KEY_TERMINAL_SCROLL_SENSITIVITY) ??
         DEFAULT_PREFERENCES.terminalScrollSensitivity,
       SCROLL_SENSITIVITY_MIN,
       SCROLL_SENSITIVITY_MAX,
@@ -645,28 +620,28 @@ export async function loadPreferences(): Promise<Preferences> {
       SCROLL_SENSITIVITY_DEFAULT,
     ),
     terminalNewFolderMode: parseTerminalNewFolderMode(
-      get<string>(KEY_TERMINAL_NEW_FOLDER_MODE),
+      getTerminal<string>(KEY_TERMINAL_NEW_FOLDER_MODE),
     ),
     lastWslDistro:
-      get<string | null>(KEY_LAST_WSL_DISTRO) ??
+      getGeneral<string | null>(KEY_LAST_WSL_DISTRO) ??
       DEFAULT_PREFERENCES.lastWslDistro,
-    zoomLevel: get<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel,
+    zoomLevel: getGeneral<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel,
     agentNotifications:
-      get<boolean>(KEY_AGENT_NOTIFICATIONS) ??
+      getGeneral<boolean>(KEY_AGENT_NOTIFICATIONS) ??
       DEFAULT_PREFERENCES.agentNotifications,
     shortcuts: shortcutsValue ?? DEFAULT_PREFERENCES.shortcuts,
     editorAutoSave:
-      get<boolean>(KEY_EDITOR_AUTO_SAVE) ??
+      getEditor<boolean>(KEY_EDITOR_AUTO_SAVE) ??
       DEFAULT_PREFERENCES.editorAutoSave,
     editorAutoSaveDelay: clampAutoSaveDelay(
-      get<number>(KEY_EDITOR_AUTO_SAVE_DELAY) ??
+      getEditor<number>(KEY_EDITOR_AUTO_SAVE_DELAY) ??
         DEFAULT_PREFERENCES.editorAutoSaveDelay,
     ),
     previewOnClick:
-      get<boolean>(KEY_PREVIEW_ON_CLICK) ??
+      getGeneral<boolean>(KEY_PREVIEW_ON_CLICK) ??
       DEFAULT_PREFERENCES.previewOnClick,
     editorViewByExt: (() => {
-      const v = get<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT);
+      const v = getEditor<EditorViewMap>(KEY_EDITOR_VIEW_BY_EXT);
       const raw =
         v && typeof v === "object" && !Array.isArray(v)
           ? (v as EditorViewMap)
@@ -687,98 +662,81 @@ export async function loadPreferences(): Promise<Preferences> {
       return normalized;
     })(),
     editorScrollPastEnd:
-      get<boolean>(KEY_EDITOR_SCROLL_PAST_END) ??
+      getEditor<boolean>(KEY_EDITOR_SCROLL_PAST_END) ??
       DEFAULT_PREFERENCES.editorScrollPastEnd,
     diffViewMode:
-      get<DiffViewMode>(KEY_DIFF_VIEW_MODE) ?? DEFAULT_PREFERENCES.diffViewMode,
+      getEditor<DiffViewMode>(KEY_DIFF_VIEW_MODE) ?? DEFAULT_PREFERENCES.diffViewMode,
     editorHighlightActiveLine:
-      get<boolean>(KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE) ??
+      getEditor<boolean>(KEY_EDITOR_HIGHLIGHT_ACTIVE_LINE) ??
       DEFAULT_PREFERENCES.editorHighlightActiveLine,
     editorBracketMatching:
-      get<boolean>(KEY_EDITOR_BRACKET_MATCHING) ??
+      getEditor<boolean>(KEY_EDITOR_BRACKET_MATCHING) ??
       DEFAULT_PREFERENCES.editorBracketMatching,
     editorCloseBrackets:
-      get<boolean>(KEY_EDITOR_CLOSE_BRACKETS) ??
+      getEditor<boolean>(KEY_EDITOR_CLOSE_BRACKETS) ??
       DEFAULT_PREFERENCES.editorCloseBrackets,
     editorAutocompletion:
-      get<boolean>(KEY_EDITOR_AUTOCOMPLETION) ??
+      getEditor<boolean>(KEY_EDITOR_AUTOCOMPLETION) ??
       DEFAULT_PREFERENCES.editorAutocompletion,
-    markdownEngine: parseMarkdownEngine(get(KEY_MARKDOWN_ENGINE)),
-    markdownWikiLinks:
-      get<boolean>(KEY_MARKDOWN_WIKI_LINKS) ??
-      DEFAULT_PREFERENCES.markdownWikiLinks,
     tabBarStyle: (() => {
-      const v = get<string>(KEY_TAB_BAR_STYLE);
+      const v = getGeneral<string>(KEY_TAB_BAR_STYLE);
       return v === "connected" || v === "pill" ? v : DEFAULT_PREFERENCES.tabBarStyle;
     })(),
     workspacePaneLimit: (() => {
-      const v = get<number>(KEY_WORKSPACE_PANE_LIMIT);
+      const v = getGeneral<number>(KEY_WORKSPACE_PANE_LIMIT);
       return Number.isFinite(v) && v! >= 1 ? Math.floor(v!) : DEFAULT_PREFERENCES.workspacePaneLimit;
     })(),
     paneSplitLimit: (() => {
-      const v = get<PaneSplitLimit>(KEY_PANE_SPLIT_LIMIT);
+      const v = getGeneral<PaneSplitLimit>(KEY_PANE_SPLIT_LIMIT);
       if (v && typeof v === "object" && Number.isFinite(v.width) && Number.isFinite(v.height)) {
         return { width: Math.max(1, v.width), height: Math.max(1, v.height) };
       }
       return DEFAULT_PREFERENCES.paneSplitLimit;
     })(),
     keepFolderLayoutOnChangeExplorerRoot:
-      get<boolean>(KEY_KEEP_FOLDER_LAYOUT) ??
+      getGeneral<boolean>(KEY_KEEP_FOLDER_LAYOUT) ??
       DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot,
     scratchpadEnterSends:
-      get<boolean>(KEY_SCRATCHPAD_ENTER_SENDS) ??
+      getTerminal<boolean>(KEY_SCRATCHPAD_ENTER_SENDS) ??
       DEFAULT_PREFERENCES.scratchpadEnterSends,
-    scratchpadInNewTerminals:
-      get<boolean>(KEY_SCRATCHPAD_IN_NEW_TERMINALS) ??
-      DEFAULT_PREFERENCES.scratchpadInNewTerminals,
-    scratchpadRememberFocus:
-      get<boolean>(KEY_SCRATCHPAD_REMEMBER_FOCUS) ??
-      DEFAULT_PREFERENCES.scratchpadRememberFocus,
-    textEditorMode: parseTextEditorMode(get<string>(KEY_TEXT_EDITOR_MODE)),
+    textEditorMode: parseTextEditorMode(getTools<string>(KEY_TEXT_EDITOR_MODE)),
     preferredFileEditorId:
-      get<string | null>(KEY_PREFERRED_FILE_EDITOR_ID) ??
+      getTools<string | null>(KEY_PREFERRED_FILE_EDITOR_ID) ??
       DEFAULT_PREFERENCES.preferredFileEditorId,
     preferredWorkspaceEditorId:
-      get<string | null>(KEY_PREFERRED_WORKSPACE_EDITOR_ID) ??
+      getTools<string | null>(KEY_PREFERRED_WORKSPACE_EDITOR_ID) ??
       DEFAULT_PREFERENCES.preferredWorkspaceEditorId,
     customEditors: (() => {
-      const v = get<CustomEditor[]>(KEY_CUSTOM_EDITORS);
+      const v = getTools<CustomEditor[]>(KEY_CUSTOM_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.customEditors;
     })(),
     detectedEditors: (() => {
-      const v = get<DetectedEditor[]>(KEY_DETECTED_EDITORS);
+      const v = getTools<DetectedEditor[]>(KEY_DETECTED_EDITORS);
       return Array.isArray(v) ? v : DEFAULT_PREFERENCES.detectedEditors;
     })(),
-    workspaceStatuses: (() => {
-      const v = get<WorkspaceStatus[]>(KEY_WORKSPACE_STATUSES);
-      if (v === undefined) return DEFAULT_WORKSPACE_STATUSES;
-      return parseWorkspaceStatuses(v);
-    })(),
     randomWorkspaceColor:
-      get<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
+      getGeneral<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
       DEFAULT_PREFERENCES.randomWorkspaceColor,
-    uiFont: get<string>(KEY_UI_FONT) ?? DEFAULT_PREFERENCES.uiFont,
+    uiFont: getGeneral<string>(KEY_UI_FONT) ?? DEFAULT_PREFERENCES.uiFont,
   };
 
   // Persist JSON-only general keys so they're discoverable in settings-general.json.
   const configDefaults: [string, unknown][] = [];
-  if (!map.has(KEY_WORKSPACE_PANE_LIMIT)) configDefaults.push([KEY_WORKSPACE_PANE_LIMIT, DEFAULT_PREFERENCES.workspacePaneLimit]);
-  if (!map.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
-  if (!map.has(KEY_KEEP_FOLDER_LAYOUT)) configDefaults.push([KEY_KEEP_FOLDER_LAYOUT, DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot]);
+  if (!generalMap.has(KEY_WORKSPACE_PANE_LIMIT)) configDefaults.push([KEY_WORKSPACE_PANE_LIMIT, DEFAULT_PREFERENCES.workspacePaneLimit]);
+  if (!generalMap.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
+  if (!generalMap.has(KEY_KEEP_FOLDER_LAYOUT)) configDefaults.push([KEY_KEEP_FOLDER_LAYOUT, DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot]);
   if (configDefaults.length > 0) {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
   }
 
   // Persist JSON-only editor keys so they're discoverable in settings-editor.json.
   const editorConfigDefaults: [string, unknown][] = [];
-  if (!map.has(KEY_MARKDOWN_ENGINE)) editorConfigDefaults.push([KEY_MARKDOWN_ENGINE, DEFAULT_PREFERENCES.markdownEngine]);
-  if (!map.has(KEY_MARKDOWN_WIKI_LINKS)) editorConfigDefaults.push([KEY_MARKDOWN_WIKI_LINKS, DEFAULT_PREFERENCES.markdownWikiLinks]);
   if (editorConfigDefaults.length > 0) {
     void Promise.all(editorConfigDefaults.map(([k, v]) => editorStore.set(k, v))).then(() => editorStore.save());
   }
 
   // Persist viewByExt to settings-editor.json so it's discoverable there.
-  const storedExtMap = map.get(KEY_EDITOR_VIEW_BY_EXT);
+  const storedExtMap = editorMap.get(KEY_EDITOR_VIEW_BY_EXT);
   const storedExtKeys =
     storedExtMap && typeof storedExtMap === "object" && !Array.isArray(storedExtMap)
       ? Object.keys(storedExtMap as object)
@@ -800,6 +758,14 @@ export async function setTheme(value: ThemePref): Promise<void> {
 
 export async function setThemeId(value: string): Promise<void> {
   await writePref(KEY_THEME_ID, value);
+}
+
+export async function setTerminalTheme(value: string): Promise<void> {
+  await writePref(KEY_TERMINAL_THEME, value);
+}
+
+export async function setThemeAuto(value: boolean): Promise<void> {
+  await writePref(KEY_THEME_AUTO, value);
 }
 
 export async function setEditorTheme(value: EditorThemePref): Promise<void> {
@@ -935,7 +901,7 @@ export async function setTerminalLetterSpacing(value: number): Promise<void> {
       LETTER_SPACING_MIN,
       LETTER_SPACING_MAX,
       LETTER_SPACING_STEP,
-      LETTER_SPACING_DEFAULT,
+      TERMINAL_LETTER_SPACING_DEFAULT,
     ),
   );
 }
@@ -1046,14 +1012,6 @@ export async function setTerminalScratchpadEnterSends(value: boolean): Promise<v
   await writeTerminalPref(KEY_SCRATCHPAD_ENTER_SENDS, value);
 }
 
-export async function setTerminalScratchpadInNewTerminals(value: boolean): Promise<void> {
-  await writeTerminalPref(KEY_SCRATCHPAD_IN_NEW_TERMINALS, value);
-}
-
-export async function setTerminalScratchpadRememberFocus(value: boolean): Promise<void> {
-  await writeTerminalPref(KEY_SCRATCHPAD_REMEMBER_FOCUS, value);
-}
-
 export async function setPreferredFileEditorId(value: string | null): Promise<void> {
   await writeToolsPref(KEY_PREFERRED_FILE_EDITOR_ID, value);
 }
@@ -1072,10 +1030,6 @@ export async function setCustomEditors(value: CustomEditor[]): Promise<void> {
 
 export async function setDetectedEditors(value: DetectedEditor[]): Promise<void> {
   await writeToolsPref(KEY_DETECTED_EDITORS, value);
-}
-
-export async function setWorkspaceStatuses(value: WorkspaceStatus[]): Promise<void> {
-  await writePref(KEY_WORKSPACE_STATUSES, value);
 }
 
 export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
@@ -1163,10 +1117,6 @@ export async function setDiffViewMode(value: DiffViewMode): Promise<void> {
   await writeEditorPref(KEY_DIFF_VIEW_MODE, value);
 }
 
-export async function setMarkdownEngine(value: MarkdownEngine): Promise<void> {
-  await writeEditorPref(KEY_MARKDOWN_ENGINE, value);
-}
-
 export async function setEditorBracketMatching(value: boolean): Promise<void> {
   await writeEditorPref(KEY_EDITOR_BRACKET_MATCHING, value);
 }
@@ -1206,6 +1156,8 @@ export type PrefKey = keyof Preferences;
 const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_THEME]: "theme",
   [KEY_THEME_ID]: "themeId",
+  [KEY_TERMINAL_THEME]: "terminalTheme",
+  [KEY_THEME_AUTO]: "themeAuto",
   [KEY_AUTOSTART]: "autostart",
   [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
@@ -1216,7 +1168,6 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
-  [KEY_WORKSPACE_STATUSES]: "workspaceStatuses",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
   [KEY_UI_FONT]: "uiFont",
 };
@@ -1239,8 +1190,6 @@ export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_SCROLL_SENSITIVITY]: "terminalScrollSensitivity",
   [KEY_TERMINAL_NEW_FOLDER_MODE]: "terminalNewFolderMode",
   [KEY_SCRATCHPAD_ENTER_SENDS]: "scratchpadEnterSends",
-  [KEY_SCRATCHPAD_IN_NEW_TERMINALS]: "scratchpadInNewTerminals",
-  [KEY_SCRATCHPAD_REMEMBER_FOCUS]: "scratchpadRememberFocus",
 };
 
 const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
@@ -1261,8 +1210,6 @@ const EDITOR_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
   [KEY_EDITOR_CLOSE_BRACKETS]: "editorCloseBrackets",
   [KEY_EDITOR_AUTOCOMPLETION]: "editorAutocompletion",
-  [KEY_MARKDOWN_ENGINE]: "markdownEngine",
-  [KEY_MARKDOWN_WIKI_LINKS]: "markdownWikiLinks",
 };
 
 const TOOLS_PREF_KEY_MAP: Record<string, PrefKey> = {
@@ -1296,32 +1243,31 @@ const STORE_PREF_KEY_MAPS: Record<StoreId, Record<string, PrefKey>> = {
   shortcuts: SHORTCUTS_PREF_KEY_MAP,
 };
 
+// Every LazyStore paired with the key map that decodes its raw keys into a
+// PrefKey, in the same order onPreferencesChange used to subscribe by hand.
+const STORES_WITH_MAPS: ReadonlyArray<[LazyStore, Record<string, PrefKey>]> = [
+  [store, GENERAL_PREF_KEY_MAP],
+  [terminalStore, TERMINAL_PREF_KEY_MAP],
+  [editorStore, EDITOR_PREF_KEY_MAP],
+  [toolsStore, TOOLS_PREF_KEY_MAP],
+  [shortcutsStore, SHORTCUTS_PREF_KEY_MAP],
+];
+
 /** Subscribe to changes from any window (settings -> main). */
 export async function onPreferencesChange(
   cb: (key: PrefKey, value: unknown) => void,
 ): Promise<UnlistenFn> {
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref/writeTerminalPref/writeEditorPref.
-  const unsubLocal = await store.onChange<unknown>((key, value) => {
-    const mapped = GENERAL_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
-  const unsubTerminal = await terminalStore.onChange<unknown>((key, value) => {
-    const mapped = TERMINAL_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
-  const unsubEditor = await editorStore.onChange<unknown>((key, value) => {
-    const mapped = EDITOR_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
-  const unsubTools = await toolsStore.onChange<unknown>((key, value) => {
-    const mapped = TOOLS_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
-  const unsubShortcuts = await shortcutsStore.onChange<unknown>((key, value) => {
-    const mapped = SHORTCUTS_PREF_KEY_MAP[key];
-    if (mapped) cb(mapped, value);
-  });
+  const unsubs: UnlistenFn[] = [];
+  for (const [targetStore, map] of STORES_WITH_MAPS) {
+    unsubs.push(
+      await targetStore.onChange<unknown>((key, value) => {
+        const mapped = map[key];
+        if (mapped) cb(mapped, value);
+      }),
+    );
+  }
   const unsubEvent = await listen<PrefsChangedPayload>(
     PREFS_CHANGED_EVENT,
     (e) => {
@@ -1331,11 +1277,7 @@ export async function onPreferencesChange(
     },
   );
   return () => {
-    unsubLocal();
-    unsubTerminal();
-    unsubEditor();
-    unsubTools();
-    unsubShortcuts();
+    for (const unsub of unsubs) unsub();
     unsubEvent();
   };
 }

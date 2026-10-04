@@ -20,12 +20,23 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Cancel01Icon, CheckmarkCircle01Icon, ChevronRightIcon, Delete02Icon, PencilEdit01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
+import {
+  Cancel01Icon,
+  ChevronRightIcon,
+  Delete02Icon,
+  Folder01Icon,
+  FolderAddIcon,
+  PencilEdit01Icon,
+  Settings01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { resolveWorkspaceColor, resolveStatusColor } from "@/modules/workspaces/lib/workspaceColor";
+import {
+  chipColorOnWhite,
+  resolveWorkspaceColor,
+} from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import {
   ContextMenu,
@@ -40,18 +51,24 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@/components/ui/popover";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
+import { useGroupRenameStore } from "@/modules/workspaces/lib/groupRenameStore";
+import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   groupDropId,
+  groupIdFromGroupId,
   groupWorkspaces,
   groupWorkspacesForDrag,
   parseGroupDropId,
-  statusIdFromGroupId,
 } from "@/modules/workspaces/lib/workspaceOrder";
-import type { WorkspaceStatus } from "@/modules/settings/store";
+import type { WorkspaceGroup } from "@/modules/workspaces/lib/types";
 
 type WorkspaceItem = {
   id: string;
@@ -60,24 +77,29 @@ type WorkspaceItem = {
   cwd?: string;
   color?: string | null;
   icon?: string;
-  statusId?: string;
+  groupId?: string;
 };
 
 export type WorkspaceBarProps = {
   workspaces: WorkspaceItem[];
   activeId: string | null;
-  workspaceStatuses: WorkspaceStatus[];
+  workspaceGroups: WorkspaceGroup[];
   onSelect: (id: string) => void;
   onNew: () => void;
   onReorder: (fromId: string, toId: string) => void;
-  onSetStatus: (id: string, statusId: string | null) => void;
+  onSetGroup: (id: string, groupId: string | null) => void;
+  onPreviewGroup: (id: string, groupId: string | null) => void;
+  onCommitGroupMove: () => void;
+  onCreateGroup: (workspaceId: string) => string;
+  onRenameGroup: (groupId: string, label: string) => void;
+  onReorderGroups: (fromId: string, toId: string) => void;
   onClose?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onOpenSettings: (id: string) => void;
   width: number;
   onWidthChange: (w: number) => void;
   collapsedGroups: Set<string>;
-  onToggleGroup: (statusId: string) => void;
+  onToggleGroup: (groupId: string) => void;
   onRestoreFocus: () => void;
 };
 
@@ -92,26 +114,38 @@ function SortableWorkspaceItem({
   ws,
   active,
   barWidth,
-  workspaceStatuses,
+  workspaceGroups,
   onSelect,
   onClose,
   onRename,
   onOpenSettings,
-  onSetStatus,
+  onSetGroup,
+  onCreateGroup,
   onRestoreFocus,
 }: {
   ws: WorkspaceItem;
   active: boolean;
   barWidth: number;
-  workspaceStatuses: WorkspaceStatus[];
+  workspaceGroups: WorkspaceGroup[];
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
   onOpenSettings: (id: string) => void;
-  onSetStatus: (id: string, statusId: string | null) => void;
+  onSetGroup: (id: string, groupId: string | null) => void;
+  onCreateGroup: (workspaceId: string) => string;
   onRestoreFocus: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ws.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: ws.id,
+    data: { type: "workspace" },
+  });
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
 
   const style: CSSProperties = {
@@ -123,6 +157,13 @@ function SortableWorkspaceItem({
   const isRenaming = useWorkspaceRenameStore((s) => s.renamingId === ws.id);
   const clearRename = useWorkspaceRenameStore((s) => s.clearRename);
   const startRename = useWorkspaceRenameStore((s) => s.startRename);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeSignal = useContextMenuCloseStore((s) => s.signal);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: closeSignal is a bump counter, only its change matters
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [closeSignal]);
 
   const shortcuts = usePreferencesStore((s) => s.shortcuts);
   const renameLabel = getShortcutLabel("workspace.rename", shortcuts);
@@ -164,10 +205,16 @@ function SortableWorkspaceItem({
   const compact = barWidth <= 80;
 
   const button = (
-    <div ref={setNodeRef} className="group relative w-full px-1.5" style={style}>
+    <div
+      ref={setNodeRef}
+      className="group relative w-full px-1.5"
+      style={style}
+    >
       <button
         type="button"
-        title={ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : (ws.title || ws.kind)}
+        title={
+          ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : ws.title || ws.kind
+        }
         onClick={() => {
           if (active) onRestoreFocus();
           else onSelect(ws.id);
@@ -179,16 +226,15 @@ function SortableWorkspaceItem({
             ? "h-9 justify-center text-[12px]"
             : "h-9 gap-2 px-2.5 text-[12px]",
           active
-            ? displayColor !== null
-              ? "text-white"
-              : "text-foreground"
-            : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
+            ? "text-foreground"
+            : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
         )}
         style={
           active
             ? displayColor !== null
               ? {
-                  backgroundColor: displayColor,
+                  backgroundColor: chipColorOnWhite(displayColor),
+                  color: "#ffffff",
                   boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
                 }
               : {
@@ -202,13 +248,24 @@ function SortableWorkspaceItem({
         aria-pressed={active}
       >
         {compact ? (
-          ws.icon && getWorkspaceIcon(ws.icon)
-            ? <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={22} strokeWidth={1.5} />
-            : <span className="text-[12px]">{abbrev(ws.title, ws.kind)}</span>
+          ws.icon && getWorkspaceIcon(ws.icon) ? (
+            <HugeiconsIcon
+              icon={getWorkspaceIcon(ws.icon)!}
+              size={22}
+              strokeWidth={1.5}
+            />
+          ) : (
+            <span className="text-[12px]">{abbrev(ws.title, ws.kind)}</span>
+          )
         ) : (
           <>
             {ws.icon && getWorkspaceIcon(ws.icon) && (
-              <HugeiconsIcon icon={getWorkspaceIcon(ws.icon)!} size={18} strokeWidth={1.5} className="shrink-0" />
+              <HugeiconsIcon
+                icon={getWorkspaceIcon(ws.icon)!}
+                size={18}
+                strokeWidth={1.5}
+                className="shrink-0"
+              />
             )}
             <span className="truncate">{ws.title || ws.kind}</span>
           </>
@@ -224,7 +281,10 @@ function SortableWorkspaceItem({
         <button
           type="button"
           title="Close workspace"
-          onClick={(e) => { e.stopPropagation(); onClose(ws.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose(ws.id);
+          }}
           className="absolute right-0.5 top-0.5 hidden size-[14px] items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
@@ -236,68 +296,94 @@ function SortableWorkspaceItem({
   return (
     <Popover
       open={isRenaming}
-      onOpenChange={(open) => { if (!open) handleSave(); }}
+      onOpenChange={(open) => {
+        if (!open) handleSave();
+      }}
     >
-      <ContextMenu>
+      <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <ContextMenuTrigger asChild>
-          <PopoverAnchor asChild>
-            {button}
-          </PopoverAnchor>
+          <PopoverAnchor asChild>{button}</PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent
           onCloseAutoFocus={(e) => {
             e.preventDefault();
-            // Selecting "Rename" opens the Popover in the same tick the menu
-            // closes; restoring focus to the terminal here would steal it
-            // from the rename input and trip the Popover's onInteractOutside.
-            if (useWorkspaceRenameStore.getState().renamingId !== ws.id) onRestoreFocus();
+            // Selecting "Rename" (or "New" group) opens a Popover in the same
+            // tick the menu closes; restoring focus to the terminal here would
+            // steal it from that input and trip its onInteractOutside.
+            if (
+              useWorkspaceRenameStore.getState().renamingId !== ws.id &&
+              useGroupRenameStore.getState().renamingId === null
+            ) {
+              onRestoreFocus();
+            }
           }}
         >
           <ContextMenuItem onSelect={() => startRename(ws.id)}>
             <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
-            Rename
-            {renameLabel && <ContextMenuShortcut>{renameLabel}</ContextMenuShortcut>}
+            Rename Workspace
+            {renameLabel && (
+              <ContextMenuShortcut>{renameLabel}</ContextMenuShortcut>
+            )}
           </ContextMenuItem>
-          {workspaceStatuses.length > 0 && (
-            <ContextMenuSub>
-              <ContextMenuSubTrigger className="gap-2">
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} strokeWidth={2} />
-                Set status
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
-                <ContextMenuRadioGroup
-                  value={ws.statusId ?? ""}
-                  onValueChange={(value) => onSetStatus(ws.id, value === "" ? null : value)}
-                >
-                  <ContextMenuRadioItem value="">
-                    No status
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="gap-2">
+              <HugeiconsIcon icon={Folder01Icon} size={14} strokeWidth={2} />
+              Move to group
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
+              <ContextMenuItem
+                onSelect={() => {
+                  const groupId = onCreateGroup(ws.id);
+                  useGroupRenameStore.getState().startRename(groupId);
+                }}
+              >
+                <HugeiconsIcon icon={FolderAddIcon} size={14} strokeWidth={2} />
+                New
+              </ContextMenuItem>
+              {(workspaceGroups.length > 0 || ws.groupId) && (
+                <ContextMenuSeparator />
+              )}
+              <ContextMenuRadioGroup
+                value={ws.groupId ?? ""}
+                onValueChange={(value) =>
+                  onSetGroup(ws.id, value === "" ? null : value)
+                }
+              >
+                {workspaceGroups.map((g) => (
+                  <ContextMenuRadioItem key={g.id} value={g.id}>
+                    {g.label}
                   </ContextMenuRadioItem>
-                  <ContextMenuSeparator />
-                  {workspaceStatuses.map((s) => (
-                    <ContextMenuRadioItem key={s.id} value={s.id} className="gap-2">
-                      <span
-                        className="size-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: resolveStatusColor(s.color, s.id) }}
-                      />
-                      {s.label}
+                ))}
+                {ws.groupId && (
+                  <>
+                    {workspaceGroups.length > 0 && <ContextMenuSeparator />}
+                    <ContextMenuRadioItem value="">
+                      No group
                     </ContextMenuRadioItem>
-                  ))}
-                </ContextMenuRadioGroup>
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-          )}
+                  </>
+                )}
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
           {onClose && (
-            <ContextMenuItem onSelect={() => onClose(ws.id)} className="text-destructive focus:text-destructive">
+            <ContextMenuItem
+              onSelect={() => onClose(ws.id)}
+              className="text-destructive focus:text-destructive"
+            >
               <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
               Delete
-              {closeLabel && <ContextMenuShortcut>{closeLabel}</ContextMenuShortcut>}
+              {closeLabel && (
+                <ContextMenuShortcut>{closeLabel}</ContextMenuShortcut>
+              )}
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => onOpenSettings(ws.id)}>
             <HugeiconsIcon icon={Settings01Icon} size={14} strokeWidth={2} />
             Properties
-            {settingsLabel && <ContextMenuShortcut>{settingsLabel}</ContextMenuShortcut>}
+            {settingsLabel && (
+              <ContextMenuShortcut>{settingsLabel}</ContextMenuShortcut>
+            )}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -316,8 +402,209 @@ function SortableWorkspaceItem({
           placeholder={ws.kind}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); handleSave(); }
-            else if (e.key === "Escape") { e.preventDefault(); handleCancel(); }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleSave();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              handleCancel();
+            }
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// A group's draggable unit is its header PLUS its (variably many) workspace
+// items, but only the header should be grabbable. useSortable is called once
+// here, on the whole block, so dnd-kit measures and animates its real height;
+// attributes/listeners are handed down to just the header (the drag handle)
+// instead of being attached to this wrapper. Attaching useSortable to the
+// header alone (the earlier approach) made dnd-kit's vertical strategy treat
+// every group as header-sized, producing a swap-like reorder that ignored
+// how many workspaces each group actually holds.
+type SortableHandleProps = Pick<
+  ReturnType<typeof useSortable>,
+  "attributes" | "listeners"
+>;
+
+function SortableGroupBlock({
+  groupId,
+  disabled,
+  children,
+}: {
+  groupId: string;
+  disabled: boolean;
+  children: (handle: SortableHandleProps) => ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: groupId,
+    data: { type: "group" },
+    disabled,
+  });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="w-full">
+      {children({ attributes, listeners })}
+    </div>
+  );
+}
+
+function SortableGroupHeader({
+  groupId,
+  label,
+  itemCount,
+  compact,
+  isCollapsed,
+  onToggleGroup,
+  onRenameGroup,
+  attributes,
+  listeners,
+}: {
+  groupId: string;
+  label: string;
+  itemCount: number;
+  compact: boolean;
+  isCollapsed: boolean;
+  onToggleGroup: (groupId: string) => void;
+  onRenameGroup: (groupId: string, label: string) => void;
+} & SortableHandleProps) {
+  const isRenaming = useGroupRenameStore((s) => s.renamingId === groupId);
+  const clearRename = useGroupRenameStore((s) => s.clearRename);
+  const startRename = useGroupRenameStore((s) => s.startRename);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const handledRef = useRef(false);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeSignal = useContextMenuCloseStore((s) => s.signal);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: closeSignal is a bump counter, only its change matters
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [closeSignal]);
+
+  useEffect(() => {
+    if (isRenaming) {
+      handledRef.current = false;
+      requestAnimationFrame(() => {
+        const el = inputRef.current;
+        if (el) {
+          el.value = label;
+          el.select();
+          el.focus();
+        }
+      });
+    }
+  }, [isRenaming, label]);
+
+  function handleSave() {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    const value = inputRef.current?.value.trim() ?? "";
+    if (value) onRenameGroup(groupId, value);
+    clearRename();
+  }
+
+  function handleCancel() {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    clearRename();
+  }
+
+  const header = compact ? (
+    <button
+      type="button"
+      title={isCollapsed ? `Expand ${label}` : `Collapse ${label}`}
+      onClick={() => onToggleGroup(groupId)}
+      className="mx-1.5 flex w-[calc(100%-12px)] items-center border-0 py-1.5 outline-none"
+      {...attributes}
+      {...listeners}
+    >
+      <span
+        className={cn(
+          "h-px w-full rounded-full bg-border/40 transition-colors hover:bg-border/80",
+          isCollapsed && "bg-border/70",
+        )}
+      />
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={() => onToggleGroup(groupId)}
+      className="flex w-full items-center gap-1 px-1.5 pt-2 pb-0.5 text-left transition-colors hover:text-foreground/80"
+      {...attributes}
+      {...listeners}
+    >
+      <HugeiconsIcon
+        icon={ChevronRightIcon}
+        size={10}
+        strokeWidth={2}
+        className={cn(
+          "shrink-0 text-muted-foreground/60 transition-transform duration-150",
+          !isCollapsed && "rotate-90",
+        )}
+      />
+      <span className="truncate text-[11px] font-medium text-muted-foreground/60">
+        {label}
+      </span>
+      {itemCount > 0 && (
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
+          {itemCount}
+        </span>
+      )}
+    </button>
+  );
+
+  return (
+    <Popover
+      open={isRenaming}
+      onOpenChange={(open) => {
+        if (!open) handleSave();
+      }}
+    >
+      <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <ContextMenuTrigger asChild>
+          <PopoverAnchor asChild>{header}</PopoverAnchor>
+        </ContextMenuTrigger>
+        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+          <ContextMenuItem onSelect={() => startRename(groupId)}>
+            <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
+            Rename Group
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+      <PopoverContent
+        side="right"
+        align="center"
+        className="w-48 p-1.5"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={handleSave}
+        onEscapeKeyDown={handleCancel}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          defaultValue={label}
+          className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleSave();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              handleCancel();
+            }
           }}
         />
       </PopoverContent>
@@ -331,22 +618,45 @@ function SortableWorkspaceItem({
 const dropAnimation: DropAnimation = {
   duration: 200,
   easing: "cubic-bezier(0.2, 0, 0, 1)",
-  sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.4" } } }),
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.4" } },
+  }),
 };
 
-// Prefer an item under the pointer (reorder within a group); fall back to the
-// group drop zone (change status), then to closestCenter for edge cases.
+// While reordering group headers, only other headers are valid collisions.
+// While dragging a workspace, prefer an item under the pointer (reorder
+// within a group); fall back to the group drop zone (change group), then to
+// closestCenter for edge cases. Group headers themselves are never a valid
+// drop target for a workspace (moving onto one would silently clear its group).
 const groupAwareCollision: CollisionDetection = (args) => {
+  if (args.active.data.current?.type === "group") {
+    return closestCenter({
+      ...args,
+      droppableContainers: args.droppableContainers.filter(
+        (c) => c.data?.current?.type === "group",
+      ),
+    });
+  }
   const pointer = pointerWithin(args);
-  const onItem = pointer.filter((c) => parseGroupDropId(String(c.id)) === null);
+  const onItem = pointer.filter(
+    (c) =>
+      parseGroupDropId(String(c.id)) === null &&
+      c.data?.current?.type !== "group",
+  );
   if (onItem.length > 0) return onItem;
   if (pointer.length > 0) return pointer;
   return closestCenter(args);
 };
 
-// Drop target for a status group, highlighted while hovered. Only used for
-// empty groups (groups with items are reordered by dropping on their items).
-function GroupDropZone({ groupId, children }: { groupId: string; children: ReactNode }) {
+// Drop target for a group, highlighted while hovered. Only used for empty
+// groups (groups with items are reordered by dropping on their items).
+function GroupDropZone({
+  groupId,
+  children,
+}: {
+  groupId: string;
+  children: ReactNode;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: groupDropId(groupId) });
   return (
     <div
@@ -364,24 +674,24 @@ function GroupDropZone({ groupId, children }: { groupId: string; children: React
 // Drop targets for groups with no workspaces, rendered at the end of the list
 // only while dragging. Placing them after the groups (the flex-1 spacer absorbs
 // the growth) keeps the existing items from shifting, so the drag overlay does
-// not jump. The no-status group appears here only when it is empty too.
+// not jump. The no-group group appears here only when it is empty too.
 function EmptyGroupDropTargets({
   workspaces,
-  workspaceStatuses,
+  workspaceGroups,
   compact,
 }: {
   workspaces: WorkspaceItem[];
-  workspaceStatuses: WorkspaceStatus[];
+  workspaceGroups: WorkspaceGroup[];
   compact: boolean;
 }) {
-  const empty = groupWorkspacesForDrag(workspaces, workspaceStatuses).filter(
+  const empty = groupWorkspacesForDrag(workspaces, workspaceGroups).filter(
     (g) => g.items.length === 0,
   );
   if (empty.length === 0) return null;
   return (
     <div className="mt-1 w-full border-t border-border/40 pt-1">
       {empty.map((group) => {
-        const label = group.label ?? "No status";
+        const label = group.label ?? "No group";
         return (
           <GroupDropZone key={group.id} groupId={group.id}>
             {compact ? (
@@ -405,11 +715,16 @@ function EmptyGroupDropTargets({
 export function WorkspaceBar({
   workspaces,
   activeId,
-  workspaceStatuses,
+  workspaceGroups,
   onSelect,
   onNew,
   onReorder,
-  onSetStatus,
+  onSetGroup,
+  onPreviewGroup,
+  onCommitGroupMove,
+  onCreateGroup,
+  onRenameGroup,
+  onReorderGroups,
   onClose,
   onRename,
   onOpenSettings,
@@ -419,27 +734,48 @@ export function WorkspaceBar({
   onToggleGroup,
   onRestoreFocus,
 }: WorkspaceBarProps) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
   const [isDragging, setIsDragging] = useState(false);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
-  // null = "had no status"; undefined = "no drag in progress"
-  const [dragStartStatus, setDragStartStatus] = useState<string | null | undefined>(undefined);
+  const [dragKind, setDragKind] = useState<"workspace" | "group" | null>(null);
+  // null = "had no group"; undefined = "no drag in progress"
+  const [dragStartGroup, setDragStartGroup] = useState<
+    string | null | undefined
+  >(undefined);
   const compact = width <= 80;
 
+  const shortcuts = usePreferencesStore((s) => s.shortcuts);
+  const newWorkspaceLabel = getShortcutLabel("workspace.new", shortcuts);
+  const newWorkspaceTitle = newWorkspaceLabel
+    ? `New workspace (${newWorkspaceLabel})`
+    : "New workspace";
+
   const groups = useMemo(
-    () => groupWorkspaces(workspaces, workspaceStatuses),
-    [workspaces, workspaceStatuses],
+    () => groupWorkspaces(workspaces, workspaceGroups),
+    [workspaces, workspaceGroups],
+  );
+  const sortableGroupIds = useMemo(
+    () => groups.filter((g) => g.label !== null).map((g) => g.id),
+    [groups],
   );
 
   function handleDragStart(event: DragStartEvent) {
     setIsDragging(true);
+    const kind =
+      event.active.data.current?.type === "group" ? "group" : "workspace";
+    setDragKind(kind);
     const id = String(event.active.id);
     setDragActiveId(id);
-    const ws = workspaces.find((w) => w.id === id);
-    setDragStartStatus(ws?.statusId ?? null);
+    if (kind === "workspace") {
+      const ws = workspaces.find((w) => w.id === id);
+      setDragStartGroup(ws?.groupId ?? null);
+    }
   }
 
   function handleDragOver(event: DragOverEvent) {
+    if (dragKind === "group") return;
     const { active, over } = event;
     if (!over) return;
     const overId = String(over.id);
@@ -450,46 +786,63 @@ export function WorkspaceBar({
     if (overId === activeId) return;
     const activeWs = workspaces.find((w) => w.id === activeId);
     if (!activeWs) return;
-    const target = workspaces.find((w) => w.id === overId)?.statusId ?? null;
-    if (target !== (activeWs.statusId ?? null)) onSetStatus(activeId, target);
+    const target = workspaces.find((w) => w.id === overId)?.groupId ?? null;
+    if (target !== (activeWs.groupId ?? null)) onPreviewGroup(activeId, target);
   }
 
   function handleDragCancel() {
     const id = dragActiveId;
-    const saved = dragStartStatus;
+    const saved = dragStartGroup;
+    const kind = dragKind;
     setIsDragging(false);
     setDragActiveId(null);
-    setDragStartStatus(undefined);
-    if (id !== null && saved !== undefined) {
-      onSetStatus(id, saved);
+    setDragStartGroup(undefined);
+    setDragKind(null);
+    if (kind === "workspace" && id !== null && saved !== undefined) {
+      onPreviewGroup(id, saved);
     }
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setIsDragging(false);
     const id = dragActiveId;
-    const saved = dragStartStatus;
+    const saved = dragStartGroup;
+    const kind = dragKind;
     setDragActiveId(null);
-    setDragStartStatus(undefined);
+    setDragStartGroup(undefined);
+    setDragKind(null);
     const { active, over } = event;
+
+    if (kind === "group") {
+      if (over) {
+        const activeId = String(active.id);
+        const overId = String(over.id);
+        if (overId !== activeId) onReorderGroups(activeId, overId);
+      }
+      return;
+    }
+
     if (!over) {
-      // Dropped in empty space: revert any status change made during drag
-      if (id !== null && saved !== undefined) onSetStatus(id, saved);
+      // Dropped in empty space: revert any group change made during drag.
+      if (id !== null && saved !== undefined) onPreviewGroup(id, saved);
       return;
     }
     const activeId = String(active.id);
     const overId = String(over.id);
-    const groupId = parseGroupDropId(overId);
-    if (groupId !== null) {
-      // Dropped on an empty-group zone: assign that status, nothing to reorder.
-      onSetStatus(activeId, statusIdFromGroupId(groupId));
+    const dropGroupId = parseGroupDropId(overId);
+    if (dropGroupId !== null) {
+      // Dropped on an empty-group zone: assign that group, nothing to reorder.
+      onSetGroup(activeId, groupIdFromGroupId(dropGroupId));
       return;
     }
-    if (overId === activeId) return;
-    onReorder(activeId, overId);
+    if (overId !== activeId) onReorder(activeId, overId);
+    if (id !== null && saved !== undefined) onCommitGroupMove();
   }
 
-  const dragActiveWs = dragActiveId ? workspaces.find((w) => w.id === dragActiveId) : null;
+  const dragActiveWs =
+    dragKind === "workspace" && dragActiveId
+      ? workspaces.find((w) => w.id === dragActiveId)
+      : null;
 
   return (
     <nav
@@ -508,148 +861,145 @@ export function WorkspaceBar({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="thin-scrollbar flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto overflow-x-hidden">
-        {groups.map((group) => {
-          const isCollapsible = group.label !== null;
-          const isCollapsed = isCollapsible && collapsedGroups.has(group.id);
-          return (
-            <div key={group.id} className="w-full">
-              {isCollapsible && (
-                compact ? (
-                  <button
-                    type="button"
-                    title={isCollapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
-                    onClick={() => onToggleGroup(group.id)}
-                    className="mx-1.5 flex w-[calc(100%-12px)] items-center border-0 py-1.5 outline-none"
-                  >
-                    <span
-                      className={cn(
-                        "h-px w-full rounded-full bg-border/40 transition-colors hover:bg-border/80",
-                        isCollapsed && "bg-border/70",
-                      )}
-                    />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onToggleGroup(group.id)}
-                    className="flex w-full items-center gap-1 px-1.5 pt-2 pb-0.5 text-left transition-colors hover:text-foreground/80"
-                  >
-                    <HugeiconsIcon
-                      icon={ChevronRightIcon}
-                      size={10}
-                      strokeWidth={2}
-                      className={cn(
-                        "shrink-0 text-muted-foreground/60 transition-transform duration-150",
-                        !isCollapsed && "rotate-90",
-                      )}
-                    />
-                    {(() => {
-                      const st = workspaceStatuses.find((s) => s.id === group.id);
-                      if (!st) return null;
-                      return (
-                        <span
-                          className="mr-0.5 h-3 w-1 shrink-0 rounded-full"
-                          style={{ backgroundColor: resolveStatusColor(st.color, st.id) }}
+        <SortableContext
+          items={sortableGroupIds}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="thin-scrollbar flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto overflow-x-hidden">
+            {groups.map((group) => {
+              const isCollapsible = group.label !== null;
+              const isCollapsed =
+                isCollapsible && collapsedGroups.has(group.id);
+              return (
+                <SortableGroupBlock
+                  key={group.id}
+                  groupId={group.id}
+                  disabled={!isCollapsible}
+                >
+                  {({ attributes, listeners }) => (
+                    <>
+                      {isCollapsible && (
+                        <SortableGroupHeader
+                          groupId={group.id}
+                          label={group.label ?? ""}
+                          itemCount={group.items.length}
+                          compact={compact}
+                          isCollapsed={isCollapsed}
+                          onToggleGroup={onToggleGroup}
+                          onRenameGroup={onRenameGroup}
+                          attributes={attributes}
+                          listeners={listeners}
                         />
-                      );
-                    })()}
-                    <span className="truncate text-[11px] font-medium text-muted-foreground/60">
-                      {group.label}
-                    </span>
-                    {group.items.length > 0 && (
-                      <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
-                        {group.items.length}
-                      </span>
-                    )}
-                  </button>
-                )
-              )}
-              {(() => {
-                if (isCollapsed) {
-                  const activeWs = group.items.find((ws) => ws.id === activeId);
-                  if (!activeWs) return null;
-                  return (
-                    <SortableContext items={[activeWs.id]} strategy={verticalListSortingStrategy}>
-                      <SortableWorkspaceItem
-                        ws={activeWs}
-                        active={true}
-                        barWidth={width}
-                        workspaceStatuses={workspaceStatuses}
-                        onSelect={onSelect}
-                        onClose={onClose}
-                        onRename={onRename}
-                        onOpenSettings={onOpenSettings}
-                        onSetStatus={onSetStatus}
-                        onRestoreFocus={onRestoreFocus}
-                      />
-                    </SortableContext>
-                  );
-                }
-                return (
-                  <SortableContext
-                    items={group.items.map((w) => w.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {group.items.map((ws) => (
-                      <SortableWorkspaceItem
-                        key={ws.id}
-                        ws={ws}
-                        active={ws.id === activeId}
-                        barWidth={width}
-                        workspaceStatuses={workspaceStatuses}
-                        onSelect={onSelect}
-                        onClose={onClose}
-                        onRename={onRename}
-                        onOpenSettings={onOpenSettings}
-                        onSetStatus={onSetStatus}
-                        onRestoreFocus={onRestoreFocus}
-                      />
-                    ))}
-                  </SortableContext>
-                );
-              })()}
-            </div>
-          );
-        })}
+                      )}
+                      {(() => {
+                        if (isCollapsed) {
+                          const activeWs = group.items.find(
+                            (ws) => ws.id === activeId,
+                          );
+                          if (!activeWs) return null;
+                          return (
+                            <SortableContext
+                              items={[activeWs.id]}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              <SortableWorkspaceItem
+                                ws={activeWs}
+                                active={true}
+                                barWidth={width}
+                                workspaceGroups={workspaceGroups}
+                                onSelect={onSelect}
+                                onClose={onClose}
+                                onRename={onRename}
+                                onOpenSettings={onOpenSettings}
+                                onSetGroup={onSetGroup}
+                                onCreateGroup={onCreateGroup}
+                                onRestoreFocus={onRestoreFocus}
+                              />
+                            </SortableContext>
+                          );
+                        }
+                        return (
+                          <SortableContext
+                            items={group.items.map((w) => w.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {group.items.map((ws) => (
+                              <SortableWorkspaceItem
+                                key={ws.id}
+                                ws={ws}
+                                active={ws.id === activeId}
+                                barWidth={width}
+                                workspaceGroups={workspaceGroups}
+                                onSelect={onSelect}
+                                onClose={onClose}
+                                onRename={onRename}
+                                onOpenSettings={onOpenSettings}
+                                onSetGroup={onSetGroup}
+                                onCreateGroup={onCreateGroup}
+                                onRestoreFocus={onRestoreFocus}
+                              />
+                            ))}
+                          </SortableContext>
+                        );
+                      })()}
+                    </>
+                  )}
+                </SortableGroupBlock>
+              );
+            })}
 
-        {isDragging && (
-          <EmptyGroupDropTargets
-            workspaces={workspaces}
-            workspaceStatuses={workspaceStatuses}
-            compact={compact}
-          />
-        )}
-        </div>
+            {isDragging && (
+              <EmptyGroupDropTargets
+                workspaces={workspaces}
+                workspaceGroups={workspaceGroups}
+                compact={compact}
+              />
+            )}
+          </div>
+        </SortableContext>
 
         <DragOverlay dropAnimation={dropAnimation}>
-          {dragActiveWs ? (() => {
-            const displayColor = resolveWorkspaceColor(dragActiveWs.color, dragActiveWs.id);
-            return (
-              <div
-                className={cn(
-                  "flex items-center justify-center rounded-lg font-semibold opacity-90",
-                  compact ? "h-9 w-9 text-[11px]" : "h-9 px-2 text-[11px]",
-                )}
-                style={
-                  displayColor
-                    ? { backgroundColor: displayColor, color: "white" }
-                    : { backgroundColor: "var(--muted)", color: "var(--foreground)" }
-                }
-              >
-                {compact
-                  ? abbrev(dragActiveWs.title, dragActiveWs.kind)
-                  : <span className="max-w-full truncate text-center">{dragActiveWs.title || dragActiveWs.kind}</span>
-                }
-              </div>
-            );
-          })() : null}
+          {dragActiveWs
+            ? (() => {
+                const displayColor = resolveWorkspaceColor(
+                  dragActiveWs.color,
+                  dragActiveWs.id,
+                );
+                return (
+                  <div
+                    className={cn(
+                      "flex items-center justify-center rounded-lg font-semibold opacity-90",
+                      compact ? "h-9 w-9 text-[11px]" : "h-9 px-2 text-[11px]",
+                    )}
+                    style={
+                      displayColor
+                        ? {
+                            backgroundColor: chipColorOnWhite(displayColor),
+                            color: "#ffffff",
+                          }
+                        : {
+                            backgroundColor: "var(--muted)",
+                            color: "var(--foreground)",
+                          }
+                    }
+                  >
+                    {compact ? (
+                      abbrev(dragActiveWs.title, dragActiveWs.kind)
+                    ) : (
+                      <span className="max-w-full truncate text-center">
+                        {dragActiveWs.title || dragActiveWs.kind}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()
+            : null}
         </DragOverlay>
       </DndContext>
 
       <button
         type="button"
-        title="New workspace (Cmd+N)"
+        title={newWorkspaceTitle}
         onClick={onNew}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-border/60 text-lg text-muted-foreground transition-colors hover:border-border hover:text-foreground"
       >
@@ -663,7 +1013,10 @@ export function WorkspaceBar({
           const startWidth = width;
           e.currentTarget.setPointerCapture(e.pointerId);
           const onMove = (ev: PointerEvent) => {
-            const next = Math.min(220, Math.max(52, startWidth + (ev.clientX - startX)));
+            const next = Math.min(
+              220,
+              Math.max(52, startWidth + (ev.clientX - startX)),
+            );
             onWidthChange(next);
           };
           const onUp = () => {
@@ -673,8 +1026,7 @@ export function WorkspaceBar({
           document.addEventListener("pointermove", onMove);
           document.addEventListener("pointerup", onUp);
         }}
-      >
-      </div>
+      ></div>
     </nav>
   );
 }

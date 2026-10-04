@@ -1,7 +1,7 @@
 import type { ShortcutId } from "@/modules/shortcuts";
 import type { TerminalIcon } from "@hugeicons/core-free-icons";
 
-export type PaletteIcon = typeof TerminalIcon;
+type PaletteIcon = typeof TerminalIcon;
 
 export type PaletteItem = {
   id: string;
@@ -9,7 +9,6 @@ export type PaletteItem = {
   group: string;
   keywords?: string[];
   icon?: PaletteIcon;
-  iconUrl?: string;
   shortcutId?: ShortcutId;
   trailing?: string;
   disabledReason?: string;

@@ -1,13 +1,14 @@
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
+import { agentRestoreDisabled } from "./lib/agentRestore";
 import { tabIcon, tabTitle } from "./lib/tabTitle";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { subscribeToRunningCommands, getRunningCommandsSnapshot } from "./lib/terminalEphemeralStore";
-import { subscribe as subscribeOscTitles, getSnapshot as getOscTitlesSnapshot } from "@/modules/terminal/lib/oscTitleStore";
+import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
+import { subscribe as subscribeOscTitles, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
@@ -28,6 +29,7 @@ import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
+import { useTheme } from "@/modules/theme/ThemeProvider";
 import { tabFilePath } from "./lib/tabPath";
 
 type Props = {
@@ -46,10 +48,8 @@ type Props = {
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
-  onDetachAgent: (tabId: string) => void;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
-  onRenameFile?: (tabId: string, newName: string) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
@@ -74,7 +74,6 @@ function DraggableTab({
   onNewBrowser,
   onSplitBrowserRight,
   onSplitBrowserDown,
-  onDetachAgent,
   shortcutLabels,
   onRenameTab,
   onUpdateTab,
@@ -101,7 +100,6 @@ function DraggableTab({
   onNewBrowser: () => void;
   onSplitBrowserRight: () => void;
   onSplitBrowserDown: () => void;
-  onDetachAgent: (tabId: string) => void;
   shortcutLabels: Record<string, string | null>;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
@@ -127,24 +125,28 @@ function DraggableTab({
   const focusFilePath = tabFilePath(tab);
   const focusTarget =
     focusFilePath ?? (tab.kind === "terminal" ? (tab.cwd ?? null) : null);
-  const runningCommandMap = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
-  const runningCommand = tab.kind === "terminal" ? (runningCommandMap.get(tab.id) ?? null) : null;
-  const oscTitleMap = useSyncExternalStore(subscribeOscTitles, getOscTitlesSnapshot);
-  const oscTitle = tab.kind === "terminal" ? oscTitleMap.get(tab.id) : undefined;
+  const runningCommand = useSyncExternalStore(
+    subscribeToRunningCommands,
+    () => (tab.kind === "terminal" ? getRunningCommand(tab.id) : null),
+  );
+  const oscTitle = useSyncExternalStore(
+    subscribeOscTitles,
+    () => (tab.kind === "terminal" ? getOscTitle(tab.id) : undefined),
+  );
   const title = tabTitle(tab, runningCommand, oscTitle);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
-  const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const agentTabTitle = useAgentTabTitle(tab);
   const agentSession = agentTabTitle?.agentSession;
   const hasAgent = agentTabTitle?.hasAgent ?? false;
   const isRestoreError = agentSession?.restoreError ?? false;
 
+  const { resolvedMode } = useTheme();
   const tabColor = useMemo(() => {
     if (tab.kind !== "editor" || !gitStatusMap || !gitStatus) return null;
     const code = lookupGitStatus(gitStatusMap, gitStatus.repoRoot, tab.path);
-    return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode") : null;
-  }, [tab, gitStatusMap, gitStatus, gitColorScheme]);
+    return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode", resolvedMode) : null;
+  }, [tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode]);
 
   // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
   // Paths (cwd segments): truncate from the left so the deepest directory stays visible.
@@ -257,7 +259,15 @@ function DraggableTab({
             ? <span className="text-amber-500" title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>
                 <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />
               </span>
-            : <AgentIcon agent={agentSession!.agent} size={12} />
+            : agentRestoreDisabled(tab)
+              ? <span
+                  className="relative inline-flex"
+                  title="Won't be restored on restart (Run on start is off)"
+                >
+                  <AgentIcon agent={agentSession!.agent} size={12} />
+                  <span className="pointer-events-none absolute left-1/2 top-1/2 h-px w-[15px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-muted-foreground" />
+                </span>
+              : <AgentIcon agent={agentSession!.agent} size={12} />
           : tab.kind === "browser" && tab.floating
             ? <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
             : tabIcon(tab, workspaceId)}
@@ -267,13 +277,13 @@ function DraggableTab({
           "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
           !isDescription && tab.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
-          tab.kind === "editor" && tab.preview && "italic",
+          (tab.kind === "editor" || tab.kind === "git-diff" || tab.kind === "git-commit-file") && tab.preview && "italic",
         )}
         style={tabColor && !isRestoreError ? { color: tabColor } : undefined}
       >
         {displayTitle}
       </span>
-      {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && !editorAutoSave && (
+      {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
         <span className="shrink-0 text-[8px] text-primary">●</span>
       )}
       {hasAgent && (
@@ -400,7 +410,7 @@ function DraggableTab({
             <ContextMenuItem
               onSelect={() => onUpdateTab?.(tab.id, (p) => {
                 const newLocked = !isLocked;
-                return { ...p, locked: newLocked, ...(newLocked && p.kind === "editor" ? { preview: false } : {}) };
+                return { ...p, locked: newLocked, ...(newLocked && (p.kind === "editor" || p.kind === "git-diff" || p.kind === "git-commit-file") ? { preview: false } : {}) };
               })}
             >
               <HugeiconsIcon icon={isLocked ? SquareUnlock02Icon : LockKeyIcon} size={14} strokeWidth={2} />
@@ -427,15 +437,6 @@ function DraggableTab({
               <HugeiconsIcon icon={CancelSquareIcon} size={14} strokeWidth={2} />
               Close All Tabs
             </ContextMenuItem>
-            {hasAgent && (
-              <>
-                <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => onDetachAgent(tab.id)}>
-                  <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={2} />
-                  Detach Claude
-                </ContextMenuItem>
-              </>
-            )}
             <ContextMenuSeparator />
             <ContextMenuItem onSelect={onNewTerminal}>
               <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={2} />
@@ -505,21 +506,24 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onDetachAgent, onRenameTab, onUpdateTab, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
+export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const shortcutLabels: Record<string, string | null> = {
-    "tab.close":       getShortcutLabel("tab.close",       userShortcuts),
-    "tab.new":         getShortcutLabel("tab.new",         userShortcuts),
-    "pane.splitRight": getShortcutLabel("pane.splitRight", userShortcuts),
-    "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
-    "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
-    "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
-    "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
-    "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
-    "tab.toggleAutofocus": getShortcutLabel("tab.toggleAutofocus", userShortcuts),
-  };
+  const shortcutLabels: Record<string, string | null> = useMemo(
+    () => ({
+      "tab.close":       getShortcutLabel("tab.close",       userShortcuts),
+      "tab.new":         getShortcutLabel("tab.new",         userShortcuts),
+      "pane.splitRight": getShortcutLabel("pane.splitRight", userShortcuts),
+      "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
+      "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
+      "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
+      "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
+      "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
+      "tab.toggleAutofocus": getShortcutLabel("tab.toggleAutofocus", userShortcuts),
+    }),
+    [userShortcuts],
+  );
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -700,7 +704,6 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           onNewBrowser={onNewBrowser}
           onSplitBrowserRight={onSplitBrowserRight}
           onSplitBrowserDown={onSplitBrowserDown}
-          onDetachAgent={onDetachAgent}
           shortcutLabels={shortcutLabels}
           onRenameTab={onRenameTab}
           onUpdateTab={onUpdateTab}

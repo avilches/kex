@@ -7,7 +7,6 @@ import {
   parentRoot,
   resolveExplorerRoot,
   resolveSidebarTarget,
-  migrateExplorerRootMode,
 } from "./explorerRoot";
 
 describe("resolveExplorerRoot", () => {
@@ -156,10 +155,10 @@ describe("resolveSidebarTarget", () => {
 
   it("stays in workspace mode in a non-repo container workspace holding a nested repo", () => {
     const t = resolveSidebarTarget({
-      folder: "/Work/terax-ai/src/App.tsx",
+      folder: "/Work/kex/src/App.tsx",
       workspaceRoot: "/Work",
       workspaceGitRoot: null,
-      gitRoot: "/Work/terax-ai",
+      gitRoot: "/Work/kex",
       currentFsRoot: null,
       home,
     });
@@ -236,21 +235,5 @@ describe("resolveSidebarTarget", () => {
       home: null,
     });
     expect(t).toEqual({ mode: "filesystem", fsRoot: "/x/y" });
-  });
-});
-
-describe("migrateExplorerRootMode", () => {
-  it("maps removed modes to filesystem", () => {
-    expect(migrateExplorerRootMode("terminal")).toBe("filesystem");
-    expect(migrateExplorerRootMode("git")).toBe("filesystem");
-  });
-  it("keeps valid modes", () => {
-    expect(migrateExplorerRootMode("filesystem")).toBe("filesystem");
-    expect(migrateExplorerRootMode("workspace")).toBe("workspace");
-  });
-
-  it("returns undefined for missing/unknown", () => {
-    expect(migrateExplorerRootMode(undefined)).toBeUndefined();
-    expect(migrateExplorerRootMode("bogus")).toBeUndefined();
   });
 });

@@ -6,12 +6,19 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { normalizeError } from "@/lib/errors";
+import { splitPath } from "@/lib/pathUtils";
 import { cn } from "@/lib/utils";
 import {
   native,
   type GitCommitFileChange,
   type GitLogEntry,
 } from "@/lib/native";
+import {
+  gitStatusCategory,
+  type GitStatusCategory,
+  normalizeGitStatusCode,
+} from "@/modules/explorer/lib/gitStatusUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   Copy01Icon,
@@ -63,6 +70,7 @@ type CommitFileDiffOpenInput = {
   subject: string;
   path: string;
   originalPath: string | null;
+  pin: boolean;
 };
 
 export type GitHistorySearchHandle = {
@@ -83,27 +91,6 @@ type FilesEntry =
   | { state: "loading" }
   | { state: "loaded"; files: GitCommitFileChange[] }
   | { state: "error"; error: string };
-
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
-}
-
-function dirname(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index <= 0) return "";
-  return normalized.slice(0, index);
-}
-
-function normalizeError(error: unknown): string {
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-  }
-  return "Unknown error";
-}
 
 function absoluteTime(secs: number): string {
   if (!secs) return "";
@@ -158,20 +145,18 @@ function compactDate(secs: number): string {
   return `${month} ${day} ${d.getFullYear()}`;
 }
 
+const STATUS_TONE_BY_CATEGORY: Partial<Record<GitStatusCategory, string>> = {
+  added: "text-emerald-600 dark:text-emerald-400",
+  modified: "text-amber-600 dark:text-amber-300",
+  deleted: "text-rose-600 dark:text-rose-400",
+  renamed: "text-sky-600 dark:text-sky-300",
+};
+
+// Commit diffs never carry an "untracked" status, so that category (and any
+// unrecognized code) falls back to the same muted tone as before.
 function statusTone(code: string): string {
-  switch (code.toUpperCase()) {
-    case "A":
-      return "text-emerald-600 dark:text-emerald-400";
-    case "M":
-      return "text-amber-600 dark:text-amber-300";
-    case "D":
-      return "text-rose-600 dark:text-rose-400";
-    case "R":
-    case "C":
-      return "text-sky-600 dark:text-sky-300";
-    default:
-      return "text-muted-foreground";
-  }
+  const category = gitStatusCategory(code);
+  return (category && STATUS_TONE_BY_CATEGORY[category]) || "text-muted-foreground";
 }
 
 function highlight(text: string, query: string): ReactNode {
@@ -482,7 +467,7 @@ export function GitHistoryPane({
   }, [openAnchor, filesTick]);
 
   const handleFileOpen = useCallback(
-    (commit: GitLogEntry, file: GitCommitFileChange) => {
+    (commit: GitLogEntry, file: GitCommitFileChange, pin: boolean) => {
       onOpenCommitFile({
         repoRoot,
         sha: commit.sha,
@@ -490,6 +475,7 @@ export function GitHistoryPane({
         subject: commit.subject,
         path: file.path,
         originalPath: file.originalPath,
+        pin,
       });
       setOpenAnchor(null);
     },
@@ -787,7 +773,7 @@ const CommitRow = memo(function CommitRow({
         {totalStat > 0 ? (
           <span className="inline-flex items-center gap-1">
             {commit.insertions > 0 ? (
-              <span className="font-semibold text-emerald-600/85 dark:text-emerald-400/85">
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400/85">
                 +{commit.insertions}
               </span>
             ) : null}
@@ -813,6 +799,7 @@ type CommitDetailProps = {
   onOpenFile: (
     commit: GitLogEntry,
     file: GitCommitFileChange,
+    pin: boolean,
   ) => Promise<void> | void;
   onRetryFiles: () => void;
 };
@@ -916,6 +903,7 @@ function CommitFiles({
   onOpenFile: (
     commit: GitLogEntry,
     file: GitCommitFileChange,
+    pin: boolean,
   ) => Promise<void> | void;
   onRetry: () => void;
 }) {
@@ -963,7 +951,7 @@ function CommitFiles({
             <li key={file.path}>
               <FileRow
                 file={file}
-                onOpen={() => void onOpenFile(commit, file)}
+                onOpen={(pin) => void onOpenFile(commit, file, pin)}
               />
             </li>
           ))}
@@ -978,15 +966,15 @@ const FileRow = memo(function FileRow({
   onOpen,
 }: {
   file: GitCommitFileChange;
-  onOpen: () => void;
+  onOpen: (pin: boolean) => void;
 }) {
-  const fileName = basename(file.path);
-  const dir = dirname(file.path);
+  const [dir, fileName] = splitPath(file.path);
   const iconUrl = fileIconUrl(fileName);
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={() => onOpen(false)}
+      onDoubleClick={() => onOpen(true)}
       className="group flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left transition-colors hover:bg-accent/40"
     >
       {iconUrl ? (
@@ -1029,7 +1017,7 @@ const FileRow = memo(function FileRow({
         )}
         title={file.statusLabel}
       >
-        {file.status.toUpperCase()}
+        {normalizeGitStatusCode(file.status)}
       </span>
     </button>
   );

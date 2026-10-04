@@ -3,8 +3,8 @@ import { findTabPane, focusedTabId } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
 import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
+import { useTauriListen } from "@/lib/useTauriListen";
 import { routeAgentNotification } from "../lib/route";
 import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
@@ -207,44 +207,16 @@ export function AgentNotificationsBridge({
     if (tabId) useAgentStore.getState().markTabSeen(tabId);
   }, [workspaces, activeWorkspaceId, focused]);
 
-  useEffect(() => {
-    let alive = true;
-    let unlisten: (() => void) | undefined;
-    listen<AgentSignal>("kex:agent-signal", (e) =>
-      handleSignal(e.payload, ctxRef.current),
-    )
-      .then((u) => {
-        if (alive) unlisten = u;
-        else u();
-      })
-      .catch((e) => console.error("[kex:agent] listen failed:", e));
-    return () => {
-      alive = false;
-      unlisten?.();
-    };
-  }, []);
+  useTauriListen<AgentSignal>("kex:agent-signal", (e) =>
+    handleSignal(e.payload, ctxRef.current),
+  );
 
-  useEffect(() => {
-    let alive = true;
-    let unlisten: (() => void) | undefined;
-    listen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) => {
-      const { tabId, sessionId, cwdLaunch, sessionTitle, model, transcriptPath } = e.payload;
-      useAgentStore
-        .getState()
-        .setMeta(tabId, { sessionId, cwdLaunch, sessionTitle, model, transcriptPath: transcriptPath || undefined });
-    })
-      .then((u) => {
-        if (alive) unlisten = u;
-        else u();
-      })
-      .catch((e) =>
-        console.error("[kex:agent] listen session-meta failed:", e),
-      );
-    return () => {
-      alive = false;
-      unlisten?.();
-    };
-  }, []);
+  useTauriListen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) => {
+    const { tabId, sessionId, cwdLaunch, sessionTitle, model, transcriptPath } = e.payload;
+    useAgentStore
+      .getState()
+      .setMeta(tabId, { sessionId, cwdLaunch, sessionTitle, model, transcriptPath: transcriptPath || undefined });
+  });
 
   return null;
 }

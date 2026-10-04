@@ -9,7 +9,7 @@ export type NoteItem = {
   created: number;
 };
 
-export type SubfolderItem = {
+type SubfolderItem = {
   name: string;
   noteCount: number;
   hasSubfolders: boolean;

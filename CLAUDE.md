@@ -32,9 +32,7 @@ Cada concepto tiene UN solo nombre canonico. Si el usuario se refiere a algo con
 | **Workspace** | Entorno de trabajo completo (un icono del WorkspaceBar), contiene un arbol de panes. ID `ws-`                               | `modules/workspaces/lib/types.ts`, `useWorkspaces.ts` |                                                                                                       |
 | **Pane** | Celda del split dentro de un workspace (arbol binario `paneTree`); contiene una tira de tabs. ID `pane-`                    | `splitNode.ts`, `PaneView.tsx` | "panel", "split", "tab set", "listado de tabs"                                                        |
 | **Tab** | Pestana dentro de un pane (terminal/editor/browser/markdown/git-diff...). ID `tab-`                                         | `types.ts` (union `Tab` por `kind`), `TabContent.tsx`, `PaneTabBar.tsx` | "pestana"                                                                                             |
-| **RichMarkdownEditor** | Editor WYSIWYG de markdown (TipTap 3) que monta el tab `markdown` por defecto; toggle Rich/Source, toolbar, outline, slash commands. El motor de un tab es el campo `markdownEngine` (`tiptap` \| `milkdown` \| `legacy`), con Settings > Editor eligiendo el default (`tiptap`) | `src/modules/markdown/tiptap/` (shell `MarkdownTab.tsx`, editor `RichMarkdownEditor.tsx`); core puro en `src/modules/markdown/lib/` | "editor rico", "editor de markdown", "el WYSIWYG", "editor de notas" |
-| **MilkdownTab / MilkdownEditor** | Segundo editor WYSIWYG de markdown, en evaluacion, sobre `@milkdown/crepe` (`markdownEngine: "milkdown"`). Mismo shell de Rich/Source y outline que TipTap; sin mermaid (el plugin de diagramas no dibuja nada, ver `docs/FORK.md`) y sin resolucion de imagenes locales (`proxyDomURL` de `Feature.ImageBlock` de Crepe, el mismo rol que `resolveImageSrc` en TipTap, no esta cableado en esta integracion; arreglo sencillo, no un hueco de fondo del motor; gap sin verificar en una app real, ver `docs/MILKDOWN_CHECKLIST.md`) | `src/modules/markdown/milkdown/` (shell `MilkdownTab.tsx`, editor `MilkdownEditor.tsx`, outline en `outline.ts` + `OutlinePanel.tsx`) | "el milkdown", "el otro editor", "crepe", "el editor nuevo de markdown" |
-| **MarkdownRenderPane** | El unico switch de render de solo lectura para markdown: recibe `engine` y monta el preview legacy (Streamdown), TipTap o Milkdown en modo no editable. Lo usa el preview overlay/split de un tab `editor` sobre un `.md`, no los tabs `markdown` en vivo (esos montan su propio editor editable directamente) | `src/modules/markdown/MarkdownRenderPane.tsx` | "el render pane", "el preview de markdown", "el switch de renderer" |
+| **Live Preview** | Unico motor de markdown. Editor construido directamente sobre CodeMirror 6 con decoraciones Obsidian-style (los marcadores de sintaxis se ocultan en todas las lineas salvo en la activa, donde se muestran en crudo para editarlos; las tablas GFM se ven como tabla HTML mientras el cursor no este dentro); nunca parsea a AST. Tiene tres modos en el path bar (Source, Rich y Preview; Source y Rich comparten la misma vista de CodeMirror, Preview monta `MarkdownPreviewPane` de solo lectura) y un panel Outline, sin toolbar | `src/modules/markdown/codemirror/` (shell `MarkdownTab.tsx`, editor `CodeMirrorEditor.tsx`); piezas puras compartidas en `src/modules/markdown/lib/` | "live preview", "el editor de markdown", "el editor de notas", "el editor de codemirror", "el WYSIWYG" |
 | **Scratchpad** | Barra de entrada inline acoplada a la parte inferior de un Tab de terminal, para escribir/enviar texto sin usar el terminal directamente. Estado binario unico `scratchpadOpen`: existe si y solo si tiene foco real (no hay estado "abierto pero sin foco"); cualquier perdida de foco (clic en terminal, cambio de tab/workspace, Escape, Cmd+U) lo cierra. Visibilidad derivada: `scratchpadOpen && tab enfocada`. Ver `docs/SCRATCHPAD.md` (referencia canonica: modelo, todos los caminos de foco/cierre, invariante `requestLeafFocus`) | `src/modules/terminal/ScratchpadBar.tsx`; estado y acciones (`toggleScratchpad`, `closeScratchpad`, `leaveLeafScratchpad`) en `modules/terminal/lib/useTerminalSession.ts`; montado desde `TerminalPane.tsx` | "scratchpad", "SP", "input del tab", "textarea", "entrada del tab", "barra del scratchpad", "caja de texto del terminal", "el componente del scratchpad" |
 | **Script** | Comando guardado y ejecutable de un workspace. Campos: `id`, `name`, `command`, `cwd?`, `tabId?`. Se configuran en `WorkspaceSettingsDialog` (pestana "Scripts"). Se persisten en `{app_data_dir}/workspaces/<id>.json` como campos `scripts: Script[]` y `activeScript: string` del objeto Workspace. | `src/modules/workspaces/lib/types.ts` (tipo `Script`); dialog en `src/app/components/WorkspaceSettingsDialog.tsx` | "comando", "script", "run config", "configuracion de run", "script del workspace" |
 | **RunButton** | Split-button en el Header para ejecutar el script activo. Parte izquierda: ejecuta/detiene el script seleccionado. Parte derecha (chevron): dropdown para seleccionar entre los scripts configurados en el workspace y acceder a "Configure Scripts". | `src/app/components/RunButton.tsx` | "selector de scripts", "combo de scripts", "menu de run", "el run", "dropdown de scripts", "boton run con flecha", "selector combo de scripts" |
@@ -67,7 +65,7 @@ Cada concepto tiene UN solo nombre canonico. Si el usuario se refiere a algo con
 
 Antes de empezar la Fase 1 (root cause investigation) de `systematic-debugging` en cualquier bug o
 comportamiento inesperado, `grep -il` por palabras clave del sintoma en `docs/*_GOTCHAS.md` (hoy:
-`docs/WORKSPACES_GOTCHAS.md` y `docs/MARKDOWN_GOTCHAS.md`). Si hay una entrada relacionada, leerla entera antes de investigar
+`docs/WORKSPACES_GOTCHAS.md`). Si hay una entrada relacionada, leerla entera antes de investigar
 nada mas: puede ahorrar horas de re-descubrir una causa raiz ya documentada, o evitar repetir un
 intento que ya fallo alli. No basta con saber que el fichero existe: hay que grepearlo activamente
 como primer paso, no confiar en recordarlo.
@@ -76,6 +74,111 @@ Si la investigacion de un bug requiere mas de un intento o mas de una ronda de e
 dar con la causa raiz, anadir una entrada nueva al GOTCHAS del subsistema correspondiente (crear uno
 si no existe, siguiendo el formato de `WORKSPACES_GOTCHAS.md`: Sintoma, pistas falsas descartadas,
 causa raiz, fix, leccion) antes de dar la tarea por terminada.
+
+### Cambios de theme: verificar siempre en la pagina de preview
+
+Cualquier peticion sobre themes (cambiar un color, ajustar contraste, anadir un theme nuevo, tocar
+`inactivePaneDim`, los colores de git o del terminal) se hace y se comprueba en la pagina
+`theme-preview.html`, no arrancando la app ni con capturas de pantalla:
+
+1. Arrancar `pnpm dev` (en un worktree, con `--port <libre>` si el 1420 esta ocupado) y abrir
+   `http://localhost:<puerto>/theme-preview.html?theme=<id>&mode=light|dark&view=swatches|app`.
+   `view=swatches` lista cada superficie y cada token con su hex; `view=app` monta una
+   aproximacion de la aplicacion (WorkspaceBar, Sidebar, Header, terminal y editor) dos veces,
+   con el foco en cada panel. Ambas vistas son estaticas: todos los estados (con foco y sin foco)
+   estan a la vez en pantalla, sin hacer clic en nada.
+2. Editar `src/modules/theme/themes/*.ts`; Vite recarga la pagina solo. Leer el resultado con
+   `window.kexThemePreview.dump()` (hex de todos los tokens y de los colores de git) o con los
+   atributos `data-hex`, nunca con una captura: Dark Reader falsea los colores en Chrome.
+3. Comprobar siempre los DOS modos (light y dark) y, si el cambio afecta al terminal o al editor,
+   tambien el estado con foco y sin foco (`inactivePaneDim`).
+4. Un theme nuevo debe verse bien en la pagina antes de darlo por terminado.
+
+**Mantener la pagina al dia:** si se anade o cambia un componente o un estilo que use colores de
+tema (una superficie nueva, un token nuevo en `ThemeColors`/`applyTheme.ts`, un estado nuevo como
+otro chip de agente), hay que reflejarlo en `src/theme-preview/main.ts` en el mismo commit: la
+lista `TOKENS`, la superficie correspondiente y la vista `app`. Las superficies de la pagina son
+aproximaciones que copian las clases de los componentes reales, asi que no se actualizan solas.
+Detalle de uso en `docs/BUILD.md`, seccion "Theme preview page".
+
+### Añadir o cambiar una paleta (tema) sin romperla
+
+Un tema vive en `src/modules/theme/themes/<id>.ts` y se registra en `themes/index.ts`. Estas son las
+reglas que salieron de TASK-774, TASK-775 y TASK-777; saltarse cualquiera reproduce un fallo que ya
+se pagó una vez.
+
+**1. La paleta original se respeta; los colores atenuados son nuestros.**
+- Los valores de la paleta oficial (fondo, texto, colores de acento, los 16 ANSI, el fondo de
+  editor y de terminal si el original los distingue) se copian tal cual, sin retocarlos "porque
+  quedan mejor". `withReadableText` (`readableColors.ts`) solo sube el contraste, al aplicar el tema
+  y solo en los temas incluidos, de los tokens de texto tenue (`mutedForeground`,
+  `primaryForeground`, `sidebarPrimaryForeground`), hasta 4.5:1 y conservando el tono.
+- Los tokens que la paleta original no define (`muted`, `secondary`, `accent`, `border`, `input`,
+  `ring`, `card`, `popover`, `sidebar*`) los derivamos nosotros mezclando su fondo y su texto, y se
+  eligen mirando `theme-preview.html` (vistas `swatches` y `app`), no a ojo en el código: el texto de
+  cada superficie debe leerse, el borde debe verse sobre su fondo y un chip sin seleccionar debe
+  distinguirse del fondo. Se ajustan hasta que la preview lo confirme, en los DOS modos.
+- Para el texto de un color con fondo variable (chips de workspace, botones) no se pone blanco ni
+  negro a mano: `chipColorOnWhite` en `modules/workspaces/lib/workspaceColor.ts` (texto siempre blanco, y el color del fondo se oscurece lo justo para llegar a 4.5).
+
+**2. Fondo del terminal y del editor: se eligen a propósito, no se heredan por accidente.**
+- `colors.background` es el fondo de la interfaz. El fondo del terminal es `terminal.background` y el
+  del editor es `editor.background` (ambos por variante). Si la paleta original usa el mismo color que
+  la interfaz se pueden omitir; si usa otro (JetBrains: panel `#3c3f41`, editor y terminal
+  `#2b2b2b`), hay que ponerlos, porque si no el editor y el terminal salen con el gris de la interfaz.
+- Con el tema de editor en Auto el editor usa `editor.background` (o `background` si falta). El
+  fondo del editor y el del tema de CodeMirror emparejado en `editorTheme` deben coincidir: se
+  comprueba con `kexThemePreview.dump()` (`editor-background`) contra el fondo del tema CM.
+- Con un tema de editor concreto, el editor toma el fondo y el texto de ese tema CM (los lee
+  `editor/lib/editorThemeSurface.ts`), no los del tema de app.
+- Un terminal en Auto usa la paleta del tema de app. Con una paleta elegida a mano, la paleta
+  prestada rellena lo que no define (fondo, texto, cursor, selección) con los colores de SU tema, nunca
+  con los del tema activo (`resolveTerminalPalette`). Un tema nuevo no necesita repetir esos valores.
+- Una superficie de editor o de terminal que pinta un componente nuevo usa `--editor-background` /
+  `--editor-foreground` / `--terminal-background`; nunca `bg-background` ni un `transparent
+  !important`. Hoy las usan: CodeMirror del código (`editor/lib/extensions.ts`), markdown en Source y
+  Rich (`markdownExtensions.ts`, ojo: el modo Rich añade una segunda regla con `Prec.high` que
+  también hay que tocar), `MarkdownPreviewPane`, `EditorPathBar`, `TerminalPathBar` y el contenedor
+  de `TerminalPane` (sin esto asoman franjas del color de la interfaz en los bordes del xterm).
+
+**3. NUNCA un tema sin sus dos modos, oscuro y claro.** Ni en `colors` ni en `editorTheme`. Un tema sin
+variante para un modo cae en silencio a la otra (`variants[mode] ?? dark ?? light`), y eso es un fallo,
+no un atajo. Si la paleta original solo existe en un modo, hay dos salidas y solo dos: buscar en
+internet la versión oficial del otro modo (Kanagawa Dragon tiene la suya en Lotus) o crearla nosotros
+a partir de la paleta original, con las reglas 1 y 2. Si la versión del otro modo ya existe como tema
+de la misma familia se reutiliza importándola, sin copiar valores (`light: kanagawa.variants.light`) y
+se empareja `editorTheme.light`. `themes/themes.test.ts` falla si un tema incluido no cumple esto.
+- **En Auto, editor y terminal siguen el modo del tema.** Cada tema incluido define en cada modo su
+  propia paleta de terminal (16 colores ANSI más fondo, texto, cursor y selección) con un fondo de la
+  misma luminosidad que el modo, y empareja un tema de editor del mismo modo (`EDITOR_THEME_MODE`). Si el
+  original no trae uno, se crea (Kex Default tiene el suyo en claro y en oscuro). `themes/themes.test.ts`
+  falla si un tema no lo cumple. Un terminal oscuro sobre un tema claro solo es válido si el usuario lo
+  elige a mano; `paletteOf` (`resolveTerminalPalette`) conserva ese recurso de prestar la paleta del otro
+  modo para los temas propios del usuario, que sí pueden traer un solo modo.
+- **Terminal claro y programas hechos para fondo oscuro:** los programas pintan blanco o amarillo claro,
+  que desaparece sobre un fondo claro. No se arregla retocando la paleta: xterm sube el contraste solo
+  en modo claro (`minimumContrastRatio` 4.5, `minimumContrastRatioFor`); en oscuro se queda en 1 para
+  no alterar los colores del tema. Al probar un tema claro se mira un diff o la salida de un programa
+  con colores claros, no solo el prompt.
+
+**4. Un tema de editor nuevo (CodeMirror)** se da de alta en `EDITOR_THEMES`, `EDITOR_THEME_MODE` y
+`EDITOR_THEME_LABELS` (`settings/store.ts`) y en `EDITOR_THEME_EXT` (`editor/lib/themes.ts`), y el
+tema de app lo empareja en `editorTheme: { dark, light }`.
+
+**5. Al probar, comprobar antes el estado.**
+- `terminalTheme` y `editorTheme` en `settings-general.json` (`user-data/support-dev/`): una paleta
+  elegida a mano gana siempre sobre el tema de app, así que "el terminal no cambia" casi siempre es un
+  valor distinto de `auto`. Se prueba con las dos preferencias en Auto.
+- La Kex instalada (`/Applications/Kex.app`) no lleva los cambios de una rama: se prueba con
+  `pnpm tauri dev` desde el worktree, y si el puerto 1420 está ocupado se cambian `beforeDevCommand` y
+  `devUrl` en `src-tauri/tauri.conf.json` y se revierte antes del commit.
+- Se mira siempre el editor de código, el markdown en Source, Rich y Preview, el terminal, las
+  muestras de Settings (Editor theme y Terminal theme) y las barras de ruta, en dark y en light.
+
+**6. Tests que lo fijan:** `resolveTerminalTheme.test.ts` (paleta prestada y sus valores por defecto),
+`resolveEditorSurface.test.ts` (fondo del editor en Auto y con tema concreto), `resolveEditorTheme.test.ts`
+y `validateTheme.test.ts`. Un cambio en cómo se resuelve un color de terminal o de editor añade su caso
+ahí antes de tocar el código.
 
 ### Sin compatibilidad hacia atras
 
@@ -198,7 +301,6 @@ carpeta y sin forma de rehacerla.
 
 - `docs/ARCHITECTURE.md` + `docs/IPC.md` + `docs/BUILD.md` — referencia principal (ver AGENTS.md para politica de actualizacion)
 - `docs/WORKSPACES.md` + `docs/WORKSPACES_GOTCHAS.md` — subsistema de workspaces y pool de terminales
-- `docs/MARKDOWN_GOTCHAS.md`: las tres capas del guardado de markdown y los bugs de fidelidad ya diagnosticados
 - `docs/AGENT_SESSION_RESTORE.md` — hooks, store JSON, algoritmo de restore, UI del tab, casos de error
 - `docs/RESTORE_SESSION_TESTS.md` — plan de pruebas manuales con checklist de diagnostico
 - `docs/FORK.md` — divergencias y roadmap respecto al upstream
@@ -207,6 +309,12 @@ carpeta y sin forma de rehacerla.
 ### Fix WebGL GPU al arrancar
 
 Bug resuelto (2026-06-11, documentado en `docs/WORKSPACES_GPU.md`). Fix: `setTimeout(retryMissingWebgl, 350)` en `main.tsx` tras `showWindow` a t=50ms. Los rAFs de `scheduleUnhide` se encolan mientras la ventana esta oculta. No anadir mas retries en `rendererPool.ts` sin pasar por `main.tsx`.
+
+### Cache de buffer sin guardar indexado por tabId, no por ruta
+
+`useDocument.ts` (`unflushedBuffers`) preserva el buffer sucio de un tab al desmontarse (arrastrar a otro panel) para recuperarlo si la misma ruta se vuelve a montar. Estaba indexado por `path`, asi que el mismo fichero abierto en dos tabs a la vez (dos workspaces, o dos panes) hacia que el desmontaje de uno pisase o adoptase el cache del otro. Ahora la clave es `tabId` (estable por tab, unico incluso para el mismo fichero); `EditorPane` y `useDocument` reciben `tabId` como prop/opcion ademas de `path`. Ver AC8 de task-765.
+
+La maquina de estados de conflicto de recarga (flag `conflict` + `keepLocalChanges`) y el temporizador de auto-save viven en `useConflictFlag`/`useAutoSaveTimer` en `src/modules/editor/lib/`, junto a `useDocument`.
 
 <!-- BACKLOG.MD GUIDELINES START -->
 <!-- backlog.md-instructions-version: 1.50.1 -->

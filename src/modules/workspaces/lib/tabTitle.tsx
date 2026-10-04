@@ -8,12 +8,12 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { IconSvgElement } from "@hugeicons/react";
 import type { ReactNode } from "react";
+import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import type { Tab } from "./types";
 
 export function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] ?? path;
+  return pathBasename(path, { tolerateTrailingSlash: true });
 }
 
 export function tabTitle(tab: Tab, runningCommand?: string | null, oscTitle?: string): string {
