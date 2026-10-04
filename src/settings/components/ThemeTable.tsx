@@ -182,51 +182,39 @@ export function ThemeTable({
 
   const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
 
-  const toggleEditorAuto = (auto: boolean) => {
+  const allAuto = editorAuto && terminalAuto;
+
+  const toggleAuto = (auto: boolean) => {
     if (auto) {
       if (!editorAuto) setLastEditor(editorPref);
-      void setEditorTheme(EDITOR_THEME_AUTO);
-    } else {
-      const back = lastEditor && isEditorThemeId(lastEditor) ? lastEditor : activeEditorId;
-      void setEditorTheme(back);
-    }
-  };
-  const toggleTerminalAuto = (auto: boolean) => {
-    if (auto) {
       if (!terminalAuto) setLastTerminal(terminalPref);
+      void setEditorTheme(EDITOR_THEME_AUTO);
       void setTerminalTheme(TERMINAL_THEME_AUTO);
-    } else {
-      const back = lastTerminal && themes.some((t) => t.id === lastTerminal) ? lastTerminal : themeId;
-      void setTerminalTheme(back);
+      return;
     }
+    const backEditor = lastEditor && isEditorThemeId(lastEditor) ? lastEditor : activeEditorId;
+    const backTerminal =
+      lastTerminal && themes.some((t) => t.id === lastTerminal) ? lastTerminal : themeId;
+    void setEditorTheme(backEditor);
+    void setTerminalTheme(backTerminal);
   };
 
   return (
     <div className="flex flex-col gap-2.5">
       <div className={cn(COLUMNS, "items-center px-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground")}>
-        <span className="px-2">Theme</span>
         <div className="flex items-center justify-between px-2">
-          <span>Editor</span>
+          <span>Theme</span>
           <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
             <Checkbox
-              id="editor-auto"
-              checked={editorAuto}
-              onCheckedChange={(v) => toggleEditorAuto(v === true)}
+              id="theme-auto"
+              checked={allAuto}
+              onCheckedChange={(v) => toggleAuto(v === true)}
             />
             Auto
           </label>
         </div>
-        <div className="flex items-center justify-between px-2">
-          <span>Terminal</span>
-          <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
-            <Checkbox
-              id="terminal-auto"
-              checked={terminalAuto}
-              onCheckedChange={(v) => toggleTerminalAuto(v === true)}
-            />
-            Auto
-          </label>
-        </div>
+        <span className="px-2">Editor</span>
+        <span className="px-2">Terminal</span>
       </div>
 
       <div className={COLUMNS}>
@@ -303,7 +291,7 @@ export function ThemeTable({
                 info={info.editor}
                 selected={editorSel}
                 frameClass={frame(editorSel, themeSel, terminalSel)}
-                locked={editorAuto}
+                locked={allAuto}
                 onPick={() => {
                   setLastEditor(editorId);
                   void setEditorTheme(editorId);
@@ -314,7 +302,7 @@ export function ThemeTable({
                 info={info.terminal}
                 selected={terminalSel}
                 frameClass={frame(terminalSel, editorSel, false)}
-                locked={terminalAuto}
+                locked={allAuto}
                 onPick={() => {
                   setLastTerminal(t.id);
                   void setTerminalTheme(t.id);
@@ -338,7 +326,7 @@ export function ThemeTable({
                 info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
                 selected={sel}
                 frameClass={frame(sel, false, false)}
-                locked={editorAuto}
+                locked={allAuto}
                 onPick={() => {
                   setLastEditor(id);
                   void setEditorTheme(id);
