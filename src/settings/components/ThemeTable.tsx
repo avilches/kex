@@ -396,7 +396,13 @@ export function ThemeTable({
                     ? {
                         shown: r.editorMode,
                         flipped: r.editorMode !== mode,
-                        onToggle: () => toggleFlipped(`e:${t.id}`),
+                        onToggle: () => {
+                          toggleFlipped(`e:${t.id}`);
+                          if (!editorSel) return;
+                          const next = otherMode(r.editorMode);
+                          setPickedEditorRow(t.id);
+                          void setEditorTheme(resolveEditorThemeId("auto", t.id, themes, next));
+                        },
                       }
                     : undefined
                 }
@@ -414,7 +420,14 @@ export function ThemeTable({
                     ? {
                         shown: r.terminalMode,
                         flipped: r.terminalMode !== mode,
-                        onToggle: () => toggleFlipped(`t:${t.id}`),
+                        onToggle: () => {
+                          toggleFlipped(`t:${t.id}`);
+                          if (!terminalSel) return;
+                          const next = otherMode(r.terminalMode);
+                          void setTerminalTheme(
+                            formatTerminalPref(t.id, next === mode ? undefined : next),
+                          );
+                        },
                       }
                     : undefined
                 }
