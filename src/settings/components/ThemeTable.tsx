@@ -24,6 +24,7 @@ import {
   unpairedEditorThemes,
   type SurfaceInfo,
 } from "@/modules/theme/themeSurfaceInfo";
+import { listTerminalOnlyThemes } from "@/modules/theme/themes";
 import type { Theme, ThemeMode } from "@/modules/theme/types";
 import { Edit02Icon, Moon02Icon, Sun03Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -292,6 +293,8 @@ export function ThemeTable({
   );
 
   const extraEditors = useMemo(() => unpairedEditorThemes(themes), [themes]);
+  const terminalOnly = useMemo(listTerminalOnlyThemes, []);
+  const terminalCatalog = useMemo(() => [...themes, ...terminalOnly], [themes, terminalOnly]);
 
   const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
 
@@ -310,7 +313,7 @@ export function ThemeTable({
     if (themeAuto) followAppTheme();
   };
 
-  const terminalPreviewName = themes.find(
+  const terminalPreviewName = terminalCatalog.find(
     (t) => t.id === (pinnedTerminal ? pinnedTerminal.id : themeId),
   )?.name;
 
@@ -357,7 +360,7 @@ export function ThemeTable({
           </span>
           <div className={PREVIEW_BOX}>
             <TerminalThemePreview
-              palette={resolveTerminalPalette(terminalPref, activeTheme, themes, mode)}
+              palette={resolveTerminalPalette(terminalPref, activeTheme, terminalCatalog, mode)}
             />
           </div>
         </div>
@@ -470,6 +473,41 @@ export function ThemeTable({
                 preview={<EditorPeek id={id} app={activeTheme} mode={mode} />}
               />
               <span />
+            </div>
+          );
+        })}
+        {terminalOnly.length > 0 ? (
+          <div className="px-2 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Terminal only
+          </div>
+        ) : null}
+        {terminalOnly.map((t) => {
+          const sel = pinnedTerminal?.id === t.id;
+          const shown = sel ? (pinnedTerminal.mode ?? mode) : mode;
+          return (
+            <div key={t.id} className={cn(COLUMNS, "relative items-stretch")}>
+              <SelectionOutline selected={[false, false, sel]} />
+              <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
+              <span />
+              <Cell
+                info={{ label: t.name, sharedWith: [] }}
+                onPick={() => {
+                  void setTerminalTheme(formatTerminalPref(t.id, shown === mode ? undefined : shown));
+                }}
+                preview={<TerminalThemePreview palette={paletteOf(t, shown)} />}
+                modeToggle={
+                  sel
+                    ? {
+                        shown,
+                        flipped: shown !== mode,
+                        onToggle: () => {
+                          const next = otherMode(shown);
+                          void setTerminalTheme(formatTerminalPref(t.id, next === mode ? undefined : next));
+                        },
+                      }
+                    : undefined
+                }
+              />
             </div>
           );
         })}
