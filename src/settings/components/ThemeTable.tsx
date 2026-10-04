@@ -41,8 +41,6 @@ const FIRST_COLUMN = "170px";
 const ICON_BUTTON =
   "flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-muted hover:text-foreground";
 
-const NO_VIEWS: Record<string, ThemeMode> = {};
-
 const otherMode = (mode: ThemeMode): ThemeMode => (mode === "dark" ? "light" : "dark");
 
 function columnLeft(i: number) {
@@ -236,17 +234,6 @@ export function ThemeTable({
   const pinnedTerminal = terminalAuto ? undefined : parseTerminalPref(terminalPref);
 
   const [pickedEditorRow, setPickedEditorRow] = useState<string | null>(null);
-  const [views, setViews] = useState<{ mode: ThemeMode; map: Record<string, ThemeMode> }>({
-    mode,
-    map: {},
-  });
-  const viewMap = views.mode === mode ? views.map : NO_VIEWS;
-  const setView = (key: string, shown: ThemeMode) =>
-    setViews((prev) => ({
-      mode,
-      map: { ...(prev.mode === mode ? prev.map : NO_VIEWS), [key]: shown },
-    }));
-
   const base = useMemo(
     () =>
       themes.map((t) => ({
@@ -283,12 +270,12 @@ export function ThemeTable({
             ? editorAuto || b.editorIds[mode] === editorPref
               ? mode
               : otherMode(mode)
-            : (viewMap[`e:${t.id}`] ?? mode);
+            : mode;
         const terminalMode = !b.modes.terminal
           ? mode
           : terminalSel
             ? (pinnedTerminal?.mode ?? mode)
-            : (viewMap[`t:${t.id}`] ?? mode);
+            : mode;
         return {
           theme: t,
           modes: b.modes,
@@ -301,7 +288,7 @@ export function ThemeTable({
           terminalInfo: themeSurfaceInfo(t, themes, terminalMode).terminal,
         };
       }),
-    [base, themes, mode, editorRowId, terminalRowId, editorAuto, editorPref, pinnedTerminal?.mode, viewMap],
+    [base, themes, mode, editorRowId, terminalRowId, editorAuto, editorPref, pinnedTerminal?.mode],
   );
 
   const extraEditors = useMemo(() => unpairedEditorThemes(themes), [themes]);
@@ -425,13 +412,12 @@ export function ThemeTable({
                 }}
                 preview={<EditorPeek id={r.editorId} app={t} mode={r.editorMode} />}
                 modeToggle={
-                  r.modes.editor
+                  r.modes.editor && editorSel
                     ? {
                         shown: r.editorMode,
                         flipped: r.editorMode !== mode,
                         onToggle: () => {
                           const next = otherMode(r.editorMode);
-                          if (!editorSel) return setView(`e:${t.id}`, next);
                           setPickedEditorRow(t.id);
                           void setEditorTheme(resolveEditorThemeId("auto", t.id, themes, next));
                         },
@@ -448,13 +434,12 @@ export function ThemeTable({
                 }}
                 preview={<TerminalThemePreview palette={paletteOf(t, r.terminalMode)} />}
                 modeToggle={
-                  r.modes.terminal
+                  r.modes.terminal && terminalSel
                     ? {
                         shown: r.terminalMode,
                         flipped: r.terminalMode !== mode,
                         onToggle: () => {
                           const next = otherMode(r.terminalMode);
-                          if (!terminalSel) return setView(`t:${t.id}`, next);
                           void setTerminalTheme(
                             formatTerminalPref(t.id, next === mode ? undefined : next),
                           );
