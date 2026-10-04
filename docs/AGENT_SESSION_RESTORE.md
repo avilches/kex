@@ -65,9 +65,13 @@ Only `SessionStart` calls `session_store::record_session` today. The payload car
 `claude --resume` also fires `SessionStart` and gets recorded through the same path; there is no separate
 `UserPromptSubmit`-based recording in the live mechanism.
 
-Sessions are cleared from the store when the agent exits (`OSC 133;D` → `agent_detach_session`) or the user detaches
-manually. Panels typically close while in idle state because the webview is destroyed before the PTYs finish shutting
-down, so a single store file is sufficient.
+Sessions are cleared from the store only when the agent process exits (the `exited` signal, from `OSC 133;D`, which
+`AgentNotificationsBridge.tsx` turns into `agent_detach_session`; the rule lives in `lib/sessionRecordPolicy.ts`).
+`StopFailure` and `SessionEnd` deliberately do not clear it: the first is just a failed turn, and the second is also
+emitted by `/clear` and `/resume`, which keep the process alive. Claude Code only emits `SessionStart` on launch,
+resume and `/clear`, so a record dropped while the process is still running would never be written again and the
+tab could no longer be restored (TASK-790). Panels typically close while in idle state because the webview is
+destroyed before the PTYs finish shutting down, so a single store file is sufficient.
 
 ### Launch command capture
 
@@ -358,7 +362,8 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | Case | Behaviour |
 |---|---|
 | `agentNotifications` disabled | Hooks not installed; store not written; `load_restore_plan` returns `[]` |
-| Agent exited cleanly | `agent_detach_session` removes panel from store; not in plan |
+| Agent process exited | `agent_detach_session` removes panel from store; not in plan |
+| Turn failed (`StopFailure`) or session ended (`SessionEnd`, incl. `/clear`, `/resume`) while the process lives | Store entry kept; the tab stays restorable |
 | Session started with `-p`/`--print` | `record_session` skips; session never written to store |
 | JSONL transcript missing (no messages sent) | Entry removed from store; `claude --session-id <id>` injected — new session reuses same UUID |
 | cwd deleted between sessions | `resumeCmd` empty, `errorReason` set; tab shows `⚠` restore error |
