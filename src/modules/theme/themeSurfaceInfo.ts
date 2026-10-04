@@ -1,7 +1,7 @@
 import {
   EDITOR_THEME_LABELS,
-  EDITOR_THEME_MODE,
   EDITOR_THEMES,
+  isEditorThemeId,
   type EditorThemeId,
 } from "@/modules/settings/store";
 import { resolveEditorThemeId } from "./resolveEditorTheme";
@@ -19,10 +19,26 @@ export type ThemeSurfaceInfo = {
   terminal: SurfaceInfo | undefined;
 };
 
-/** Editor themes of a mode that no app theme of the catalog pairs, so they can still be picked. */
-export function unpairedEditorThemes(catalog: Theme[], mode: ThemeMode): EditorThemeId[] {
-  const paired = new Set(catalog.map((t) => resolveEditorThemeId("auto", t.id, catalog, mode)));
-  return EDITOR_THEMES.filter((id) => EDITOR_THEME_MODE[id] === mode && !paired.has(id));
+const MODES: ThemeMode[] = ["dark", "light"];
+
+/** Editor themes no app theme pairs in any mode, so they can still be picked. */
+export function unpairedEditorThemes(catalog: Theme[]): EditorThemeId[] {
+  const paired = new Set(
+    catalog.flatMap((t) => MODES.map((m) => resolveEditorThemeId("auto", t.id, catalog, m))),
+  );
+  return EDITOR_THEMES.filter((id) => !paired.has(id));
+}
+
+/** Whether a theme offers a different editor theme and terminal palette in each mode. */
+export function surfaceModes(theme: Theme): { editor: boolean; terminal: boolean } {
+  const pairing = theme.editorTheme;
+  return {
+    editor:
+      isEditorThemeId(pairing?.dark) &&
+      isEditorThemeId(pairing?.light) &&
+      pairing.dark !== pairing.light,
+    terminal: !!theme.variants.dark?.terminal && !!theme.variants.light?.terminal,
+  };
 }
 
 /**

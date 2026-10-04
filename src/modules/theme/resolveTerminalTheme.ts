@@ -36,9 +36,25 @@ export function paletteOf(theme: Theme | undefined, mode: ThemeMode): TerminalPa
   };
 }
 
+const MODE_SEPARATOR = "@";
+
+/** A terminal pref is a theme id, optionally pinned to one mode as "id@dark" or "id@light". */
+export function formatTerminalPref(id: string, mode?: ThemeMode): string {
+  return mode ? `${id}${MODE_SEPARATOR}${mode}` : id;
+}
+
+export function parseTerminalPref(pref: string): { id: string; mode?: ThemeMode } {
+  const i = pref.lastIndexOf(MODE_SEPARATOR);
+  if (i > 0) {
+    const mode = pref.slice(i + 1);
+    if (mode === "dark" || mode === "light") return { id: pref.slice(0, i), mode };
+  }
+  return { id: pref };
+}
+
 /**
  * Terminal palette to apply. "auto" uses the app theme's own; a concrete id
- * borrows that theme's. An unknown id (a deleted custom theme) or a theme with
+ * borrows that theme's, in the app mode unless the pref pins a mode. An unknown id (a deleted custom theme) or a theme with
  * no palette at all falls back to the app theme's.
  */
 export function resolveTerminalPalette(
@@ -48,9 +64,10 @@ export function resolveTerminalPalette(
   mode: ThemeMode,
 ): TerminalPalette | undefined {
   if (pref !== TERMINAL_THEME_AUTO) {
+    const { id, mode: pinned } = parseTerminalPref(pref);
     const borrowed = paletteOf(
-      catalog.find((t) => t.id === pref),
-      mode,
+      catalog.find((t) => t.id === id),
+      pinned ?? mode,
     );
     if (borrowed) return borrowed;
   }

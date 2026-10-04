@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { listBuiltinThemes } from "./themes";
-import { EDITOR_THEME_MODE } from "@/modules/settings/store";
-import { themeSurfaceInfo, unpairedEditorThemes } from "./themeSurfaceInfo";
+import { surfaceModes, themeSurfaceInfo, unpairedEditorThemes } from "./themeSurfaceInfo";
 import type { Theme } from "./types";
 
 const palette = (bg: string) => ({
@@ -56,17 +55,28 @@ describe("themeSurfaceInfo", () => {
     expect(themeSurfaceInfo(a, [a, b], "light").editor.sharedWith).toEqual(["B"]);
   });
 
-  it("lists the editor themes of the mode that no app theme pairs", () => {
+  it("lists the editor themes that no app theme pairs in any mode", () => {
     const a = mk("a", "nord", "#000000");
-    const unpaired = unpairedEditorThemes([a], "dark");
+    const unpaired = unpairedEditorThemes([a]);
     expect(unpaired).toContain("dracula");
+    expect(unpaired).toContain("github-light");
+    expect(unpaired).not.toContain("nord");
+  });
+
+  it("does not list an editor theme paired only in the other mode", () => {
+    const a = mk("a", "nord", "#000000");
+    a.editorTheme = { dark: "nord", light: "github-light" };
+    const unpaired = unpairedEditorThemes([a]);
     expect(unpaired).not.toContain("nord");
     expect(unpaired).not.toContain("github-light");
   });
 
-  it("only lists editor themes of the requested mode", () => {
-    const unpaired = unpairedEditorThemes(listBuiltinThemes(), "light");
-    for (const id of unpaired) expect(EDITOR_THEME_MODE[id]).toBe("light");
+  it("reports which surfaces a theme offers in both modes", () => {
+    const both = mk("a", "nord", "#000000");
+    both.editorTheme = { dark: "nord", light: "github-light" };
+    expect(surfaceModes(both)).toEqual({ editor: true, terminal: true });
+    expect(surfaceModes(mk("b", "nord", "#000000")).editor).toBe(false);
+    expect(surfaceModes(mk("c", "nord", null)).terminal).toBe(false);
   });
 
   it("gives every builtin theme an editor and a terminal in both modes", () => {

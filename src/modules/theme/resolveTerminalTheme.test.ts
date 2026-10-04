@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { resolveTerminalPalette, terminalThemeOptions } from "./resolveTerminalTheme";
+import {
+  formatTerminalPref,
+  parseTerminalPref,
+  resolveTerminalPalette,
+  terminalThemeOptions,
+} from "./resolveTerminalTheme";
 import type { TerminalPalette, Theme } from "./types";
 
 const ansi = (c: string) =>
@@ -136,5 +141,33 @@ describe("terminalThemeOptions", () => {
   it("lists the themes with an ANSI palette in some mode", () => {
     expect(terminalThemeOptions(catalog, "dark").map((o) => o.id)).toEqual(["app", "other"]);
     expect(terminalThemeOptions(catalog, "light").map((o) => o.id)).toEqual(["app", "other"]);
+  });
+});
+
+describe("terminal pref pinned to a mode", () => {
+  const both: Theme = {
+    id: "both",
+    name: "Both",
+    variants: {
+      dark: { terminal: { background: "#010101", foreground: "#eeeeee", ansi: ansi("#333333") } },
+      light: { terminal: { background: "#fefefe", foreground: "#111111", ansi: ansi("#444444") } },
+    },
+  };
+
+  it("round trips the id and the pinned mode", () => {
+    expect(parseTerminalPref(formatTerminalPref("both", "dark"))).toEqual({ id: "both", mode: "dark" });
+    expect(parseTerminalPref(formatTerminalPref("both"))).toEqual({ id: "both" });
+  });
+
+  it("an id that merely contains the separator is not read as pinned", () => {
+    expect(parseTerminalPref("a@b")).toEqual({ id: "a@b" });
+  });
+
+  it("a pinned dark palette is used on a light app", () => {
+    expect(resolveTerminalPalette("both@dark", app, [app, both], "light")?.background).toBe("#010101");
+  });
+
+  it("an unpinned pref follows the app mode", () => {
+    expect(resolveTerminalPalette("both", app, [app, both], "light")?.background).toBe("#fefefe");
   });
 });
