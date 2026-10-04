@@ -28,7 +28,7 @@ import type { Theme, ThemeMode } from "@/modules/theme/types";
 import { Edit02Icon, Moon02Icon, Sun03Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HoverCard } from "radix-ui";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { Fragment, lazy, Suspense, useMemo, useState } from "react";
 import { TerminalThemePreview } from "./TerminalThemePreview";
 
 const EditorThemePreview = lazy(() => import("./EditorThemePreview"));
@@ -73,7 +73,7 @@ function SelectionOutline({ selected }: { selected: boolean[] }) {
       {runs.map(([from, to]) => {
         const style = { left: columnLeft(from), width: columnWidth(from, to) };
         return (
-          <div key={from}>
+          <Fragment key={from}>
             <div
               className="pointer-events-none absolute inset-y-0 rounded-lg bg-card/60"
               style={style}
@@ -82,7 +82,7 @@ function SelectionOutline({ selected }: { selected: boolean[] }) {
               className="pointer-events-none absolute inset-y-0 z-10 rounded-lg border border-foreground/50"
               style={style}
             />
-          </div>
+          </Fragment>
         );
       })}
     </>
