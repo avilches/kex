@@ -16,6 +16,12 @@ next free one if taken). The script prints it (`[kex] dev server on port N`) and
 `src-tauri/build.rs`, which bakes the same URL into the dev build. Exporting `KEX_DEV_PORT` yourself
 overrides the choice, and a bare `pnpm dev` honors it too, defaulting to 1420.
 
+When `pnpm tauri dev` runs inside a Claude Code session (`CLAUDECODE` is set), the script also drops every
+`CLAUDE*` variable from the environment before starting the app (`scripts/devEnv.mjs`). Kex Dev would otherwise
+hand them to each `claude` opened in its terminals, and `CLAUDE_CODE_CHILD_SESSION` makes those stop saving
+transcripts ("Transcript saving is off"), so session restore never finds a JSONL and always falls back to
+`--session-id`. Variables you export in your shell rc still reach each tab, because the tab's shell re-reads it.
+
 ### Theme preview page
 
 `pnpm dev` also serves `http://localhost:1420/theme-preview.html` (on the port Vite prints if `KEX_DEV_PORT` is set; `theme-preview.html` +
