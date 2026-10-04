@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useTauriListen } from "@/lib/useTauriListen";
 import { routeAgentNotification } from "../lib/route";
-import { dropsStoredSession } from "../lib/sessionRecordPolicy";
+import { endsAgentSession } from "../lib/sessionEndPolicy";
 import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
@@ -113,7 +113,8 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const tabId = leafIdForPty(sig.id);
   if (tabId === null) return;
   const store = useAgentStore.getState();
-  if (dropsStoredSession(sig.kind)) {
+  if (endsAgentSession(sig.kind)) {
+    store.finish(tabId);
     invoke("agent_detach_session", { tabId }).catch(() => {});
   }
 
@@ -160,23 +161,19 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     }
     case "StopFailure": {
       ensureSession(tabId, ctx, sig.agent ?? "claude");
+      store.setStatus(tabId, "idle");
       const failSession = store.sessions[tabId];
-      store.finish(tabId);
       if (failSession)
         route(failSession, "error", ctx, sig.message ?? undefined);
       return;
     }
-    case "SessionEnd": {
-      store.finish(tabId);
+    case "SessionEnd":
       return;
-    }
     case "MessageDisplay":
       // Fields TBD after log inspection - for now just ensure session exists.
       ensureSession(tabId, ctx, sig.agent ?? "claude");
       return;
     case "exited":
-      ensureSession(tabId, ctx, sig.agent ?? "claude");
-      store.finish(tabId);
       return;
   }
 }
