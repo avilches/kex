@@ -18,7 +18,7 @@ import type { Theme, ThemeMode } from "@/modules/theme/types";
 import { Edit02Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HoverCard } from "radix-ui";
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { TerminalThemePreview } from "./TerminalThemePreview";
 
 const EditorThemePreview = lazy(() => import("./EditorThemePreview"));
@@ -158,6 +158,8 @@ export function ThemeTable({
   const editorAuto = editorPref === EDITOR_THEME_AUTO;
   const terminalAuto = terminalPref === TERMINAL_THEME_AUTO;
 
+  const [pickedEditorRow, setPickedEditorRow] = useState<string | null>(null);
+
   const rows = useMemo(
     () =>
       themes.map((t) => ({
@@ -171,6 +173,12 @@ export function ThemeTable({
   const extraEditors = useMemo(() => unpairedEditorThemes(themes, mode), [themes, mode]);
 
   const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
+
+  const editorRowId = useMemo(() => {
+    const matching = rows.filter((r) => r.editorId === editorPref).map((r) => r.theme.id);
+    if (pickedEditorRow && matching.includes(pickedEditorRow)) return pickedEditorRow;
+    return matching.includes(themeId) ? themeId : matching[0];
+  }, [rows, editorPref, pickedEditorRow, themeId]);
 
   const followAppTheme = () => {
     void setEditorTheme(EDITOR_THEME_AUTO);
@@ -241,7 +249,7 @@ export function ThemeTable({
           const active = t.id === themeId;
           const isCustom = customIds.has(t.id);
           const themeSel = active;
-          const editorSel = editorAuto ? active : editorId === editorPref;
+          const editorSel = editorAuto ? active : t.id === editorRowId;
           const terminalSel = info.terminal !== undefined && (terminalAuto ? active : t.id === terminalPref);
           return (
             <div key={t.id} className={cn(COLUMNS, "group items-stretch")}>
@@ -278,7 +286,8 @@ export function ThemeTable({
               <Cell
                 info={info.editor}
                 frameClass={frame(editorSel, themeSel, terminalSel)}
-                                onPick={() => {
+                onPick={() => {
+                  setPickedEditorRow(t.id);
                   void setEditorTheme(editorId);
                 }}
                 preview={<EditorPeek id={editorId} app={t} mode={mode} />}
