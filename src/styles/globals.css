@@ -379,6 +379,27 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
   --flash-peak: 1;
 }
 
+/* A bar drawn over the editor or terminal surface takes that surface's text and
+ * line colors, so a dark editor under a light app theme (or the reverse) stays readable. */
+.surface-editor,
+.surface-terminal {
+  --surface-bg: var(--editor-background);
+  --surface-fg: var(--editor-foreground);
+}
+.surface-terminal {
+  --surface-bg: var(--terminal-background);
+  --surface-fg: var(--terminal-foreground);
+}
+.surface-editor,
+.surface-terminal {
+  --foreground: var(--surface-fg);
+  --muted-foreground: color-mix(in srgb, var(--surface-fg) 60%, var(--surface-bg));
+  --border: color-mix(in srgb, var(--surface-fg) 18%, var(--surface-bg));
+  --muted: color-mix(in srgb, var(--surface-fg) 10%, var(--surface-bg));
+  --input: color-mix(in srgb, var(--surface-fg) 14%, var(--surface-bg));
+  color: var(--surface-fg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dur-fast: 0.01ms;
