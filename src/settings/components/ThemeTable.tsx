@@ -12,10 +12,20 @@ import {
 import type { EditorThemeId } from "@/modules/settings/store";
 import { resolveEditorSurface } from "@/modules/theme/resolveEditorSurface";
 import { resolveEditorThemeId } from "@/modules/theme/resolveEditorTheme";
-import { paletteOf, resolveTerminalPalette } from "@/modules/theme/resolveTerminalTheme";
-import { themeSurfaceInfo, unpairedEditorThemes, type SurfaceInfo } from "@/modules/theme/themeSurfaceInfo";
+import {
+  formatTerminalPref,
+  paletteOf,
+  parseTerminalPref,
+  resolveTerminalPalette,
+} from "@/modules/theme/resolveTerminalTheme";
+import {
+  surfaceModes,
+  themeSurfaceInfo,
+  unpairedEditorThemes,
+  type SurfaceInfo,
+} from "@/modules/theme/themeSurfaceInfo";
 import type { Theme, ThemeMode } from "@/modules/theme/types";
-import { Edit02Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import { Edit02Icon, Moon02Icon, Sun03Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HoverCard } from "radix-ui";
 import { lazy, Suspense, useMemo, useState } from "react";
@@ -28,6 +38,10 @@ const PREVIEW_BOX = "h-[84px] overflow-hidden rounded-md";
 
 const CELL = "relative rounded-lg";
 const FIRST_COLUMN = "170px";
+const ICON_BUTTON =
+  "flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-muted hover:text-foreground";
+
+const otherMode = (mode: ThemeMode): ThemeMode => (mode === "dark" ? "light" : "dark");
 
 function columnLeft(i: number) {
   if (i === 0) return "0px";
@@ -42,7 +56,10 @@ function columnWidth(from: number, to: number) {
   return `calc(${firstColumn ? FIRST_COLUMN : "0px"} + ${sides} * ${side})`;
 }
 
-/** One outline per run of adjacent selected cells, so joined cells share a single border. */
+/**
+ * One outline per run of adjacent selected cells, so joined cells share a
+ * single border. The border sits above the cells so a hover shade never hides it.
+ */
 function SelectionOutline({ selected }: { selected: boolean[] }) {
   const runs: [number, number][] = [];
   selected.forEach((on, i) => {
@@ -53,13 +70,21 @@ function SelectionOutline({ selected }: { selected: boolean[] }) {
   });
   return (
     <>
-      {runs.map(([from, to]) => (
-        <div
-          key={from}
-          className="pointer-events-none absolute inset-y-0 rounded-lg border border-foreground/50 bg-card/60"
-          style={{ left: columnLeft(from), width: columnWidth(from, to) }}
-        />
-      ))}
+      {runs.map(([from, to]) => {
+        const style = { left: columnLeft(from), width: columnWidth(from, to) };
+        return (
+          <div key={from}>
+            <div
+              className="pointer-events-none absolute inset-y-0 rounded-lg bg-card/60"
+              style={style}
+            />
+            <div
+              className="pointer-events-none absolute inset-y-0 z-10 rounded-lg border border-foreground/50"
+              style={style}
+            />
+          </div>
+        );
+      })}
     </>
   );
 }
@@ -116,40 +141,61 @@ function EditorPeek({ id, app, mode }: { id: EditorThemeId; app: Theme; mode: Th
   );
 }
 
+type ModeToggle = { shown: ThemeMode; flipped: boolean; onToggle: () => void };
+
 function Cell({
   info,
-  frameClass,
   onPick,
   preview,
+  modeToggle,
 }: {
   info: SurfaceInfo | undefined;
-  frameClass: string;
   onPick: () => void;
   preview: React.ReactNode;
+  modeToggle?: ModeToggle;
 }) {
   if (!info) {
-    return <div className={cn(frameClass, "px-2 py-1.5 text-[11.5px] text-muted-foreground/60")}>-</div>;
+    return <div className={cn(CELL, "px-2 py-1.5 text-[11.5px] text-muted-foreground/60")}>-</div>;
   }
   const shared = info.sharedWith.length > 0;
   return (
-    <div className={cn(frameClass, "group/cell flex min-w-0 items-center")}>
+    <div className={cn(CELL, "group/cell flex min-w-0 items-center")}>
       <button
         type="button"
         onClick={onPick}
         title={shared ? `Also used by ${info.sharedWith.join(", ")}` : "Its own"}
-        className={cn(
-          "flex min-w-0 flex-1 items-center rounded-md px-2 py-1.5 text-left text-[11.5px] transition-colors",
-          "hover:bg-muted/60",
-        )}
+        className="flex min-w-0 flex-1 items-center rounded-md px-2 py-1.5 text-left text-[11.5px] transition-colors hover:bg-muted/60"
       >
         <span className="truncate">{info.label}</span>
       </button>
+      {modeToggle ? (
+        <button
+          type="button"
+          onClick={modeToggle.onToggle}
+          title={
+            modeToggle.shown === "dark"
+              ? "Showing the dark variant, click for light"
+              : "Showing the light variant, click for dark"
+          }
+          aria-label="Switch between the dark and the light variant"
+          className={cn(
+            ICON_BUTTON,
+            modeToggle.flipped ? "opacity-100" : "opacity-0 group-hover/cell:opacity-100",
+          )}
+        >
+          <HugeiconsIcon
+            icon={modeToggle.shown === "dark" ? Moon02Icon : Sun03Icon}
+            size={12}
+            strokeWidth={1.75}
+          />
+        </button>
+      ) : null}
       <HoverCard.Root openDelay={150} closeDelay={80}>
         <HoverCard.Trigger asChild>
           <span
             role="img"
             aria-label={`Preview ${info.label}`}
-            className="mr-1 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover/cell:opacity-100"
+            className={cn(ICON_BUTTON, "mr-1 opacity-0 group-hover/cell:opacity-100")}
           >
             <HugeiconsIcon icon={ViewIcon} size={12} strokeWidth={1.75} />
           </span>
@@ -185,20 +231,37 @@ export function ThemeTable({
   const themeAuto = usePreferencesStore((s) => s.themeAuto);
   const editorAuto = editorPref === EDITOR_THEME_AUTO;
   const terminalAuto = terminalPref === TERMINAL_THEME_AUTO;
+  const pinnedTerminal = terminalAuto ? undefined : parseTerminalPref(terminalPref);
 
   const [pickedEditorRow, setPickedEditorRow] = useState<string | null>(null);
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
+  const toggleFlipped = (key: string) =>
+    setFlipped((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
 
   const rows = useMemo(
     () =>
-      themes.map((t) => ({
-        theme: t,
-        info: themeSurfaceInfo(t, themes, mode),
-        editorId: resolveEditorThemeId("auto", t.id, themes, mode),
-      })),
-    [themes, mode],
+      themes.map((t) => {
+        const modes = surfaceModes(t);
+        const editorMode = modes.editor && flipped.has(`e:${t.id}`) ? otherMode(mode) : mode;
+        const terminalMode = modes.terminal && flipped.has(`t:${t.id}`) ? otherMode(mode) : mode;
+        return {
+          theme: t,
+          modes,
+          editorMode,
+          terminalMode,
+          editorId: resolveEditorThemeId("auto", t.id, themes, editorMode),
+          editorInfo: themeSurfaceInfo(t, themes, editorMode).editor,
+          terminalInfo: themeSurfaceInfo(t, themes, terminalMode).terminal,
+        };
+      }),
+    [themes, mode, flipped],
   );
 
-  const extraEditors = useMemo(() => unpairedEditorThemes(themes, mode), [themes, mode]);
+  const extraEditors = useMemo(() => unpairedEditorThemes(themes), [themes]);
 
   const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
 
@@ -222,6 +285,10 @@ export function ThemeTable({
     onSelectTheme(id);
     if (themeAuto) followAppTheme();
   };
+
+  const terminalPreviewName = themes.find(
+    (t) => t.id === (pinnedTerminal ? pinnedTerminal.id : themeId),
+  )?.name;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -248,7 +315,7 @@ export function ThemeTable({
         </div>
         <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">
-            {rows.find((r) => r.editorId === activeEditorId)?.info.editor.label ?? activeEditorId}
+            {EDITOR_THEME_LABELS[activeEditorId]}
           </span>
           <div className={cn(PREVIEW_BOX, "border border-border/60 text-[10.5px]")}>
             <Suspense fallback={null}>
@@ -261,8 +328,8 @@ export function ThemeTable({
         </div>
         <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">
-            {themes.find((t) => t.id === (terminalAuto ? themeId : terminalPref))?.name ??
-              activeTheme.name}
+            {terminalPreviewName ?? activeTheme.name}
+            {pinnedTerminal?.mode && pinnedTerminal.mode !== mode ? ` (${pinnedTerminal.mode})` : ""}
           </span>
           <div className={PREVIEW_BOX}>
             <TerminalThemePreview
@@ -273,12 +340,17 @@ export function ThemeTable({
       </div>
 
       <div className="flex max-h-[340px] flex-col gap-1 overflow-y-auto pr-0.5">
-        {rows.map(({ theme: t, info, editorId }) => {
+        {rows.map((r) => {
+          const t = r.theme;
           const active = t.id === themeId;
           const isCustom = customIds.has(t.id);
           const themeSel = active;
           const editorSel = editorAuto ? active : t.id === editorRowId;
-          const terminalSel = info.terminal !== undefined && (terminalAuto ? active : t.id === terminalPref);
+          const terminalSel =
+            r.terminalInfo !== undefined &&
+            (pinnedTerminal
+              ? t.id === pinnedTerminal.id && (pinnedTerminal.mode ?? mode) === r.terminalMode
+              : active && r.terminalMode === mode);
           return (
             <div key={t.id} className={cn(COLUMNS, "group relative items-stretch")}>
               <SelectionOutline selected={[themeSel, editorSel, terminalSel]} />
@@ -313,21 +385,39 @@ export function ThemeTable({
                 ) : null}
               </div>
               <Cell
-                info={info.editor}
-                frameClass={CELL}
+                info={r.editorInfo}
                 onPick={() => {
                   setPickedEditorRow(t.id);
-                  void setEditorTheme(editorId);
+                  void setEditorTheme(r.editorId);
                 }}
-                preview={<EditorPeek id={editorId} app={t} mode={mode} />}
+                preview={<EditorPeek id={r.editorId} app={t} mode={r.editorMode} />}
+                modeToggle={
+                  r.modes.editor
+                    ? {
+                        shown: r.editorMode,
+                        flipped: r.editorMode !== mode,
+                        onToggle: () => toggleFlipped(`e:${t.id}`),
+                      }
+                    : undefined
+                }
               />
               <Cell
-                info={info.terminal}
-                frameClass={CELL}
-                                onPick={() => {
-                  void setTerminalTheme(t.id);
+                info={r.terminalInfo}
+                onPick={() => {
+                  void setTerminalTheme(
+                    formatTerminalPref(t.id, r.terminalMode === mode ? undefined : r.terminalMode),
+                  );
                 }}
-                preview={<TerminalThemePreview palette={paletteOf(t, mode)} />}
+                preview={<TerminalThemePreview palette={paletteOf(t, r.terminalMode)} />}
+                modeToggle={
+                  r.modes.terminal
+                    ? {
+                        shown: r.terminalMode,
+                        flipped: r.terminalMode !== mode,
+                        onToggle: () => toggleFlipped(`t:${t.id}`),
+                      }
+                    : undefined
+                }
               />
             </div>
           );
@@ -345,8 +435,7 @@ export function ThemeTable({
               <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
               <Cell
                 info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
-                frameClass={CELL}
-                                onPick={() => {
+                onPick={() => {
                   void setEditorTheme(id);
                 }}
                 preview={<EditorPeek id={id} app={activeTheme} mode={mode} />}
