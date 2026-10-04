@@ -456,7 +456,7 @@ function SortableGroupBlock({
     opacity: isDragging ? 0.4 : 1,
   };
   return (
-    <div ref={setNodeRef} style={style} className="w-full">
+    <div ref={setNodeRef} style={style} className="flex w-full flex-col gap-px">
       {children({ attributes, listeners })}
     </div>
   );
