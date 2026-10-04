@@ -337,9 +337,11 @@ describe("buildReopenedTab", () => {
     expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, restoreOnRestart: true, persistentCommand: "lazygit" });
   });
 
-  it("unlocks a reopened git-diff tab", () => {
-    const tab: Tab = { id: "old", kind: "git-diff", path: "/f.ts", repoRoot: "/repo", mode: "+", originalPath: null, locked: true };
-    expect(buildReopenedTab(tab, "new").locked).toBe(false);
+  it("unlocks a reopened git-diff tab and drops its preview state", () => {
+    const tab: Tab = { id: "old", kind: "git-diff", path: "/f.ts", repoRoot: "/repo", mode: "+", originalPath: null, preview: true, locked: true };
+    const reopened = buildReopenedTab(tab, "new");
+    expect(reopened.locked).toBe(false);
+    expect(reopened).toMatchObject({ preview: false });
   });
 
   it("leaves other kinds unchanged besides the id", () => {
