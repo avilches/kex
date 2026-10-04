@@ -66,8 +66,12 @@ Only `SessionStart` calls `session_store::record_session` today. The payload car
 `UserPromptSubmit`-based recording in the live mechanism.
 
 Sessions are cleared from the store only when the agent process exits (the `exited` signal, from `OSC 133;D`, which
-`AgentNotificationsBridge.tsx` turns into `agent_detach_session`; the rule lives in `lib/sessionRecordPolicy.ts`).
-`StopFailure` and `SessionEnd` deliberately do not clear it: the first is just a failed turn, and the second is also
+`AgentNotificationsBridge.tsx` turns into `agent_detach_session`; the rule lives in `lib/sessionEndPolicy.ts`).
+The same signal removes the session shown in the panel and the agent icon of the tab (`agentStore.finish`); the one
+predicate `endsAgentSession` decides both. `StopFailure` still raises its error notification but leaves the session
+idle, and `SessionEnd` changes nothing, so `/clear` and `/resume` keep the icon and the next `SessionStart` updates its
+meta (TASK-792).
+`StopFailure` and `SessionEnd` deliberately do not clear the record: the first is just a failed turn, and the second is also
 emitted by `/clear` and `/resume`, which keep the process alive. Claude Code only emits `SessionStart` on launch,
 resume and `/clear`, so a record dropped while the process is still running would never be written again and the
 tab could no longer be restored (TASK-790). Panels typically close while in idle state because the webview is
@@ -275,7 +279,9 @@ Session metadata that was previously accessible from the floating tab HoverCard 
 surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side of `TerminalPathBar`:
 
 - **Run on start** checkbox: toggles `restoreOnRestart` on the panel. When enabled (and a `persistentCommand` is set), a
-  reload icon appears inline in the path bar as a visual indicator. For agent sessions the checkbox defaults to checked
+  reload icon appears inline in the path bar as a visual indicator, except while an agent is alive: the agent icon of
+  the tab (struck through when it is off) already says it, and the path bar shows no status dot either, only the
+  model name, because the tab icon already carries the working and attention states. For agent sessions the checkbox defaults to checked
   and enabling it captures the current running command as the `persistentCommand` if none is already set — this is only
   a fallback default now (see below), not what normally gets shown or run.
 - **Command preview**: for a tab with a live agent session, this is a *live, read-only* preview of the resume command

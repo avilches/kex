@@ -4,9 +4,10 @@
 // (build.rs) through KEX_DEV_PORT.
 import { spawn } from "node:child_process";
 import { buildTauriArgs, isPortFree, pickPort } from "./devPort.mjs";
+import { stripClaudeSessionEnv } from "./devEnv.mjs";
 
 const args = process.argv.slice(2);
-const env = { ...process.env };
+const env = args[0] === "dev" ? { ...stripClaudeSessionEnv(process.env) } : { ...process.env };
 
 if (args[0] === "dev" && !env.KEX_DEV_PORT) {
   env.KEX_DEV_PORT = String(await pickPort(process.cwd(), isPortFree));
