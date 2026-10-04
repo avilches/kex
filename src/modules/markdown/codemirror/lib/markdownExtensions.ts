@@ -22,12 +22,12 @@ const itemTextIndent = (depth: string): string =>
 // `--lp-quote-depth * 16px`; and the flat band behind code, as a layer too.
 const QUOTE_BARS =
   "repeating-linear-gradient(to right, color-mix(in srgb, var(--muted-foreground) 70%, transparent) 0 3px, transparent 3px 16px)";
-const CODE_BG = "color-mix(in srgb, var(--foreground) 6%, transparent)";
+const CODE_BG = "color-mix(in srgb, var(--editor-foreground) 6%, transparent)";
 const CODE_BAND = `linear-gradient(${CODE_BG}, ${CODE_BG})`;
 
 // The user's code-syntax theme colors bare URLs arbitrarily; this engine does
 // not decorate them, so they should read as plain text.
-export const plainUrlHighlight = HighlightStyle.define([{ tag: tags.url, color: "var(--foreground) !important" }]);
+export const plainUrlHighlight = HighlightStyle.define([{ tag: tags.url, color: "var(--editor-foreground) !important" }]);
 
 // GFM (tables, task lists, strikethrough) plus subscript/superscript/emoji: the
 // `markdownLanguage` export already bundles these on top of CommonMark, so no
@@ -43,7 +43,7 @@ export function buildMarkdownBaseExtensions(): Extension[] {
         padding: "8px 16px",
       },
       ".cm-scroller": { fontFamily: "var(--font-mono, monospace)", fontSize: "13px", lineHeight: "1.6" },
-      ".cm-content": { caretColor: "var(--foreground)" },
+      ".cm-content": { caretColor: "var(--editor-foreground)" },
     }),
   ];
 }
@@ -87,7 +87,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       },
       // Plain text (and table cells, which inherit) takes the same color as the
       // headings; some editor themes would otherwise give it a dim foreground.
-      ".cm-content": { caretColor: "var(--foreground)", color: "var(--foreground) !important" },
+      ".cm-content": { caretColor: "var(--editor-foreground)", color: "var(--editor-foreground) !important" },
       ".cm-lp-heading": { fontWeight: "700" },
       ".cm-lp-h1": { fontSize: "1.85em" },
       ".cm-lp-h2": { fontSize: "1.6em" },
@@ -107,7 +107,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       ".cm-lp-strike": { textDecoration: "line-through" },
       ".cm-lp-code": {
         fontFamily: "var(--font-mono, monospace)",
-        backgroundColor: "color-mix(in srgb, var(--foreground) 8%, transparent)",
+        backgroundColor: "color-mix(in srgb, var(--editor-foreground) 8%, transparent)",
         fontSize: "0.9em",
         borderRadius: "3px",
         padding: "0.1em 0.4em",
@@ -123,15 +123,15 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       // The hand shows only while the open-link modifier is held (a class the
       // plugin puts on the editor), since a plain click just places the cursor.
       "&.cm-lp-mod .cm-lp-link-text, &.cm-lp-mod .cm-lp-link-text *": { cursor: "pointer" },
-      [LP_TEXT_COLOR_SELECTORS]: { color: "var(--foreground) !important" },
+      [LP_TEXT_COLOR_SELECTORS]: { color: "var(--editor-foreground) !important" },
       // After the rule above (same specificity), so H6 keeps its dimmer color.
-      ".cm-lp-h6, .cm-lp-h6 *": { color: "color-mix(in srgb, var(--foreground) 70%, transparent) !important" },
+      ".cm-lp-h6, .cm-lp-h6 *": { color: "color-mix(in srgb, var(--editor-foreground) 70%, transparent) !important" },
       // Same reason as LP_TEXT_COLOR_SELECTORS: the syntax highlighter's own
       // nested span (ordered-list digits, unordered-list dash/star/plus, or a
       // link inside a quote) otherwise sets its own color, beating this one.
       // The marker takes the text color: --muted-foreground reads as a tint of
       // its own in some app themes.
-      ".cm-lp-bullet, .cm-lp-bullet *": { color: "var(--foreground) !important" },
+      ".cm-lp-bullet, .cm-lp-bullet *": { color: "var(--editor-foreground) !important" },
       ".cm-lp-quote, .cm-lp-quote *": { color: "var(--muted-foreground) !important" },
       // Same specificity as the two rules above, so it must come after them for
       // a link nested in bold, a heading, or a quote (or bold nested in a link)
@@ -139,7 +139,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       ".cm-lp-link-text, .cm-lp-link-text *": { color: "var(--primary, #3b82f6) !important" },
       // Brackets that turned out not to be a link (`[TODO]`, `[[Wiki Link]]`):
       // the syntax theme colors any Link node as a link, this puts it back.
-      ".cm-lp-notlink, .cm-lp-notlink *": { color: "var(--foreground) !important", textDecoration: "none" },
+      ".cm-lp-notlink, .cm-lp-notlink *": { color: "var(--editor-foreground) !important", textDecoration: "none" },
       // The dot and the checkbox are both 20px wide (checkbox 16px + 4px
       // margin), so a task item's text lines up with a plain item's text.
       ".cm-lp-bullet-dot": { display: "inline-block", width: "20px", textAlign: "center" },
@@ -149,7 +149,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
         width: "0.5em",
         height: "0.5em",
         borderRadius: "50%",
-        backgroundColor: "var(--foreground)",
+        backgroundColor: "var(--editor-foreground)",
         verticalAlign: "middle",
       },
       ".cm-lp-checkbox": {
@@ -230,7 +230,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       },
       ".cm-lp-frontmatter": {
         fontFamily: "var(--font-mono, monospace)",
-        backgroundColor: "color-mix(in srgb, var(--foreground) 4%, transparent)",
+        backgroundColor: "color-mix(in srgb, var(--editor-foreground) 4%, transparent)",
       },
       // The parser still reads the frontmatter as markdown, so the theme paints
       // its closing `---` as a heading (bold) and a `[list]` as a link; it is
@@ -239,7 +239,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
         fontWeight: "normal !important",
         fontStyle: "normal !important",
         textDecoration: "none !important",
-        color: "var(--foreground) !important",
+        color: "var(--editor-foreground) !important",
       },
       ".cm-lp-html": { fontFamily: "var(--font-mono, monospace)" },
       // A line decoration: one flat background on every line reads as one block.
@@ -307,7 +307,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
         lineHeight: "0",
       },
       ".cm-lp-code-copy svg": { width: "1em", height: "1em" },
-      ".cm-lp-code-copy:hover": { color: "var(--foreground)", background: "var(--background)" },
+      ".cm-lp-code-copy:hover": { color: "var(--editor-foreground)", background: "var(--editor-background)" },
       ".cm-lp-code-copy.copied": {
         color: "var(--primary)",
         borderColor: "var(--primary)",

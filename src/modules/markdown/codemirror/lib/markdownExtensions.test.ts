@@ -135,7 +135,7 @@ describe("buildLivePreviewExtensions", () => {
     const rawCss = Array.from(document.querySelectorAll("style"))
       .map((style) => style.textContent ?? "")
       .join("\n");
-    expect(/\.cm-content \{[^}]*color: var\(--foreground\) !important/.test(rawCss)).toBe(true);
+    expect(/\.cm-content \{[^}]*color: var\(--editor-foreground\) !important/.test(rawCss)).toBe(true);
     const h6 = /\.cm-lp-h6, [^{]*\{([^}]*)\}/.exec(rawCss)?.[1] ?? "";
     expect(h6).toContain("color-mix");
     // H5 is body-sized; H6 is smaller than body text.
@@ -150,9 +150,9 @@ describe("buildLivePreviewExtensions", () => {
     const rawCss = Array.from(document.querySelectorAll("style"))
       .map((style) => style.textContent ?? "")
       .join("\n");
-    expect(/\.cm-lp-bullet, [^{]*\{[^}]*color: var\(--foreground\) !important/.test(rawCss)).toBe(true);
+    expect(/\.cm-lp-bullet, [^{]*\{[^}]*color: var\(--editor-foreground\) !important/.test(rawCss)).toBe(true);
     const dot = /\.cm-lp-bullet-dot::before \{([^}]*)\}/.exec(rawCss)?.[1] ?? "";
-    expect(dot).toContain("background-color: var(--foreground)");
+    expect(dot).toContain("background-color: var(--editor-foreground)");
     view.destroy();
   });
 
