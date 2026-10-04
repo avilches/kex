@@ -23,12 +23,15 @@ export function TerminalThemePreview({ palette }: { palette: TerminalPalette | u
         {"        new file:   src/theme.ts"}
       </div>
       <div className="whitespace-pre">
-        <span style={{ color: color(3) }}>warning:</span> LF will be replaced by CRLF{" "}
-        <span style={{ background: palette?.selection ?? "var(--accent)" }}>selected</span>
+        <span style={{ color: color(3) }}>warning:</span> LF will be replaced by CRLF
         <span
           className="ml-0.5 inline-block w-[7px] align-middle"
           style={{ background: palette?.cursor ?? fg, height: "1.1em" }}
         />
+      </div>
+      <div className="whitespace-pre">
+        {"❯ echo "}
+        <span style={{ background: palette?.selection ?? "var(--accent)" }}>selected text looks like this</span>
       </div>
       {ansi ? (
         <>

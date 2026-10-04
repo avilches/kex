@@ -7,7 +7,13 @@ import CodeMirror from "@uiw/react-codemirror";
 import { EditorView } from "@codemirror/view";
 import { useMemo } from "react";
 
-const BASE = [javascript({ typescript: true })];
+// The preview is never focused, but themes style the selection under .cm-focused.
+const BASE = [javascript({ typescript: true }), EditorView.editorAttributes.of({ class: "cm-focused" })];
+const SELECTED = 'debounce.name';
+const SELECTION = (() => {
+  const from = EDITOR_PREVIEW_SAMPLE.indexOf(SELECTED);
+  return { anchor: from, head: from + SELECTED.length };
+})();
 
 export default function EditorThemePreview({
   themeId,
@@ -38,6 +44,7 @@ export default function EditorThemePreview({
         theme={EDITOR_THEME_EXT[themeId]}
         extensions={extensions}
         readOnly
+        selection={SELECTION}
         editable={false}
         basicSetup={{
           lineNumbers: true,

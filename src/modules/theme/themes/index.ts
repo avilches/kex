@@ -4,6 +4,7 @@ import { catppuccin } from "./catppuccin";
 import { claude } from "./claude";
 import { dracula } from "./dracula";
 import { everforest } from "./everforest";
+import { ghosttyDefaultStyle } from "./ghostty-default-style";
 import { gruvbox } from "./gruvbox";
 import { kanagawa } from "./kanagawa";
 import { kanagawaDragon } from "./kanagawa-dragon";
@@ -35,10 +36,18 @@ const BUILTIN: Theme[] = [
   caffeine,
 ];
 
+// Palettes that carry only a terminal. They stay out of BUILTIN so they never
+// show up as app themes; the terminal catalog adds them back.
+const TERMINAL_ONLY: Theme[] = [ghosttyDefaultStyle];
+
 const BY_ID = new Map<string, Theme>(BUILTIN.map((t) => [t.id, t]));
 
 export function listBuiltinThemes(): Theme[] {
   return BUILTIN;
+}
+
+export function listTerminalOnlyThemes(): Theme[] {
+  return TERMINAL_ONLY;
 }
 
 export function getBuiltinTheme(id: string): Theme | undefined {

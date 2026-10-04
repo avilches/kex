@@ -4,7 +4,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { javascript } from "@codemirror/lang-javascript";
 import { applyTheme } from "@/modules/theme/applyTheme";
-import { listBuiltinThemes } from "@/modules/theme/themes";
+import { listBuiltinThemes, listTerminalOnlyThemes } from "@/modules/theme/themes";
 import { validateTheme } from "@/modules/theme/validateTheme";
 import { EDITOR_THEME_EXT } from "@/modules/editor/lib/themes";
 import { isEditorThemeId, TERMINAL_THEME_AUTO } from "@/modules/settings/store";
@@ -375,7 +375,7 @@ function controls(): HTMLElement {
   };
   const terminalSelect = h("select", { class: "rounded border border-border bg-transparent px-2 py-1 text-[12px]", title: "Terminal theme" });
   terminalSelect.append(h("option", { value: TERMINAL_THEME_AUTO }, "terminal: auto"));
-  for (const o of terminalThemeOptions(themes, state.mode)) {
+  for (const o of terminalThemeOptions([...themes, ...listTerminalOnlyThemes()], state.mode)) {
     terminalSelect.append(h("option", { value: o.id }, `terminal: ${o.name}`));
   }
   terminalSelect.value = state.terminal;
@@ -451,7 +451,7 @@ function render(): void {
   applyTheme(
     theme,
     state.mode,
-    resolveTerminalPalette(state.terminal, theme, allThemes(), state.mode),
+    resolveTerminalPalette(state.terminal, theme, [...allThemes(), ...listTerminalOnlyThemes()], state.mode),
   );
   document.documentElement.dataset.previewTheme = theme.id;
   document.documentElement.dataset.previewTerminal = state.terminal;

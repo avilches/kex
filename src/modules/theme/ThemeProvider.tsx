@@ -21,7 +21,12 @@ import {
   listCustomThemes,
   onCustomThemesChange,
 } from "./customThemes";
-import { getBuiltinTheme, getDefaultTheme, listBuiltinThemes } from "./themes";
+import {
+  getBuiltinTheme,
+  getDefaultTheme,
+  listBuiltinThemes,
+  listTerminalOnlyThemes,
+} from "./themes";
 import { resolveEditorSurface } from "./resolveEditorSurface";
 import { resolveTerminalPalette } from "./resolveTerminalTheme";
 import type { EditorSurface, Theme } from "./types";
@@ -166,7 +171,7 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
     const terminal = resolveTerminalPalette(
       terminalThemePref,
       appTheme,
-      [...listBuiltinThemes(), ...customThemes],
+      [...listBuiltinThemes(), ...listTerminalOnlyThemes(), ...customThemes],
       resolvedMode,
     );
     const editor =
