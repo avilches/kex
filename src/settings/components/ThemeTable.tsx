@@ -90,16 +90,12 @@ function EditorPeek({ id, app, mode }: { id: EditorThemeId; app: Theme; mode: Th
 
 function Cell({
   info,
-  selected,
   frameClass,
-  locked,
   onPick,
   preview,
 }: {
   info: SurfaceInfo | undefined;
-  selected: boolean;
   frameClass: string;
-  locked: boolean;
   onPick: () => void;
   preview: React.ReactNode;
 }) {
@@ -111,13 +107,11 @@ function Cell({
     <div className={cn(frameClass, "group/cell flex min-w-0 items-center")}>
       <button
         type="button"
-        disabled={locked}
         onClick={onPick}
         title={shared ? `Also used by ${info.sharedWith.join(", ")}` : "Its own"}
         className={cn(
           "flex min-w-0 flex-1 items-center rounded-md px-2 py-1.5 text-left text-[11.5px] transition-colors",
-          locked ? "cursor-default" : "hover:bg-muted/60",
-          locked && !selected && "opacity-50",
+          "hover:bg-muted/60",
         )}
       >
         <span className="truncate">{info.label}</span>
@@ -289,10 +283,8 @@ export function ThemeTable({
               </div>
               <Cell
                 info={info.editor}
-                selected={editorSel}
                 frameClass={frame(editorSel, themeSel, terminalSel)}
-                locked={allAuto}
-                onPick={() => {
+                                onPick={() => {
                   setLastEditor(editorId);
                   void setEditorTheme(editorId);
                 }}
@@ -300,10 +292,8 @@ export function ThemeTable({
               />
               <Cell
                 info={info.terminal}
-                selected={terminalSel}
                 frameClass={frame(terminalSel, editorSel, false)}
-                locked={allAuto}
-                onPick={() => {
+                                onPick={() => {
                   setLastTerminal(t.id);
                   void setTerminalTheme(t.id);
                 }}
@@ -324,10 +314,8 @@ export function ThemeTable({
               <span className="truncate px-2 text-[12px] text-muted-foreground">-</span>
               <Cell
                 info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
-                selected={sel}
                 frameClass={frame(sel, false, false)}
-                locked={allAuto}
-                onPick={() => {
+                                onPick={() => {
                   setLastEditor(id);
                   void setEditorTheme(id);
                 }}
