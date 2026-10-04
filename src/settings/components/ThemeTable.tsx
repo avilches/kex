@@ -41,6 +41,8 @@ const FIRST_COLUMN = "170px";
 const ICON_BUTTON =
   "flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-muted hover:text-foreground";
 
+const NO_VIEWS: Record<string, ThemeMode> = {};
+
 const otherMode = (mode: ThemeMode): ThemeMode => (mode === "dark" ? "light" : "dark");
 
 function columnLeft(i: number) {
@@ -234,42 +236,77 @@ export function ThemeTable({
   const pinnedTerminal = terminalAuto ? undefined : parseTerminalPref(terminalPref);
 
   const [pickedEditorRow, setPickedEditorRow] = useState<string | null>(null);
-  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
-  const toggleFlipped = (key: string) =>
-    setFlipped((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
+  const [views, setViews] = useState<{ mode: ThemeMode; map: Record<string, ThemeMode> }>({
+    mode,
+    map: {},
+  });
+  const viewMap = views.mode === mode ? views.map : NO_VIEWS;
+  const setView = (key: string, shown: ThemeMode) =>
+    setViews((prev) => ({
+      mode,
+      map: { ...(prev.mode === mode ? prev.map : NO_VIEWS), [key]: shown },
+    }));
+
+  const base = useMemo(
+    () =>
+      themes.map((t) => ({
+        theme: t,
+        modes: surfaceModes(t),
+        editorIds: {
+          dark: resolveEditorThemeId("auto", t.id, themes, "dark"),
+          light: resolveEditorThemeId("auto", t.id, themes, "light"),
+        },
+      })),
+    [themes],
+  );
+
+  const editorRowId = useMemo(() => {
+    if (editorAuto) return themeId;
+    const matching = base
+      .filter((b) => b.editorIds.dark === editorPref || b.editorIds.light === editorPref)
+      .map((b) => b.theme.id);
+    if (pickedEditorRow && matching.includes(pickedEditorRow)) return pickedEditorRow;
+    return matching.includes(themeId) ? themeId : matching[0];
+  }, [base, editorAuto, editorPref, pickedEditorRow, themeId]);
+
+  const terminalRowId = pinnedTerminal ? pinnedTerminal.id : themeId;
 
   const rows = useMemo(
     () =>
-      themes.map((t) => {
-        const modes = surfaceModes(t);
-        const editorMode = modes.editor && flipped.has(`e:${t.id}`) ? otherMode(mode) : mode;
-        const terminalMode = modes.terminal && flipped.has(`t:${t.id}`) ? otherMode(mode) : mode;
+      base.map((b) => {
+        const t = b.theme;
+        const editorSel = t.id === editorRowId;
+        const terminalSel = t.id === terminalRowId;
+        const editorMode = !b.modes.editor
+          ? mode
+          : editorSel
+            ? editorAuto || b.editorIds[mode] === editorPref
+              ? mode
+              : otherMode(mode)
+            : (viewMap[`e:${t.id}`] ?? mode);
+        const terminalMode = !b.modes.terminal
+          ? mode
+          : terminalSel
+            ? (pinnedTerminal?.mode ?? mode)
+            : (viewMap[`t:${t.id}`] ?? mode);
         return {
           theme: t,
-          modes,
+          modes: b.modes,
+          editorSel,
+          terminalSel,
           editorMode,
           terminalMode,
-          editorId: resolveEditorThemeId("auto", t.id, themes, editorMode),
+          editorId: b.editorIds[editorMode],
           editorInfo: themeSurfaceInfo(t, themes, editorMode).editor,
           terminalInfo: themeSurfaceInfo(t, themes, terminalMode).terminal,
         };
       }),
-    [themes, mode, flipped],
+    [base, themes, mode, editorRowId, terminalRowId, editorAuto, editorPref, pinnedTerminal?.mode, viewMap],
   );
 
   const extraEditors = useMemo(() => unpairedEditorThemes(themes), [themes]);
 
   const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
-
-  const editorRowId = useMemo(() => {
-    const matching = rows.filter((r) => r.editorId === editorPref).map((r) => r.theme.id);
-    if (pickedEditorRow && matching.includes(pickedEditorRow)) return pickedEditorRow;
-    return matching.includes(themeId) ? themeId : matching[0];
-  }, [rows, editorPref, pickedEditorRow, themeId]);
 
   const followAppTheme = () => {
     void setEditorTheme(EDITOR_THEME_AUTO);
@@ -345,12 +382,8 @@ export function ThemeTable({
           const active = t.id === themeId;
           const isCustom = customIds.has(t.id);
           const themeSel = active;
-          const editorSel = editorAuto ? active : t.id === editorRowId;
-          const terminalSel =
-            r.terminalInfo !== undefined &&
-            (pinnedTerminal
-              ? t.id === pinnedTerminal.id && (pinnedTerminal.mode ?? mode) === r.terminalMode
-              : active && r.terminalMode === mode);
+          const editorSel = r.editorSel;
+          const terminalSel = r.terminalSel && r.terminalInfo !== undefined;
           return (
             <div key={t.id} className={cn(COLUMNS, "group relative items-stretch")}>
               <SelectionOutline selected={[themeSel, editorSel, terminalSel]} />
@@ -397,9 +430,8 @@ export function ThemeTable({
                         shown: r.editorMode,
                         flipped: r.editorMode !== mode,
                         onToggle: () => {
-                          toggleFlipped(`e:${t.id}`);
-                          if (!editorSel) return;
                           const next = otherMode(r.editorMode);
+                          if (!editorSel) return setView(`e:${t.id}`, next);
                           setPickedEditorRow(t.id);
                           void setEditorTheme(resolveEditorThemeId("auto", t.id, themes, next));
                         },
@@ -421,9 +453,8 @@ export function ThemeTable({
                         shown: r.terminalMode,
                         flipped: r.terminalMode !== mode,
                         onToggle: () => {
-                          toggleFlipped(`t:${t.id}`);
-                          if (!terminalSel) return;
                           const next = otherMode(r.terminalMode);
+                          if (!terminalSel) return setView(`t:${t.id}`, next);
                           void setTerminalTheme(
                             formatTerminalPref(t.id, next === mode ? undefined : next),
                           );
