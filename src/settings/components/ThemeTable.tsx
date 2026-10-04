@@ -4,9 +4,9 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   EDITOR_THEME_AUTO,
   EDITOR_THEME_LABELS,
-  isEditorThemeId,
   setEditorTheme,
   setTerminalTheme,
+  setThemeAuto,
   TERMINAL_THEME_AUTO,
 } from "@/modules/settings/store";
 import type { EditorThemeId } from "@/modules/settings/store";
@@ -18,7 +18,7 @@ import type { Theme, ThemeMode } from "@/modules/theme/types";
 import { Edit02Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { HoverCard } from "radix-ui";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { TerminalThemePreview } from "./TerminalThemePreview";
 
 const EditorThemePreview = lazy(() => import("./EditorThemePreview"));
@@ -154,13 +154,9 @@ export function ThemeTable({
 }: Props) {
   const editorPref = usePreferencesStore((s) => s.editorTheme);
   const terminalPref = usePreferencesStore((s) => s.terminalTheme);
+  const themeAuto = usePreferencesStore((s) => s.themeAuto);
   const editorAuto = editorPref === EDITOR_THEME_AUTO;
   const terminalAuto = terminalPref === TERMINAL_THEME_AUTO;
-
-  const [lastEditor, setLastEditor] = useState<string | null>(editorAuto ? null : editorPref);
-  const [lastTerminal, setLastTerminal] = useState<string | null>(
-    terminalAuto ? null : terminalPref,
-  );
 
   const rows = useMemo(
     () =>
@@ -176,21 +172,19 @@ export function ThemeTable({
 
   const activeEditorId = resolveEditorThemeId(editorPref, themeId, themes, mode);
 
-  const allAuto = editorAuto && terminalAuto;
+  const followAppTheme = () => {
+    void setEditorTheme(EDITOR_THEME_AUTO);
+    void setTerminalTheme(TERMINAL_THEME_AUTO);
+  };
 
   const toggleAuto = (auto: boolean) => {
-    if (auto) {
-      if (!editorAuto) setLastEditor(editorPref);
-      if (!terminalAuto) setLastTerminal(terminalPref);
-      void setEditorTheme(EDITOR_THEME_AUTO);
-      void setTerminalTheme(TERMINAL_THEME_AUTO);
-      return;
-    }
-    const backEditor = lastEditor && isEditorThemeId(lastEditor) ? lastEditor : activeEditorId;
-    const backTerminal =
-      lastTerminal && themes.some((t) => t.id === lastTerminal) ? lastTerminal : themeId;
-    void setEditorTheme(backEditor);
-    void setTerminalTheme(backTerminal);
+    void setThemeAuto(auto);
+    if (auto) followAppTheme();
+  };
+
+  const selectTheme = (id: string) => {
+    onSelectTheme(id);
+    if (themeAuto) followAppTheme();
   };
 
   return (
@@ -201,7 +195,7 @@ export function ThemeTable({
           <label className="flex items-center gap-1 text-[11px] font-medium normal-case tracking-normal text-foreground/80">
             <Checkbox
               id="theme-auto"
-              checked={allAuto}
+              checked={themeAuto}
               onCheckedChange={(v) => toggleAuto(v === true)}
             />
             Auto
@@ -254,7 +248,7 @@ export function ThemeTable({
               <div className={cn(frame(themeSel, false, editorSel), "flex min-w-0 items-center gap-1")}>
                 <button
                   type="button"
-                  onClick={() => onSelectTheme(t.id)}
+                  onClick={() => selectTheme(t.id)}
                   className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted/60"
                 >
                   <Swatch theme={t} mode={mode} />
@@ -285,7 +279,6 @@ export function ThemeTable({
                 info={info.editor}
                 frameClass={frame(editorSel, themeSel, terminalSel)}
                                 onPick={() => {
-                  setLastEditor(editorId);
                   void setEditorTheme(editorId);
                 }}
                 preview={<EditorPeek id={editorId} app={t} mode={mode} />}
@@ -294,7 +287,6 @@ export function ThemeTable({
                 info={info.terminal}
                 frameClass={frame(terminalSel, editorSel, false)}
                                 onPick={() => {
-                  setLastTerminal(t.id);
                   void setTerminalTheme(t.id);
                 }}
                 preview={<TerminalThemePreview palette={paletteOf(t, mode)} />}
@@ -316,7 +308,6 @@ export function ThemeTable({
                 info={{ label: EDITOR_THEME_LABELS[id], sharedWith: [] }}
                 frameClass={frame(sel, false, false)}
                                 onPick={() => {
-                  setLastEditor(id);
                   void setEditorTheme(id);
                 }}
                 preview={<EditorPeek id={id} app={activeTheme} mode={mode} />}

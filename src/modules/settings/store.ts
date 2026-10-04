@@ -135,6 +135,7 @@ export type Preferences = {
   themeId: string;
   terminalTheme: string;
   editorTheme: EditorThemePref;
+  themeAuto: boolean;
   editorFontFamily: string;
   editorFontSize: number;
   editorLetterSpacing: number;
@@ -201,6 +202,7 @@ const TOOLS_STORE_PATH = "settings-tools.json";
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
 const KEY_TERMINAL_THEME = "terminalTheme";
+const KEY_THEME_AUTO = "themeAuto";
 const KEY_AUTOSTART = "autostart";
 const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
@@ -369,6 +371,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   themeId: DEFAULT_THEME_ID,
   terminalTheme: TERMINAL_THEME_AUTO,
   editorTheme: EDITOR_THEME_AUTO,
+  themeAuto: true,
   editorFontFamily: "",
   editorFontSize: EDITOR_FONT_SIZE_DEFAULT,
   editorLetterSpacing: LETTER_SPACING_DEFAULT,
@@ -519,6 +522,7 @@ export async function loadPreferences(): Promise<Preferences> {
     themeId: getGeneral<string>(KEY_THEME_ID) ?? DEFAULT_PREFERENCES.themeId,
     terminalTheme:
       getGeneral<string>(KEY_TERMINAL_THEME) ?? DEFAULT_PREFERENCES.terminalTheme,
+    themeAuto: getGeneral<boolean>(KEY_THEME_AUTO) ?? DEFAULT_PREFERENCES.themeAuto,
     editorTheme: ((): EditorThemePref => {
       const stored = getEditor<string>(KEY_EDITOR_THEME);
       if (stored === EDITOR_THEME_AUTO || isEditorThemeId(stored)) return stored;
@@ -758,6 +762,10 @@ export async function setThemeId(value: string): Promise<void> {
 
 export async function setTerminalTheme(value: string): Promise<void> {
   await writePref(KEY_TERMINAL_THEME, value);
+}
+
+export async function setThemeAuto(value: boolean): Promise<void> {
+  await writePref(KEY_THEME_AUTO, value);
 }
 
 export async function setEditorTheme(value: EditorThemePref): Promise<void> {
@@ -1149,6 +1157,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_THEME]: "theme",
   [KEY_THEME_ID]: "themeId",
   [KEY_TERMINAL_THEME]: "terminalTheme",
+  [KEY_THEME_AUTO]: "themeAuto",
   [KEY_AUTOSTART]: "autostart",
   [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
