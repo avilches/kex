@@ -9,6 +9,7 @@ import {
 import { useTauriUnlisten } from "@/lib/useTauriListen";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  EDITOR_THEME_AUTO,
   onPreferencesChange,
   setTheme as persistTheme,
   setThemeId as persistThemeId,
@@ -20,9 +21,15 @@ import {
   listCustomThemes,
   onCustomThemesChange,
 } from "./customThemes";
-import { getBuiltinTheme, getDefaultTheme, listBuiltinThemes } from "./themes";
+import {
+  getBuiltinTheme,
+  getDefaultTheme,
+  listBuiltinThemes,
+  listTerminalOnlyThemes,
+} from "./themes";
+import { resolveEditorSurface } from "./resolveEditorSurface";
 import { resolveTerminalPalette } from "./resolveTerminalTheme";
-import type { Theme } from "./types";
+import type { EditorSurface, Theme } from "./types";
 
 export type { Theme };
 
@@ -143,17 +150,36 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
   }, [resolvedMode]);
 
   const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
+  const editorThemePref = usePreferencesStore((s) => s.editorTheme);
   const effectiveId = previewId ?? themeId;
+  const [editorSurface, setEditorSurface] = useState<EditorSurface | undefined>();
+  useEffect(() => {
+    if (editorThemePref === EDITOR_THEME_AUTO) {
+      setEditorSurface(undefined);
+      return;
+    }
+    let alive = true;
+    void import("@/modules/editor/lib/editorThemeSurface").then((m) => {
+      if (alive) setEditorSurface(m.readEditorThemeSurface(editorThemePref));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [editorThemePref]);
   useEffect(() => {
     const appTheme = resolveTheme(effectiveId, customThemes);
     const terminal = resolveTerminalPalette(
       terminalThemePref,
       appTheme,
-      [...listBuiltinThemes(), ...customThemes],
+      [...listBuiltinThemes(), ...listTerminalOnlyThemes(), ...customThemes],
       resolvedMode,
     );
-    applyTheme(appTheme, resolvedMode, terminal);
-  }, [effectiveId, resolvedMode, customThemes, terminalThemePref]);
+    const editor =
+      editorThemePref === EDITOR_THEME_AUTO
+        ? resolveEditorSurface(editorThemePref, appTheme, resolvedMode, () => undefined)
+        : editorSurface;
+    applyTheme(appTheme, resolvedMode, terminal, editor);
+  }, [effectiveId, resolvedMode, customThemes, terminalThemePref, editorThemePref, editorSurface]);
 
   const setMode = useCallback((next: ThemePref) => {
     setModeState(next);

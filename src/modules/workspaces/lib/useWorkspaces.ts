@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
+import { previewResumeCmd, seedRestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import {
   allPaneIds,
   allPanes,
@@ -29,6 +30,22 @@ export function captureClosedEntry(
   cap = 10,
 ): ClosedEntry[] {
   return [entry, ...entries].slice(0, cap);
+}
+
+export function buildReopenedTab(tab: Tab, newId: string): Tab {
+  const base = { ...tab, id: newId };
+  if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
+  if (base.kind === "git-diff" || base.kind === "git-commit-file") return { ...base, preview: false, locked: false };
+  if (base.kind === "terminal") return { ...base, locked: false };
+  return base;
+}
+
+// Whether a reopened closed tab is worth asking Rust for a live agent resume plan.
+// Mirrors the same "Run on start" gate the startup restore flow already applies
+// (useTerminalSession.ts), so a tab with it off never even fetches a plan it would
+// discard anyway.
+export function needsResumePlanLookup(tab: Tab): boolean {
+  return tab.kind === "terminal" && tab.restoreOnRestart !== false;
 }
 
 export function findReopenTarget(
@@ -581,19 +598,25 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaces((prev) => applyCloseTab(prev, workspaceId, tabId, history));
   }, []);
 
-  const reopenClosed = useCallback(() => {
+  const reopenClosed = useCallback(async () => {
     const [entry, ...rest] = closedTabsRef.current;
     if (!entry) return;
     const target = findReopenTarget(workspacesRef.current, activeWorkspaceId, entry);
     if (!target) return;
     closedTabsRef.current = rest;
-    const newTab: Tab = (() => {
-      const base = { ...entry.tab, id: newTabId() };
-      if (base.kind === "editor") return { ...base, dirty: false, preview: false, locked: false };
-      if (base.kind === "git-diff" || base.kind === "git-commit-file") return { ...base, preview: false, locked: false };
-      if (base.kind === "terminal") return { ...base, locked: false };
-      return base;
-    })();
+
+    const newId = newTabId();
+    // A reopened terminal tab that used to run an agent gets the same live,
+    // just-in-time resume plan the startup flow computes, keyed by the id the
+    // tab had before it was closed (agent-sessions.json is indexed by tab id).
+    // Seeding it under the new id lets useTerminalSession's normal restore-plan
+    // consumption pick it up with no other change to the spawn path.
+    if (needsResumePlanLookup(entry.tab)) {
+      const plan = await previewResumeCmd(entry.tab.id);
+      if (plan) seedRestorePlan(newId, plan);
+    }
+
+    const newTab = buildReopenedTab(entry.tab, newId);
     openTab(target.workspaceId, target.paneId, newTab);
   }, [openTab, activeWorkspaceId]);
 

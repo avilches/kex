@@ -38,7 +38,7 @@ export function buildMarkdownBaseExtensions(): Extension[] {
     EditorView.lineWrapping,
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
-        backgroundColor: "transparent !important",
+        backgroundColor: "var(--editor-background) !important",
         outline: "none",
         padding: "8px 16px",
       },
@@ -76,7 +76,7 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
     // precedence the earlier extension wins, which kept Rich monospace.
     Prec.high(EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
-        backgroundColor: "transparent !important",
+        backgroundColor: "var(--editor-background) !important",
         outline: "none",
         padding: "8px 16px",
       },

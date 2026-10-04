@@ -122,7 +122,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     if (blocks) {
       return (
         <div
-          className="zoom-exempt flex h-full w-full flex-col"
+          className="zoom-exempt flex h-full w-full flex-col bg-[var(--terminal-background)]"
           style={hideStyle}
         >
           <div
@@ -182,7 +182,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     }
 
     return (
-      <div className="zoom-exempt flex h-full w-full flex-col" style={hideStyle}>
+      <div className="zoom-exempt flex h-full w-full flex-col bg-[var(--terminal-background)]" style={hideStyle}>
         <div
           ref={containerRef}
           className={cn(

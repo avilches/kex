@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useTauriListen } from "@/lib/useTauriListen";
 import { routeAgentNotification } from "../lib/route";
+import { dropsStoredSession } from "../lib/sessionRecordPolicy";
 import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
@@ -112,6 +113,9 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const tabId = leafIdForPty(sig.id);
   if (tabId === null) return;
   const store = useAgentStore.getState();
+  if (dropsStoredSession(sig.kind)) {
+    invoke("agent_detach_session", { tabId }).catch(() => {});
+  }
 
   switch (sig.kind) {
     case "started":
@@ -158,14 +162,12 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       ensureSession(tabId, ctx, sig.agent ?? "claude");
       const failSession = store.sessions[tabId];
       store.finish(tabId);
-      invoke("agent_detach_session", { tabId }).catch(() => {});
       if (failSession)
         route(failSession, "error", ctx, sig.message ?? undefined);
       return;
     }
     case "SessionEnd": {
       store.finish(tabId);
-      invoke("agent_detach_session", { tabId }).catch(() => {});
       return;
     }
     case "MessageDisplay":
@@ -175,7 +177,6 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     case "exited":
       ensureSession(tabId, ctx, sig.agent ?? "claude");
       store.finish(tabId);
-      invoke("agent_detach_session", { tabId }).catch(() => {});
       return;
   }
 }

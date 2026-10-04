@@ -1,6 +1,6 @@
 import { withReadableText } from "./readableColors";
 import { getBuiltinTheme } from "./themes";
-import type { Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
+import type { EditorSurface, Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
 
 const COLOR_VAR: Record<keyof ThemeColors, string> = {
   background: "--background",
@@ -54,6 +54,8 @@ const ANSI_VARS: readonly string[] = [
 
 const ALL_VARS: readonly string[] = [
   ...Object.values(COLOR_VAR),
+  "--editor-background",
+  "--editor-foreground",
   "--terminal-background",
   "--terminal-foreground",
   "--terminal-cursor",
@@ -68,6 +70,7 @@ export function applyTheme(
   theme: Theme,
   mode: ThemeMode,
   terminalOverride?: TerminalPalette,
+  editorOverride?: EditorSurface,
 ): void {
   const root = document.documentElement;
   const variant = theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light;
@@ -83,6 +86,8 @@ export function applyTheme(
     writeColors(root, isBuiltin ? withReadableText(colors) : colors);
   }
   if (terminal) writeTerminal(root, terminal);
+  const editor = editorOverride ?? variant.editor;
+  if (editor) writeEditor(root, editor);
   lastApplied = theme.id;
 }
 
@@ -98,6 +103,11 @@ function writeColors(root: HTMLElement, c: ThemeColors): void {
     const v = c[k];
     if (v) root.style.setProperty(COLOR_VAR[k], v);
   }
+}
+
+function writeEditor(root: HTMLElement, e: EditorSurface): void {
+  if (e.background) root.style.setProperty("--editor-background", e.background);
+  if (e.foreground) root.style.setProperty("--editor-foreground", e.foreground);
 }
 
 function writeTerminal(root: HTMLElement, t: TerminalPalette): void {

@@ -35,6 +35,7 @@ export const jetbrainsClassic: Theme = {
         sidebarBorder: "#323232",
         sidebarRing: "#365880",
       },
+      editor: { background: "#2b2b2b", foreground: "#a9b7c6" },
       terminal: {
         background: "#2b2b2b",
         foreground: "#bbbbbb",
@@ -79,6 +80,7 @@ export const jetbrainsClassic: Theme = {
         sidebarBorder: "#ebecf0",
         sidebarRing: "#3574f0",
       },
+      editor: { background: "#ffffff", foreground: "#080808" },
       terminal: {
         background: "#ffffff",
         foreground: "#080808",

@@ -13,6 +13,10 @@ import Inspect from "vite-plugin-inspect";
 
 const host = process.env.TAURI_DEV_HOST;
 
+// `pnpm tauri dev` picks a free port per checkout (scripts/tauri.mjs) so several
+// worktrees can run at once; a bare `pnpm dev` keeps the classic 1420.
+const port = Number(process.env.KEX_DEV_PORT) || 1420;
+
 // Bundle/treemap analysis is opt-in: `ANALYZE=true pnpm build` emits stats.html.
 const analyze = process.env.ANALYZE === "true";
 
@@ -141,7 +145,7 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
   },
   clearScreen: false,
   server: {
-    port: 1420,
+    port,
     strictPort: true,
     host: host || false,
     // Worktrees symlink node_modules back to the main repo, so font/asset
@@ -158,7 +162,7 @@ export default defineConfig(async ({ mode }): Promise<UserConfig> => ({
       ? {
           protocol: "ws",
           host,
-          port: 1421,
+          port: port + 10000,
         }
       : undefined,
     watch: {

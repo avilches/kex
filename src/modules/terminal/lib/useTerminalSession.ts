@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { consumeRestorePlan, restorePlansReady } from "@/modules/agents/lib/agentSessionRestore";
+import { consumeRestorePlan, restorePlansReady, watchResume } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -902,6 +902,7 @@ function attachSession(
           if (plan) {
             if (plan.resumeCmd) {
               void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
+              watchResume(plan);
             } else if (plan.errorReason) {
               console.error(`[kex] session restore failed for tab ${leafId} (${plan.agent}): ${plan.errorReason}`);
               useAgentStore.getState().setRestoreError(leafId, leafId, plan.agent, plan.errorReason);

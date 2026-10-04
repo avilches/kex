@@ -1,6 +1,22 @@
 import { readTerminalTokens } from "@/styles/tokens";
 import type { ITheme } from "@xterm/xterm";
 
+type Mode = "light" | "dark";
+
+/**
+ * Programs pick colors for a dark terminal (white, light yellow), which vanish
+ * on a light background. xterm lifts a foreground to this ratio; dark keeps the
+ * palette exactly as the theme defines it.
+ */
+export function minimumContrastRatioFor(mode: Mode): number {
+  return mode === "light" ? 4.5 : 1;
+}
+
+export function currentMinimumContrastRatio(): number {
+  const light = document.documentElement.classList.contains("light");
+  return minimumContrastRatioFor(light ? "light" : "dark");
+}
+
 export function buildTerminalTheme(): ITheme {
   const t = readTerminalTokens();
   return {

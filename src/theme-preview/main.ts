@@ -4,7 +4,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { javascript } from "@codemirror/lang-javascript";
 import { applyTheme } from "@/modules/theme/applyTheme";
-import { listBuiltinThemes } from "@/modules/theme/themes";
+import { listBuiltinThemes, listTerminalOnlyThemes } from "@/modules/theme/themes";
 import { validateTheme } from "@/modules/theme/validateTheme";
 import { EDITOR_THEME_EXT } from "@/modules/editor/lib/themes";
 import { isEditorThemeId, TERMINAL_THEME_AUTO } from "@/modules/settings/store";
@@ -38,7 +38,7 @@ const TOKENS = [
   "accent-foreground", "destructive", "border", "input", "ring", "sidebar",
   "sidebar-foreground", "sidebar-primary", "sidebar-primary-foreground",
   "sidebar-accent", "sidebar-accent-foreground", "sidebar-border",
-  "sidebar-ring", "tab-focus-indicator", "terminal-background",
+  "sidebar-ring", "tab-focus-indicator", "editor-background", "editor-foreground", "terminal-background",
   "terminal-foreground", "terminal-cursor", "terminal-cursor-accent",
   "terminal-selection", ...ANSI_NAMES.map((n) => `terminal-ansi-${n}`),
 ];
@@ -286,12 +286,12 @@ function editorBody(focused: boolean): HTMLElement {
   const theme = currentTheme();
   const pair = theme.editorTheme?.[state.mode] ?? theme.editorTheme?.dark;
   const id = isEditorThemeId(pair) ? pair : state.mode === "light" ? "github-light" : "atomone";
-  const host = h("div", { "data-editor-theme": id });
+  const host = h("div", { "data-editor-theme": id, style: "background:var(--editor-background);color:var(--editor-foreground)" });
   const view = new EditorView({
     parent: host,
     state: EditorState.create({
       doc: 'import { greet } from "./greet";\n\nexport function main(name: string) {\n  // active line + selection\n  const msg = greet(name);\n  return `hello ${msg}` + 42;\n}\n',
-      extensions: [lineNumbers(), highlightActiveLine(), javascript({ typescript: true }), EDITOR_THEME_EXT[id]],
+      extensions: [lineNumbers(), highlightActiveLine(), javascript({ typescript: true }), EDITOR_THEME_EXT[id], EditorView.theme({ "&, &.cm-editor": { backgroundColor: "var(--editor-background) !important" }, ".cm-gutters": { backgroundColor: "transparent !important" } })],
       selection: { anchor: 68, head: 82 },
     }),
   });
@@ -375,7 +375,7 @@ function controls(): HTMLElement {
   };
   const terminalSelect = h("select", { class: "rounded border border-border bg-transparent px-2 py-1 text-[12px]", title: "Terminal theme" });
   terminalSelect.append(h("option", { value: TERMINAL_THEME_AUTO }, "terminal: auto"));
-  for (const o of terminalThemeOptions(themes, state.mode)) {
+  for (const o of terminalThemeOptions([...themes, ...listTerminalOnlyThemes()], state.mode)) {
     terminalSelect.append(h("option", { value: o.id }, `terminal: ${o.name}`));
   }
   terminalSelect.value = state.terminal;
@@ -451,7 +451,7 @@ function render(): void {
   applyTheme(
     theme,
     state.mode,
-    resolveTerminalPalette(state.terminal, theme, allThemes(), state.mode),
+    resolveTerminalPalette(state.terminal, theme, [...allThemes(), ...listTerminalOnlyThemes()], state.mode),
   );
   document.documentElement.dataset.previewTheme = theme.id;
   document.documentElement.dataset.previewTerminal = state.terminal;

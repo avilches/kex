@@ -65,9 +65,13 @@ Only `SessionStart` calls `session_store::record_session` today. The payload car
 `claude --resume` also fires `SessionStart` and gets recorded through the same path; there is no separate
 `UserPromptSubmit`-based recording in the live mechanism.
 
-Sessions are cleared from the store when the agent exits (`OSC 133;D` → `agent_detach_session`) or the user detaches
-manually. Panels typically close while in idle state because the webview is destroyed before the PTYs finish shutting
-down, so a single store file is sufficient.
+Sessions are cleared from the store only when the agent process exits (the `exited` signal, from `OSC 133;D`, which
+`AgentNotificationsBridge.tsx` turns into `agent_detach_session`; the rule lives in `lib/sessionRecordPolicy.ts`).
+`StopFailure` and `SessionEnd` deliberately do not clear it: the first is just a failed turn, and the second is also
+emitted by `/clear` and `/resume`, which keep the process alive. Claude Code only emits `SessionStart` on launch,
+resume and `/clear`, so a record dropped while the process is still running would never be written again and the
+tab could no longer be restored (TASK-790). Panels typically close while in idle state because the webview is
+destroyed before the PTYs finish shutting down, so a single store file is sufficient.
 
 ### Launch command capture
 
@@ -215,8 +219,13 @@ result in a module-level `Map<tabId, RestorePlan>`. `consumeRestorePlan(tabId)` 
 given tab — consume-once semantics prevent double injection.
 
 `previewResumeCmd(tabId)` is a separate, non-consuming call to `agent_session_preview_cmd`, used on demand by
-`TerminalPathBarMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below). It reads
-`agent-sessions.json` fresh each time and never mutates it, unlike `load_restore_plan`.
+`TerminalPathBarMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below), and by
+`useWorkspaces.ts`'s `reopenClosed` (see "Reopening a closed terminal tab" below). It reads `agent-sessions.json`
+fresh each time and never mutates it, unlike `load_restore_plan`.
+
+`seedRestorePlan(tabId, plan)` inserts a plan into the same module-level map `loadRestorePlans` populates, keyed by
+whatever tab id the caller chooses. It exists so a plan fetched on demand (from `previewResumeCmd`) can still be
+consumed through the one normal path, `consumeRestorePlan`.
 
 ### useTerminalSession.ts
 
@@ -236,6 +245,27 @@ emits when it actually renders its interactive prompt; `133;A` is not usable bec
 `_kex_precmd` once by hand while still sourcing the rc file) and only then writes. A 1500ms fallback covers shells
 without Kex integration. A fixed delay was unreliable: the resume command of the first PTY opened at startup was
 silently lost (see `WORKSPACES_GOTCHAS.md`, Bug 14). The same wait applies to a plain `persistentCommand`.
+
+### Reopening a closed terminal tab
+
+"Reopen Closed Tab" (`tab.reopenClosed` in `useWorkspaces.ts`) reuses this same consumption path instead of
+duplicating it. A reopened tab gets a brand new id, so it can never find a match in the startup-loaded
+`restorePlans` map on its own. Before creating the new tab, `reopenClosed` calls `previewResumeCmd` with the id the
+*closed* tab had (available on the captured `ClosedEntry`, gated by `needsResumePlanLookup` so a tab with "Run on
+start" off never bothers) and, if a plan comes back, seeds it into the same map under the *new* tab's id via
+`seedRestorePlan`. From there `useTerminalSession.ts` cannot tell the difference: it consumes the seeded plan
+exactly like one loaded at launch, same `cwdLaunch`, same 200ms injection delay, same `restored`/`restoreError`
+states.
+
+This is a fresh lookup, not a cached one: whether the resume command ends up as `--resume <id>` or
+`--session-id <id>` depends on whether the JSONL transcript exists yet, which can change between the moment the
+tab is closed and the moment it is reopened. Caching the computed command at close time could go stale; caching
+only the tab id (already needed to close/reopen at all) and recomputing on demand cannot.
+
+The tab's own entry in `agent-sessions.json`, still keyed by the *old* tab id, is left alone by this path (
+`previewResumeCmd` never mutates the store). It becomes an orphan once the resumed session's `SessionStart` hook
+writes a fresh record under the new tab id, and is cleaned up the same way any other orphaned entry is: by
+`pruneOrphanedPlans` on the next app launch.
 
 ---
 
@@ -332,10 +362,29 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | Case | Behaviour |
 |---|---|
 | `agentNotifications` disabled | Hooks not installed; store not written; `load_restore_plan` returns `[]` |
-| Agent exited cleanly | `agent_detach_session` removes panel from store; not in plan |
+| Agent process exited | `agent_detach_session` removes panel from store; not in plan |
+| Turn failed (`StopFailure`) or session ended (`SessionEnd`, incl. `/clear`, `/resume`) while the process lives | Store entry kept; the tab stays restorable |
 | Session started with `-p`/`--print` | `record_session` skips; session never written to store |
 | JSONL transcript missing (no messages sent) | Entry removed from store; `claude --session-id <id>` injected — new session reuses same UUID |
 | cwd deleted between sessions | `resumeCmd` empty, `errorReason` set; tab shows `⚠` restore error |
 | `KEX_TAB_ID` not set in shell | Hook exits silently; session not recorded |
 | `agent_session_restore_plan` IPC fails | `loadRestorePlans` catches and sets an empty Map; no crash |
 | Resume command fails inside terminal | User sees the error in the terminal; `⚠` stays until user types |
+
+### Dev-only restore check (`pnpm tauri dev`)
+
+Two failures leave no trace in the UI, so dev builds (`import.meta.env.DEV`, absent from production) warn with a
+Sonner toast. The pure logic is in `agents/lib/restoreCheck.ts`; the toasts are fired from `agentSessionRestore.ts`.
+
+- **Plan whose tab no longer exists.** `pruneOrphanedPlans` already dropped it silently; now a toast says how many of
+  the N loaded plans were lost and which tabs.
+- **Resume command that never reports a session.** `watchResume` runs after the command is written to the PTY and, 30 s
+  later (`RESUME_CHECK_MS`), toasts if `sessions[tabId].meta.sessionId` is still empty (it is filled by `SessionStart`
+  via `kex:agent-session-meta`). The timer starts when the tab's terminal spawns, so a plan in a workspace that is never
+  opened is not a failure.
+
+Each toast is also written to `Kex.log` (`user-data/logs-dev/Kex.log`) as a `WARN` line starting with
+`[agent-session]`, so the log can be searched for it after the toast is gone.
+
+It cannot see a session that was never recorded in the store (hook without `KEX_TAB_ID`, `agentNotifications` off,
+`-p`): that session is not among the N plans to begin with.
