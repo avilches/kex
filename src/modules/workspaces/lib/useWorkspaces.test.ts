@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
-import { applyCloseTab, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceStatus, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceStatus, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, needsResumePlanLookup, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -323,6 +323,46 @@ describe("findReopenTarget", () => {
       workspaceId: "w1",
     };
     expect(findReopenTarget([], "w1", entry)).toBeNull();
+  });
+});
+
+describe("buildReopenedTab", () => {
+  it("assigns the new id and resets editor-specific transient flags", () => {
+    const tab: Tab = { id: "old", kind: "editor", path: "/f.ts", dirty: true, preview: true, locked: true };
+    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "editor", path: "/f.ts", dirty: false, preview: false, locked: false });
+  });
+
+  it("unlocks a reopened terminal tab but keeps everything else", () => {
+    const tab: Tab = { id: "old", kind: "terminal", cwd: "/proj", locked: true, restoreOnRestart: true, persistentCommand: "lazygit" };
+    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "terminal", cwd: "/proj", locked: false, restoreOnRestart: true, persistentCommand: "lazygit" });
+  });
+
+  it("unlocks a reopened git-diff tab", () => {
+    const tab: Tab = { id: "old", kind: "git-diff", path: "/f.ts", repoRoot: "/repo", mode: "+", originalPath: null, locked: true };
+    expect(buildReopenedTab(tab, "new").locked).toBe(false);
+  });
+
+  it("leaves other kinds unchanged besides the id", () => {
+    const tab: Tab = { id: "old", kind: "browser", url: "https://example.com" };
+    expect(buildReopenedTab(tab, "new")).toEqual({ id: "new", kind: "browser", url: "https://example.com" });
+  });
+});
+
+describe("needsResumePlanLookup", () => {
+  it("is true for a terminal tab with no explicit restoreOnRestart", () => {
+    expect(needsResumePlanLookup({ id: "t1", kind: "terminal" })).toBe(true);
+  });
+
+  it("is true for a terminal tab with restoreOnRestart explicitly on", () => {
+    expect(needsResumePlanLookup({ id: "t1", kind: "terminal", restoreOnRestart: true })).toBe(true);
+  });
+
+  it("is false for a terminal tab with restoreOnRestart explicitly off", () => {
+    expect(needsResumePlanLookup({ id: "t1", kind: "terminal", restoreOnRestart: false })).toBe(false);
+  });
+
+  it("is false for non-terminal kinds", () => {
+    expect(needsResumePlanLookup({ id: "t1", kind: "browser", url: "https://example.com" })).toBe(false);
   });
 });
 

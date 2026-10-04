@@ -214,8 +214,13 @@ result in a module-level `Map<tabId, RestorePlan>`. `consumeRestorePlan(tabId)` 
 given tab — consume-once semantics prevent double injection.
 
 `previewResumeCmd(tabId)` is a separate, non-consuming call to `agent_session_preview_cmd`, used on demand by
-`TerminalPathBarMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below). It reads
-`agent-sessions.json` fresh each time and never mutates it, unlike `load_restore_plan`.
+`TerminalPathBarMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below), and by
+`useWorkspaces.ts`'s `reopenClosed` (see "Reopening a closed terminal tab" below). It reads `agent-sessions.json`
+fresh each time and never mutates it, unlike `load_restore_plan`.
+
+`seedRestorePlan(tabId, plan)` inserts a plan into the same module-level map `loadRestorePlans` populates, keyed by
+whatever tab id the caller chooses. It exists so a plan fetched on demand (from `previewResumeCmd`) can still be
+consumed through the one normal path, `consumeRestorePlan`.
 
 ### useTerminalSession.ts
 
@@ -231,6 +236,27 @@ if plan = consumeRestorePlan(leafId):
 ```
 
 The 200ms delay lets the shell finish its init sequence before the command is injected.
+
+### Reopening a closed terminal tab
+
+"Reopen Closed Tab" (`tab.reopenClosed` in `useWorkspaces.ts`) reuses this same consumption path instead of
+duplicating it. A reopened tab gets a brand new id, so it can never find a match in the startup-loaded
+`restorePlans` map on its own. Before creating the new tab, `reopenClosed` calls `previewResumeCmd` with the id the
+*closed* tab had (available on the captured `ClosedEntry`, gated by `needsResumePlanLookup` so a tab with "Run on
+start" off never bothers) and, if a plan comes back, seeds it into the same map under the *new* tab's id via
+`seedRestorePlan`. From there `useTerminalSession.ts` cannot tell the difference: it consumes the seeded plan
+exactly like one loaded at launch, same `cwdLaunch`, same 200ms injection delay, same `restored`/`restoreError`
+states.
+
+This is a fresh lookup, not a cached one: whether the resume command ends up as `--resume <id>` or
+`--session-id <id>` depends on whether the JSONL transcript exists yet, which can change between the moment the
+tab is closed and the moment it is reopened. Caching the computed command at close time could go stale; caching
+only the tab id (already needed to close/reopen at all) and recomputing on demand cannot.
+
+The tab's own entry in `agent-sessions.json`, still keyed by the *old* tab id, is left alone by this path (
+`previewResumeCmd` never mutates the store). It becomes an orphan once the resumed session's `SessionStart` hook
+writes a fresh record under the new tab id, and is cleaned up the same way any other orphaned entry is: by
+`pruneOrphanedPlans` on the next app launch.
 
 ---
 

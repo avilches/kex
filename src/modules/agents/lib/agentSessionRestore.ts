@@ -37,6 +37,15 @@ export async function loadRestorePlans(): Promise<void> {
   }
 }
 
+// Injects a plan fetched on demand (e.g. via previewResumeCmd for a reopened closed
+// tab) into the same map the startup restore flow populates, keyed by the tab id
+// that will actually spawn the PTY. consumeRestorePlan then treats it exactly like
+// a plan loaded at launch, no matter which one produced it.
+export function seedRestorePlan(tabId: string, plan: RestorePlan): void {
+  if (!restorePlans) restorePlans = new Map();
+  restorePlans.set(tabId, plan);
+}
+
 export function consumeRestorePlan(tabId: string): RestorePlan | null {
   if (!restorePlans) return null;
   const plan = restorePlans.get(tabId) ?? null;
