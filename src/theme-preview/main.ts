@@ -1,14 +1,26 @@
 import "../styles/globals.css";
 
-import { EditorState } from "@codemirror/state";
+import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { javascript } from "@codemirror/lang-javascript";
 import { applyTheme } from "@/modules/theme/applyTheme";
 import { listBuiltinThemes, listTerminalOnlyThemes } from "@/modules/theme/themes";
 import { validateTheme } from "@/modules/theme/validateTheme";
 import { EDITOR_THEME_EXT } from "@/modules/editor/lib/themes";
-import { isEditorThemeId, TERMINAL_THEME_AUTO } from "@/modules/settings/store";
+import { readEditorThemeSurface } from "@/modules/editor/lib/editorThemeSurface";
+import {
+  buildLivePreviewExtensions,
+  buildStaticPreviewExtensions,
+} from "@/modules/markdown/codemirror/lib/markdownExtensions";
+import { frontmatterAsCodeBlock } from "@/modules/markdown/lib/frontmatter";
+import {
+  EDITOR_THEME_LABELS,
+  EDITOR_THEMES,
+  isEditorThemeId,
+  TERMINAL_THEME_AUTO,
+} from "@/modules/settings/store";
 import { resolveTerminalPalette, terminalThemeOptions } from "@/modules/theme/resolveTerminalTheme";
+import markdownDemo from "./live-preview-demo.md?raw";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import type { Theme, ThemeMode } from "@/modules/theme/types";
@@ -20,8 +32,13 @@ const state = {
   themeId: params.get("theme") ?? "kex-default",
   mode: (params.get("mode") === "light" ? "light" : "dark") as ThemeMode,
   scheme: (params.get("scheme") === "jetbrains" ? "jetbrains" : "vscode") as Scheme,
-  view: (params.get("view") === "app" ? "app" : "swatches") as "app" | "swatches",
+  view: (["app", "markdown"].includes(params.get("view") ?? "") ? params.get("view") : "swatches") as
+    | "app"
+    | "swatches"
+    | "markdown",
   terminal: params.get("terminal") ?? TERMINAL_THEME_AUTO,
+  // An explicit editor theme, like the Settings choice; "auto" is the app theme's own pairing.
+  editor: params.get("editor") ?? "auto",
   custom: null as Theme | null,
 };
 
@@ -282,10 +299,15 @@ function terminalBody(focused: boolean): HTMLElement {
   );
 }
 
+function activeEditorId(theme: Theme): keyof typeof EDITOR_THEME_EXT {
+  if (isEditorThemeId(state.editor)) return state.editor;
+  const pair = theme.editorTheme?.[state.mode] ?? theme.editorTheme?.dark;
+  return isEditorThemeId(pair) ? pair : state.mode === "light" ? "github-light" : "atomone";
+}
+
 function editorBody(focused: boolean): HTMLElement {
   const theme = currentTheme();
-  const pair = theme.editorTheme?.[state.mode] ?? theme.editorTheme?.dark;
-  const id = isEditorThemeId(pair) ? pair : state.mode === "light" ? "github-light" : "atomone";
+  const id = activeEditorId(theme);
   const host = h("div", { "data-editor-theme": id, style: "background:var(--editor-background);color:var(--editor-foreground)" });
   const view = new EditorView({
     parent: host,
@@ -380,6 +402,11 @@ function controls(): HTMLElement {
   }
   terminalSelect.value = state.terminal;
   terminalSelect.onchange = () => set({ terminal: terminalSelect.value });
+  const editorSelect = h("select", { class: "rounded border border-border bg-transparent px-2 py-1 text-[12px]", title: "Editor theme" });
+  editorSelect.append(h("option", { value: "auto" }, "editor: auto"));
+  for (const id of EDITOR_THEMES) editorSelect.append(h("option", { value: id }, `editor: ${EDITOR_THEME_LABELS[id]}`));
+  editorSelect.value = state.editor;
+  editorSelect.onchange = () => set({ editor: editorSelect.value });
   const btn = (label: string, on: boolean, fn: () => void) => {
     const b = h("button", { class: `rounded border border-border px-2 py-1 text-[12px] ${on ? "bg-primary text-primary-foreground" : ""}` }, label);
     b.onclick = fn;
@@ -403,13 +430,38 @@ function controls(): HTMLElement {
     h("div", { class: "flex flex-wrap items-center gap-2" },
       select,
       terminalSelect,
+      editorSelect,
       btn("vscode", state.scheme === "vscode", () => set({ scheme: "vscode" })),
       btn("jetbrains", state.scheme === "jetbrains", () => set({ scheme: "jetbrains" })),
       btn("swatches view", state.view === "swatches", () => set({ view: "swatches" })),
       btn("app view", state.view === "app", () => set({ view: "app" })),
+      btn("markdown view", state.view === "markdown", () => set({ view: "markdown" })),
     ),
     area, load, err,
   );
+}
+
+// Rich (the Live Preview editor, cursor on the last line so nothing else shows raw) next
+// to Preview (the read-only view), same document, same theme. Both documents have the
+// same number of lines, so line n of one is line n of the other.
+const markdownViews: { rich?: EditorView; preview?: EditorView } = {};
+
+function markdownView(): HTMLElement {
+  const id = activeEditorId(currentTheme());
+  const identity = (src: string) => src;
+  const pane = (label: string, doc: string, extensions: Extension[]) => {
+    const host = h("div", { class: "h-[78vh] overflow-auto rounded-md border border-border/60", style: "background:var(--editor-background);color:var(--editor-foreground)" });
+    const view = new EditorView({
+      parent: host,
+      state: EditorState.create({ doc, extensions: [EDITOR_THEME_EXT[id], ...extensions], selection: { anchor: doc.length } }),
+    });
+    return { view, node: h("div", { class: "flex min-w-0 flex-col gap-1" }, h("div", { class: "text-[11px] text-muted-foreground" }, label), host) };
+  };
+  const rich = pane("Rich", markdownDemo, buildLivePreviewExtensions(identity));
+  const preview = pane("Preview", frontmatterAsCodeBlock(markdownDemo), buildStaticPreviewExtensions(identity));
+  markdownViews.rich = rich.view;
+  markdownViews.preview = preview.view;
+  return h("div", { class: "grid grid-cols-1 gap-3 xl:grid-cols-2", "data-editor-theme": id }, rich.node, preview.node);
 }
 
 function allThemes(): Theme[] {
@@ -434,7 +486,7 @@ function dump(): Record<string, string> {
 
 function set(patch: Partial<typeof state>): void {
   Object.assign(state, patch);
-  const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme, view: state.view, terminal: state.terminal });
+  const q = new URLSearchParams({ theme: state.themeId, mode: state.mode, scheme: state.scheme, view: state.view, terminal: state.terminal, editor: state.editor });
   history.replaceState(null, "", `?${q}`);
   render();
 }
@@ -452,6 +504,7 @@ function render(): void {
     theme,
     state.mode,
     resolveTerminalPalette(state.terminal, theme, [...allThemes(), ...listTerminalOnlyThemes()], state.mode),
+    isEditorThemeId(state.editor) ? readEditorThemeSurface(state.editor) : undefined,
   );
   document.documentElement.dataset.previewTheme = theme.id;
   document.documentElement.dataset.previewTerminal = state.terminal;
@@ -491,7 +544,9 @@ function render(): void {
       controls(),
       ...(state.view === "app"
         ? [section("App (approximation of the real layout)", appView())]
-        : [section("Surfaces", surfaces), section("Buttons and badges", buttons)]),
+        : state.view === "markdown"
+          ? [section("Markdown: Rich and Preview", markdownView())]
+          : [section("Surfaces", surfaces), section("Buttons and badges", buttons)]),
       section("Tokens (declared value read back as hex)", tokenGrid),
     ),
   );
@@ -499,8 +554,8 @@ function render(): void {
 
 declare global {
   interface Window {
-    kexThemePreview: { dump: typeof dump; set: typeof set };
+    kexThemePreview: { dump: typeof dump; set: typeof set; markdown: typeof markdownViews };
   }
 }
-window.kexThemePreview = { dump, set };
+window.kexThemePreview = { dump, set, markdown: markdownViews };
 render();

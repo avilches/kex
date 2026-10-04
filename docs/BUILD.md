@@ -25,11 +25,17 @@ Control, History, Notes), tab bar with agent chips, terminal (background, select
 ANSI), a real CodeMirror editor with the theme's paired editor theme, buttons/badges, and every CSS
 token. It is dev only and not part of `pnpm build`.
 
-- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app&terminal=auto|<theme id>`.
+- URL params: `?theme=<id>&mode=light|dark&scheme=vscode|jetbrains&view=swatches|app|markdown&terminal=auto|<theme id>&editor=auto|<editor theme id>`.
   `terminal` mirrors the "Terminal theme" preference: the terminal panes use that theme's palette
-  while the rest of the page keeps `theme`.
+  while the rest of the page keeps `theme`. `editor` mirrors the "Editor theme" preference the same way
+  (`auto` is the app theme's own pairing, an id sets the editor background and text color like Settings does).
   A user theme can be pasted as JSON in the textarea (validated with `validateTheme`). The selector
   lists every theme twice ("Nord dark", "Nord light"), so there is no separate dark/light button.
+- A third view, `markdown`, puts Rich (the Live Preview editor) and Preview (the read-only view) side by
+  side on `src/theme-preview/live-preview-demo.md`. Both documents have the same number of lines (Preview
+  turns the frontmatter into a yaml fence of the same height), so line n of one is line n of the other:
+  `kexThemePreview.markdown.rich` and `.preview` are the two `EditorView`s, to compare line classes and
+  computed styles. Use it to check that a change to the Live Preview extensions keeps both modes looking alike.
 - Two views, both static: every state is on screen at once, nothing needs a click. `swatches` lists
   every surface plus a terminal and an editor pane each in focused and unfocused state. `app` stacks
   two approximations of the real window (WorkspaceBar, Sidebar, Header, a terminal pane and an editor
