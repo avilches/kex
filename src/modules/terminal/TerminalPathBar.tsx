@@ -14,18 +14,10 @@ import type { Tab } from "@/modules/workspaces/lib/types";
 import { ComputerTerminal01Icon, ReloadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
-import { agentChip } from "./lib/agentChip";
 import { TerminalPathBarMenu } from "./TerminalPathBarMenu";
 
 function AgentChipIndicator({ session }: { session: AgentSession }) {
-  const chip = agentChip(session.status);
-  const model = session.meta?.model ?? session.agent;
-  return (
-    <span className="inline-flex items-center gap-1">
-      <span className={cn("size-2 rounded-full", chip.dotClass)} title={chip.title} />
-      <span>{model}</span>
-    </span>
-  );
+  return <span>{session.meta?.model ?? session.agent}</span>;
 }
 
 type Props = {
@@ -119,7 +111,7 @@ export function TerminalPathBar({
             <span>{formatMem(metrics.memBytes)}</span>
           </>
         )}
-        {restoreOnRestart !== false && persistentCommand && (
+        {!agentSession && restoreOnRestart !== false && persistentCommand && (
           <span
             title={persistentCommand}
             className="flex size-[22px] items-center justify-center text-muted-foreground"
