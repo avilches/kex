@@ -20,7 +20,7 @@ export function MarkdownPreviewPane({ content, path }: Props) {
   const extensions = useMemo(() => buildStaticPreviewExtensions(resolveImageSrc), [resolveImageSrc]);
   const value = useMemo(() => frontmatterAsCodeBlock(content), [content]);
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-[var(--editor-background)] text-[var(--editor-foreground)]">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-[var(--editor-background)] text-[var(--editor-foreground)]">
       <CodeMirror
         value={value}
         theme={themeExt}
