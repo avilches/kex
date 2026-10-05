@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { arrayMove } from "@dnd-kit/sortable";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
@@ -618,6 +619,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
     const newTab = buildReopenedTab(entry.tab, newId);
     openTab(target.workspaceId, target.paneId, newTab);
+    useAgentStore.getState().retargetNotifications(entry.tab.id, newId);
   }, [openTab, activeWorkspaceId]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {

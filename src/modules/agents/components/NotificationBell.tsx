@@ -94,6 +94,7 @@ export function NotificationBell({ onActivate }: Props) {
   const [installing, setInstalling] = useState(false);
   const sessions = useAgentStore((s) => s.sessions);
   const notifications = useAgentStore((s) => s.notifications);
+  const tabLocations = useAgentStore((s) => s.tabLocations);
   const markAllRead = useAgentStore((s) => s.markAllRead);
   const clearAll = useAgentStore((s) => s.clearAll);
   const oscTitles = useSyncExternalStore(
@@ -112,8 +113,8 @@ export function NotificationBell({ onActivate }: Props) {
   }, [open]);
 
   const entries = useMemo(
-    () => buildAgentEntries(sessions, notifications),
-    [sessions, notifications],
+    () => buildAgentEntries(sessions, notifications, tabLocations),
+    [sessions, notifications, tabLocations],
   );
   const activeCount = entries.filter(
     (e) => e.visual === "attention" || e.visual === "working",

@@ -1,6 +1,6 @@
 import type { AgentNotification, AgentSession } from "./types";
 
-type AgentEntryVisual = "attention" | "working" | "error";
+export type AgentEntryVisual = "attention" | "working" | "error";
 
 export type AgentEntry = {
   tabId: string;
@@ -29,6 +29,7 @@ const RANK: Record<AgentEntryVisual, number> = {
 export function buildAgentEntries(
   sessions: Record<string, AgentSession>,
   notifications: AgentNotification[],
+  tabLocations: Record<string, string> | null = null,
 ): AgentEntry[] {
   const notifByTab = new Map<string, AgentNotification>();
   for (const n of notifications) {
@@ -45,7 +46,11 @@ export function buildAgentEntries(
     const session = sessions[tabId];
     const notif = notifByTab.get(tabId);
     const agent = session?.agent ?? notif?.agent ?? "claude";
-    const workspaceId = session?.workspaceId ?? notif?.workspaceId ?? "";
+    // A closed tab has no row (it comes back if the tab is reopened); the live
+    // location also wins over the stored workspace id when a tab was moved.
+    if (tabLocations && !(tabId in tabLocations)) continue;
+    const workspaceId =
+      tabLocations?.[tabId] ?? session?.workspaceId ?? notif?.workspaceId ?? "";
 
     let visual: AgentEntryVisual;
     let at: number;
@@ -83,4 +88,16 @@ export function buildAgentEntries(
   );
 
   return entries;
+}
+
+/** The most urgent visual of the agents living in each workspace. */
+export function workspaceAgentVisuals(
+  entries: AgentEntry[],
+): Record<string, AgentEntryVisual> {
+  const out: Record<string, AgentEntryVisual> = {};
+  for (const e of entries) {
+    const prev = out[e.workspaceId];
+    if (!prev || RANK[e.visual] < RANK[prev]) out[e.workspaceId] = e.visual;
+  }
+  return out;
 }

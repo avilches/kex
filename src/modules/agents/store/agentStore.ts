@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { sameLocations } from "@/modules/workspaces/lib/tabLocations";
 import type {
   AgentNotification,
   AgentSession,
@@ -15,6 +16,10 @@ type AgentStoreState = {
   sessions: Record<string, AgentSession>;
   localAgent: LocalAgentState;
   notifications: AgentNotification[];
+  /** tabId -> workspaceId of every live tab; null until the app reports it. */
+  tabLocations: Record<string, string> | null;
+  setTabLocations: (locations: Record<string, string>) => void;
+  retargetNotifications: (oldTabId: string, newTabId: string) => void;
   start: (tabId: string, workspaceId: string, agent: string) => void;
   startIdle: (tabId: string, workspaceId: string, agent: string) => void;
   setStatus: (tabId: string, status: AgentStatus) => void;
@@ -40,6 +45,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   sessions: {},
   localAgent: null,
   notifications: [],
+  tabLocations: null,
 
   start: (tabId, workspaceId, agent) =>
     set((s) => {
@@ -234,6 +240,22 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       if (!s.notifications.some((n) => !n.read)) return s;
       return {
         notifications: s.notifications.map((n) => ({ ...n, read: true })),
+      };
+    }),
+
+  setTabLocations: (locations) =>
+    set((s) =>
+      sameLocations(s.tabLocations, locations) ? s : { tabLocations: locations },
+    ),
+
+  // A reopened tab gets a fresh id; its pending notification follows it.
+  retargetNotifications: (oldTabId, newTabId) =>
+    set((s) => {
+      if (!s.notifications.some((n) => n.tabId === oldTabId)) return s;
+      return {
+        notifications: s.notifications.map((n) =>
+          n.tabId === oldTabId ? { ...n, tabId: newTabId } : n,
+        ),
       };
     }),
 

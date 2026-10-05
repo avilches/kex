@@ -3,6 +3,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { tabLocations } from "@/modules/workspaces/lib/tabLocations";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -2759,10 +2760,13 @@ export default function App() {
         if (activeTabId) editorHandles.current.get(activeTabId)?.redo();
       },
       "notifications.jumpToLast": () => {
-        const first = useAgentStore.getState().notifications[0];
+        const { notifications, tabLocations: live } = useAgentStore.getState();
+        const first = notifications.find((n) => live && n.tabId in live);
         if (!first) return;
-        setActiveWorkspaceId(first.workspaceId);
-        onActivateTabStable(first.workspaceId, first.tabId);
+        const workspaceId = live?.[first.tabId];
+        if (!workspaceId) return;
+        setActiveWorkspaceId(workspaceId);
+        onActivateTabStable(workspaceId, first.tabId);
         setTimeout(() => requestLeafFocus(first.tabId), 50);
       },
       "tab.lock": () => {
@@ -2894,10 +2898,16 @@ export default function App() {
 
   // ── Agent activation ──────────────────────────────────────────────────────
 
+  useEffect(() => {
+    useAgentStore.getState().setTabLocations(tabLocations(workspaces));
+  }, [workspaces]);
+
   const onActivateAgent = useCallback(
-    (workspaceId: string, tabId: string) => {
-      setActiveWorkspaceId(workspaceId);
-      onActivateTabStable(workspaceId, tabId);
+    (_storedWorkspaceId: string, tabId: string) => {
+      const live = useAgentStore.getState().tabLocations?.[tabId];
+      if (!live) return;
+      setActiveWorkspaceId(live);
+      onActivateTabStable(live, tabId);
       setTimeout(() => requestLeafFocus(tabId), 50);
     },
     [setActiveWorkspaceId, onActivateTabStable],
