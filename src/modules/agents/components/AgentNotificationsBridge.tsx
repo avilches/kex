@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useTauriListen } from "@/lib/useTauriListen";
 import { routeAgentNotification } from "../lib/route";
-import { endsAgentSession } from "../lib/sessionEndPolicy";
+import { endsAgentSession, isRunningAgentSession } from "../lib/sessionEndPolicy";
 import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
@@ -93,7 +93,7 @@ function route(
 
 function ensureSession(tabId: string, ctx: Ctx, agent: string): boolean {
   const store = useAgentStore.getState();
-  if (store.sessions[tabId]) return true;
+  if (isRunningAgentSession(store.sessions[tabId])) return true;
   const info = tabInfo(ctx.workspaces, tabId);
   if (!info) return false;
   store.start(tabId, info.workspaceId, agent);
@@ -102,7 +102,7 @@ function ensureSession(tabId: string, ctx: Ctx, agent: string): boolean {
 
 function ensureSessionIdle(tabId: string, ctx: Ctx, agent: string): boolean {
   const store = useAgentStore.getState();
-  if (store.sessions[tabId]) return true;
+  if (isRunningAgentSession(store.sessions[tabId])) return true;
   const info = tabInfo(ctx.workspaces, tabId);
   if (!info) return false;
   store.startIdle(tabId, info.workspaceId, agent);

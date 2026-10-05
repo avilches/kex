@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { endsAgentSession } from "./sessionEndPolicy";
+import { endsAgentSession, isRunningAgentSession } from "./sessionEndPolicy";
+import type { AgentSession } from "./types";
 
 describe("endsAgentSession", () => {
   it("ends the session when the agent process exits", () => {
@@ -18,5 +19,31 @@ describe("endsAgentSession", () => {
     for (const kind of ["started", "UserPromptSubmit", "Notification", "Stop", "PermissionRequest", "MessageDisplay"] as const) {
       expect(endsAgentSession(kind)).toBe(false);
     }
+  });
+});
+
+describe("isRunningAgentSession", () => {
+  const base: AgentSession = {
+    tabId: "tab-1",
+    workspaceId: "ws-1",
+    agent: "claude",
+    status: "idle",
+    startedAt: 0,
+    lastActivityAt: 0,
+    attentionSince: null,
+    restored: false,
+    restoreError: false,
+  };
+
+  it("is false when the tab has no session", () => {
+    expect(isRunningAgentSession(undefined)).toBe(false);
+  });
+
+  it("is true for a live session", () => {
+    expect(isRunningAgentSession(base)).toBe(true);
+  });
+
+  it("is false for the placeholder left by a failed restore", () => {
+    expect(isRunningAgentSession({ ...base, restoreError: true })).toBe(false);
   });
 });

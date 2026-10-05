@@ -315,7 +315,9 @@ surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side o
   there is no up-front IPC cost.
 - **Started elapsed**: how long ago the session started.
 - **Restore error**: shown when `restoreError` is set on the session (e.g. the resume command failed or the cwd was
-  deleted). The tab title turns red and a `⚠` icon appears; the menu surfaces the error reason for diagnosis.
+  deleted). The tab title turns red and a `⚠` icon appears; the menu surfaces the error reason for diagnosis. The session with `restoreError` is only a placeholder: when
+  the user launches an agent by hand in that tab, the `started` signal replaces it (`isRunningAgentSession`) and the
+  error clears.
 
 The agent icon in the tab bar (`PaneTabBar.tsx`) gets a diagonal strike-through when the tab's "Run on start" is off
 (`agentRestoreDisabled`), meaning the live session will not come back on the next launch. It only shows while an

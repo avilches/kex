@@ -1,4 +1,4 @@
-import type { AgentSignal } from "./types";
+import type { AgentSession, AgentSignal } from "./types";
 
 // An agent session, both the stored record and the icon on the tab, lasts as long as the
 // agent process: only its exit ends it. StopFailure (a failed turn) and SessionEnd (also
@@ -7,4 +7,11 @@ import type { AgentSignal } from "./types";
 // still runs would never be registered again.
 export function endsAgentSession(kind: AgentSignal["kind"]): boolean {
   return kind === "exited";
+}
+
+// A failed restore leaves a placeholder session on the tab. It must not count as a running
+// agent, or the next `started` signal (the user launching claude by hand) never replaces it
+// and the tab stays flagged as failed until that agent exits.
+export function isRunningAgentSession(session: AgentSession | undefined): boolean {
+  return session !== undefined && !session.restoreError;
 }
