@@ -145,10 +145,14 @@ For each session in the store:
    same UUID — equivalent to what Claude would have done had the user run it again without `--resume`. The stale
    store entry is removed now; if the session produces messages, hooks will re-record it with the new
    `transcript_path`.
-3. **Read the launch cwd.** Opens the JSONL with `BufReader` and reads only as many lines as needed to find the first
-   `cwd` field, avoiding loading large transcripts into memory.
+3. **Read the launch cwd.** Opens the JSONL with `BufReader` and reads only as many lines as needed. If a
+   `worktree-state` entry with a non-null `worktreeSession` comes first (Claude Code writes it before the first entry
+   with a cwd), its `originalCwd` is used: it is where the command was launched from, while the `cwd` of the entries is
+   the worktree, which may be deleted by restore time. Otherwise the first `cwd` field is used, and `cwd_launch` from
+   the store if the transcript has none.
 4. **Verify the directory exists.** If the cwd is missing or was deleted, the plan carries a non-empty `error_reason`
-   and an empty `resume_cmd` (signals a restore error in the tab UI). Entry is removed from the store.
+   and an empty `resume_cmd` (signals a restore error in the tab UI). The store entry is kept, so the session is not
+   lost; it goes away when the agent exits or the tab is closed.
 5. **Build the command.**
    - JSONL found: if `launch_cmd` is present, `strip_for_resume_base(launch_cmd) + --resume <id>`;
      otherwise `claude --resume '<id>'` / `codex resume --last` / `gemini --resume '<id>'`
@@ -372,7 +376,8 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | Turn failed (`StopFailure`) or session ended (`SessionEnd`, incl. `/clear`, `/resume`) while the process lives | Store entry kept; the tab stays restorable |
 | Session started with `-p`/`--print` | `record_session` skips; session never written to store |
 | JSONL transcript missing (no messages sent) | Entry removed from store; `claude --session-id <id>` injected — new session reuses same UUID |
-| cwd deleted between sessions | `resumeCmd` empty, `errorReason` set; tab shows `⚠` restore error |
+| launch cwd deleted between sessions | `resumeCmd` empty, `errorReason` set; tab shows `⚠` restore error; store entry kept |
+| session entered a worktree later deleted | restored in the worktree's `originalCwd` (from `worktree-state`), not in the worktree |
 | `KEX_TAB_ID` not set in shell | Hook exits silently; session not recorded |
 | `agent_session_restore_plan` IPC fails | `loadRestorePlans` catches and sets an empty Map; no crash |
 | Resume command fails inside terminal | User sees the error in the terminal; `⚠` stays until user types |

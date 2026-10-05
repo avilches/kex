@@ -108,11 +108,21 @@ fn read_launch_cwd_from_jsonl(jsonl: &PathBuf) -> Option<String> {
     let reader = std::io::BufReader::new(file);
     for line in reader.lines() {
         let line = line.ok()?;
-        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) {
-            if let Some(cwd) = obj.get("cwd").and_then(|v| v.as_str()) {
-                if !cwd.is_empty() {
-                    return Some(cwd.to_string());
-                }
+        let Ok(obj) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+        // Claude Code writes `worktree-state` before the first entry carrying a cwd. While the
+        // session is inside a worktree, `originalCwd` is where the command was launched from;
+        // the entry's own `cwd` is the worktree, which may be deleted by the time of the restore.
+        if let Some(original) = obj
+            .get("worktreeSession")
+            .and_then(|w| w.get("originalCwd"))
+            .and_then(|v| v.as_str())
+            .filter(|c| !c.is_empty())
+        {
+            return Some(original.to_string());
+        }
+        if let Some(cwd) = obj.get("cwd").and_then(|v| v.as_str()) {
+            if !cwd.is_empty() {
+                return Some(cwd.to_string());
             }
         }
     }
@@ -241,8 +251,8 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
     for (tab_id, record) in tabs {
         let agent = record.agent.unwrap_or_else(|| "claude".to_string());
 
-        // Prefer the cwd recorded in the transcript (more accurate than cwd_launch when
-        // the user cd'd before running the agent).
+        // Prefer the launch directory recorded in the transcript (the worktree's originalCwd when
+        // the session entered one, else the first cwd) over cwd_launch.
         let jsonl = find_jsonl(&record.session_id, &record.transcript_path);
 
         // When JSONL is absent the session was opened but no message was ever sent.
@@ -281,9 +291,6 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
 
         if !PathBuf::from(&cwd_launch).exists() {
             log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent} cwd not found: {cwd_launch}");
-            if let Some(path) = store_path {
-                remove_panel_from_store(&tab_id, path);
-            }
             plans.push(RestorePlan {
                 tab_id, agent,
                 resume_cmd: String::new(),
@@ -633,6 +640,67 @@ mod tests {
         // Unlike load_restore_plan, this must never touch the store file on disk.
         let after = std::fs::read_to_string(&store_path).unwrap();
         assert_eq!(before, after);
+    }
+
+    fn plan_for_transcript(dir: &Path, lines: &[String], cwd_launch: &Path) -> (RestorePlan, PathBuf) {
+        let jsonl = dir.join("session.jsonl");
+        std::fs::write(&jsonl, lines.join("\n") + "\n").unwrap();
+        let store_path = dir.join("agent-sessions.json");
+        write_store(&store_path, sample_tabs(cwd_launch, &jsonl));
+        let plans = load_restore_plan_from_path(&store_path);
+        (plans.into_iter().next().expect("one plan"), store_path)
+    }
+
+    #[test]
+    fn restore_uses_original_cwd_when_session_entered_a_worktree() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("app");
+        std::fs::create_dir_all(&launch).unwrap();
+        let worktree = dir.path().join("deleted-worktree");
+        let lines = vec![
+            r#"{"type":"mode"}"#.to_string(),
+            format!(
+                r#"{{"type":"worktree-state","worktreeSession":{{"originalCwd":"{}","worktreePath":"{}"}}}}"#,
+                launch.display(), worktree.display()
+            ),
+            format!(r#"{{"type":"user","cwd":"{}"}}"#, worktree.display()),
+        ];
+
+        let (plan, _) = plan_for_transcript(dir.path(), &lines, &worktree);
+
+        assert_eq!(plan.error_reason, "");
+        assert_eq!(plan.cwd_launch, launch.display().to_string());
+    }
+
+    #[test]
+    fn restore_falls_back_to_first_cwd_without_worktree_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("app");
+        std::fs::create_dir_all(&launch).unwrap();
+        let lines = vec![
+            r#"{"type":"mode"}"#.to_string(),
+            r#"{"type":"worktree-state","worktreeSession":null}"#.to_string(),
+            format!(r#"{{"type":"user","cwd":"{}"}}"#, launch.display()),
+        ];
+
+        let (plan, _) = plan_for_transcript(dir.path(), &lines, &dir.path().join("elsewhere"));
+
+        assert_eq!(plan.error_reason, "");
+        assert_eq!(plan.cwd_launch, launch.display().to_string());
+    }
+
+    #[test]
+    fn restore_keeps_store_entry_when_launch_dir_is_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("gone");
+        let lines = vec![format!(r#"{{"type":"user","cwd":"{}"}}"#, missing.display())];
+
+        let (plan, store_path) = plan_for_transcript(dir.path(), &lines, &missing);
+
+        assert!(plan.error_reason.contains("Directory not found"));
+        assert_eq!(plan.resume_cmd, "");
+        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"));
     }
 
     #[test]
