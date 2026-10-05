@@ -224,7 +224,7 @@ export function MarkdownTab(props: Props): JSX.Element {
                 </svg>
               </button>
             )}
-            <div className="flex items-center overflow-hidden rounded border border-border/60 text-[11px]">
+            <div className="flex items-center overflow-hidden rounded bg-muted/60 text-[11px]">
               {VIEW_MODES.map(({ mode, label }) => (
                 <button
                   key={mode}
