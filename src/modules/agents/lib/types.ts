@@ -28,6 +28,8 @@ export type AgentSessionMeta = {
   sessionTitle?: string;
   model?: string;
   transcriptPath?: string;
+  agentCwd?: string;
+  worktreeCwd?: string;
 };
 
 export type AgentSession = {

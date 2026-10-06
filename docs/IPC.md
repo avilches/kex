@@ -185,6 +185,8 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 | `PermissionRequest` | `kex:agent-signal` kind=`PermissionRequest` | Includes `tool_name` as `toolName` |
 | `MessageDisplay` | `kex:agent-signal` kind=`MessageDisplay` | Only on `final: true` chunks; `delta` as `message` |
 
+Every hook event that carries a non-empty `cwd` (all but `SessionEnd`) also emits `kex:agent-cwd` (`{ tabId, cwd }`). `AgentNotificationsBridge` resolves it with `git_resolve_repo`; when it is a linked worktree the root is stored in the session as `meta.worktreeCwd`. F4 and autofocus on that terminal tab then target the worktree instead of the shell cwd (which does not change when the agent enters a worktree), and fall back to the shell cwd when the agent leaves it or its session ends.
+
 Independent of agents, the PTY reader emits `kex:shell-ready` (`{ id }`, the PTY id) once per PTY, on the first `OSC 133;B` (`AgentDetector` -> `Transition::ShellReady`, handled in `session.rs` before the agent-signal plumbing). The frontend (`shellReadyWaiter.ts`) uses it to know when it is safe to inject a "Run on start" command.
 
 The socket is created in `session::spawn()` before the child process starts, so `KEX_IPC` is always set when the shell reads its environment. The socket file is removed when the `IpcGuard` drops (PTY session closed).

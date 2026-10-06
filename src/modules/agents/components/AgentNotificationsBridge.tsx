@@ -2,6 +2,7 @@ import type { Workspace } from "@/modules/workspaces";
 import { findTabPane, focusedTabId } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
 import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
+import { native } from "@/lib/native";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useTauriListen } from "@/lib/useTauriListen";
@@ -20,6 +21,24 @@ type AgentSessionMetaPayload = {
   model: string;
   transcriptPath: string;
 };
+const latestAgentCwd = new Map<string, string>();
+
+function handleAgentCwd(tabId: string, cwd: string) {
+  const known = useAgentStore.getState().sessions[tabId]?.meta?.agentCwd;
+  if (known === cwd) return;
+  latestAgentCwd.set(tabId, cwd);
+  void native
+    .gitResolveRepo(cwd)
+    .catch(() => null)
+    .then((info) => {
+      if (latestAgentCwd.get(tabId) !== cwd) return;
+      useAgentStore.getState().setMeta(tabId, {
+        agentCwd: cwd,
+        worktreeCwd: info?.isWorktree ? info.repoRoot : undefined,
+      });
+    });
+}
+
 type Ctx = {
   workspaces: Workspace[];
   activeWorkspaceId: string;
@@ -41,6 +60,10 @@ function tabInfo(
       return { workspaceId: ws.id, title };
     }
   }
+  useTauriListen<{ tabId: string; cwd: string }>("kex:agent-cwd", (e) =>
+    handleAgentCwd(e.payload.tabId, e.payload.cwd),
+  );
+
   return null;
 }
 

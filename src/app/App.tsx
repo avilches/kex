@@ -1081,6 +1081,12 @@ export default function App() {
 
   const lastFocusFolderRef = useRef<string | null>(null);
 
+  // Worktree an agent has entered in the active tab; the sidebar follows it
+  // instead of the shell cwd (which stays put) until the agent leaves.
+  const agentWorktree = useAgentStore((s) =>
+    activeTabId ? (s.sessions[activeTabId]?.meta?.worktreeCwd ?? null) : null,
+  );
+
   const focusSidebar = useCallback(
     (
       folder: string,
@@ -1151,16 +1157,16 @@ export default function App() {
     const target =
       ap && isAutofocusTab(ap) && ap.autofocus
         ? (tabFilePath(ap) ??
-          (ap.kind === "terminal" ? (ap.cwd ?? null) : null))
+          (ap.kind === "terminal" ? (agentWorktree ?? ap.cwd ?? null) : null))
         : null;
-    const signal = target ? activeTabId : null;
+    const signal = target ? `${activeTabId}|${agentWorktree ?? ""}` : null;
     const prev = prevAutofocusSignalRef.current;
     prevAutofocusSignalRef.current = signal;
     if (prev === undefined) return; // skip initial mount
     if (signal && signal !== prev && target) {
       focusSidebar(target, { fromShortcut: false });
     }
-  }, [activeTabId, activeTab, focusSidebar]);
+  }, [activeTabId, activeTab, agentWorktree, focusSidebar]);
 
   // Whether the saved workspace root still exists on disk, so the selector can
   // disable the option when it is unset or missing.
@@ -2185,7 +2191,11 @@ export default function App() {
               found.tab.kind === "terminal" &&
               found.tab.autofocus
             ) {
-              focusSidebar(cwd, { fromShortcut: false });
+              focusSidebar(
+                useAgentStore.getState().sessions[tabId]?.meta?.worktreeCwd ??
+                  cwd,
+                { fromShortcut: false },
+              );
             }
           }
         }
@@ -2785,7 +2795,9 @@ export default function App() {
         if (!activeTab) return;
         const target =
           tabFilePath(activeTab) ??
-          (activeTab.kind === "terminal" ? (activeTab.cwd ?? null) : null);
+          (activeTab.kind === "terminal"
+            ? (agentWorktree ?? activeTab.cwd ?? null)
+            : null);
         if (target) focusSidebar(target, { fromShortcut: true });
       },
       "tab.toggleAutofocus": () => {
@@ -2835,6 +2847,7 @@ export default function App() {
       reopenClosed,
       requestCloseWorkspace,
       focusSidebar,
+      agentWorktree,
       openNewTerminal,
       addWorkspace,
       openTab,

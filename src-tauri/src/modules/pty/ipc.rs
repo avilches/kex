@@ -14,6 +14,7 @@ use crate::modules::agent::session_store;
 
 const AGENT_EVENT: &str = "kex:agent-signal";
 const AGENT_SESSION_META_EVENT: &str = "kex:agent-session-meta";
+const AGENT_CWD_EVENT: &str = "kex:agent-cwd";
 
 /// Directory that holds this user's IPC sockets.
 ///
@@ -331,6 +332,9 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         log::debug!("[ipc] invalid JSON: {}", truncate_for_log(json, MAX_LOG_FIELD_LEN));
         return;
     };
+    if !p.cwd.is_empty() && p.event != "SessionEnd" {
+        let _ = app.emit(AGENT_CWD_EVENT, serde_json::json!({ "tabId": tab_id, "cwd": p.cwd }));
+    }
     match p.event.as_str() {
         "SessionStart" => {
             let source        = p.source.as_deref().unwrap_or("");
