@@ -322,7 +322,15 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       },
       // Shrink-to-fit: a small table is as wide as its content, a wide one is
       // capped by its wrapper, which scrolls.
-      ".cm-lp-table": { borderCollapse: "collapse", width: "auto" },
+      // CodeMirror's line wrapping sets `overflow-wrap: anywhere` on the content,
+      // which the table inherits and which shrinks every column's minimum width
+      // to one character; cells break at word boundaries only.
+      ".cm-lp-table": {
+        borderCollapse: "collapse",
+        width: "auto",
+        overflowWrap: "normal",
+        wordBreak: "normal",
+      },
       ".cm-lp-table th, .cm-lp-table td": {
         border: "1px solid var(--border)",
         padding: "6px 12px",

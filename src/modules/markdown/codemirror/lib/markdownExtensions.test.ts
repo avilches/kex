@@ -123,6 +123,8 @@ describe("buildLivePreviewExtensions", () => {
     const table = /\.cm-lp-table \{([^}]*)\}/.exec(rawCss)?.[1] ?? "";
     expect(table).toContain("width: auto");
     expect(table).not.toContain("100%");
+    expect(table).toContain("overflow-wrap: normal");
+    expect(table).toContain("word-break: normal");
     const quoteLine = /\.cm-lp-quote-line \{([^}]*)\}/.exec(rawCss)?.[1] ?? "";
     expect(quoteLine).not.toContain("italic");
     expect(/\.cm-lp-quote \{[^}]*italic/.test(rawCss)).toBe(false);
