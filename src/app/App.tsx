@@ -19,7 +19,6 @@ import { AgentNotificationsBridge, useBellStore } from "@/modules/agents";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   loadRestorePlans,
-  pruneOrphanedPlans,
 } from "@/modules/agents/lib/agentSessionRestore";
 import { CommandPalette, createCommandItems } from "@/modules/command-palette";
 import {
@@ -379,17 +378,7 @@ export default function App() {
   }, [workspaces, activeWorkspaceId]);
 
   useEffect(() => {
-    void loadRestorePlans().then(() => {
-      const knownIds = new Set<string>();
-      for (const ws of workspacesRef.current) {
-        for (const pane of allPanes(ws.paneTree)) {
-          for (const tab of pane.tabs) {
-            if (tab.kind === "terminal") knownIds.add(tab.id);
-          }
-        }
-      }
-      pruneOrphanedPlans(knownIds);
-    });
+    void loadRestorePlans();
   }, []);
 
   useEffect(() => {
