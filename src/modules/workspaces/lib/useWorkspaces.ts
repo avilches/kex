@@ -20,6 +20,7 @@ import {
   updateDivider,
   updatePane,
 } from "./splitNode";
+import { attachTab, workspaceForTab, workspaceTitleFromCwd, type TabPlacement } from "./tabTransfer";
 import { type ClosedEntry, type Tab, type PaneNode, type Script, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
@@ -236,6 +237,39 @@ export function applyCloseTab(
   });
 }
 
+export type TabMoveDestination =
+  | { kind: "existing"; workspaceId: string; placement: TabPlacement }
+  | { kind: "new"; workspaceId: string; paneId: string; color: string | null | undefined };
+
+// Moves a tab to another workspace in one pass so the tab keeps its id (and so
+// its PTY). Returns the same array when the move is invalid, so the tab is
+// never dropped from the source without having landed somewhere.
+export function applyMoveTabToWorkspace(
+  workspaces: Workspace[],
+  sourceWorkspaceId: string,
+  tabId: string,
+  dest: TabMoveDestination,
+  paneLimit: number,
+): Workspace[] {
+  const source = workspaces.find((w) => w.id === sourceWorkspaceId);
+  const found = source ? findTabPane(source.paneTree, tabId) : null;
+  if (!found) return workspaces;
+  const { tab } = found;
+
+  if (dest.kind === "new") {
+    const detached = applyCloseTab(workspaces, sourceWorkspaceId, tabId);
+    return insertWorkspaceAfterActive(detached, sourceWorkspaceId, workspaceForTab(tab, dest, dest.color));
+  }
+
+  if (dest.workspaceId === sourceWorkspaceId) return workspaces;
+  const target = workspaces.find((w) => w.id === dest.workspaceId);
+  const attached = target ? attachTab(target, tab, dest.placement, paneLimit) : null;
+  if (!attached) return workspaces;
+  return applyCloseTab(workspaces, sourceWorkspaceId, tabId).map((w) =>
+    w.id === dest.workspaceId ? attached : w,
+  );
+}
+
 export async function collectRunningTerminals(
   ws: Workspace,
   getForegroundProcess: (tabId: string) => Promise<string | null>,
@@ -272,7 +306,7 @@ function newWorkspace(cwd?: string): Workspace {
   const randomColor = usePreferencesStore.getState().randomWorkspaceColor;
   return {
     id: newWorkspaceId(),
-    title: cwd ? (cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] ?? "shell") : "shell",
+    title: workspaceTitleFromCwd(cwd),
     cwd,
     color: randomColor ? undefined : null,
     paneTree: pane,
