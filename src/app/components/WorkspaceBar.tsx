@@ -21,6 +21,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  type AgentEntryVisual,
+  buildAgentEntries,
+  workspaceAgentVisuals,
+} from "@/modules/agents/lib/notificationList";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
+import {
   Cancel01Icon,
   ChevronRightIcon,
   Delete02Icon,
@@ -113,6 +119,7 @@ function abbrev(title: string, kind: string): string {
 function SortableWorkspaceItem({
   ws,
   active,
+  agentVisual,
   barWidth,
   workspaceGroups,
   onSelect,
@@ -125,6 +132,7 @@ function SortableWorkspaceItem({
 }: {
   ws: WorkspaceItem;
   active: boolean;
+  agentVisual?: AgentEntryVisual;
   barWidth: number;
   workspaceGroups: WorkspaceGroup[];
   onSelect: (id: string) => void;
@@ -271,6 +279,25 @@ function SortableWorkspaceItem({
           </>
         )}
       </button>
+      {agentVisual ? (
+        <span
+          className="pointer-events-none absolute left-2.5 top-0.5 flex size-[10px] items-center justify-center rounded-full bg-background"
+          title={
+            agentVisual === "working" ? "Agent working" : "Agent needs you"
+          }
+        >
+          {agentVisual === "working" ? (
+            <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />
+          ) : (
+            <span
+              className={cn(
+                "size-[6px] rounded-full",
+                agentVisual === "error" ? "bg-destructive" : "bg-amber-400",
+              )}
+            />
+          )}
+        </span>
+      ) : null}
       {!active && displayColor && (
         <span
           className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
@@ -746,6 +773,17 @@ export function WorkspaceBar({
   >(undefined);
   const compact = width <= 80;
 
+  const agentSessions = useAgentStore((s) => s.sessions);
+  const agentNotifications = useAgentStore((s) => s.notifications);
+  const tabLocations = useAgentStore((s) => s.tabLocations);
+  const agentVisuals = useMemo(
+    () =>
+      workspaceAgentVisuals(
+        buildAgentEntries(agentSessions, agentNotifications, tabLocations),
+      ),
+    [agentSessions, agentNotifications, tabLocations],
+  );
+
   const shortcuts = usePreferencesStore((s) => s.shortcuts);
   const newWorkspaceLabel = getShortcutLabel("workspace.new", shortcuts);
   const newWorkspaceTitle = newWorkspaceLabel
@@ -905,6 +943,7 @@ export function WorkspaceBar({
                               <SortableWorkspaceItem
                                 ws={activeWs}
                                 active={true}
+                                agentVisual={agentVisuals[activeWs.id]}
                                 barWidth={width}
                                 workspaceGroups={workspaceGroups}
                                 onSelect={onSelect}
@@ -928,6 +967,7 @@ export function WorkspaceBar({
                                 key={ws.id}
                                 ws={ws}
                                 active={ws.id === activeId}
+                                agentVisual={agentVisuals[ws.id]}
                                 barWidth={width}
                                 workspaceGroups={workspaceGroups}
                                 onSelect={onSelect}
