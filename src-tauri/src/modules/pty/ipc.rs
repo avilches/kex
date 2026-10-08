@@ -110,6 +110,10 @@ pub fn socket_path_for_pty_id(id: u32) -> PathBuf {
     static SWEEP: std::sync::Once = std::sync::Once::new();
     let dir = runtime_dir();
     SWEEP.call_once(|| sweep_orphaned_sockets(&dir));
+    socket_path_in(&dir, id)
+}
+
+fn socket_path_in(dir: &Path, id: u32) -> PathBuf {
     dir.join(socket_file_name(std::process::id(), id))
 }
 
@@ -530,7 +534,7 @@ mod tests {
 
     #[test]
     fn socket_path_for_id_is_short_enough() {
-        let p = socket_path_for_pty_id(u32::MAX);
+        let p = socket_path_in(&runtime_dir(), u32::MAX);
         assert!(p.to_str().unwrap().len() < 104);
     }
 
@@ -541,7 +545,7 @@ mod tests {
 
     #[test]
     fn socket_path_embeds_the_current_pid() {
-        let p = socket_path_for_pty_id(7);
+        let p = socket_path_in(Path::new("/x"), 7);
         let expected = socket_file_name(std::process::id(), 7);
         assert_eq!(p.file_name().unwrap().to_str().unwrap(), expected);
     }
@@ -561,6 +565,24 @@ mod tests {
         .to_vec();
         let found = orphaned_sockets(&names, |pid| pid == 200);
         assert_eq!(found, vec!["kex-ipc-100-1.sock", "kex-ipc-300-2.sock"]);
+    }
+
+    #[test]
+    fn sweep_removes_dead_pid_sockets_and_keeps_live_and_unrelated_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut child = std::process::Command::new("true").spawn().unwrap();
+        let dead = child.id();
+        child.wait().unwrap();
+        let orphan = socket_file_name(dead, 1);
+        let live = socket_file_name(std::process::id(), 1);
+        for name in [orphan.as_str(), live.as_str(), "kex-ipc-5.sock", "notes.txt"] {
+            std::fs::write(dir.path().join(name), b"").unwrap();
+        }
+        sweep_orphaned_sockets(dir.path());
+        assert!(!dir.path().join(&orphan).exists());
+        for name in [live.as_str(), "kex-ipc-5.sock", "notes.txt"] {
+            assert!(dir.path().join(name).exists(), "{name} must survive");
+        }
     }
 
     #[test]
