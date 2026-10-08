@@ -97,12 +97,16 @@ describe("resolveTabDrop across workspaces", () => {
 
 describe("originToRestore", () => {
   it("returns the origin when the drag ended without placing the tab elsewhere", () => {
-    expect(originToRestore("A", "B", false)).toBe("A");
+    expect(originToRestore("A", "B", false, ["A", "B"])).toBe("A");
   });
 
   it("returns null when the tab was placed, there is no origin or the user is already there", () => {
-    expect(originToRestore("A", "B", true)).toBeNull();
-    expect(originToRestore(null, "B", false)).toBeNull();
-    expect(originToRestore("A", "A", false)).toBeNull();
+    expect(originToRestore("A", "B", true, ["A", "B"])).toBeNull();
+    expect(originToRestore(null, "B", false, ["B"])).toBeNull();
+    expect(originToRestore("A", "A", false, ["A"])).toBeNull();
+  });
+
+  it("returns null when the origin workspace was closed mid-drag", () => {
+    expect(originToRestore("A", "B", false, ["B"])).toBeNull();
   });
 });

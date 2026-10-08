@@ -151,7 +151,7 @@ export function WorkspaceDndProvider({
   }
 
   function restoreOrigin(placed: boolean) {
-    const target = originToRestore(originWorkspaceIdRef.current, activeWorkspaceIdRef.current, placed);
+    const target = originToRestore(originWorkspaceIdRef.current, activeWorkspaceIdRef.current, placed, workspaces.map((w) => w.id));
     originWorkspaceIdRef.current = null;
     if (target) onSelectWorkspace(target);
   }

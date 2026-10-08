@@ -78,7 +78,12 @@ export function resolveTabDrop(
   return { kind: "split", workspaceId: source.wsId, tabId, paneId, direction };
 }
 
-export function originToRestore(originId: string | null, currentId: string, placed: boolean): string | null {
-  if (placed || !originId || originId === currentId) return null;
+export function originToRestore(
+  originId: string | null,
+  currentId: string,
+  placed: boolean,
+  existingIds: readonly string[],
+): string | null {
+  if (placed || !originId || originId === currentId || !existingIds.includes(originId)) return null;
   return originId;
 }
