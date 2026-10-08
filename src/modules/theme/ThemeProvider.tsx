@@ -28,6 +28,7 @@ import {
   listTerminalOnlyThemes,
 } from "./themes";
 import { resolveEditorSurface } from "./resolveEditorSurface";
+import { resolveEditorThemeId } from "./resolveEditorTheme";
 import { resolveTerminalPalette } from "./resolveTerminalTheme";
 import type { EditorSurface, Theme } from "./types";
 
@@ -150,7 +151,11 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
   }, [resolvedMode]);
 
   const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
-  const editorThemePref = usePreferencesStore((s) => s.editorTheme);
+  const editorPref = usePreferencesStore((s) => s.editorTheme);
+  const editorThemePref =
+    editorPref === EDITOR_THEME_AUTO
+      ? EDITOR_THEME_AUTO
+      : resolveEditorThemeId(editorPref, themeId, customThemes, resolvedMode);
   const effectiveId = previewId ?? themeId;
   const [editorSurface, setEditorSurface] = useState<EditorSurface | undefined>();
   useEffect(() => {
