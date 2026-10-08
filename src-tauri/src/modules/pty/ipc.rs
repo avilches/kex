@@ -63,8 +63,54 @@ fn owned_runtime_subdir(base: &std::path::Path, uid: u32) -> PathBuf {
     }
 }
 
+fn socket_file_name(pid: u32, pty_id: u32) -> String {
+    format!("kex-ipc-{pid}-{pty_id}.sock")
+}
+
+fn socket_owner_pid(file_name: &str) -> Option<u32> {
+    let rest = file_name.strip_prefix("kex-ipc-")?.strip_suffix(".sock")?;
+    let (pid, pty_id) = rest.split_once('-')?;
+    pty_id.parse::<u32>().ok()?;
+    pid.parse().ok()
+}
+
+/// Names in `names` that are sockets of a Kex process that no longer exists.
+fn orphaned_sockets(names: &[String], is_alive: impl Fn(u32) -> bool) -> Vec<&str> {
+    names
+        .iter()
+        .filter(|n| socket_owner_pid(n).is_some_and(|pid| !is_alive(pid)))
+        .map(String::as_str)
+        .collect()
+}
+
+fn pid_is_alive(pid: u32) -> bool {
+    let Ok(pid) = libc::pid_t::try_from(pid) else {
+        return true;
+    };
+    let rc = unsafe { libc::kill(pid, 0) };
+    rc == 0 || std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
+}
+
+fn sweep_orphaned_sockets(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let names: Vec<String> = entries
+        .flatten()
+        .filter_map(|e| e.file_name().into_string().ok())
+        .collect();
+    for name in orphaned_sockets(&names, pid_is_alive) {
+        let _ = std::fs::remove_file(dir.join(name));
+    }
+}
+
+/// The path embeds this process's pid because several Kex instances (installed
+/// and dev) share `runtime_dir()` and each numbers its PTYs from 1.
 pub fn socket_path_for_pty_id(id: u32) -> PathBuf {
-    runtime_dir().join(format!("kex-ipc-{id}.sock"))
+    static SWEEP: std::sync::Once = std::sync::Once::new();
+    let dir = runtime_dir();
+    SWEEP.call_once(|| sweep_orphaned_sockets(&dir));
+    dir.join(socket_file_name(std::process::id(), id))
 }
 
 /// Stops the listener thread and removes the socket file when dropped.
@@ -232,6 +278,7 @@ pub fn spawn_listener(
     pty_id: u32,
     app: AppHandle,
 ) -> IpcGuard {
+    // The pid in the name makes this path ours alone, so only a leftover of ours can be here.
     let _ = std::fs::remove_file(&socket_path);
     let shutdown = Arc::new(AtomicBool::new(false));
 
@@ -485,6 +532,44 @@ mod tests {
     fn socket_path_for_id_is_short_enough() {
         let p = socket_path_for_pty_id(u32::MAX);
         assert!(p.to_str().unwrap().len() < 104);
+    }
+
+    #[test]
+    fn same_pty_id_in_two_processes_gets_different_socket_names() {
+        assert_ne!(socket_file_name(100, 38), socket_file_name(200, 38));
+    }
+
+    #[test]
+    fn socket_path_embeds_the_current_pid() {
+        let p = socket_path_for_pty_id(7);
+        let expected = socket_file_name(std::process::id(), 7);
+        assert_eq!(p.file_name().unwrap().to_str().unwrap(), expected);
+    }
+
+    #[test]
+    fn orphan_cleanup_only_selects_dead_pids_and_matching_names() {
+        let names: Vec<String> = [
+            "kex-ipc-100-1.sock",
+            "kex-ipc-200-1.sock",
+            "kex-ipc-300-2.sock",
+            "kex-ipc-5.sock",
+            "kex-ipc-abc-1.sock",
+            "kex-ipc-100-1.txt",
+            "other-100-1.sock",
+        ]
+        .map(String::from)
+        .to_vec();
+        let found = orphaned_sockets(&names, |pid| pid == 200);
+        assert_eq!(found, vec!["kex-ipc-100-1.sock", "kex-ipc-300-2.sock"]);
+    }
+
+    #[test]
+    fn pid_is_alive_detects_self_and_not_a_dead_pid() {
+        assert!(pid_is_alive(std::process::id()));
+        let mut child = std::process::Command::new("true").spawn().unwrap();
+        let pid = child.id();
+        child.wait().unwrap();
+        assert!(!pid_is_alive(pid));
     }
 
     #[test]
