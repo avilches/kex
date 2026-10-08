@@ -142,16 +142,33 @@ describe("planLivePreview", () => {
   });
 
   it("keeps bracketed text with no destination as plain text: nothing hidden, never a link", () => {
-    for (const text of ["see [TODO] here\n", "see [[My Note]] here\n"]) {
-      const result = plan(text);
-      expect(result.hides).toEqual([]);
-      expect(result.marks.some((m) => m.className === "cm-lp-link-text")).toBe(false);
-      // Marked so the theme's link color can be taken back off it.
-      expect(result.marks.length).toBeGreaterThan(0);
-      expect(result.marks.every((m) => m.className === "cm-lp-notlink")).toBe(true);
-    }
-    const todo = plan("see [TODO] here\n").marks;
-    expect(todo).toEqual([{ from: 4, to: 10, className: "cm-lp-notlink" }]);
+    const result = plan("see [TODO] here\n");
+    expect(result.hides).toEqual([]);
+    // Marked so the theme's link color can be taken back off it.
+    expect(result.marks).toEqual([{ from: 4, to: 10, className: "cm-lp-notlink" }]);
+  });
+
+  it("plans a [[wiki link]]: label marked, brackets hidden off the active line", () => {
+    const text = "see [[My Note]] here\n";
+    const result = plan(text);
+    expect(result.marks).toEqual([{ from: 6, to: 13, className: "cm-lp-wikilink", title: "My Note" }]);
+    expect(result.hides).toEqual([
+      { from: 4, to: 6 },
+      { from: 13, to: 15 },
+    ]);
+  });
+
+  it("hides the target and the pipe of an aliased wiki link, and shows it raw on the active line", () => {
+    const text = "[[Note#Head|the alias]]\n";
+    expect(plan(text).hides).toEqual([
+      { from: 0, to: 12 },
+      { from: 21, to: 23 },
+    ]);
+    expect(plan(text, [1]).hides).toEqual([]);
+  });
+
+  it("leaves [[wiki]] inside inline code alone", () => {
+    expect(plan("`[[My Note]]`\n").marks.every((m) => m.className !== "cm-lp-wikilink")).toBe(true);
   });
 
   it("styles a bullet marker but never hides it, active or not", () => {

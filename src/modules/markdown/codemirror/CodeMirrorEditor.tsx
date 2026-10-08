@@ -3,6 +3,8 @@ import {
   buildLiveDecorationExtensions,
   buildMarkdownBaseExtensions,
 } from "@/modules/markdown/codemirror/lib/markdownExtensions";
+import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
+import { useWikiLinkExtension } from "@/modules/markdown/codemirror/lib/useWikiLinkExtension";
 import { resolveMarkdownImageSrc } from "@/modules/markdown/lib/imageSrc";
 import { Compartment } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
@@ -30,10 +32,12 @@ type Props = {
   // its directory, same as RichMarkdownEditor.resolveImageSrc.
   path: string;
   mode?: CodeMirrorEditorMode;
+  // Lets `[[Note]]` resolve and open; without it wiki links stay inert.
+  wikiLinks?: WikiLinkHost;
 };
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
-  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich" }, ref) {
+  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich", wikiLinks }, ref) {
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const themeExt = useEditorThemeExt();
     const pathRef = useRef(path);
@@ -50,12 +54,14 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
     // this array changes, which would drop the compartment's current content.
     // The initial mode is read through a ref and later switches go through
     // the effect below.
+    const wikiExtension = useWikiLinkExtension(cmRef, wikiLinks);
     const extensions = useMemo(
       () => [
         ...buildMarkdownBaseExtensions(),
         liveCompartment.of(modeRef.current === "rich" ? liveExtensions : []),
+        wikiExtension,
       ],
-      [liveCompartment, liveExtensions],
+      [liveCompartment, liveExtensions, wikiExtension],
     );
 
     const appliedModeRef = useRef(mode);

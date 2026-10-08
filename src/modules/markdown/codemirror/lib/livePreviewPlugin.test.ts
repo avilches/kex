@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { forceParsing, syntaxTreeAvailable } from "@codemirror/language";
-import { EditorSelection, EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,8 @@ import {
   linkClickHandler,
   linkUrlAt,
   livePreviewPlugin,
+  wikiLinkHost,
+  type WikiLinkHost,
 } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 
 const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -22,11 +24,11 @@ vi.mock("@/lib/platform", () => platformMock);
 
 const identitySrc = (src: string) => src;
 
-function mount(doc: string, selection?: { anchor: number }) {
+function mount(doc: string, selection?: { anchor: number; extensions?: Extension[] }) {
   const state = EditorState.create({
     doc,
     selection: selection ? { anchor: selection.anchor } : undefined,
-    extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin(identitySrc)],
+    extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin(identitySrc), ...(selection?.extensions ?? [])],
   });
   return new EditorView({ state, parent: document.body });
 }
@@ -288,7 +290,7 @@ describe("livePreviewPlugin", () => {
   });
 
   it("marks brackets that are not a link, so the theme's link color can be taken back", () => {
-    const doc = "Plain [TODO] and [[Wiki Link]] and [real](https://x.com).\n\nafter\n";
+    const doc = "Plain [TODO] and [real](https://x.com).\n\nafter\n";
     const view = mount(doc, { anchor: doc.indexOf("after") });
     const notlinks = Array.from(view.dom.querySelectorAll(".cm-lp-notlink")).map((el) => el.textContent);
     expect(notlinks).toContain("[TODO]");
@@ -296,6 +298,21 @@ describe("livePreviewPlugin", () => {
     expect(view.dom.querySelector(".cm-lp-link-text")?.textContent).toBe("real");
     view.destroy();
   });
+
+  it("shows a [[wiki link]] as a link when its note exists and as a dim one when it does not", () => {
+    const doc = "See [[Known]] and [[Ghost|alias]].\n\nafter\n";
+    const host = {
+      resolve: (t: string) => (t === "Known" ? "/ws/Known.md" : null),
+      open: () => {},
+    };
+    const view = mount(doc, { anchor: doc.indexOf("after"), extensions: [wikiLinkHost.of(host)] });
+    expect(Array.from(view.dom.querySelectorAll(".cm-lp-link-text")).map((el) => el.textContent)).toEqual(["Known"]);
+    expect(Array.from(view.dom.querySelectorAll(".cm-lp-wikilink-missing")).map((el) => el.textContent)).toEqual([
+      "alias",
+    ]);
+    view.destroy();
+  });
+
 
   it("replaces an image that fails to load with its alt text, or a fallback word without one", () => {
     const doc = "Pic ![Rota](./no-existe.png) and ![](./otra.png) here\n\nafter\n";
@@ -672,6 +689,39 @@ describe("linkClickHandler", () => {
       expect(ctrlEvent.defaultPrevented).toBe(true);
       await vi.waitFor(() => expect(openUrl).toHaveBeenCalledWith("https://example.com"));
       posView.destroy();
+    });
+  });
+
+  describe("wiki links", () => {
+    const wikiDoc = "See [[Known]] and `[[Code]]`.\n";
+
+    function mountWiki(pointerPos: number, opened: string[]) {
+      platformMock.IS_MAC = false;
+      const host: WikiLinkHost = { resolve: () => "/ws/x.md", open: (t) => opened.push(t) };
+      const state = EditorState.create({
+        doc: wikiDoc,
+        extensions: [markdown({ base: markdownLanguage }), livePreviewPlugin(identitySrc), linkClickHandler, wikiLinkHost.of(host)],
+      });
+      const view = new EditorView({ state, parent: document.body });
+      vi.spyOn(view, "posAtCoords").mockReturnValue(pointerPos);
+      return view;
+    }
+
+    it("opens the note on a Ctrl+click, and nothing on a plain click", () => {
+      const opened: string[] = [];
+      const view = mountWiki(wikiDoc.indexOf("Known"), opened);
+      expect(runHandler(view, {})).toEqual({ handled: false, prevented: false });
+      expect(runHandler(view, { ctrlKey: true }).handled).toBe(true);
+      expect(opened).toEqual(["Known"]);
+      view.destroy();
+    });
+
+    it("ignores a wiki link inside inline code", () => {
+      const opened: string[] = [];
+      const view = mountWiki(wikiDoc.indexOf("Code"), opened);
+      expect(runHandler(view, { ctrlKey: true }).handled).toBe(false);
+      expect(opened).toEqual([]);
+      view.destroy();
     });
   });
 

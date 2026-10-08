@@ -1,5 +1,6 @@
 import type { SyntaxNode, Tree } from "@lezer/common";
 import type { Text } from "@codemirror/state";
+import { wikiLinkAt } from "@/modules/markdown/lib/wikiLinks";
 import { codeLanguages } from "@/modules/markdown/codemirror/lib/codeLanguages";
 
 export type MarkSpec = { from: number; to: number; className: string; title?: string };
@@ -81,6 +82,31 @@ function isActive(node: SyntaxNode, doc: Text, activeLines: ReadonlySet<number>)
     if (activeLines.has(line)) return true;
   }
   return false;
+}
+
+export const WIKI_LINK_CLASS = "cm-lp-wikilink";
+
+// Lezer reads `[[Note]]` as a Link (the outer one, or only the inner `[Note]`
+// when the outer is not one), so the check starts at the node or one bracket before.
+function planWikiLink(
+  node: SyntaxNode,
+  doc: Text,
+  activeLines: ReadonlySet<number>,
+  marks: MarkSpec[],
+  hides: HideSpec[],
+): boolean {
+  const at = [node.from, node.from - 1].find((p) => p >= 0 && doc.sliceString(p, p + 2) === "[[");
+  if (at === undefined) return false;
+  const wiki = wikiLinkAt(doc.sliceString(at, Math.min(doc.length, at + 400)), 0);
+  if (!wiki || at + wiki.to < node.to) return false;
+  const from = at;
+  const to = at + wiki.to;
+  marks.push({ from: from + wiki.labelFrom, to: to - 2, className: WIKI_LINK_CLASS, title: wiki.target });
+  if (!isActive(node, doc, activeLines)) {
+    hides.push({ from, to: from + wiki.labelFrom });
+    hides.push({ from: to - 2, to });
+  }
+  return true;
 }
 
 export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
@@ -291,6 +317,7 @@ export function planLivePreview(input: LivePreviewInput): LivePreviewPlan {
       }
 
       if (node.type.name === "Link") {
+        if (planWikiLink(node, doc, activeLines, marks, hides)) return false;
         planLink(node, doc, activeLines, marks, hides, definitions);
         return;
       }
