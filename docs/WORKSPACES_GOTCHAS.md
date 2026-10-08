@@ -887,7 +887,7 @@ El socket de hooks se llamaba `kex-ipc-<pty_id>.sock` y vive en un directorio po
 
 ### Fix
 
-El nombre pasa a `kex-ipc-<pid>-<pty_id>.sock`, con el pid del proceso de Kex, de forma que dos instancias vivas nunca comparten ruta. La primera vez que se construye una ruta se borran los `kex-ipc-<pid>-*.sock` cuyo pid ya no existe (`kill(pid, 0)` con ESRCH); los de pids vivos y los ficheros que no encajan en el patron no se tocan (`orphaned_sockets`, funcion pura con tests).
+El nombre pasa a `kex-ipc-<pid>-<pty_id>.sock`, con el pid del proceso de Kex, de forma que dos instancias vivas nunca comparten ruta. La primera vez que se construye una ruta se borran los `kex-ipc-<pid>-*.sock` cuyo pid ya no existe (`kill(pid, 0)` con ESRCH); los de pids vivos y los ficheros que no encajan en el patron no se tocan (`orphaned_sockets`, funcion pura con tests). Los sockets del formato antiguo `kex-ipc-<n>.sock` que ya hubiera en disco no se barren (no hay migracion); se borran a mano con `rm $TMPDIR/kex-ipc-$(id -u)/kex-ipc-[0-9]*.sock`.
 
 ### Leccion
 
