@@ -54,7 +54,7 @@ hook events the same way:
 3. Forwards the JSON payload byte for byte, unmodified, to the socket at `$KEX_IPC` (`send_ipc`): `nc -w 1 -U`,
    falling back to a small inline `python3` script if `nc` is missing or the connection fails. If both fail, or
    `KEX_IPC` is unset, the event is silently dropped (`|| true`); there is no retry or spool (TASK-730).
-4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `$TMPDIR/kex-ipc-<pty_id>.sock`, reads the JSON
+4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `kex-ipc-<pid>-<pty_id>.sock`, reads the JSON
    directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
    `kex:agent-session-meta`; for every other event (`UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`,
    `SessionEnd`, `PermissionRequest`, `MessageDisplay`) it emits `kex:agent-signal` directly with a `kind` matching

@@ -195,7 +195,7 @@ const SESSION_HOOK_EVENTS: [&str; 8] = [
 `trigger-event.sh` reads the hook's JSON from stdin and forwards it, byte for
 byte, over a **Unix domain socket, one per PTY**
 (`src-tauri/src/modules/pty/ipc.rs::socket_path_for_pty_id`, path
-`$TMPDIR/kex-ipc-<pty_id>.sock`, passed to the child as `KEX_IPC`):
+`kex-ipc-<pid>-<pty_id>.sock` in the per-user `kex-ipc-<uid>` directory, passed to the child as `KEX_IPC`):
 
 ```bash
 send_ipc() {
