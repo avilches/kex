@@ -46,17 +46,26 @@ export function resolveWikiTarget(target: string, root: string, files: readonly 
 
 const BAD_SEGMENT = /[:*?"<>|\0]/;
 
-// Where `[[target]]` is created when no note has that name: next to the note
-// that holds the link, with `.md` added. Null for a name that is not a plain
-// relative path or that would land outside the workspace.
-export function newWikiNotePath(target: string, currentPath: string, root: string): string | null {
+export type NewWikiNote = { path: string } | { error: "invalid" | "outside" };
+
+// Where `[[target]]` is created when no note has that name: relative to the
+// note that holds the link, with `.md` added. `..` may climb as far as `root`
+// and no further (`outside`); `a/../b` is just `b`. Anything that is not a
+// plain relative file name is `invalid`.
+export function newWikiNotePath(target: string, currentPath: string, root: string): NewWikiNote {
   const name = target.trim().replace(/\\/g, "/");
-  if (name === "" || name.startsWith("/")) return null;
-  const segments = name.split("/");
-  if (segments.some((s) => s === "" || s === "." || s === ".." || s.trim() !== s || BAD_SEGMENT.test(s))) return null;
-  const dir = slashes(currentPath).replace(/\/[^/]*$/, "");
+  if (name === "" || name.startsWith("/")) return { error: "invalid" };
+  const parts = name.split("/");
+  if (parts.some((s) => s.trim() !== s || BAD_SEGMENT.test(s))) return { error: "invalid" };
+  if ([".", "..", ""].includes(parts[parts.length - 1])) return { error: "invalid" };
+  const out = slashes(currentPath).replace(/\/[^/]*$/, "").split("/");
+  for (const part of parts) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") out.pop();
+    else out.push(part);
+  }
   const base = slashes(root).replace(/\/+$/, "");
-  if (dir !== base && !dir.startsWith(base + "/")) return null;
-  const file = /\.md$/i.test(name) ? name : `${name}.md`;
-  return `${dir}/${file}`;
+  const full = out.join("/");
+  if (!full.startsWith(base + "/")) return { error: "outside" };
+  return { path: /\.md$/i.test(full) ? full : `${full}.md` };
 }

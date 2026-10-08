@@ -41,20 +41,38 @@ describe("resolveWikiTarget", () => {
 
 describe("newWikiNotePath", () => {
   const current = "/ws/notes/today.md";
+  const make = (name: string, root = "/ws") => newWikiNotePath(name, current, root);
 
   it("creates next to the current note and adds the extension once", () => {
-    expect(newWikiNotePath("Idea", current, "/ws")).toBe("/ws/notes/Idea.md");
-    expect(newWikiNotePath("Idea.md", current, "/ws")).toBe("/ws/notes/Idea.md");
-    expect(newWikiNotePath(" proyectos/Idea ".trim(), current, "/ws")).toBe("/ws/notes/proyectos/Idea.md");
+    expect(make("Idea")).toEqual({ path: "/ws/notes/Idea.md" });
+    expect(make("Idea.md")).toEqual({ path: "/ws/notes/Idea.md" });
+    expect(make("proyectos/Idea")).toEqual({ path: "/ws/notes/proyectos/Idea.md" });
   });
 
-  it("refuses names that escape or are not plain relative paths", () => {
-    for (const bad of ["../x", "a/../x", "/etc/x", "a//b", "C:x", "a|b", "", "  "]) {
-      expect(newWikiNotePath(bad, current, "/ws")).toBeNull();
+  it("collapses . and .. so pepe/../file is just file", () => {
+    expect(make("pepe/../file")).toEqual({ path: "/ws/notes/file.md" });
+    expect(make("./a//b")).toEqual({ path: "/ws/notes/a/b.md" });
+  });
+
+  it("lets .. climb up to the root and no further", () => {
+    expect(make("../Top")).toEqual({ path: "/ws/Top.md" });
+    expect(make("../../Top")).toEqual({ error: "outside" });
+    expect(make("../x", "/ws/notes")).toEqual({ error: "outside" });
+    expect(make("a/../../../x")).toEqual({ error: "outside" });
+  });
+
+  it("stays inside the note's own folder when that is the root", () => {
+    expect(make("sub/x", "/ws/notes")).toEqual({ path: "/ws/notes/sub/x.md" });
+    expect(make("sub/../x", "/ws/notes")).toEqual({ path: "/ws/notes/x.md" });
+  });
+
+  it("rejects names that are not a plain relative file name", () => {
+    for (const bad of ["/etc/x", "C:x", "a|b", "", "  ", "a/..", "a/", ".", "a /b"]) {
+      expect(make(bad)).toEqual({ error: "invalid" });
     }
   });
 
-  it("refuses when the current note is outside the workspace", () => {
-    expect(newWikiNotePath("Idea", "/other/today.md", "/ws")).toBeNull();
+  it("refuses when the current note is outside the root", () => {
+    expect(newWikiNotePath("Idea", "/other/today.md", "/ws")).toEqual({ error: "outside" });
   });
 });
