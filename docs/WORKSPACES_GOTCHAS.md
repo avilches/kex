@@ -869,3 +869,26 @@ Rust detecta el primer `OSC 133;B` de cada PTY (`Transition::ShellReady`) y emit
 ### Leccion
 
 Un `setTimeout` para "esperar a que el shell este listo" es una apuesta de timing; si el sistema ya emite una senal real de prompt listo, esperar a esa senal. Y ante un fallo que siempre cae en el mismo elemento del arranque, buscar que trabajo extra hace solo ese elemento antes de culpar a la carga general.
+
+## Bug 15: la pestana de una instancia de Kex se quedaba con el spinner del agente para siempre (RESUELTO)
+
+### Sintoma
+
+Con la Kex instalada y `pnpm tauri dev` abiertas a la vez, una pestana con Claude Code terminaba su turno pero el spinner del agente no se apagaba nunca. El agente seguia vivo y respondia, y los eventos de hook (`Stop`, etc.) aparecian en el spool de la pestana, pero la interfaz no los recibia.
+
+### Pistas falsas descartadas
+
+- Que el agente no emitiera `Stop`: el hook se ejecutaba y el evento estaba en el spool.
+- Un fallo del spool: tenia los eventos correctos; simplemente nadie escuchaba el socket.
+
+### Causa raiz
+
+El socket de hooks se llamaba `kex-ipc-<pty_id>.sock` y vive en un directorio por usuario compartido por todas las instancias de Kex. Cada instancia numera sus PTYs desde 1, asi que chocaban (en los logs, la instalada tenia id=38 y Kex Dev abrio id=38 un minuto despues). `spawn_listener` hacia `remove_file` y `bind`, robando el socket vivo de la otra instancia, y `IpcGuard::drop` borraba el fichero por ruta, de modo que cerrar una pestana de una instancia podia borrar el socket de la otra.
+
+### Fix
+
+El nombre pasa a `kex-ipc-<pid>-<pty_id>.sock`, con el pid del proceso de Kex, de forma que dos instancias vivas nunca comparten ruta. La primera vez que se construye una ruta se borran los `kex-ipc-<pid>-*.sock` cuyo pid ya no existe (`kill(pid, 0)` con ESRCH); los de pids vivos y los ficheros que no encajan en el patron no se tocan (`orphaned_sockets`, funcion pura con tests).
+
+### Leccion
+
+Un recurso con nombre derivado de un contador por proceso no es unico en una ruta compartida entre procesos. Si varias instancias de la app pueden convivir (instalada y dev), el nombre debe incluir algo propio del proceso, y borrar por ruta solo es seguro si esa ruta no la puede usar nadie mas.
