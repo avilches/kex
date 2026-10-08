@@ -145,7 +145,7 @@ import {
 } from "@/modules/workspaces/lib/workspaceGroupsState";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
-import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
+import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
@@ -2632,13 +2632,18 @@ export default function App() {
       "tab.rename": () => {
         const active = document.activeElement;
         const tag = active?.tagName;
-        if (
-          (tag === "INPUT" || tag === "TEXTAREA") &&
-          !active?.classList.contains("xterm-helper-textarea")
-        )
-          return;
-        if (!activeTabId) return;
-        useTabRenameStore.getState().startRename(activeTabId);
+        const store = useTabRenameStore.getState();
+        const action = resolveRenameShortcut({
+          renamingTabId: store.renamingTabId,
+          step: store.step,
+          activeTabId,
+          inTextField:
+            (tag === "INPUT" || tag === "TEXTAREA") &&
+            !active?.classList.contains("xterm-helper-textarea"),
+        });
+        if (action === "start" && activeTabId) store.startRename(activeTabId);
+        else if (action === "to-note") store.goToNote();
+        else if (action === "save") store.requestSave();
       },
       "file.rename": () => {
         const active = document.activeElement;

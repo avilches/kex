@@ -15,6 +15,8 @@ export type Script = {
 type TabCommon = {
   id: string;
   title?: string;
+  // Markdown the user attaches to the tab (rename popover, second step).
+  note?: string;
   locked?: boolean;
   autofocus?: boolean;
 };
