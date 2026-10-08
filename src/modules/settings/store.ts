@@ -68,7 +68,14 @@ export const EDITOR_THEME_AUTO = "auto" as const;
 
 /** "auto" uses the active app theme's terminal palette; otherwise an app theme id whose palette is borrowed. */
 export const TERMINAL_THEME_AUTO = "auto";
-export type EditorThemePref = typeof EDITOR_THEME_AUTO | EditorThemeId;
+export const EDITOR_ROW_PREFIX = "row:";
+/** An app theme's editor pairing, optionally pinned to a mode: "row:<themeId>" or "row:<themeId>@dark|light". */
+export type EditorRowPref = `${typeof EDITOR_ROW_PREFIX}${string}`;
+export type EditorThemePref = typeof EDITOR_THEME_AUTO | EditorThemeId | EditorRowPref;
+
+export function isEditorRowPref(v: unknown): v is EditorRowPref {
+  return typeof v === "string" && v.startsWith(EDITOR_ROW_PREFIX) && v.length > EDITOR_ROW_PREFIX.length;
+}
 
 export function isEditorThemeId(v: unknown): v is EditorThemeId {
   return (
@@ -525,7 +532,9 @@ export async function loadPreferences(): Promise<Preferences> {
     themeAuto: getGeneral<boolean>(KEY_THEME_AUTO) ?? DEFAULT_PREFERENCES.themeAuto,
     editorTheme: ((): EditorThemePref => {
       const stored = getEditor<string>(KEY_EDITOR_THEME);
-      if (stored === EDITOR_THEME_AUTO || isEditorThemeId(stored)) return stored;
+      if (stored === EDITOR_THEME_AUTO || isEditorThemeId(stored) || isEditorRowPref(stored)) {
+        return stored;
+      }
       return DEFAULT_PREFERENCES.editorTheme;
     })(),
     editorFontFamily:

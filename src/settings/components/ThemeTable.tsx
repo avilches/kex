@@ -11,7 +11,11 @@ import {
 } from "@/modules/settings/store";
 import type { EditorThemeId } from "@/modules/settings/store";
 import { resolveEditorSurface } from "@/modules/theme/resolveEditorSurface";
-import { resolveEditorThemeId } from "@/modules/theme/resolveEditorTheme";
+import {
+  formatEditorRowPref,
+  parseEditorRowPref,
+  resolveEditorThemeId,
+} from "@/modules/theme/resolveEditorTheme";
 import {
   formatTerminalPref,
   paletteOf,
@@ -233,6 +237,7 @@ export function ThemeTable({
   const editorAuto = editorPref === EDITOR_THEME_AUTO;
   const terminalAuto = terminalPref === TERMINAL_THEME_AUTO;
   const pinnedTerminal = terminalAuto ? undefined : parseTerminalPref(terminalPref);
+  const editorRowPref = parseEditorRowPref(editorPref);
 
   const [pickedEditorRow, setPickedEditorRow] = useState<string | null>(null);
   const base = useMemo(
@@ -250,12 +255,13 @@ export function ThemeTable({
 
   const editorRowId = useMemo(() => {
     if (editorAuto) return themeId;
+    if (editorRowPref) return editorRowPref.id;
     const matching = base
       .filter((b) => b.editorIds.dark === editorPref || b.editorIds.light === editorPref)
       .map((b) => b.theme.id);
     if (pickedEditorRow && matching.includes(pickedEditorRow)) return pickedEditorRow;
     return matching.includes(themeId) ? themeId : matching[0];
-  }, [base, editorAuto, editorPref, pickedEditorRow, themeId]);
+  }, [base, editorAuto, editorPref, editorRowPref, pickedEditorRow, themeId]);
 
   const terminalRowId = pinnedTerminal ? pinnedTerminal.id : themeId;
 
@@ -268,9 +274,11 @@ export function ThemeTable({
         const editorMode = !b.modes.editor
           ? mode
           : editorSel
-            ? editorAuto || b.editorIds[mode] === editorPref
-              ? mode
-              : otherMode(mode)
+            ? editorRowPref
+              ? (editorRowPref.mode ?? mode)
+              : editorAuto || b.editorIds[mode] === editorPref
+                ? mode
+                : otherMode(mode)
             : mode;
         const terminalMode = !b.modes.terminal
           ? mode
@@ -289,7 +297,17 @@ export function ThemeTable({
           terminalInfo: themeSurfaceInfo(t, themes, terminalMode).terminal,
         };
       }),
-    [base, themes, mode, editorRowId, terminalRowId, editorAuto, editorPref, pinnedTerminal?.mode],
+    [
+      base,
+      themes,
+      mode,
+      editorRowId,
+      terminalRowId,
+      editorAuto,
+      editorPref,
+      editorRowPref,
+      pinnedTerminal?.mode,
+    ],
   );
 
   const extraEditors = useMemo(() => unpairedEditorThemes(themes), [themes]);
@@ -348,7 +366,12 @@ export function ThemeTable({
             <Suspense fallback={null}>
               <EditorThemePreview
                 themeId={activeEditorId}
-                surface={resolveEditorSurface(editorPref, activeTheme, mode, () => undefined)}
+                surface={resolveEditorSurface(
+                  editorRowPref ? activeEditorId : editorPref,
+                  activeTheme,
+                  mode,
+                  () => undefined,
+                )}
               />
             </Suspense>
           </div>
@@ -411,7 +434,9 @@ export function ThemeTable({
                 info={r.editorInfo}
                 onPick={() => {
                   setPickedEditorRow(t.id);
-                  void setEditorTheme(r.editorId);
+                  void setEditorTheme(
+                    formatEditorRowPref(t.id, r.editorMode === mode ? undefined : r.editorMode),
+                  );
                 }}
                 preview={<EditorPeek id={r.editorId} app={t} mode={r.editorMode} />}
                 modeToggle={
@@ -422,7 +447,9 @@ export function ThemeTable({
                         onToggle: () => {
                           const next = otherMode(r.editorMode);
                           setPickedEditorRow(t.id);
-                          void setEditorTheme(resolveEditorThemeId("auto", t.id, themes, next));
+                          void setEditorTheme(
+                            formatEditorRowPref(t.id, next === mode ? undefined : next),
+                          );
                         },
                       }
                     : undefined
