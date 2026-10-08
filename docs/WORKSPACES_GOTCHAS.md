@@ -892,3 +892,27 @@ El nombre pasa a `kex-ipc-<pid>-<pty_id>.sock`, con el pid del proceso de Kex, d
 ### Leccion
 
 Un recurso con nombre derivado de un contador por proceso no es unico en una ruta compartida entre procesos. Si varias instancias de la app pueden convivir (instalada y dev), el nombre debe incluir algo propio del proceso, y borrar por ruta solo es seguro si esa ruta no la puede usar nadie mas.
+
+## Bug 16: con dos ventanas, una borraba las sesiones de Claude de la otra (RESUELTO)
+
+### Sintoma
+
+Tras abrir una segunda ventana (la "pequena", con 0 o 1 workspaces) y reiniciar Kex, los workspaces de la ventana principal (Serverless, y parte de kex) arrancaban con shells normales: ninguna tab con Claude se reanudaba, sin ningun error en el log.
+
+### Pistas falsas descartadas
+
+- Un fallo de `claude --resume` o de la transcripcion: no se llegaba a lanzar, porque no habia plan.
+- Un fallo del pty o del cwd: los pty abrieron bien y el unico aviso de cwd era de otro workspace (Taxes).
+- El log de un arranque en el que el usuario habia cerrado y reabierto tabs a mano contaminaba la lectura del workspace kex; el workspace Serverless, que no se toco, dio la prueba limpia.
+
+### Causa raiz
+
+`agent_session_restore_plan` devuelve el plan de TODAS las sesiones del almacen a cada ventana. Despues `pruneOrphanedPlans` (frontend) trataba como huerfano cualquier plan cuya tab no estuviera en ESA ventana y llamaba a `agent_detach_session`, que borra la entrada de `agent-sessions.json`. Una ventana vacia (a las 17:03 UTC, `create_app_window ... workspaces=0`) desvinculaba siete tabs de la principal. Esas tabs seguian con Claude vivo pero no volvian a registrarse hasta el siguiente `SessionStart`, asi que en el arranque siguiente no habia nada que restaurar. Una ventana no puede distinguir "esta tab es de otra ventana" de "esta tab ya no existe".
+
+### Fix
+
+La decision pasa a Rust y usa la union de todas las ventanas. `WindowStateManager::terminal_tab_ids` recorre los workspaces de cada ventana y devuelve los ids de tabs de tipo terminal; `session_store::split_orphans` separa los planes cuya tab esta en esa union de los que no; `agent_session_restore_plan` desvincula solo los segundos y devuelve el resto. Se elimina `pruneOrphanedPlans` del frontend y sus helpers.
+
+### Leccion
+
+Una limpieza basada en "lo que no veo" solo es segura si quien la hace ve todo el universo. Con estado repartido entre varias ventanas, la decision de borrar tiene que tomarla quien conoce la union, no cada ventana con su trozo.

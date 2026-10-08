@@ -4,9 +4,7 @@ import { toast } from "sonner";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   RESUME_CHECK_MS,
-  describeOrphans,
   describeSilentResume,
-  findOrphanedPlans,
   hasResumed,
 } from "@/modules/agents/lib/restoreCheck";
 
@@ -19,7 +17,6 @@ export type RestorePlan = {
 };
 
 let restorePlans: Map<string, RestorePlan> | null = null;
-let loadedPlanCount = 0;
 // Resolves once plans are loaded so the terminal spawn can make a correct
 // consume decision instead of racing the load.
 let readyResolve!: () => void;
@@ -33,7 +30,6 @@ export async function loadRestorePlans(): Promise<void> {
   try {
     const plans = await invoke<RestorePlan[]>("agent_session_restore_plan");
     restorePlans = new Map(plans.map((p) => [p.tabId, p]));
-    loadedPlanCount = plans.length;
     if (plans.length > 0) {
       console.debug(`[agent-session] loaded ${plans.length} restore plan(s):`, plans.map((p) =>
         `${p.tabId} agent=${p.agent} cwdLaunch=${p.cwdLaunch}${p.errorReason ? ` ERROR: ${p.errorReason}` : ""}`,
@@ -83,22 +79,6 @@ export async function previewResumeCmd(tabId: string): Promise<RestorePlan | nul
 export async function detachAgentSession(tabId: string): Promise<void> {
   restorePlans?.delete(tabId);
   await invoke("agent_detach_session", { tabId });
-}
-
-export function pruneOrphanedPlans(knownTabIds: Set<string>): void {
-  if (!restorePlans) return;
-  const orphaned = findOrphanedPlans(restorePlans.values(), knownTabIds);
-  for (const plan of orphaned) {
-    console.debug(`[agent-session] pruning orphaned plan tab=${plan.tabId} (tab no longer in workspace)`);
-    void detachAgentSession(plan.tabId);
-  }
-  if (import.meta.env.DEV) {
-    const msg = describeOrphans(loadedPlanCount, orphaned);
-    if (msg) {
-      void warn(`[agent-session] ${msg}`);
-      toast.warning(msg, { duration: 20_000 });
-    }
-  }
 }
 
 // Dev builds only: a resume command that was typed but never produced a SessionStart

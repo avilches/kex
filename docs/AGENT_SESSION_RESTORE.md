@@ -273,7 +273,7 @@ only the tab id (already needed to close/reopen at all) and recomputing on deman
 The tab's own entry in `agent-sessions.json`, still keyed by the *old* tab id, is left alone by this path (
 `previewResumeCmd` never mutates the store). It becomes an orphan once the resumed session's `SessionStart` hook
 writes a fresh record under the new tab id, and is cleaned up the same way any other orphaned entry is: by
-`pruneOrphanedPlans` on the next app launch.
+`agent_session_restore_plan` on the next app launch.
 
 ---
 
@@ -386,11 +386,13 @@ Two things to check if the log looks unhelpful right after a restore failure:
 
 ### Dev-only restore check (`pnpm tauri dev`)
 
-Two failures leave no trace in the UI, so dev builds (`import.meta.env.DEV`, absent from production) warn with a
-Sonner toast. The pure logic is in `agents/lib/restoreCheck.ts`; the toasts are fired from `agentSessionRestore.ts`.
+One failure leaves no trace in the UI, so dev builds (`import.meta.env.DEV`, absent from production) warn with a
+Sonner toast. The pure logic is in `agents/lib/restoreCheck.ts`; the toast is fired from `agentSessionRestore.ts`.
 
-- **Plan whose tab no longer exists.** `pruneOrphanedPlans` already dropped it silently; now a toast says how many of
-  the N loaded plans were lost and which tabs.
+- **Plan whose tab no longer exists.** `agent_session_restore_plan` (Rust) drops it and detaches its store entry. A tab
+  counts as gone only when it is in *no* window: `WindowStateManager::terminal_tab_ids` returns the union over every
+  window, and `split_orphans` partitions the plans against it. This must not be decided per window (see Bug 16 in
+  `WORKSPACES_GOTCHAS.md`).
 - **Resume command that never reports a session.** `watchResume` runs after the command is written to the PTY and, 30 s
   later (`RESUME_CHECK_MS`), toasts if `sessions[tabId].meta.sessionId` is still empty (it is filled by `SessionStart`
   via `kex:agent-session-meta`). The timer starts when the tab's terminal spawns, so a plan in a workspace that is never

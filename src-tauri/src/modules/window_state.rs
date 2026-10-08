@@ -140,6 +140,21 @@ fn write_atomic(path: &Path, content: &str) -> bool {
     std::fs::rename(&tmp, path).is_ok()
 }
 
+fn collect_terminal_tab_ids(value: &Value, out: &mut HashSet<String>) {
+    match value {
+        Value::Object(map) => {
+            if map.get("kind").and_then(Value::as_str) == Some("terminal") {
+                if let Some(id) = map.get("id").and_then(Value::as_str) {
+                    out.insert(id.to_string());
+                }
+            }
+            map.values().for_each(|v| collect_terminal_tab_ids(v, out));
+        }
+        Value::Array(items) => items.iter().for_each(|v| collect_terminal_tab_ids(v, out)),
+        _ => {}
+    }
+}
+
 pub struct WindowStateManager {
     inner: RwLock<WindowStateFile>,
     /// Path of the index file (`workspaces.json`).
@@ -343,6 +358,17 @@ impl WindowStateManager {
         }
 
         log::debug!("[window-state] saved - windows: {:?}", state.window_order);
+    }
+
+    /// Terminal tab ids across every open window, so a caller can tell a tab that
+    /// lives in another window from one that no longer exists anywhere.
+    pub fn terminal_tab_ids(&self) -> HashSet<String> {
+        let state = self.inner.read().expect("window state lock poisoned");
+        let mut ids = HashSet::new();
+        for entry in state.windows.values() {
+            collect_terminal_tab_ids(&entry.workspaces, &mut ids);
+        }
+        ids
     }
 
     pub fn window_order(&self) -> Vec<String> {
@@ -825,5 +851,40 @@ mod tests {
         let mgr = WindowStateManager::new(path);
         assert!(mgr.load());
         assert!(mgr.get_entry("w-1").unwrap().groups.is_empty());
+    }
+
+    fn ws_with_tabs(tabs: &[(&str, &str)]) -> Value {
+        let tabs: Vec<Value> = tabs
+            .iter()
+            .map(|(id, kind)| serde_json::json!({"id": id, "kind": kind}))
+            .collect();
+        serde_json::json!([{
+            "id": "ws-1",
+            "paneTree": {"type": "leaf", "pane": {"id": "pane-1", "tabs": tabs}}
+        }])
+    }
+
+    #[test]
+    fn terminal_tab_ids_is_the_union_of_every_window() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WindowStateManager::new(dir.path().join("state.json"));
+        mgr.add_window("w-main".to_string());
+        mgr.add_window("w-small".to_string());
+        mgr.update_workspace("w-main", ws_with_tabs(&[("tab-a", "terminal"), ("tab-b", "editor")]), 0);
+        mgr.update_workspace("w-small", ws_with_tabs(&[("tab-c", "terminal")]), 0);
+
+        let ids = mgr.terminal_tab_ids();
+        assert_eq!(ids, HashSet::from(["tab-a".to_string(), "tab-c".to_string()]));
+    }
+
+    #[test]
+    fn terminal_tab_ids_survives_an_empty_window() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WindowStateManager::new(dir.path().join("state.json"));
+        mgr.add_window("w-main".to_string());
+        mgr.add_window("w-empty".to_string());
+        mgr.update_workspace("w-main", ws_with_tabs(&[("tab-a", "terminal")]), 0);
+
+        assert_eq!(mgr.terminal_tab_ids(), HashSet::from(["tab-a".to_string()]));
     }
 }

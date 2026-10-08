@@ -70,6 +70,13 @@ pub struct RestorePlan {
     pub error_reason: String,
 }
 
+/// Splits plans into those whose tab exists in some window and those whose tab is gone
+/// from every window. A single window cannot tell the two apart, so `known` must be the
+/// union over all windows.
+pub fn split_orphans(plans: Vec<RestorePlan>, known: &std::collections::HashSet<String>) -> (Vec<RestorePlan>, Vec<RestorePlan>) {
+    plans.into_iter().partition(|p| known.contains(&p.tab_id))
+}
+
 fn store_path() -> Option<PathBuf> {
     DATA_DIR.get().map(|d| d.join("agent-sessions.json"))
 }
@@ -916,5 +923,30 @@ mod tests {
 
         let after: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
         assert!(after.tabs.contains_key("tab-2"));
+    }
+
+    fn plan(tab: &str) -> RestorePlan {
+        RestorePlan {
+            tab_id: tab.to_string(),
+            agent: "claude".to_string(),
+            resume_cmd: String::new(),
+            cwd_launch: String::new(),
+            error_reason: String::new(),
+        }
+    }
+
+    #[test]
+    fn split_orphans_keeps_plans_whose_tab_lives_in_any_window() {
+        let known = std::collections::HashSet::from(["tab-a".to_string(), "tab-c".to_string()]);
+        let (kept, orphans) = split_orphans(vec![plan("tab-a"), plan("tab-b"), plan("tab-c")], &known);
+        assert_eq!(kept.iter().map(|p| p.tab_id.as_str()).collect::<Vec<_>>(), vec!["tab-a", "tab-c"]);
+        assert_eq!(orphans.iter().map(|p| p.tab_id.as_str()).collect::<Vec<_>>(), vec!["tab-b"]);
+    }
+
+    #[test]
+    fn split_orphans_with_no_known_tabs_orphans_everything() {
+        let (kept, orphans) = split_orphans(vec![plan("tab-a")], &std::collections::HashSet::new());
+        assert!(kept.is_empty());
+        assert_eq!(orphans.len(), 1);
     }
 }
