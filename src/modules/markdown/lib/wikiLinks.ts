@@ -43,3 +43,20 @@ export function resolveWikiTarget(target: string, root: string, files: readonly 
   }
   return best;
 }
+
+const BAD_SEGMENT = /[:*?"<>|\0]/;
+
+// Where `[[target]]` is created when no note has that name: next to the note
+// that holds the link, with `.md` added. Null for a name that is not a plain
+// relative path or that would land outside the workspace.
+export function newWikiNotePath(target: string, currentPath: string, root: string): string | null {
+  const name = target.trim().replace(/\\/g, "/");
+  if (name === "" || name.startsWith("/")) return null;
+  const segments = name.split("/");
+  if (segments.some((s) => s === "" || s === "." || s === ".." || s.trim() !== s || BAD_SEGMENT.test(s))) return null;
+  const dir = slashes(currentPath).replace(/\/[^/]*$/, "");
+  const base = slashes(root).replace(/\/+$/, "");
+  if (dir !== base && !dir.startsWith(base + "/")) return null;
+  const file = /\.md$/i.test(name) ? name : `${name}.md`;
+  return `${dir}/${file}`;
+}

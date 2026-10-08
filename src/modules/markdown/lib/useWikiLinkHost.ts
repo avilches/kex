@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { native } from "@/lib/native";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
-import { resolveWikiTarget } from "@/modules/markdown/lib/wikiLinks";
+import { newWikiNotePath, resolveWikiTarget } from "@/modules/markdown/lib/wikiLinks";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
 
 // The workspace's markdown files, listed once per workspace root, so a
 // `[[Note]]` resolves without an IO round-trip on every redraw. A click on a
-// name that is not in the list re-lists once before giving up, since the note
-// may have been created after the tab opened.
-export function useWikiLinkHost(onOpenFile: ((path: string) => void) | undefined): WikiLinkHost | undefined {
+// name that is not in the list re-lists once (the note may have been created
+// after the tab opened) and, if it is still missing, creates an empty note
+// next to the current one, as Obsidian does.
+export function useWikiLinkHost(
+  currentPath: string,
+  onOpenFile: ((path: string) => void) | undefined,
+): WikiLinkHost | undefined {
   const { workspaceRoot } = useEditorChrome();
   const [files, setFiles] = useState<string[]>([]);
 
@@ -31,6 +36,24 @@ export function useWikiLinkHost(onOpenFile: ((path: string) => void) | undefined
 
   return useMemo(() => {
     if (!workspaceRoot || !onOpenFile) return undefined;
+
+    const create = async (target: string): Promise<void> => {
+      const path = newWikiNotePath(target, currentPath, workspaceRoot);
+      if (!path) {
+        toast.error(`Cannot create a note named "${target}"`);
+        return;
+      }
+      try {
+        const dir = path.replace(/\/[^/]*$/, "");
+        await native.createDir(dir).catch(() => undefined);
+        await native.createFile(path);
+        setFiles((prev) => [...prev, path]);
+        onOpenFile(path);
+      } catch (err) {
+        toast.error(`Could not create "${target}"`, { description: String(err) });
+      }
+    };
+
     return {
       resolve: (target) => resolveWikiTarget(target, workspaceRoot, files),
       open: (target) => {
@@ -39,8 +62,9 @@ export function useWikiLinkHost(onOpenFile: ((path: string) => void) | undefined
         void list().then((fresh) => {
           const found = resolveWikiTarget(target, workspaceRoot, fresh);
           if (found) onOpenFile(found);
+          else void create(target);
         });
       },
     };
-  }, [workspaceRoot, onOpenFile, files, list]);
+  }, [workspaceRoot, currentPath, onOpenFile, files, list]);
 }

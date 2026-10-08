@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveWikiTarget, wikiLinkAt } from "@/modules/markdown/lib/wikiLinks";
+import { newWikiNotePath, resolveWikiTarget, wikiLinkAt } from "@/modules/markdown/lib/wikiLinks";
 
 describe("wikiLinkAt", () => {
   it("parses a plain link", () => {
@@ -36,5 +36,25 @@ describe("resolveWikiTarget", () => {
   it("returns null when nothing matches", () => {
     expect(resolveWikiTarget("Missing", root, files)).toBeNull();
     expect(resolveWikiTarget("  ", root, files)).toBeNull();
+  });
+});
+
+describe("newWikiNotePath", () => {
+  const current = "/ws/notes/today.md";
+
+  it("creates next to the current note and adds the extension once", () => {
+    expect(newWikiNotePath("Idea", current, "/ws")).toBe("/ws/notes/Idea.md");
+    expect(newWikiNotePath("Idea.md", current, "/ws")).toBe("/ws/notes/Idea.md");
+    expect(newWikiNotePath(" proyectos/Idea ".trim(), current, "/ws")).toBe("/ws/notes/proyectos/Idea.md");
+  });
+
+  it("refuses names that escape or are not plain relative paths", () => {
+    for (const bad of ["../x", "a/../x", "/etc/x", "a//b", "C:x", "a|b", "", "  "]) {
+      expect(newWikiNotePath(bad, current, "/ws")).toBeNull();
+    }
+  });
+
+  it("refuses when the current note is outside the workspace", () => {
+    expect(newWikiNotePath("Idea", "/other/today.md", "/ws")).toBeNull();
   });
 });

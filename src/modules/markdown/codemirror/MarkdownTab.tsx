@@ -50,7 +50,7 @@ export function MarkdownTab(props: Props): JSX.Element {
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [edit, setEdit] = useState<{ doc: unknown; text: string } | null>(null);
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
-  const wikiLinks = useWikiLinkHost(props.callbacks.onOpenFile);
+  const wikiLinks = useWikiLinkHost(props.path, props.callbacks.onOpenFile);
 
   const { doc, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate } =
     useDocument({

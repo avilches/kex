@@ -410,7 +410,7 @@ the same Live Preview extensions in a read-only view (Streamdown and its depende
   line. Blocks nested in containers line up with them: a fenced or indented code block, a table or a quote inside a
   list item sits at that item's text (the container's indentation is hidden on code lines and re-created as padding),
   a quoted code block loses the `>` markers of all its lines, and a table inside a list item is rendered as a widget
-  (one inside a quote stays raw). Brackets that are not a link (`[TODO]`) are plain text, `[[Note]]` and `[[Note|alias]]` are wiki links (the name is matched, ignoring case and extension, against the workspace's `.md` files listed once per tab with `fs_glob`; a Cmd/Ctrl+click, or a plain click in Preview, opens the note as a pinned tab, and a name that matches nothing is drawn dim with a dashed underline), an image that
+  (one inside a quote stays raw). Brackets that are not a link (`[TODO]`) are plain text, `[[Note]]` and `[[Note|alias]]` are wiki links (the name is matched, ignoring case and extension, against the workspace's `.md` files listed once per tab with `fs_glob`; a Cmd/Ctrl+click, or a plain click in Preview, opens the note as a pinned tab, and a name that matches nothing is drawn in the destructive color with a dashed underline, and clicking it creates an empty note next to the current one, plus any folders in the name, never outside the workspace), an image that
   fails to load shows its alt text, and the frontmatter is plain monospace text whatever the theme paints it as.
   A code block's band is a background layer that starts where its container's text does (`--lp-code-left`), so in a
   list item or a quote it is indented as a band and a quote's bars still run beside it. `<https://x.com>` (an
