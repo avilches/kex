@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
-import { applyCloseTab, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, needsResumePlanLookup, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, needsResumePlanLookup, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -465,5 +465,101 @@ describe("applyWorkspaceGroup", () => {
   it("does not modify unrelated workspaces", () => {
     const out = applyWorkspaceGroup([ws(), ws({ id: "w2", groupId: "completed" })], "w1", "on-hold");
     expect(out[1].groupId).toBe("completed");
+  });
+});
+
+describe("applyMoveTabToWorkspace", () => {
+  const term = (id: string, cwd?: string): Tab => ({ id, kind: "terminal", cwd });
+  const leaf = (id: string, tabs: Tab[]): SplitNode => ({
+    kind: "pane",
+    id,
+    tabs,
+    activeTabId: tabs[0]?.id ?? null,
+  });
+  const src = (over: Partial<Workspace> = {}) =>
+    ws({ id: "src", paneTree: leaf("sp1", [term("t1"), term("t2")]), activePaneId: "sp1", ...over });
+  const dst = (over: Partial<Workspace> = {}) =>
+    ws({ id: "dst", paneTree: leaf("dp1", [term("d1")]), activePaneId: "dp1", ...over });
+  const autoDest = {
+    kind: "existing",
+    workspaceId: "dst",
+    placement: { kind: "auto", splitId: "sx", newPaneId: "px" },
+  } as const;
+
+  it("moves the tab keeping its id and removes it from the source", () => {
+    const out = applyMoveTabToWorkspace([src(), dst()], "src", "t1", autoDest, 8);
+    const source = out.find((w) => w.id === "src")!;
+    const target = out.find((w) => w.id === "dst")!;
+    expect((source.paneTree as { tabs: Tab[] }).tabs.map((t) => t.id)).toEqual(["t2"]);
+    const panes = JSON.stringify(target.paneTree);
+    expect(panes).toContain('"id":"t1"');
+    expect(target.activePaneId).toBe("px");
+  });
+
+  it("keeps the source workspace with an empty pane when its last tab leaves", () => {
+    const onlyTab = src({ paneTree: leaf("sp1", [term("t1")]) });
+    const out = applyMoveTabToWorkspace([onlyTab, dst()], "src", "t1", autoDest, 8);
+    const source = out.find((w) => w.id === "src")!;
+    expect(out).toHaveLength(2);
+    expect(source.paneTree).toEqual({ kind: "pane", id: "sp1", tabs: [], activeTabId: null });
+    expect(source.activePaneId).toBe("sp1");
+  });
+
+  it("collapses a source pane that empties and repoints activePaneId at a live pane", () => {
+    const split = src({
+      paneTree: {
+        kind: "split",
+        id: "ss",
+        orientation: "horizontal",
+        dividerPosition: 0.5,
+        first: leaf("sp1", [term("t1")]),
+        second: leaf("sp2", [term("t2")]),
+      },
+      activePaneId: "sp1",
+    });
+    const out = applyMoveTabToWorkspace([split, dst()], "src", "t1", autoDest, 8);
+    const source = out.find((w) => w.id === "src")!;
+    expect(source.paneTree).toMatchObject({ kind: "pane", id: "sp2" });
+    expect(source.activePaneId).toBe("sp2");
+  });
+
+  it("leaves everything untouched when a split is blocked by the pane limit", () => {
+    const input = [src(), dst()];
+    const out = applyMoveTabToWorkspace(
+      input,
+      "src",
+      "t1",
+      {
+        kind: "existing",
+        workspaceId: "dst",
+        placement: { kind: "split", paneId: "dp1", direction: "right", splitId: "sx", newPaneId: "px" },
+      },
+      1,
+    );
+    expect(out).toBe(input);
+  });
+
+  it("returns the same array for the same workspace, a missing tab or a missing destination", () => {
+    const input = [src(), dst()];
+    const same = { kind: "existing", workspaceId: "src", placement: { kind: "pane", paneId: "sp1" } } as const;
+    expect(applyMoveTabToWorkspace(input, "src", "t1", same, 8)).toBe(input);
+    expect(applyMoveTabToWorkspace(input, "src", "nope", autoDest, 8)).toBe(input);
+    const ghost = { kind: "existing", workspaceId: "ghost", placement: { kind: "auto", splitId: "s", newPaneId: "p" } } as const;
+    expect(applyMoveTabToWorkspace(input, "src", "t1", ghost, 8)).toBe(input);
+  });
+
+  it("creates a workspace right after the source, in its group, with the tab's cwd", () => {
+    const grouped = src({ groupId: "g1", paneTree: leaf("sp1", [term("t1", "/Users/me/proj"), term("t2")]) });
+    const out = applyMoveTabToWorkspace(
+      [grouped, dst()],
+      "src",
+      "t1",
+      { kind: "new", workspaceId: "wn", paneId: "pn", color: null },
+      8,
+    );
+    expect(out.map((w) => w.id)).toEqual(["src", "wn", "dst"]);
+    const created = out[1]!;
+    expect(created).toMatchObject({ title: "proj", cwd: "/Users/me/proj", groupId: "g1", color: null, activePaneId: "pn" });
+    expect(created.paneTree).toMatchObject({ kind: "pane", id: "pn", activeTabId: "t1" });
   });
 });

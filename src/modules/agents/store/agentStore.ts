@@ -41,6 +41,7 @@ type AgentStoreState = {
   ) => void;
   clearRestored: (tabId: string) => void;
   setMeta: (tabId: string, meta: Partial<AgentSessionMeta>) => void;
+  reassignTabWorkspace: (tabId: string, workspaceId: string) => void;
   setLocalAgent: (state: LocalAgentState) => void;
   pushNotification: (n: Omit<AgentNotification, "id" | "at" | "read">) => void;
   markTabSeen: (tabId: string) => void;
@@ -189,6 +190,23 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
           ...s.sessions,
           [tabId]: { ...prev, meta: { ...prev.meta, ...meta } },
         },
+      };
+    }),
+
+  reassignTabWorkspace: (tabId, workspaceId) =>
+    set((s) => {
+      const session = s.sessions[tabId];
+      const hasNotifications = s.notifications.some((n) => n.tabId === tabId);
+      if (!session && !hasNotifications) return s;
+      return {
+        sessions: session
+          ? { ...s.sessions, [tabId]: { ...session, workspaceId } }
+          : s.sessions,
+        notifications: hasNotifications
+          ? s.notifications.map((n) =>
+              n.tabId === tabId ? { ...n, workspaceId } : n,
+            )
+          : s.notifications,
       };
     }),
 

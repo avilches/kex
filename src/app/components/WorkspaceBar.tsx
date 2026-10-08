@@ -45,6 +45,8 @@ import {
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
+import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
+import { useWorkspaceDnd } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -132,6 +134,7 @@ function SortableWorkspaceItem({
   onSetGroup,
   onCreateGroup,
   onRestoreFocus,
+  hoverSwitch,
 }: {
   ws: WorkspaceItem;
   active: boolean;
@@ -146,6 +149,7 @@ function SortableWorkspaceItem({
   onSetGroup: (id: string, groupId: string | null) => void;
   onCreateGroup: (workspaceId: string) => string;
   onRestoreFocus: () => void;
+  hoverSwitch: HoverSwitch | null;
 }) {
   const {
     attributes,
@@ -221,6 +225,8 @@ function SortableWorkspaceItem({
       ref={setNodeRef}
       className="group relative w-full px-1.5"
       style={style}
+      onPointerEnter={hoverSwitch ? () => hoverSwitch.enter(ws.id) : undefined}
+      onPointerLeave={hoverSwitch ? () => hoverSwitch.leave(ws.id) : undefined}
     >
       <button
         type="button"
@@ -816,6 +822,14 @@ export function WorkspaceBar({
     ? `New workspace (${newWorkspaceLabel})`
     : "New workspace";
 
+  const { draggingItem } = useWorkspaceDnd();
+  const tabDragging = draggingItem?.kind === "tab";
+  const hoverSwitch = useMemo(() => createHoverSwitch(onSelect), [onSelect]);
+  useEffect(() => {
+    if (!tabDragging) hoverSwitch.cancel();
+    return () => hoverSwitch.cancel();
+  }, [tabDragging, hoverSwitch]);
+
   const groups = useMemo(
     () => groupWorkspaces(workspaces, workspaceGroups),
     [workspaces, workspaceGroups],
@@ -980,6 +994,7 @@ export function WorkspaceBar({
                                 onSetGroup={onSetGroup}
                                 onCreateGroup={onCreateGroup}
                                 onRestoreFocus={onRestoreFocus}
+                                hoverSwitch={null}
                               />
                             </SortableContext>
                           );
@@ -1005,6 +1020,7 @@ export function WorkspaceBar({
                                 onSetGroup={onSetGroup}
                                 onCreateGroup={onCreateGroup}
                                 onRestoreFocus={onRestoreFocus}
+                                hoverSwitch={tabDragging && ws.id !== activeId ? hoverSwitch : null}
                               />
                             ))}
                           </SortableContext>
