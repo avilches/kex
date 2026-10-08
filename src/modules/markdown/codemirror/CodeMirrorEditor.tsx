@@ -5,6 +5,8 @@ import {
 } from "@/modules/markdown/codemirror/lib/markdownExtensions";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 import { useWikiLinkExtension } from "@/modules/markdown/codemirror/lib/useWikiLinkExtension";
+import { applyViewPosition, readViewPosition } from "@/modules/markdown/codemirror/lib/viewPosition";
+import type { ViewPosition } from "@/modules/markdown/lib/viewPosition";
 import { resolveMarkdownImageSrc } from "@/modules/markdown/lib/imageSrc";
 import { Compartment } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
@@ -15,6 +17,7 @@ export type CodeMirrorEditorHandle = {
   focus(): void;
   // 0-based line; puts the cursor at its start and scrolls it to the top.
   scrollToLine(line: number): void;
+  getPosition(): ViewPosition | null;
 };
 
 // "source" shows the raw markdown; "rich" adds the Live Preview decorations.
@@ -34,10 +37,12 @@ type Props = {
   mode?: CodeMirrorEditorMode;
   // Lets `[[Note]]` resolve and open; without it wiki links stay inert.
   wikiLinks?: WikiLinkHost;
+  // Cursor and scroll to restore when this editor mounts, e.g. after Preview.
+  initialPosition?: ViewPosition | null;
 };
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
-  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich", wikiLinks }, ref) {
+  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich", wikiLinks, initialPosition }, ref) {
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const themeExt = useEditorThemeExt();
     const pathRef = useRef(path);
@@ -93,8 +98,18 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
       view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
     }, [syncKey, value]);
 
+    const initialPositionRef = useRef(initialPosition);
+    useEffect(() => {
+      const view = cmRef.current?.view;
+      if (view && initialPositionRef.current) applyViewPosition(view, initialPositionRef.current);
+    }, []);
+
     useImperativeHandle(ref, () => ({
       focus: () => cmRef.current?.view?.focus(),
+      getPosition: () => {
+        const view = cmRef.current?.view;
+        return view ? readViewPosition(view) : null;
+      },
       scrollToLine: (line) => {
         const view = cmRef.current?.view;
         if (!view) return;
