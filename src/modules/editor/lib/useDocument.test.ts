@@ -196,6 +196,61 @@ describe("useDocument reload", () => {
     harness.unmount();
   });
 
+  it("leaves the deleted state when the file reappears with the same content", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const harness = mountUseDocument("/tmp/r1.txt");
+    await flush();
+
+    vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+    act(() => {
+      harness.hook.reload();
+    });
+    await flush();
+    expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    act(() => {
+      harness.hook.reload();
+    });
+    await flush();
+
+    expect(harness.hook.doc).toEqual({
+      status: "ready",
+      content: "on disk",
+      size: 7,
+    } satisfies DocumentState);
+
+    harness.unmount();
+  });
+
+  it("leaves the deleted state with a conflict when the file reappears while dirty", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const harness = mountUseDocument("/tmp/r2.txt");
+    await flush();
+
+    act(() => {
+      harness.hook.onChange("local edit");
+    });
+    vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+    act(() => {
+      harness.hook.reload();
+    });
+    await flush();
+    expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "recreated", size: 9 });
+    act(() => {
+      harness.hook.reload();
+    });
+    await flush();
+
+    expect(harness.hook.doc).toMatchObject({ status: "ready", content: "local edit" });
+    expect(harness.hook.dirty).toBe(true);
+    expect(harness.hook.conflict).toBe(true);
+
+    harness.unmount();
+  });
+
   it("carries an unsaved edit across unmount instead of saving it, and restores it on remount", async () => {
     vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
     const first = mountUseDocument("/tmp/e.txt");

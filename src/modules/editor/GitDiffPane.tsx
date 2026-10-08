@@ -296,11 +296,15 @@ export function GitDiffPane({ source, chipLabel, active, onNavigateDiff }: Props
     let alive = true;
     let unlisten: (() => void) | undefined;
     const checkExistence = () => {
-      void invoke("fs_stat", { path: targetPath, workspace: currentWorkspaceEnv() }).catch(() => {
-        if (!alive) return;
-        setDeletedOnDisk(true);
-        invalidateDiff(key);
-      });
+      void invoke("fs_stat", { path: targetPath, workspace: currentWorkspaceEnv() })
+        .then(() => {
+          if (alive) setDeletedOnDisk(false);
+        })
+        .catch(() => {
+          if (!alive) return;
+          setDeletedOnDisk(true);
+          invalidateDiff(key);
+        });
     };
     void listenFsChanged((paths) => {
       if (paths.some((p) => p.replace(/\\/g, "/") === targetPath)) checkExistence();
