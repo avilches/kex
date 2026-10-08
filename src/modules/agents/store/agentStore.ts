@@ -9,6 +9,7 @@ import type {
 } from "../lib/types";
 
 const MAX_NOTIFICATIONS = 50;
+const MAX_CLOSED = 20;
 
 let notifSeq = 0;
 
@@ -19,7 +20,14 @@ type AgentStoreState = {
   /** tabId -> workspaceId of every live tab; null until the app reports it. */
   tabLocations: Record<string, string> | null;
   setTabLocations: (locations: Record<string, string>) => void;
-  retargetNotifications: (oldTabId: string, newTabId: string) => void;
+  /** Sessions of closed tabs that were waiting on the user, by their old tab id. */
+  closedSessions: Record<string, AgentSession>;
+  stashClosedSession: (tabId: string) => void;
+  restoreClosedSession: (
+    oldTabId: string,
+    newTabId: string,
+    workspaceId: string,
+  ) => void;
   start: (tabId: string, workspaceId: string, agent: string) => void;
   startIdle: (tabId: string, workspaceId: string, agent: string) => void;
   setStatus: (tabId: string, status: AgentStatus) => void;
@@ -46,6 +54,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   localAgent: null,
   notifications: [],
   tabLocations: null,
+  closedSessions: {},
 
   start: (tabId, workspaceId, agent) =>
     set((s) => {
@@ -248,13 +257,33 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       sameLocations(s.tabLocations, locations) ? s : { tabLocations: locations },
     ),
 
-  // A reopened tab gets a fresh id; its pending notification follows it.
-  retargetNotifications: (oldTabId, newTabId) =>
+  // Closing the tab kills the agent and drops its session, so an attention state
+  // would be lost for good. Keep it aside in case the tab is reopened.
+  stashClosedSession: (tabId) =>
     set((s) => {
-      if (!s.notifications.some((n) => n.tabId === oldTabId)) return s;
+      const session = s.sessions[tabId];
+      if (session?.status !== "attention") return s;
+      const kept = Object.entries(s.closedSessions).slice(-(MAX_CLOSED - 1));
+      return { closedSessions: { ...Object.fromEntries(kept), [tabId]: session } };
+    }),
+
+  // A reopened tab gets a fresh id: its stashed session and its notification follow it.
+  restoreClosedSession: (oldTabId, newTabId, workspaceId) =>
+    set((s) => {
+      const stashed = s.closedSessions[oldTabId];
+      const hasNotif = s.notifications.some((n) => n.tabId === oldTabId);
+      if (!stashed && !hasNotif) return s;
+      const { [oldTabId]: _gone, ...closedSessions } = s.closedSessions;
       return {
+        closedSessions,
+        sessions: stashed
+          ? {
+              ...s.sessions,
+              [newTabId]: { ...stashed, tabId: newTabId, workspaceId },
+            }
+          : s.sessions,
         notifications: s.notifications.map((n) =>
-          n.tabId === oldTabId ? { ...n, tabId: newTabId } : n,
+          n.tabId === oldTabId ? { ...n, tabId: newTabId, workspaceId } : n,
         ),
       };
     }),

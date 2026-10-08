@@ -184,3 +184,33 @@ describe("agentStore.clearAll", () => {
     expect(next.sessions.p2.status).toBe("working");
   });
 });
+
+describe("agentStore closed tab sessions", () => {
+  beforeEach(() => {
+    useAgentStore.setState({
+      sessions: {},
+      notifications: [],
+      closedSessions: {},
+    });
+  });
+
+  test("an attention session survives its tab and follows it to the new id", () => {
+    const s = useAgentStore.getState();
+    s.start("old", "w1", "claude");
+    s.setStatus("old", "attention");
+    s.stashClosedSession("old");
+    s.finish("old");
+    s.restoreClosedSession("old", "new", "w1");
+    const after = useAgentStore.getState();
+    expect(after.sessions.new.status).toBe("attention");
+    expect(after.sessions.new.tabId).toBe("new");
+    expect(after.closedSessions).toEqual({});
+  });
+
+  test("a session that was not waiting on the user is not kept", () => {
+    const s = useAgentStore.getState();
+    s.start("old", "w1", "claude");
+    s.stashClosedSession("old");
+    expect(useAgentStore.getState().closedSessions).toEqual({});
+  });
+});

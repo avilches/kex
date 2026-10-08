@@ -585,6 +585,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const closeTab = useCallback((workspaceId: string, tabId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     let history: string[] | undefined;
+    useAgentStore.getState().stashClosedSession(tabId);
     if (ws) {
       const found = findTabPane(ws.paneTree, tabId);
       if (found) {
@@ -619,7 +620,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
     const newTab = buildReopenedTab(entry.tab, newId);
     openTab(target.workspaceId, target.paneId, newTab);
-    useAgentStore.getState().retargetNotifications(entry.tab.id, newId);
+    useAgentStore.getState().restoreClosedSession(entry.tab.id, newId, target.workspaceId);
   }, [openTab, activeWorkspaceId]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
