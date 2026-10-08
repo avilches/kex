@@ -18,7 +18,8 @@ import {
   type CodeMirrorEditorHandle,
 } from "@/modules/markdown/codemirror/CodeMirrorEditor";
 import { cn } from "@/lib/utils";
-import { MarkdownPreviewPane } from "@/modules/markdown/MarkdownPreviewPane";
+import { MarkdownPreviewPane, type MarkdownPreviewPaneHandle } from "@/modules/markdown/MarkdownPreviewPane";
+import { positionAfterPreview, type ViewPosition } from "@/modules/markdown/lib/viewPosition";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
 import { OutlinePanel } from "@/modules/markdown/lib/OutlinePanel";
 import { headingsFromMarkdown } from "@/modules/markdown/lib/outline";
@@ -45,6 +46,12 @@ const VIEW_MODES: { mode: ViewMode; label: string }[] = [
 export function MarkdownTab(props: Props): JSX.Element {
   const editorRef = useRef<CodeMirrorEditorHandle>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const previewPaneRef = useRef<MarkdownPreviewPaneHandle>(null);
+  // Preview and the editor are different CodeMirror views, so the reader's place
+  // is carried across them by hand: saved on the way into Preview, merged with
+  // where they scrolled to on the way out, and handed to whichever view mounts.
+  const savedPositionRef = useRef<ViewPosition | null>(null);
+  const [restore, setRestore] = useState<ViewPosition | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("rich");
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [edit, setEdit] = useState<{ doc: unknown; text: string } | null>(null);
@@ -81,7 +88,15 @@ export function MarkdownTab(props: Props): JSX.Element {
     [onChange],
   );
   const selectMode = useCallback((next: ViewMode) => {
-    if (next === "preview") setEdit(latestEditRef.current);
+    const current = viewModeRef.current;
+    if (next === "preview" && current !== "preview") {
+      savedPositionRef.current = editorRef.current?.getPosition() ?? null;
+      setRestore(savedPositionRef.current);
+      setEdit(latestEditRef.current);
+    } else if (next !== "preview" && current === "preview") {
+      const top = previewPaneRef.current?.getTopLine();
+      setRestore(top ? positionAfterPreview(savedPositionRef.current, top) : savedPositionRef.current);
+    }
     setViewMode(next);
   }, []);
   const cycleView = useCallback(
@@ -246,7 +261,12 @@ export function MarkdownTab(props: Props): JSX.Element {
       <div className="relative min-h-0 flex-1">
         {doc.status === "ready" && viewMode === "preview" ? (
           <div ref={previewRef} tabIndex={-1} className="h-full outline-none">
-            <MarkdownPreviewPane content={liveContent} path={props.path} />
+            <MarkdownPreviewPane
+              ref={previewPaneRef}
+              content={liveContent}
+              path={props.path}
+              initialTopLine={restore?.topLine}
+            />
           </div>
         ) : doc.status === "ready" ? (
           <div className="flex h-full min-h-0">
@@ -258,6 +278,7 @@ export function MarkdownTab(props: Props): JSX.Element {
                 onChange={handleChange}
                 path={props.path}
                 mode={viewMode === "source" ? "source" : "rich"}
+                initialPosition={restore}
               />
             </div>
             {outlineOpen && (
