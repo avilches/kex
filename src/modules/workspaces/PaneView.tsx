@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { EmptyPaneWelcome, type WelcomeActions } from "./EmptyPaneWelcome";
 import { PaneTabBar } from "./PaneTabBar";
+import { PinnedTabNote, TAB_NOTE_ATTR } from "./PinnedTabNote";
 import { TabContent } from "./TabContent";
 import type { TabCallbacks } from "./TabContent";
 import type { PaneNode } from "./lib/types";
@@ -181,6 +182,7 @@ export const PaneView = memo(function PaneView({
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const tabBarRef = useRef<HTMLDivElement>(null);
   const [paneSize, setPaneSize] = useState({ w: Infinity, h: Infinity });
 
   useEffect(() => {
@@ -258,11 +260,26 @@ export const PaneView = memo(function PaneView({
       ref={containerRef}
       data-pane-id={pane.id}
       className="relative flex h-full flex-col overflow-hidden"
-      onMouseDownCapture={handleFocus}
+      onMouseDownCapture={(e) => {
+        // The pinned note must not pull focus to the terminal, or text selection inside it is lost.
+        if (e.target instanceof Element && e.target.closest(`[${TAB_NOTE_ATTR}]`)) return;
+        handleFocus();
+      }}
       onFocus={handleFocus}
     >
       <PaneFlashBorder tabId={pane.activeTabId} />
-      <div className="relative shrink-0">
+      {activeTab?.note && activeTab.notePinned && (
+        <PinnedTabNote
+          key={activeTab.id}
+          tab={activeTab}
+          active
+          paneRef={containerRef}
+          tabBarRef={tabBarRef}
+          layoutKey={pane.tabs.map((t) => t.id).join(",")}
+          onUpdateTab={callbacks.onUpdateTab}
+        />
+      )}
+      <div ref={tabBarRef} className="relative shrink-0">
         <PaneTabBar
           tabs={pane.tabs}
           activeTabId={pane.activeTabId}

@@ -1,5 +1,6 @@
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { useEditorThemeExt } from "@/modules/editor/lib/useEditorThemeExt";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 import { buildStaticPreviewExtensions } from "@/modules/markdown/codemirror/lib/markdownExtensions";
@@ -13,10 +14,14 @@ type Props = {
   content: string;
   // The markdown file's own path: a relative image src resolves against its
   // directory, same as the Live Preview editor does.
-  path: string;
+  // Optional for markdown that is not a file (a tab note): relative images
+  // then have no directory to resolve against.
+  path?: string;
   wikiLinks?: WikiLinkHost;
   // Source line to show at the top when the pane mounts.
   initialTopLine?: number | null;
+  // Sizes to the content up to a max height instead of filling the parent.
+  compact?: boolean;
 };
 
 export type MarkdownPreviewPaneHandle = {
@@ -25,7 +30,7 @@ export type MarkdownPreviewPaneHandle = {
 };
 
 export const MarkdownPreviewPane = forwardRef<MarkdownPreviewPaneHandle, Props>(function MarkdownPreviewPane(
-  { content, path, wikiLinks, initialTopLine },
+  { content, path = "", wikiLinks, initialTopLine, compact = false },
   ref,
 ) {
   const themeExt = useEditorThemeExt();
@@ -54,13 +59,19 @@ export const MarkdownPreviewPane = forwardRef<MarkdownPreviewPaneHandle, Props>(
   );
   const value = useMemo(() => frontmatterAsCodeBlock(content), [content]);
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-[var(--editor-background)] text-[var(--editor-foreground)]">
+    <div
+      data-compact={compact || undefined}
+      className={cn(
+        "relative flex w-full flex-col overflow-hidden bg-[var(--editor-background)] text-[var(--editor-foreground)]",
+        compact ? "max-h-64" : "h-full",
+      )}
+    >
       <CodeMirror
         ref={cmRef}
         value={value}
         theme={themeExt}
         editable={false}
-        height="100%"
+        height={compact ? undefined : "100%"}
         className="min-h-0 flex-1 overflow-auto"
         basicSetup={{
           lineNumbers: false,
