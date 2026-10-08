@@ -3153,6 +3153,17 @@ export default function App() {
           {/* 3-column layout */}
           <div className="flex min-h-0 flex-1">
             <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabToWorkspace}>
+            <WorkspaceDndProvider
+              workspaces={workspaces}
+              activeWorkspaceId={activeWorkspaceId}
+              onMoveTab={moveTab}
+              onReorderTab={reorderTab}
+              onSplitPaneAndPlace={splitPaneAndPlace}
+              onSplitPaneAndOpenTab={splitPaneAndOpenTab}
+              onOpenTab={openTab}
+              onMoveTabToWorkspace={handleMoveTabToWorkspace}
+              onSelectWorkspace={setActiveWorkspaceId}
+            >
             {/* LEFT: workspace bar */}
             <WorkspaceBar
               workspaces={workspaceBarItems}
@@ -3180,15 +3191,6 @@ export default function App() {
             />
 
             {/* CENTER + TOOL PANEL: resizable, side configurable */}
-            <WorkspaceDndProvider
-              workspaces={workspaces}
-              activeWorkspaceId={activeWorkspaceId}
-              onMoveTab={moveTab}
-              onReorderTab={reorderTab}
-              onSplitPaneAndPlace={splitPaneAndPlace}
-              onSplitPaneAndOpenTab={splitPaneAndOpenTab}
-              onOpenTab={openTab}
-            >
               <ResizablePanelGroup
                 orientation="horizontal"
                 className="min-h-0 flex-1"

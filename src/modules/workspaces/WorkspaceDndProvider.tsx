@@ -15,6 +15,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { tabForDroppedPath } from "./lib/dropTab";
 import { allPanes, findOpenPathTab, findTabPane } from "./lib/splitNode";
+import { originToRestore, resolveTabDrop, type TabLocation } from "./lib/tabDrop";
+import type { TabMoveRequest } from "./lib/tabTransfer";
 import {
   insertIntoLeafScratchpad,
   leafCwd,
@@ -76,6 +78,8 @@ type Props = {
   onSplitPaneAndPlace: UseWorkspacesReturn["splitPaneAndPlace"];
   onSplitPaneAndOpenTab: UseWorkspacesReturn["splitPaneAndOpenTab"];
   onOpenTab: UseWorkspacesReturn["openTab"];
+  onMoveTabToWorkspace: (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest) => string | null;
+  onSelectWorkspace: (id: string) => void;
   children: ReactNode;
 };
 
@@ -87,6 +91,8 @@ export function WorkspaceDndProvider({
   onSplitPaneAndPlace,
   onSplitPaneAndOpenTab,
   onOpenTab,
+  onMoveTabToWorkspace,
+  onSelectWorkspace,
   children,
 }: Props) {
   const [draggingItem, setDraggingItem] = useState<DraggingItem | null>(null);
@@ -96,10 +102,11 @@ export function WorkspaceDndProvider({
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
 
   // tabId → { paneId, wsId } — built once at dragStart, used by handleDragOver (hot path).
-  const dragIndexRef = useRef<Map<string, { paneId: string; wsId: string }>>(new Map());
+  const dragIndexRef = useRef<Map<string, TabLocation>>(new Map());
+  const originWorkspaceIdRef = useRef<string | null>(null);
 
   const buildDragIndex = useCallback(() => {
-    const idx = new Map<string, { paneId: string; wsId: string }>();
+    const idx = new Map<string, TabLocation>();
     for (const ws of workspaces) {
       for (const pane of allPanes(ws.paneTree)) {
         for (const tab of pane.tabs) {
@@ -135,12 +142,22 @@ export function WorkspaceDndProvider({
       const ws = workspaces.find((w) => w.id === entry.wsId);
       if (ws) {
         const result = findTabPane(ws.paneTree, activeId);
-        if (result) setDraggingItem({ kind: "tab", tab: result.tab, workspaceId: ws.id });
+        if (result) {
+          setDraggingItem({ kind: "tab", tab: result.tab, workspaceId: ws.id });
+          originWorkspaceIdRef.current = activeWorkspaceIdRef.current;
+        }
       }
     }
   }
 
+  function restoreOrigin(placed: boolean) {
+    const target = originToRestore(originWorkspaceIdRef.current, activeWorkspaceIdRef.current, placed);
+    originWorkspaceIdRef.current = null;
+    if (target) onSelectWorkspace(target);
+  }
+
   function handleDragCancel() {
+    restoreOrigin(false);
     document.body.style.cursor = "";
     dragIndexRef.current = new Map();
     setDraggingItem(null);
@@ -189,7 +206,10 @@ export function WorkspaceDndProvider({
     setDraggingItem(null);
     setTabInsertPaneId(null);
     const { active, over } = event;
-    if (!over) return;
+    if (!over) {
+      restoreOrigin(false);
+      return;
+    }
 
     const activeId = String(active.id);
     const overId = String(over.id);
@@ -210,7 +230,7 @@ export function WorkspaceDndProvider({
       return;
     }
 
-    handleTabDragEnd(activeId, overId, idx);
+    restoreOrigin(handleTabDragEnd(activeId, overId, idx));
   }
 
   // A file/folder dropped on a terminal's scratchpad bar inserts its path,
@@ -224,7 +244,7 @@ export function WorkspaceDndProvider({
     return true;
   }
 
-  function handleFileDragEnd(filePath: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>, isDir: boolean) {
+  function handleFileDragEnd(filePath: string, overId: string, idx: Map<string, TabLocation>, isDir: boolean) {
     const activeWs = workspaces.find((ws) => ws.id === activeWorkspaceIdRef.current);
     if (!activeWs) return;
     const panes = allPanes(activeWs.paneTree);
@@ -295,52 +315,21 @@ export function WorkspaceDndProvider({
     }
   }
 
-  function handleTabDragEnd(tabId: string, overId: string, idx: Map<string, { paneId: string; wsId: string }>) {
-    const sourceEntry = idx.get(tabId);
-    if (!sourceEntry) return;
-    const { paneId: sourcePaneId, wsId: sourceWorkspaceId } = sourceEntry;
-    const sourceWs = workspaces.find((ws) => ws.id === sourceWorkspaceId);
-    if (!sourceWs) return;
-
-    if (overId.startsWith("tab-insert:")) {
-      const parts = overId.split(":");
-      const refTabId = parts[1];
-      const side = parts[2];
-      if (!refTabId || !side) return;
-      if (side !== "before" && side !== "after") return;
-
-      const targetEntry = idx.get(refTabId);
-      if (!targetEntry) return;
-      const targetPaneId = targetEntry.paneId;
-      const targetPane = allPanes(sourceWs.paneTree).find((p) => p.id === targetPaneId);
-      if (!targetPane) return;
-      const refTabIndex = targetPane.tabs.findIndex((p) => p.id === refTabId);
-      if (refTabIndex === -1) return;
-
-      const insertionIndex = refTabIndex + (side === "after" ? 1 : 0);
-      if (sourcePaneId === targetPaneId) {
-        onReorderTab(sourceWorkspaceId, tabId, insertionIndex);
-      } else {
-        onMoveTab(sourceWorkspaceId, tabId, targetPaneId, insertionIndex);
-      }
-      return;
-    }
-
-    if (!overId.startsWith("zone:")) return;
-    const parts = overId.split(":");
-    const targetPaneId = parts[1]!;
-    const zone = parts[2] as "top" | "bottom" | "left" | "right" | "center";
-
-    const sourcePanes = allPanes(sourceWs.paneTree);
-    if (!sourcePanes.some((p) => p.id === targetPaneId)) return;
-
-    if (zone === "center") {
-      if (sourcePaneId === targetPaneId) return;
-      onMoveTab(sourceWorkspaceId, tabId, targetPaneId);
-    } else {
-      const { workspacePaneLimit } = usePreferencesStore.getState();
-      if (sourcePanes.length >= workspacePaneLimit) return;
-      onSplitPaneAndPlace(sourceWorkspaceId, targetPaneId, zone, tabId);
+  function handleTabDragEnd(tabId: string, overId: string, idx: Map<string, TabLocation>): boolean {
+    const action = resolveTabDrop(overId, tabId, workspaces, idx, usePreferencesStore.getState().workspacePaneLimit);
+    if (!action) return false;
+    switch (action.kind) {
+      case "reorder":
+        onReorderTab(action.workspaceId, action.tabId, action.index);
+        return true;
+      case "move":
+        onMoveTab(action.workspaceId, action.tabId, action.paneId, action.index);
+        return true;
+      case "split":
+        onSplitPaneAndPlace(action.workspaceId, action.paneId, action.direction, action.tabId);
+        return true;
+      case "transfer":
+        return onMoveTabToWorkspace(action.sourceWorkspaceId, action.tabId, action.request) !== null;
     }
   }
 
@@ -362,7 +351,8 @@ export function WorkspaceDndProvider({
           {children}
         </WorkspaceDndInsertContext.Provider>
       </WorkspaceDndContext.Provider>
-      <DragOverlay dropAnimation={null}>
+      {/* Without pointer-events-none the overlay under the cursor swallows the WorkspaceBar hover. */}
+      <DragOverlay dropAnimation={null} className="pointer-events-none">
         {draggingItem?.kind === "tab" && (
           <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
             <span className="shrink-0 opacity-70">{tabIcon(draggingItem.tab, draggingItem.workspaceId)}</span>

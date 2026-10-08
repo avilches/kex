@@ -303,8 +303,9 @@ the active tab visible:
 ## Drag-and-drop (panel reordering, splitting, and file open)
 
 Drag-and-drop uses `@dnd-kit/core` v6.3.1. The `DndContext` lives in `WorkspaceDndProvider`
-(`WorkspaceDndProvider.tsx`), which wraps both the explorer panel and the workspace area so
-that file drags from the explorer can target pane drop zones.
+(`WorkspaceDndProvider.tsx`), which wraps the `WorkspaceBar`, the explorer panel and the workspace
+area so that file drags from the explorer can target pane drop zones and tab drags can switch
+workspace by hovering the bar.
 
 ### Drag item type
 
@@ -377,20 +378,31 @@ sits on top of the bar, the `DndContext` uses a custom `collisionDetection` that
 `pointerWithin` and promotes any `scratchpad:` collision to the front, so a path drop inserts a
 reference instead of opening a pane.
 
-**Tab drag** — two zone ID formats:
+**Tab drag**: `handleTabDragEnd` delegates to `resolveTabDrop` (`lib/tabDrop.ts`, pure). Given the
+`over` id, the dragged tab, every workspace and the drag index built at drag start, it returns one of
+four actions, or `null` when the drop does nothing:
+
+- `reorder`, `move`, `split`: the target is in the tab's own workspace; they call `reorderTab`,
+  `moveTab` and `splitPaneAndPlace`.
+- `transfer`: the target is in another workspace; it calls `onMoveTabToWorkspace` (App's
+  `handleMoveTabToWorkspace`) with a `pane` or `split` request.
+
+Two over id formats:
 
 `tab-insert:<tabId>:before|after` - tab border drop zones for positional insertion:
 - `before`: insert at `indexOf(tabId)` in the target pane
 - `after`: insert at `indexOf(tabId) + 1`
-- Same pane: `reorderTab(workspaceId, tabId, insertionIndex)` — reorders tabs using
-  `arrayMove`; dropping before or after the dragged tab itself is a noop
-- Different pane: `moveTab(workspaceId, tabId, targetPaneId, insertionIndex)` — moves tab to
-  the target pane at the given position; source pane auto-collapses if it becomes empty
+- Same pane: `reorder` (dropping before or after the dragged tab itself is a noop)
+- Different pane of the same workspace: `move` at the given position; the source pane
+  auto-collapses if it becomes empty
+- Pane of another workspace: `transfer` into that pane at the given position
 
 `zone:<paneId>:<direction>` - pane-level drop zones:
-- `center`: `moveTab(sourceWorkspaceId, tabId, targetPaneId)` — moves tab to end of another pane
-- directional zones: `splitPaneAndPlace(sourceWorkspaceId, targetPaneId, direction, tabId)` —
-  splits the target pane and places the dragged tab in the new half
+- `center`: `move` to the end of another pane (`null` on the tab's own pane), or `transfer` when the
+  pane belongs to another workspace
+- directional zones: `split` (or `transfer` with a split request) that splits the target pane and
+  places the tab in the new half; `null` when the target workspace already has `workspacePaneLimit`
+  panes
 
 **File drag** — for a file, the handler checks whether an editor with that path is already open in
 the active workspace. If it is, the existing panel is treated as a panel drag (move/reorder) so the
@@ -414,8 +426,15 @@ insertion atomically in a single state update.
 Both zone types coexist. Tab-border zones take priority when the pointer is over a tab bar (they are
 physically smaller and registered on top). Pane zones handle the content area and pane borders.
 
-Cross-workspace drops are blocked: the target pane is validated to belong to the same workspace as
-the source panel before any mutation.
+Cross-workspace drops are supported. While a tab is dragged, each workspace of the `WorkspaceBar` is a
+hover target: keeping the pointer on it for 600 ms (`createHoverSwitch`, `lib/hoverSwitch.ts`) makes it
+the active workspace, and only the active workspace renders drop zones, so the drop uses the usual zones.
+`WorkspaceDndProvider` wraps the `WorkspaceBar` (which keeps its own nested `DndContext` for reordering
+workspaces) so the bar can read `draggingItem`. The provider's `DragOverlay` is `pointer-events-none`,
+otherwise the chip under the cursor would swallow the `pointerenter` of the bar items. The provider
+remembers the active workspace when a tab drag starts and goes back to it (`originToRestore`) when the
+drag is cancelled with Esc or dropped where nothing happens. Known limitation: workspaces inside a
+collapsed group are not on screen, so they cannot be hover targets.
 
 ---
 
@@ -436,7 +455,7 @@ user stays in the current workspace. "New" creates a workspace right after the s
 only tab is the moved one, titled and rooted after the tab's cwd when it is a terminal. A source
 workspace that loses its last tab is not closed: it keeps an empty pane. `App.tsx` also calls
 `useAgentStore.reassignTabWorkspace` so the agent session and its notifications point at the new
-workspace.
+workspace. Dragging uses the same operation, through `resolveTabDrop` (see Drag-and-drop).
 
 ## Resize handles (`resizable.tsx`)
 
