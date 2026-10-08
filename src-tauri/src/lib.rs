@@ -491,9 +491,15 @@ fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::App
 }
 
 #[tauri::command]
-fn agent_session_restore_plan() -> Vec<agent::session_store::RestorePlan> {
+fn agent_session_restore_plan(app: tauri::AppHandle) -> Vec<agent::session_store::RestorePlan> {
     log::debug!("[agent-session] agent_session_restore_plan invoked");
     let plans = agent::session_store::load_restore_plan();
+    let known = app.state::<window_state::WindowStateManager>().terminal_tab_ids();
+    let (plans, orphans) = agent::session_store::split_orphans(plans, &known);
+    for orphan in &orphans {
+        log::info!("[agent-session] restore: tab {} is in no window, dropping its session", orphan.tab_id);
+        let _ = agent::session_store::detach_session(&orphan.tab_id);
+    }
     log::info!("[agent-session] restore: {} plan(s) ready for frontend", plans.len());
     plans
 }
