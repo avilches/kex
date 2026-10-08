@@ -139,6 +139,11 @@ export function buildLiveDecorationExtensions(resolveImageSrc: (src: string) => 
       ".cm-lp-link-text, .cm-lp-link-text *": { color: "var(--primary, #3b82f6) !important" },
       // Brackets that turned out not to be a link (`[TODO]`, `[[Wiki Link]]`):
       // the syntax theme colors any Link node as a link, this puts it back.
+      // A `[[Note]]` that names no note yet: a click creates it.
+      ".cm-lp-wikilink-missing, .cm-lp-wikilink-missing *": {
+        color: "var(--destructive) !important",
+        textDecoration: "underline dashed",
+      },
       ".cm-lp-notlink, .cm-lp-notlink *": { color: "var(--editor-foreground) !important", textDecoration: "none" },
       // The dot and the checkbox are both 20px wide (checkbox 16px + 4px
       // margin), so a task item's text lines up with a plain item's text.

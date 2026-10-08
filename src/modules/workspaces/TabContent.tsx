@@ -118,6 +118,8 @@ export type TabCallbacks = {
   onNewWorkspaceFromFolder?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onAddToGitignore?: (path: string, isDir: boolean) => void;
+  // Open a file as a pinned tab (a markdown tab following a `[[Note]]`)
+  onOpenFile?: (path: string) => void;
 };
 
 type Props = {

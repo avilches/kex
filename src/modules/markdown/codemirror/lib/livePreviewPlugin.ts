@@ -22,7 +22,9 @@ import {
   planTables,
   resolveReference,
   type TableSpec,
+  WIKI_LINK_CLASS,
 } from "@/modules/markdown/codemirror/lib/livePreview";
+import { wikiLinkAt } from "@/modules/markdown/lib/wikiLinks";
 import { type CellNode, parseCellInline } from "@/modules/markdown/codemirror/lib/tableCellInline";
 
 class CheckboxWidget extends WidgetType {
@@ -415,7 +417,10 @@ function buildDecorations(view: EditorView, resolveImageSrc: (src: string) => st
       decorations.push({
         from: mark.from,
         to: mark.to,
-        deco: Decoration.mark({ class: mark.className, ...(mark.title ? { attributes: { title: mark.title } } : {}) }),
+        deco: Decoration.mark({
+          class: mark.className === WIKI_LINK_CLASS ? wikiLinkClass(state, mark.title) : mark.className,
+          ...(mark.title ? { attributes: { title: mark.title } } : {}),
+        }),
       });
     }
     for (const hide of plan.hides) {
@@ -563,7 +568,8 @@ function createInlinePlugin(resolveImageSrc: (src: string) => string): Extension
           update.docChanged ||
           update.selectionSet ||
           update.viewportChanged ||
-          syntaxTree(update.startState) !== syntaxTree(update.state)
+          syntaxTree(update.startState) !== syntaxTree(update.state) ||
+          update.startState.facet(wikiLinkHost) !== update.state.facet(wikiLinkHost)
         ) {
           this.decorations = buildDecorations(update.view, resolveImageSrc);
         }
@@ -652,6 +658,14 @@ export function handleLinkMousedown(event: MouseEvent, view: EditorView): boolea
   if (!modifierHeld && !view.state.facet(staticPreview)) return false;
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
   if (pos == null) return false;
+  const wiki = wikiTargetAt(view.state, pos);
+  if (wiki !== null) {
+    const host = view.state.facet(wikiLinkHost);
+    if (!host) return false;
+    event.preventDefault();
+    host.open(wiki);
+    return true;
+  }
   const url = linkUrlAt(view.state, pos);
   if (!url) return false;
   event.preventDefault();
@@ -659,4 +673,33 @@ export function handleLinkMousedown(event: MouseEvent, view: EditorView): boolea
   return true;
 }
 
-export const linkClickHandler: Extension = EditorView.domEventHandlers({ mousedown: handleLinkMousedown });
+// What the editor needs to know about the workspace's notes: whether a name
+// points at one (to tell a live link from a dangling one) and how to open it.
+export type WikiLinkHost = { resolve(target: string): string | null; open(target: string): void };
+export const wikiLinkHost = Facet.define<WikiLinkHost, WikiLinkHost | null>({
+  combine: (values) => values[0] ?? null,
+});
+
+function wikiLinkClass(state: EditorState, target: string | undefined): string {
+  const host = state.facet(wikiLinkHost);
+  // A view with no notes to open (an overlay preview) shows the label as plain text.
+  if (!host || target === undefined) return "cm-lp-notlink";
+  return host.resolve(target) === null ? "cm-lp-wikilink-missing" : "cm-lp-link-text";
+}
+
+// The note name of the `[[...]]` under `pos`; null when there is none or it
+// sits inside code.
+export function wikiTargetAt(state: EditorState, pos: number): string | null {
+  const line = state.doc.lineAt(pos);
+  for (let i = line.text.indexOf("[["); i !== -1; i = line.text.indexOf("[[", i + 1)) {
+    const wiki = wikiLinkAt(line.text, i);
+    if (!wiki || pos < line.from + wiki.from || pos > line.from + wiki.to) continue;
+    for (let n: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1); n; n = n.parent) {
+      if (n.type.name === "InlineCode" || n.type.name === "FencedCode" || n.type.name === "CodeBlock") return null;
+    }
+    return wiki.target;
+  }
+  return null;
+}
+
+export const linkClickHandler: Extension =EditorView.domEventHandlers({ mousedown: handleLinkMousedown });

@@ -379,7 +379,7 @@ evaluation-stage second one on Milkdown Crepe, and the Streamdown-only "legacy" 
 Settings selector (`markdownEngine`). All three were removed in favor of "Live Preview", which is now the only
 engine, together with their npm dependencies (`@tiptap/*`, `@milkdown/*`, `mermaid`, `katex`, `lowlight`,
 `highlight.js`, `markdown-it` and its plugins), the engine Settings selector, the `markdownEngine` field of a tab and
-the `markdownWikiLinks` preference. What was lost with them: the toolbar, slash commands, visual wiki-links and
+the `markdownWikiLinks` preference. What was lost with them: the toolbar, slash commands, visual wiki-links (rebuilt later, see Live Preview) and
 mermaid/KaTeX rendering; they can be rebuilt on Live Preview if they are ever missed. The Preview mode and the overlay/split preview of an `editor` tab are
 the same Live Preview extensions in a read-only view (Streamdown and its dependency were removed). See `docs/ARCHITECTURE.md`
 (Frontend module map, `markdown/`; 4.9-4.11) and `docs/BUILD.md` (Markdown editor chunks).
@@ -410,7 +410,7 @@ the same Live Preview extensions in a read-only view (Streamdown and its depende
   line. Blocks nested in containers line up with them: a fenced or indented code block, a table or a quote inside a
   list item sits at that item's text (the container's indentation is hidden on code lines and re-created as padding),
   a quoted code block loses the `>` markers of all its lines, and a table inside a list item is rendered as a widget
-  (one inside a quote stays raw). Brackets that are not a link (`[TODO]`, `[[Wiki Link]]`) are plain text, an image that
+  (one inside a quote stays raw). Brackets that are not a link (`[TODO]`) are plain text, `[[Note]]` and `[[Note|alias]]` are wiki links (the name is matched, ignoring case and extension, against the workspace's `.md` files listed once per tab with `fs_glob`; a Cmd/Ctrl+click, or a plain click in Preview, opens the note as a pinned tab, and a name that matches nothing is drawn in the destructive color with a dashed underline, and clicking it creates an empty note next to the current one, plus any folders in the name; `..` may climb up to the workspace root and no further, and a workspace without a root uses the note's own folder as that limit, for both the lookup and the creation), an image that
   fails to load shows its alt text, and the frontmatter is plain monospace text whatever the theme paints it as.
   A code block's band is a background layer that starts where its container's text does (`--lp-code-left`), so in a
   list item or a quote it is indented as a band and a quote's bars still run beside it. `<https://x.com>` (an

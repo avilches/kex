@@ -2382,8 +2382,10 @@ export default function App() {
       onNewWorkspaceFromFolder: newWorkspaceFromFolder,
       onRevealInTerminal: openFolderInTerminal,
       onAddToGitignore: handleAddToGitignore,
+      onOpenFile: (path) => void openFileInTab(path, true),
     }),
     [
+      openFileInTab,
       activeTabId,
       findTabGlobal,
       closeTab,

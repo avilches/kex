@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { MarkdownPreviewPane } from "@/modules/markdown/MarkdownPreviewPane";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
 import { OutlinePanel } from "@/modules/markdown/lib/OutlinePanel";
+import { useWikiLinkHost } from "@/modules/markdown/lib/useWikiLinkHost";
 import { headingsFromMarkdown } from "@/modules/markdown/lib/outline";
 import { nextViewMode } from "@/modules/markdown/lib/viewCycle";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
@@ -49,6 +50,7 @@ export function MarkdownTab(props: Props): JSX.Element {
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [edit, setEdit] = useState<{ doc: unknown; text: string } | null>(null);
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
+  const wikiLinks = useWikiLinkHost(props.path, props.callbacks.onOpenFile);
 
   const { doc, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate } =
     useDocument({
@@ -246,7 +248,7 @@ export function MarkdownTab(props: Props): JSX.Element {
       <div className="relative min-h-0 flex-1">
         {doc.status === "ready" && viewMode === "preview" ? (
           <div ref={previewRef} tabIndex={-1} className="h-full outline-none">
-            <MarkdownPreviewPane content={liveContent} path={props.path} />
+            <MarkdownPreviewPane content={liveContent} path={props.path} wikiLinks={wikiLinks} />
           </div>
         ) : doc.status === "ready" ? (
           <div className="flex h-full min-h-0">
@@ -258,6 +260,7 @@ export function MarkdownTab(props: Props): JSX.Element {
                 onChange={handleChange}
                 path={props.path}
                 mode={viewMode === "source" ? "source" : "rich"}
+                wikiLinks={wikiLinks}
               />
             </div>
             {outlineOpen && (
