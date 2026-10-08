@@ -94,6 +94,8 @@ import {
 } from "@/modules/workspaces";
 import type { Script, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
+import { WorkspaceMoveProvider } from "@/modules/workspaces/WorkspaceMoveContext";
+import type { TabMoveRequest } from "@/modules/workspaces/lib/tabTransfer";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
@@ -209,6 +211,7 @@ export default function App() {
     focusPane,
     setPaneDivider,
     moveTab,
+    moveTabToWorkspace,
     reorderTab,
     splitPaneAndPlace,
     splitPaneAndOpenTab,
@@ -1584,6 +1587,15 @@ export default function App() {
       activateTab(wsId, tabId);
     },
     [activateTab],
+  );
+
+  const handleMoveTabToWorkspace = useCallback(
+    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): string | null => {
+      const destinationId = moveTabToWorkspace(sourceWorkspaceId, tabId, request);
+      if (destinationId) useAgentStore.getState().reassignTabWorkspace(tabId, destinationId);
+      return destinationId;
+    },
+    [moveTabToWorkspace],
   );
 
   const onCloseTabStable = useCallback((_wsId: string, tabId: string) => {
@@ -3140,6 +3152,7 @@ export default function App() {
 
           {/* 3-column layout */}
           <div className="flex min-h-0 flex-1">
+            <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabToWorkspace}>
             {/* LEFT: workspace bar */}
             <WorkspaceBar
               workspaces={workspaceBarItems}
@@ -3355,6 +3368,7 @@ export default function App() {
                 )}
               </ResizablePanelGroup>
             </WorkspaceDndProvider>
+            </WorkspaceMoveProvider>
           </div>
 
           <DuplicateProgressBar />

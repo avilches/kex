@@ -16,6 +16,9 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
@@ -24,13 +27,14 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Alert02Icon, ArrowRight01Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { tabFilePath } from "./lib/tabPath";
+import { useWorkspaceMove } from "./WorkspaceMoveContext";
 
 type Props = {
   tabs: Tab[];
@@ -109,6 +113,8 @@ function DraggableTab({
   gitColorScheme?: GitColorScheme;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: tab.id });
+  const { targets, moveTab } = useWorkspaceMove();
+  const otherTargets = targets.filter((t) => t.id !== workspaceId);
   const wrappedListeners = useMemo(() => ({
     ...listeners,
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
@@ -419,6 +425,32 @@ function DraggableTab({
                 <ContextMenuShortcut>{shortcutLabels["tab.lock"]}</ContextMenuShortcut>
               )}
             </ContextMenuItem>
+            <ContextMenuSub>
+              <ContextMenuSubTrigger className="gap-2">
+                <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
+                Move to Workspace
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
+                <ContextMenuItem onSelect={() => moveTab(workspaceId, tab.id, { kind: "new" })}>
+                  <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+                  New
+                </ContextMenuItem>
+                {otherTargets.length > 0 && <ContextMenuSeparator />}
+                {otherTargets.map((t) => (
+                  <ContextMenuItem
+                    key={t.id}
+                    onSelect={() => moveTab(workspaceId, tab.id, { kind: "auto", workspaceId: t.id })}
+                  >
+                    <span
+                      aria-hidden
+                      className={cn("size-2 shrink-0 rounded-full", t.color === null && "border border-border")}
+                      style={t.color !== null ? { backgroundColor: t.color } : undefined}
+                    />
+                    <span className="truncate">{t.title}</span>
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
             <ContextMenuItem disabled={isLocked} onSelect={() => onClose(tab.id)}>
               <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
               Close Tab

@@ -20,7 +20,7 @@ import {
   updateDivider,
   updatePane,
 } from "./splitNode";
-import { attachTab, workspaceForTab, workspaceTitleFromCwd, type TabPlacement } from "./tabTransfer";
+import { attachTab, workspaceForTab, workspaceTitleFromCwd, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
 import { type ClosedEntry, type Tab, type PaneNode, type Script, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
@@ -314,6 +314,26 @@ function newWorkspace(cwd?: string): Workspace {
   };
 }
 
+function buildMoveDestination(request: TabMoveRequest): TabMoveDestination {
+  if (request.kind === "new") {
+    const randomColor = usePreferencesStore.getState().randomWorkspaceColor;
+    return {
+      kind: "new",
+      workspaceId: newWorkspaceId(),
+      paneId: newPaneId(),
+      color: randomColor ? undefined : null,
+    };
+  }
+  const fresh = { splitId: newSplitId(), newPaneId: newPaneId() };
+  const placement: TabPlacement =
+    request.kind === "pane"
+      ? { kind: "pane", paneId: request.paneId, index: request.index }
+      : request.kind === "split"
+        ? { kind: "split", paneId: request.paneId, direction: request.direction, ...fresh }
+        : { kind: "auto", ...fresh };
+  return { kind: "existing", workspaceId: request.workspaceId, placement };
+}
+
 export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Workspace[]; initialActiveIndex?: number }) {
   // Pre-compute stable initial state once so both useState lazies share the same objects
   const initRef = useRef<{ workspaces: Workspace[]; activeId: string } | null>(null);
@@ -476,6 +496,20 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       }),
     );
   }, []);
+
+  const moveTabToWorkspace = useCallback(
+    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): string | null => {
+      const dest = buildMoveDestination(request);
+      const { workspacePaneLimit } = usePreferencesStore.getState();
+      const current = workspacesRef.current;
+      if (applyMoveTabToWorkspace(current, sourceWorkspaceId, tabId, dest, workspacePaneLimit) === current) {
+        return null;
+      }
+      setWorkspaces((prev) => applyMoveTabToWorkspace(prev, sourceWorkspaceId, tabId, dest, workspacePaneLimit));
+      return dest.workspaceId;
+    },
+    [],
+  );
 
   const reorderTab = useCallback((workspaceId: string, tabId: string, insertionIndex: number) => {
     setWorkspaces((prev) =>
@@ -917,6 +951,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     focusPane,
     setPaneDivider,
     moveTab,
+    moveTabToWorkspace,
     reorderTab,
     splitPaneAndPlace,
     splitPaneAndOpenTab,

@@ -419,6 +419,25 @@ the source panel before any mutation.
 
 ---
 
+## Moving a tab to another workspace
+
+`applyMoveTabToWorkspace` (`useWorkspaces.ts`, pure) removes the tab from the source workspace with
+`applyCloseTab` and places it in the destination in a single `setWorkspaces`. The tab keeps its id, so a
+terminal keeps its PTY and history; it is never cloned and never goes through `closedTabsRef`. If the
+destination is invalid (missing workspace or pane, same workspace, pane limit reached on an explicit
+split) the same array is returned and nothing moves. `lib/tabTransfer.ts` holds the placement logic
+(`attachTab`, `workspaceForTab`).
+
+The context menu of a tab has "Move to Workspace" (`PaneTabBar.tsx`, fed by `WorkspaceMoveContext`):
+"New", then every other workspace with a dot of its color. Choosing a workspace uses the `auto`
+placement: a single pane with tabs is split in two and the tab lands in the new right half; an already
+split workspace gets the tab in its active pane; a single empty pane receives it without splitting. The
+user stays in the current workspace. "New" creates a workspace right after the source (same group) whose
+only tab is the moved one, titled and rooted after the tab's cwd when it is a terminal. A source
+workspace that loses its last tab is not closed: it keeps an empty pane. `App.tsx` also calls
+`useAgentStore.reassignTabWorkspace` so the agent session and its notifications point at the new
+workspace.
+
 ## Resize handles (`resizable.tsx`)
 
 `react-resizable-panels` registers a `document` capture-phase `pointerdown` listener that calls
