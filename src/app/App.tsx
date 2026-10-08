@@ -1589,15 +1589,6 @@ export default function App() {
     [activateTab],
   );
 
-  const handleMoveTabToWorkspace = useCallback(
-    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): string | null => {
-      const destinationId = moveTabToWorkspace(sourceWorkspaceId, tabId, request);
-      if (destinationId) useAgentStore.getState().reassignTabWorkspace(tabId, destinationId);
-      return destinationId;
-    },
-    [moveTabToWorkspace],
-  );
-
   const onCloseTabStable = useCallback((_wsId: string, tabId: string) => {
     closeTabsRef.current([tabId]);
   }, []);
@@ -1924,6 +1915,18 @@ export default function App() {
       else requestLeafFocus(tabId);
     });
   }, [findTabGlobal]);
+
+  const handleMoveTabToWorkspace = useCallback(
+    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): string | null => {
+      const destinationId = moveTabToWorkspace(sourceWorkspaceId, tabId, request);
+      if (destinationId) {
+        useAgentStore.getState().reassignTabWorkspace(tabId, destinationId);
+        requestAnimationFrame(focusActiveTab);
+      }
+      return destinationId;
+    },
+    [moveTabToWorkspace, focusActiveTab],
+  );
 
   const {
     pendingCloseTab,
