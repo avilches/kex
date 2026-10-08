@@ -184,3 +184,38 @@ describe("agentStore.clearAll", () => {
     expect(next.sessions.p2.status).toBe("working");
   });
 });
+
+describe("agentStore.reassignTabWorkspace", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [] });
+  });
+
+  test("no-op cuando el tab no tiene sesion ni notificaciones", () => {
+    const before = useAgentStore.getState();
+    useAgentStore.getState().reassignTabWorkspace("unknown", "ws-2");
+    expect(useAgentStore.getState().sessions).toBe(before.sessions);
+    expect(useAgentStore.getState().notifications).toBe(before.notifications);
+  });
+
+  test("mueve la sesion y las notificaciones del tab, y solo las suyas", () => {
+    useAgentStore.getState().start("tab-1", "ws-1", "claude");
+    useAgentStore.getState().start("tab-2", "ws-1", "claude");
+    useAgentStore.getState().pushNotification({ source: "terminal", tabId: "tab-1", workspaceId: "ws-1", agent: "claude", kind: "finished" });
+    useAgentStore.getState().pushNotification({ source: "terminal", tabId: "tab-2", workspaceId: "ws-1", agent: "claude", kind: "finished" });
+
+    useAgentStore.getState().reassignTabWorkspace("tab-1", "ws-2");
+
+    const { sessions, notifications } = useAgentStore.getState();
+    expect(sessions["tab-1"].workspaceId).toBe("ws-2");
+    expect(sessions["tab-2"].workspaceId).toBe("ws-1");
+    expect(notifications.find((n) => n.tabId === "tab-1")?.workspaceId).toBe("ws-2");
+    expect(notifications.find((n) => n.tabId === "tab-2")?.workspaceId).toBe("ws-1");
+  });
+
+  test("mueve las notificaciones aunque la sesion ya haya terminado", () => {
+    useAgentStore.getState().pushNotification({ source: "terminal", tabId: "tab-1", workspaceId: "ws-1", agent: "claude", kind: "attention" });
+    useAgentStore.getState().reassignTabWorkspace("tab-1", "ws-2");
+    expect(useAgentStore.getState().notifications[0]?.workspaceId).toBe("ws-2");
+    expect(useAgentStore.getState().sessions).toEqual({});
+  });
+});
