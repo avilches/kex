@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { buildAgentEntries, workspaceAgentVisuals } from "./notificationList";
+import {
+  buildAgentEntries,
+  entriesByWorkspace,
+  nextEntryTab,
+} from "./notificationList";
 import type { AgentNotification, AgentSession } from "./types";
 
 const session = (
@@ -55,20 +59,33 @@ describe("buildAgentEntries with live tab locations", () => {
   });
 });
 
-describe("workspaceAgentVisuals", () => {
-  test("attention beats working, per workspace", () => {
-    const entries = buildAgentEntries(
-      {
-        a: session("a", "w1", "working"),
-        b: session("b", "w1", "attention"),
-        c: session("c", "w2", "working"),
-      },
-      [],
-      { a: "w1", b: "w1", c: "w2" },
-    );
-    expect(workspaceAgentVisuals(entries)).toEqual({
-      w1: "attention",
-      w2: "working",
-    });
+describe("entriesByWorkspace and nextEntryTab", () => {
+  const entries = buildAgentEntries(
+    {
+      a: session("a", "w1", "working"),
+      b: session("b", "w1", "attention"),
+      c: session("c", "w2", "working"),
+    },
+    [],
+    { a: "w1", b: "w1", c: "w2" },
+  );
+
+  test("groups by workspace, most urgent first", () => {
+    const by = entriesByWorkspace(entries);
+    expect(by.w1.map((e) => e.tabId)).toEqual(["b", "a"]);
+    expect(by.w2.map((e) => e.tabId)).toEqual(["c"]);
+  });
+
+  test("walks the list on repeated jumps and wraps around", () => {
+    const w1 = entriesByWorkspace(entries).w1;
+    expect(nextEntryTab(w1, undefined)).toBe("b");
+    expect(nextEntryTab(w1, "b")).toBe("a");
+    expect(nextEntryTab(w1, "a")).toBe("b");
+  });
+
+  test("restarts at the first entry when the last visit is gone", () => {
+    const w1 = entriesByWorkspace(entries).w1;
+    expect(nextEntryTab(w1, "cleared")).toBe("b");
+    expect(nextEntryTab([], "b")).toBeNull();
   });
 });

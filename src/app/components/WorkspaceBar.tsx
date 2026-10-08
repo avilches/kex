@@ -21,9 +21,10 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  type AgentEntryVisual,
+  type AgentEntry,
   buildAgentEntries,
-  workspaceAgentVisuals,
+  entriesByWorkspace,
+  nextEntryTab,
 } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
@@ -37,7 +38,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   chipColorOnWhite,
@@ -107,6 +108,7 @@ export type WorkspaceBarProps = {
   collapsedGroups: Set<string>;
   onToggleGroup: (groupId: string) => void;
   onRestoreFocus: () => void;
+  onActivateAgentTab: (workspaceId: string, tabId: string) => void;
 };
 
 function abbrev(title: string, kind: string): string {
@@ -119,7 +121,8 @@ function abbrev(title: string, kind: string): string {
 function SortableWorkspaceItem({
   ws,
   active,
-  agentVisual,
+  agentEntries,
+  onJumpAgent,
   barWidth,
   workspaceGroups,
   onSelect,
@@ -132,7 +135,8 @@ function SortableWorkspaceItem({
 }: {
   ws: WorkspaceItem;
   active: boolean;
-  agentVisual?: AgentEntryVisual;
+  agentEntries?: AgentEntry[];
+  onJumpAgent: (workspaceId: string, entries: AgentEntry[]) => void;
   barWidth: number;
   workspaceGroups: WorkspaceGroup[];
   onSelect: (id: string) => void;
@@ -279,24 +283,35 @@ function SortableWorkspaceItem({
           </>
         )}
       </button>
-      {agentVisual ? (
-        <span
-          className="pointer-events-none absolute left-2.5 top-0.5 flex size-[10px] items-center justify-center rounded-full bg-background"
+      {agentEntries ? (
+        <button
+          type="button"
           title={
-            agentVisual === "working" ? "Agent working" : "Agent needs you"
+            agentEntries.length > 1
+              ? `${agentEntries.length} agents, click to visit the next`
+              : agentEntries[0].visual === "working"
+                ? "Agent working"
+                : "Agent needs you"
           }
+          onClick={(e) => {
+            e.stopPropagation();
+            onJumpAgent(ws.id, agentEntries);
+          }}
+          className="absolute right-0.5 top-0.5 flex size-[14px] items-center justify-center rounded-full bg-muted"
         >
-          {agentVisual === "working" ? (
+          {agentEntries[0].visual === "working" ? (
             <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />
           ) : (
             <span
               className={cn(
                 "size-[6px] rounded-full",
-                agentVisual === "error" ? "bg-destructive" : "bg-amber-400",
+                agentEntries[0].visual === "error"
+                  ? "bg-destructive"
+                  : "bg-amber-400",
               )}
             />
           )}
-        </span>
+        </button>
       ) : null}
       {!active && displayColor && (
         <span
@@ -304,7 +319,7 @@ function SortableWorkspaceItem({
           style={{ backgroundColor: displayColor }}
         />
       )}
-      {onClose && (
+      {onClose && !agentEntries && (
         <button
           type="button"
           title="Close workspace"
@@ -760,6 +775,7 @@ export function WorkspaceBar({
   collapsedGroups,
   onToggleGroup,
   onRestoreFocus,
+  onActivateAgentTab,
 }: WorkspaceBarProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -776,12 +792,22 @@ export function WorkspaceBar({
   const agentSessions = useAgentStore((s) => s.sessions);
   const agentNotifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
-  const agentVisuals = useMemo(
+  const agentEntriesByWs = useMemo(
     () =>
-      workspaceAgentVisuals(
+      entriesByWorkspace(
         buildAgentEntries(agentSessions, agentNotifications, tabLocations),
       ),
     [agentSessions, agentNotifications, tabLocations],
+  );
+  const lastJump = useRef(new Map<string, string>());
+  const jumpAgent = useCallback(
+    (workspaceId: string, entries: AgentEntry[]) => {
+      const tabId = nextEntryTab(entries, lastJump.current.get(workspaceId));
+      if (!tabId) return;
+      lastJump.current.set(workspaceId, tabId);
+      onActivateAgentTab(workspaceId, tabId);
+    },
+    [onActivateAgentTab],
   );
 
   const shortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -943,7 +969,8 @@ export function WorkspaceBar({
                               <SortableWorkspaceItem
                                 ws={activeWs}
                                 active={true}
-                                agentVisual={agentVisuals[activeWs.id]}
+                                agentEntries={agentEntriesByWs[activeWs.id]}
+                                onJumpAgent={jumpAgent}
                                 barWidth={width}
                                 workspaceGroups={workspaceGroups}
                                 onSelect={onSelect}
@@ -967,7 +994,8 @@ export function WorkspaceBar({
                                 key={ws.id}
                                 ws={ws}
                                 active={ws.id === activeId}
-                                agentVisual={agentVisuals[ws.id]}
+                                agentEntries={agentEntriesByWs[ws.id]}
+                                onJumpAgent={jumpAgent}
                                 barWidth={width}
                                 workspaceGroups={workspaceGroups}
                                 onSelect={onSelect}

@@ -3165,6 +3165,7 @@ export default function App() {
           <div className="flex min-h-0 flex-1">
             {/* LEFT: workspace bar */}
             <WorkspaceBar
+              onActivateAgentTab={onActivateAgent}
               workspaces={workspaceBarItems}
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}

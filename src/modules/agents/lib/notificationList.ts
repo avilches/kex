@@ -90,14 +90,29 @@ export function buildAgentEntries(
   return entries;
 }
 
-/** The most urgent visual of the agents living in each workspace. */
-export function workspaceAgentVisuals(
+/** The entries of each workspace, keeping the urgency order of the input. */
+export function entriesByWorkspace(
   entries: AgentEntry[],
-): Record<string, AgentEntryVisual> {
-  const out: Record<string, AgentEntryVisual> = {};
+): Record<string, AgentEntry[]> {
+  const out: Record<string, AgentEntry[]> = {};
   for (const e of entries) {
-    const prev = out[e.workspaceId];
-    if (!prev || RANK[e.visual] < RANK[prev]) out[e.workspaceId] = e.visual;
+    const list = out[e.workspaceId] ?? [];
+    list.push(e);
+    out[e.workspaceId] = list;
   }
   return out;
+}
+
+/**
+ * The tab a workspace bubble jumps to: the entry after the one visited last, so
+ * repeated clicks walk the list. Without a usable last visit (never visited, or
+ * its entry cleared once seen) it is the first, most urgent, entry.
+ */
+export function nextEntryTab(
+  entries: AgentEntry[],
+  lastTabId: string | undefined,
+): string | null {
+  if (entries.length === 0) return null;
+  const i = entries.findIndex((e) => e.tabId === lastTabId);
+  return entries[(i + 1) % entries.length].tabId;
 }
