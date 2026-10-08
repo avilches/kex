@@ -153,14 +153,24 @@ export function useDocument({ path, tabId, onDirtyChange }: Options) {
       workspace: currentWorkspaceEnv(),
     })
       .then((res) => {
-        if (!applyContent) return;
+        // The file is back after being deleted: leave the deleted state even
+        // if content is unchanged or the buffer is dirty (then the edits are
+        // kept and the conflict overlay lets the user choose).
+        if (!applyContent) {
+          if (docStatusRef.current === "deleted" && res.kind === "text") {
+            setDoc({ status: "ready", content: bufferRef.current, size: res.size });
+          }
+          return;
+        }
         if (res.kind === "text") {
           // The dedup check only exists to skip a wasted re-render for a
           // duplicate watcher event while the buffer is clean; a forced
           // reload (the user explicitly clicked "Reload from disk") must
           // always apply and discard the dirty buffer, even if the disk
           // content happens to already equal what was last read.
-          if (!force && res.content === savedRef.current) return;
+          if (!force && docStatusRef.current === "ready" && res.content === savedRef.current) {
+            return;
+          }
           savedRef.current = res.content;
           bufferRef.current = res.content;
           setDirty(false);
