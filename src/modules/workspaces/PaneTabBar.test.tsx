@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { DndContext } from "@dnd-kit/core";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p }));
@@ -114,5 +114,22 @@ describe("PaneTabBar rename and note", () => {
     cleanup();
     setup({ id: "tab-2", kind: "terminal" });
     expect(screen.queryByLabelText("Tab note")).toBeNull();
+  });
+
+  it("the hover card pin button pins the tab and closes the card", async () => {
+    const { onUpdateTab, getTab } = setup({ id: "tab-1", kind: "terminal", note: "x" });
+    fireEvent.pointerEnter(screen.getByLabelText("Tab note"), { pointerType: "mouse" });
+    const pin = await waitFor(() => screen.getByLabelText("Pin note"));
+    fireEvent.click(pin);
+    expect(onUpdateTab).toHaveBeenCalledTimes(1);
+    expect(getTab()).toMatchObject({ notePinned: true });
+    await waitFor(() => expect(screen.queryByLabelText("Pin note")).toBeNull());
+  });
+
+  it("does not open the hover card for a pinned tab", async () => {
+    setup({ id: "tab-1", kind: "terminal", note: "x", notePinned: true });
+    fireEvent.pointerEnter(screen.getByLabelText("Tab note"), { pointerType: "mouse" });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByLabelText("Pin note")).toBeNull();
   });
 });

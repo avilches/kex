@@ -8,7 +8,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { HoverCard } from "radix-ui";
-import { applyTabEdit } from "./lib/tabNote";
+import { applyTabEdit, pinTabNote } from "./lib/tabNote";
 import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
@@ -26,7 +26,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, StickyNote01Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, PinIcon, SquareUnlock02Icon, StickyNote01Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
@@ -60,6 +60,72 @@ type Props = {
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
 };
+
+function TabNoteHover({
+  note,
+  pinned,
+  onPin,
+  onActivate,
+}: {
+  note: string;
+  pinned: boolean;
+  onPin?: () => void;
+  onActivate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const icon = (
+    <span
+      title=""
+      aria-label="Tab note"
+      className="ml-0.5 shrink-0 text-muted-foreground"
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <HugeiconsIcon icon={StickyNote01Icon} size={13} strokeWidth={2} />
+    </span>
+  );
+  // The pinned note is already on screen, so the hover preview would be a duplicate.
+  if (pinned) return icon;
+  return (
+    <HoverCard.Root open={open} onOpenChange={setOpen} openDelay={150} closeDelay={80}>
+      <HoverCard.Trigger asChild>{icon}</HoverCard.Trigger>
+      <HoverCard.Portal>
+        <HoverCard.Content
+          side="bottom"
+          align="start"
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-50 w-80 max-w-[calc(100vw-24px)] overflow-hidden rounded-lg border border-border bg-popover shadow-xl"
+          // The card is portaled but React events still bubble to the draggable tab: keep
+          // them from starting a tab drag, activating it or blocking text selection.
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onPin && (
+            <div className="flex h-5 items-center justify-end border-b border-border/60 bg-muted/40 px-1">
+              <button
+                type="button"
+                title="Pin note"
+                aria-label="Pin note"
+                className="flex size-4 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                onClick={() => {
+                  setOpen(false);
+                  onActivate();
+                  onPin();
+                }}
+              >
+                <HugeiconsIcon icon={PinIcon} size={12} strokeWidth={2} />
+              </button>
+            </div>
+          )}
+          <Suspense fallback={<pre className="whitespace-pre-wrap p-2 text-[12px] text-foreground">{note}</pre>}>
+            <MarkdownPreviewPane content={note} compact />
+          </Suspense>
+        </HoverCard.Content>
+      </HoverCard.Portal>
+    </HoverCard.Root>
+  );
+}
 
 function DraggableTab({
   tab,
@@ -323,33 +389,12 @@ function DraggableTab({
         <span className="shrink-0 text-[8px] text-primary">●</span>
       )}
       {tab.note && (
-        <HoverCard.Root openDelay={150} closeDelay={80}>
-          <HoverCard.Trigger asChild>
-            <span
-              title=""
-              aria-label="Tab note"
-              className="ml-0.5 shrink-0 text-muted-foreground"
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <HugeiconsIcon icon={StickyNote01Icon} size={13} strokeWidth={2} />
-            </span>
-          </HoverCard.Trigger>
-          <HoverCard.Portal>
-            <HoverCard.Content
-              side="bottom"
-              align="start"
-              sideOffset={6}
-              collisionPadding={12}
-              className="z-50 w-80 max-w-[calc(100vw-24px)] overflow-hidden rounded-lg border border-border bg-popover shadow-xl"
-            >
-              <Suspense
-                fallback={<pre className="whitespace-pre-wrap p-2 text-[12px] text-foreground">{tab.note}</pre>}
-              >
-                <MarkdownPreviewPane content={tab.note} compact />
-              </Suspense>
-            </HoverCard.Content>
-          </HoverCard.Portal>
-        </HoverCard.Root>
+        <TabNoteHover
+          note={tab.note}
+          pinned={!!tab.notePinned}
+          onPin={onUpdateTab ? () => onUpdateTab(tab.id, pinTabNote) : undefined}
+          onActivate={() => onActivate(tab.id)}
+        />
       )}
       {hasAgent && (
         isRestoreError ? (

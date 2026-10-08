@@ -17,6 +17,9 @@ type TabCommon = {
   title?: string;
   // Markdown the user attaches to the tab (rename popover, second step).
   note?: string;
+  notePinned?: boolean;
+  // Relative to the pane's top-left; absent while pinned means docked under the tab.
+  notePos?: { x: number; y: number };
   locked?: boolean;
   autofocus?: boolean;
 };
