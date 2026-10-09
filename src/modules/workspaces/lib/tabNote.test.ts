@@ -3,7 +3,6 @@ import {
   dropBlankTabNote,
   hasTabNote,
   hideTabNote,
-  openTabNote,
   isTabNoteOpen,
   moveTabNote,
   removeTabNote,
@@ -69,9 +68,13 @@ describe("moveTabNote", () => {
     expect(moveTabNote(open, { x: 10.4, y: 20.6 }).notePos).toEqual({ x: 10, y: 21 });
   });
 
-  test("is a no-op for a hidden note", () => {
+  test("makes a hidden note sticky when it is dragged", () => {
     const hidden: Tab = { ...plain, note: "text" };
-    expect(moveTabNote(hidden, { x: 1, y: 2 })).toBe(hidden);
+    expect(moveTabNote(hidden, { x: 1, y: 2 })).toMatchObject({ noteOpen: true, notePos: { x: 1, y: 2 } });
+  });
+
+  test("is a no-op for a tab without a note", () => {
+    expect(moveTabNote(plain, { x: 1, y: 2 })).toBe(plain);
   });
 });
 
@@ -104,13 +107,5 @@ describe("dropBlankTabNote", () => {
   test("keeps a note with text and a tab without a note", () => {
     expect(dropBlankTabNote(open)).toBe(open);
     expect(dropBlankTabNote(plain)).toBe(plain);
-  });
-});
-
-describe("openTabNote", () => {
-  test("opens a hidden note and leaves open or missing notes alone", () => {
-    expect(openTabNote({ ...plain, note: "x" })).toMatchObject({ note: "x", noteOpen: true });
-    expect(openTabNote(open)).toBe(open);
-    expect(openTabNote(plain)).toBe(plain);
   });
 });

@@ -300,6 +300,7 @@ export const PaneView = memo(function PaneView({
           layoutKey={pane.tabs.map((t) => t.id).join(",")}
           onUpdateTab={callbacks.onUpdateTab}
           onClose={() => closeNote(activeTab.id)}
+          onDismiss={notePreview.close}
           onPointerEnter={() => notePreview.show(activeTab.id)}
           onPointerLeave={() => notePreview.leave(activeTab.id)}
         />
@@ -315,6 +316,7 @@ export const PaneView = memo(function PaneView({
           layoutKey={pane.tabs.map((t) => t.id).join(",")}
           onUpdateTab={callbacks.onUpdateTab}
           onClose={() => closeNote(previewTab.id)}
+          onDismiss={notePreview.close}
           onPointerEnter={() => notePreview.show(previewTab.id)}
           onPointerLeave={() => notePreview.leave(previewTab.id)}
         />

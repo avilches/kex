@@ -205,9 +205,46 @@ describe("FloatingTabNote", () => {
     expect(getTab().note).toBe("");
   });
 
-  it("opens a previewed note for good once the editor takes focus", () => {
-    const { getTab } = setup({ ...open, noteOpen: false }, true, { preview: true });
-    fireEvent.focus(document.querySelector("[data-tab-note]") as HTMLElement);
-    expect(getTab().noteOpen).toBe(true);
+  it("hover notes have no close button; sticky ones do", () => {
+    setup({ ...open, noteOpen: false }, true, { preview: true });
+    expect(screen.queryByRole("button", { name: "Close note" })).toBeNull();
+    cleanup();
+    setup({ ...open, noteOpen: false }, false, { preview: true });
+    expect(screen.queryByRole("button", { name: "Close note" })).toBeNull();
+    cleanup();
+    setup(open);
+    expect(screen.queryByRole("button", { name: "Close note" })).not.toBeNull();
+  });
+
+  it("a hover note of an inactive tab cannot be dragged", () => {
+    const { onUpdateTab } = setup({ ...open, noteOpen: false }, false, { preview: true });
+    const handle = screen.getByTestId("tab-note-handle");
+    fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 260, clientY: 90, pointerId: 1 });
+    fireEvent.pointerUp(handle, { clientX: 260, clientY: 90, pointerId: 1 });
+    expect(onUpdateTab).not.toHaveBeenCalled();
+  });
+
+  it("dragging the hover note of the active tab makes it sticky", () => {
+    const onPointerEnter = vi.fn();
+    const { getTab } = setup({ ...open, noteOpen: false, notePos: undefined }, true, { preview: true, onPointerEnter });
+    const handle = screen.getByTestId("tab-note-handle");
+    fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 250, clientY: 100, pointerId: 1 });
+    fireEvent.pointerUp(handle, { clientX: 250, clientY: 100, pointerId: 1 });
+    expect(getTab()).toMatchObject({ noteOpen: true, notePos: { x: 150, y: 82 } });
+    expect(onPointerEnter).toHaveBeenCalled();
+  });
+
+  it("a hover note is dismissed when it loses focus, a sticky one is not", () => {
+    const onDismiss = vi.fn();
+    setup({ ...open, noteOpen: false }, true, { preview: true, onDismiss });
+    fireEvent.blur(document.querySelector("[data-tab-note]") as HTMLElement);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    cleanup();
+    onDismiss.mockClear();
+    setup(open, true, { onDismiss });
+    fireEvent.blur(document.querySelector("[data-tab-note]") as HTMLElement);
+    expect(onDismiss).not.toHaveBeenCalled();
   });
 });
