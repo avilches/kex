@@ -4,7 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeMirrorEditor";
-import { dropBlankTabNote, moveTabNote, setTabNoteText } from "./lib/tabNote";
+import { dropBlankTabNote, moveTabNote, openTabNote, setTabNoteText } from "./lib/tabNote";
 import { useTabNoteStore } from "./lib/tabNoteStore";
 import { clampNotePos, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
 import type { Tab } from "./lib/types";
@@ -158,7 +158,10 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         )}
         style={{ left: pos?.x ?? 0, top: pos?.y ?? 0 }}
         onMouseDown={(e) => e.stopPropagation()}
-        onFocus={(e) => e.stopPropagation()}
+        onFocus={(e) => {
+          e.stopPropagation();
+          if (!tab.noteOpen) onUpdateTab?.(tab.id, openTabNote);
+        }}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
         onBlur={(e) => {

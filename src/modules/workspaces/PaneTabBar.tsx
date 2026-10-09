@@ -28,7 +28,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon, Alert02Icon, ArrowRight01Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, StickyNote01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Alert02Icon, ArrowRight01Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
@@ -80,7 +80,7 @@ function TabNoteButton({ open, onToggle, onHover }: { open: boolean; onToggle: (
         onToggle();
       }}
     >
-      <HugeiconsIcon icon={StickyNote01Icon} size={13} strokeWidth={2} />
+      <HugeiconsIcon icon={StickyNote03Icon} size={13} strokeWidth={2} />
     </button>
   );
 }
@@ -427,7 +427,7 @@ function DraggableTab({
                       onUpdateTab(tab.id, toggleTabNote);
                     }}
                   >
-                    <HugeiconsIcon icon={StickyNote01Icon} size={14} strokeWidth={2} />
+                    <HugeiconsIcon icon={StickyNote03Icon} size={14} strokeWidth={2} />
                     {isTabNoteOpen(tab) ? "Hide Note" : tab.note !== undefined ? "Show Note" : "Add Note"}
                     {shortcutLabels["tab.note"] && (
                       <ContextMenuShortcut>{shortcutLabels["tab.note"]}</ContextMenuShortcut>

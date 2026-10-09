@@ -33,6 +33,12 @@ export function hideTabNote<T extends Tab>(tab: T): T {
   return next;
 }
 
+// Keeps a previewed note on screen once the user engages with it.
+export function openTabNote<T extends Tab>(tab: T): T {
+  if (tab.note === undefined || tab.noteOpen) return tab;
+  return { ...tab, noteOpen: true };
+}
+
 // An empty note that lost focus has nothing worth keeping.
 export function dropBlankTabNote<T extends Tab>(tab: T): T {
   if (tab.note === undefined || tab.note.trim()) return tab;

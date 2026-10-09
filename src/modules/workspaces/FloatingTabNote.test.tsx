@@ -204,4 +204,10 @@ describe("FloatingTabNote", () => {
     fireEvent.blur(note, { relatedTarget: screen.getByRole("button", { name: "Close note" }) });
     expect(getTab().note).toBe("");
   });
+
+  it("opens a previewed note for good once the editor takes focus", () => {
+    const { getTab } = setup({ ...open, noteOpen: false }, true, { preview: true });
+    fireEvent.focus(document.querySelector("[data-tab-note]") as HTMLElement);
+    expect(getTab().noteOpen).toBe(true);
+  });
 });
