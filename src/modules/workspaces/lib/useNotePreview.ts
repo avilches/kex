@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 // Which tab's note is being previewed by hovering its icon. Leaving is delayed so the
 // pointer can travel from the icon to the note, and skipped while the note holds focus.
-export function useNotePreview(isHeld: (tabId: string) => boolean, delayMs = 250) {
+// resetKey changes whenever the sticky state may have changed (tab switch, shortcut toggle):
+// the pointer is no longer a reliable witness then, so the preview is dropped.
+export function useNotePreview(isHeld: (tabId: string) => boolean, resetKey: string, delayMs = 250) {
   const [tabId, setTabId] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heldRef = useRef(isHeld);
@@ -39,6 +41,10 @@ export function useNotePreview(isHeld: (tabId: string) => boolean, delayMs = 250
   }, [cancel]);
 
   useEffect(() => cancel, [cancel]);
+
+  useEffect(() => {
+    close();
+  }, [resetKey, close]);
 
   return { tabId, show, leave, close };
 }
