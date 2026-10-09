@@ -143,7 +143,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         ref={noteRef}
         {...{ [TAB_NOTE_ATTR]: "" }}
         className={cn(
-          "pointer-events-auto absolute w-80 max-w-full overflow-hidden rounded-lg border border-border bg-popover shadow-xl",
+          "pointer-events-auto absolute w-80 max-w-full overflow-hidden rounded-lg border border-border bg-[var(--editor-background)] shadow-xl",
           !pos && "invisible",
         )}
         style={{ left: pos?.x ?? 0, top: pos?.y ?? 0 }}
@@ -153,7 +153,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         <div
           data-testid="tab-note-handle"
           className={cn(
-            "h-3 cursor-grab border-b border-border/60 bg-muted/40",
+            "h-3 cursor-grab",
             dragPos && "cursor-grabbing",
           )}
           onPointerDown={onPointerDown}
@@ -164,7 +164,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
             if (dragRef.current) endDrag(e, false);
           }}
         />
-        <div className="min-h-8 bg-[var(--editor-background)] text-[var(--editor-foreground)]">
+        <div className="min-h-8 text-[var(--editor-foreground)]">
           <Suspense fallback={<pre className="whitespace-pre-wrap p-2 text-[12px]">{tab.note}</pre>}>
             <CodeMirrorEditor
               ref={setEditor}
