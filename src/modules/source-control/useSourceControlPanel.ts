@@ -622,7 +622,7 @@ export function useSourceControlPanel(
     async (entry: SourceControlEntry, pin: boolean) => {
       if (!repo) return;
       const nextSelection: DiffSelection = { path: entry.path, mode: entry.mode };
-      // A pin (double click, or the "Open Diff" menu action) must still fix the
+      // A pin (double click, or the "Show Diff" menu action) must still fix the
       // tab in place even when re-clicking the file that is already selected.
       if (!pin && sameSelection(selected, nextSelection)) {
         setActionError(null);

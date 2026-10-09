@@ -30,6 +30,8 @@ import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
   copyToClipboard,
+  OPEN_EXTERNAL_LABEL,
+  openWithDefaultApp,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
 import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
@@ -54,6 +56,7 @@ import {
   CheckmarkCircle01Icon,
   CopySlashIcon,
   File01Icon,
+  LinkSquare02Icon,
   FileDiffIcon,
   FolderOpenIcon,
   FolderTreeIcon,
@@ -1841,7 +1844,7 @@ const EntryRow = memo(function EntryRow({
           }}
         >
           <HugeiconsIcon icon={FileDiffIcon} size={14} strokeWidth={2} />
-          Open Diff
+          Show Diff
         </ContextMenuItem>
         {!isDeleted && onOpenFile && absolutePath ? (
           <ContextMenuItem
@@ -1850,6 +1853,15 @@ const EntryRow = memo(function EntryRow({
           >
             <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open File
+          </ContextMenuItem>
+        ) : null}
+        {!isDeleted && absolutePath ? (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => void openWithDefaultApp(absolutePath)}
+          >
+            <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={2} />
+            {OPEN_EXTERNAL_LABEL}
           </ContextMenuItem>
         ) : null}
         {!isDeleted && absolutePath ? (
