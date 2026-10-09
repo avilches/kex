@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::modules::fs::to_canon;
 use crate::modules::workspace::{resolve_path, WorkspaceEnv, WorkspaceRegistry};
@@ -94,8 +94,14 @@ pub struct FsWatchState {
     inner: Mutex<Option<WatchInner>>,
 }
 
+// Canonical dir -> how many requesters asked for it under each spelling. Events
+// carry canonical paths (the symlink target), but tabs and the explorer hold the
+// path as the user opened it, so each event is also emitted under that spelling.
+type Aliases = HashMap<PathBuf, HashMap<String, usize>>;
+
 struct WatchInner {
     watcher: RecommendedWatcher,
+    aliases: Aliases,
     // Explorer (expanded dirs) and editor (dirs of open files) can request the
     // same dir; unwatch only when the last requester releases it.
     refcounts: HashMap<PathBuf, usize>,
@@ -129,6 +135,7 @@ fn ensure_started(state: &FsWatchState, app: &AppHandle) -> Result<(), String> {
 
     *guard = Some(WatchInner {
         watcher,
+        aliases: Aliases::new(),
         refcounts: HashMap::new(),
     });
     Ok(())
@@ -160,6 +167,15 @@ fn drain_loop(rx: mpsc::Receiver<notify::Result<Event>>, app: AppHandle) {
         if paths.is_empty() {
             continue;
         }
+        if let Some(inner) = app
+            .state::<FsWatchState>()
+            .inner
+            .lock()
+            .expect("fs watch state poisoned")
+            .as_ref()
+        {
+            expand_aliases(&mut paths, &inner.aliases);
+        }
         let _ = app.emit(
             "fs:changed",
             ChangedPayload {
@@ -179,8 +195,55 @@ fn collect(set: &mut HashSet<String>, ev: notify::Result<Event>) {
     }
 }
 
-fn add_paths(inner: &mut WatchInner, paths: Vec<PathBuf>) {
-    for canonical in paths {
+fn register_alias(aliases: &mut Aliases, canonical: &Path, spelled: &str) {
+    if canonical.as_os_str() == spelled {
+        return;
+    }
+    *aliases
+        .entry(canonical.to_path_buf())
+        .or_default()
+        .entry(spelled.to_string())
+        .or_insert(0) += 1;
+}
+
+fn release_alias(aliases: &mut Aliases, canonical: &Path, spelled: &str) {
+    let Some(spellings) = aliases.get_mut(canonical) else {
+        return;
+    };
+    match spellings.get_mut(spelled) {
+        Some(n) if *n > 1 => *n -= 1,
+        Some(_) => {
+            spellings.remove(spelled);
+        }
+        None => {}
+    }
+    if spellings.is_empty() {
+        aliases.remove(canonical);
+    }
+}
+
+fn expand_aliases(paths: &mut HashSet<String>, aliases: &Aliases) {
+    if aliases.is_empty() {
+        return;
+    }
+    let mut extra = Vec::new();
+    for path in paths.iter() {
+        let path = Path::new(path);
+        for (canonical, spellings) in aliases {
+            let Ok(rel) = path.strip_prefix(canonical) else {
+                continue;
+            };
+            for spelled in spellings.keys() {
+                extra.push(to_canon(Path::new(spelled).join(rel)));
+            }
+        }
+    }
+    paths.extend(extra);
+}
+
+fn add_paths(inner: &mut WatchInner, paths: Vec<(PathBuf, String)>) {
+    for (canonical, spelled) in paths {
+        register_alias(&mut inner.aliases, &canonical, &spelled);
         let current = inner.refcounts.get(&canonical).copied().unwrap_or(0);
         if current == 0 {
             match inner.watcher.watch(&canonical, RecursiveMode::NonRecursive) {
@@ -195,8 +258,9 @@ fn add_paths(inner: &mut WatchInner, paths: Vec<PathBuf>) {
     }
 }
 
-fn remove_paths(inner: &mut WatchInner, paths: Vec<PathBuf>) {
-    for key in paths {
+fn remove_paths(inner: &mut WatchInner, paths: Vec<(PathBuf, String)>) {
+    for (key, spelled) in paths {
+        release_alias(&mut inner.aliases, &key, &spelled);
         let current = inner.refcounts.get(&key).copied().unwrap_or(0);
         if current <= 1 {
             inner.refcounts.remove(&key);
@@ -212,7 +276,7 @@ fn prepare_add(
     registry: &WorkspaceRegistry,
     workspace: &WorkspaceEnv,
     paths: Vec<String>,
-) -> Vec<PathBuf> {
+) -> Vec<(PathBuf, String)> {
     paths
         .into_iter()
         .filter_map(|raw| {
@@ -221,7 +285,7 @@ fn prepare_add(
             if !canonical.is_dir() || is_skipped(&canonical) || !registry.is_authorized(&canonical) {
                 return None;
             }
-            Some(canonical)
+            Some((canonical, to_canon(&resolved)))
         })
         .collect()
 }
@@ -256,11 +320,12 @@ pub fn fs_watch_remove(
     let workspace = WorkspaceEnv::from_option(workspace);
     // A removed/renamed dir no longer canonicalizes; fall back so the refcount
     // entry is still released.
-    let prepared: Vec<PathBuf> = paths
+    let prepared: Vec<(PathBuf, String)> = paths
         .into_iter()
         .map(|raw| {
             let resolved = resolve_path(&raw, &workspace);
-            std::fs::canonicalize(&resolved).unwrap_or(resolved)
+            let spelled = to_canon(&resolved);
+            (std::fs::canonicalize(&resolved).unwrap_or(resolved), spelled)
         })
         .collect();
     let mut guard = state.inner.lock().expect("fs watch state poisoned");
@@ -306,5 +371,73 @@ mod tests {
         collect(&mut set, modify());
         collect(&mut set, modify());
         assert_eq!(set.len(), 1);
+    }
+
+    fn aliases_of(canon: &str, spelled: &str) -> Aliases {
+        let mut aliases = Aliases::new();
+        register_alias(&mut aliases, Path::new(canon), spelled);
+        aliases
+    }
+
+    #[test]
+    fn expand_adds_the_path_as_the_directory_was_requested() {
+        let aliases = aliases_of("/vol/mnt/Hub/Finance", "/home/u/Hub/Data/Finance");
+        let mut paths = HashSet::from(["/vol/mnt/Hub/Finance/FBAR.md".to_string()]);
+        expand_aliases(&mut paths, &aliases);
+        assert!(paths.contains("/vol/mnt/Hub/Finance/FBAR.md"));
+        assert!(paths.contains("/home/u/Hub/Data/Finance/FBAR.md"));
+        assert_eq!(paths.len(), 2);
+    }
+
+    #[test]
+    fn expand_leaves_unrelated_and_identical_spellings_alone() {
+        let aliases = aliases_of("/a/real", "/a/real");
+        let mut paths = HashSet::from(["/a/real/x".to_string(), "/b/other/y".to_string()]);
+        expand_aliases(&mut paths, &aliases);
+        assert_eq!(paths.len(), 2);
+
+        let aliases = aliases_of("/a/real", "/a/link");
+        let mut paths = HashSet::from(["/a/realistic/x".to_string()]);
+        expand_aliases(&mut paths, &aliases);
+        assert_eq!(paths.len(), 1, "a sibling that merely shares a prefix is not under the dir");
+    }
+
+    #[test]
+    fn two_spellings_of_one_directory_are_both_expanded_until_released() {
+        let mut aliases = aliases_of("/real", "/link1");
+        register_alias(&mut aliases, Path::new("/real"), "/link2");
+        register_alias(&mut aliases, Path::new("/real"), "/link2");
+
+        let mut paths = HashSet::from(["/real/f".to_string()]);
+        expand_aliases(&mut paths, &aliases);
+        assert!(paths.contains("/link1/f") && paths.contains("/link2/f"));
+
+        release_alias(&mut aliases, Path::new("/real"), "/link1");
+        release_alias(&mut aliases, Path::new("/real"), "/link2");
+        let mut paths = HashSet::from(["/real/f".to_string()]);
+        expand_aliases(&mut paths, &aliases);
+        assert!(!paths.contains("/link1/f"));
+        assert!(paths.contains("/link2/f"), "one requester of /link2 is still left");
+
+        release_alias(&mut aliases, Path::new("/real"), "/link2");
+        assert!(aliases.is_empty(), "the directory entry goes with its last alias");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_real_symlink_resolves_back_to_the_spelling_the_tab_uses() {
+        let tmp = tempfile::tempdir().unwrap();
+        let real = tmp.path().join("real");
+        std::fs::create_dir(&real).unwrap();
+        let link = tmp.path().join("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+
+        let canonical = std::fs::canonicalize(&link).unwrap();
+        let mut aliases = Aliases::new();
+        register_alias(&mut aliases, &canonical, &to_canon(&link));
+
+        let mut paths = HashSet::from([to_canon(canonical.join("note.md"))]);
+        expand_aliases(&mut paths, &aliases);
+        assert!(paths.contains(&to_canon(link.join("note.md"))));
     }
 }
