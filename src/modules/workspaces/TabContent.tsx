@@ -347,6 +347,7 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
                   onLanguageResolved={setCurrentLanguageName}
                   onConflictChange={setEditorConflict}
                   hideConflictOverlay={effectivePreviewMode != null}
+                  visible={visible}
                 />
               </div>
 

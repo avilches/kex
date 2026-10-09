@@ -15,23 +15,23 @@ vi.mock("@/modules/settings/preferences", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { DELETED_POLL_MS, useDocument, type DocumentState } from "./useDocument";
+import { useDocument, type DocumentState } from "./useDocument";
 
 type Hook = ReturnType<typeof useDocument>;
 
-function mountUseDocument(path: string, tabId: string = path) {
+function mountUseDocument(path: string, tabId: string = path, visible = true) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
   let latest: Hook | undefined;
 
-  function Harness() {
-    latest = useDocument({ path, tabId });
+  function Harness({ visible }: { visible: boolean }) {
+    latest = useDocument({ path, tabId, visible });
     return null;
   }
 
   act(() => {
-    root.render(createElement(Harness));
+    root.render(createElement(Harness, { visible }));
   });
 
   return {
@@ -39,6 +39,10 @@ function mountUseDocument(path: string, tabId: string = path) {
       if (!latest) throw new Error("hook did not mount");
       return latest;
     },
+    setVisible: (v: boolean) =>
+      act(() => {
+        root.render(createElement(Harness, { visible: v }));
+      }),
     unmount: () => act(() => root.unmount()),
   };
 }
@@ -223,38 +227,68 @@ describe("useDocument reload", () => {
     harness.unmount();
   });
 
-  it("recovers from the deleted state on its own when the file reappears without any fs event", async () => {
-    vi.useFakeTimers();
-    try {
+  describe("a deleted file that reappears without any fs event", () => {
+    async function deleteIt(path: string, visible = true) {
       vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
-      const harness = mountUseDocument("/tmp/vault.md");
+      const harness = mountUseDocument(path, path, visible);
       await flush();
-
       vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
       act(() => {
         harness.hook.reload();
       });
       await flush();
       expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
-
       // The vault is unlocked: the path resolves again but the stale watcher
       // never emits fs:changed for the new mount.
       vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+      return harness;
+    }
+
+    const ready = { status: "ready", content: "on disk", size: 7 } satisfies DocumentState;
+
+    it("recovers when the window regains focus", async () => {
+      const harness = await deleteIt("/tmp/vault-focus.md");
       await act(async () => {
-        vi.advanceTimersByTime(DELETED_POLL_MS);
+        window.dispatchEvent(new Event("focus"));
       });
       await flush();
-
-      expect(harness.hook.doc).toEqual({
-        status: "ready",
-        content: "on disk",
-        size: 7,
-      } satisfies DocumentState);
-
+      expect(harness.hook.doc).toEqual(ready);
       harness.unmount();
-    } finally {
-      vi.useRealTimers();
-    }
+    });
+
+    it("recovers when the tab becomes visible, and not while it is hidden", async () => {
+      const harness = await deleteIt("/tmp/vault-tab.md", false);
+      await act(async () => {
+        window.dispatchEvent(new Event("focus"));
+      });
+      await flush();
+      expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+
+      harness.setVisible(true);
+      await flush();
+      expect(harness.hook.doc).toEqual(ready);
+      harness.unmount();
+    });
+
+    it("recovers on demand and reports when the file is still missing", async () => {
+      const harness = await deleteIt("/tmp/vault-refresh.md", false);
+      vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+      let exists: boolean | undefined;
+      await act(async () => {
+        exists = await harness.hook.refresh();
+      });
+      expect(exists).toBe(false);
+      expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+
+      vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+      await act(async () => {
+        exists = await harness.hook.refresh();
+      });
+      await flush();
+      expect(exists).toBe(true);
+      expect(harness.hook.doc).toEqual(ready);
+      harness.unmount();
+    });
   });
 
   it("leaves the deleted state with a conflict when the file reappears while dirty", async () => {
