@@ -64,11 +64,12 @@ export function MarkdownTab(props: Props): JSX.Element {
     props.callbacks.isFileOpen,
   );
 
-  const { doc, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate } =
+  const { doc, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate, refresh } =
     useDocument({
       path: props.path,
       tabId: props.tabId,
       onDirtyChange: (d) => props.callbacks.onEditorDirtyChange?.(props.tabId, d),
+      visible: props.visible,
     });
 
   useBackgroundConflictToast(conflict, props.visible, props.path);
@@ -316,6 +317,17 @@ export function MarkdownTab(props: Props): JSX.Element {
                 onClick={() => props.callbacks.onEditorClose?.(props.tabId)}
               >
                 Close tab
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void refresh().then((exists) => {
+                    if (!exists) toast.info("The file is still missing");
+                  });
+                }}
+              >
+                Refresh
               </Button>
               <Button
                 size="sm"

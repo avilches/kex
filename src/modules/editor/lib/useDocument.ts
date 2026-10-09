@@ -31,8 +31,6 @@ export type DocumentState =
   | { status: "error"; message: string }
   | { status: "deleted" };
 
-export const DELETED_POLL_MS = 2000;
-
 async function fileExists(path: string): Promise<boolean> {
   try {
     await invoke("fs_stat", { path, workspace: currentWorkspaceEnv() });
@@ -46,9 +44,11 @@ type Options = {
   path: string;
   tabId: string;
   onDirtyChange?: (dirty: boolean) => void;
+  /** Whether the tab is the one on screen; a deleted file is re-checked when this turns true. */
+  visible?: boolean;
 };
 
-export function useDocument({ path, tabId, onDirtyChange }: Options) {
+export function useDocument({ path, tabId, onDirtyChange, visible = true }: Options) {
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
   const { conflict, setConflict, keepLocalChanges } = useConflictFlag();
@@ -211,17 +211,30 @@ export function useDocument({ path, tabId, onDirtyChange }: Options) {
   }, [performReload]);
 
   // A path under a remounted volume (an unlocked vault) comes back without any
-  // fs:changed: the watcher still points at the old mount. Poll while deleted.
+  // fs:changed: the watcher still points at the old mount. So a deleted file is
+  // re-checked when its tab becomes visible, when the window regains focus, and
+  // on demand (the Refresh button), never on a timer.
+  const refresh = useCallback(async (): Promise<boolean> => {
+    if (docStatusRef.current !== "deleted") return true;
+    const exists = await fileExists(path);
+    if (exists) reload();
+    return exists;
+  }, [path, reload]);
+
   const isDeleted = doc.status === "deleted";
   useEffect(() => {
-    if (!isDeleted) return;
-    const id = setInterval(() => {
-      void fileExists(path).then((exists) => {
-        if (exists && docStatusRef.current === "deleted") reload();
-      });
-    }, DELETED_POLL_MS);
-    return () => clearInterval(id);
-  }, [isDeleted, path, reload]);
+    if (!isDeleted || !visible) return;
+    const recheck = () => {
+      if (!document.hidden) void refresh();
+    };
+    recheck();
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
+    };
+  }, [isDeleted, visible, refresh]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   const reloadFromDisk = useCallback(() => {
@@ -284,5 +297,5 @@ export function useDocument({ path, tabId, onDirtyChange }: Options) {
     };
   }, [tabId, clearAutoSaveTimer, saveNow]);
 
-  return { doc, dirty, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate };
+  return { doc, dirty, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate, refresh };
 }

@@ -98,15 +98,18 @@ type Props = {
   onConflictChange?: (conflict: boolean) => void;
   /** Skips rendering the built-in conflict overlay; the parent renders one instead, driven by onConflictChange and the keepLocalChanges/reloadFromDisk handle methods. */
   hideConflictOverlay?: boolean;
+  /** Whether the tab is on screen; a deleted file is re-checked when it turns true. */
+  visible?: boolean;
 };
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, tabId, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved, onClose, onConflictChange, hideConflictOverlay }, ref) {
-    const { doc, onChange, save, reload, recreate, conflict, keepLocalChanges, reloadFromDisk } =
+  function EditorPane({ path, tabId, onDirtyChange, onSaved, onContentChange, onReady, overrideLanguage, onLanguageResolved, onClose, onConflictChange, hideConflictOverlay, visible }, ref) {
+    const { doc, onChange, save, reload, recreate, refresh, conflict, keepLocalChanges, reloadFromDisk } =
       useDocument({
         path,
         tabId,
         onDirtyChange,
+        visible,
       });
     const onConflictChangeRef = useRef(onConflictChange);
     onConflictChangeRef.current = onConflictChange;
@@ -450,6 +453,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
               onClick={() => onClose?.()}
             >
               Close tab
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void refresh().then((exists) => {
+                  if (!exists) toast.info("The file is still missing");
+                });
+              }}
+            >
+              Refresh
             </Button>
             <Button
               size="sm"

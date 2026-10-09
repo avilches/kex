@@ -934,7 +934,7 @@ Todo el camino depende de un evento `fs:changed`. Al montarse un volumen nuevo, 
 
 ### Fix
 
-`useDocument` sondea `fs_stat` cada `DELETED_POLL_MS` mientras el estado es `deleted` y llama a `reload()` cuando el fichero existe. El sondeo solo corre en ese estado.
+`useDocument` vuelve a comprobar que el fichero existe (`fs_stat`) mientras el estado es `deleted`, y llama a `reload()` si existe. Se dispara al volver el foco a la ventana, al hacerse visible el tab (`visible` desde `TabContent`) y desde el boton "Refresh" de la pantalla de fichero borrado (`refresh()`). No hay temporizador: un sondeo habria corrido en segundo plano para siempre mientras el tab siguiera borrado.
 
 ### Leccion
 
