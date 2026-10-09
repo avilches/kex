@@ -14,6 +14,7 @@ import {
   DashboardSquareAddIcon,
   FileAddIcon,
   Folder01Icon,
+  FocusPointIcon,
   FolderAddIcon,
   FolderOpenIcon,
   HierarchyFilesIcon,
@@ -100,6 +101,7 @@ type Props = {
   onChangeRootMode: (mode: ExplorerRootMode) => void;
   showHidden: boolean;
   onToggleShowHidden: () => void;
+  onFocusActiveTab?: () => void;
   onSetAsRoot: (path: string) => void;
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
@@ -359,6 +361,7 @@ export const FileExplorer = memo(
       onChangeRootMode,
       showHidden,
       onToggleShowHidden,
+      onFocusActiveTab,
       onSetAsRoot,
       onEnterFolder,
       onNavigateUp,
@@ -1212,6 +1215,17 @@ export const FileExplorer = memo(
             aria-label="Search files"
           >
             <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={onFocusActiveTab}
+            disabled={!onFocusActiveTab}
+            title="Focus the active tab's file or folder in the explorer"
+            aria-label="Focus active tab in explorer"
+          >
+            <HugeiconsIcon icon={FocusPointIcon} size={13} strokeWidth={2} />
           </Button>
           <Button
             variant="ghost"
