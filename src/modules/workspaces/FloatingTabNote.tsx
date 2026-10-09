@@ -4,7 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeMirrorEditor";
-import { dropBlankTabNote, moveTabNote, openTabNote, setTabNoteText } from "./lib/tabNote";
+import { dropBlankTabNote, moveTabNote, setTabNoteText } from "./lib/tabNote";
 import { useTabNoteStore } from "./lib/tabNoteStore";
 import { clampNotePos, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
 import type { Tab } from "./lib/types";
@@ -24,10 +24,12 @@ type Props = {
   // Changes whenever the tab strip layout may have changed (tab list or order).
   layoutKey: string;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
-  // Shown by hovering the tab icon: visible even when closed or inactive. A preview of
-  // an inactive tab is docked under its tab, ignoring the saved drag position.
+  // Shown by hovering the tab icon, even when closed or inactive. A hover note has no
+  // close button and goes away by itself; an inactive tab's one is docked under its tab
+  // and cannot be dragged. Dragging an active tab's hover note makes it sticky.
   preview?: boolean;
   onClose?: () => void;
+  onDismiss?: () => void;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
 };
@@ -52,9 +54,11 @@ function sameMeasure(a: Measure, b: Measure) {
   );
 }
 
-export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab, preview, onClose, onPointerEnter, onPointerLeave }: Props) {
+export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab, preview, onClose, onDismiss, onPointerEnter, onPointerLeave }: Props) {
   const visible = tab.note !== undefined && (!!preview || (active && !!tab.noteOpen));
-  const docked = !!preview && !active;
+  const sticky = active && !!tab.noteOpen;
+  const docked = !active;
+  const draggable = sticky || active;
   const noteRef = useRef<HTMLDivElement>(null);
   const [m, setM] = useState<Measure | null>(null);
   const [dragPos, setDragPos] = useState<Point | null>(null);
@@ -118,9 +122,11 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
   const pos = dragPos ?? resolved;
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.button !== 0 || !resolved) return;
+    if (e.button !== 0 || !resolved || !draggable) return;
     // Keeps text selection and DOM focus where they were while dragging.
     e.preventDefault();
+    // Keeps a hover note alive for the whole drag; it turns sticky when dropped.
+    onPointerEnter?.();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     dragRef.current = { startX: e.clientX, startY: e.clientY, origin: resolved, pos: null };
   }
@@ -158,31 +164,31 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         )}
         style={{ left: pos?.x ?? 0, top: pos?.y ?? 0 }}
         onMouseDown={(e) => e.stopPropagation()}
-        onFocus={(e) => {
-          e.stopPropagation();
-          if (!tab.noteOpen) onUpdateTab?.(tab.id, openTabNote);
-        }}
+        onFocus={(e) => e.stopPropagation()}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
         onBlur={(e) => {
           if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return;
           if (!tab.note?.trim()) onUpdateTab?.(tab.id, dropBlankTabNote);
-          onPointerLeave?.();
+          if (!sticky) onDismiss?.();
         }}
       >
-        <button
-          type="button"
-          aria-label="Close note"
-          title="Close note"
-          className="absolute right-1 top-1 z-10 flex size-4 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-          onClick={onClose}
-        >
-          <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
-        </button>
+        {sticky && (
+          <button
+            type="button"
+            aria-label="Close note"
+            title="Close note"
+            className="absolute right-1 top-1 z-10 flex size-4 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+            onClick={onClose}
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+          </button>
+        )}
         <div
           data-testid="tab-note-handle"
           className={cn(
-            "h-3 cursor-grab",
+            "h-3",
+            draggable && "cursor-grab",
             dragPos && "cursor-grabbing",
           )}
           onPointerDown={onPointerDown}

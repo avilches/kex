@@ -33,12 +33,6 @@ export function hideTabNote<T extends Tab>(tab: T): T {
   return next;
 }
 
-// Keeps a previewed note on screen once the user engages with it.
-export function openTabNote<T extends Tab>(tab: T): T {
-  if (tab.note === undefined || tab.noteOpen) return tab;
-  return { ...tab, noteOpen: true };
-}
-
 // An empty note that lost focus has nothing worth keeping.
 export function dropBlankTabNote<T extends Tab>(tab: T): T {
   if (tab.note === undefined || tab.note.trim()) return tab;
@@ -54,7 +48,8 @@ export function removeTabNote<T extends Tab>(tab: T): T {
   return withoutNote(tab);
 }
 
+// Dragging a note makes it sticky: moving a hover preview opens it for good.
 export function moveTabNote<T extends Tab>(tab: T, pos: { x: number; y: number }): T {
-  if (!isTabNoteOpen(tab)) return tab;
-  return { ...tab, notePos: { x: Math.round(pos.x), y: Math.round(pos.y) } };
+  if (tab.note === undefined) return tab;
+  return { ...tab, noteOpen: true, notePos: { x: Math.round(pos.x), y: Math.round(pos.y) } };
 }
