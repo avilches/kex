@@ -10,7 +10,7 @@ vi.mock("@/modules/editor/lib/useEditorThemeExt", () => ({ useEditorThemeExt: ()
 vi.mock("@/modules/theme/ThemeProvider", () => ({ useTheme: () => ({ resolvedMode: "dark" }) }));
 
 import { FloatingTabNote } from "./FloatingTabNote";
-import { useTabNoteStore } from "./lib/tabNoteStore";
+import { flushTabNote, useTabNoteStore } from "./lib/tabNoteStore";
 import type { Tab } from "./lib/types";
 
 class RO {
@@ -93,8 +93,29 @@ describe("FloatingTabNote", () => {
     const view = EditorView.findFromDOM(content);
     expect(view?.state.doc.toString()).toBe("hello");
     view?.dispatch({ changes: { from: 5, insert: " world" } });
-    expect(onUpdateTab).toHaveBeenCalledTimes(1);
-    expect(getTab()).toMatchObject({ note: "hello world", noteOpen: true });
+    view?.dispatch({ changes: { from: 11, insert: "!" } });
+    expect(onUpdateTab).not.toHaveBeenCalled();
+    await waitFor(() => expect(onUpdateTab).toHaveBeenCalledTimes(1));
+    expect(getTab()).toMatchObject({ note: "hello world!", noteOpen: true });
+  });
+
+  it("flushes pending text right away on request, on blur and on unmount", async () => {
+    const { getTab, view } = setup(open);
+    const content = await waitFor(() => {
+      const el = document.querySelector(".cm-content") as HTMLElement | null;
+      if (!el) throw new Error("editor not mounted");
+      return el;
+    });
+    const cm = EditorView.findFromDOM(content);
+    cm?.dispatch({ changes: { from: 5, insert: "1" } });
+    flushTabNote("tab-1");
+    expect(getTab().note).toBe("hello1");
+    cm?.dispatch({ changes: { from: 6, insert: "2" } });
+    fireEvent.blur(document.querySelector("[data-tab-note]") as HTMLElement);
+    expect(getTab().note).toBe("hello12");
+    cm?.dispatch({ changes: { from: 7, insert: "3" } });
+    view.unmount();
+    expect(getTab().note).toBe("hello123");
   });
 
   it("focuses the editor when the toggle shortcut requested it", async () => {

@@ -212,6 +212,7 @@ export const PaneView = memo(function PaneView({
           ?.contains(document.activeElement),
       [],
     ),
+    `${pane.activeTabId}:${activeTab?.noteOpen ? 1 : 0}`,
   );
   const previewTab = pane.tabs.find((t) => t.id === notePreview.tabId && t.note !== undefined);
   const handleNoteHover = useCallback(
