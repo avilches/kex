@@ -815,6 +815,16 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
+  const setWorkspaceDetailExpanded = useCallback((workspaceId: string, expanded: boolean) => {
+    setWorkspaces((prev) =>
+      prev.map((w) =>
+        w.id === workspaceId
+          ? { ...w, detailExpanded: expanded || undefined }
+          : w,
+      ),
+    );
+  }, []);
+
   const setWorkspaceGroup = useCallback((workspaceId: string, groupId: string | null) => {
     setWorkspaces((prev) => applyWorkspaceGroup(prev, workspaceId, groupId));
   }, []);
@@ -976,6 +986,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceTitle,
     setWorkspaceColor,
     setWorkspaceIcon,
+    setWorkspaceDetailExpanded,
     setWorkspaceGroup,
     addScript,
     updateScript,

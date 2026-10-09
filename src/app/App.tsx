@@ -176,6 +176,9 @@ import { isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
 
+// Same reference for every workspace whose nested list is closed, so the bar items stay stable.
+const NO_TABS: Tab[] = [];
+
 function toastSplitBlocked(
   reason: "pane-limit" | "too-narrow" | "too-short",
   max?: number,
@@ -234,6 +237,7 @@ export default function App() {
     setWorkspaceTitle,
     setWorkspaceColor,
     setWorkspaceIcon,
+    setWorkspaceDetailExpanded,
     setWorkspaceGroup,
     setWorkspaceGitConfig,
     addScript,
@@ -3149,6 +3153,10 @@ export default function App() {
         color: w.color,
         icon: w.icon,
         groupId: w.groupId,
+        tabs: w.detailExpanded
+          ? allPanes(w.paneTree).flatMap((p) => p.tabs)
+          : NO_TABS,
+        detailExpanded: w.detailExpanded,
       })),
     [workspaces],
   );
@@ -3206,6 +3214,7 @@ export default function App() {
             {/* LEFT: workspace bar */}
             <WorkspaceBar
               onActivateAgentTab={onActivateAgent}
+              onSetDetailExpanded={setWorkspaceDetailExpanded}
               workspaces={workspaceBarItems}
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}

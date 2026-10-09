@@ -10,6 +10,10 @@ import { LazyStore } from "@tauri-apps/plugin-store";
 import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
+import {
+  isWorkspaceDetailMode,
+  type WorkspaceDetailMode,
+} from "@/modules/workspaces/lib/workspaceDetail";
 
 export type ThemePref = "system" | "light" | "dark";
 
@@ -196,6 +200,7 @@ export type Preferences = {
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
   randomWorkspaceColor: boolean;
+  workspaceDetail: WorkspaceDetailMode;
   uiFont: string;
 };
 
@@ -225,6 +230,7 @@ const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
 const KEY_RANDOM_WORKSPACE_COLOR = "randomWorkspaceColor";
+const KEY_WORKSPACE_DETAIL = "workspaceDetail";
 
 // Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
@@ -432,6 +438,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   customEditors: [],
   detectedEditors: [],
   randomWorkspaceColor: true,
+  workspaceDetail: "none",
   uiFont: "",
 };
 
@@ -726,6 +733,10 @@ export async function loadPreferences(): Promise<Preferences> {
     randomWorkspaceColor:
       getGeneral<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
       DEFAULT_PREFERENCES.randomWorkspaceColor,
+    workspaceDetail: (() => {
+      const v = getGeneral<string>(KEY_WORKSPACE_DETAIL);
+      return isWorkspaceDetailMode(v) ? v : DEFAULT_PREFERENCES.workspaceDetail;
+    })(),
     uiFont: getGeneral<string>(KEY_UI_FONT) ?? DEFAULT_PREFERENCES.uiFont,
   };
 
@@ -1045,6 +1056,12 @@ export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
   await writePref(KEY_RANDOM_WORKSPACE_COLOR, value);
 }
 
+export async function setWorkspaceDetail(
+  value: WorkspaceDetailMode,
+): Promise<void> {
+  await writePref(KEY_WORKSPACE_DETAIL, value);
+}
+
 export async function setZoomLevel(value: number): Promise<void> {
   await writePref(KEY_ZOOM_LEVEL, value);
 }
@@ -1178,6 +1195,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
+  [KEY_WORKSPACE_DETAIL]: "workspaceDetail",
   [KEY_UI_FONT]: "uiFont",
 };
 

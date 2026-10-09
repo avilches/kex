@@ -40,7 +40,7 @@ const SECTIONS: {
   component: () => JSX.Element;
 }[] = [
   { id: "general", label: "General", icon: Settings01Icon, component: GeneralSection },
-  { id: "workspaces", label: "Workspace", icon: Layers01Icon, component: WorkspacesSection },
+  { id: "workspaces", label: "Workspaces", icon: Layers01Icon, component: WorkspacesSection },
   { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon, component: TerminalSection },
   { id: "external-editors", label: "Tools", icon: DocumentCodeIcon, component: ExternalEditorsSection },
   { id: "editor", label: "Editor", icon: SourceCodeIcon, component: EditorSection },
