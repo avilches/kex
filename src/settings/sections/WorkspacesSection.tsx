@@ -44,7 +44,7 @@ export function WorkspacesSection() {
         </SettingRow>
         <SettingRow
           title="Detail under each workspace"
-          description="What the expand arrow of a workspace in the bar lists below it. None keeps the bar as it is, with only the number of active agents."
+          description="What the expand arrow of a workspace in the bar lists below it. With None, the bar only shows the number of active agents."
         >
           <RadioGroup
             value={workspaceDetail}

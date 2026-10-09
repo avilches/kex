@@ -51,7 +51,9 @@ export function workspaceDetailRows(
   if (mode === "agents") return tabs.filter((t) => agentTabIds.has(t.id)).map(row);
 
   const present = new Set(tabs.map((t) => t.id));
-  return entries.filter((e) => present.has(e.tabId)).map((e) => row({ id: e.tabId, kind: "" }));
+  return entries
+    .filter((e) => present.has(e.tabId))
+    .map((e) => ({ tabId: e.tabId, visual: e.visual }));
 }
 
 export function activeAgentCount(entries: AgentEntry[] | undefined): number {

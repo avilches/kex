@@ -176,6 +176,9 @@ import { isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
 
+// Same reference for every workspace whose nested list is closed, so the bar items stay stable.
+const NO_TABS: Tab[] = [];
+
 function toastSplitBlocked(
   reason: "pane-limit" | "too-narrow" | "too-short",
   max?: number,
@@ -3149,7 +3152,9 @@ export default function App() {
         color: w.color,
         icon: w.icon,
         groupId: w.groupId,
-        tabs: allPanes(w.paneTree).flatMap((p) => p.tabs),
+        tabs: w.detailExpanded
+          ? allPanes(w.paneTree).flatMap((p) => p.tabs)
+          : NO_TABS,
         detailExpanded: w.detailExpanded,
       })),
     [workspaces],

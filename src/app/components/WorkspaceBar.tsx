@@ -303,78 +303,99 @@ function SortableWorkspaceItem({
       onPointerEnter={hoverSwitch ? () => hoverSwitch.enter(ws.id) : undefined}
       onPointerLeave={hoverSwitch ? () => hoverSwitch.leave(ws.id) : undefined}
     >
-      <button
-        type="button"
-        title={
-          ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : ws.title || ws.kind
-        }
-        onClick={() => {
-          if (active) onRestoreFocus();
-          else onSelect(ws.id);
-        }}
-        onDoubleClick={() => onOpenSettings(ws.id)}
-        className={cn(
-          "flex w-full items-center rounded-lg font-semibold transition-all select-none",
-          compact
-            ? "h-9 justify-center text-[12px]"
-            : "h-9 gap-2 px-2.5 text-[12px]",
-          active
-            ? "text-foreground"
-            : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
-        )}
-        style={
-          active
-            ? displayColor !== null
-              ? {
-                  backgroundColor: chipColorOnWhite(displayColor),
-                  color: "#ffffff",
-                  boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
-                }
-              : {
-                  backgroundColor: "var(--muted)",
-                  boxShadow: "inset 0 0 0 1px var(--ring)",
-                }
-            : undefined
-        }
-        {...attributes}
-        {...listeners}
-        aria-pressed={active}
-      >
-        {compact ? (
-          ws.icon && getWorkspaceIcon(ws.icon) ? (
-            <HugeiconsIcon
-              icon={getWorkspaceIcon(ws.icon)!}
-              size={22}
-              strokeWidth={1.5}
-            />
-          ) : (
-            <span className="text-[12px]">{abbrev(ws.title, ws.kind)}</span>
-          )
-        ) : (
-          <>
-            {detailToggle}
-            {ws.icon && getWorkspaceIcon(ws.icon) && (
+      <div className="relative -mx-1.5 px-1.5">
+        <button
+          type="button"
+          title={
+            ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : ws.title || ws.kind
+          }
+          onClick={() => {
+            if (active) onRestoreFocus();
+            else onSelect(ws.id);
+          }}
+          onDoubleClick={() => onOpenSettings(ws.id)}
+          className={cn(
+            "flex w-full items-center rounded-lg font-semibold transition-all select-none",
+            compact
+              ? "h-9 justify-center text-[12px]"
+              : "h-9 gap-2 px-2.5 text-[12px]",
+            active
+              ? "text-foreground"
+              : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
+          )}
+          style={
+            active
+              ? displayColor !== null
+                ? {
+                    backgroundColor: chipColorOnWhite(displayColor),
+                    color: "#ffffff",
+                    boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
+                  }
+                : {
+                    backgroundColor: "var(--muted)",
+                    boxShadow: "inset 0 0 0 1px var(--ring)",
+                  }
+              : undefined
+          }
+          {...attributes}
+          {...listeners}
+          aria-pressed={active}
+        >
+          {compact ? (
+            ws.icon && getWorkspaceIcon(ws.icon) ? (
               <HugeiconsIcon
                 icon={getWorkspaceIcon(ws.icon)!}
-                size={18}
+                size={22}
                 strokeWidth={1.5}
-                className="shrink-0"
               />
-            )}
-            <span className="truncate">{ws.title || ws.kind}</span>
-            {agentCount > 0 && (
-              <span
-                title={`${agentCount} active ${agentCount === 1 ? "agent" : "agents"}`}
-                className="shrink-0 text-[11px] font-normal tabular-nums opacity-50"
-              >
-                {agentCount}
-              </span>
-            )}
-            {agentIndicator}
-          </>
+            ) : (
+              <span className="text-[12px]">{abbrev(ws.title, ws.kind)}</span>
+            )
+          ) : (
+            <>
+              {detailToggle}
+              {ws.icon && getWorkspaceIcon(ws.icon) && (
+                <HugeiconsIcon
+                  icon={getWorkspaceIcon(ws.icon)!}
+                  size={18}
+                  strokeWidth={1.5}
+                  className="shrink-0"
+                />
+              )}
+              <span className="truncate">{ws.title || ws.kind}</span>
+              {agentCount > 0 && (
+                <span
+                  title={`${agentCount} active ${agentCount === 1 ? "agent" : "agents"}`}
+                  className="shrink-0 text-[11px] font-normal tabular-nums opacity-50"
+                >
+                  {agentCount}
+                </span>
+              )}
+              {agentIndicator}
+            </>
+          )}
+        </button>
+        {agentIndicator && compact ? agentIndicator : null}
+        {!active && displayColor && (
+          <span
+            className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
+            style={{ backgroundColor: displayColor }}
+          />
         )}
-      </button>
-      {agentIndicator && compact ? agentIndicator : null}
+        {onClose && !agentEntries && (
+          <button
+            type="button"
+            title="Close workspace"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose(ws.id);
+            }}
+            className="absolute right-0.5 top-0.5 hidden size-[14px] items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+          </button>
+        )}
+      </div>
       {expanded && (
         <WorkspaceDetailList
           tabs={ws.tabs}
@@ -382,25 +403,6 @@ function SortableWorkspaceItem({
           mode={detailMode}
           onActivate={(tabId) => onActivateAgentTab(ws.id, tabId)}
         />
-      )}
-      {!active && displayColor && (
-        <span
-          className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
-          style={{ backgroundColor: displayColor }}
-        />
-      )}
-      {onClose && !agentEntries && (
-        <button
-          type="button"
-          title="Close workspace"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose(ws.id);
-          }}
-          className="absolute right-0.5 top-0.5 hidden size-[14px] items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
-        >
-          <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-        </button>
       )}
     </div>
   );
