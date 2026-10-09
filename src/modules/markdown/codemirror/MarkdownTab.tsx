@@ -18,6 +18,7 @@ import {
   type CodeMirrorEditorHandle,
 } from "@/modules/markdown/codemirror/CodeMirrorEditor";
 import { cn } from "@/lib/utils";
+import { WikiLinkContextMenu } from "@/modules/markdown/codemirror/WikiLinkContextMenu";
 import { MarkdownPreviewPane, type MarkdownPreviewPaneHandle } from "@/modules/markdown/MarkdownPreviewPane";
 import { positionAfterPreview, type ViewPosition } from "@/modules/markdown/lib/viewPosition";
 import { MarkdownDocFallback } from "@/modules/markdown/lib/MarkdownDocFallback";
@@ -57,7 +58,11 @@ export function MarkdownTab(props: Props): JSX.Element {
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [edit, setEdit] = useState<{ doc: unknown; text: string } | null>(null);
   const { workspaceRoot, home, gitRootPath } = useEditorChrome();
-  const wikiLinks = useWikiLinkHost(props.path, props.callbacks.onOpenFile);
+  const wikiLinks = useWikiLinkHost(
+    props.path,
+    props.callbacks.onOpenFile,
+    props.callbacks.isFileOpen,
+  );
 
   const { doc, conflict, keepLocalChanges, reloadFromDisk, onChange, save, reload, recreate } =
     useDocument({
@@ -263,27 +268,31 @@ export function MarkdownTab(props: Props): JSX.Element {
       <div className="relative min-h-0 flex-1">
         {doc.status === "ready" && viewMode === "preview" ? (
           <div ref={previewRef} tabIndex={-1} className="h-full outline-none">
-            <MarkdownPreviewPane
-              ref={previewPaneRef}
-              content={liveContent}
-              path={props.path}
-              wikiLinks={wikiLinks}
-              initialTopLine={restore?.topLine}
-            />
+            <WikiLinkContextMenu host={wikiLinks}>
+              <MarkdownPreviewPane
+                ref={previewPaneRef}
+                content={liveContent}
+                path={props.path}
+                wikiLinks={wikiLinks}
+                initialTopLine={restore?.topLine}
+              />
+            </WikiLinkContextMenu>
           </div>
         ) : doc.status === "ready" ? (
           <div className="flex h-full min-h-0">
             <div className="min-w-0 flex-1">
-              <CodeMirrorEditor
-                ref={editorRef}
-                value={liveContent}
-                syncKey={doc}
-                onChange={handleChange}
-                path={props.path}
-                mode={viewMode === "source" ? "source" : "rich"}
-                wikiLinks={wikiLinks}
-                initialPosition={restore}
-              />
+              <WikiLinkContextMenu host={wikiLinks}>
+                <CodeMirrorEditor
+                  ref={editorRef}
+                  value={liveContent}
+                  syncKey={doc}
+                  onChange={handleChange}
+                  path={props.path}
+                  mode={viewMode === "source" ? "source" : "rich"}
+                  wikiLinks={wikiLinks}
+                  initialPosition={restore}
+                />
+              </WikiLinkContextMenu>
             </div>
             {outlineOpen && (
               <OutlinePanel
