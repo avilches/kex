@@ -1,5 +1,5 @@
 import { IS_MAC } from "@/lib/platform";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { ClipboardCopyIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { toast } from "sonner";
@@ -25,6 +25,17 @@ export function relativePath(rootPath: string, path: string): string {
   if (path === rootPath) return ".";
   if (path.startsWith(`${rootPath}/`)) return path.slice(rootPath.length + 1);
   return path;
+}
+
+export const OPEN_EXTERNAL_LABEL = "Open with Default App";
+
+export async function openWithDefaultApp(path: string): Promise<void> {
+  try {
+    await openPath(path);
+  } catch (e) {
+    console.error("openPath failed:", e);
+    toast.error("Could not open the file", { description: String(e) });
+  }
 }
 
 export async function revealInFinder(path: string): Promise<void> {

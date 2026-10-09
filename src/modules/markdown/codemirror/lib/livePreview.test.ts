@@ -167,6 +167,11 @@ describe("planLivePreview", () => {
     expect(plan(text, [1]).hides).toEqual([]);
   });
 
+  it("plans a wiki link whose anchor looks like a list item", () => {
+    const text = "- [[file#7. Listas]]\n";
+    expect(plan(text).marks).toContainEqual({ from: 4, to: 18, className: "cm-lp-wikilink", title: "file" });
+  });
+
   it("leaves [[wiki]] inside inline code alone", () => {
     expect(plan("`[[My Note]]`\n").marks.every((m) => m.className !== "cm-lp-wikilink")).toBe(true);
   });

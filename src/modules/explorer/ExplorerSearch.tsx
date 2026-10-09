@@ -13,6 +13,7 @@ import {
   CopySlashIcon,
   DashboardSquareAddIcon,
   File01Icon,
+  LinkSquare02Icon,
   Folder01Icon,
   FolderOpenIcon,
   HierarchyFilesIcon,
@@ -34,6 +35,8 @@ import { pathDirname } from "@/lib/pathUtils";
 import { fileIconUrl } from "./lib/iconResolver";
 import {
   copyToClipboard,
+  OPEN_EXTERNAL_LABEL,
+  openWithDefaultApp,
   relativePath,
   REVEAL_LABEL,
   revealInFinder,
@@ -362,6 +365,15 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 >
                   <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
                   Open File
+                </ContextMenuItem>
+              )}
+              {contextHit && !contextHit.is_dir && (
+                <ContextMenuItem
+                  className={COMPACT_ITEM}
+                  onSelect={() => void openWithDefaultApp(contextHit.path)}
+                >
+                  <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={2} />
+                  {OPEN_EXTERNAL_LABEL}
                 </ContextMenuItem>
               )}
               {contextHit && onRevealInTerminal && (

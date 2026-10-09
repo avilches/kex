@@ -33,6 +33,7 @@ import {
   FolderAddIcon,
   FolderOpenIcon,
   Link01Icon,
+  LinkSquare02Icon,
   PencilEdit01Icon,
   PinIcon,
   Refresh01Icon,
@@ -44,6 +45,8 @@ import { memo, useCallback, useEffect } from "react";
 import { InlineInput } from "./InlineInput";
 import {
   copyToClipboard,
+  OPEN_EXTERNAL_LABEL,
+  openWithDefaultApp,
   relativePath,
   REVEAL_LABEL,
   revealInFinder,
@@ -346,6 +349,15 @@ function EntryRowImpl(props: EntryRowProps) {
           >
             <HugeiconsIcon icon={File01Icon} size={14} strokeWidth={2} />
             Open File
+          </ContextMenuItem>
+        )}
+        {!isDir && (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => void openWithDefaultApp(path)}
+          >
+            <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={2} />
+            {OPEN_EXTERNAL_LABEL}
           </ContextMenuItem>
         )}
         {onRevealInTerminal && isDir && (
