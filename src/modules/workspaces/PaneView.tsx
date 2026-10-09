@@ -4,6 +4,8 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { EmptyPaneWelcome, type WelcomeActions } from "./EmptyPaneWelcome";
 import { PaneTabBar } from "./PaneTabBar";
 import { FloatingTabNote, TAB_NOTE_ATTR } from "./FloatingTabNote";
+import { hideTabNote } from "./lib/tabNote";
+import { useNotePreview } from "./lib/useNotePreview";
 import { TabContent } from "./TabContent";
 import type { TabCallbacks } from "./TabContent";
 import type { PaneNode } from "./lib/types";
@@ -202,6 +204,25 @@ export const PaneView = memo(function PaneView({
 
   const activeTab = pane.tabs.find((p) => p.id === pane.activeTabId);
 
+  const notePreview = useNotePreview(
+    useCallback(
+      (id: string) =>
+        !!containerRef.current
+          ?.querySelector(`[data-tab-note-id="${CSS.escape(id)}"]`)
+          ?.contains(document.activeElement),
+      [],
+    ),
+  );
+  const previewTab = pane.tabs.find((t) => t.id === notePreview.tabId && t.note !== undefined);
+  const handleNoteHover = useCallback(
+    (tabId: string, hovering: boolean) => (hovering ? notePreview.show(tabId) : notePreview.leave(tabId)),
+    [notePreview.show, notePreview.leave],
+  );
+  const closeNote = (tabId: string) => {
+    notePreview.close();
+    callbacks.onUpdateTab?.(tabId, hideTabNote);
+  };
+
 
   useDndMonitor({
     onDragStart: (event) => {
@@ -268,15 +289,34 @@ export const PaneView = memo(function PaneView({
       onFocus={handleFocus}
     >
       <PaneFlashBorder tabId={pane.activeTabId} />
-      {activeTab?.note !== undefined && activeTab.noteOpen && (
+      {activeTab?.note !== undefined && (activeTab.noteOpen || previewTab?.id === activeTab.id) && (
         <FloatingTabNote
           key={activeTab.id}
           tab={activeTab}
           active
+          preview={previewTab?.id === activeTab.id}
           paneRef={containerRef}
           tabBarRef={tabBarRef}
           layoutKey={pane.tabs.map((t) => t.id).join(",")}
           onUpdateTab={callbacks.onUpdateTab}
+          onClose={() => closeNote(activeTab.id)}
+          onPointerEnter={() => notePreview.show(activeTab.id)}
+          onPointerLeave={() => notePreview.leave(activeTab.id)}
+        />
+      )}
+      {previewTab && previewTab.id !== activeTab?.id && (
+        <FloatingTabNote
+          key={`preview-${previewTab.id}`}
+          tab={previewTab}
+          active={false}
+          preview
+          paneRef={containerRef}
+          tabBarRef={tabBarRef}
+          layoutKey={pane.tabs.map((t) => t.id).join(",")}
+          onUpdateTab={callbacks.onUpdateTab}
+          onClose={() => closeNote(previewTab.id)}
+          onPointerEnter={() => notePreview.show(previewTab.id)}
+          onPointerLeave={() => notePreview.leave(previewTab.id)}
         />
       )}
       <div ref={tabBarRef} className="relative shrink-0">
@@ -298,6 +338,7 @@ export const PaneView = memo(function PaneView({
           onSplitBrowserDown={handleSplitBrowserDown}
           onRenameTab={callbacks.onRenameTab}
           onUpdateTab={callbacks.onUpdateTab}
+          onNoteHover={handleNoteHover}
           onFocusOnExplorer={callbacks.onFocusOnExplorer}
           gitStatus={gitStatus}
           gitColorScheme={gitColorScheme}
