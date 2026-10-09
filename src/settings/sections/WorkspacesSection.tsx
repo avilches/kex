@@ -1,16 +1,27 @@
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setRandomWorkspaceColor, setWarnOnCloseWorkspace } from "@/modules/settings/store";
+import {
+  setRandomWorkspaceColor,
+  setWarnOnCloseWorkspace,
+  setWorkspaceDetail,
+} from "@/modules/settings/store";
+import {
+  WORKSPACE_DETAIL_LABELS,
+  WORKSPACE_DETAIL_MODES,
+  type WorkspaceDetailMode,
+} from "@/modules/workspaces/lib/workspaceDetail";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
 export function WorkspacesSection() {
   const warnOnCloseWorkspace = usePreferencesStore((s) => s.warnOnCloseWorkspace);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
+  const workspaceDetail = usePreferencesStore((s) => s.workspaceDetail);
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="Workspace" />
+      <SectionHeader title="Workspaces" />
 
       <div className="flex flex-col gap-2">
         <SettingRow
@@ -30,6 +41,27 @@ export function WorkspacesSection() {
             checked={randomWorkspaceColor}
             onCheckedChange={(v) => void setRandomWorkspaceColor(v)}
           />
+        </SettingRow>
+        <SettingRow
+          title="Detail under each workspace"
+          description="What the expand arrow of a workspace in the bar lists below it. None keeps the bar as it is, with only the number of active agents."
+        >
+          <RadioGroup
+            value={workspaceDetail}
+            onValueChange={(v) => void setWorkspaceDetail(v as WorkspaceDetailMode)}
+          >
+            {WORKSPACE_DETAIL_MODES.map((mode) => (
+              <div key={mode} className="flex items-center gap-2">
+                <RadioGroupItem value={mode} id={`workspace-detail-${mode}`} />
+                <label
+                  htmlFor={`workspace-detail-${mode}`}
+                  className="cursor-pointer text-[12px]"
+                >
+                  {WORKSPACE_DETAIL_LABELS[mode]}
+                </label>
+              </div>
+            ))}
+          </RadioGroup>
         </SettingRow>
       </div>
     </div>

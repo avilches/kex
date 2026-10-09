@@ -90,6 +90,8 @@ export type Workspace = {
   scripts?: Script[];
   activeScript?: string;
   scriptPaneId?: string;
+  // The nested tab list under this workspace in the WorkspaceBar is open.
+  detailExpanded?: boolean;
 };
 
 export type ClosedEntry = {

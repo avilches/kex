@@ -234,6 +234,7 @@ export default function App() {
     setWorkspaceTitle,
     setWorkspaceColor,
     setWorkspaceIcon,
+    setWorkspaceDetailExpanded,
     setWorkspaceGroup,
     setWorkspaceGitConfig,
     addScript,
@@ -3148,6 +3149,8 @@ export default function App() {
         color: w.color,
         icon: w.icon,
         groupId: w.groupId,
+        tabs: allPanes(w.paneTree).flatMap((p) => p.tabs),
+        detailExpanded: w.detailExpanded,
       })),
     [workspaces],
   );
@@ -3205,6 +3208,7 @@ export default function App() {
             {/* LEFT: workspace bar */}
             <WorkspaceBar
               onActivateAgentTab={onActivateAgent}
+              onSetDetailExpanded={setWorkspaceDetailExpanded}
               workspaces={workspaceBarItems}
               activeId={activeWorkspaceId}
               onSelect={setActiveWorkspaceId}

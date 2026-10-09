@@ -77,7 +77,12 @@ import {
   groupWorkspacesForDrag,
   parseGroupDropId,
 } from "@/modules/workspaces/lib/workspaceOrder";
-import type { WorkspaceGroup } from "@/modules/workspaces/lib/types";
+import type { Tab, WorkspaceGroup } from "@/modules/workspaces/lib/types";
+import {
+  activeAgentCount,
+  type WorkspaceDetailMode,
+} from "@/modules/workspaces/lib/workspaceDetail";
+import { WorkspaceDetailList } from "./WorkspaceDetailList";
 
 type WorkspaceItem = {
   id: string;
@@ -87,6 +92,8 @@ type WorkspaceItem = {
   color?: string | null;
   icon?: string;
   groupId?: string;
+  tabs: Tab[];
+  detailExpanded?: boolean;
 };
 
 export type WorkspaceBarProps = {
@@ -111,6 +118,7 @@ export type WorkspaceBarProps = {
   onToggleGroup: (groupId: string) => void;
   onRestoreFocus: () => void;
   onActivateAgentTab: (workspaceId: string, tabId: string) => void;
+  onSetDetailExpanded: (id: string, expanded: boolean) => void;
 };
 
 function abbrev(title: string, kind: string): string {
@@ -125,6 +133,9 @@ function SortableWorkspaceItem({
   active,
   agentEntries,
   onJumpAgent,
+  detailMode,
+  onSetDetailExpanded,
+  onActivateAgentTab,
   barWidth,
   workspaceGroups,
   onSelect,
@@ -140,6 +151,9 @@ function SortableWorkspaceItem({
   active: boolean;
   agentEntries?: AgentEntry[];
   onJumpAgent: (workspaceId: string, entries: AgentEntry[]) => void;
+  detailMode: WorkspaceDetailMode;
+  onSetDetailExpanded: (id: string, expanded: boolean) => void;
+  onActivateAgentTab: (workspaceId: string, tabId: string) => void;
   barWidth: number;
   workspaceGroups: WorkspaceGroup[];
   onSelect: (id: string) => void;
@@ -219,6 +233,31 @@ function SortableWorkspaceItem({
   }
 
   const compact = barWidth <= 80;
+  const showDetail = !compact && detailMode !== "none";
+  const expanded = showDetail && !!ws.detailExpanded;
+  const agentCount = activeAgentCount(agentEntries);
+
+  const detailToggle = showDetail ? (
+    <span
+      role="button"
+      aria-expanded={expanded}
+      title={expanded ? "Hide tabs" : "Show tabs"}
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSetDetailExpanded(ws.id, !expanded);
+      }}
+      className="flex size-[14px] shrink-0 items-center justify-center rounded opacity-60 hover:opacity-100"
+    >
+      <HugeiconsIcon
+        icon={ChevronRightIcon}
+        size={12}
+        strokeWidth={2}
+        className={cn("transition-transform", expanded && "rotate-90")}
+      />
+    </span>
+  ) : null;
 
   const agentIndicator = agentEntries ? (
     <span
@@ -313,6 +352,7 @@ function SortableWorkspaceItem({
           )
         ) : (
           <>
+            {detailToggle}
             {ws.icon && getWorkspaceIcon(ws.icon) && (
               <HugeiconsIcon
                 icon={getWorkspaceIcon(ws.icon)!}
@@ -322,11 +362,27 @@ function SortableWorkspaceItem({
               />
             )}
             <span className="truncate">{ws.title || ws.kind}</span>
+            {agentCount > 0 && (
+              <span
+                title={`${agentCount} active ${agentCount === 1 ? "agent" : "agents"}`}
+                className="shrink-0 text-[11px] font-normal tabular-nums opacity-50"
+              >
+                {agentCount}
+              </span>
+            )}
             {agentIndicator}
           </>
         )}
       </button>
       {agentIndicator && compact ? agentIndicator : null}
+      {expanded && (
+        <WorkspaceDetailList
+          tabs={ws.tabs}
+          entries={agentEntries}
+          mode={detailMode}
+          onActivate={(tabId) => onActivateAgentTab(ws.id, tabId)}
+        />
+      )}
       {!active && displayColor && (
         <span
           className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
@@ -790,6 +846,7 @@ export function WorkspaceBar({
   onToggleGroup,
   onRestoreFocus,
   onActivateAgentTab,
+  onSetDetailExpanded,
 }: WorkspaceBarProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -803,6 +860,7 @@ export function WorkspaceBar({
   >(undefined);
   const compact = width <= 80;
 
+  const detailMode = usePreferencesStore((s) => s.workspaceDetail);
   const agentSessions = useAgentStore((s) => s.sessions);
   const agentNotifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
@@ -993,6 +1051,9 @@ export function WorkspaceBar({
                                 active={true}
                                 agentEntries={agentEntriesByWs[activeWs.id]}
                                 onJumpAgent={jumpAgent}
+                                detailMode={detailMode}
+                                onSetDetailExpanded={onSetDetailExpanded}
+                                onActivateAgentTab={onActivateAgentTab}
                                 barWidth={width}
                                 workspaceGroups={workspaceGroups}
                                 onSelect={onSelect}
@@ -1019,6 +1080,9 @@ export function WorkspaceBar({
                                 active={ws.id === activeId}
                                 agentEntries={agentEntriesByWs[ws.id]}
                                 onJumpAgent={jumpAgent}
+                                detailMode={detailMode}
+                                onSetDetailExpanded={onSetDetailExpanded}
+                                onActivateAgentTab={onActivateAgentTab}
                                 barWidth={width}
                                 workspaceGroups={workspaceGroups}
                                 onSelect={onSelect}
