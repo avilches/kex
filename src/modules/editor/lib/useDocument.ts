@@ -31,6 +31,8 @@ export type DocumentState =
   | { status: "error"; message: string }
   | { status: "deleted" };
 
+export const DELETED_POLL_MS = 2000;
+
 async function fileExists(path: string): Promise<boolean> {
   try {
     await invoke("fs_stat", { path, workspace: currentWorkspaceEnv() });
@@ -207,6 +209,19 @@ export function useDocument({ path, tabId, onDirtyChange }: Options) {
     performReload();
     return true;
   }, [performReload]);
+
+  // A path under a remounted volume (an unlocked vault) comes back without any
+  // fs:changed: the watcher still points at the old mount. Poll while deleted.
+  const isDeleted = doc.status === "deleted";
+  useEffect(() => {
+    if (!isDeleted) return;
+    const id = setInterval(() => {
+      void fileExists(path).then((exists) => {
+        if (exists && docStatusRef.current === "deleted") reload();
+      });
+    }, DELETED_POLL_MS);
+    return () => clearInterval(id);
+  }, [isDeleted, path, reload]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: setConflict is a stable setState from useConflictFlag
   const reloadFromDisk = useCallback(() => {

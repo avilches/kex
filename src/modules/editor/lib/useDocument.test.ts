@@ -15,7 +15,7 @@ vi.mock("@/modules/settings/preferences", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { useDocument, type DocumentState } from "./useDocument";
+import { DELETED_POLL_MS, useDocument, type DocumentState } from "./useDocument";
 
 type Hook = ReturnType<typeof useDocument>;
 
@@ -221,6 +221,40 @@ describe("useDocument reload", () => {
     } satisfies DocumentState);
 
     harness.unmount();
+  });
+
+  it("recovers from the deleted state on its own when the file reappears without any fs event", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+      const harness = mountUseDocument("/tmp/vault.md");
+      await flush();
+
+      vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+      act(() => {
+        harness.hook.reload();
+      });
+      await flush();
+      expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+
+      // The vault is unlocked: the path resolves again but the stale watcher
+      // never emits fs:changed for the new mount.
+      vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+      await act(async () => {
+        vi.advanceTimersByTime(DELETED_POLL_MS);
+      });
+      await flush();
+
+      expect(harness.hook.doc).toEqual({
+        status: "ready",
+        content: "on disk",
+        size: 7,
+      } satisfies DocumentState);
+
+      harness.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("leaves the deleted state with a conflict when the file reappears while dirty", async () => {

@@ -916,3 +916,26 @@ La decision pasa a Rust y usa la union de todas las ventanas. `WindowStateManage
 ### Leccion
 
 Una limpieza basada en "lo que no veo" solo es segura si quien la hace ve todo el universo. Con estado repartido entre varias ventanas, la decision de borrar tiene que tomarla quien conoce la union, no cada ventana con su trozo.
+
+## Bug 17: un fichero borrado al cerrar el vault no reaparecia en el tab al desbloquearlo (RESUELTO)
+
+### Sintoma
+
+Con un tab abierto sobre `~/Hub/Data/...` (symlink a un montaje de Cryptomator), cerrar el vault dejaba el tab en "This file was deleted from disk". Al desbloquear el vault el fichero volvia a existir pero el tab seguia en ese estado.
+
+### Pistas falsas descartadas
+
+- La logica de `useDocument`: salir de `deleted` cuando el fichero vuelve ya estaba arreglado (commit `66be26c7`) y sus tests pasaban.
+- El cableado de `useEditorFileSync` y `MarkdownTab`: llaman a `reload()` en cada `fs:changed` de la carpeta del fichero.
+
+### Causa raiz
+
+Todo el camino depende de un evento `fs:changed`. Al montarse un volumen nuevo, el watcher de Rust sigue apuntando al montaje anterior (clave canonica en `refcounts`, `add_paths` solo incrementa el contador si ya existe) y no emite nada, asi que `reload()` nunca se llama.
+
+### Fix
+
+`useDocument` sondea `fs_stat` cada `DELETED_POLL_MS` mientras el estado es `deleted` y llama a `reload()` cuando el fichero existe. El sondeo solo corre en ese estado.
+
+### Leccion
+
+Un estado que solo se abandona por un evento del sistema de ficheros necesita una salida que no dependa del evento cuando el origen puede ser un montaje o desmontaje. Pendiente: tras reaparecer, el watcher sigue obsoleto, asi que las ediciones externas posteriores no se detectan hasta reabrir el tab.
