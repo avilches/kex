@@ -248,6 +248,16 @@ function DraggableTab({
     return parts.join(" - ") || undefined;
   })();
 
+  const statusIndicator = !hasAgent
+    ? null
+    : isRestoreError
+      ? <span className="inline-block size-[6px] rounded-full bg-destructive" />
+      : agentSession?.status === "working"
+        ? <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />
+        : agentSession?.status === "attention"
+          ? <span className="inline-block size-[6px] rounded-full bg-amber-400" />
+          : null;
+
   const tabDiv = (
     <div
       ref={setNodeRef}
@@ -345,15 +355,7 @@ function DraggableTab({
           onHover={(hovering) => onNoteHover?.(tab.id, hovering)}
         />
       )}
-      {hasAgent && (
-        isRestoreError ? (
-          <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-destructive" />
-        ) : agentSession?.status === "working" ? (
-          <span className="ml-0.5 size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
-        ) : agentSession?.status === "attention" ? (
-          <span className="ml-0.5 inline-block size-[6px] shrink-0 rounded-full bg-amber-400" />
-        ) : null
-      )}
+      {isLocked && statusIndicator && <span className="ml-0.5 flex shrink-0 items-center">{statusIndicator}</span>}
       {isAutofocusTab(tab) && tab.autofocus && (
         <span
           className="ml-0.5 shrink-0 text-muted-foreground"
@@ -377,18 +379,25 @@ function DraggableTab({
           <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
         </button>
       ) : (
-        <button
-          type="button"
-          className="ml-0.5 flex size-[16px] shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose(tab.id);
-          }}
-          title="Close tab"
-        >
-          <span className="text-[13px] leading-none">×</span>
-        </button>
+        <span className="relative ml-0.5 flex size-[16px] shrink-0 items-center justify-center">
+          {statusIndicator && (
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0">
+              {statusIndicator}
+            </span>
+          )}
+          <button
+            type="button"
+            className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100 hover:bg-muted"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose(tab.id);
+            }}
+            title="Close tab"
+          >
+            <span className="text-[13px] leading-none">×</span>
+          </button>
+        </span>
       )}
     </div>
   );
