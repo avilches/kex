@@ -146,6 +146,8 @@ import {
 } from "@/modules/workspaces/lib/workspaceGroupsState";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
+import { isTabNoteOpen, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
+import { useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
@@ -2641,15 +2643,22 @@ export default function App() {
         const store = useTabRenameStore.getState();
         const action = resolveRenameShortcut({
           renamingTabId: store.renamingTabId,
-          step: store.step,
           activeTabId,
           inTextField:
             (tag === "INPUT" || tag === "TEXTAREA") &&
             !active?.classList.contains("xterm-helper-textarea"),
         });
         if (action === "start" && activeTabId) store.startRename(activeTabId);
-        else if (action === "to-note") store.goToNote();
         else if (action === "save") store.requestSave();
+      },
+      "tab.note": () => {
+        if (!activeTabId || !activeTab) return;
+        const found = findTabGlobal(activeTabId);
+        if (!found) return;
+        const closing = isTabNoteOpen(activeTab);
+        if (!closing) useTabNoteStore.getState().requestFocus(activeTabId);
+        updateTabData(found.workspace.id, activeTabId, toggleTabNote);
+        if (closing && document.activeElement?.closest("[data-tab-note]")) requestLeafFocus(activeTabId);
       },
       "file.rename": () => {
         const active = document.activeElement;

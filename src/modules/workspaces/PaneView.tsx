@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { EmptyPaneWelcome, type WelcomeActions } from "./EmptyPaneWelcome";
 import { PaneTabBar } from "./PaneTabBar";
-import { PinnedTabNote, TAB_NOTE_ATTR } from "./PinnedTabNote";
+import { FloatingTabNote, TAB_NOTE_ATTR } from "./FloatingTabNote";
 import { TabContent } from "./TabContent";
 import type { TabCallbacks } from "./TabContent";
 import type { PaneNode } from "./lib/types";
@@ -261,15 +261,15 @@ export const PaneView = memo(function PaneView({
       data-pane-id={pane.id}
       className="relative flex h-full flex-col overflow-hidden"
       onMouseDownCapture={(e) => {
-        // The pinned note must not pull focus to the terminal, or text selection inside it is lost.
+        // The floating note must not pull focus to the terminal, or text selection inside it is lost.
         if (e.target instanceof Element && e.target.closest(`[${TAB_NOTE_ATTR}]`)) return;
         handleFocus();
       }}
       onFocus={handleFocus}
     >
       <PaneFlashBorder tabId={pane.activeTabId} />
-      {activeTab?.note && activeTab.notePinned && (
-        <PinnedTabNote
+      {activeTab?.note !== undefined && activeTab.noteOpen && (
+        <FloatingTabNote
           key={activeTab.id}
           tab={activeTab}
           active

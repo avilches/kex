@@ -6,9 +6,8 @@ import { tabIcon, tabTitle } from "./lib/tabTitle";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { HoverCard } from "radix-ui";
-import { applyTabEdit, pinTabNote } from "./lib/tabNote";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
@@ -29,7 +28,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon, Alert02Icon, ArrowRight01Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, PinIcon, SquareUnlock02Icon, StickyNote01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Alert02Icon, ArrowRight01Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, StickyNote01Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
@@ -37,10 +36,6 @@ import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { tabFilePath } from "./lib/tabPath";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
-
-const MarkdownPreviewPane = lazy(() =>
-  import("@/modules/markdown/MarkdownPreviewPane").then((m) => ({ default: m.MarkdownPreviewPane })),
-);
 
 type Props = {
   tabs: Tab[];
@@ -65,69 +60,25 @@ type Props = {
   gitColorScheme?: GitColorScheme;
 };
 
-function TabNoteHover({
-  note,
-  pinned,
-  onPin,
-  onActivate,
-}: {
-  note: string;
-  pinned: boolean;
-  onPin?: () => void;
-  onActivate: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const icon = (
-    <span
-      title=""
+function TabNoteButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
       aria-label="Tab note"
-      className="ml-0.5 shrink-0 text-muted-foreground"
+      aria-pressed={open}
+      title={open ? "Hide note" : "Show note"}
+      className={cn(
+        "ml-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground",
+        open && "text-foreground",
+      )}
       onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
     >
       <HugeiconsIcon icon={StickyNote01Icon} size={13} strokeWidth={2} />
-    </span>
-  );
-  // The pinned note is already on screen, so the hover preview would be a duplicate.
-  if (pinned) return icon;
-  return (
-    <HoverCard.Root open={open} onOpenChange={setOpen} openDelay={150} closeDelay={80}>
-      <HoverCard.Trigger asChild>{icon}</HoverCard.Trigger>
-      <HoverCard.Portal>
-        <HoverCard.Content
-          side="bottom"
-          align="start"
-          sideOffset={6}
-          collisionPadding={12}
-          className="z-50 w-80 max-w-[calc(100vw-24px)] overflow-hidden rounded-lg border border-border bg-popover shadow-xl"
-          // The card is portaled but React events still bubble to the draggable tab: keep
-          // them from starting a tab drag, activating it or blocking text selection.
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {onPin && (
-            <div className="flex h-5 items-center justify-end border-b border-border/60 bg-muted/40 px-1">
-              <button
-                type="button"
-                title="Pin note"
-                aria-label="Pin note"
-                className="flex size-4 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                onClick={() => {
-                  setOpen(false);
-                  onActivate();
-                  onPin();
-                }}
-              >
-                <HugeiconsIcon icon={PinIcon} size={12} strokeWidth={2} />
-              </button>
-            </div>
-          )}
-          <Suspense fallback={<pre className="whitespace-pre-wrap p-2 text-[12px] text-foreground">{note}</pre>}>
-            <MarkdownPreviewPane content={note} compact />
-          </Suspense>
-        </HoverCard.Content>
-      </HoverCard.Portal>
-    </HoverCard.Root>
+    </button>
   );
 }
 
@@ -250,37 +201,22 @@ function DraggableTab({
     if (isRenaming) handledRef.current = false;
   }, [isRenaming]);
 
-  const renameStep = useTabRenameStore((s) => s.step);
   const saveSeq = useTabRenameStore((s) => s.saveSeq);
   const seenSaveSeq = useRef(saveSeq);
-  const noteRef = useRef<HTMLTextAreaElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   function handleSave() {
     if (handledRef.current) return;
     handledRef.current = true;
-    const title = inputRef.current?.value ?? "";
-    const note = noteRef.current?.value ?? tab.note ?? "";
-    onUpdateTab?.(tab.id, (p) => applyTabEdit(p, { title, note }));
+    const title = (inputRef.current?.value ?? "").trim();
+    onRenameTab?.(tab.id, title || undefined);
     clearRename();
   }
 
-  // Moving focus between the title and the note keeps the popover open.
-  const movingFocusRef = useRef(false);
   function handleBlur(e: React.FocusEvent) {
-    if (movingFocusRef.current) return;
     if (popoverRef.current?.contains(e.relatedTarget as Node | null)) return;
     handleSave();
   }
-
-  // Stable on purpose: focuses the textarea once, when it mounts.
-  const setNoteRef = useCallback((el: HTMLTextAreaElement | null) => {
-    noteRef.current = el;
-    if (!el) return;
-    movingFocusRef.current = true;
-    el.focus();
-    movingFocusRef.current = false;
-  }, []);
 
   useEffect(() => {
     if (saveSeq === seenSaveSeq.current) return;
@@ -394,12 +330,13 @@ function DraggableTab({
       {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
         <span className="shrink-0 text-[8px] text-primary">●</span>
       )}
-      {tab.note && (
-        <TabNoteHover
-          note={tab.note}
-          pinned={!!tab.notePinned}
-          onPin={onUpdateTab ? () => onUpdateTab(tab.id, pinTabNote) : undefined}
-          onActivate={() => onActivate(tab.id)}
+      {tab.note !== undefined && (
+        <TabNoteButton
+          open={isTabNoteOpen(tab)}
+          onToggle={() => {
+            if (!isTabNoteOpen(tab)) onActivate(tab.id);
+            onUpdateTab?.(tab.id, toggleTabNote);
+          }}
         />
       )}
       {hasAgent && (
@@ -478,15 +415,21 @@ function DraggableTab({
                   </ContextMenuItem>
                 )}
                 {onUpdateTab && (
-                  <ContextMenuItem onSelect={() => startRename(tab.id, "note")}>
+                  <ContextMenuItem
+                    onSelect={() => {
+                      if (!isTabNoteOpen(tab)) onActivate(tab.id);
+                      onUpdateTab(tab.id, toggleTabNote);
+                    }}
+                  >
                     <HugeiconsIcon icon={StickyNote01Icon} size={14} strokeWidth={2} />
-                    {tab.note ? "Edit Note" : "Add Note"}
+                    {isTabNoteOpen(tab) ? "Hide Note" : tab.note !== undefined ? "Show Note" : "Add Note"}
+                    {shortcutLabels["tab.note"] && (
+                      <ContextMenuShortcut>{shortcutLabels["tab.note"]}</ContextMenuShortcut>
+                    )}
                   </ContextMenuItem>
                 )}
-                {onUpdateTab && tab.note && (
-                  <ContextMenuItem
-                    onSelect={() => onUpdateTab(tab.id, (p) => applyTabEdit(p, { title: p.title ?? "", note: "" }))}
-                  >
+                {onUpdateTab && tab.note !== undefined && (
+                  <ContextMenuItem onSelect={() => onUpdateTab(tab.id, removeTabNote)}>
                     <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
                     Remove Note
                   </ContextMenuItem>
@@ -639,7 +582,7 @@ function DraggableTab({
         side="bottom"
         align="start"
         sideOffset={4}
-        className={cn("flex flex-col gap-1 rounded-lg p-2", renameStep === "note" ? "w-80" : "w-52")}
+        className="flex w-52 flex-col gap-1 rounded-lg p-2"
         onEscapeKeyDown={(e) => { e.preventDefault(); handleCancel(); }}
         onPointerDownOutside={(e) => e.preventDefault()}
         onFocusOutside={(e) => e.preventDefault()}
@@ -647,7 +590,7 @@ function DraggableTab({
         <span className="text-[12px] text-muted-foreground">Rename tab</span>
         <input
           ref={inputRef}
-          autoFocus={renameStep === "title"}
+          autoFocus
           onFocus={(e) => { e.stopPropagation(); e.currentTarget.select(); }}
           onBlur={handleBlur}
           defaultValue={tab.title ?? ""}
@@ -658,24 +601,6 @@ function DraggableTab({
           onPointerDown={(e) => e.stopPropagation()}
           className="w-full rounded border border-input bg-transparent px-1.5 py-1 text-[12px] text-foreground outline-none focus:border-ring placeholder:text-muted-foreground/60"
         />
-        {renameStep === "note" && (
-          <>
-            <span className="mt-1 text-[12px] text-muted-foreground">Note (markdown)</span>
-            <textarea
-              ref={setNoteRef}
-              rows={8}
-              onBlur={handleBlur}
-              defaultValue={tab.note ?? ""}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="w-full resize-none rounded border border-input bg-transparent px-1.5 py-1 font-mono text-[12px] text-foreground outline-none focus:border-ring placeholder:text-muted-foreground/60"
-            />
-          </>
-        )}
-        {shortcutLabels["tab.rename"] && (
-          <span className="text-[11px] text-muted-foreground/70">
-            {shortcutLabels["tab.rename"]} {renameStep === "title" ? "again to add a note" : "to save"}
-          </span>
-        )}
       </PopoverContent>
     </Popover>
   );
@@ -693,6 +618,7 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
       "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
       "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
       "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
+      "tab.note":        getShortcutLabel("tab.note",        userShortcuts),
       "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
       "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
       "tab.toggleAutofocus": getShortcutLabel("tab.toggleAutofocus", userShortcuts),

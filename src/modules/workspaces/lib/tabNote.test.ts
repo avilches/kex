@@ -1,82 +1,73 @@
 import { describe, expect, test } from "vitest";
-import { applyTabEdit, moveTabNote, pinTabNote, unpinTabNote } from "./tabNote";
+import {
+  hasTabNote,
+  isTabNoteOpen,
+  moveTabNote,
+  removeTabNote,
+  setTabNoteText,
+  toggleTabNote,
+} from "./tabNote";
 import type { Tab } from "./types";
 
-const terminal: Tab = { id: "tab-1", kind: "terminal", title: "old", note: "old note" };
+const plain: Tab = { id: "tab-1", kind: "terminal", title: "build" };
+const open: Tab = { ...plain, note: "text", noteOpen: true, notePos: { x: 3, y: 4 } };
 
-describe("applyTabEdit", () => {
-  test("sets title and note, trimmed", () => {
-    const next = applyTabEdit(terminal, { title: "  build  ", note: "\n- a\n- b\n" });
-    expect(next).toMatchObject({ title: "build", note: "- a\n- b" });
+describe("toggleTabNote", () => {
+  test("creates an empty open note on a tab without one", () => {
+    const next = toggleTabNote(plain);
+    expect(next).toMatchObject({ note: "", noteOpen: true, title: "build" });
+    expect(isTabNoteOpen(next)).toBe(true);
   });
 
-  test("a blank note removes the field", () => {
-    const next = applyTabEdit(terminal, { title: "build", note: "   \n " });
+  test("shows a hidden note", () => {
+    const next = toggleTabNote({ ...plain, note: "text" });
+    expect(next).toMatchObject({ note: "text", noteOpen: true });
+  });
+
+  test("hides an open note but keeps its text and position", () => {
+    const next = toggleTabNote(open);
+    expect(next.noteOpen).toBeUndefined();
+    expect(next).toMatchObject({ note: "text", notePos: { x: 3, y: 4 } });
+    expect(hasTabNote(next)).toBe(true);
+  });
+
+  test("hiding a blank note removes note, noteOpen and notePos", () => {
+    const next = toggleTabNote({ ...open, note: "  \n " });
     expect("note" in next).toBe(false);
-  });
-
-  test("a blank title removes the field and keeps the note", () => {
-    const next = applyTabEdit(terminal, { title: "", note: "keep" });
-    expect("title" in next).toBe(false);
-    expect(next.note).toBe("keep");
-  });
-
-  test("keeps the rest of the tab untouched", () => {
-    const next = applyTabEdit({ ...terminal, locked: true }, { title: "t", note: "n" });
-    expect(next).toMatchObject({ id: "tab-1", kind: "terminal", locked: true });
+    expect("noteOpen" in next).toBe(false);
+    expect("notePos" in next).toBe(false);
   });
 
   test("does not mutate the input", () => {
-    applyTabEdit(terminal, { title: "", note: "" });
-    expect(terminal).toMatchObject({ title: "old", note: "old note" });
-  });
-
-  test("a blank note also clears the pin and its position", () => {
-    const pinned: Tab = { ...terminal, notePinned: true, notePos: { x: 1, y: 2 } };
-    const next = applyTabEdit(pinned, { title: "t", note: " " });
-    expect("notePinned" in next).toBe(false);
-    expect("notePos" in next).toBe(false);
-  });
-
-  test("a non-blank note keeps the pin", () => {
-    const pinned: Tab = { ...terminal, notePinned: true, notePos: { x: 1, y: 2 } };
-    const next = applyTabEdit(pinned, { title: "t", note: "n" });
-    expect(next).toMatchObject({ notePinned: true, notePos: { x: 1, y: 2 } });
+    toggleTabNote(open);
+    expect(open.noteOpen).toBe(true);
   });
 });
 
-describe("pinTabNote", () => {
-  test("pins and docks, dropping notePos", () => {
-    const next = pinTabNote({ ...terminal, notePos: { x: 5, y: 5 } });
-    expect(next.notePinned).toBe(true);
-    expect("notePos" in next).toBe(false);
+describe("setTabNoteText", () => {
+  test("stores the text untrimmed", () => {
+    expect(setTabNoteText(open, "a \n").note).toBe("a \n");
   });
-  test("no-op without a note", () => {
-    const bare: Tab = { id: "tab-2", kind: "terminal" };
-    expect(pinTabNote(bare)).toBe(bare);
+
+  test("is a no-op without a note", () => {
+    expect(setTabNoteText(plain, "x")).toBe(plain);
   });
 });
 
-describe("unpinTabNote", () => {
-  test("removes pin and position, keeps the note", () => {
-    const next = unpinTabNote({ ...terminal, notePinned: true, notePos: { x: 1, y: 1 } });
-    expect("notePinned" in next).toBe(false);
-    expect("notePos" in next).toBe(false);
-    expect(next.note).toBe("old note");
+describe("removeTabNote", () => {
+  test("drops all three fields and keeps the rest", () => {
+    const next = removeTabNote({ ...open, locked: true });
+    expect(next).toEqual({ ...plain, locked: true });
   });
 });
 
 describe("moveTabNote", () => {
-  test("sets a rounded position when pinned", () => {
-    const next = moveTabNote({ ...terminal, notePinned: true }, { x: 10.4, y: 20.6 });
-    expect(next.notePos).toEqual({ x: 10, y: 21 });
+  test("stores a rounded position on an open note", () => {
+    expect(moveTabNote(open, { x: 10.4, y: 20.6 }).notePos).toEqual({ x: 10, y: 21 });
   });
-  test("no-op when not pinned", () => {
-    expect(moveTabNote(terminal, { x: 1, y: 1 })).toBe(terminal);
-  });
-  test("does not mutate the input", () => {
-    const pinned: Tab = { ...terminal, notePinned: true };
-    moveTabNote(pinned, { x: 1, y: 1 });
-    expect("notePos" in pinned).toBe(false);
+
+  test("is a no-op for a hidden note", () => {
+    const hidden: Tab = { ...plain, note: "text" };
+    expect(moveTabNote(hidden, { x: 1, y: 2 })).toBe(hidden);
   });
 });

@@ -15,10 +15,10 @@ export type Script = {
 type TabCommon = {
   id: string;
   title?: string;
-  // Markdown the user attaches to the tab (rename popover, second step).
+  // Markdown the user attaches to the tab, shown in a floating panel while `noteOpen`.
   note?: string;
-  notePinned?: boolean;
-  // Relative to the pane's top-left; absent while pinned means docked under the tab.
+  noteOpen?: boolean;
+  // Relative to the pane's top-left; absent means docked under the tab.
   notePos?: { x: number; y: number };
   locked?: boolean;
   autofocus?: boolean;
