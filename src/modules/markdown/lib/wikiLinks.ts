@@ -69,3 +69,12 @@ export function newWikiNotePath(target: string, currentPath: string, root: strin
   if (!full.startsWith(base + "/")) return { error: "outside" };
   return { path: /\.md$/i.test(full) ? full : `${full}.md` };
 }
+
+// The workspace root when the note lives under it, else the note's own folder:
+// a note outside the root cannot create anything above its own folder.
+export function wikiBoundary(workspaceRoot: string | null, currentPath: string): string {
+  const dir = slashes(currentPath).replace(/\/[^/]*$/, "");
+  if (!workspaceRoot) return dir;
+  const base = slashes(workspaceRoot).replace(/\/+$/, "");
+  return dir === base || dir.startsWith(base + "/") ? workspaceRoot : dir;
+}

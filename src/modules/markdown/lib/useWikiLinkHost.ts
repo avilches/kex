@@ -2,15 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { native } from "@/lib/native";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
-import { newWikiNotePath, resolveWikiTarget } from "@/modules/markdown/lib/wikiLinks";
+import { newWikiNotePath, resolveWikiTarget, wikiBoundary } from "@/modules/markdown/lib/wikiLinks";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
-
-// Where notes are looked up and where a new one may be created: the
-// workspace root when it has one, else the folder of the note itself, so a
-// note outside any root still links to its own subfolders but never above.
-function boundaryOf(workspaceRoot: string | null, currentPath: string): string {
-  return workspaceRoot ?? currentPath.replace(/\\/g, "/").replace(/\/[^/]*$/, "");
-}
 
 // The markdown files under that boundary, listed once per boundary, so a
 // `[[Note]]` resolves without an IO round-trip on every redraw. A click on a
@@ -22,7 +15,7 @@ export function useWikiLinkHost(
   onOpenFile: ((path: string) => void) | undefined,
 ): WikiLinkHost | undefined {
   const { workspaceRoot } = useEditorChrome();
-  const root = boundaryOf(workspaceRoot, currentPath);
+  const root = wikiBoundary(workspaceRoot, currentPath);
   const [files, setFiles] = useState<string[]>([]);
 
   const list = useCallback(async (): Promise<string[]> => {
@@ -49,7 +42,7 @@ export function useWikiLinkHost(
       if ("error" in note) {
         toast.error(
           note.error === "outside"
-            ? `Cannot create "${target}" outside of ${workspaceRoot ? "the workspace root" : "this note's folder"}`
+            ? `Cannot create "${target}" outside of ${root === workspaceRoot ? "the workspace root" : "this note's folder"}`
             : `Cannot create a note named "${target}"`,
         );
         return;

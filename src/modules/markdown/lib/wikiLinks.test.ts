@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newWikiNotePath, resolveWikiTarget, wikiLinkAt } from "@/modules/markdown/lib/wikiLinks";
+import { newWikiNotePath, resolveWikiTarget, wikiBoundary, wikiLinkAt } from "@/modules/markdown/lib/wikiLinks";
 
 describe("wikiLinkAt", () => {
   it("parses a plain link", () => {
@@ -74,5 +74,18 @@ describe("newWikiNotePath", () => {
 
   it("refuses when the current note is outside the root", () => {
     expect(newWikiNotePath("Idea", "/other/today.md", "/ws")).toEqual({ error: "outside" });
+  });
+});
+
+describe("wikiBoundary", () => {
+  it("uses the root when the note is under it", () => {
+    expect(wikiBoundary("/ws", "/ws/a/n.md")).toBe("/ws");
+    expect(wikiBoundary("/ws", "/ws/n.md")).toBe("/ws");
+  });
+
+  it("falls back to the note's folder without a root or outside it", () => {
+    expect(wikiBoundary(null, "/x/y/n.md")).toBe("/x/y");
+    expect(wikiBoundary("/ws", "/other/n.md")).toBe("/other");
+    expect(wikiBoundary("/ws", "/ws2/n.md")).toBe("/ws2");
   });
 });
