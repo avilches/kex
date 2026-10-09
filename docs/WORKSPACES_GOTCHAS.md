@@ -930,12 +930,19 @@ Con un tab abierto sobre `~/Hub/Data/...` (symlink a un montaje de Cryptomator),
 
 ### Causa raiz
 
-Todo el camino depende de un evento `fs:changed`. Al montarse un volumen nuevo, el watcher de Rust sigue apuntando al montaje anterior (clave canonica en `refcounts`, `add_paths` solo incrementa el contador si ya existe) y no emite nada, asi que `reload()` nunca se llama.
+Dos fallos encadenados, medidos con un programa aparte sobre `notify` 8.2.0 (FSEvents):
+
+1. El watcher emite rutas canonicas (el destino del symlink) y `useEditorFileSync` y `MarkdownTab` las comparan con la ruta del tab tal como se abrio. Escribir en `link/f.md` produce un evento `real/f.md`. Para cualquier fichero bajo `~/Hub/Data` el evento no coincidia nunca, ni al editarlo desde fuera ni al reaparecer.
+2. Montar un volumen no genera ningun evento dentro de las carpetas vigiladas, asi que ni con la ruta bien habria llegado un `fs:changed` al desbloquear el vault.
+
+Descartado: que el watcher quede apuntando al montaje anterior. Con un volumen desmontado y vuelto a montar en la misma ruta, el mismo watcher siguio recibiendo eventos (2 antes, 2 despues).
 
 ### Fix
 
 `useDocument` vuelve a comprobar que el fichero existe (`fs_stat`) mientras el estado es `deleted`, y llama a `reload()` si existe. Se dispara al volver el foco a la ventana, al hacerse visible el tab (`visible` desde `TabContent`) y desde el boton "Refresh" de la pantalla de fichero borrado (`refresh()`). No hay temporizador: un sondeo habria corrido en segundo plano para siempre mientras el tab siguiera borrado.
 
+Para el fallo 1, `fs_watch` guarda por directorio canonico las rutas con que se pidio (`Aliases`, con contador por ruta) y `drain_loop` anade a cada evento la misma ruta reescrita con cada una de ellas, sin quitar la canonica. Afecta a todos los consumidores de `fs:changed` (explorer, notas, source control).
+
 ### Leccion
 
-Un estado que solo se abandona por un evento del sistema de ficheros necesita una salida que no dependa del evento cuando el origen puede ser un montaje o desmontaje. Pendiente: tras reaparecer, el watcher sigue obsoleto, asi que las ediciones externas posteriores no se detectan hasta reabrir el tab.
+Un estado que solo se abandona por un evento del sistema de ficheros necesita una salida que no dependa del evento cuando el origen puede ser un montaje o desmontaje.

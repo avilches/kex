@@ -41,7 +41,7 @@ Shell integration scripts (`scripts/`) are injected at spawn time. Platform dete
 | `fs_delete` | Delete a file or directory permanently |
 | `fs_trash` | Move a file or directory to the system trash (recoverable); mirrors `fs_delete`. Best-effort: errors on WSL/UNC paths where the Windows Recycle Bin is unavailable (caller falls back to an error toast, never data loss) |
 | `fs_copy` | Copy external files/dirs into a destination directory (recursive, refuses to overwrite). Backs the explorer OS-file-drop; sources are absolute OS paths, only the destination is workspace-resolved |
-| `fs_watch_add` | Start watching a path for changes (emits Tauri events) |
+| `fs_watch_add` | Start watching a directory for changes (emits `fs:changed`). Events carry canonical paths; each one is also emitted under the spelling the directory was requested with, so a path that goes through a symlink (e.g. `~/Hub/Data`) still matches |
 | `fs_watch_remove` | Stop watching a path |
 | `fs_search` | Fuzzy file name search via `nucleo-matcher` + `ignore` |
 | `fs_list_files` | List all files in a tree (respects `.gitignore`) |
