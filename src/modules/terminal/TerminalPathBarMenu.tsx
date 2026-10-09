@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Cancel01Icon,
   Copy01Icon,
   FolderOpenIcon,
   MoreHorizontalIcon,
@@ -30,32 +31,60 @@ function formatElapsed(ms: number): string {
   return `${h}h ${m % 60}m`;
 }
 
+function legacyCopy(value: string): boolean {
+  const ta = document.createElement("textarea");
+  ta.value = value;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    return document.execCommand("copy");
+  } finally {
+    ta.remove();
+  }
+}
+
+async function writeClipboard(value: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch (err) {
+    console.warn("clipboard.writeText failed, using execCommand fallback", err);
+    return legacyCopy(value);
+  }
+}
+
 function CopyIdButton({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      return;
-    }
-    setCopied(true);
+    const ok = await writeClipboard(value);
+    setState(ok ? "copied" : "failed");
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setCopied(false), 1500);
+    timer.current = window.setTimeout(() => setState("idle"), 1500);
   };
 
   return (
     <button
       type="button"
-      title={copied ? "Copied!" : `Copy ${label}`}
+      title={state === "copied" ? "Copied!" : state === "failed" ? "Copy failed" : `Copy ${label}`}
       onClick={() => void copy()}
       className={`flex size-[20px] shrink-0 items-center justify-center rounded transition-colors ${
-        copied ? "text-primary" : "text-muted-foreground hover:text-foreground"
+        state === "copied"
+          ? "text-primary"
+          : state === "failed"
+            ? "text-destructive"
+            : "text-muted-foreground hover:text-foreground"
       }`}
     >
-      <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={12} strokeWidth={1.9} />
+      <HugeiconsIcon
+        icon={state === "copied" ? Tick02Icon : state === "failed" ? Cancel01Icon : Copy01Icon}
+        size={12}
+        strokeWidth={1.9}
+      />
     </button>
   );
 }
