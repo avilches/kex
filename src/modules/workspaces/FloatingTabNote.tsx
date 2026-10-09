@@ -1,11 +1,11 @@
-import { lazy, Suspense, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeMirrorEditor";
 import { dropBlankTabNote, moveTabNote, setTabNoteText } from "./lib/tabNote";
-import { useTabNoteStore } from "./lib/tabNoteStore";
+import { registerTabNoteFlush, useTabNoteStore } from "./lib/tabNoteStore";
 import { clampNotePos, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
 import type { Tab } from "./lib/types";
 
@@ -64,6 +64,29 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
   const [dragPos, setDragPos] = useState<Point | null>(null);
   // pos lives here, not only in state: pointerup can fire before React re-renders the last move.
   const dragRef = useRef<{ startX: number; startY: number; origin: Point; pos: Point | null } | null>(null);
+
+  // Typing stays local and reaches the tab on a debounce: a state update per key re-renders the app.
+  const [initialText] = useState(tab.note ?? "");
+  const draftRef = useRef<string | null>(null);
+  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const updateRef = useRef(onUpdateTab);
+  updateRef.current = onUpdateTab;
+  const tabId = tab.id;
+  const flush = useCallback(() => {
+    if (flushTimer.current) clearTimeout(flushTimer.current);
+    flushTimer.current = null;
+    const text = draftRef.current;
+    if (text === null) return;
+    draftRef.current = null;
+    updateRef.current?.(tabId, (p) => setTabNoteText(p, text));
+  }, [tabId]);
+  useEffect(() => {
+    const unregister = registerTabNoteFlush(tabId, flush);
+    return () => {
+      unregister();
+      flush();
+    };
+  }, [tabId, flush]);
 
   const setEditor = useCallback(
     (handle: CodeMirrorEditorHandle | null) => {
@@ -169,7 +192,8 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         onPointerLeave={onPointerLeave}
         onBlur={(e) => {
           if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return;
-          if (!tab.note?.trim()) onUpdateTab?.(tab.id, dropBlankTabNote);
+          flush();
+          onUpdateTab?.(tab.id, dropBlankTabNote);
           if (!sticky) onDismiss?.();
         }}
       >
@@ -179,7 +203,10 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
             aria-label="Close note"
             title="Close note"
             className="absolute right-1 top-1 z-10 flex size-4 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-            onClick={onClose}
+            onClick={() => {
+              flush();
+              onClose?.();
+            }}
           >
             <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
           </button>
@@ -203,12 +230,16 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
           <Suspense fallback={<pre className="whitespace-pre-wrap p-2 text-[12px]">{tab.note}</pre>}>
             <CodeMirrorEditor
               ref={setEditor}
-              value={tab.note ?? ""}
+              value={initialText}
               syncKey={tab.id}
               path=""
               mode="rich"
               maxHeight="16rem"
-              onChange={(next) => onUpdateTab?.(tab.id, (p) => setTabNoteText(p, next))}
+              onChange={(next) => {
+                draftRef.current = next;
+                if (flushTimer.current) clearTimeout(flushTimer.current);
+                flushTimer.current = setTimeout(flush, 300);
+              }}
             />
           </Suspense>
         </div>

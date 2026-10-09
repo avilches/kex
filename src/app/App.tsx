@@ -147,7 +147,7 @@ import {
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { isTabNoteOpen, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
+import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
@@ -2670,6 +2670,7 @@ export default function App() {
         if (!activeTabId || !activeTab) return;
         const found = findTabGlobal(activeTabId);
         if (!found) return;
+        flushTabNote(activeTabId);
         const closing = isTabNoteOpen(activeTab);
         if (!closing) useTabNoteStore.getState().requestFocus(activeTabId);
         updateTabData(found.workspace.id, activeTabId, toggleTabNote);
