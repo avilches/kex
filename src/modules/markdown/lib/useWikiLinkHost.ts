@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { native } from "@/lib/native";
+import { relativePath } from "@/modules/explorer/lib/contextActions";
 import type { WikiLinkHost } from "@/modules/markdown/codemirror/lib/livePreviewPlugin";
 import { newWikiNotePath, resolveWikiTarget, wikiBoundary } from "@/modules/markdown/lib/wikiLinks";
 import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
@@ -10,10 +11,20 @@ import { useEditorChrome } from "@/modules/workspaces/EditorChromeContext";
 // name that is not in the list re-lists once (the note may have been created
 // after the tab opened) and, if it is still missing, creates an empty note
 // relative to the current one, as Obsidian does.
+export type WikiNoteInfo = { path: string; relativePath: string; isOpen: boolean };
+
+// The editor host plus what its right-click menu needs: the note a name
+// points at, and a way to open it.
+export type WikiLinkMenuHost = WikiLinkHost & {
+  infoFor(target: string): WikiNoteInfo | null;
+  openPath(path: string): void;
+};
+
 export function useWikiLinkHost(
   currentPath: string,
   onOpenFile: ((path: string) => void) | undefined,
-): WikiLinkHost | undefined {
+  isFileOpen?: (path: string) => boolean,
+): WikiLinkMenuHost | undefined {
   const { workspaceRoot } = useEditorChrome();
   const root = wikiBoundary(workspaceRoot, currentPath);
   const [files, setFiles] = useState<string[]>([]);
@@ -58,6 +69,12 @@ export function useWikiLinkHost(
     };
 
     return {
+      infoFor: (target) => {
+        const path = resolveWikiTarget(target, root, files);
+        if (path === null) return null;
+        return { path, relativePath: relativePath(root, path), isOpen: isFileOpen?.(path) ?? false };
+      },
+      openPath: onOpenFile,
       resolve: (target) => resolveWikiTarget(target, root, files),
       open: (target) => {
         const known = resolveWikiTarget(target, root, files);
@@ -69,5 +86,5 @@ export function useWikiLinkHost(
         });
       },
     };
-  }, [root, workspaceRoot, currentPath, onOpenFile, files, list]);
+  }, [root, workspaceRoot, currentPath, onOpenFile, isFileOpen, files, list]);
 }

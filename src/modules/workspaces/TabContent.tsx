@@ -120,6 +120,8 @@ export type TabCallbacks = {
   onAddToGitignore?: (path: string, isDir: boolean) => void;
   // Open a file as a pinned tab (a markdown tab following a `[[Note]]`)
   onOpenFile?: (path: string) => void;
+  // Whether some tab already shows this file (opening it then only focuses it)
+  isFileOpen?: (path: string) => boolean;
 };
 
 type Props = {

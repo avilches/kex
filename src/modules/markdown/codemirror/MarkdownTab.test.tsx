@@ -279,7 +279,7 @@ describe("Live Preview MarkdownTab", () => {
     it("keeps the focus inside the tab when cycling into and out of Preview", async () => {
       const { container } = await setup();
       act(() => handle()?.cycleView());
-      expect(document.activeElement).toBe(screen.getByTestId("preview-pane").parentElement);
+      expect(document.activeElement).toBe(screen.getByTestId("preview-pane").closest('[tabindex="-1"]'));
       act(() => handle()?.cycleView());
       expect(container.contains(document.activeElement)).toBe(true);
     });

@@ -2374,8 +2374,11 @@ export default function App() {
       onRevealInTerminal: openFolderInTerminal,
       onAddToGitignore: handleAddToGitignore,
       onOpenFile: (path) => void openFileInTab(path, true),
+      isFileOpen: (path) =>
+        activeWorkspace ? findOpenPathTab(activeWorkspace.paneTree, path) !== null : false,
     }),
     [
+      activeWorkspace,
       openFileInTab,
       activeTabId,
       findTabGlobal,
