@@ -3,7 +3,7 @@ import { findTabPane, focusedTabId } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
 import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { native } from "@/lib/native";
-import { debug } from "@tauri-apps/plugin-log";
+import { info as logInfo } from "@tauri-apps/plugin-log";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useTauriListen } from "@/lib/useTauriListen";
@@ -26,18 +26,19 @@ const latestAgentCwd = new Map<string, string>();
 
 function handleAgentCwd(tabId: string, cwd: string) {
   const known = useAgentStore.getState().sessions[tabId]?.meta?.agentCwd;
+  void logInfo(`[agent-cwd] event tab=${tabId} cwd=${cwd} known=${known ?? null}`);
   if (known === cwd) return;
   latestAgentCwd.set(tabId, cwd);
   void native
     .gitResolveRepo(cwd)
     .catch((err) => {
-      void debug(`[agent-cwd] resolve failed tab=${tabId} cwd=${cwd} err=${String(err)}`);
+      void logInfo(`[agent-cwd] resolve failed tab=${tabId} cwd=${cwd} err=${String(err)}`);
       return null;
     })
     .then((info) => {
       if (latestAgentCwd.get(tabId) !== cwd) return;
       const hasSession = !!useAgentStore.getState().sessions[tabId];
-      void debug(
+      void logInfo(
         `[agent-cwd] tab=${tabId} cwd=${cwd} session=${hasSession} isWorktree=${info?.isWorktree ?? null} root=${info?.repoRoot ?? null}`,
       );
       useAgentStore.getState().setMeta(tabId, {
