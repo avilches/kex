@@ -1,8 +1,10 @@
 import { lazy, Suspense, useCallback, useLayoutEffect, useRef, useState } from "react";
 import type React from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeMirrorEditor";
-import { moveTabNote, setTabNoteText } from "./lib/tabNote";
+import { dropBlankTabNote, moveTabNote, openTabNote, setTabNoteText } from "./lib/tabNote";
 import { useTabNoteStore } from "./lib/tabNoteStore";
 import { clampNotePos, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
 import type { Tab } from "./lib/types";
@@ -22,6 +24,12 @@ type Props = {
   // Changes whenever the tab strip layout may have changed (tab list or order).
   layoutKey: string;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  // Shown by hovering the tab icon: visible even when closed or inactive. A preview of
+  // an inactive tab is docked under its tab, ignoring the saved drag position.
+  preview?: boolean;
+  onClose?: () => void;
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
 };
 
 type Measure = { pane: Rect; tab: Rect | null; note: Size; tabBarHeight: number };
@@ -44,8 +52,9 @@ function sameMeasure(a: Measure, b: Measure) {
   );
 }
 
-export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab }: Props) {
-  const visible = active && tab.note !== undefined && !!tab.noteOpen;
+export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab, preview, onClose, onPointerEnter, onPointerLeave }: Props) {
+  const visible = tab.note !== undefined && (!!preview || (active && !!tab.noteOpen));
+  const docked = !!preview && !active;
   const noteRef = useRef<HTMLDivElement>(null);
   const [m, setM] = useState<Measure | null>(null);
   const [dragPos, setDragPos] = useState<Point | null>(null);
@@ -104,7 +113,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
   if (!visible) return null;
 
   const resolved = m
-    ? resolveNotePos({ notePos: tab.notePos, tab: m.tab, pane: m.pane, note: m.note, tabBarHeight: m.tabBarHeight })
+    ? resolveNotePos({ notePos: docked ? undefined : tab.notePos, tab: m.tab, pane: m.pane, note: m.note, tabBarHeight: m.tabBarHeight })
     : null;
   const pos = dragPos ?? resolved;
 
@@ -142,14 +151,34 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
       <div
         ref={noteRef}
         {...{ [TAB_NOTE_ATTR]: "" }}
+        data-tab-note-id={tab.id}
         className={cn(
           "pointer-events-auto absolute w-80 max-w-full overflow-hidden rounded-lg border border-border bg-[var(--editor-background)] shadow-xl",
           !pos && "invisible",
         )}
         style={{ left: pos?.x ?? 0, top: pos?.y ?? 0 }}
         onMouseDown={(e) => e.stopPropagation()}
-        onFocus={(e) => e.stopPropagation()}
+        onFocus={(e) => {
+          e.stopPropagation();
+          if (!tab.noteOpen) onUpdateTab?.(tab.id, openTabNote);
+        }}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
+        onBlur={(e) => {
+          if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return;
+          if (!tab.note?.trim()) onUpdateTab?.(tab.id, dropBlankTabNote);
+          onPointerLeave?.();
+        }}
       >
+        <button
+          type="button"
+          aria-label="Close note"
+          title="Close note"
+          className="absolute right-1 top-1 z-10 flex size-4 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+          onClick={onClose}
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+        </button>
         <div
           data-testid="tab-note-handle"
           className={cn(

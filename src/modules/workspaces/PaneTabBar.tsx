@@ -28,7 +28,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon, Alert02Icon, ArrowRight01Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, StickyNote01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Alert02Icon, ArrowRight01Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
@@ -55,12 +55,13 @@ type Props = {
   onSplitBrowserDown: () => void;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  onNoteHover?: (tabId: string, hovering: boolean) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
 };
 
-function TabNoteButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+function TabNoteButton({ open, onToggle, onHover }: { open: boolean; onToggle: () => void; onHover?: (hovering: boolean) => void }) {
   return (
     <button
       type="button"
@@ -72,12 +73,14 @@ function TabNoteButton({ open, onToggle }: { open: boolean; onToggle: () => void
         open && "text-foreground",
       )}
       onPointerDown={(e) => e.stopPropagation()}
+      onPointerEnter={() => onHover?.(true)}
+      onPointerLeave={() => onHover?.(false)}
       onClick={(e) => {
         e.stopPropagation();
         onToggle();
       }}
     >
-      <HugeiconsIcon icon={StickyNote01Icon} size={13} strokeWidth={2} />
+      <HugeiconsIcon icon={StickyNote03Icon} size={13} strokeWidth={2} />
     </button>
   );
 }
@@ -104,6 +107,7 @@ function DraggableTab({
   shortcutLabels,
   onRenameTab,
   onUpdateTab,
+  onNoteHover,
   onFocusOnExplorer,
   gitStatusMap,
   gitStatus,
@@ -130,6 +134,7 @@ function DraggableTab({
   shortcutLabels: Record<string, string | null>;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
+  onNoteHover?: (tabId: string, hovering: boolean) => void;
   onFocusOnExplorer?: (filePath: string) => void;
   gitStatusMap?: Map<string, GitStatusCode> | null;
   gitStatus?: GitStatusSnapshot | null;
@@ -337,6 +342,7 @@ function DraggableTab({
             if (!isTabNoteOpen(tab)) onActivate(tab.id);
             onUpdateTab?.(tab.id, toggleTabNote);
           }}
+          onHover={(hovering) => onNoteHover?.(tab.id, hovering)}
         />
       )}
       {hasAgent && (
@@ -421,7 +427,7 @@ function DraggableTab({
                       onUpdateTab(tab.id, toggleTabNote);
                     }}
                   >
-                    <HugeiconsIcon icon={StickyNote01Icon} size={14} strokeWidth={2} />
+                    <HugeiconsIcon icon={StickyNote03Icon} size={14} strokeWidth={2} />
                     {isTabNoteOpen(tab) ? "Hide Note" : tab.note !== undefined ? "Show Note" : "Add Note"}
                     {shortcutLabels["tab.note"] && (
                       <ContextMenuShortcut>{shortcutLabels["tab.note"]}</ContextMenuShortcut>
@@ -606,7 +612,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
+export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onNoteHover, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -808,6 +814,7 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           shortcutLabels={shortcutLabels}
           onRenameTab={onRenameTab}
           onUpdateTab={onUpdateTab}
+          onNoteHover={onNoteHover}
           onFocusOnExplorer={onFocusOnExplorer}
           gitStatusMap={gitStatusMap}
           gitStatus={gitStatus}

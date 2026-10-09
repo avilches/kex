@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 import {
+  dropBlankTabNote,
   hasTabNote,
+  hideTabNote,
+  openTabNote,
   isTabNoteOpen,
   moveTabNote,
   removeTabNote,
@@ -69,5 +72,45 @@ describe("moveTabNote", () => {
   test("is a no-op for a hidden note", () => {
     const hidden: Tab = { ...plain, note: "text" };
     expect(moveTabNote(hidden, { x: 1, y: 2 })).toBe(hidden);
+  });
+});
+
+describe("hideTabNote", () => {
+  test("keeps the text of a non-blank note and clears only noteOpen", () => {
+    const next = hideTabNote(open);
+    expect(next.note).toBe("text");
+    expect(next.noteOpen).toBeUndefined();
+    expect(next.notePos).toEqual({ x: 3, y: 4 });
+  });
+
+  test("drops a blank open note entirely", () => {
+    const next = hideTabNote({ ...open, note: "  " });
+    expect(next).toEqual(plain);
+  });
+
+  test("leaves a hidden or missing note untouched", () => {
+    expect(hideTabNote(plain)).toBe(plain);
+    const hidden: Tab = { ...plain, note: "x" };
+    expect(hideTabNote(hidden)).toBe(hidden);
+  });
+});
+
+describe("dropBlankTabNote", () => {
+  test("drops a blank note whether open or hidden", () => {
+    expect(dropBlankTabNote({ ...open, note: "" })).toEqual(plain);
+    expect(dropBlankTabNote({ ...plain, note: " \n" })).toEqual(plain);
+  });
+
+  test("keeps a note with text and a tab without a note", () => {
+    expect(dropBlankTabNote(open)).toBe(open);
+    expect(dropBlankTabNote(plain)).toBe(plain);
+  });
+});
+
+describe("openTabNote", () => {
+  test("opens a hidden note and leaves open or missing notes alone", () => {
+    expect(openTabNote({ ...plain, note: "x" })).toMatchObject({ note: "x", noteOpen: true });
+    expect(openTabNote(open)).toBe(open);
+    expect(openTabNote(plain)).toBe(plain);
   });
 });

@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { EditorView } from "@codemirror/view";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p }));
@@ -21,7 +22,7 @@ class RO {
 const rect = (left: number, top: number, width: number, height: number) =>
   ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON() {} }) as DOMRect;
 
-function setup(tab: Tab, active = true) {
+function setup(tab: Tab, active = true, extra: Partial<ComponentProps<typeof FloatingTabNote>> = {}) {
   let current = tab;
   const onUpdateTab = vi.fn((_id: string, updater: (p: Tab) => Tab) => {
     current = updater(current);
@@ -43,6 +44,7 @@ function setup(tab: Tab, active = true) {
       tabBarRef={{ current: bar }}
       layoutKey={tab.id}
       onUpdateTab={onUpdateTab}
+      {...extra}
     />,
   );
   return { onUpdateTab, getTab: () => current, view };
@@ -163,5 +165,49 @@ describe("FloatingTabNote", () => {
     fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 50, pointerId: 1 });
     fireEvent.pointerUp(handle, { clientX: 200, clientY: 50, pointerId: 1 });
     expect(onUpdateTab).not.toHaveBeenCalled();
+  });
+
+  it("previews a closed note of an inactive tab docked under its tab, ignoring notePos", async () => {
+    setup({ ...open, noteOpen: false, notePos: { x: 400, y: 300 } }, false, { preview: true });
+    const note = document.querySelector("[data-tab-note]") as HTMLElement;
+    await waitFor(() => expect(note.style.left).toBe("100px"));
+    expect(note.style.top).toBe("32px");
+  });
+
+  it("previews a closed note of the active tab at its saved position", async () => {
+    setup({ ...open, noteOpen: false, notePos: { x: 400, y: 300 } }, true, { preview: true });
+    const note = document.querySelector("[data-tab-note]") as HTMLElement;
+    await waitFor(() => expect(note.style.left).toBe("400px"));
+    expect(note.style.top).toBe("300px");
+  });
+
+  it("calls onClose from the close button", () => {
+    const onClose = vi.fn();
+    setup(open, true, { onClose });
+    fireEvent.click(screen.getByRole("button", { name: "Close note" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a blank note when focus leaves it, and keeps one with text", () => {
+    const blank = setup({ ...open, note: "  " });
+    fireEvent.blur(document.querySelector("[data-tab-note]") as HTMLElement);
+    expect(blank.getTab().note).toBeUndefined();
+    cleanup();
+    const text = setup(open);
+    fireEvent.blur(document.querySelector("[data-tab-note]") as HTMLElement);
+    expect(text.getTab().note).toBe("hello");
+  });
+
+  it("keeps a blank note when focus moves inside it", () => {
+    const { getTab } = setup({ ...open, note: "" });
+    const note = document.querySelector("[data-tab-note]") as HTMLElement;
+    fireEvent.blur(note, { relatedTarget: screen.getByRole("button", { name: "Close note" }) });
+    expect(getTab().note).toBe("");
+  });
+
+  it("opens a previewed note for good once the editor takes focus", () => {
+    const { getTab } = setup({ ...open, noteOpen: false }, true, { preview: true });
+    fireEvent.focus(document.querySelector("[data-tab-note]") as HTMLElement);
+    expect(getTab().noteOpen).toBe(true);
   });
 });

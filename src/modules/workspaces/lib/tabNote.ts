@@ -21,10 +21,28 @@ function withoutNote<T extends Tab>(tab: T): T {
 export function toggleTabNote<T extends Tab>(tab: T): T {
   if (tab.note === undefined) return { ...tab, note: "", noteOpen: true };
   if (!tab.noteOpen) return { ...tab, noteOpen: true };
+  return hideTabNote(tab);
+}
+
+// Hides an open note; a blank one is dropped instead of kept as an invisible leftover.
+export function hideTabNote<T extends Tab>(tab: T): T {
+  if (tab.note === undefined || !tab.noteOpen) return tab;
   if (!tab.note.trim()) return withoutNote(tab);
   const next = { ...tab };
   delete next.noteOpen;
   return next;
+}
+
+// Keeps a previewed note on screen once the user engages with it.
+export function openTabNote<T extends Tab>(tab: T): T {
+  if (tab.note === undefined || tab.noteOpen) return tab;
+  return { ...tab, noteOpen: true };
+}
+
+// An empty note that lost focus has nothing worth keeping.
+export function dropBlankTabNote<T extends Tab>(tab: T): T {
+  if (tab.note === undefined || tab.note.trim()) return tab;
+  return withoutNote(tab);
 }
 
 export function setTabNoteText<T extends Tab>(tab: T, text: string): T {
