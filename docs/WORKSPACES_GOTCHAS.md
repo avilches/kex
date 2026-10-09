@@ -946,3 +946,26 @@ Para el fallo 1, `fs_watch` guarda por directorio canonico las rutas con que se 
 ### Leccion
 
 Un estado que solo se abandona por un evento del sistema de ficheros necesita una salida que no dependa del evento cuando el origen puede ser un montaje o desmontaje.
+
+## Bug 18: el explorer de `/tmp` no se actualizaba y la tab reabria en `/private/tmp` (RESUELTO)
+
+### Sintoma
+
+Con el explorer en `/tmp` (que es un symlink a `/private/tmp`), un `mkdir` o `touch` desde el terminal no aparecia ni en el nodo `/tmp` ni en el `/private/tmp`. Ademas, al cerrar y reabrir la tab, su cwd era `/private/tmp` en vez de `/tmp`.
+
+### Pistas falsas descartadas
+
+El alias de rutas del Bug 17 parecia cubrirlo, pero fallaba tambien el nodo `/private/tmp`, que ya llevaba la ruta canonica: el problema no era el nombre de la ruta.
+
+### Causa raiz
+
+1. `fs_watch_add` descartaba en silencio cualquier carpeta fuera de las raices autorizadas (home, directorio de lanzamiento y cwd con que se abrio cada PTY). Un `cd /tmp` hecho a mano no autoriza nada, y `fs_read_dir` no comprueba autorizacion, asi que el explorer mostraba la carpeta pero nunca la vigilaba.
+2. El PTY se lanza con `chdir("/tmp")`, y `getcwd()` devuelve `/private/tmp`. Como `$PWD` heredado no coincidia, zsh arrancaba con `/private/tmp` y el OSC 7 reportaba esa ruta.
+
+### Fix
+
+`prepare_add` ya no consulta el registro de autorizacion (leer ya estaba sin guardia). `apply_common` fija `PWD` al cwd tal como se pidio, en Unix.
+
+### Leccion
+
+Un watcher que falla en silencio parece un evento perdido. Si una carpeta se lista pero no se refresca, comprobar primero que `fs_watch_add` la acepta.

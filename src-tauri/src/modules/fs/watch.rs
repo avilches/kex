@@ -8,7 +8,7 @@ use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watche
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::modules::fs::to_canon;
-use crate::modules::workspace::{resolve_path, WorkspaceEnv, WorkspaceRegistry};
+use crate::modules::workspace::{resolve_path, WorkspaceEnv};
 
 // Quiet-gap before a batch flushes; MAX_WINDOW caps latency under a long stream.
 const DEBOUNCE: Duration = Duration::from_millis(150);
@@ -272,8 +272,10 @@ fn remove_paths(inner: &mut WatchInner, paths: Vec<(PathBuf, String)>) {
 }
 
 // Canonical keys keep add/remove symmetric regardless of how the path was spelled.
+// No authorization check: the explorer reads any directory it navigates to
+// (fs_read_dir is unguarded), so refusing to watch one the shell reached with
+// `cd` only left its listing frozen.
 fn prepare_add(
-    registry: &WorkspaceRegistry,
     workspace: &WorkspaceEnv,
     paths: Vec<String>,
 ) -> Vec<(PathBuf, String)> {
@@ -282,7 +284,7 @@ fn prepare_add(
         .filter_map(|raw| {
             let resolved = resolve_path(&raw, workspace);
             let canonical = std::fs::canonicalize(&resolved).ok()?;
-            if !canonical.is_dir() || is_skipped(&canonical) || !registry.is_authorized(&canonical) {
+            if !canonical.is_dir() || is_skipped(&canonical) {
                 return None;
             }
             Some((canonical, to_canon(&resolved)))
@@ -296,10 +298,9 @@ pub fn fs_watch_add(
     workspace: Option<WorkspaceEnv>,
     app: AppHandle,
     state: State<'_, FsWatchState>,
-    registry: State<'_, WorkspaceRegistry>,
 ) -> Result<(), String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let prepared = prepare_add(&registry, &workspace, paths);
+    let prepared = prepare_add(&workspace, paths);
     if prepared.is_empty() {
         return Ok(());
     }
@@ -338,6 +339,15 @@ pub fn fs_watch_remove(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prepare_add_accepts_a_dir_outside_every_authorized_root() {
+        let dir = std::env::temp_dir().join(format!("kex-watch-unauth-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let prepared = prepare_add(&WorkspaceEnv::Local, vec![dir.to_string_lossy().into_owned()]);
+        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(prepared.len(), 1);
+    }
 
     #[test]
     fn skip_filter_matches_basename() {

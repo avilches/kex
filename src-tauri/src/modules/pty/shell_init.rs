@@ -218,6 +218,10 @@ fn apply_common(
         #[cfg(windows)]
         let cwd = PathBuf::from(cwd.to_string_lossy().replace('/', "\\"));
         log::info!("pty cwd: {}", cwd.display());
+        // chdir makes getcwd() return the symlink target (/tmp -> /private/tmp);
+        // a matching $PWD keeps the shell, and so OSC 7, on the path as spelled.
+        #[cfg(unix)]
+        cmd.env("PWD", &cwd);
         cmd.cwd(cwd);
     } else {
         log::warn!("pty cwd: no usable directory, inheriting from process");
@@ -418,6 +422,17 @@ mod unix {
     #[cfg(test)]
     mod tests {
         use super::Shell;
+
+        #[cfg(unix)]
+        #[test]
+        fn pwd_env_keeps_the_spelling_the_cwd_was_requested_with() {
+            let dir = std::env::temp_dir().join(format!("kex-pwd-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let mut cmd = portable_pty::CommandBuilder::new("sh");
+            super::super::apply_common(&mut cmd, Some(dir.to_string_lossy().into_owned()), false, None, None);
+            std::fs::remove_dir_all(&dir).ok();
+            assert_eq!(cmd.get_env("PWD"), Some(dir.as_os_str()));
+        }
 
         #[test]
         fn classify_maps_known_shells() {
