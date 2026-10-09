@@ -1146,14 +1146,26 @@ export default function App() {
   // (shortcut / hover / context menu). Toggling autofocus on a non-active tab
   // does nothing here because the active tab does not change. The startup
   // mount is skipped so restoring a session never auto-fires.
+  const activeTabFocusTarget = useMemo(
+    () =>
+      activeTab
+        ? (tabFilePath(activeTab) ??
+          (activeTab.kind === "terminal"
+            ? (agentWorktree ?? activeTab.cwd ?? null)
+            : null))
+        : null,
+    [activeTab, agentWorktree],
+  );
+  const focusActiveTabInExplorer = useCallback(() => {
+    if (activeTabFocusTarget) {
+      focusSidebar(activeTabFocusTarget, { fromShortcut: true });
+    }
+  }, [activeTabFocusTarget, focusSidebar]);
+
   const prevAutofocusSignalRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     const ap = activeTab;
-    const target =
-      ap && isAutofocusTab(ap) && ap.autofocus
-        ? (tabFilePath(ap) ??
-          (ap.kind === "terminal" ? (agentWorktree ?? ap.cwd ?? null) : null))
-        : null;
+    const target = ap && isAutofocusTab(ap) && ap.autofocus ? activeTabFocusTarget : null;
     const signal = target ? `${activeTabId}|${agentWorktree ?? ""}` : null;
     const prev = prevAutofocusSignalRef.current;
     prevAutofocusSignalRef.current = signal;
@@ -1161,7 +1173,7 @@ export default function App() {
     if (signal && signal !== prev && target) {
       focusSidebar(target, { fromShortcut: false });
     }
-  }, [activeTabId, activeTab, agentWorktree, focusSidebar]);
+  }, [activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar]);
 
   // Whether the saved workspace root still exists on disk, so the selector can
   // disable the option when it is unset or missing.
@@ -2818,15 +2830,7 @@ export default function App() {
             return { ...p, locked: newLocked };
           });
       },
-      "tab.focusOnExplorer": () => {
-        if (!activeTab) return;
-        const target =
-          tabFilePath(activeTab) ??
-          (activeTab.kind === "terminal"
-            ? (agentWorktree ?? activeTab.cwd ?? null)
-            : null);
-        if (target) focusSidebar(target, { fromShortcut: true });
-      },
+      "tab.focusOnExplorer": focusActiveTabInExplorer,
       "tab.toggleAutofocus": () => {
         if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
         const found = findTabGlobal(activeTabId);
@@ -3252,6 +3256,7 @@ export default function App() {
                         onChangeRootMode={handleChangeRootMode}
                         showHidden={activeShowHidden}
                         onToggleShowHidden={handleToggleShowHidden}
+                        onFocusActiveTab={activeTabFocusTarget ? focusActiveTabInExplorer : undefined}
                         onSetAsRoot={handleSetAsRoot}
                         onEnterFolder={handleEnterFolder}
                         onNavigateUp={handleNavigateUp}
@@ -3359,6 +3364,7 @@ export default function App() {
                         onChangeRootMode={handleChangeRootMode}
                         showHidden={activeShowHidden}
                         onToggleShowHidden={handleToggleShowHidden}
+                        onFocusActiveTab={activeTabFocusTarget ? focusActiveTabInExplorer : undefined}
                         onSetAsRoot={handleSetAsRoot}
                         onEnterFolder={handleEnterFolder}
                         onNavigateUp={handleNavigateUp}

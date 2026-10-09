@@ -54,6 +54,7 @@ export type SidebarProps = {
   onChangeRootMode: (mode: ExplorerRootMode) => void;
   showHidden: boolean;
   onToggleShowHidden: () => void;
+  onFocusActiveTab?: () => void;
   onSetAsRoot: (path: string) => void;
   onEnterFolder?: (path: string) => void;
   onNavigateUp?: () => void;
@@ -160,6 +161,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               onChangeRootMode={props.onChangeRootMode}
               showHidden={props.showHidden}
               onToggleShowHidden={props.onToggleShowHidden}
+              onFocusActiveTab={props.onFocusActiveTab}
               onSetAsRoot={props.onSetAsRoot}
               onEnterFolder={props.onEnterFolder}
               onNavigateUp={props.onNavigateUp}
