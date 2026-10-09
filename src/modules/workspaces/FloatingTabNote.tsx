@@ -1,14 +1,14 @@
 import { lazy, Suspense, useCallback, useLayoutEffect, useRef, useState } from "react";
 import type React from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { PinIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { moveTabNote, unpinTabNote } from "./lib/tabNote";
+import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeMirrorEditor";
+import { moveTabNote, setTabNoteText } from "./lib/tabNote";
+import { useTabNoteStore } from "./lib/tabNoteStore";
 import { clampNotePos, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
 import type { Tab } from "./lib/types";
 
-const MarkdownPreviewPane = lazy(() =>
-  import("@/modules/markdown/MarkdownPreviewPane").then((m) => ({ default: m.MarkdownPreviewPane })),
+const CodeMirrorEditor = lazy(() =>
+  import("@/modules/markdown/codemirror/CodeMirrorEditor").then((m) => ({ default: m.CodeMirrorEditor })),
 );
 
 // Marker read by PaneView so interacting with the note never moves terminal focus.
@@ -44,13 +44,25 @@ function sameMeasure(a: Measure, b: Measure) {
   );
 }
 
-export function PinnedTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab }: Props) {
-  const visible = active && !!tab.note && !!tab.notePinned;
+export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab }: Props) {
+  const visible = active && tab.note !== undefined && !!tab.noteOpen;
   const noteRef = useRef<HTMLDivElement>(null);
   const [m, setM] = useState<Measure | null>(null);
   const [dragPos, setDragPos] = useState<Point | null>(null);
   // pos lives here, not only in state: pointerup can fire before React re-renders the last move.
   const dragRef = useRef<{ startX: number; startY: number; origin: Point; pos: Point | null } | null>(null);
+
+  const setEditor = useCallback(
+    (handle: CodeMirrorEditorHandle | null) => {
+      if (!handle) return;
+      const store = useTabNoteStore.getState();
+      if (store.focusTabId !== tab.id) return;
+      store.clearFocus();
+      // The CodeMirror view is created in the child's effect, after this ref fires.
+      requestAnimationFrame(() => handle.focus());
+    },
+    [tab.id],
+  );
 
   const measure = useCallback(() => {
     const paneEl = paneRef.current;
@@ -139,9 +151,9 @@ export function PinnedTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUp
         onFocus={(e) => e.stopPropagation()}
       >
         <div
-          data-testid="pinned-note-handle"
+          data-testid="tab-note-handle"
           className={cn(
-            "flex h-5 cursor-grab items-center justify-end border-b border-border/60 bg-muted/40 px-1",
+            "h-3 cursor-grab border-b border-border/60 bg-muted/40",
             dragPos && "cursor-grabbing",
           )}
           onPointerDown={onPointerDown}
@@ -151,26 +163,20 @@ export function PinnedTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUp
           onLostPointerCapture={(e) => {
             if (dragRef.current) endDrag(e, false);
           }}
-        >
-          <button
-            type="button"
-            title="Unpin note"
-            aria-label="Unpin note"
-            className="flex size-4 items-center justify-center rounded bg-muted text-foreground transition-colors hover:bg-muted/70"
-            onPointerDown={(e) => e.stopPropagation()}
-            // Keeps the terminal focused: the button never takes DOM focus.
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateTab?.(tab.id, unpinTabNote);
-            }}
-          >
-            <HugeiconsIcon icon={PinIcon} size={12} strokeWidth={2} />
-          </button>
+        />
+        <div className="min-h-8 bg-[var(--editor-background)] text-[var(--editor-foreground)]">
+          <Suspense fallback={<pre className="whitespace-pre-wrap p-2 text-[12px]">{tab.note}</pre>}>
+            <CodeMirrorEditor
+              ref={setEditor}
+              value={tab.note ?? ""}
+              syncKey={tab.id}
+              path=""
+              mode="rich"
+              maxHeight="16rem"
+              onChange={(next) => onUpdateTab?.(tab.id, (p) => setTabNoteText(p, next))}
+            />
+          </Suspense>
         </div>
-        <Suspense fallback={<pre className="whitespace-pre-wrap p-2 text-[12px] text-foreground">{tab.note}</pre>}>
-          <MarkdownPreviewPane content={tab.note ?? ""} compact />
-        </Suspense>
       </div>
     </div>
   );

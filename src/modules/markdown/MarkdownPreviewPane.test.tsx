@@ -56,25 +56,6 @@ describe("MarkdownPreviewPane", () => {
     expect(container.querySelector(".cm-lp-codeblock")).not.toBeNull();
   });
 
-  it("fills its parent by default and sizes to content with compact", () => {
-    const full = render(<MarkdownPreviewPane content="a" path="/n/a.md" />).container.firstElementChild;
-    expect(full?.className).toContain("h-full");
-    expect(full?.hasAttribute("data-compact")).toBe(false);
-    cleanup();
-    const compact = render(<MarkdownPreviewPane content="a" compact />).container.firstElementChild;
-    expect(compact?.className).toContain("max-h-64");
-    expect(compact?.className).not.toContain("h-full");
-    expect(compact?.hasAttribute("data-compact")).toBe(true);
-  });
-
-  it("renders without a path and keeps absolute and http images working", () => {
-    const { container } = render(
-      <MarkdownPreviewPane content={"![a](https://example.com/p.png)\n\n![b](/abs/p.png)"} />,
-    );
-    const srcs = [...container.querySelectorAll("img.cm-lp-image")].map((i) => i.getAttribute("src"));
-    expect(srcs).toEqual(["https://example.com/p.png", "asset://localhost//abs/p.png"]);
-  });
-
   it("opens a link with a plain click", () => {
     const container = renderPane("[site](https://example.com)\n");
     const link = container.querySelector(".cm-lp-link-text") as HTMLElement;

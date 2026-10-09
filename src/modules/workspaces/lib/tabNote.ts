@@ -1,40 +1,42 @@
 import type { Tab } from "./types";
 
-// Blank title or note clears the field instead of storing an empty string.
-export function applyTabEdit<T extends Tab>(
-  tab: T,
-  edit: { title: string; note: string },
-): T {
-  const title = edit.title.trim();
-  const note = edit.note.trim();
-  const next = { ...tab, title: title || undefined, note: note || undefined };
-  if (!next.title) delete next.title;
-  if (!next.note) {
-    delete next.note;
-    delete next.notePinned;
-    delete next.notePos;
-  }
-  return next;
+export function hasTabNote(tab: Tab): boolean {
+  return tab.note !== undefined;
 }
 
-export function pinTabNote<T extends Tab>(tab: T): T {
-  if (!tab.note) return tab;
-  const next = { ...tab, notePinned: true };
-  delete next.notePos;
-  return next;
+export function isTabNoteOpen(tab: Tab): boolean {
+  return tab.note !== undefined && !!tab.noteOpen;
 }
 
-export function unpinTabNote<T extends Tab>(tab: T): T {
+function withoutNote<T extends Tab>(tab: T): T {
   const next = { ...tab };
-  delete next.notePinned;
+  delete next.note;
+  delete next.noteOpen;
   delete next.notePos;
   return next;
 }
 
-export function moveTabNote<T extends Tab>(
-  tab: T,
-  pos: { x: number; y: number },
-): T {
-  if (!tab.notePinned) return tab;
+// Creates an empty open note, reopens a hidden one, or hides an open one.
+// Hiding a blank note drops it, so toggling twice on a fresh tab leaves no trace.
+export function toggleTabNote<T extends Tab>(tab: T): T {
+  if (tab.note === undefined) return { ...tab, note: "", noteOpen: true };
+  if (!tab.noteOpen) return { ...tab, noteOpen: true };
+  if (!tab.note.trim()) return withoutNote(tab);
+  const next = { ...tab };
+  delete next.noteOpen;
+  return next;
+}
+
+export function setTabNoteText<T extends Tab>(tab: T, text: string): T {
+  if (tab.note === undefined) return tab;
+  return { ...tab, note: text };
+}
+
+export function removeTabNote<T extends Tab>(tab: T): T {
+  return withoutNote(tab);
+}
+
+export function moveTabNote<T extends Tab>(tab: T, pos: { x: number; y: number }): T {
+  if (!isTabNoteOpen(tab)) return tab;
   return { ...tab, notePos: { x: Math.round(pos.x), y: Math.round(pos.y) } };
 }

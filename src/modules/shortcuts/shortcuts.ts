@@ -13,6 +13,7 @@ export type ShortcutId =
   | "tab.close"
   | "tab.reopenClosed"
   | "tab.rename"
+  | "tab.note"
   | "tab.lock"
   | "tab.focusOnExplorer"
   | "tab.toggleAutofocus"
@@ -296,6 +297,12 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Rename Tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
+  },
+  {
+    id: "tab.note",
+    label: "Toggle Tab Note",
+    group: "Tabs",
+    defaultBindings: [{ [MOD_PROP]: true, key: "b" }],
   },
   {
     id: "tab.lock",

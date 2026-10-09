@@ -1,13 +1,15 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p }));
 vi.mock("@/modules/editor/lib/useEditorThemeExt", () => ({ useEditorThemeExt: () => [] }));
 vi.mock("@/modules/theme/ThemeProvider", () => ({ useTheme: () => ({ resolvedMode: "dark" }) }));
 
-import { PinnedTabNote } from "./PinnedTabNote";
+import { FloatingTabNote } from "./FloatingTabNote";
+import { useTabNoteStore } from "./lib/tabNoteStore";
 import type { Tab } from "./lib/types";
 
 class RO {
@@ -33,8 +35,8 @@ function setup(tab: Tab, active = true) {
   pane.getBoundingClientRect = () => rect(0, 0, 800, 600);
   tabEl.getBoundingClientRect = () => rect(100, 0, 80, 20);
   Object.defineProperty(bar, "offsetHeight", { value: 32, configurable: true });
-  render(
-    <PinnedTabNote
+  const view = render(
+    <FloatingTabNote
       tab={tab}
       active={active}
       paneRef={{ current: pane }}
@@ -43,16 +45,17 @@ function setup(tab: Tab, active = true) {
       onUpdateTab={onUpdateTab}
     />,
   );
-  return { onUpdateTab, getTab: () => current };
+  return { onUpdateTab, getTab: () => current, view };
 }
 
-const pinned: Tab = { id: "tab-1", kind: "terminal", note: "hello", notePinned: true };
+const open: Tab = { id: "tab-1", kind: "terminal", note: "hello", noteOpen: true };
 
-describe("PinnedTabNote", () => {
+describe("FloatingTabNote", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", RO);
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(320);
     vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(60);
+    useTabNoteStore.setState({ focusTabId: null });
   });
   afterEach(() => {
     cleanup();
@@ -61,32 +64,54 @@ describe("PinnedTabNote", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders only for an active tab with a pinned note", () => {
-    setup(pinned);
-    expect(screen.queryByLabelText("Unpin note")).not.toBeNull();
+  it("renders only for an active tab with an open note, even an empty one", () => {
+    setup(open);
+    expect(screen.queryByTestId("tab-note-handle")).not.toBeNull();
     cleanup();
-    setup(pinned, false);
-    expect(screen.queryByLabelText("Unpin note")).toBeNull();
+    setup({ ...open, note: "" });
+    expect(screen.queryByTestId("tab-note-handle")).not.toBeNull();
     cleanup();
-    setup({ ...pinned, notePinned: false });
-    expect(screen.queryByLabelText("Unpin note")).toBeNull();
+    setup(open, false);
+    expect(screen.queryByTestId("tab-note-handle")).toBeNull();
     cleanup();
-    setup({ id: "tab-2", kind: "terminal", notePinned: true });
-    expect(screen.queryByLabelText("Unpin note")).toBeNull();
+    setup({ ...open, noteOpen: false });
+    expect(screen.queryByTestId("tab-note-handle")).toBeNull();
+    cleanup();
+    setup({ id: "tab-2", kind: "terminal", noteOpen: true });
+    expect(screen.queryByTestId("tab-note-handle")).toBeNull();
   });
 
-  it("unpin removes notePinned and notePos", () => {
-    const { onUpdateTab, getTab } = setup({ ...pinned, notePos: { x: 5, y: 6 } });
-    fireEvent.click(screen.getByLabelText("Unpin note"));
+  it("edits the note in the Live Preview editor and stores each change on the tab", async () => {
+    const { getTab, onUpdateTab } = setup(open);
+    const content = await waitFor(() => {
+      const el = document.querySelector(".cm-content") as HTMLElement | null;
+      if (!el) throw new Error("editor not mounted");
+      return el;
+    });
+    const view = EditorView.findFromDOM(content);
+    expect(view?.state.doc.toString()).toBe("hello");
+    view?.dispatch({ changes: { from: 5, insert: " world" } });
     expect(onUpdateTab).toHaveBeenCalledTimes(1);
-    expect(getTab().notePinned).toBeUndefined();
-    expect(getTab().notePos).toBeUndefined();
-    expect(getTab().note).toBe("hello");
+    expect(getTab()).toMatchObject({ note: "hello world", noteOpen: true });
+  });
+
+  it("focuses the editor when the toggle shortcut requested it", async () => {
+    useTabNoteStore.getState().requestFocus("tab-1");
+    setup({ ...open, note: "" });
+    await waitFor(() => expect(document.activeElement?.classList.contains("cm-content")).toBe(true));
+    expect(useTabNoteStore.getState().focusTabId).toBeNull();
+  });
+
+  it("does not take focus when no request is pending", async () => {
+    setup(open);
+    await waitFor(() => expect(document.querySelector(".cm-content")).not.toBeNull());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.activeElement?.classList.contains("cm-content")).toBe(false);
   });
 
   it("commits a moved position once after a drag", () => {
-    const { onUpdateTab, getTab } = setup(pinned);
-    const handle = screen.getByTestId("pinned-note-handle");
+    const { onUpdateTab, getTab } = setup(open);
+    const handle = screen.getByTestId("tab-note-handle");
     fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 50, pointerId: 1 });
     fireEvent.pointerMove(handle, { clientX: 230, clientY: 90, pointerId: 1 });
     fireEvent.pointerMove(handle, { clientX: 250, clientY: 100, pointerId: 1 });
@@ -95,12 +120,12 @@ describe("PinnedTabNote", () => {
     expect(onUpdateTab).toHaveBeenCalledTimes(1);
     // Docked at x=100, y=tab bar height 32; moved by (50, 50).
     expect(getTab().notePos).toEqual({ x: 150, y: 82 });
-    expect(getTab().notePinned).toBe(true);
+    expect(getTab().noteOpen).toBe(true);
   });
 
   it("clamps a dragged note inside the pane and below the tab bar", () => {
-    const { getTab } = setup(pinned);
-    const handle = screen.getByTestId("pinned-note-handle");
+    const { getTab } = setup(open);
+    const handle = screen.getByTestId("tab-note-handle");
     fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 50, pointerId: 1 });
     fireEvent.pointerMove(handle, { clientX: -2000, clientY: -2000, pointerId: 1 });
     fireEvent.pointerUp(handle, { clientX: -2000, clientY: -2000, pointerId: 1 });
@@ -113,8 +138,8 @@ describe("PinnedTabNote", () => {
   });
 
   it("commits the last position even when pointerup arrives before React re-renders", () => {
-    const { onUpdateTab, getTab } = setup(pinned);
-    const handle = screen.getByTestId("pinned-note-handle");
+    const { onUpdateTab, getTab } = setup(open);
+    const handle = screen.getByTestId("tab-note-handle");
     fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 50, pointerId: 1 });
     const init = { bubbles: true, cancelable: true, pointerId: 1 };
     handle.dispatchEvent(new PointerEvent("pointermove", { ...init, clientX: 240, clientY: 70 }));
@@ -124,8 +149,8 @@ describe("PinnedTabNote", () => {
   });
 
   it("commits nothing when the drag is cancelled", () => {
-    const { onUpdateTab } = setup(pinned);
-    const handle = screen.getByTestId("pinned-note-handle");
+    const { onUpdateTab } = setup(open);
+    const handle = screen.getByTestId("tab-note-handle");
     fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 50, pointerId: 1 });
     fireEvent.pointerMove(handle, { clientX: 260, clientY: 90, pointerId: 1 });
     fireEvent.pointerCancel(handle, { pointerId: 1 });
@@ -133,8 +158,8 @@ describe("PinnedTabNote", () => {
   });
 
   it("commits nothing for a click without movement", () => {
-    const { onUpdateTab } = setup(pinned);
-    const handle = screen.getByTestId("pinned-note-handle");
+    const { onUpdateTab } = setup(open);
+    const handle = screen.getByTestId("tab-note-handle");
     fireEvent.pointerDown(handle, { button: 0, clientX: 200, clientY: 50, pointerId: 1 });
     fireEvent.pointerUp(handle, { clientX: 200, clientY: 50, pointerId: 1 });
     expect(onUpdateTab).not.toHaveBeenCalled();

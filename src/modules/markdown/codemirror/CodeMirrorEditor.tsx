@@ -39,10 +39,12 @@ type Props = {
   wikiLinks?: WikiLinkHost;
   // Cursor and scroll to restore when this editor mounts, e.g. after Preview.
   initialPosition?: ViewPosition | null;
+  // Sizes to the content up to this CSS height instead of filling the parent.
+  maxHeight?: string;
 };
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
-  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich", wikiLinks, initialPosition }, ref) {
+  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich", wikiLinks, initialPosition, maxHeight }, ref) {
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const themeExt = useEditorThemeExt();
     const pathRef = useRef(path);
@@ -130,8 +132,9 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
         // only the string so onChange matches its declared Props signature.
         onChange={(next) => onChange(next)}
         theme={themeExt}
-        height="100%"
-        className="h-full w-full overflow-auto"
+        height={maxHeight ? undefined : "100%"}
+        maxHeight={maxHeight}
+        className={maxHeight ? "w-full overflow-auto" : "h-full w-full overflow-auto"}
         basicSetup={{
           lineNumbers: false,
           foldGutter: false,
