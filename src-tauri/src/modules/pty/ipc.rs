@@ -384,6 +384,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
         return;
     };
     if !p.cwd.is_empty() && p.event != "SessionEnd" {
+        log::debug!("[ipc] cwd tab={tab_id} event={} cwd={:?}", p.event, p.cwd);
         let _ = app.emit(AGENT_CWD_EVENT, serde_json::json!({ "tabId": tab_id, "cwd": p.cwd }));
     }
     match p.event.as_str() {

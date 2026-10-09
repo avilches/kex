@@ -3,6 +3,7 @@ import { findTabPane, focusedTabId } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
 import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { native } from "@/lib/native";
+import { debug } from "@tauri-apps/plugin-log";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useTauriListen } from "@/lib/useTauriListen";
@@ -29,9 +30,16 @@ function handleAgentCwd(tabId: string, cwd: string) {
   latestAgentCwd.set(tabId, cwd);
   void native
     .gitResolveRepo(cwd)
-    .catch(() => null)
+    .catch((err) => {
+      void debug(`[agent-cwd] resolve failed tab=${tabId} cwd=${cwd} err=${String(err)}`);
+      return null;
+    })
     .then((info) => {
       if (latestAgentCwd.get(tabId) !== cwd) return;
+      const hasSession = !!useAgentStore.getState().sessions[tabId];
+      void debug(
+        `[agent-cwd] tab=${tabId} cwd=${cwd} session=${hasSession} isWorktree=${info?.isWorktree ?? null} root=${info?.repoRoot ?? null}`,
+      );
       useAgentStore.getState().setMeta(tabId, {
         agentCwd: cwd,
         worktreeCwd: info?.isWorktree ? info.repoRoot : undefined,
