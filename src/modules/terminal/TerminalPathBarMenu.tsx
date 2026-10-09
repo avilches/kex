@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -12,10 +12,11 @@ import {
   FolderOpenIcon,
   MoreHorizontalIcon,
   PlayIcon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { native } from "@/lib/native";
-import { copyToClipboard, revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
+import { revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
 import { previewResumeCmd, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import type { AgentSession } from "@/modules/agents/lib/types";
 import type { Tab } from "@/modules/workspaces/lib/types";
@@ -27,6 +28,36 @@ function formatElapsed(ms: number): string {
   if (m < 60) return `${m}m ${s % 60}s`;
   const h = Math.floor(m / 60);
   return `${h}h ${m % 60}m`;
+}
+
+function CopyIdButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      return;
+    }
+    setCopied(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <button
+      type="button"
+      title={copied ? "Copied!" : `Copy ${label}`}
+      onClick={() => void copy()}
+      className={`flex size-[20px] shrink-0 items-center justify-center rounded transition-colors ${
+        copied ? "text-primary" : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={12} strokeWidth={1.9} />
+    </button>
+  );
 }
 
 type Props = {
@@ -102,14 +133,7 @@ export function TerminalPathBarMenu({
           <span className="shrink-0 text-muted-foreground">Tab id</span>
           <span className="flex min-w-0 items-center gap-1">
             <span className="max-w-[140px] truncate font-mono text-foreground">{tabId}</span>
-            <button
-              type="button"
-              title="Copy tab id"
-              onClick={() => void copyToClipboard(tabId)}
-              className="flex size-[20px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={1.9} />
-            </button>
+            <CopyIdButton value={tabId} label="tab id" />
           </span>
         </div>
         <DropdownMenuSeparator />
@@ -181,14 +205,7 @@ export function TerminalPathBarMenu({
                   <span className="shrink-0 text-muted-foreground">Session</span>
                   <span className="flex min-w-0 items-center gap-1">
                     <span className="max-w-[120px] truncate font-mono text-foreground">{sessionId}</span>
-                    <button
-                      type="button"
-                      title="Copy session id"
-                      onClick={() => void copyToClipboard(sessionId)}
-                      className="flex size-[20px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={1.9} />
-                    </button>
+                    <CopyIdButton value={sessionId} label="session id" />
                   </span>
                 </div>
               )}
