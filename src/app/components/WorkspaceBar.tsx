@@ -220,6 +220,42 @@ function SortableWorkspaceItem({
 
   const compact = barWidth <= 80;
 
+  const agentIndicator = agentEntries ? (
+    <span
+      role="button"
+      title={
+        agentEntries.length > 1
+          ? `${agentEntries.length} agents, click to visit the next`
+          : agentEntries[0].visual === "working"
+            ? "Agent working"
+            : "Agent needs you"
+      }
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onJumpAgent(ws.id, agentEntries);
+      }}
+      className={cn(
+        "flex shrink-0 items-center justify-center",
+        compact ? "absolute right-1 top-1 size-[10px]" : "size-[10px]",
+      )}
+    >
+      {agentEntries[0].visual === "working" ? (
+        <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-current opacity-70" />
+      ) : (
+        <span
+          className={cn(
+            "size-[6px] rounded-full",
+            agentEntries[0].visual === "error"
+              ? "bg-destructive"
+              : "bg-amber-400",
+          )}
+        />
+      )}
+    </span>
+  ) : null;
+
   const button = (
     <div
       ref={setNodeRef}
@@ -286,39 +322,11 @@ function SortableWorkspaceItem({
               />
             )}
             <span className="truncate">{ws.title || ws.kind}</span>
+            {agentIndicator}
           </>
         )}
       </button>
-      {agentEntries ? (
-        <button
-          type="button"
-          title={
-            agentEntries.length > 1
-              ? `${agentEntries.length} agents, click to visit the next`
-              : agentEntries[0].visual === "working"
-                ? "Agent working"
-                : "Agent needs you"
-          }
-          onClick={(e) => {
-            e.stopPropagation();
-            onJumpAgent(ws.id, agentEntries);
-          }}
-          className="absolute right-0.5 top-0.5 flex size-[14px] items-center justify-center rounded-full bg-muted"
-        >
-          {agentEntries[0].visual === "working" ? (
-            <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />
-          ) : (
-            <span
-              className={cn(
-                "size-[6px] rounded-full",
-                agentEntries[0].visual === "error"
-                  ? "bg-destructive"
-                  : "bg-amber-400",
-              )}
-            />
-          )}
-        </button>
-      ) : null}
+      {agentIndicator && compact ? agentIndicator : null}
       {!active && displayColor && (
         <span
           className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
