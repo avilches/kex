@@ -10,8 +10,8 @@ const FLUSH_MS = 1500;
 
 /**
  * Keeps the name and pending notification of every agent tab in
- * agent-sessions.json so a restart can put them back. Writes are debounced and
- * only the tabs whose snapshot changed are sent, since the agent retitles its
+ * agent-sessions.json so a restart can put them back. Writes are batched (one
+ * flush 1.5s after the first change of a burst) and only the tabs whose snapshot changed are sent, since the agent retitles its
  * tab all the time. A pending write is flushed when the window closes, and a
  * tab Rust has no record for yet is sent again on its next change.
  */

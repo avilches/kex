@@ -7,11 +7,13 @@ import {
   consumeRestorePlan,
   seedRestorePlan,
   stageRestoredSnapshot,
+  stagedSnapshotCount,
   STAGED_SNAPSHOT_TTL_MS,
   type RestorePlan,
 } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { _clearAll, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { _clearAll, getOscTitle, setOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 
 function makePlan(overrides: Partial<RestorePlan> = {}): RestorePlan {
   return {
@@ -60,14 +62,16 @@ describe("seedRestorePlan", () => {
 describe("staged restore snapshot", () => {
   beforeEach(() => {
     useAgentStore.setState({ sessions: {}, notifications: [], closedSessions: {} });
+    usePreferencesStore.setState({ agentNotifications: true });
     _clearAll();
   });
 
   it("puts the name back and raises the attention dot and bell entry without a new signal", () => {
-    stageRestoredSnapshot(makePlan({ tabId: "t1", title: "fixing the build", notification: "attention" }));
+    const plan = makePlan({ tabId: "t1", title: "fixing the build", notification: "attention" });
+    stageRestoredSnapshot("t1", plan);
     useAgentStore.getState().startIdle("t1", "ws", "claude");
 
-    applyStagedSnapshot("t1");
+    expect(applyStagedSnapshot("t1")).toBe(true);
 
     const s = useAgentStore.getState();
     expect(getOscTitle("t1")).toBe("fixing the build");
@@ -77,7 +81,7 @@ describe("staged restore snapshot", () => {
   });
 
   it("a finished notification adds the bell entry but leaves the session idle", () => {
-    stageRestoredSnapshot(makePlan({ tabId: "t2", notification: "finished" }));
+    stageRestoredSnapshot("t2", makePlan({ tabId: "t2", notification: "finished" }));
     useAgentStore.getState().startIdle("t2", "ws", "claude");
 
     applyStagedSnapshot("t2");
@@ -87,26 +91,48 @@ describe("staged restore snapshot", () => {
     expect(s.notifications[0].kind).toBe("finished");
   });
 
+  it("keeps the bell empty when notifications are switched off, but still raises the dot", () => {
+    usePreferencesStore.setState({ agentNotifications: false });
+    stageRestoredSnapshot("t7", makePlan({ tabId: "t7", notification: "attention" }));
+    useAgentStore.getState().startIdle("t7", "ws", "claude");
+
+    applyStagedSnapshot("t7");
+
+    const s = useAgentStore.getState();
+    expect(s.notifications).toHaveLength(0);
+    expect(s.sessions.t7.status).toBe("attention");
+  });
+
+  it("is keyed by the tab that spawns the PTY, not by the id inside the plan (reopened closed tab)", () => {
+    stageRestoredSnapshot("t-new", makePlan({ tabId: "t-old", title: "reopened" }));
+    useAgentStore.getState().startIdle("t-new", "ws", "claude");
+
+    expect(applyStagedSnapshot("t-old")).toBe(false);
+    expect(applyStagedSnapshot("t-new")).toBe(true);
+    expect(getOscTitle("t-new")).toBe("reopened");
+  });
+
   it("applies once and ignores plans with nothing to restore or an unknown kind", () => {
-    stageRestoredSnapshot(makePlan({ tabId: "t3", notification: "bogus", title: null }));
+    stageRestoredSnapshot("t3", makePlan({ tabId: "t3", notification: "bogus", title: null }));
     useAgentStore.getState().startIdle("t3", "ws", "claude");
-    applyStagedSnapshot("t3");
+    expect(applyStagedSnapshot("t3")).toBe(false);
     expect(useAgentStore.getState().notifications).toHaveLength(0);
 
-    stageRestoredSnapshot(makePlan({ tabId: "t3", title: "once" }));
-    applyStagedSnapshot("t3");
-    applyStagedSnapshot("t3");
-    expect(getOscTitle("t3")).toBe("once");
+    stageRestoredSnapshot("t3", makePlan({ tabId: "t3", title: "once" }));
+    expect(applyStagedSnapshot("t3")).toBe(true);
+    setOscTitle("t3", "agent sent a new one");
+    expect(applyStagedSnapshot("t3")).toBe(false);
+    expect(getOscTitle("t3")).toBe("agent sent a new one");
   });
 
   it("drops a staged snapshot the agent never claimed in time, so a later manual agent starts clean", () => {
     vi.useFakeTimers();
     try {
-      stageRestoredSnapshot(makePlan({ tabId: "t4", title: "old", notification: "attention" }));
+      stageRestoredSnapshot("t4", makePlan({ tabId: "t4", title: "old", notification: "attention" }));
       vi.advanceTimersByTime(STAGED_SNAPSHOT_TTL_MS + 1);
       useAgentStore.getState().start("t4", "ws", "claude");
 
-      applyStagedSnapshot("t4");
+      expect(applyStagedSnapshot("t4")).toBe(false);
 
       expect(getOscTitle("t4")).toBeUndefined();
       expect(useAgentStore.getState().notifications).toHaveLength(0);
@@ -116,19 +142,18 @@ describe("staged restore snapshot", () => {
     }
   });
 
-  it("prunes expired entries when another tab is staged", () => {
+  it("prunes expired entries from the map when another tab is staged", () => {
     vi.useFakeTimers();
     try {
-      stageRestoredSnapshot(makePlan({ tabId: "t5", title: "stale" }));
+      stageRestoredSnapshot("t5", makePlan({ tabId: "t5", title: "stale" }));
+      const before = stagedSnapshotCount();
       vi.advanceTimersByTime(STAGED_SNAPSHOT_TTL_MS + 1);
-      stageRestoredSnapshot(makePlan({ tabId: "t6", title: "fresh" }));
-      vi.advanceTimersByTime(1000);
+      stageRestoredSnapshot("t6", makePlan({ tabId: "t6", title: "fresh" }));
 
-      applyStagedSnapshot("t5");
-      applyStagedSnapshot("t6");
-
-      expect(getOscTitle("t5")).toBeUndefined();
-      expect(getOscTitle("t6")).toBe("fresh");
+      expect(before).toBeGreaterThan(0);
+      expect(stagedSnapshotCount()).toBe(1);
+      expect(applyStagedSnapshot("t6")).toBe(true);
+      expect(stagedSnapshotCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }

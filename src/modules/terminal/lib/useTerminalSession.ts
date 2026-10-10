@@ -901,7 +901,7 @@ function attachSession(
           if (!runOnStart) return;
           if (plan) {
             if (plan.resumeCmd) {
-              stageRestoredSnapshot(plan);
+              stageRestoredSnapshot(leafId, plan);
               void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
               watchResume(plan);
             } else if (plan.errorReason) {

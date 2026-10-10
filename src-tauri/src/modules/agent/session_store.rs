@@ -410,8 +410,10 @@ fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id:
         }
     }
     // SessionStart fires again on every resume and replaces the record; the name and the
-    // pending notification it held must survive until the frontend reports new ones.
-    if let Some(previous) = store.tabs.get(tab_id) {
+    // pending notification it held must survive until the frontend reports new ones. A resume
+    // keeps the session id, while /clear or an agent launched by hand brings a new one, which
+    // must not inherit the old conversation's name.
+    if let Some(previous) = store.tabs.get(tab_id).filter(|p| p.session_id == session_id) {
         record.title = previous.title.clone();
         record.notification = previous.notification.clone();
     }
@@ -460,12 +462,15 @@ fn set_snapshot_at_path(path: &Path, tab_id: &str, title: &str, notification: &s
     }
     record.title = next_title;
     record.notification = next_notification;
-    if let Ok(out) = serde_json::to_string_pretty(&store) {
-        let tmp = path.with_extension("json.kex-tmp");
-        if std::fs::write(&tmp, out).is_ok() {
-            write_backup(path, &content);
-            let _ = std::fs::rename(&tmp, path);
-        }
+    let Ok(out) = serde_json::to_string_pretty(&store) else { return false };
+    let tmp = path.with_extension("json.kex-tmp");
+    if std::fs::write(&tmp, out).is_err() {
+        return false;
+    }
+    write_backup(path, &content);
+    if std::fs::rename(&tmp, path).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return false;
     }
     true
 }
@@ -1059,6 +1064,37 @@ mod tests {
     }
 
     #[test]
+    fn set_snapshot_caps_the_title_by_characters_and_keeps_it_with_an_unknown_notification() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+        let long: String = "\u{00e9}\u{1F600}x".repeat(300);
+
+        set_snapshot_at_path(&path, "tab-1", &long, "bogus");
+
+        let rec = &read_store(&path).tabs["tab-1"];
+        let title = rec.title.as_deref().unwrap();
+        assert_eq!(title.chars().count(), MAX_TITLE_CHARS);
+        assert!(long.starts_with(title));
+        assert_eq!(rec.notification, None);
+    }
+
+    #[test]
+    fn restore_plan_for_a_missing_directory_still_carries_title_and_notification() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        let missing = dir.path().join("gone");
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", &missing.display().to_string());
+        set_snapshot_at_path(&path, "tab-1", "fixing the build", "error");
+
+        let plans = load_restore_plan_from_path(&path);
+
+        assert!(plans[0].resume_cmd.is_empty());
+        assert_eq!(plans[0].title.as_deref(), Some("fixing the build"));
+        assert_eq!(plans[0].notification.as_deref(), Some("error"));
+    }
+
+    #[test]
     fn set_snapshot_does_not_rewrite_the_file_when_nothing_changed() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
@@ -1079,12 +1115,26 @@ mod tests {
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
         set_snapshot_at_path(&path, "tab-1", "fixing the build", "finished");
 
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+
+        let rec = &read_store(&path).tabs["tab-1"];
+        assert_eq!(rec.title.as_deref(), Some("fixing the build"));
+        assert_eq!(rec.notification.as_deref(), Some("finished"));
+    }
+
+    #[test]
+    fn recording_a_different_session_on_the_tab_starts_without_the_old_title_and_notification() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
+        set_snapshot_at_path(&path, "tab-1", "fixing the build", "finished");
+
         record_session_at_path(&path, "tab-1", "claude", "def", "/tmp/s2.jsonl", "/tmp/p");
 
         let rec = &read_store(&path).tabs["tab-1"];
         assert_eq!(rec.session_id, "def");
-        assert_eq!(rec.title.as_deref(), Some("fixing the build"));
-        assert_eq!(rec.notification.as_deref(), Some("finished"));
+        assert_eq!(rec.title, None);
+        assert_eq!(rec.notification, None);
     }
 
     #[test]

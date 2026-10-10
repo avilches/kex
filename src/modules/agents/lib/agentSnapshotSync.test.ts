@@ -52,9 +52,41 @@ describe("startAgentSnapshotSync", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    setOscTitle("t1", "later");
+    useAgentStore.setState((s) => ({ sessions: { ...s.sessions } }));
     vi.advanceTimersByTime(1600);
     expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not resend a tab Rust accepted when nothing about it changed", async () => {
+    stop = startAgentSnapshotSync();
+    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    vi.advanceTimersByTime(1600);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    useAgentStore.setState((s) => ({ sessions: { ...s.sessions } }));
+    vi.advanceTimersByTime(1600);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("also sends the tab again after a failed call", async () => {
+    invoke.mockRejectedValue(new Error("ipc down"));
+    stop = startAgentSnapshotSync();
+    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    vi.advanceTimersByTime(1600);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    useAgentStore.setState((s) => ({ sessions: { ...s.sessions } }));
+    vi.advanceTimersByTime(1600);
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("flushes a pending change when the window is about to unload", () => {
+    stop = startAgentSnapshotSync();
+    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    window.dispatchEvent(new Event("beforeunload"));
+    expect(invoke).toHaveBeenCalledTimes(1);
   });
 
   it("flushes a pending change when stopped", () => {

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { warn } from "@tauri-apps/plugin-log";
 import { toast } from "sonner";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import type { NotificationKind } from "@/modules/agents/lib/types";
 import {
@@ -68,37 +69,48 @@ function isNotificationKind(v: string | null | undefined): v is NotificationKind
 // The name and notification the tab had when Kex closed. They are applied when the
 // resumed agent registers its session, not before: a shell prompt that sets its own
 // terminal title would overwrite the name, and the notification needs a session to attach to.
-export function stageRestoredSnapshot(plan: RestorePlan): void {
+// Keyed by the tab that actually spawns the PTY, which is not `plan.tabId` for a reopened
+// closed tab (its plan was fetched under the old id).
+export function stageRestoredSnapshot(tabId: string, plan: RestorePlan): void {
   const title = plan.title || null;
   const notification = isNotificationKind(plan.notification) ? plan.notification : null;
   const now = Date.now();
-  for (const [tabId, staged] of stagedSnapshots) {
-    if (now - staged.stagedAt > STAGED_SNAPSHOT_TTL_MS) stagedSnapshots.delete(tabId);
+  for (const [id, staged] of stagedSnapshots) {
+    if (now - staged.stagedAt > STAGED_SNAPSHOT_TTL_MS) stagedSnapshots.delete(id);
   }
   if (title || notification) {
-    stagedSnapshots.set(plan.tabId, { title, notification, stagedAt: now });
+    stagedSnapshots.set(tabId, { title, notification, stagedAt: now });
   }
+}
+
+export function stagedSnapshotCount(): number {
+  return stagedSnapshots.size;
 }
 
 // Puts the staged name and notification back, silently: no toast and no OS notification,
 // since the user already knew about it before restarting.
-export function applyStagedSnapshot(tabId: string): void {
+// Returns whether anything was applied.
+export function applyStagedSnapshot(tabId: string): boolean {
   const staged = stagedSnapshots.get(tabId);
-  if (!staged) return;
+  if (!staged) return false;
   stagedSnapshots.delete(tabId);
-  if (Date.now() - staged.stagedAt > STAGED_SNAPSHOT_TTL_MS) return;
+  if (Date.now() - staged.stagedAt > STAGED_SNAPSHOT_TTL_MS) return false;
   const store = useAgentStore.getState();
   const session = store.sessions[tabId];
   if (staged.title) setOscTitle(tabId, staged.title);
-  if (!staged.notification || !session) return;
-  store.pushNotification({
-    source: "terminal",
-    tabId,
-    workspaceId: session.workspaceId,
-    agent: session.agent,
-    kind: staged.notification,
-  });
+  if (!staged.notification || !session) return true;
+  // The bell entry honors the same switch as every other notification; the dot does not.
+  if (usePreferencesStore.getState().agentNotifications) {
+    store.pushNotification({
+      source: "terminal",
+      tabId,
+      workspaceId: session.workspaceId,
+      agent: session.agent,
+      kind: staged.notification,
+    });
+  }
   if (staged.notification === "attention") store.setStatus(tabId, "attention");
+  return true;
 }
 
 // Injects a plan fetched on demand (e.g. via previewResumeCmd for a reopened closed
