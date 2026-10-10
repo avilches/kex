@@ -977,6 +977,24 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, []);
 
+  // Menu variant of moveTabToWorkspace: a hibernated destination is woken first
+  // instead of refused. The preview runs on the woken list because the ref only
+  // catches up after the next render.
+  const moveTabToWorkspaceWaking = useCallback(
+    async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
+      if (request.kind !== "new") await wakeWorkspace(request.workspaceId);
+      const dest = buildMoveDestination(request);
+      const { workspacePaneLimit } = usePreferencesStore.getState();
+      const woken = applyWake(workspacesRef.current, dest.workspaceId);
+      if (applyMoveTabToWorkspace(woken, sourceWorkspaceId, tabId, dest, workspacePaneLimit) === woken) {
+        return null;
+      }
+      setWorkspaces((prev) => applyMoveTabToWorkspace(prev, sourceWorkspaceId, tabId, dest, workspacePaneLimit));
+      return dest.workspaceId;
+    },
+    [wakeWorkspace],
+  );
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -1017,6 +1035,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setPaneDivider,
     moveTab,
     moveTabToWorkspace,
+    moveTabToWorkspaceWaking,
     reorderTab,
     splitPaneAndPlace,
     splitPaneAndOpenTab,

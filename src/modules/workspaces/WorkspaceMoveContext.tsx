@@ -3,11 +3,11 @@ import type { TabMoveRequest } from "./lib/tabTransfer";
 import type { Workspace } from "./lib/types";
 import { resolveWorkspaceColor } from "./lib/workspaceColor";
 
-export type WorkspaceMoveTarget = { id: string; title: string; color: string | null };
+export type WorkspaceMoveTarget = { id: string; title: string; color: string | null; hibernated: boolean };
 
 type WorkspaceMoveValue = {
   targets: WorkspaceMoveTarget[];
-  moveTab: (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest) => void;
+  moveTab: (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest) => void | Promise<void>;
 };
 
 const WorkspaceMoveContext = createContext<WorkspaceMoveValue>({
@@ -21,7 +21,7 @@ export function useWorkspaceMove(): WorkspaceMoveValue {
 
 type Props = {
   workspaces: Workspace[];
-  onMoveTab: (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest) => void;
+  onMoveTab: (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest) => void | Promise<void>;
   children: ReactNode;
 };
 
@@ -30,19 +30,17 @@ type Props = {
 // (which changes on every cwd update and would re-render every tab).
 export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props) {
   const key = workspaces
-    .filter((w) => !w.hibernated)
-    .map((w) => `${w.id}\u0000${w.title}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}`)
+    .map((w) => `${w.id}\u0000${w.title}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}\u0000${w.hibernated ? 1 : 0}`)
     .join("\u0001");
   // biome-ignore lint/correctness/useExhaustiveDependencies: key captures every field read from workspaces
   const targets = useMemo(
     () =>
-      workspaces
-        .filter((w) => !w.hibernated)
-        .map((w) => ({
-          id: w.id,
-          title: w.title || "shell",
-          color: resolveWorkspaceColor(w.color, w.id),
-        })),
+      workspaces.map((w) => ({
+        id: w.id,
+        title: w.title || "shell",
+        color: resolveWorkspaceColor(w.color, w.id),
+        hibernated: w.hibernated === true,
+      })),
     [key],
   );
   const value = useMemo(() => ({ targets, moveTab: onMoveTab }), [targets, onMoveTab]);

@@ -139,6 +139,7 @@ export function TabContextMenuItems({
                     style={t.color !== null ? { backgroundColor: t.color } : undefined}
                   />
                   <span className="truncate">{t.title}</span>
+                  {t.hibernated && <span className="ml-auto text-muted-foreground">Zzz</span>}
                 </ContextMenuItem>
               ))}
             </ContextMenuSubContent>
