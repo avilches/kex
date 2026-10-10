@@ -174,7 +174,9 @@ import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
   buildScriptInput,
+  planReusedTabInput,
   resolveScriptCwd,
+  type ScriptShell,
 } from "@/modules/workspaces/lib/scriptCwd";
 import { IS_WINDOWS } from "@/lib/platform";
 import { isAutofocusTab } from "@/modules/workspaces/lib/types";
@@ -719,6 +721,10 @@ export default function App() {
       // The user's own leaf, captured up front so a same-workspace script run
       // reveals its tab without moving activePaneId or focus away from here.
       const userPaneId = activeWorkspace.activePaneId;
+      const scriptShell: ScriptShell =
+        IS_WINDOWS && useWorkspaceEnvStore.getState().env.kind !== "wsl"
+          ? "powershell"
+          : "posix";
       const scriptCwd = resolveScriptCwd({
         mode: config.cwdMode,
         fixedFolder: config.cwd,
@@ -748,13 +754,14 @@ export default function App() {
             activateTab(found.workspace.id, config.tabId);
             requestLeafFocus(config.tabId);
           }
-          if (!getScriptRunningSnapshot().get(config.tabId)) {
-            const tabId = config.tabId;
-            const input = buildScriptInput(
-              config.command,
-              config.cwdMode === "context" ? scriptCwd : undefined,
-              IS_WINDOWS,
-            );
+          const tabId = config.tabId;
+          const input = planReusedTabInput(
+            !!getScriptRunningSnapshot().get(tabId),
+            config.command,
+            scriptCwd,
+            scriptShell,
+          );
+          if (input !== null) {
             const tryWrite = (attempts = 0) => {
               const handle = terminalHandles.current.get(tabId);
               if (handle) {
@@ -828,7 +835,7 @@ export default function App() {
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(freshTabId);
         if (handle) {
-          handle.write(buildScriptInput(config.command, undefined, IS_WINDOWS));
+          handle.write(buildScriptInput(config.command, undefined, scriptShell));
           setScriptRunning(freshTabId, "running");
         } else if (attempts < 20) {
           setTimeout(() => tryWrite(attempts + 1), 100);

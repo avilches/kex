@@ -363,10 +363,10 @@ A global ordered list of named statuses that can be assigned to workspaces. Not 
 
 ### Scripts and Run button (F12)
 
-Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell commands (with optional cwd override) and execute them from the header bar with one click or F12. Not present in upstream Terax.
+Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell commands (with a folder mode: workspace root by default, last folder from the focused terminal or editor, or a fixed folder) and execute them from the header bar with one click or F12. Not present in upstream Terax.
 
 - **Header Run button** (`src/app/components/RunButton.tsx`): renders in three modes based on the number of saved scripts in the active workspace. Zero scripts: a muted placeholder that opens Workspace Settings on the scripts tab. One script: a simple play/stop toggle. Two or more scripts: a split button with a dropdown script selector on the left and a play/stop icon on the right.
-- **Run execution** (`runWorkspaceConfig` in `App.tsx`): if the script's saved `tabId` still refers to a live terminal tab, navigates to it; otherwise splits the active pane downward, creates a new terminal tab in the script's cwd, saves the new tab id on the script, and writes the command followed by CR. Uses a 150ms + retry loop to wait for the terminal handle to register.
+- **Run execution** (`runWorkspaceConfig` in `App.tsx`): if the script's saved `tabId` still refers to a live terminal tab, navigates to it and, if idle, types a `cd` to the resolved folder before the command (PowerShell syntax on native Windows workspaces); otherwise splits the active pane downward, creates a new terminal tab in the folder resolved by `cwdMode` (`modules/workspaces/lib/scriptCwd.ts`), saves the new tab id on the script, and writes the command followed by CR. Uses a 150ms + retry loop to wait for the terminal handle to register.
 - **Stop** (`stopWorkspaceConfig` in `App.tsx`): sends Ctrl+C (`\x03`) to the terminal handle.
 - **isRunning state** (`scriptRunning` in `terminalEphemeralStore`): a `Map<tabId, ScriptState>` (outside the workspaces React tree, `useSyncExternalStore`) set on run and cleared when OSC 133;D fires for that tab. Manual commands typed by the user do not touch this map.
 - **F12 shortcut** (`workspace.run` in `shortcuts.ts`): runs or stops the active script of the current workspace, toggling based on the current isRunning state.
