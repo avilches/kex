@@ -10,13 +10,6 @@ import {
   workspaceDetailRows,
 } from "@/modules/workspaces/lib/workspaceDetail";
 
-const EMPTY_TEXT: Record<WorkspaceDetailMode, string> = {
-  "all-tabs": "No tabs",
-  agents: "No agents",
-  "active-agents": "No active agents",
-  none: "",
-};
-
 function StatusMark({ visual }: { visual: DetailRow["visual"] }) {
   if (visual === "working") {
     return (
@@ -78,13 +71,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   }, [tabs, sessions, entries, mode]);
   const tabsById = useMemo(() => new Map(tabs.map((t) => [t.id, t])), [tabs]);
 
-  if (rows.length === 0) {
-    return (
-      <div className="ml-6 py-1 pl-2 text-[11px] italic text-muted-foreground/70">
-        {EMPTY_TEXT[mode]}
-      </div>
-    );
-  }
+  if (rows.length === 0) return null;
 
   return (
     <div className="ml-6 mt-0.5 flex flex-col gap-px border-l border-border/60 pl-0.5">

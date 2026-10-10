@@ -78,11 +78,10 @@ describe("WorkspaceDetailList", () => {
     unmount();
   });
 
-  it("says so when there is nothing to list", () => {
+  it("renders nothing when there is nothing to list", () => {
     resetAgents();
-    const { container, rows, unmount } = mount("active-agents");
-    expect(rows()).toHaveLength(0);
-    expect(container.textContent).toBe("No active agents");
+    const { container, unmount } = mount("active-agents");
+    expect(container.innerHTML).toBe("");
     unmount();
   });
 });
