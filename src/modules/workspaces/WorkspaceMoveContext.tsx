@@ -3,7 +3,7 @@ import type { TabMoveRequest } from "./lib/tabTransfer";
 import type { Workspace } from "./lib/types";
 import { resolveWorkspaceColor } from "./lib/workspaceColor";
 
-export type WorkspaceMoveTarget = { id: string; title: string; color: string | null; hibernated: boolean };
+export type WorkspaceMoveTarget = { id: string; title: string; color: string | null; icon?: string; hibernated: boolean };
 
 type WorkspaceMoveValue = {
   targets: WorkspaceMoveTarget[];
@@ -30,7 +30,7 @@ type Props = {
 // (which changes on every cwd update and would re-render every tab).
 export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props) {
   const key = workspaces
-    .map((w) => `${w.id}\u0000${w.title}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}\u0000${w.hibernated ? 1 : 0}`)
+    .map((w) => `${w.id}\u0000${w.title}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}\u0000${w.icon ?? ""}\u0000${w.hibernated ? 1 : 0}`)
     .join("\u0001");
   // biome-ignore lint/correctness/useExhaustiveDependencies: key captures every field read from workspaces
   const targets = useMemo(
@@ -39,6 +39,7 @@ export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props
         id: w.id,
         title: w.title || "shell",
         color: resolveWorkspaceColor(w.color, w.id),
+        icon: w.icon,
         hibernated: w.hibernated === true,
       })),
     [key],

@@ -26,6 +26,7 @@ import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
+import { getWorkspaceIcon } from "./lib/workspaceIcon";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
 
 type Props = {
@@ -138,6 +139,9 @@ export function TabContextMenuItems({
                     className={cn("size-2 shrink-0 rounded-full", t.color === null && "border border-border")}
                     style={t.color !== null ? { backgroundColor: t.color } : undefined}
                   />
+                  {t.icon && getWorkspaceIcon(t.icon) && (
+                    <HugeiconsIcon icon={getWorkspaceIcon(t.icon)!} size={14} strokeWidth={1.5} className="shrink-0" />
+                  )}
                   <span className="truncate">{t.title}</span>
                   {t.hibernated && <span className="ml-auto text-muted-foreground">Zzz</span>}
                 </ContextMenuItem>
