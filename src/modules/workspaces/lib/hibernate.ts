@@ -50,6 +50,16 @@ export function applyHibernate(workspaces: Workspace[], workspaceId: string): Wo
   );
 }
 
+export function applyStartupHibernation(
+  workspaces: Workspace[],
+  activeIndex: number,
+  restoreAll: boolean,
+): Workspace[] {
+  if (restoreAll || workspaces.length === 0) return workspaces;
+  const active = workspaces[Math.max(0, Math.min(activeIndex, workspaces.length - 1))]!;
+  return workspaces.reduce((acc, w) => (w.id === active.id ? acc : applyHibernate(acc, w.id)), workspaces);
+}
+
 export function applyWake(workspaces: Workspace[], workspaceId: string): Workspace[] {
   return workspaces.map((w) => {
     if (w.id !== workspaceId) return w;
