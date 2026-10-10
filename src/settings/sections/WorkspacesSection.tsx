@@ -48,7 +48,7 @@ export function WorkspacesSection() {
       <div className="flex flex-col gap-2">
         <SettingRow
           title="Restore all workspaces on startup"
-          description="Reopen the terminals, agents and editors of every workspace when Kex starts. This can use a lot of memory and CPU if you have many workspaces. When it is off, only the workspace you were in is restored and the others start hibernated: nothing is lost, and each one comes back when you restore it manually. Applies the next time Kex starts."
+          description="Reopen the terminals, agents and editors of every workspace when Kex starts. This can use a lot of memory and CPU if you have many workspaces. When it is off, only the workspace you were in is restored and the others start hibernated: nothing is lost, and each one comes back when you restore it manually. Workspaces that were already hibernated stay hibernated until you restore them. Applies the next time Kex starts."
         >
           <Switch
             checked={restoreAll}
