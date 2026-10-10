@@ -3531,7 +3531,9 @@ export default function App() {
             }}
             onEnableRunOnStart={(tabId, running) => {
               const id = hibernateFlow.pendingWorkspaceId;
-              if (id) updateTabData(id, tabId, (t) => enableRunOnStart(t, running));
+              if (!id) return;
+              const isAgent = useAgentStore.getState().sessions[tabId] !== undefined;
+              updateTabData(id, tabId, (t) => enableRunOnStart(t, isAgent ? undefined : running));
             }}
           />
 
