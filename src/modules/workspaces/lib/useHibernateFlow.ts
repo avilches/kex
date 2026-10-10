@@ -3,7 +3,7 @@ import { markHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { terminalTabs } from "./hibernate";
-import { hibernateReview, isReviewEmpty, type HibernateLive } from "./hibernateReview";
+import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
 import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
 import type { Workspace } from "./types";
 
@@ -83,7 +83,7 @@ export function useHibernateFlow(deps: HookDeps) {
         live: () => {
           const sessions = useAgentStore.getState().sessions;
           const commands = getRunningCommandsSnapshot();
-          return { agentOf: (id) => sessions[id], runningCommand: (id) => commands.get(id) };
+          return { agentOf: (id) => liveAgent(sessions[id]), runningCommand: (id) => commands.get(id) };
         },
         finishAgent: (id) => useAgentStore.getState().finish(id),
         destroyFloats: (id) => depsRef.current.destroyWorkspaceFloats(id, depsRef.current.workspacesRef.current),

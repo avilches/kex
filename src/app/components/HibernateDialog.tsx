@@ -14,7 +14,7 @@ import {
   getRunningCommandsSnapshot,
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { hibernateReview, isReviewEmpty } from "@/modules/workspaces/lib/hibernateReview";
+import { hibernateReview, isReviewEmpty, liveAgent } from "@/modules/workspaces/lib/hibernateReview";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 
 type Props = {
@@ -33,7 +33,7 @@ export function HibernateDialog({ workspace, onClose, onHibernate, onSaveTab, on
     () =>
       workspace
         ? hibernateReview(workspace, {
-            agentOf: (id) => sessions[id],
+            agentOf: (id) => liveAgent(sessions[id]),
             runningCommand: (id) => commands.get(id),
           })
         : null,

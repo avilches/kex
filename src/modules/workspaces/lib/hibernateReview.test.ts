@@ -12,10 +12,10 @@ const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
 const term = (id: string, over: Record<string, unknown> = {}): Tab =>
   ({ id, kind: "terminal", ...over }) as Tab;
 const live = (
-  agents: Record<string, { agent: string; status: "working" | "attention" | "idle" }> = {},
+  agents: Record<string, { agent: string; status: "working" | "attention" | "idle"; resumable?: boolean }> = {},
   commands: Record<string, string> = {},
 ): HibernateLive => ({
-  agentOf: (id) => agents[id],
+  agentOf: (id) => (agents[id] ? { resumable: true, ...agents[id] } : undefined),
   runningCommand: (id) => commands[id],
 });
 
@@ -46,6 +46,28 @@ describe("hibernateReview agents", () => {
 });
 
 describe("hibernateReview commands", () => {
+  it("lists an idle agent without a stored session, since it cannot resume", () => {
+    const r = hibernateReview(
+      ws([term("t1")]),
+      live({ t1: { agent: "codex", status: "idle", resumable: false } }),
+    );
+    expect(r.commands).toEqual([{ tabId: "t1", title: undefined, command: "codex" }]);
+  });
+
+  it("does not list an idle agent with a stored session and Run on start", () => {
+    const r = hibernateReview(ws([term("t1")]), live({ t1: { agent: "claude", status: "idle", resumable: true } }));
+    expect(isReviewEmpty(r)).toBe(true);
+  });
+
+  it("keeps a working agent without a stored session in agents only", () => {
+    const r = hibernateReview(
+      ws([term("t1")]),
+      live({ t1: { agent: "claude", status: "working", resumable: false } }),
+    );
+    expect(r.agents.map((a) => a.tabId)).toEqual(["t1"]);
+    expect(r.commands).toEqual([]);
+  });
+
   it("lists an idle agent whose Run on start is explicitly off", () => {
     const r = hibernateReview(
       ws([term("t1", { restoreOnRestart: false })]),
