@@ -3213,6 +3213,7 @@ export default function App() {
           : NO_TABS,
         focusedTabId: focusedTabId(w.paneTree, w.activePaneId),
         detailExpanded: w.detailExpanded,
+        hibernated: w.hibernated,
       })),
     [workspaces],
   );
@@ -3278,6 +3279,8 @@ export default function App() {
               onReorder={reorderWorkspaces}
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
+              onHibernate={(id) => void hibernateFlow.requestHibernate(id)}
+              onWake={(id) => void wakeWorkspace(id)}
               onOpenSettings={(id) =>
                 useWorkspaceSettingsStore.getState().openSettings(id)
               }

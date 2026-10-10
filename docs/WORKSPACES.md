@@ -217,7 +217,9 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
 
 #### Hibernate and wake flow
 
-The shortcut `workspace.hibernate` (Cmd+Alt+Z, never blocked while hibernated) calls
+The shortcut `workspace.hibernate` (Cmd+Alt+Z, never blocked while hibernated) and the
+WorkspaceBar context menu entry "Hibernate" (any workspace, without switching the active one;
+hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
 `requestHibernate` from `useHibernateFlow` (`lib/useHibernateFlow.ts`; the framework-free
 `createHibernateFlow` holds the logic so it is testable without React):
 
@@ -232,6 +234,7 @@ The shortcut `workspace.hibernate` (Cmd+Alt+Z, never blocked while hibernated) c
    session, destroys the floating browsers and finally calls `hibernateWorkspace`. A set of
    in-flight workspace ids makes a double trigger hibernate once.
 
+The dialog title names the workspace and shows a small ball in its color (neutral when it has none).
 `HibernateDialog` is reactive: it recomputes the review from the agent store and the running
 commands store, so a row disappears when its agent finishes or when "Run on start" is enabled
 (`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are

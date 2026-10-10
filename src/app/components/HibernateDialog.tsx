@@ -15,6 +15,7 @@ import {
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { hibernateReview, isReviewEmpty, liveAgent } from "@/modules/workspaces/lib/hibernateReview";
+import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 
 type Props = {
@@ -40,6 +41,8 @@ export function HibernateDialog({ workspace, onClose, onHibernate, onSaveTab, on
     [workspace, sessions, commands],
   );
 
+  const color = workspace ? resolveWorkspaceColor(workspace.color, workspace.id) : null;
+
   // The dialog only opens when something is pending: once everything is
   // resolved there is nothing left to warn about, so it closes and hibernates.
   useEffect(() => {
@@ -50,7 +53,19 @@ export function HibernateDialog({ workspace, onClose, onHibernate, onSaveTab, on
     <AlertDialog open={workspace !== null} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Hibernate this workspace?</AlertDialogTitle>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <span
+              className="size-3 shrink-0 rounded-full"
+              style={
+                color !== null
+                  ? { backgroundColor: color }
+                  : { backgroundColor: "var(--muted)", boxShadow: "inset 0 0 0 1px var(--ring)" }
+              }
+            />
+            <span className="truncate">
+              {workspace?.title ? `Hibernate "${workspace.title}"?` : "Hibernate this workspace?"}
+            </span>
+          </AlertDialogTitle>
           <AlertDialogDescription>
             Hibernating closes every terminal and editor. The items below cannot be recovered when you restore it.
           </AlertDialogDescription>
