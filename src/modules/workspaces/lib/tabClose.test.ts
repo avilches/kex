@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { bulkClosableIds, isBulkClosable, otherBulkClosableIds } from "./tabClose";
+import { bulkClosableIds, closeIdsForTab, isBulkClosable, otherBulkClosableIds, paneTabCountForTab } from "./tabClose";
 import type { Tab } from "./types";
 
 describe("isBulkClosable", () => {
@@ -51,5 +51,48 @@ describe("bulk close selection", () => {
   test("otherBulkClosableIds also skips the kept tab", () => {
     expect(otherBulkClosableIds(tabs, "a")).toEqual(["c"]);
     expect(otherBulkClosableIds(tabs, "b")).toEqual(["a", "c"]);
+  });
+});
+
+describe("closeIdsForTab", () => {
+  const pane = (id: string, tabs: Tab[]) => ({ kind: "pane" as const, id, tabs, activeTabId: tabs[0]?.id ?? null });
+  const term = (id: string, locked?: boolean): Tab => ({ id, kind: "terminal", locked });
+  const workspaces = [
+    { paneTree: pane("p1", [term("a"), term("b", true), term("c")]) },
+    {
+      paneTree: {
+        kind: "split" as const,
+        id: "s",
+        orientation: "horizontal" as const,
+        dividerPosition: 50,
+        first: pane("p2", [term("d"), term("e")]),
+        second: pane("p3", [term("f")]),
+      },
+    },
+  ];
+
+  test("others closes the rest of the pane that holds the tab, skipping locked ones", () => {
+    expect(closeIdsForTab(workspaces, "a", "others")).toEqual(["c"]);
+  });
+
+  test("all closes every unlocked tab of that pane only", () => {
+    expect(closeIdsForTab(workspaces, "a", "all")).toEqual(["a", "c"]);
+    expect(closeIdsForTab(workspaces, "d", "all")).toEqual(["d", "e"]);
+  });
+
+  test("finds the pane in a workspace other than the first and inside a split", () => {
+    expect(closeIdsForTab(workspaces, "e", "others")).toEqual(["d"]);
+    expect(closeIdsForTab(workspaces, "f", "others")).toEqual([]);
+  });
+
+  test("a missing tab closes nothing", () => {
+    expect(closeIdsForTab(workspaces, "nope", "all")).toEqual([]);
+    expect(closeIdsForTab([], "a", "others")).toEqual([]);
+  });
+
+  test("paneTabCountForTab counts the tabs of the holding pane, 0 when missing", () => {
+    expect(paneTabCountForTab(workspaces, "b")).toBe(3);
+    expect(paneTabCountForTab(workspaces, "f")).toBe(1);
+    expect(paneTabCountForTab(workspaces, "nope")).toBe(0);
   });
 });
