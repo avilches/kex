@@ -124,25 +124,27 @@ describe("WorkspaceDetailList focus", () => {
   });
 });
 
-describe("WorkspaceDetailList agent icon", () => {
-  it("shows the agent icon on agent rows and keeps an empty slot on the others so titles align", () => {
+describe("WorkspaceDetailList kind icons", () => {
+  const icon = (r: Element) => r.querySelector("span.size-3\\.5");
+
+  it("shows an icon on every row when agents are mixed with other tabs", () => {
     const { rows, unmount } = mount({ terminals: "all", editors: true });
-    const agentRows = rows().slice(0, 3);
-    for (const r of agentRows) expect(r.querySelector("img")).not.toBeNull();
-    for (const r of rows().slice(3)) {
-      expect(r.querySelector("img")).toBeNull();
-      expect(r.querySelector("span.size-3")).not.toBeNull();
-    }
+    expect(rows()).toHaveLength(5);
+    for (const r of rows()) expect(icon(r)).not.toBeNull();
     unmount();
   });
 
-  it("adds no icon slot when the list has no agents", () => {
+  it("shows an icon on every row when several kinds are mixed without agents", () => {
     resetAgents();
     const { rows, unmount } = mount({ terminals: "all", editors: true });
-    for (const r of rows()) {
-      expect(r.querySelector("img")).toBeNull();
-      expect(r.querySelector("span.size-3")).toBeNull();
-    }
+    for (const r of rows()) expect(icon(r)).not.toBeNull();
+    unmount();
+  });
+
+  it("shows no icons when every row is the same plain kind", () => {
+    resetAgents();
+    const { rows, unmount } = mount({ terminals: "all" });
+    for (const r of rows()) expect(icon(r)).toBeNull();
     unmount();
   });
 });
