@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { endsAgentSession, isRunningAgentSession } from "./sessionEndPolicy";
+import { detachesRecord, endsAgentSession, isRunningAgentSession } from "./sessionEndPolicy";
 import type { AgentSession } from "./types";
 
 describe("endsAgentSession", () => {
@@ -19,6 +19,20 @@ describe("endsAgentSession", () => {
     for (const kind of ["started", "UserPromptSubmit", "Notification", "Stop", "PermissionRequest", "MessageDisplay"] as const) {
       expect(endsAgentSession(kind)).toBe(false);
     }
+  });
+});
+
+describe("detachesRecord", () => {
+  it("drops the stored record when the agent exits on a normal tab", () => {
+    expect(detachesRecord("exited", false)).toBe(true);
+  });
+
+  it("keeps the record when the exit comes from hibernating the workspace", () => {
+    expect(detachesRecord("exited", true)).toBe(false);
+  });
+
+  it("never drops it for signals that do not end the session", () => {
+    expect(detachesRecord("Stop", false)).toBe(false);
   });
 });
 

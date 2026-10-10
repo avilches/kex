@@ -887,4 +887,16 @@ mod tests {
 
         assert_eq!(mgr.terminal_tab_ids(), HashSet::from(["tab-a".to_string()]));
     }
+
+    #[test]
+    fn terminal_tab_ids_includes_hibernated_workspaces() {
+        let dir = TempDir::new().unwrap();
+        let mgr = WindowStateManager::new(dir.path().join("state.json"));
+        mgr.add_window("w-main".to_string());
+        let mut ws = ws_with_tabs(&[("tab-a", "terminal")]);
+        ws[0]["hibernated"] = serde_json::json!(true);
+        mgr.update_workspace("w-main", ws, 0);
+
+        assert_eq!(mgr.terminal_tab_ids(), HashSet::from(["tab-a".to_string()]));
+    }
 }
