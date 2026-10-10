@@ -346,6 +346,7 @@ function newWorkspace(cwd?: string): Workspace {
     color: randomColor ? undefined : null,
     paneTree: pane,
     activePaneId: pane.id,
+    detailExpanded: true,
   };
 }
 
