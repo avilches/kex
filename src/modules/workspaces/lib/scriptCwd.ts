@@ -29,19 +29,39 @@ export function resolveScriptCwd(input: ScriptCwdInput): string | undefined {
   }
 }
 
-// cmd.exe is not told apart from PowerShell: a Windows workspace is assumed to
-// run PowerShell, so a cmd.exe tab gets PowerShell syntax and the cd fails.
+/** PowerShell reads U+2018, U+2019, U+201A and U+201B as a single quote too. */
+const POWERSHELL_QUOTES = /['‘’‚‛]/g;
+
+export function isSafeScriptCwd(cwd: string): boolean {
+  return !/[\x00-\x1f\x7f]/.test(cwd);
+}
+
+export function scriptShellFor(
+  isWindows: boolean,
+  envKind: string,
+): ScriptShell {
+  return isWindows && envKind !== "wsl" ? "powershell" : "posix";
+}
+
+// The blank line before "}" keeps a command ending in "\" (or a PowerShell
+// backtick) from joining its line break with the closing brace.
+// Limitations: cmd.exe is not told apart from PowerShell (a Windows workspace
+// is assumed to run PowerShell), and fish before 4.1 has no `{ }` group, so
+// there the typed line is a syntax error and nothing runs.
 export function buildScriptInput(
   command: string,
   cwd: string | undefined,
   shell: ScriptShell,
 ): string {
-  if (!cwd || /[\r\n]/.test(cwd)) return command + "\r";
-  if (shell === "powershell") {
-    const literal = `'${cwd.replace(/'/g, "''")}'`;
-    return `Set-Location -LiteralPath ${literal}; if ($?) { ${command} }\r`;
+  if (!cwd) return command + "\r";
+  if (!isSafeScriptCwd(cwd)) {
+    throw new Error("script folder contains a control character");
   }
-  return `cd ${quoteShellArg(cwd, false)} && ${command}\r`;
+  if (shell === "powershell") {
+    const literal = `'${cwd.replace(POWERSHELL_QUOTES, (q) => q + q)}'`;
+    return `Set-Location -LiteralPath ${literal}; if ($?) { ${command}\n\n}\r`;
+  }
+  return `cd ${quoteShellArg(cwd, false)} && { ${command}\n\n}\r`;
 }
 
 /** What to type into an existing script tab, or null if it is still busy. */

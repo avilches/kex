@@ -1,8 +1,14 @@
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildScriptInput,
+  isSafeScriptCwd,
   planReusedTabInput,
   resolveScriptCwd,
+  scriptShellFor,
 } from "./scriptCwd";
 
 const base = {
@@ -94,27 +100,138 @@ describe("buildScriptInput", () => {
     expect(buildScriptInput("pnpm dev", undefined, "posix")).toBe("pnpm dev\r");
   });
 
-  it("chains cd and the command with && on posix, quoting the path", () => {
+  it("groups the command after && on posix, quoting the path", () => {
     expect(buildScriptInput("pnpm dev", "/a b/it's", "posix")).toBe(
-      "cd '/a b/it'\\''s' && pnpm dev\r",
+      "cd '/a b/it'\\''s' && { pnpm dev\n\n}\r",
     );
   });
 
   it("keeps $, backtick, double quote and % literal on posix", () => {
     for (const p of ["/a/$HOME", "/a/`x`", '/a/"q"', "/a/%PATH%"]) {
-      expect(buildScriptInput("ls", p, "posix")).toBe(`cd '${p}' && ls\r`);
+      expect(buildScriptInput("ls", p, "posix")).toBe(
+        `cd '${p}' && { ls\n\n}\r`,
+      );
     }
   });
 
-  it("does not cd when the path has a line break", () => {
-    expect(buildScriptInput("ls", "/a\nrm -rf x", "posix")).toBe("ls\r");
-    expect(buildScriptInput("ls", "/a\rb", "powershell")).toBe("ls\r");
+  it("throws on a path with any control character", () => {
+    for (const c of ["\n", "\r", "\t", "\x03", "\x00", "\x1b", "\x7f"]) {
+      expect(() => buildScriptInput("ls", `/a${c}b`, "posix")).toThrow();
+      expect(() => buildScriptInput("ls", `/a${c}b`, "powershell")).toThrow();
+    }
+  });
+
+  it("isSafeScriptCwd rejects control characters only", () => {
+    expect(isSafeScriptCwd("/a b/\u00e9")).toBe(true);
+    expect(isSafeScriptCwd("/a\tb")).toBe(false);
+    expect(isSafeScriptCwd("/a\x03b")).toBe(false);
   });
 
   it("uses a literal Set-Location guarded by $? on powershell", () => {
     expect(buildScriptInput("pnpm dev", "C:/it's [x] $a", "powershell")).toBe(
-      "Set-Location -LiteralPath 'C:/it''s [x] $a'; if ($?) { pnpm dev }\r",
+      "Set-Location -LiteralPath 'C:/it''s [x] $a'; if ($?) { pnpm dev\n\n}\r",
     );
+  });
+
+  it("closes the powershell block on its own line so a trailing comment cannot swallow it", () => {
+    expect(buildScriptInput("ls # note", "C:/a", "powershell")).toBe(
+      "Set-Location -LiteralPath 'C:/a'; if ($?) { ls # note\n\n}\r",
+    );
+  });
+
+  it("doubles every quote PowerShell treats as a single quote", () => {
+    for (const q of ["'", "\u2018", "\u2019", "\u201A", "\u201B"]) {
+      expect(buildScriptInput("ls", `C:/a${q}b`, "powershell")).toBe(
+        `Set-Location -LiteralPath 'C:/a${q}${q}b'; if ($?) { ls\n\n}\r`,
+      );
+    }
+  });
+
+  it("adds no group when there is no folder", () => {
+    expect(buildScriptInput("a; b", undefined, "powershell")).toBe("a; b\r");
+  });
+});
+
+describe("scriptShellFor", () => {
+  it("is powershell only on Windows outside WSL", () => {
+    expect(scriptShellFor(true, "local")).toBe("powershell");
+    expect(scriptShellFor(true, "wsl")).toBe("posix");
+    expect(scriptShellFor(false, "local")).toBe("posix");
+    expect(scriptShellFor(false, "wsl")).toBe("posix");
+  });
+});
+
+const hasBash =
+  process.platform !== "win32" &&
+  spawnSync("bash", ["-c", "exit 0"]).status === 0;
+
+// Non-interactive bash: it checks grouping and cd semantics, but not what an
+// interactive zsh does with a trailing "# comment" (it needs interactive_comments).
+describe.skipIf(!hasBash)("posix input run by a non-interactive bash", () => {
+  const run = (command: string, cwd: string) => {
+    const dir = mkdtempSync(join(tmpdir(), "kex-cwd-"));
+    try {
+      const input = buildScriptInput(
+        command.replace(/@OUT/g, dir),
+        cwd,
+        "posix",
+      ).replace(/\r$/, "\n");
+      const res = spawnSync("bash", ["-c", input], { cwd: dir });
+      const read = (f: string) =>
+        existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8") : "";
+      return {
+        error: res.error,
+        status: res.status,
+        ran: read("ran"),
+        ranB: read("ranB"),
+      };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  const missing = "/definitely/not/here";
+
+  it("runs a compound command when the cd works", () => {
+    const r = run("echo a > @OUT/ran; echo b > @OUT/ranB", tmpdir());
+    expect(r.error).toBeUndefined();
+    expect(r.status).toBe(0);
+    expect(r.ran).toBe("a\n");
+    expect(r.ranB).toBe("b\n");
+  });
+
+  it("runs nothing of a ';' chain when the cd fails", () => {
+    const r = run("true; echo b > @OUT/ranB", missing);
+    expect(r.error).toBeUndefined();
+    expect(r.status).toBe(1);
+    expect(r.ranB).toBe("");
+  });
+
+  it("runs nothing of a '||' chain when the cd fails", () => {
+    const r = run("false || echo b > @OUT/ranB", missing);
+    expect(r.error).toBeUndefined();
+    expect(r.status).toBe(1);
+    expect(r.ranB).toBe("");
+  });
+
+  it("runs nothing of a multiline command when the cd fails", () => {
+    const r = run("echo a > @OUT/ran\necho b > @OUT/ranB", missing);
+    expect(r.error).toBeUndefined();
+    expect(r.status).toBe(1);
+    expect(r.ran + r.ranB).toBe("");
+  });
+
+  it("a trailing comment does not break the group", () => {
+    const r = run("echo a > @OUT/ran # note", tmpdir());
+    expect(r.error).toBeUndefined();
+    expect(r.status).toBe(0);
+    expect(r.ran).toBe("a\n");
+  });
+
+  it("a trailing backslash does not swallow the closing brace", () => {
+    const r = run("echo a > @OUT/ran \\", tmpdir());
+    expect(r.error).toBeUndefined();
+    expect(r.status).toBe(0);
+    expect(r.ran).toBe("a\n");
   });
 });
 
@@ -125,7 +242,7 @@ describe("planReusedTabInput", () => {
 
   it("cds first on an idle tab whenever a folder resolves", () => {
     expect(planReusedTabInput(false, "ls", "/a", "posix")).toBe(
-      "cd '/a' && ls\r",
+      "cd '/a' && { ls\n\n}\r",
     );
   });
 
