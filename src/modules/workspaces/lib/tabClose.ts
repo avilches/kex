@@ -8,3 +8,11 @@ import type { Tab } from "./types";
 export function isBulkClosable(tab: Tab): boolean {
   return !(tab.locked ?? false);
 }
+
+export function bulkClosableIds(tabs: Tab[]): string[] {
+  return tabs.filter(isBulkClosable).map((t) => t.id);
+}
+
+export function otherBulkClosableIds(tabs: Tab[], keepId: string): string[] {
+  return tabs.filter((t) => t.id !== keepId && isBulkClosable(t)).map((t) => t.id);
+}

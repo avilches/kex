@@ -1,9 +1,24 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { resolveRenameShortcut, useTabRenameStore } from "./tabRenameStore";
+import { isRenamingAt, resolveRenameShortcut, useTabRenameStore } from "./tabRenameStore";
 
 describe("tabRenameStore", () => {
   beforeEach(() => {
-    useTabRenameStore.setState({ renamingTabId: null, saveSeq: 0 });
+    useTabRenameStore.setState({ renamingTabId: null, renamingOrigin: "pane", saveSeq: 0 });
+  });
+
+  test("startRename defaults to the pane origin and records the sidebar one", () => {
+    useTabRenameStore.getState().startRename("tab-abc");
+    expect(useTabRenameStore.getState().renamingOrigin).toBe("pane");
+    useTabRenameStore.getState().startRename("tab-abc", "sidebar");
+    expect(useTabRenameStore.getState().renamingOrigin).toBe("sidebar");
+  });
+
+  test("isRenamingAt matches only the tab and the origin that started the rename", () => {
+    useTabRenameStore.getState().startRename("tab-abc", "sidebar");
+    const state = useTabRenameStore.getState();
+    expect(isRenamingAt(state, "tab-abc", "sidebar")).toBe(true);
+    expect(isRenamingAt(state, "tab-abc", "pane")).toBe(false);
+    expect(isRenamingAt(state, "tab-xyz", "sidebar")).toBe(false);
   });
 
   test("initial state has no tab being renamed", () => {

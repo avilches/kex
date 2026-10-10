@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { isBulkClosable } from "./tabClose";
+import { bulkClosableIds, isBulkClosable, otherBulkClosableIds } from "./tabClose";
 import type { Tab } from "./types";
 
 describe("isBulkClosable", () => {
@@ -34,5 +34,22 @@ describe("isBulkClosable", () => {
     expect(isBulkClosable(gitDiff)).toBe(true);
     expect(isBulkClosable(browser)).toBe(true);
     expect(isBulkClosable(markdown)).toBe(true);
+  });
+});
+
+describe("bulk close selection", () => {
+  const tabs: Tab[] = [
+    { id: "a", kind: "terminal" },
+    { id: "b", kind: "terminal", locked: true },
+    { id: "c", kind: "browser", url: "http://localhost" },
+  ];
+
+  test("bulkClosableIds skips locked tabs", () => {
+    expect(bulkClosableIds(tabs)).toEqual(["a", "c"]);
+  });
+
+  test("otherBulkClosableIds also skips the kept tab", () => {
+    expect(otherBulkClosableIds(tabs, "a")).toEqual(["c"]);
+    expect(otherBulkClosableIds(tabs, "b")).toEqual(["a", "c"]);
   });
 });

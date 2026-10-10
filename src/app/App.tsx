@@ -109,7 +109,7 @@ import type { TabMoveRequest } from "@/modules/workspaces/lib/tabTransfer";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
 import { flashLockIcon } from "@/modules/workspaces/lib/lockFlashStore";
-import { isBulkClosable } from "@/modules/workspaces/lib/tabClose";
+import { bulkClosableIds, otherBulkClosableIds } from "@/modules/workspaces/lib/tabClose";
 import { scratchpadLeafsToClose } from "@/modules/workspaces/lib/scratchpadLeave";
 import { flashTab } from "@/modules/workspaces/lib/tabFlashStore";
 import {
@@ -2603,15 +2603,13 @@ export default function App() {
 
   const handleCloseOtherTabs = useCallback(() => {
     if (!activePane || !activeTabId) return;
-    const ids = activePane.tabs
-      .filter((p) => p.id !== activeTabId && isBulkClosable(p))
-      .map((p) => p.id);
+    const ids = otherBulkClosableIds(activePane.tabs, activeTabId);
     if (ids.length) closeTabsRef.current(ids);
   }, [activePane, activeTabId]);
 
   const handleCloseAllTabs = useCallback(() => {
     if (!activePane) return;
-    const ids = activePane.tabs.filter(isBulkClosable).map((p) => p.id);
+    const ids = bulkClosableIds(activePane.tabs);
     if (ids.length) closeTabsRef.current(ids);
   }, [activePane]);
 

@@ -515,7 +515,7 @@ destination is invalid (missing workspace or pane, same workspace, pane limit re
 split) the same array is returned and nothing moves. `lib/tabTransfer.ts` holds the placement logic
 (`attachTab`, `workspaceForTab`).
 
-The context menu of a tab has "Move to Workspace" (`PaneTabBar.tsx`, fed by `WorkspaceMoveContext`):
+The context menu of a tab has "Move to Workspace" (`TabContextMenuItems.tsx`, the menu body shared by the pane tab and the sidebar rows, fed by `WorkspaceMoveContext`):
 "New", then every other workspace with a dot of its color. Choosing a workspace uses the `auto`
 placement: a single pane with tabs is split in two and the tab lands in the new right half; an already
 split workspace gets the tab in its active pane; a single empty pane receives it without splitting. The
