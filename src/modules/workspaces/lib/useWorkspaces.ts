@@ -713,6 +713,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, [openTab, activeWorkspaceId]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
+    if (workspacesRef.current.find((w) => w.id === workspaceId)?.hibernated) return;
     const sealedTab = newTab;
     recordActivation(paneId, sealedTab.id);
     setWorkspaces((prev) =>
