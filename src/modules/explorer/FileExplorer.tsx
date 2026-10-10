@@ -11,10 +11,10 @@ import {
   ClipboardIcon,
   ComputerTerminal01Icon,
   CopySlashIcon,
+  CrosshairIcon,
   DashboardSquareAddIcon,
   FileAddIcon,
   Folder01Icon,
-  FocusPointIcon,
   FolderAddIcon,
   FolderOpenIcon,
   HierarchyFilesIcon,
@@ -1225,7 +1225,7 @@ export const FileExplorer = memo(
             title="Focus the active tab's file or folder in the explorer"
             aria-label="Focus active tab in explorer"
           >
-            <HugeiconsIcon icon={FocusPointIcon} size={13} strokeWidth={2} />
+            <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
           </Button>
           <Button
             variant="ghost"
