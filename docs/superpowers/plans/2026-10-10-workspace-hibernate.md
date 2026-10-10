@@ -22,7 +22,7 @@
 - Componentes de formulario siempre de shadcn (`Button`, `AlertDialog`...), nunca HTML nativo con estilos ad-hoc.
 - Cualquier cambio de logica nuclear lleva un test que fija el invariante.
 - Trabajo en el worktree `.claude/worktrees/workspace-hibernate`; no tocar el checkout principal.
-- Documentacion viva en el mismo commit que el cambio de codigo (Task 5 la concentra, pero cada tarea que cambie comportamiento visible la menciona en su commit si ya existe la seccion).
+- Documentacion viva en el mismo commit que el cambio de codigo (`AGENTS.md`): cada tarea actualiza las docs que toca.
 
 ## Review Focus
 
@@ -31,6 +31,11 @@
 3. Una sesion de agente que muere sin que su senal llegue (el PTY se descarta antes) no debe dejar un spinner fantasma en la WorkspaceBar. Test: hibernar llama a `finish` para cada terminal.
 4. Un agente con spinner que ademas no tiene Run on start no debe salir duplicado en dos listas del modal. Test en `hibernateReview`.
 5. Una terminal de script del RunButton con comando en marcha no debe avisar ni ofrecer Run on start. Test en `hibernateReview`.
+6. Una ventana flotante de navegador de un workspace hibernado no debe resucitar al reiniciar ni quedar huerfana al despertar. Test: `applyHibernate` pone `floating: false`.
+7. Con el workspace activo hibernado, los atajos de tabs, terminal y editor no deben actuar sobre tabs invisibles. Test de `shortcutsDisabled` (funcion pura extraida).
+8. El modal y el runtime deben coincidir en que significa "Run on start": en ejecucion (`useTerminalSession.ts`, `runOnStart = restoreOnRestart !== false`) un comando solo se relanza si hay plan de agente o `persistentCommand`. Tests de `hibernateReview` para `restoreOnRestart` indefinido con y sin `persistentCommand`.
+9. Dos disparos seguidos de hibernar (el efecto del modal se redispara al limpiar las sesiones) no deben hibernar dos veces. Test de `useHibernateFlow`.
+10. Las notificaciones y la lista anidada de la WorkspaceBar no deben referirse a tabs de un workspace hibernado.
 
 ---
 
@@ -51,17 +56,20 @@
 | `src-tauri/src/modules/window_state.rs` | Modificar | Test: workspace hibernado cuenta en `terminal_tab_ids` |
 | `src/modules/workspaces/lib/useWorkspaces.ts` | Modificar | `hibernateWorkspace`, `wakeWorkspace` |
 | `src/modules/workspaces/lib/useWorkspaces.test.ts` | Modificar | Tests de la transicion |
-| `src/modules/editor/lib/useDocument.ts` | Modificar | `discardUnflushedBuffers(tabIds)` exportado |
+| `src/modules/editor/lib/unflushedBuffers.ts` | Crear | Mapa de buffers sin guardar por tabId y `discardUnflushedBuffers` (extraido de `useDocument.ts`) |
+| `src/modules/editor/lib/unflushedBuffers.test.ts` | Crear | Tests sin mocks |
+| `src/modules/editor/lib/useDocument.ts` | Modificar | Importar el mapa extraido |
+| `src/modules/shortcuts/shortcuts.test.ts` | Modificar | Test del atajo `workspace.hibernate` |
+| `src/modules/workspaces/lib/useHibernateFlow.test.ts` | Crear | Tests de la fabrica `createHibernateFlow` |
 | `src/modules/workspaces/WorkspaceView.tsx` | Modificar | Arbol sin tabs + `HibernatedOverlay` |
 | `src/modules/workspaces/HibernatedOverlay.tsx` | Crear | Capa Zzzzz con boton Restore |
 | `src/modules/workspaces/SplitNodeView.tsx` | Modificar | Propagar `hibernated` a `PaneView` |
 | `src/modules/workspaces/PaneView.tsx` | Modificar | Render vacio si `hibernated` |
-| `src/app/App.tsx` | Modificar | Barrido de sesiones, atajo, wiring del flujo y del modal |
-| `src/app/components/WorkspaceBar.tsx` | Modificar | Lista anidada vacia para hibernados |
+| `src/app/App.tsx` | Modificar | Barrido de sesiones, lista anidada y ubicaciones de tabs sin hibernados, `shortcutsDisabled`, atajo, wiring del flujo y del modal |
 | `src/app/components/HibernateDialog.tsx` | Crear | Modal reactivo reutilizable |
 | `src/modules/workspaces/lib/useHibernateFlow.ts` | Crear | Orquestacion: pedir, revisar, hibernar |
 | `src/modules/shortcuts/shortcuts.ts` | Modificar | Atajo `workspace.hibernate` |
-| `docs/ARCHITECTURE.md`, `docs/WORKSPACES.md`, `docs/AGENT_SESSION_RESTORE.md`, `docs/FORK.md`, `CLAUDE.md` | Modificar | Documentacion y glosario |
+| `docs/ARCHITECTURE.md`, `docs/WORKSPACES.md`, `docs/AGENT_SESSION_RESTORE.md`, `docs/FORK.md`, `CLAUDE.md` | Modificar | Documentacion y glosario, repartida en el commit de cada tarea |
 
 ---
 
@@ -75,6 +83,8 @@
 **Interfaces:**
 - Produces (`hibernate.ts`):
   - `stripTabs(node: SplitNode): SplitNode`
+  - `strippedTree(node: SplitNode): SplitNode` (igual que `stripTabs` pero cacheado por identidad del nodo, para no romper el `memo` de `SplitNodeView`)
+  - `blockedWhileHibernated(id: ShortcutId): boolean`
   - `applyHibernate(workspaces: Workspace[], workspaceId: string): Workspace[]`
   - `applyWake(workspaces: Workspace[], workspaceId: string): Workspace[]`
   - `terminalTabs(ws: Workspace): Extract<Tab, { kind: "terminal" }>[]`
@@ -106,9 +116,11 @@ import { describe, expect, it } from "vitest";
 import {
   applyHibernate,
   applyWake,
+  blockedWhileHibernated,
   editorTabIds,
   enableRunOnStart,
   stripTabs,
+  strippedTree,
   terminalTabs,
 } from "./hibernate";
 import type { SplitNode, Tab, Workspace } from "./types";
@@ -169,6 +181,15 @@ describe("applyHibernate", () => {
     expect(terminalTabs(out[0]!).map((t) => t.id)).toEqual(["t1"]);
   });
 
+  it("turns off floating on browser tabs so the window is not reopened on restart", () => {
+    const b: Tab = { id: "b1", kind: "browser", url: "https://x.test", floating: true };
+    const w = ws({ paneTree: { kind: "pane", id: "p1", tabs: [b], activeTabId: "b1" } });
+    const out = applyHibernate([w], "w1")[0]!;
+    const pane = out.paneTree as Extract<SplitNode, { kind: "pane" }>;
+    const tab = pane.tabs[0]!;
+    expect(tab.kind === "browser" && tab.floating).toBe(false);
+  });
+
   it("clears dirty on editor and markdown tabs, which are about to be unmounted", () => {
     const out = applyHibernate([ws()], "w1")[0]!;
     const tabs = (out.paneTree as Extract<SplitNode, { kind: "split" }>);
@@ -185,6 +206,26 @@ describe("applyWake", () => {
     const out = applyWake(hib, "w1")[0]!;
     expect("hibernated" in out).toBe(false);
     expect(out.paneTree).toEqual(hib[0]!.paneTree);
+  });
+});
+
+describe("strippedTree", () => {
+  it("returns the same reference for the same input tree", () => {
+    expect(strippedTree(tree)).toBe(strippedTree(tree));
+  });
+});
+
+describe("blockedWhileHibernated", () => {
+  it("blocks tab, pane, terminal, editor and script shortcuts", () => {
+    for (const id of ["tab.new", "tab.close", "pane.splitRight", "terminal.clear", "editor.save", "workspace.run", "search.focus"] as const) {
+      expect(blockedWhileHibernated(id)).toBe(true);
+    }
+  });
+
+  it("lets workspace, window, view and settings shortcuts through", () => {
+    for (const id of ["workspace.hibernate", "workspace.new", "workspace.next", "window.new", "view.zoomIn", "settings.open"] as const) {
+      expect(blockedWhileHibernated(id)).toBe(false);
+    }
   });
 });
 
@@ -231,6 +272,7 @@ Expected: FAIL (modulo `./hibernate` inexistente).
 - [ ] **Step 4: Implementar `hibernate.ts`**
 
 ```ts
+import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { allPanes } from "./splitNode";
 import type { PaneNode, SplitNode, Tab, Workspace } from "./types";
 
@@ -241,22 +283,45 @@ export function stripTabs(node: SplitNode): SplitNode {
   return { ...node, first: stripTabs(node.first), second: stripTabs(node.second) };
 }
 
-function clearDirty(node: SplitNode): SplitNode {
+// Editors are about to be unmounted (their unsaved state goes with them) and a
+// floating browser window is destroyed, so neither flag may outlive hibernation.
+const strippedCache = new WeakMap<SplitNode, SplitNode>();
+
+export function strippedTree(node: SplitNode): SplitNode {
+  let out = strippedCache.get(node);
+  if (!out) {
+    out = stripTabs(node);
+    strippedCache.set(node, out);
+  }
+  return out;
+}
+
+// Shortcuts that act on tabs, terminals, editors or scripts have nothing to act
+// on while the workspace is asleep (its tabs are in the tree but not mounted).
+const BLOCKED_PREFIXES = ["tab.", "pane.", "terminal.", "editor.", "markdown.", "file.", "path."];
+
+export function blockedWhileHibernated(id: ShortcutId): boolean {
+  return id === "search.focus" || id === "workspace.run" || BLOCKED_PREFIXES.some((p) => id.startsWith(p));
+}
+
+function clearTransientTabState(node: SplitNode): SplitNode {
   if (node.kind === "pane") {
     const pane: PaneNode = {
       ...node,
-      tabs: node.tabs.map((t) =>
-        t.kind === "editor" ? { ...t, dirty: false } : t.kind === "markdown" ? { ...t, dirty: false } : t,
-      ),
+      tabs: node.tabs.map((t) => {
+        if (t.kind === "editor" || t.kind === "markdown") return { ...t, dirty: false };
+        if (t.kind === "browser") return { ...t, floating: false };
+        return t;
+      }),
     };
     return pane;
   }
-  return { ...node, first: clearDirty(node.first), second: clearDirty(node.second) };
+  return { ...node, first: clearTransientTabState(node.first), second: clearTransientTabState(node.second) };
 }
 
 export function applyHibernate(workspaces: Workspace[], workspaceId: string): Workspace[] {
   return workspaces.map((w) =>
-    w.id === workspaceId ? { ...w, hibernated: true, paneTree: clearDirty(w.paneTree) } : w,
+    w.id === workspaceId ? { ...w, hibernated: true, paneTree: clearTransientTabState(w.paneTree) } : w,
   );
 }
 
@@ -362,12 +427,25 @@ describe("hibernateReview commands", () => {
     expect(r.commands.map((c) => c.command)).toEqual(["npm run dev"]);
   });
 
-  it("lists a terminal that has a persistent command but Run on start off", () => {
-    const r = hibernateReview(ws([term("t1", { persistentCommand: "make watch" })]), live());
+  it("lists a terminal that has a persistent command but Run on start explicitly off", () => {
+    const r = hibernateReview(
+      ws([term("t1", { persistentCommand: "make watch", restoreOnRestart: false })]),
+      live(),
+    );
     expect(r.commands.map((c) => c.command)).toEqual(["make watch"]);
   });
 
-  it("does not list a terminal with Run on start", () => {
+  it("does not list a terminal whose persistent command replays on its own (restoreOnRestart unset)", () => {
+    const r = hibernateReview(ws([term("t1", { persistentCommand: "make watch" })]), live({}, { t1: "make watch" }));
+    expect(isReviewEmpty(r)).toBe(true);
+  });
+
+  it("lists a terminal with Run on start on but no command saved, since nothing would replay", () => {
+    const r = hibernateReview(ws([term("t1", { restoreOnRestart: true })]), live({}, { t1: "npm run dev" }));
+    expect(r.commands.map((c) => c.command)).toEqual(["npm run dev"]);
+  });
+
+  it("does not list a terminal with Run on start and a saved command", () => {
     const r = hibernateReview(
       ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]),
       live({}, { t1: "make" }),
@@ -426,10 +504,12 @@ export function isReviewEmpty(r: HibernateReview): boolean {
   return r.agents.length === 0 && r.docs.length === 0 && r.commands.length === 0;
 }
 
-// Agents default to restoring; plain terminals default to not (same rule as the
-// "Run on start" checkbox in TerminalPathBarMenu).
-function runsOnStart(tab: Extract<Tab, { kind: "terminal" }>, isAgent: boolean): boolean {
-  return isAgent ? tab.restoreOnRestart !== false : (tab.restoreOnRestart ?? false);
+// Mirrors what useTerminalSession does on spawn: with restoreOnRestart not
+// explicitly off, an agent resumes from its stored session and a plain terminal
+// replays its persistentCommand. Anything else comes back as an empty shell.
+function comesBack(tab: Extract<Tab, { kind: "terminal" }>, isAgent: boolean): boolean {
+  if (tab.restoreOnRestart === false) return false;
+  return isAgent || !!tab.persistentCommand;
 }
 
 export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateReview {
@@ -449,7 +529,7 @@ export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateRe
       continue;
     }
     if (scriptTabs.has(tab.id)) continue;
-    if (runsOnStart(tab, agent !== undefined)) continue;
+    if (comesBack(tab, agent !== undefined)) continue;
     const command = live.runningCommand(tab.id) ?? tab.persistentCommand ?? agent?.agent;
     if (!command) continue;
     review.commands.push({ tabId: tab.id, title: tab.title, command });
@@ -479,6 +559,7 @@ git commit -m "Add pure core for hibernated workspaces"
 - Modify: `src/modules/agents/lib/sessionEndPolicy.ts`, `src/modules/agents/lib/sessionEndPolicy.test.ts`
 - Modify: `src/modules/agents/components/AgentNotificationsBridge.tsx` (linea ~135)
 - Modify: `src-tauri/src/modules/window_state.rs` (modulo de tests, junto a `terminal_tab_ids_survives_an_empty_window`)
+- Modify: `docs/AGENT_SESSION_RESTORE.md`
 
 **Interfaces:**
 - Produces: `markHibernating(tabIds: Iterable<string>): void`, `unmarkHibernating(tabIds: Iterable<string>): void`, `isHibernating(tabId: string): boolean`, `detachesRecord(kind: AgentSignal["kind"], hibernating: boolean): boolean`.
@@ -585,11 +666,8 @@ En `window_state.rs`, dentro del `mod tests`, tras `terminal_tab_ids_survives_an
         let dir = TempDir::new().unwrap();
         let mgr = WindowStateManager::new(dir.path().join("state.json"));
         mgr.add_window("w-main".to_string());
-        let ws = serde_json::json!([{
-            "id": "ws-1",
-            "hibernated": true,
-            "paneTree": {"type": "leaf", "pane": {"id": "pane-1", "tabs": [{"id": "tab-a", "kind": "terminal"}]}}
-        }]);
+        let mut ws = ws_with_tabs(&[("tab-a", "terminal")]);
+        ws[0]["hibernated"] = serde_json::json!(true);
         mgr.update_workspace("w-main", ws, 0);
 
         assert_eq!(mgr.terminal_tab_ids(), HashSet::from(["tab-a".to_string()]));
@@ -601,10 +679,14 @@ En `window_state.rs`, dentro del `mod tests`, tras `terminal_tab_ids_survives_an
 Run: `pnpm test src/modules/agents && pnpm check-types && pnpm lint && cd src-tauri && cargo test --locked terminal_tab_ids && cargo clippy`
 Expected: PASS. (El test Rust pasa desde el primer momento: es una regresion que fija un invariante existente.)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Documentar en este mismo commit**
+
+En `docs/AGENT_SESSION_RESTORE.md`, anadir una seccion "Hibernating a workspace": `hibernatingTabs`, `detachesRecord`, y la dependencia de orden que hoy protege el registro (`disposeSession` descarta la sesion de forma sincrona y `leafIdForPty` devuelve `null` cuando llega `exited`; el conjunto lo vuelve explicito).
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/modules/agents src-tauri/src/modules/window_state.rs
+git add src/modules/agents src-tauri/src/modules/window_state.rs docs/AGENT_SESSION_RESTORE.md
 git commit -m "Keep agent session records when a workspace hibernates"
 ```
 
@@ -614,25 +696,38 @@ git commit -m "Keep agent session records when a workspace hibernates"
 
 **Files:**
 - Modify: `src/modules/workspaces/lib/useWorkspaces.ts`, `src/modules/workspaces/lib/useWorkspaces.test.ts`
+- Create: `src/modules/editor/lib/unflushedBuffers.ts`, `src/modules/editor/lib/unflushedBuffers.test.ts`
 - Modify: `src/modules/editor/lib/useDocument.ts`
 - Create: `src/modules/workspaces/HibernatedOverlay.tsx`
 - Modify: `src/modules/workspaces/WorkspaceView.tsx`, `SplitNodeView.tsx`, `PaneView.tsx`
-- Modify: `src/app/App.tsx` (barrido de sesiones, ~linea 640-675), `src/app/components/WorkspaceBar.tsx`
+- Modify: `src/app/App.tsx` (barrido de sesiones ~640-675; `setTabLocations` ~2947; `shortcutsDisabled` ~2911; `workspaceBarItems` ~3153; `runWorkspaceConfig` ~708)
+- Modify: `docs/ARCHITECTURE.md`, `docs/WORKSPACES.md`
 
 **Interfaces:**
-- Consumes (Task 1): `applyHibernate`, `applyWake`, `stripTabs`, `terminalTabs`, `editorTabIds`. (Task 2): `unmarkHibernating`.
-- Produces: `useWorkspaces()` devuelve ademas `hibernateWorkspace(workspaceId: string): void` y `wakeWorkspace(workspaceId: string): Promise<void>`. `useDocument.ts` exporta `discardUnflushedBuffers(tabIds: Iterable<string>): void`. `WorkspaceView` recibe la prop nueva `onWake: (workspaceId: string) => void`.
+- Consumes (Task 1): `applyHibernate`, `applyWake`, `strippedTree`, `terminalTabs`, `editorTabIds`, `blockedWhileHibernated`. (Task 2): `unmarkHibernating`.
+- Produces: `useWorkspaces()` devuelve ademas `hibernateWorkspace(workspaceId: string): void` y `wakeWorkspace(workspaceId: string): Promise<void>`. `seedWakePlans(ws, lookup, seed): Promise<void>` exportada y pura. `unflushedBuffers.ts` exporta `stashUnflushedBuffer(tabId, text)`, `takeUnflushedBuffer(tabId): string | undefined`, `hasUnflushedBuffer(tabId)`, `discardUnflushedBuffers(tabIds)`. `WorkspaceView` recibe la prop nueva `onWake: (workspaceId: string) => void`.
 
-- [ ] **Step 1: Test de `discardUnflushedBuffers` (falla)**
+- [ ] **Step 1: Extraer los buffers sin guardar (TDD)**
 
-Mirar como `useDocument.ts` ya se prueba (si hay `useDocument.test.ts`, anadir ahi; si no, crear `src/modules/editor/lib/unflushedBuffers.test.ts`). Para poder testearlo sin montar el hook, exportar tambien `hasUnflushedBuffer(tabId): boolean` y `stashUnflushedBuffer(tabId, text): void` desde `useDocument.ts` (el efecto de desmontaje pasa a usar `stashUnflushedBuffer`). Test:
+`src/modules/editor/lib/unflushedBuffers.test.ts` (sin mocks; `useDocument.test.ts` mockea tauri y sonner y no hace falta arrastrarlos):
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { discardUnflushedBuffers, hasUnflushedBuffer, stashUnflushedBuffer } from "./useDocument";
+import {
+  discardUnflushedBuffers,
+  hasUnflushedBuffer,
+  stashUnflushedBuffer,
+  takeUnflushedBuffer,
+} from "./unflushedBuffers";
 
-describe("discardUnflushedBuffers", () => {
-  it("drops the carried edits of the given tabs only", () => {
+describe("unflushedBuffers", () => {
+  it("returns and removes a stashed buffer", () => {
+    stashUnflushedBuffer("t1", "text");
+    expect(takeUnflushedBuffer("t1")).toBe("text");
+    expect(hasUnflushedBuffer("t1")).toBe(false);
+  });
+
+  it("discards the carried edits of the given tabs only", () => {
     stashUnflushedBuffer("t1", "a");
     stashUnflushedBuffer("t2", "b");
     discardUnflushedBuffers(["t1"]);
@@ -643,31 +738,39 @@ describe("discardUnflushedBuffers", () => {
 });
 ```
 
-Run: `pnpm test src/modules/editor/lib` Expected: FAIL.
+Run: `pnpm test src/modules/editor/lib/unflushedBuffers.test.ts`. Expected: FAIL (modulo inexistente).
 
-- [ ] **Step 2: Implementar en `useDocument.ts`**
-
-Junto a `const unflushedBuffers = new Map<string, string>();` (linea 24):
+`src/modules/editor/lib/unflushedBuffers.ts`:
 
 ```ts
+// An editor unmounted with unsaved edits and autosave off carries them here, keyed
+// by tab id, so the same tab remounting picks them up again.
+const buffers = new Map<string, string>();
+
 export function stashUnflushedBuffer(tabId: string, text: string): void {
-  unflushedBuffers.set(tabId, text);
+  buffers.set(tabId, text);
+}
+
+export function takeUnflushedBuffer(tabId: string): string | undefined {
+  const text = buffers.get(tabId);
+  buffers.delete(tabId);
+  return text;
 }
 
 export function hasUnflushedBuffer(tabId: string): boolean {
-  return unflushedBuffers.has(tabId);
+  return buffers.has(tabId);
 }
 
 export function discardUnflushedBuffers(tabIds: Iterable<string>): void {
-  for (const id of tabIds) unflushedBuffers.delete(id);
+  for (const id of tabIds) buffers.delete(id);
 }
 ```
 
-y en el efecto de desmontaje (linea ~294) reemplazar `unflushedBuffers.set(tabId, bufferRef.current);` por `stashUnflushedBuffer(tabId, bufferRef.current);`. Run del test: PASS.
+En `useDocument.ts`: borrar `const unflushedBuffers = new Map<string, string>();` (linea 24), importar el modulo nuevo, sustituir en la linea ~112-113 `const unflushed = unflushedBuffers.get(tabId); unflushedBuffers.delete(tabId);` por `const unflushed = takeUnflushedBuffer(tabId);` y en la linea ~294 `unflushedBuffers.set(tabId, bufferRef.current)` por `stashUnflushedBuffer(tabId, bufferRef.current)`. Run: `pnpm test src/modules/editor` (incluye `useDocument.test.ts`). Expected: PASS.
 
-- [ ] **Step 3: Tests de la transicion en `useWorkspaces.test.ts` (fallan)**
+- [ ] **Step 2: Tests de despertar en `useWorkspaces.test.ts` (fallan)**
 
-El archivo prueba funciones `apply*` exportadas. Anadir una funcion pura exportada `planWake(ws: Workspace): string[]` en `useWorkspaces.ts` que devuelva los ids de las terminales para las que hay que pedir plan de resume (`needsResumePlanLookup`), y probarla:
+Anadir (importar `planWake` y `seedWakePlans` en el import existente):
 
 ```ts
 describe("planWake", () => {
@@ -687,19 +790,71 @@ describe("planWake", () => {
     expect(planWake(w)).toEqual(["a"]);
   });
 });
+
+describe("seedWakePlans", () => {
+  const plan = { tabId: "a", agent: "claude", resumeCmd: "claude --resume x", cwdLaunch: "/p", errorReason: "" };
+
+  it("seeds the plan under the same tab id for each terminal that has one", async () => {
+    const seeded: [string, unknown][] = [];
+    const w = ws({
+      paneTree: {
+        kind: "pane",
+        id: "p1",
+        activeTabId: "a",
+        tabs: [
+          { id: "a", kind: "terminal" },
+          { id: "b", kind: "terminal" },
+        ],
+      },
+    });
+    await seedWakePlans(
+      w,
+      async (id) => (id === "a" ? plan : null),
+      (id, p) => seeded.push([id, p]),
+    );
+    expect(seeded).toEqual([["a", plan]]);
+  });
+
+  it("does not look up terminals that opted out", async () => {
+    const asked: string[] = [];
+    const w = ws({
+      paneTree: {
+        kind: "pane",
+        id: "p1",
+        activeTabId: "a",
+        tabs: [{ id: "a", kind: "terminal", restoreOnRestart: false }],
+      },
+    });
+    await seedWakePlans(w, async (id) => (asked.push(id), null), () => {});
+    expect(asked).toEqual([]);
+  });
+});
 ```
 
-(importar `planWake` en la linea de imports del archivo). Run: FAIL.
+Run: `pnpm test src/modules/workspaces/lib/useWorkspaces.test.ts`. Expected: FAIL.
 
-- [ ] **Step 4: Implementar en `useWorkspaces.ts`**
+- [ ] **Step 3: Implementar en `useWorkspaces.ts`**
 
-Imports nuevos al principio: `import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";`, `import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";`, `import { discardUnflushedBuffers } from "@/modules/editor/lib/useDocument";`.
+Imports nuevos: `import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";`, `import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";`, `import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";`, y el tipo `RestorePlan` de `@/modules/agents/lib/agentSessionRestore` (ya se importan `previewResumeCmd` y `seedRestorePlan` de ahi).
 
 Junto a `needsResumePlanLookup`:
 
 ```ts
 export function planWake(ws: Workspace): string[] {
   return terminalTabs(ws).filter(needsResumePlanLookup).map((t) => t.id);
+}
+
+export async function seedWakePlans(
+  ws: Workspace,
+  lookup: (tabId: string) => Promise<RestorePlan | null>,
+  seed: (tabId: string, plan: RestorePlan) => void,
+): Promise<void> {
+  await Promise.all(
+    planWake(ws).map(async (tabId) => {
+      const plan = await lookup(tabId);
+      if (plan) seed(tabId, plan);
+    }),
+  );
 }
 ```
 
@@ -713,32 +868,29 @@ Dentro del hook, antes de `// ── Derived`:
   const wakeWorkspace = useCallback(async (workspaceId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     if (!ws?.hibernated) return;
-    await Promise.all(
-      planWake(ws).map(async (tabId) => {
-        const plan = await previewResumeCmd(tabId);
-        if (plan) seedRestorePlan(tabId, plan);
-      }),
-    );
+    await seedWakePlans(ws, previewResumeCmd, seedRestorePlan);
     discardUnflushedBuffers(editorTabIds(ws));
     unmarkHibernating(terminalTabs(ws).map((t) => t.id));
     setWorkspaces((prev) => applyWake(prev, workspaceId));
   }, []);
 ```
 
-y anadir `hibernateWorkspace, wakeWorkspace` al objeto devuelto.
+Anadir `hibernateWorkspace, wakeWorkspace` al objeto devuelto. Ademas, `openTab` y `splitPaneAndOpenTab` no deben anadir tabs a un workspace hibernado (por ejemplo al abrir un fichero desde el explorer con el Sidebar a la vista): al principio de cada callback, leer `workspacesRef.current.find(...)` y, si `hibernated`, devolver sin hacer nada (`null` en `splitPaneAndOpenTab`, que ya devuelve un id de pane; seguir el contrato existente de "split bloqueado").
 
-- [ ] **Step 5: Capa `HibernatedOverlay.tsx`**
+Run: `pnpm test src/modules/workspaces/lib/useWorkspaces.test.ts`. Expected: PASS.
+
+- [ ] **Step 4: Capa `HibernatedOverlay.tsx`**
 
 ```tsx
 import { Button } from "@/components/ui/button";
 
-type Props = { onWake: () => void };
+type Props = { onWake: () => void; active: boolean };
 
-export function HibernatedOverlay({ onWake }: Props) {
+export function HibernatedOverlay({ onWake, active }: Props) {
   return (
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-background/95 text-muted-foreground">
       <span className="select-none text-5xl font-light tracking-widest">Zzzzz</span>
-      <Button variant="outline" size="sm" onClick={onWake} autoFocus>
+      <Button variant="outline" size="sm" onClick={onWake} autoFocus={active}>
         Restore
       </Button>
     </div>
@@ -746,44 +898,47 @@ export function HibernatedOverlay({ onWake }: Props) {
 }
 ```
 
-- [ ] **Step 6: Render en `WorkspaceView.tsx`, `SplitNodeView.tsx`, `PaneView.tsx`**
+- [ ] **Step 5: Render en `WorkspaceView.tsx`, `SplitNodeView.tsx`, `PaneView.tsx`**
 
-`WorkspaceView.tsx`: importar `stripTabs` y `HibernatedOverlay`; anadir a `Props` `onWake: (workspaceId: string) => void;` y desestructurarlo (`onWake`) para que no se propague en `...rest`. En el `map` de workspaces, pasar `node={ws.hibernated ? stripTabs(ws.paneTree) : ws.paneTree}` y `hibernated={ws.hibernated}`, y tras `</SplitNodeView>` dentro del `div` del workspace: `{ws.hibernated && <HibernatedOverlay onWake={() => onWake(ws.id)} />}`.
+`WorkspaceView.tsx`: importar `strippedTree` y `HibernatedOverlay`; anadir a `Props` `onWake: (workspaceId: string) => void;` y desestructurarlo para que no viaje en `...rest`. En el `map` de workspaces, pasar `node={ws.hibernated ? strippedTree(ws.paneTree) : ws.paneTree}` y `hibernated={ws.hibernated}`, y dentro del `div` del workspace tras el `SplitNodeView`: `{ws.hibernated && <HibernatedOverlay active={ws.id === activeWorkspaceId} onWake={() => onWake(ws.id)} />}`.
 
-`SplitNodeView.tsx`: anadir `hibernated?: boolean` a `Props`; pasar `hibernated={rest.hibernated}` a `<PaneView>` (los hijos recursivos ya reciben `{...rest}`).
+`SplitNodeView.tsx`: anadir `hibernated?: boolean` a `Props` y pasar `hibernated={rest.hibernated}` a `<PaneView>` (los hijos recursivos ya reciben `{...rest}`).
 
-`PaneView.tsx`: anadir `hibernated?: boolean` a `Props`; al principio del componente, tras los hooks, `if (hibernated) return <div className="h-full w-full border border-border" />;`. Respetar el orden de hooks: el `return` temprano debe ir despues de TODOS los hooks del componente (mirar el final de los hooks y colocarlo justo antes del JSX principal).
+`PaneView.tsx`: anadir `hibernated?: boolean` a `Props`; colocar `if (hibernated) return <div className="h-full w-full border border-border" />;` DESPUES del ultimo hook y justo antes del `return` principal (alrededor de la linea 280; el revisor verifico que no hay hooks despues).
 
-- [ ] **Step 7: Barrido de sesiones en `App.tsx` (~linea 640-675)**
+- [ ] **Step 6: Efectos en `App.tsx`**
 
-En el efecto "Live terminal tab tracking", al construir `live`, saltar los workspaces hibernados para que sus terminales se destruyan por el camino normal:
+1. Barrido de sesiones (~linea 640-675). Al construir `live`, saltar hibernados para que sus terminales se destruyan por el camino normal:
 
 ```ts
     for (const ws of workspaces) {
       if (ws.hibernated) continue;
 ```
 
-Dos efectos colaterales que este cambio tiene que cubrir en el mismo sitio:
-- Al destruirse una terminal, `finish` del almacen de agentes no se ejecuta (la senal llega con la sesion ya descartada). Dentro del `if (!live.has(id))`, antes de `disposeSession(id)`, anadir `useAgentStore.getState().finish(id);` para no dejar spinners fantasma (Review Focus 3).
-- Pasar `onWake` a `<WorkspaceView>`: `onWake={(id) => void wakeWorkspace(id)}` y obtener `wakeWorkspace`/`hibernateWorkspace` del `useWorkspaces()` ya destructurado en App.tsx.
+   Dentro de `if (!live.has(id))`, antes de `disposeSession(id)`, anadir `useAgentStore.getState().finish(id);`. Es un cambio de comportamiento deliberado para cualquier terminal descartada (cerrar, mover de ventana, hibernar): la senal `exited` llega con la sesion ya descartada y `leafIdForPty` devuelve `null`, asi que sin esto quedaria un spinner fantasma. Es inocuo al reabrir una tab cerrada porque `stashClosedSession` ya se ejecuto antes en `closeTab`.
+2. `setTabLocations` (~linea 2947): pasar solo los workspaces despiertos, `setTabLocations(tabLocations(workspaces.filter((w) => !w.hibernated)))`, para que las notificaciones de agentes de un workspace dormido no apunten a tabs que no existen en pantalla.
+3. `workspaceBarItems` (~linea 3153): `tabs: w.detailExpanded && !w.hibernated ? allPanes(w.paneTree).flatMap((p) => p.tabs) : NO_TABS`. No hay nada que cambiar en `WorkspaceBar.tsx`.
+4. `shortcutsDisabled` (~linea 2911): al principio, `if (activeWorkspace?.hibernated && blockedWhileHibernated(id)) return true;` (importar de `@/modules/workspaces/lib/hibernate`).
+5. `runWorkspaceConfig` (~linea 708): `if (!activeWorkspace || activeWorkspace.hibernated) return;` para que el RunButton no cree terminales en un workspace dormido.
+6. Pasar `onWake={(id) => void wakeWorkspace(id)}` a `<WorkspaceView>` y obtener `hibernateWorkspace`/`wakeWorkspace` del `useWorkspaces()` ya destructurado.
 
-- [ ] **Step 8: Lista anidada de la WorkspaceBar**
+- [ ] **Step 7: Documentar en este mismo commit**
 
-En `WorkspaceBar.tsx`, donde se construye el detalle de tabs de cada workspace (buscar el uso de `workspaceDetail`, ~linea 857), si `ws.hibernated` no generar filas (lista vacia). Mantener el workspace en la barra.
+`docs/ARCHITECTURE.md`: el campo `Workspace.hibernated`, por que las tabs permanecen en el JSON, y las limitaciones (los scripts del RunButton no se relanzan solos al despertar; un agente que no pueda reanudarse sigue el camino de error existente). `docs/WORKSPACES.md`: render del workspace hibernado (`strippedTree`, `HibernatedOverlay`, exclusion del barrido de sesiones, el `finish` del barrido) y los guardas (`openTab`, `shortcutsDisabled`, `runWorkspaceConfig`).
 
-- [ ] **Step 9: Tests y comprobaciones**
+- [ ] **Step 8: Comprobaciones**
 
 Run: `pnpm test && pnpm check-types && pnpm lint`
 Expected: PASS.
 
-- [ ] **Step 10: Verificacion manual del render**
+- [ ] **Step 9: Verificacion manual del render**
 
-Run `pnpm tauri dev` desde el worktree. En un workspace de prueba, editar `src-tauri`-persistido no hace falta: anadir temporalmente (sin commitear) `hibernated: true` a un workspace via `user-data/support-dev/workspaces/<id>.json` con la app cerrada, arrancar y comprobar: panes y divisores visibles, ninguna tab, capa Zzzzz, boton Restore despierta y las tabs vuelven. Ningun PTY de ese workspace debe existir (`ps` por `KEX_TAB_ID` o el log `Kex.log` de `user-data/logs-dev`).
+Con la app cerrada, poner `"hibernated": true` en uno de los `user-data/support-dev/workspaces/<id>.json` (cambio local, no se commitea), ejecutar `pnpm tauri dev` desde el worktree y comprobar: panes y divisores visibles, ninguna tab, capa Zzzzz, boton Restore despierta y las tabs vuelven; no hay PTY de ese workspace (`Kex.log` de `user-data/logs-dev`); la lista anidada de la WorkspaceBar esta vacia; abrir un fichero desde el explorer con ese workspace activo no anade tabs; F12 no lanza el script.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add -A src
+git add -A src docs
 git commit -m "Render hibernated workspaces and wake them from the overlay"
 ```
 
@@ -792,18 +947,19 @@ git commit -m "Render hibernated workspaces and wake them from the overlay"
 ### Task 4: Flujo de hibernar, modal y atajo
 
 **Files:**
-- Create: `src/modules/workspaces/lib/useHibernateFlow.ts`
+- Create: `src/modules/workspaces/lib/useHibernateFlow.ts`, `src/modules/workspaces/lib/useHibernateFlow.test.ts`
 - Create: `src/app/components/HibernateDialog.tsx`
-- Modify: `src/modules/shortcuts/shortcuts.ts` (+ su test si lista ids)
+- Modify: `src/modules/shortcuts/shortcuts.ts`, `src/modules/shortcuts/shortcuts.test.ts`
 - Modify: `src/app/App.tsx`
+- Modify: `docs/WORKSPACES.md`, `docs/FORK.md`, `CLAUDE.md` (glosario)
 
 **Interfaces:**
-- Consumes (Task 1-3): `hibernateReview`, `isReviewEmpty`, `enableRunOnStart`, `terminalTabs`, `hibernateWorkspace`, `markHibernating`, `useAgentStore`, `getRunningCommandsSnapshot`, `subscribeToRunningCommands`.
-- Produces: `useHibernateFlow(deps)` devuelve `{ pendingWorkspaceId: string | null; requestHibernate(wsId: string): Promise<void>; performHibernate(wsId: string): Promise<void>; cancel(): void }`. `HibernateDialog` props: `{ workspace: Workspace | null; onClose(): void; onHibernate(): void; onSaveTab(tabId: string): Promise<void>; onSaveAll(tabIds: string[]): Promise<void>; onEnableRunOnStart(tabId: string, runningCommand?: string): void }`.
+- Consumes (Tasks 1-3): `hibernateReview`, `isReviewEmpty`, `HibernateLive`, `enableRunOnStart`, `terminalTabs`, `hibernateWorkspace`, `markHibernating`, `useAgentStore`, `getRunningCommandsSnapshot`, `subscribeToRunningCommands`.
+- Produces: `createHibernateFlow(deps): { request(workspaceId): Promise<void>; perform(workspaceId): Promise<void> }` (sin React, testeable) y `useHibernateFlow(deps)`, que devuelve `{ pendingWorkspaceId: string | null; requestHibernate(id): Promise<void>; performHibernate(id): Promise<void>; cancel(): void }`. `HibernateDialog` props: `{ workspace: Workspace | null; onClose(): void; onHibernate(): void; onSaveTab(tabId: string): Promise<void>; onSaveAll(tabIds: string[]): Promise<void>; onEnableRunOnStart(tabId: string, runningCommand?: string): void }`.
 
-- [ ] **Step 1: Atajo**
+- [ ] **Step 1: Atajo y su test**
 
-En `shortcuts.ts`: anadir `| "workspace.hibernate"` al union `ShortcutId` (junto a `workspace.run`) y la entrada del registry:
+En `shortcuts.ts`: anadir `| "workspace.hibernate"` al union `ShortcutId` (junto a `workspace.run`) y la entrada:
 
 ```ts
   {
@@ -814,78 +970,225 @@ En `shortcuts.ts`: anadir `| "workspace.hibernate"` al union `ShortcutId` (junto
   },
 ```
 
-Comprobar que ningun otro atajo usa Mod+Alt+Z (`shortcuts.test.ts` ya valida conflictos; ejecutarlo) y que en macOS la tecla con Alt sigue resolviendo a `z` (mirar como `matchBinding` trata `alt+b`, `alt+h`, `alt+n` ya existentes y seguir el mismo patron). Run: `pnpm test src/modules/shortcuts`. Expected: PASS.
-
-- [ ] **Step 2: `useHibernateFlow.ts`**
+Seguir el patron de `alt+b`, `alt+h` y `alt+n` ya existentes (`matchBinding` usa `e.code` cuando el binding lleva `alt`). Test en `shortcuts.test.ts` (importar `SHORTCUTS` y `MOD_PROP` como hace el resto del archivo):
 
 ```ts
-import { useCallback, useRef, useState } from "react";
-import { useAgentStore } from "@/modules/agents/store/agentStore";
+describe("workspace.hibernate", () => {
+  it("is registered on Mod+Alt+Z and nothing else uses that chord", () => {
+    const sc = SHORTCUTS.find((s) => s.id === "workspace.hibernate");
+    expect(sc?.defaultBindings).toEqual([{ [MOD_PROP]: true, alt: true, key: "z" }]);
+    const clashes = SHORTCUTS.filter(
+      (s) =>
+        s.id !== "workspace.hibernate" &&
+        s.defaultBindings.some((b) => b.key === "z" && b.alt && b[MOD_PROP]),
+    );
+    expect(clashes).toEqual([]);
+  });
+});
+```
+
+Run: `pnpm test src/modules/shortcuts`. Expected: PASS (tras anadir la entrada; antes FAIL).
+
+- [ ] **Step 2: Tests de la fabrica de flujo (fallan)**
+
+`src/modules/workspaces/lib/useHibernateFlow.test.ts`:
+
+```ts
+import { beforeEach, describe, expect, it } from "vitest";
+import { isHibernating, unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
+import { createHibernateFlow, type HibernateFlowDeps } from "./useHibernateFlow";
+import type { Tab, Workspace } from "./types";
+
+const term = (id: string, over: Record<string, unknown> = {}): Tab => ({ id, kind: "terminal", ...over }) as Tab;
+const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
+  id: "w1",
+  title: "W",
+  paneTree: { kind: "pane", id: "p1", tabs, activeTabId: tabs[0]?.id ?? null },
+  activePaneId: "p1",
+  ...over,
+});
+
+function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
+  const calls: string[] = [];
+  const deps: HibernateFlowDeps = {
+    getWorkspace: () => workspace,
+    autosaveEnabled: () => false,
+    flushDirtyEditors: async () => void calls.push("flush"),
+    settle: async () => void calls.push("settle"),
+    live: () => ({ agentOf: () => undefined, runningCommand: () => undefined }),
+    finishAgent: (id) => void calls.push(`finish:${id}`),
+    destroyFloats: async () => void calls.push("floats"),
+    hibernate: () => void calls.push("hibernate"),
+    setPending: (id) => void calls.push(`pending:${id}`),
+    ...over,
+  };
+  return { flow: createHibernateFlow(deps), calls };
+}
+
+describe("createHibernateFlow", () => {
+  beforeEach(() => unmarkHibernating(["t1", "t2"]));
+
+  it("hibernates straight away when there is nothing to warn about", async () => {
+    const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]));
+    await flow.request("w1");
+    expect(calls).toContain("hibernate");
+    expect(calls).not.toContain("pending:w1");
+  });
+
+  it("opens the dialog instead when a command would be lost", async () => {
+    const { flow, calls } = setup(ws([term("t1")]), {
+      live: () => ({ agentOf: () => undefined, runningCommand: () => "npm run dev" }),
+    });
+    await flow.request("w1");
+    expect(calls).toContain("pending:w1");
+    expect(calls).not.toContain("hibernate");
+  });
+
+  it("flushes autosave and lets the state settle before reviewing", async () => {
+    const { flow, calls } = setup(ws([term("t1")]), { autosaveEnabled: () => true });
+    await flow.request("w1");
+    expect(calls.indexOf("flush")).toBeLessThan(calls.indexOf("settle"));
+    expect(calls.indexOf("settle")).toBeLessThan(calls.indexOf("hibernate"));
+  });
+
+  it("marks tabs, finishes each agent session and closes floats before flagging", async () => {
+    const { flow, calls } = setup(ws([term("t1"), term("t2")]));
+    await flow.perform("w1");
+    expect(isHibernating("t1") && isHibernating("t2")).toBe(true);
+    expect(calls).toEqual(["pending:null", "finish:t1", "finish:t2", "floats", "hibernate"]);
+  });
+
+  it("hibernates once when performed twice at the same time", async () => {
+    const { flow, calls } = setup(ws([term("t1")]));
+    await Promise.all([flow.perform("w1"), flow.perform("w1")]);
+    expect(calls.filter((c) => c === "hibernate")).toHaveLength(1);
+  });
+
+  it("ignores a workspace that is already hibernated", async () => {
+    const { flow, calls } = setup(ws([term("t1")], { hibernated: true }));
+    await flow.request("w1");
+    await flow.perform("w1");
+    expect(calls).toEqual([]);
+  });
+});
+```
+
+Run: `pnpm test src/modules/workspaces/lib/useHibernateFlow.test.ts`. Expected: FAIL.
+
+- [ ] **Step 3: Implementar `useHibernateFlow.ts`**
+
+```ts
+import { useCallback, useMemo, useRef, useState } from "react";
 import { markHibernating } from "@/modules/agents/lib/hibernatingTabs";
-import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
-import { hibernateReview, isReviewEmpty } from "./hibernateReview";
-import { terminalTabs } from "./hibernate";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { terminalTabs } from "./hibernate";
+import { hibernateReview, isReviewEmpty, type HibernateLive } from "./hibernateReview";
+import { getRunningCommandsSnapshot } from "./terminalEphemeralStore";
 import type { Workspace } from "./types";
 
-type Deps = {
+export type HibernateFlowDeps = {
+  getWorkspace: (workspaceId: string) => Workspace | undefined;
+  autosaveEnabled: () => boolean;
+  flushDirtyEditors: () => Promise<void>;
+  // Lets the dirty flags written by the flush reach the workspace state.
+  settle: () => Promise<void>;
+  live: () => HibernateLive;
+  finishAgent: (tabId: string) => void;
+  destroyFloats: (workspaceId: string) => Promise<void>;
+  hibernate: (workspaceId: string) => void;
+  setPending: (workspaceId: string | null) => void;
+};
+
+export function createHibernateFlow(d: HibernateFlowDeps) {
+  const inFlight = new Set<string>();
+
+  async function perform(workspaceId: string): Promise<void> {
+    const ws = d.getWorkspace(workspaceId);
+    if (!ws || ws.hibernated || inFlight.has(workspaceId)) return;
+    inFlight.add(workspaceId);
+    try {
+      // First, so the dialog stops watching the stores this call is about to change.
+      d.setPending(null);
+      const ids = terminalTabs(ws).map((t) => t.id);
+      markHibernating(ids);
+      for (const id of ids) d.finishAgent(id);
+      await d.destroyFloats(workspaceId);
+      d.hibernate(workspaceId);
+    } finally {
+      inFlight.delete(workspaceId);
+    }
+  }
+
+  async function request(workspaceId: string): Promise<void> {
+    if (d.getWorkspace(workspaceId)?.hibernated) return;
+    if (d.autosaveEnabled()) {
+      await d.flushDirtyEditors();
+      await d.settle();
+    }
+    const ws = d.getWorkspace(workspaceId);
+    if (!ws || ws.hibernated) return;
+    if (isReviewEmpty(hibernateReview(ws, d.live()))) {
+      await perform(workspaceId);
+      return;
+    }
+    d.setPending(workspaceId);
+  }
+
+  return { request, perform };
+}
+
+const nextFrames = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
+type HookDeps = {
   workspacesRef: { current: Workspace[] };
   hibernateWorkspace: (workspaceId: string) => void;
   flushDirtyEditors: () => Promise<void>;
   destroyWorkspaceFloats: (workspaceId: string, workspaces: Workspace[]) => Promise<void>;
 };
 
-export function useHibernateFlow(deps: Deps) {
+export function useHibernateFlow(deps: HookDeps) {
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<string | null>(null);
   const depsRef = useRef(deps);
   depsRef.current = deps;
 
-  const performHibernate = useCallback(async (workspaceId: string) => {
-    const d = depsRef.current;
-    const ws = d.workspacesRef.current.find((w) => w.id === workspaceId);
-    if (!ws || ws.hibernated) return;
-    const ids = terminalTabs(ws).map((t) => t.id);
-    markHibernating(ids);
-    for (const id of ids) useAgentStore.getState().finish(id);
-    await d.destroyWorkspaceFloats(workspaceId, d.workspacesRef.current);
-    d.hibernateWorkspace(workspaceId);
-    setPendingWorkspaceId(null);
-  }, []);
-
-  const requestHibernate = useCallback(
-    async (workspaceId: string) => {
-      const d = depsRef.current;
-      const ws = d.workspacesRef.current.find((w) => w.id === workspaceId);
-      if (!ws || ws.hibernated) return;
-      if (usePreferencesStore.getState().editorAutoSave) await d.flushDirtyEditors();
-      const fresh = d.workspacesRef.current.find((w) => w.id === workspaceId);
-      if (!fresh) return;
-      const sessions = useAgentStore.getState().sessions;
-      const commands = getRunningCommandsSnapshot();
-      const review = hibernateReview(fresh, {
-        agentOf: (id) => sessions[id],
-        runningCommand: (id) => commands.get(id),
-      });
-      if (isReviewEmpty(review)) {
-        await performHibernate(workspaceId);
-        return;
-      }
-      setPendingWorkspaceId(workspaceId);
-    },
-    [performHibernate],
+  const flow = useMemo(
+    () =>
+      createHibernateFlow({
+        getWorkspace: (id) => depsRef.current.workspacesRef.current.find((w) => w.id === id),
+        autosaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
+        flushDirtyEditors: () => depsRef.current.flushDirtyEditors(),
+        settle: nextFrames,
+        live: () => {
+          const sessions = useAgentStore.getState().sessions;
+          const commands = getRunningCommandsSnapshot();
+          return { agentOf: (id) => sessions[id], runningCommand: (id) => commands.get(id) };
+        },
+        finishAgent: (id) => useAgentStore.getState().finish(id),
+        destroyFloats: (id) => depsRef.current.destroyWorkspaceFloats(id, depsRef.current.workspacesRef.current),
+        hibernate: (id) => depsRef.current.hibernateWorkspace(id),
+        setPending: setPendingWorkspaceId,
+      }),
+    [],
   );
 
   const cancel = useCallback(() => setPendingWorkspaceId(null), []);
 
-  return { pendingWorkspaceId, requestHibernate, performHibernate, cancel };
+  return {
+    pendingWorkspaceId,
+    requestHibernate: flow.request,
+    performHibernate: flow.perform,
+    cancel,
+  };
 }
 ```
 
-Nota para quien implemente: `flushDirtyEditors` guarda a traves de los handles; tras guardar, el `dirty` de la tab se actualiza de forma asincrona en el estado. Por eso `requestHibernate` relee `workspacesRef.current` DESPUES del flush. Si en la prueba manual aun aparece algun documento ya guardado, esperar un tick (`await new Promise((r) => setTimeout(r, 0))`) tras el flush.
+Run: `pnpm test src/modules/workspaces/lib/useHibernateFlow.test.ts`. Expected: PASS. (Si Vitest no tiene `requestAnimationFrame` en el entorno, `nextFrames` solo se usa dentro del hook; la fabrica recibe `settle` inyectado.)
 
-- [ ] **Step 3: `HibernateDialog.tsx`**
+- [ ] **Step 4: `HibernateDialog.tsx`**
 
-Modal con `AlertDialog` de shadcn (patron de `CloseDialogs.tsx`). Comportamiento exacto:
+Modal con `AlertDialog` de shadcn (patron de `CloseDialogs.tsx`):
 
 ```tsx
 import { useEffect, useMemo, useSyncExternalStore } from "react";
@@ -930,7 +1233,7 @@ export function HibernateDialog({ workspace, onClose, onHibernate, onSaveTab, on
     [workspace, sessions, commands],
   );
 
-  // The modal was opened because something was pending: once everything is
+  // The dialog only opens when something is pending: once everything is
   // resolved there is nothing left to warn about, so it closes and hibernates.
   useEffect(() => {
     if (workspace && review && isReviewEmpty(review)) onHibernate();
@@ -942,7 +1245,7 @@ export function HibernateDialog({ workspace, onClose, onHibernate, onSaveTab, on
         <AlertDialogHeader>
           <AlertDialogTitle>Hibernate this workspace?</AlertDialogTitle>
           <AlertDialogDescription>
-            Hibernating closes every terminal and editor. These cannot be recovered when you restore it.
+            Hibernating closes every terminal and editor. The items below cannot be recovered when you restore it.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {review && review.agents.length > 0 && (
@@ -963,12 +1266,12 @@ export function HibernateDialog({ workspace, onClose, onHibernate, onSaveTab, on
                 <span className="truncate text-[12px] text-muted-foreground" title={d.path}>
                   {pathBasename(d.path)}
                 </span>
-                <Button size="sm" variant="outline" onClick={() => void onSaveTab(d.tabId)}>
+                <Button size="sm" variant="outline" title="Save this document" onClick={() => void onSaveTab(d.tabId)}>
                   Save
                 </Button>
               </div>
             ))}
-            <Button size="sm" onClick={() => void onSaveAll(review.docs.map((d) => d.tabId))}>
+            <Button size="sm" title="Save every unsaved document" onClick={() => void onSaveAll(review.docs.map((d) => d.tabId))}>
               Save all
             </Button>
           </section>
@@ -981,7 +1284,12 @@ export function HibernateDialog({ workspace, onClose, onHibernate, onSaveTab, on
                 <span className="truncate font-mono text-[12px] text-muted-foreground" title={c.command}>
                   {c.command}
                 </span>
-                <Button size="sm" variant="outline" onClick={() => onEnableRunOnStart(c.tabId, commands.get(c.tabId))}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  title="Run this command again when the workspace is restored"
+                  onClick={() => onEnableRunOnStart(c.tabId, commands.get(c.tabId))}
+                >
                   Run on start
                 </Button>
               </div>
@@ -1002,82 +1310,76 @@ export function HibernateDialog({ workspace, onClose, onHibernate, onSaveTab, on
 }
 ```
 
-Detalles a respetar: botones de acciones pequenas y titles nativos segun el patron de `ShortcutsSection`; si `AlertDialog` cierra al pulsar un `Button` normal, comprobar que los botones de fila NO cierran el modal (usar `Button` y no `AlertDialogAction`).
+Los botones de fila son `Button` normales de shadcn con `title` nativo (no `AlertDialogAction`), para que no cierren el modal.
 
-- [ ] **Step 4: Wiring en `App.tsx`**
+- [ ] **Step 5: Wiring en `App.tsx`**
 
 - Obtener `hibernateWorkspace` y `wakeWorkspace` de `useWorkspaces()`.
-- Instanciar `const hibernateFlow = useHibernateFlow({ workspacesRef, hibernateWorkspace, flushDirtyEditors, destroyWorkspaceFloats });` despues de definir `flushDirtyEditors` (~linea 1900) y `destroyWorkspaceFloats` (ya disponible).
-- Mapa de atajos (~linea 2636, junto a `"workspace.run"`): `"workspace.hibernate": () => { if (activeWorkspace) void hibernateFlow.requestHibernate(activeWorkspace.id); },`.
-- Renderizar, junto a `<CloseDialogs>` (~linea 3473):
+- Instanciar `const hibernateFlow = useHibernateFlow({ workspacesRef, hibernateWorkspace, flushDirtyEditors, destroyWorkspaceFloats });` despues de definir `flushDirtyEditors` (~linea 1900).
+- Mapa de atajos (~linea 2636, junto a `"workspace.run"`): `"workspace.hibernate": () => { if (activeWorkspace) void hibernateFlow.requestHibernate(activeWorkspace.id); },`. En el array de dependencias del `useMemo` de `shortcutHandlers` (~linea 2884) anadir `hibernateFlow.requestHibernate` (estable), no el objeto `hibernateFlow`.
+- Renderizar junto a `<CloseDialogs>` (~linea 3473):
 
 ```tsx
 <HibernateDialog
   workspace={workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId) ?? null}
   onClose={hibernateFlow.cancel}
-  onHibernate={() => hibernateFlow.pendingWorkspaceId && void hibernateFlow.performHibernate(hibernateFlow.pendingWorkspaceId)}
+  onHibernate={handleHibernateFromDialog}
   onSaveTab={async (tabId) => { await saveTab(tabId); }}
   onSaveAll={async (tabIds) => { await Promise.all(tabIds.map((id) => saveTab(id).catch(() => {}))); }}
   onEnableRunOnStart={(tabId, running) => {
-    const ws = workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId);
-    if (ws) updateTabData(ws.id, tabId, (t) => enableRunOnStart(t, running));
+    const id = hibernateFlow.pendingWorkspaceId;
+    if (id) updateTabData(id, tabId, (t) => enableRunOnStart(t, running));
   }}
 />
 ```
 
-`onHibernate` se pasa estable: envolverlo en `useCallback` para que el efecto del modal no se redispare en cada render.
+con `handleHibernateFromDialog` en un `useCallback` que lee `hibernateFlow.pendingWorkspaceId` desde un ref, de modo que su identidad sea estable y el efecto del modal no se redispare en cada render.
 
-- [ ] **Step 5: Comprobaciones**
+- [ ] **Step 6: Documentar en este mismo commit**
+
+- `docs/WORKSPACES.md`: flujo de hibernar y despertar, el modal reactivo y sus tres listas.
+- `docs/FORK.md`: funcionalidad nueva que el upstream no tiene.
+- `CLAUDE.md`: fila **Workspace hibernado** en el glosario (que es, donde vive, "Como te refieres a ello": "dormido", "suspendido", "zzz", "hibernar").
+
+- [ ] **Step 7: Comprobaciones**
 
 Run: `pnpm test && pnpm check-types && pnpm lint`
 Expected: PASS.
 
-- [ ] **Step 6: Verificacion manual (checklist)**
+- [ ] **Step 8: Verificacion manual (checklist)**
 
 Con `pnpm tauri dev` en el worktree:
 1. Workspace con un shell vacio: Cmd+Alt+Z hiberna sin modal; Restore devuelve el shell en el mismo sitio.
-2. Un terminal con `sleep 600` sin Run on start: sale el modal con el comando y el boton Run on start; activarlo quita la fila, el modal se cierra solo y hiberna; Restore reescribe `sleep 600`.
-3. Un documento editado con autosave desactivado: sale en el modal; Save lo quita; Save all quita todos; cerrar el modal con Close no hiberna; Hibernate anyway descarta; al despertar el documento no recupera el texto no guardado.
-4. Un agente trabajando (spinner): sale en el modal y desaparece cuando termina el turno; el modal se cierra y hiberna si no queda nada.
-5. Un agente en reposo con Run on start: no avisa; al despertar se reanuda (`claude --resume`).
+2. Terminal con `sleep 600` sin Run on start: sale el modal con el comando; Run on start quita la fila, el modal se cierra solo y hiberna; Restore reescribe `sleep 600`.
+3. Documento editado con autosave desactivado: sale en el modal; Save lo quita; Save all quita todos; Close no hiberna; Hibernate anyway descarta; al despertar no recupera el texto no guardado. Con autosave activado: no sale en el modal y queda guardado.
+4. Agente con spinner: sale en el modal y desaparece cuando termina el turno; el modal se cierra y hiberna si no queda nada.
+5. Agente en reposo con Run on start: no avisa; al despertar se reanuda (`claude --resume`) y su registro sigue en `user-data/support-dev/agent-sessions.json`.
 6. Terminal de script lanzado desde el RunButton: no avisa; tras despertar, pulsar Run lo relanza.
-7. Reiniciar Kex con un workspace hibernado: sigue hibernado y despierta bien.
+7. Navegador flotante en el workspace: la ventana se cierra al hibernar y no reaparece al reiniciar Kex.
+8. Reiniciar Kex con un workspace hibernado: sigue hibernado, no hay PTY, y despierta bien.
+9. Con el workspace hibernado activo: Cmd+T, Cmd+W y F12 no hacen nada; Cmd+Alt+Z de nuevo no rompe nada.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add -A src
+git add -A src docs CLAUDE.md
 git commit -m "Add hibernate flow, review dialog and Cmd+Alt+Z shortcut"
 ```
 
 ---
 
-### Task 5: Documentacion, glosario y cierre
+### Task 5: Verificacion final
 
-**Files:**
-- Modify: `docs/ARCHITECTURE.md`, `docs/WORKSPACES.md`, `docs/AGENT_SESSION_RESTORE.md`, `docs/FORK.md`, `CLAUDE.md` (glosario)
-
-- [ ] **Step 1: Documentar**
-
-- `docs/ARCHITECTURE.md`: modelo (`Workspace.hibernated`), por que las tabs permanecen en el JSON, y la limitacion: scripts del RunButton no se relanzan solos.
-- `docs/WORKSPACES.md`: render del workspace hibernado (`stripTabs`, `HibernatedOverlay`, exclusion en el barrido de sesiones) y el flujo de hibernar/despertar.
-- `docs/AGENT_SESSION_RESTORE.md`: `hibernatingTabs`, `detachesRecord` y que despertar usa `previewResumeCmd` + `seedRestorePlan`; la dependencia de orden entre `disposeSession` y la senal `exited`.
-- `docs/FORK.md`: funcionalidad nueva no presente en el upstream.
-- `CLAUDE.md`: fila **Workspace hibernado** en el glosario (que es, donde vive, alias "dormido", "suspendido", "zzz").
-
-- [ ] **Step 2: Verificacion completa**
+- [ ] **Step 1: Todo en verde**
 
 Run: `pnpm lint && pnpm check-types && pnpm test && cd src-tauri && cargo clippy && cargo test --locked`
-Expected: todo en verde.
+Expected: todo en verde, sin avisos nuevos.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Comprobar que no quedan em-dash ni emojis en lo anadido**
 
-```bash
-git add docs CLAUDE.md
-git commit -m "Document hibernated workspaces"
-```
+Run: `git diff main...HEAD | grep -nP "\x{2014}|\p{Extended_Pictographic}"`
+Expected: sin resultados.
 
----
 
 ## Self-Review (plan contra spec)
 
@@ -1090,5 +1392,6 @@ git commit -m "Document hibernated workspaces"
 - Despertar: planes, buffers descartados, desmarcado: Task 3 Step 4.
 - Proteccion del registro y supervivencia a reinicio: Task 2.
 - Scripts del RunButton: Task 1 (`hibernateReview`).
-- Docs y glosario: Task 5.
+- Documentacion y glosario: repartidos en los commits de las Tasks 2, 3 y 4; Task 5 solo verifica.
+- Floats, atajos bloqueados, notificaciones y lista anidada de hibernados: Tasks 1 y 3.
 - Consistencia de nombres: `hibernateWorkspace`, `wakeWorkspace`, `applyHibernate`, `applyWake`, `stripTabs`, `terminalTabs`, `editorTabIds`, `enableRunOnStart`, `hibernateReview`, `isReviewEmpty`, `markHibernating`, `unmarkHibernating`, `isHibernating`, `detachesRecord`, `discardUnflushedBuffers`, `planWake` coinciden entre tareas.

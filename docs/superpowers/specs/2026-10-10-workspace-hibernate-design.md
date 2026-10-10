@@ -31,9 +31,12 @@ Componente reutilizable (la fase 2 lo enchufa a cerrar workspace). Alimentado po
    start, porque se perderia el trabajo en curso.
 2. **Documentos sin guardar**: tabs `editor` y `markdown` con `dirty`. Cada fila lleva un boton Save, y debajo hay
    un Save all. Las filas desaparecen segun se guardan.
-3. **Comandos sin Run on start**: terminales con comando (`runningCommand` o `persistentCommand`) y
-   `restoreOnRestart` distinto de verdadero, o agentes con `restoreOnRestart === false`. Cada fila lleva un boton
-   que activa Run on start y hace desaparecer la fila. Quedan fuera las terminales de scripts del RunButton
+3. **Comandos que no volverian**: terminales con comando (`runningCommand`, `persistentCommand` o el nombre del
+   agente) que al despertar no se relanzarian. Se aplica la misma regla que `useTerminalSession` al arrancar: con
+   `restoreOnRestart` distinto de falso, un agente se reanuda y una terminal normal repite su `persistentCommand`;
+   en cualquier otro caso (Run on start apagado a mano, o sin `persistentCommand` que repetir) el comando se
+   pierde y sale en la lista. Cada fila lleva un boton que activa Run on start (y fija `persistentCommand` al
+   comando en marcha) y hace desaparecer la fila. Quedan fuera las terminales de scripts del RunButton
    (`workspace.scripts.some(s => s.tabId === tab.id)`): se recuperan pulsando Run, que reescribe el comando.
 
 No avisan: agentes en reposo con Run on start, terminales con Run on start, shells vacios.
@@ -53,8 +56,16 @@ Reglas del flujo:
 
 1. Anadir los ids de las terminales del workspace a `hibernatingTabs` (ver "Registro de sesion").
 2. Destruir los flotantes del workspace (`destroyWorkspaceFloats`).
-3. `hibernated: true` y persistir. Las tabs dejan de montarse, lo que cierra los PTY y los editores por el camino
-   normal de desmontaje.
+3. `hibernated: true` y persistir. Ademas se limpian `dirty` en editores y markdown y `floating` en navegadores,
+   porque sus ventanas o buffers dejan de existir. Las terminales se destruyen por el barrido de sesiones de
+   `App.tsx`, que ignora los workspaces hibernados; el barrido tambien limpia el almacen de agentes de cada
+   terminal descartada, para no dejar spinners fantasma.
+
+Con el workspace hibernado:
+
+- Las notificaciones de agentes y la lista anidada de la WorkspaceBar no incluyen sus tabs.
+- Abrir una tab en el (por ejemplo desde el explorer), el RunButton y los atajos de tabs, terminal y editor no
+  hacen nada.
 
 ## Despertar (Restore)
 
