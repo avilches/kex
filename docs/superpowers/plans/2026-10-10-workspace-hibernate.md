@@ -223,7 +223,7 @@ describe("blockedWhileHibernated", () => {
   });
 
   it("lets workspace, window, view and settings shortcuts through", () => {
-    for (const id of ["workspace.hibernate", "workspace.new", "workspace.next", "window.new", "view.zoomIn", "settings.open"] as const) {
+    for (const id of ["workspace.new", "workspace.next", "window.new", "view.zoomIn", "settings.open"] as const) {
       expect(blockedWhileHibernated(id)).toBe(false);
     }
   });
@@ -984,8 +984,14 @@ describe("workspace.hibernate", () => {
     );
     expect(clashes).toEqual([]);
   });
+
+  it("stays usable while the workspace is hibernated, so it can be toggled", () => {
+    expect(blockedWhileHibernated("workspace.hibernate")).toBe(false);
+  });
 });
 ```
+
+(importar `blockedWhileHibernated` de `@/modules/workspaces/lib/hibernate`).
 
 Run: `pnpm test src/modules/shortcuts`. Expected: PASS (tras anadir la entrada; antes FAIL).
 
