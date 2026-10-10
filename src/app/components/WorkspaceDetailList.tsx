@@ -74,7 +74,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   if (rows.length === 0) return null;
 
   return (
-    <div className="ml-6 mt-0.5 flex flex-col gap-px border-l border-border/60 pl-0.5">
+    <div className="ml-3 mt-0.5 flex flex-col gap-px border-l border-border/60 pl-0.5">
       {rows.map((row) => {
         const tab = tabsById.get(row.tabId);
         return tab ? (
