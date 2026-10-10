@@ -734,7 +734,11 @@ export default function App() {
         workspaceRoot: activeWorkspace.workspaceRoot,
         workspaceCwd: activeWorkspace.cwd,
       });
-      if (scriptCwd && !isSafeScriptCwd(scriptCwd)) {
+      const busyReusedTab =
+        !!config.tabId &&
+        !!findTabGlobal(config.tabId) &&
+        !!getScriptRunningSnapshot().get(config.tabId);
+      if (scriptCwd && !isSafeScriptCwd(scriptCwd) && !busyReusedTab) {
         toast.error("Script not run: the folder name has control characters", {
           duration: 4000,
         });
@@ -772,6 +776,7 @@ export default function App() {
           if (input !== null) {
             setScriptRunning(tabId, "running");
             const tryWrite = (attempts = 0) => {
+              if (getScriptRunningSnapshot().get(tabId) !== "running") return;
               const handle = terminalHandles.current.get(tabId);
               if (handle) {
                 handle.write(input);
@@ -844,6 +849,7 @@ export default function App() {
 
       setScriptRunning(freshTabId, "running");
       const tryWrite = (attempts = 0) => {
+        if (getScriptRunningSnapshot().get(freshTabId) !== "running") return;
         const handle = terminalHandles.current.get(freshTabId);
         if (handle) {
           handle.write(buildScriptInput(config.command, undefined, scriptShell));
