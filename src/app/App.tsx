@@ -2053,9 +2053,19 @@ export default function App() {
 
   const handleMoveTabFromMenu = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<void> => {
-      settleMovedTab(tabId, await moveTabToWorkspaceWaking(sourceWorkspaceId, tabId, request));
+      const source = workspacesRef.current.find((w) => w.id === activeWorkspaceIdRef.current);
+      const hadFocus =
+        source?.id === sourceWorkspaceId &&
+        findPane(source.paneTree, source.activePaneId)?.activeTabId === tabId;
+      const destinationId = await moveTabToWorkspaceWaking(sourceWorkspaceId, tabId, request);
+      settleMovedTab(tabId, destinationId);
+      if (hadFocus && destinationId) {
+        setActiveWorkspaceId(destinationId);
+        activateTab(destinationId, tabId);
+        setTimeout(focusActiveTab, 50);
+      }
     },
-    [moveTabToWorkspaceWaking, settleMovedTab],
+    [moveTabToWorkspaceWaking, settleMovedTab, setActiveWorkspaceId, activateTab, focusActiveTab],
   );
 
   const {
