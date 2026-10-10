@@ -4,6 +4,7 @@ import {
   type DetailFilter,
   TERMINAL_DETAIL_MODES,
   activeAgentCount,
+  hasDetail,
   workspaceDetailRows,
 } from "./workspaceDetail";
 
@@ -131,6 +132,13 @@ describe("activeAgentCount", () => {
 
 describe("TERMINAL_DETAIL_MODES", () => {
   test("go from more information to less", () => {
-    expect(TERMINAL_DETAIL_MODES).toEqual(["all", "agents", "active-agents", "none"]);
+    expect(TERMINAL_DETAIL_MODES).toEqual(["all", "agents", "active-agents"]);
+  });
+
+  test("hasDetail is false only when nothing is included", () => {
+    const off = { terminals: "none", editors: false, browsers: false, git: false } as const;
+    expect(hasDetail(off)).toBe(false);
+    expect(hasDetail({ ...off, git: true })).toBe(true);
+    expect(hasDetail({ ...off, terminals: "agents" })).toBe(true);
   });
 });
