@@ -42,6 +42,7 @@ type Props = {
   onFocusFloatBrowserTab?: (tabId: string) => void;
   onNavigateFloatBrowserTab?: (tabId: string, url: string) => void;
   welcomeActions?: WelcomeActions;
+  hibernated?: boolean;
 };
 
 export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, expandedPaneId, ...rest }: Props) {
@@ -94,6 +95,7 @@ export const SplitNodeView = memo(function SplitNodeView({ node, activePaneId, e
           onFocusFloatBrowserTab={rest.onFocusFloatBrowserTab}
           onNavigateFloatBrowserTab={rest.onNavigateFloatBrowserTab}
           welcomeActions={rest.welcomeActions}
+          hibernated={rest.hibernated}
         />
       </div>
     );

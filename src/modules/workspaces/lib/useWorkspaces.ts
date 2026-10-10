@@ -6,7 +6,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
-import { previewResumeCmd, seedRestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";
+import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
+import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import {
   allPaneIds,
   allPanes,
@@ -48,6 +51,23 @@ export function buildReopenedTab(tab: Tab, newId: string): Tab {
 // discard anyway.
 export function needsResumePlanLookup(tab: Tab): boolean {
   return tab.kind === "terminal" && tab.restoreOnRestart !== false;
+}
+
+export function planWake(ws: Workspace): string[] {
+  return terminalTabs(ws).filter(needsResumePlanLookup).map((t) => t.id);
+}
+
+export async function seedWakePlans(
+  ws: Workspace,
+  lookup: (tabId: string) => Promise<RestorePlan | null>,
+  seed: (tabId: string, plan: RestorePlan) => void,
+): Promise<void> {
+  await Promise.all(
+    planWake(ws).map(async (tabId) => {
+      const plan = await lookup(tabId);
+      if (plan) seed(tabId, plan);
+    }),
+  );
 }
 
 export function findReopenTarget(
@@ -571,7 +591,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const sealedTab = withNewTabAutofocus(tab);
     setWorkspaces((prev) =>
       prev.map((w) => {
-        if (w.id !== workspaceId) return w;
+        if (w.id !== workspaceId || w.hibernated) return w;
         const { workspacePaneLimit } = usePreferencesStore.getState();
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
@@ -587,6 +607,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Tab operations ────────────────────────────────────────────────────────
 
   const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
+    if (workspacesRef.current.find((w) => w.id === workspaceId)?.hibernated) return;
     const newTab = withNewTabAutofocus(tab);
     recordActivation(paneId, newTab.id);
     setWorkspaces((prev) =>
@@ -925,6 +946,19 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
+  const hibernateWorkspace = useCallback((workspaceId: string) => {
+    setWorkspaces((prev) => applyHibernate(prev, workspaceId));
+  }, []);
+
+  const wakeWorkspace = useCallback(async (workspaceId: string) => {
+    const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    if (!ws?.hibernated) return;
+    await seedWakePlans(ws, previewResumeCmd, seedRestorePlan);
+    discardUnflushedBuffers(editorTabIds(ws));
+    unmarkHibernating(terminalTabs(ws).map((t) => t.id));
+    setWorkspaces((prev) => applyWake(prev, workspaceId));
+  }, []);
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -969,6 +1003,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     splitPaneAndPlace,
     splitPaneAndOpenTab,
     openTab,
+    hibernateWorkspace,
+    wakeWorkspace,
     activateTab,
     revealTab,
     closeTab,

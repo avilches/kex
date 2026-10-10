@@ -191,6 +191,27 @@ are dropped and the message `[kex: dropped output during hibernation]` is prepen
 The PTY process itself is never paused — the OS shell keeps running and output keeps arriving;
 only the rendering is deferred.
 
+### Hibernated workspaces
+
+Not to be confused with the dormant ring above: a hibernated workspace (`Workspace.hibernated`)
+has no mounted tabs at all. Its tabs stay in the persisted `paneTree`, but `WorkspaceView` renders
+`strippedTree(ws.paneTree)` (a memoized copy with every pane emptied) and passes `hibernated` down
+through `SplitNodeView` to `PaneView`, which returns a bordered empty box right before its main
+`return` (after the last hook). `HibernatedOverlay` (Zzzzz plus a Restore button, wired to
+`wakeWorkspace` through the `onWake` prop) covers the workspace.
+
+- The live-tab sweep in `App.tsx` skips hibernated workspaces, so their terminals leave the live
+  set and are disposed by the normal path (PTY closed). That sweep now also calls
+  `useAgentStore.getState().finish(id)` for every terminal that leaves the set (close, move to
+  another window, hibernate): the `exited` signal arrives after the session is disposed and
+  `leafIdForPty` returns `null`, so without it a phantom spinner would stay.
+- `wakeWorkspace` seeds the agent resume plans (`seedWakePlans`, same "Run on start" gate as the
+  reopen flow), discards the carried unsaved editor buffers (`unflushedBuffers.ts`) and then clears
+  `hibernated`; the terminals mount again and resume through the normal restore path.
+- Guards: `openTab` and `splitPaneAndOpenTab` ignore a hibernated workspace, `shortcutsDisabled`
+  blocks the shortcuts that need tabs (`blockedWhileHibernated`), `runWorkspaceConfig` does nothing,
+  `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is empty.
+
 ---
 
 ## Renderer slot pool (`rendererPool.ts`)

@@ -43,6 +43,7 @@ type Props = {
   onFocusFloatBrowserTab?: (tabId: string) => void;
   onNavigateFloatBrowserTab?: (tabId: string, url: string) => void;
   welcomeActions?: WelcomeActions;
+  hibernated?: boolean;
 };
 
 function DropZone({
@@ -180,6 +181,7 @@ export const PaneView = memo(function PaneView({
   onFocusFloatBrowserTab,
   onNavigateFloatBrowserTab,
   welcomeActions,
+  hibernated,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
@@ -276,6 +278,8 @@ export const PaneView = memo(function PaneView({
   const handleNewBrowser = useCallback(() => onNewBrowser(workspaceId, pane.id), [onNewBrowser, workspaceId, pane.id]);
   const handleSplitBrowserRight = useCallback(() => onSplitBrowserRight(workspaceId, pane.id), [onSplitBrowserRight, workspaceId, pane.id]);
   const handleSplitBrowserDown = useCallback(() => onSplitBrowserDown(workspaceId, pane.id), [onSplitBrowserDown, workspaceId, pane.id]);
+
+  if (hibernated) return <div className="h-full w-full border border-border" />;
 
   return (
     <div

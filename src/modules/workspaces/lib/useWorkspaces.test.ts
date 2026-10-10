@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
-import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, needsResumePlanLookup, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -561,5 +561,62 @@ describe("applyMoveTabToWorkspace", () => {
     const created = out[1]!;
     expect(created).toMatchObject({ title: "proj", cwd: "/Users/me/proj", groupId: "g1", color: null, activePaneId: "pn" });
     expect(created.paneTree).toMatchObject({ kind: "pane", id: "pn", activeTabId: "t1" });
+  });
+});
+
+describe("planWake", () => {
+  it("asks for a resume plan only on terminals that did not opt out of Run on start", () => {
+    const w = ws({
+      paneTree: {
+        kind: "pane",
+        id: "p1",
+        activeTabId: "a",
+        tabs: [
+          { id: "a", kind: "terminal" },
+          { id: "b", kind: "terminal", restoreOnRestart: false },
+          { id: "c", kind: "editor", path: "/x", dirty: false, preview: false },
+        ],
+      },
+    });
+    expect(planWake(w)).toEqual(["a"]);
+  });
+});
+
+describe("seedWakePlans", () => {
+  const plan = { tabId: "a", agent: "claude", resumeCmd: "claude --resume x", cwdLaunch: "/p", errorReason: "" };
+
+  it("seeds the plan under the same tab id for each terminal that has one", async () => {
+    const seeded: [string, unknown][] = [];
+    const w = ws({
+      paneTree: {
+        kind: "pane",
+        id: "p1",
+        activeTabId: "a",
+        tabs: [
+          { id: "a", kind: "terminal" },
+          { id: "b", kind: "terminal" },
+        ],
+      },
+    });
+    await seedWakePlans(
+      w,
+      async (id) => (id === "a" ? plan : null),
+      (id, p) => seeded.push([id, p]),
+    );
+    expect(seeded).toEqual([["a", plan]]);
+  });
+
+  it("does not look up terminals that opted out", async () => {
+    const asked: string[] = [];
+    const w = ws({
+      paneTree: {
+        kind: "pane",
+        id: "p1",
+        activeTabId: "a",
+        tabs: [{ id: "a", kind: "terminal", restoreOnRestart: false }],
+      },
+    });
+    await seedWakePlans(w, async (id) => (asked.push(id), null), () => {});
+    expect(asked).toEqual([]);
   });
 });

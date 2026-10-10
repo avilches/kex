@@ -4,6 +4,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { tabLocations } from "@/modules/workspaces/lib/tabLocations";
+import { blockedWhileHibernated } from "@/modules/workspaces/lib/hibernate";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -221,6 +222,7 @@ export default function App() {
     splitPaneAndPlace,
     splitPaneAndOpenTab,
     openTab,
+    wakeWorkspace,
     activateTab,
     revealTab,
     closeTab,
@@ -644,6 +646,7 @@ export default function App() {
   useEffect(() => {
     const live = new Set<string>();
     for (const ws of workspaces) {
+      if (ws.hibernated) continue;
       for (const pane of allPanes(ws.paneTree)) {
         for (const tab of pane.tabs) {
           if (tab.kind === "terminal") live.add(tab.id);
@@ -652,6 +655,7 @@ export default function App() {
     }
     for (const id of liveTabIdsRef.current) {
       if (!live.has(id)) {
+        useAgentStore.getState().finish(id);
         disposeSession(id);
         searchAddons.current.delete(id);
         terminalHandles.current.delete(id);
@@ -708,7 +712,7 @@ export default function App() {
 
   const runWorkspaceConfig = useCallback(
     (config: Script) => {
-      if (!activeWorkspace) return;
+      if (!activeWorkspace || activeWorkspace.hibernated) return;
 
       // The user's own leaf, captured up front so a same-workspace script run
       // reveals its tab without moving activePaneId or focus away from here.
@@ -2910,6 +2914,7 @@ export default function App() {
 
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
+      if (activeWorkspace?.hibernated && blockedWhileHibernated(id)) return true;
       if (id === "editor.undo" || id === "editor.redo") {
         return activeTab?.kind !== "editor";
       }
@@ -2936,7 +2941,7 @@ export default function App() {
 
       return false;
     },
-    [activeTab],
+    [activeTab, activeWorkspace?.hibernated],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
@@ -2944,7 +2949,9 @@ export default function App() {
   // ── Agent activation ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    useAgentStore.getState().setTabLocations(tabLocations(workspaces));
+    useAgentStore.getState().setTabLocations(
+      tabLocations(workspaces.filter((w) => !w.hibernated)),
+    );
   }, [workspaces]);
 
   const onActivateAgent = useCallback(
@@ -3153,7 +3160,7 @@ export default function App() {
         color: w.color,
         icon: w.icon,
         groupId: w.groupId,
-        tabs: w.detailExpanded
+        tabs: w.detailExpanded && !w.hibernated
           ? allPanes(w.paneTree).flatMap((p) => p.tabs)
           : NO_TABS,
         focusedTabId: focusedTabId(w.paneTree, w.activePaneId),
@@ -3322,6 +3329,7 @@ export default function App() {
                           workspaces={workspaces}
                           activeWorkspaceId={activeWorkspaceId}
                           expandedPaneId={zenPaneId}
+                          onWake={(id) => void wakeWorkspace(id)}
                           onActivateTab={onActivateTabStable}
                           onCloseTab={onCloseTabStable}
                           onCloseManyTabs={onCloseManyTabsStable}
