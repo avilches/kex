@@ -3013,6 +3013,15 @@ export default function App() {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (hibernateFlow.pendingWorkspaceId !== null) return true;
       if (activeWorkspace?.hibernated && blockedWhileHibernated(id)) return true;
+      if (
+        id === "workspace.settings" &&
+        !useWorkspaceSettingsStore.getState().open &&
+        document.querySelector(
+          '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]',
+        )
+      ) {
+        return true;
+      }
       if (id === "editor.undo" || id === "editor.redo") {
         return activeTab?.kind !== "editor";
       }
