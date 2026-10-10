@@ -1,0 +1,132 @@
+import { describe, expect, it } from "vitest";
+import { hibernateReview, isReviewEmpty, type HibernateLive } from "./hibernateReview";
+import type { Tab, Workspace } from "./types";
+
+const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
+  id: "w1",
+  title: "W",
+  paneTree: { kind: "pane", id: "p1", tabs, activeTabId: tabs[0]?.id ?? null },
+  activePaneId: "p1",
+  ...over,
+});
+const term = (id: string, over: Record<string, unknown> = {}): Tab =>
+  ({ id, kind: "terminal", ...over }) as Tab;
+const live = (
+  agents: Record<string, { agent: string; status: "working" | "attention" | "idle"; resumable?: boolean }> = {},
+  commands: Record<string, string> = {},
+): HibernateLive => ({
+  agentOf: (id) => (agents[id] ? { resumable: true, ...agents[id] } : undefined),
+  runningCommand: (id) => commands[id],
+});
+
+describe("hibernateReview agents", () => {
+  it("lists agents with a spinner even when they have Run on start", () => {
+    const r = hibernateReview(ws([term("t1")]), live({ t1: { agent: "claude", status: "working" } }));
+    expect(r.agents.map((a) => a.tabId)).toEqual(["t1"]);
+  });
+
+  it("does not list an idle agent that has Run on start", () => {
+    const r = hibernateReview(ws([term("t1")]), live({ t1: { agent: "claude", status: "idle" } }));
+    expect(isReviewEmpty(r)).toBe(true);
+  });
+
+  it("does not list an agent waiting for the user as active", () => {
+    const r = hibernateReview(ws([term("t1")]), live({ t1: { agent: "claude", status: "attention" } }));
+    expect(r.agents).toEqual([]);
+  });
+
+  it("does not duplicate a working agent without Run on start in the commands list", () => {
+    const r = hibernateReview(
+      ws([term("t1", { restoreOnRestart: false })]),
+      live({ t1: { agent: "claude", status: "working" } }),
+    );
+    expect(r.agents.map((a) => a.tabId)).toEqual(["t1"]);
+    expect(r.commands).toEqual([]);
+  });
+});
+
+describe("hibernateReview commands", () => {
+  it("lists an idle agent without a stored session, since it cannot resume", () => {
+    const r = hibernateReview(
+      ws([term("t1")]),
+      live({ t1: { agent: "codex", status: "idle", resumable: false } }),
+    );
+    expect(r.commands).toEqual([{ tabId: "t1", title: undefined, command: "codex" }]);
+  });
+
+  it("does not list an idle agent with a stored session and Run on start", () => {
+    const r = hibernateReview(ws([term("t1")]), live({ t1: { agent: "claude", status: "idle", resumable: true } }));
+    expect(isReviewEmpty(r)).toBe(true);
+  });
+
+  it("keeps a working agent without a stored session in agents only", () => {
+    const r = hibernateReview(
+      ws([term("t1")]),
+      live({ t1: { agent: "claude", status: "working", resumable: false } }),
+    );
+    expect(r.agents.map((a) => a.tabId)).toEqual(["t1"]);
+    expect(r.commands).toEqual([]);
+  });
+
+  it("lists an idle agent whose Run on start is explicitly off", () => {
+    const r = hibernateReview(
+      ws([term("t1", { restoreOnRestart: false })]),
+      live({ t1: { agent: "claude", status: "idle" } }),
+    );
+    expect(r.commands).toEqual([{ tabId: "t1", title: undefined, command: "claude" }]);
+  });
+
+  it("lists a plain terminal running a command without Run on start", () => {
+    const r = hibernateReview(ws([term("t1")]), live({}, { t1: "npm run dev" }));
+    expect(r.commands.map((c) => c.command)).toEqual(["npm run dev"]);
+  });
+
+  it("lists a terminal that has a persistent command but Run on start explicitly off", () => {
+    const r = hibernateReview(
+      ws([term("t1", { persistentCommand: "make watch", restoreOnRestart: false })]),
+      live(),
+    );
+    expect(r.commands.map((c) => c.command)).toEqual(["make watch"]);
+  });
+
+  it("does not list a terminal whose persistent command replays on its own (restoreOnRestart unset)", () => {
+    const r = hibernateReview(ws([term("t1", { persistentCommand: "make watch" })]), live({}, { t1: "make watch" }));
+    expect(isReviewEmpty(r)).toBe(true);
+  });
+
+  it("lists a terminal with Run on start on but no command saved, since nothing would replay", () => {
+    const r = hibernateReview(ws([term("t1", { restoreOnRestart: true })]), live({}, { t1: "npm run dev" }));
+    expect(r.commands.map((c) => c.command)).toEqual(["npm run dev"]);
+  });
+
+  it("does not list a terminal with Run on start and a saved command", () => {
+    const r = hibernateReview(
+      ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]),
+      live({}, { t1: "make" }),
+    );
+    expect(isReviewEmpty(r)).toBe(true);
+  });
+
+  it("does not list an empty shell", () => {
+    expect(isReviewEmpty(hibernateReview(ws([term("t1")]), live()))).toBe(true);
+  });
+
+  it("skips RunButton script terminals even with a command running", () => {
+    const w = ws([term("t1")], { scripts: [{ id: "s1", name: "dev", command: "npm run dev", tabId: "t1" }] });
+    expect(isReviewEmpty(hibernateReview(w, live({}, { t1: "npm run dev" })))).toBe(true);
+  });
+});
+
+describe("hibernateReview docs", () => {
+  it("lists dirty editor and markdown tabs only", () => {
+    const tabs: Tab[] = [
+      { id: "e1", kind: "editor", path: "/a.ts", dirty: true, preview: false },
+      { id: "e2", kind: "editor", path: "/b.ts", dirty: false, preview: false },
+      { id: "m1", kind: "markdown", path: "/c.md", dirty: true },
+      { id: "m2", kind: "markdown", path: "/d.md" },
+    ];
+    const r = hibernateReview(ws(tabs), live());
+    expect(r.docs.map((d) => d.tabId)).toEqual(["e1", "m1"]);
+    expect(r.docs[0]).toMatchObject({ path: "/a.ts" });
+  });
+});

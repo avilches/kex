@@ -6,7 +6,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
-import { previewResumeCmd, seedRestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";
+import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
+import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import {
   allPaneIds,
   allPanes,
@@ -50,14 +53,44 @@ export function needsResumePlanLookup(tab: Tab): boolean {
   return tab.kind === "terminal" && tab.restoreOnRestart !== false;
 }
 
+export function planWake(ws: Workspace): string[] {
+  return terminalTabs(ws).filter(needsResumePlanLookup).map((t) => t.id);
+}
+
+export async function seedWakePlans(
+  ws: Workspace,
+  lookup: (tabId: string) => Promise<RestorePlan | null>,
+  seed: (tabId: string, plan: RestorePlan) => void,
+): Promise<void> {
+  await Promise.all(
+    planWake(ws).map(async (tabId) => {
+      const plan = await lookup(tabId);
+      if (plan) seed(tabId, plan);
+    }),
+  );
+}
+
+// A double click on Restore would otherwise seed the resume plans twice, and a
+// leftover plan could resurrect a stale session on a later wake.
+export async function runOnce(inFlight: Set<string>, key: string, task: () => Promise<void>): Promise<void> {
+  if (inFlight.has(key)) return;
+  inFlight.add(key);
+  try {
+    await task();
+  } finally {
+    inFlight.delete(key);
+  }
+}
+
+const wakesInFlight = new Set<string>();
+
 export function findReopenTarget(
   workspaces: Workspace[],
   activeWorkspaceId: string,
   entry: ClosedEntry,
 ): { workspaceId: string; paneId: string } | null {
-  const targetWs =
-    workspaces.find((w) => w.id === entry.workspaceId) ??
-    workspaces.find((w) => w.id === activeWorkspaceId);
+  const awake = (id: string) => workspaces.find((w) => w.id === id && !w.hibernated);
+  const targetWs = awake(entry.workspaceId) ?? awake(activeWorkspaceId);
   if (!targetWs) return null;
   const pane = findPane(targetWs.paneTree, entry.paneId);
   return {
@@ -264,6 +297,7 @@ export function applyMoveTabToWorkspace(
 
   if (dest.workspaceId === sourceWorkspaceId) return workspaces;
   const target = workspaces.find((w) => w.id === dest.workspaceId);
+  if (target?.hibernated) return workspaces;
   const attached = target ? attachTab(target, tab, dest.placement, paneLimit) : null;
   if (!attached) return workspaces;
   return applyCloseTab(workspaces, sourceWorkspaceId, tabId).map((w) =>
@@ -571,7 +605,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     const sealedTab = withNewTabAutofocus(tab);
     setWorkspaces((prev) =>
       prev.map((w) => {
-        if (w.id !== workspaceId) return w;
+        if (w.id !== workspaceId || w.hibernated) return w;
         const { workspacePaneLimit } = usePreferencesStore.getState();
         if (allPanes(w.paneTree).length >= workspacePaneLimit) return w;
         const orientation = direction === "left" || direction === "right" ? "horizontal" : "vertical";
@@ -587,6 +621,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // ── Tab operations ────────────────────────────────────────────────────────
 
   const openTab = useCallback((workspaceId: string, paneId: string, tab: Tab, insertionIndex?: number) => {
+    if (workspacesRef.current.find((w) => w.id === workspaceId)?.hibernated) return;
     const newTab = withNewTabAutofocus(tab);
     recordActivation(paneId, newTab.id);
     setWorkspaces((prev) =>
@@ -692,6 +727,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, [openTab, activeWorkspaceId]);
 
   const replaceTab = useCallback((workspaceId: string, paneId: string, oldTabId: string, newTab: Tab) => {
+    if (workspacesRef.current.find((w) => w.id === workspaceId)?.hibernated) return;
     const sealedTab = newTab;
     recordActivation(paneId, sealedTab.id);
     setWorkspaces((prev) =>
@@ -925,6 +961,21 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
+  const hibernateWorkspace = useCallback((workspaceId: string) => {
+    setWorkspaces((prev) => applyHibernate(prev, workspaceId));
+  }, []);
+
+  const wakeWorkspace = useCallback(async (workspaceId: string) => {
+    const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+    if (!ws?.hibernated) return;
+    await runOnce(wakesInFlight, workspaceId, async () => {
+      await seedWakePlans(ws, previewResumeCmd, seedRestorePlan);
+      discardUnflushedBuffers(editorTabIds(ws));
+      unmarkHibernating(terminalTabs(ws).map((t) => t.id));
+      setWorkspaces((prev) => applyWake(prev, workspaceId));
+    });
+  }, []);
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -969,6 +1020,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     splitPaneAndPlace,
     splitPaneAndOpenTab,
     openTab,
+    hibernateWorkspace,
+    wakeWorkspace,
     activateTab,
     revealTab,
     closeTab,

@@ -8,6 +8,7 @@ import {
   type KeyBinding,
   type ShortcutId,
 } from "./shortcuts";
+import { blockedWhileHibernated } from "@/modules/workspaces/lib/hibernate";
 
 function keyEvent(key: string, shift = false): KeyboardEvent {
   return {
@@ -338,5 +339,22 @@ describe("editor view shortcuts", () => {
 
   it("keeps the split preview available with no default binding", () => {
     expect(SHORTCUTS.find((x) => x.id === "editor.preview.toggleSplit")?.defaultBindings).toEqual([]);
+  });
+});
+
+describe("workspace.hibernate", () => {
+  it("is registered on Mod+Alt+Z and nothing else uses that chord", () => {
+    const sc = SHORTCUTS.find((s) => s.id === "workspace.hibernate");
+    expect(sc?.defaultBindings).toEqual([{ [MOD_PROP]: true, alt: true, key: "z" }]);
+    const clashes = SHORTCUTS.filter(
+      (s) =>
+        s.id !== "workspace.hibernate" &&
+        s.defaultBindings.some((b) => b.key === "z" && b.alt && b[MOD_PROP]),
+    );
+    expect(clashes).toEqual([]);
+  });
+
+  it("stays usable while the workspace is hibernated, so it can be toggled", () => {
+    expect(blockedWhileHibernated("workspace.hibernate")).toBe(false);
   });
 });

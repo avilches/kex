@@ -4,6 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setRandomWorkspaceColor,
+  setRestoreAllWorkspacesOnStartup,
   setWarnOnCloseWorkspace,
   setWorkspaceDetailBrowsers,
   setWorkspaceDetailEditors,
@@ -20,6 +21,7 @@ import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
 export function WorkspacesSection() {
+  const restoreAll = usePreferencesStore((s) => s.restoreAllWorkspacesOnStartup);
   const warnOnCloseWorkspace = usePreferencesStore((s) => s.warnOnCloseWorkspace);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
@@ -44,6 +46,15 @@ export function WorkspacesSection() {
       <SectionHeader title="Workspaces" />
 
       <div className="flex flex-col gap-2">
+        <SettingRow
+          title="Restore all workspaces on startup"
+          description="Reopen the terminals, agents and editors of every workspace when Kex starts. This can use a lot of memory and CPU if you have many workspaces. When it is off, only the workspace you were in is restored and the others start hibernated: nothing is lost, and each one comes back when you restore it manually. Workspaces that were already hibernated stay hibernated until you restore them. Applies the next time Kex starts."
+        >
+          <Switch
+            checked={restoreAll}
+            onCheckedChange={(v) => void setRestoreAllWorkspacesOnStartup(v)}
+          />
+        </SettingRow>
         <SettingRow
           title="Warn when closing a workspace"
           description="Confirm before closing a workspace and its tabs."

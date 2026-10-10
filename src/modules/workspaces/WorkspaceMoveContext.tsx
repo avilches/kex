@@ -30,16 +30,19 @@ type Props = {
 // (which changes on every cwd update and would re-render every tab).
 export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props) {
   const key = workspaces
+    .filter((w) => !w.hibernated)
     .map((w) => `${w.id}\u0000${w.title}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}`)
     .join("\u0001");
   // biome-ignore lint/correctness/useExhaustiveDependencies: key captures every field read from workspaces
   const targets = useMemo(
     () =>
-      workspaces.map((w) => ({
-        id: w.id,
-        title: w.title || "shell",
-        color: resolveWorkspaceColor(w.color, w.id),
-      })),
+      workspaces
+        .filter((w) => !w.hibernated)
+        .map((w) => ({
+          id: w.id,
+          title: w.title || "shell",
+          color: resolveWorkspaceColor(w.color, w.id),
+        })),
     [key],
   );
   const value = useMemo(() => ({ targets, moveTab: onMoveTab }), [targets, onMoveTab]);

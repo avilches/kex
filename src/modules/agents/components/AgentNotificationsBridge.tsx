@@ -9,7 +9,8 @@ import { useTauriListen } from "@/lib/useTauriListen";
 import { applyStagedSnapshot } from "../lib/agentSessionRestore";
 import { startAgentSnapshotSync } from "../lib/agentSnapshotSync";
 import { routeAgentNotification } from "../lib/route";
-import { endsAgentSession, isRunningAgentSession } from "../lib/sessionEndPolicy";
+import { isHibernating } from "../lib/hibernatingTabs";
+import { detachesRecord, endsAgentSession, isRunningAgentSession } from "../lib/sessionEndPolicy";
 import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
@@ -153,7 +154,9 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const store = useAgentStore.getState();
   if (endsAgentSession(sig.kind)) {
     store.finish(tabId);
-    invoke("agent_detach_session", { tabId }).catch(() => {});
+    if (detachesRecord(sig.kind, isHibernating(tabId))) {
+      invoke("agent_detach_session", { tabId }).catch(() => {});
+    }
   }
 
   switch (sig.kind) {

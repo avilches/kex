@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
-import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, needsResumePlanLookup, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -316,6 +316,18 @@ describe("findReopenTarget", () => {
     });
   });
 
+  it("skips a hibernated original workspace and uses the active one", () => {
+    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")];
+    const entry: ClosedEntry = { tab: { id: "t1", kind: "terminal" }, paneId: "p1", workspaceId: "w1" };
+    expect(findReopenTarget(workspaces, "w2", entry)).toEqual({ workspaceId: "w2", paneId: "p3" });
+  });
+
+  it("returns null when the original and the active workspaces are both hibernated", () => {
+    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, { ...makeWs("w2", "p3"), hibernated: true }];
+    const entry: ClosedEntry = { tab: { id: "t1", kind: "terminal" }, paneId: "p1", workspaceId: "w1" };
+    expect(findReopenTarget(workspaces, "w2", entry)).toBeNull();
+  });
+
   it("returns null when no workspaces exist", () => {
     const entry: ClosedEntry = {
       tab: { id: "t1", kind: "terminal" },
@@ -496,6 +508,11 @@ describe("applyMoveTabToWorkspace", () => {
     expect(target.activePaneId).toBe("px");
   });
 
+  it("refuses to move a tab into a hibernated workspace", () => {
+    const input = [src(), dst({ hibernated: true })];
+    expect(applyMoveTabToWorkspace(input, "src", "t1", autoDest, 8)).toBe(input);
+  });
+
   it("keeps the source workspace with an empty pane when its last tab leaves", () => {
     const onlyTab = src({ paneTree: leaf("sp1", [term("t1")]) });
     const out = applyMoveTabToWorkspace([onlyTab, dst()], "src", "t1", autoDest, 8);
@@ -561,5 +578,88 @@ describe("applyMoveTabToWorkspace", () => {
     const created = out[1]!;
     expect(created).toMatchObject({ title: "proj", cwd: "/Users/me/proj", groupId: "g1", color: null, activePaneId: "pn" });
     expect(created.paneTree).toMatchObject({ kind: "pane", id: "pn", activeTabId: "t1" });
+  });
+});
+
+describe("planWake", () => {
+  it("asks for a resume plan only on terminals that did not opt out of Run on start", () => {
+    const w = ws({
+      paneTree: {
+        kind: "pane",
+        id: "p1",
+        activeTabId: "a",
+        tabs: [
+          { id: "a", kind: "terminal" },
+          { id: "b", kind: "terminal", restoreOnRestart: false },
+          { id: "c", kind: "editor", path: "/x", dirty: false, preview: false },
+        ],
+      },
+    });
+    expect(planWake(w)).toEqual(["a"]);
+  });
+});
+
+describe("seedWakePlans", () => {
+  const plan = { tabId: "a", agent: "claude", resumeCmd: "claude --resume x", cwdLaunch: "/p", errorReason: "" };
+
+  it("seeds the plan under the same tab id for each terminal that has one", async () => {
+    const seeded: [string, unknown][] = [];
+    const w = ws({
+      paneTree: {
+        kind: "pane",
+        id: "p1",
+        activeTabId: "a",
+        tabs: [
+          { id: "a", kind: "terminal" },
+          { id: "b", kind: "terminal" },
+        ],
+      },
+    });
+    await seedWakePlans(
+      w,
+      async (id) => (id === "a" ? plan : null),
+      (id, p) => seeded.push([id, p]),
+    );
+    expect(seeded).toEqual([["a", plan]]);
+  });
+
+  it("does not look up terminals that opted out", async () => {
+    const asked: string[] = [];
+    const w = ws({
+      paneTree: {
+        kind: "pane",
+        id: "p1",
+        activeTabId: "a",
+        tabs: [{ id: "a", kind: "terminal", restoreOnRestart: false }],
+      },
+    });
+    await seedWakePlans(w, async (id) => (asked.push(id), null), () => {});
+    expect(asked).toEqual([]);
+  });
+});
+
+describe("runOnce", () => {
+  it("ignores a second call for the same key while the first is in flight", async () => {
+    const inFlight = new Set<string>();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let runs = 0;
+    const task = async () => {
+      runs++;
+      await gate;
+    };
+    const first = runOnce(inFlight, "w1", task);
+    await runOnce(inFlight, "w1", task);
+    expect(runs).toBe(1);
+    release();
+    await first;
+    await runOnce(inFlight, "w1", task);
+    expect(runs).toBe(2);
+  });
+
+  it("frees the key when the task throws", async () => {
+    const inFlight = new Set<string>();
+    await expect(runOnce(inFlight, "w1", async () => { throw new Error("x"); })).rejects.toThrow("x");
+    expect(inFlight.size).toBe(0);
   });
 });

@@ -4,6 +4,16 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { tabLocations } from "@/modules/workspaces/lib/tabLocations";
+import {
+  blockedWhileHibernated,
+  editorTabIds,
+  enableRunOnStart,
+  isPendingStale,
+  terminalTabs,
+} from "@/modules/workspaces/lib/hibernate";
+import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
+import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
+import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -121,6 +131,7 @@ import {
   useState,
 } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
+import { HibernateDialog } from "./components/HibernateDialog";
 import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
@@ -142,6 +153,7 @@ import {
 } from "@/modules/workspaces/lib/collapsedGroupsState";
 import {
   getSavedGroups,
+  groupLabelOf,
   saveGroups,
 } from "@/modules/workspaces/lib/workspaceGroupsState";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
@@ -230,6 +242,8 @@ export default function App() {
     splitPaneAndPlace,
     splitPaneAndOpenTab,
     openTab,
+    hibernateWorkspace,
+    wakeWorkspace,
     activateTab,
     revealTab,
     closeTab,
@@ -654,6 +668,7 @@ export default function App() {
   useEffect(() => {
     const live = new Set<string>();
     for (const ws of workspaces) {
+      if (ws.hibernated) continue;
       for (const pane of allPanes(ws.paneTree)) {
         for (const tab of pane.tabs) {
           if (tab.kind === "terminal") live.add(tab.id);
@@ -662,6 +677,7 @@ export default function App() {
     }
     for (const id of liveTabIdsRef.current) {
       if (!live.has(id)) {
+        useAgentStore.getState().finish(id);
         disposeSession(id);
         searchAddons.current.delete(id);
         terminalHandles.current.delete(id);
@@ -718,7 +734,7 @@ export default function App() {
 
   const runWorkspaceConfig = useCallback(
     (config: Script) => {
-      if (!activeWorkspace) return;
+      if (!activeWorkspace || activeWorkspace.hibernated) return;
 
       // The user's own leaf, captured up front so a same-workspace script run
       // reveals its tab without moving activePaneId or focus away from here.
@@ -932,6 +948,10 @@ export default function App() {
         tabIds.length > 0 ? await closeTabsRef.current(tabIds) : true;
       if (!allClosed) return;
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
+      if (ws?.hibernated) {
+        discardUnflushedBuffers(editorTabIds(ws));
+        unmarkHibernating(terminalTabs(ws).map((t) => t.id));
+      }
       closeWorkspace(wsId);
     },
     [closeWorkspace, destroyWorkspaceFloats],
@@ -1936,6 +1956,22 @@ export default function App() {
     await editorHandles.current.get(tabId)?.save();
   }, []);
 
+  const saveTabReportingErrors = useCallback(
+    async (tabId: string) => {
+      try {
+        await saveTab(tabId);
+      } catch (err) {
+        const tab = workspacesRef.current
+          .flatMap((w) => allPanes(w.paneTree))
+          .flatMap((p) => p.tabs)
+          .find((t) => t.id === tabId);
+        const name = tab && "path" in tab ? tab.path.split(/[\\/]/).pop() : tabId;
+        toast.error(`Could not save ${name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [saveTab],
+  );
+
   // Autosave-on-focus-loss: save every dirty editor (save() no-ops when clean).
   // Gated on the autosave preference; triggered by tab/workspace switch, window
   // blur, tab close, and app close.
@@ -1951,6 +1987,24 @@ export default function App() {
   }, [saveTab]);
   const flushDirtyEditorsRef = useRef(flushDirtyEditors);
   flushDirtyEditorsRef.current = flushDirtyEditors;
+
+  const hibernateFlow = useHibernateFlow({
+    workspacesRef,
+    hibernateWorkspace,
+    flushDirtyEditors,
+    destroyWorkspaceFloats,
+  });
+  const { requestHibernate, performHibernate } = hibernateFlow;
+  const pendingHibernateRef = useRef<string | null>(null);
+  pendingHibernateRef.current = hibernateFlow.pendingWorkspaceId;
+  const { cancel: cancelHibernate } = hibernateFlow;
+  useEffect(() => {
+    if (isPendingStale(hibernateFlow.pendingWorkspaceId, workspaces)) cancelHibernate();
+  }, [hibernateFlow.pendingWorkspaceId, workspaces, cancelHibernate]);
+  const handleHibernateFromDialog = useCallback(() => {
+    const id = pendingHibernateRef.current;
+    if (id) void performHibernate(id);
+  }, [performHibernate]);
 
   useEffect(() => {
     setEditorFlush(() => flushDirtyEditorsRef.current());
@@ -2675,6 +2729,9 @@ export default function App() {
           }
         }
       },
+      "workspace.hibernate": () => {
+        if (activeWorkspace) void requestHibernate(activeWorkspace.id);
+      },
       "workspace.run": () => {
         if (!activeWorkspace) return;
         const configs = activeWorkspace.scripts ?? [];
@@ -2947,11 +3004,15 @@ export default function App() {
       toggleSplitPreview,
       runWorkspaceConfig,
       stopWorkspaceConfig,
+      requestHibernate,
     ],
   );
 
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
+      // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
+      if (hibernateFlow.pendingWorkspaceId !== null) return true;
+      if (activeWorkspace?.hibernated && blockedWhileHibernated(id)) return true;
       if (id === "editor.undo" || id === "editor.redo") {
         return activeTab?.kind !== "editor";
       }
@@ -2978,7 +3039,7 @@ export default function App() {
 
       return false;
     },
-    [activeTab],
+    [activeTab, activeWorkspace?.hibernated, hibernateFlow.pendingWorkspaceId],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
@@ -2986,7 +3047,9 @@ export default function App() {
   // ── Agent activation ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    useAgentStore.getState().setTabLocations(tabLocations(workspaces));
+    useAgentStore.getState().setTabLocations(
+      tabLocations(workspaces.filter((w) => !w.hibernated)),
+    );
   }, [workspaces]);
 
   const onActivateAgent = useCallback(
@@ -3195,11 +3258,12 @@ export default function App() {
         color: w.color,
         icon: w.icon,
         groupId: w.groupId,
-        tabs: w.detailExpanded
+        tabs: w.detailExpanded && !w.hibernated
           ? allPanes(w.paneTree).flatMap((p) => p.tabs)
           : NO_TABS,
         focusedTabId: focusedTabId(w.paneTree, w.activePaneId),
         detailExpanded: w.detailExpanded,
+        hibernated: w.hibernated,
       })),
     [workspaces],
   );
@@ -3265,6 +3329,8 @@ export default function App() {
               onReorder={reorderWorkspaces}
               onClose={(wsId) => void requestCloseWorkspace(wsId)}
               onRename={(id, title) => setWorkspaceTitle(id, title)}
+              onHibernate={(id) => void hibernateFlow.requestHibernate(id)}
+              onWake={(id) => void wakeWorkspace(id)}
               onOpenSettings={(id) =>
                 useWorkspaceSettingsStore.getState().openSettings(id)
               }
@@ -3364,6 +3430,7 @@ export default function App() {
                           workspaces={workspaces}
                           activeWorkspaceId={activeWorkspaceId}
                           expandedPaneId={zenPaneId}
+                          onWake={(id) => void wakeWorkspace(id)}
                           onActivateTab={onActivateTabStable}
                           onCloseTab={onCloseTabStable}
                           onCloseManyTabs={onCloseManyTabsStable}
@@ -3510,6 +3577,29 @@ export default function App() {
             onRemoveScript={removeScript}
             onReorderScripts={reorderScripts}
             onRestoreFocus={restoreLeafFocus}
+          />
+
+          <HibernateDialog
+            workspace={
+              workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId) ??
+              null
+            }
+            groupLabel={groupLabelOf(
+              workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId)?.groupId,
+              groups,
+            )}
+            onClose={hibernateFlow.cancel}
+            onHibernate={handleHibernateFromDialog}
+            onSaveTab={saveTabReportingErrors}
+            onSaveAll={async (tabIds) => {
+              await Promise.all(tabIds.map(saveTabReportingErrors));
+            }}
+            onEnableRunOnStart={(tabId, running) => {
+              const id = hibernateFlow.pendingWorkspaceId;
+              if (!id) return;
+              const isAgent = useAgentStore.getState().sessions[tabId] !== undefined;
+              updateTabData(id, tabId, (t) => enableRunOnStart(t, isAgent ? undefined : running));
+            }}
           />
 
           <CloseDialogs

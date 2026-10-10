@@ -1,5 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { sanitizeTab, sanitizeWorkspace } from "./workspaceState";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const invokeMock = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+vi.mock("@tauri-apps/api/webviewWindow", () => ({
+  getCurrentWebviewWindow: () => ({ label: "w-test" }),
+}));
+
+import {
+  getSavedWorkspaceState,
+  initWorkspaceState,
+  sanitizeTab,
+  sanitizeWorkspace,
+} from "./workspaceState";
 import type { Tab } from "./types";
 import type { Workspace } from "./types";
 
@@ -45,5 +57,34 @@ describe("sanitizeWorkspace", () => {
     const pane = out.paneTree as Extract<Workspace["paneTree"], { kind: "pane" }>;
     expect(pane.tabs).toHaveLength(2);
     expect(pane.tabs.map((t) => t.id)).toEqual(["tab-1", "tab-2"]);
+  });
+});
+
+describe("initWorkspaceState", () => {
+  const saved = (id: string): Workspace => ({
+    id,
+    title: id,
+    paneTree: { kind: "pane", id: `p-${id}`, tabs: [{ id: `t-${id}`, kind: "terminal" }], activeTabId: `t-${id}` },
+    activePaneId: `p-${id}`,
+  });
+
+  beforeEach(() => {
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue({
+      workspaces: [saved("a"), saved("b"), saved("c")],
+      activeIndex: 1,
+    });
+  });
+
+  it("hibernates every saved workspace but the active one when restoreAll is false", async () => {
+    await initWorkspaceState(false);
+    const state = getSavedWorkspaceState()!;
+    expect(state.activeIndex).toBe(1);
+    expect(state.workspaces.map((w) => w.hibernated)).toEqual([true, undefined, true]);
+  });
+
+  it("hibernates nothing when restoreAll is true", async () => {
+    await initWorkspaceState(true);
+    expect(getSavedWorkspaceState()!.workspaces.some((w) => w.hibernated)).toBe(false);
   });
 });

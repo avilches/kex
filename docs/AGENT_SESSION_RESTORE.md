@@ -368,6 +368,31 @@ Actions:
 
 ---
 
+## Hibernating a workspace
+
+Hibernating a workspace kills its PTYs, and each kill produces an `exited` signal. The stored
+session record in `agent-sessions.json` must survive that exit, because waking the workspace
+restores the agent from it. A normal exit detaches the record (`agent_detach_session`).
+
+- `lib/hibernatingTabs.ts` keeps an in-memory set of the tab ids being killed for hibernation.
+  `markHibernating` and `unmarkHibernating` maintain it; `isHibernating` reads it. It is never persisted.
+- `lib/sessionEndPolicy.ts` `detachesRecord(kind, hibernating)` decides whether an end signal drops
+  the record: only `exited` does, and not when the tab is hibernating.
+- `AgentNotificationsBridge.tsx` `handleSignal` always finishes the session in the store and calls
+  `agent_detach_session` only when `detachesRecord` says so.
+
+The record was already safe before this set existed, through an implicit order: `disposeSession`
+removes the session from the `sessions` map synchronously, so when `exited` arrives `leafIdForPty`
+already returns `null` and `handleSignal` returns before reaching the detach. The set makes that
+protection explicit instead of depending on the order.
+
+`window_state.rs` `terminal_tab_ids` is what `agent_session_restore_plan` uses to find orphan
+records: a stored session whose tab is in no window is dropped. A hibernated workspace keeps its
+tabs in the saved state (flagged, not removed), so its records are not orphans. A regression test
+pins that, so a later change cannot make hibernated tabs look gone.
+
+---
+
 ## Diagnosing a failed restore with Kex.log
 
 `kex_lib::modules::agent`, `kex_lib::modules::pty::agent_detect` and `kex_lib::modules::pty::ipc` all log at

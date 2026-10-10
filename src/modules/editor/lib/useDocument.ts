@@ -6,22 +6,13 @@ import { useConflictFlag } from "@/modules/editor/lib/useConflictFlag";
 import { shouldApplyReload } from "@/modules/editor/lib/reloadPlan";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { stashUnflushedBuffer, takeUnflushedBuffer } from "@/modules/editor/lib/unflushedBuffers";
 
 type ReadResult =
   | { kind: "text"; content: string; size: number }
   | { kind: "binary"; size: number }
   | { kind: "toolarge"; size: number; limit: number };
 
-// Survives a component unmount (e.g. dragging a tab to another pane, which
-// unmounts EditorPane in the source pane and mounts a fresh one in the
-// target) so an in-progress edit isn't force-saved to disk or lost just
-// because the tab moved. A real, guarded close (useTabCloseGuards) already
-// saves or asks before disposing the tab; this only covers moves that never
-// go through that flow. Keyed by tabId, not path: the same file can be open
-// in two tabs (different panes or workspaces) at once, and keying by path
-// would let one unmounting overwrite or adopt the other's stash. Process-
-// lifetime only, so it does not survive an app quit.
-const unflushedBuffers = new Map<string, string>();
 
 export type DocumentState =
   | { status: "loading" }
@@ -109,8 +100,7 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
       .then((res) => {
         if (cancelled) return;
         if (res.kind === "text") {
-          const unflushed = unflushedBuffers.get(tabId);
-          unflushedBuffers.delete(tabId);
+          const unflushed = takeUnflushedBuffer(tabId);
           savedRef.current = res.content;
           bufferRef.current = unflushed ?? res.content;
           setDirty(unflushed != null && unflushed !== res.content);
@@ -291,7 +281,7 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
             console.error("[autosave flush]", e);
           });
         } else {
-          unflushedBuffers.set(tabId, bufferRef.current);
+          stashUnflushedBuffer(tabId, bufferRef.current);
         }
       }
     };

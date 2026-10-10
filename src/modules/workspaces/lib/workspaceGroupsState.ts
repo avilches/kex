@@ -12,6 +12,14 @@ export function sanitizeSavedGroups(raw: unknown): WorkspaceGroup[] {
   );
 }
 
+export function groupLabelOf(
+  groupId: string | undefined,
+  groups: readonly WorkspaceGroup[],
+): string | undefined {
+  if (!groupId) return undefined;
+  return groups.find((g) => g.id === groupId)?.label || undefined;
+}
+
 let cached: WorkspaceGroup[] = [];
 
 export function setSavedGroups(raw: unknown): void {

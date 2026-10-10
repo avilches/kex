@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { debouncedInvoke } from "./debouncedInvoke";
+import { applyStartupHibernation } from "./hibernate";
 import type { Tab, SplitNode, Workspace } from "./types";
 import {
   setSavedSidebarState,
@@ -45,7 +46,7 @@ export function sanitizeWorkspace(w: Workspace): Workspace {
   };
 }
 
-export async function initWorkspaceState(): Promise<void> {
+export async function initWorkspaceState(restoreAll: boolean): Promise<void> {
   try {
     const label = getCurrentWebviewWindow().label;
     if (import.meta.env.DEV) console.debug("[workspace-state] initWorkspaceState: window label =", label);
@@ -54,7 +55,11 @@ export async function initWorkspaceState(): Promise<void> {
       ? `${entry.workspaces.length} workspace(s), activeIndex=${entry.activeIndex}`
       : "null (no saved state)");
     if (entry && Array.isArray(entry.workspaces) && entry.workspaces.length > 0) {
-      cached = { workspaces: entry.workspaces.map(sanitizeWorkspace), activeIndex: entry.activeIndex };
+      const sanitized = entry.workspaces.map(sanitizeWorkspace);
+      cached = {
+        workspaces: applyStartupHibernation(sanitized, entry.activeIndex, restoreAll),
+        activeIndex: entry.activeIndex,
+      };
     }
     setSavedSidebarState(entry?.sidebar);
     setSavedWorkspaceBarWidth(entry?.workspaceBarWidth);

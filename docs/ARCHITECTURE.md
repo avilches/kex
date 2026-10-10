@@ -401,6 +401,21 @@ On first launch Windows shows "Windows protected your PC" (SmartScreen). Click "
 
 The preview pane renders local dev servers in a native child webview. It does not have navigation history, bookmarks, devtools, or extension support. It is not a replacement for opening your dev server in Chrome or Firefox. External URLs work but the experience is intentionally minimal.
 
+### 5.7a Hibernated workspaces
+
+`Workspace.hibernated` marks a workspace whose tabs are not mounted: its terminals have no PTY and
+its editors are unmounted. The tabs stay in the persisted `paneTree` on purpose, so waking the
+workspace restores the same layout and tabs. Limitations: scripts launched from the RunButton are
+not relaunched on wake, unsaved editor edits are discarded, and an agent that cannot be resumed
+follows the existing restore error path. Rendering details are in `docs/WORKSPACES.md`.
+
+Startup: unless the global preference `restoreAllWorkspacesOnStartup` (Settings > Workspaces, default
+off) is on, `initWorkspaceState(restoreAll)` hibernates every saved workspace of the window except the
+one at the saved `activeIndex` (`applyStartupHibernation`), with no review dialog because nothing is
+running yet. `main.tsx` awaits `loadPreferences()` before `initWorkspaceState` for that reason. The
+preference is read at startup only, so a change applies from the next launch. Nothing is lost: the
+tabs stay in the workspace JSON and each workspace comes back with Restore.
+
 ### 5.8 Workspace authorization and file opening
 
 A file opened in the editor from a directory the user has not navigated to in a terminal tab will show git diff decorations only after the directory is authorized. The source control panel will similarly refuse to operate on that path. Navigate to the directory in a terminal tab first (`cd <path>`) to authorize it.

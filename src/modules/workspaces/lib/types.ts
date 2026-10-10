@@ -96,6 +96,9 @@ export type Workspace = {
   scriptPaneId?: string;
   // The nested tab list under this workspace in the WorkspaceBar is open.
   detailExpanded?: boolean;
+  // The workspace keeps its pane tree and tabs in the JSON but mounts none of
+  // them; waking it brings editors, commands and agents back.
+  hibernated?: boolean;
 };
 
 export type ClosedEntry = {

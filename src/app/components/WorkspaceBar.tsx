@@ -96,6 +96,7 @@ type WorkspaceItem = {
   tabs: Tab[];
   focusedTabId: string | null;
   detailExpanded?: boolean;
+  hibernated?: boolean;
 };
 
 export type WorkspaceBarProps = {
@@ -113,6 +114,8 @@ export type WorkspaceBarProps = {
   onReorderGroups: (fromId: string, toId: string) => void;
   onClose?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
+  onHibernate?: (id: string) => void;
+  onWake?: (id: string) => void;
   onOpenSettings: (id: string) => void;
   width: number;
   onWidthChange: (w: number) => void;
@@ -143,6 +146,8 @@ function SortableWorkspaceItem({
   onSelect,
   onClose,
   onRename,
+  onHibernate,
+  onWake,
   onOpenSettings,
   onSetGroup,
   onCreateGroup,
@@ -161,6 +166,8 @@ function SortableWorkspaceItem({
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
   onRename: (id: string, newTitle: string) => void;
+  onHibernate?: (id: string) => void;
+  onWake?: (id: string) => void;
   onOpenSettings: (id: string) => void;
   onSetGroup: (id: string, groupId: string | null) => void;
   onCreateGroup: (workspaceId: string) => string;
@@ -199,6 +206,7 @@ function SortableWorkspaceItem({
 
   const shortcuts = usePreferencesStore((s) => s.shortcuts);
   const renameLabel = getShortcutLabel("workspace.rename", shortcuts);
+  const hibernateLabel = getShortcutLabel("workspace.hibernate", shortcuts);
   const settingsLabel = getShortcutLabel("workspace.settings", shortcuts);
   const closeLabel = getShortcutLabel("workspace.close", shortcuts);
 
@@ -429,6 +437,20 @@ function SortableWorkspaceItem({
               <ContextMenuShortcut>{renameLabel}</ContextMenuShortcut>
             )}
           </ContextMenuItem>
+          {ws.hibernated
+            ? onWake && (
+                <ContextMenuItem onSelect={() => onWake(ws.id)}>
+                  Restore
+                </ContextMenuItem>
+              )
+            : onHibernate && (
+                <ContextMenuItem onSelect={() => onHibernate(ws.id)}>
+                  Hibernate
+                  {hibernateLabel && (
+                    <ContextMenuShortcut>{hibernateLabel}</ContextMenuShortcut>
+                  )}
+                </ContextMenuItem>
+              )}
           <ContextMenuSub>
             <ContextMenuSubTrigger className="gap-2">
               <HugeiconsIcon icon={Folder01Icon} size={14} strokeWidth={2} />
@@ -831,6 +853,8 @@ export function WorkspaceBar({
   onReorderGroups,
   onClose,
   onRename,
+  onHibernate,
+  onWake,
   onOpenSettings,
   width,
   onWidthChange,
@@ -1051,6 +1075,8 @@ export function WorkspaceBar({
                                 onSelect={onSelect}
                                 onClose={onClose}
                                 onRename={onRename}
+                                onHibernate={onHibernate}
+                                onWake={onWake}
                                 onOpenSettings={onOpenSettings}
                                 onSetGroup={onSetGroup}
                                 onCreateGroup={onCreateGroup}
@@ -1080,6 +1106,8 @@ export function WorkspaceBar({
                                 onSelect={onSelect}
                                 onClose={onClose}
                                 onRename={onRename}
+                                onHibernate={onHibernate}
+                                onWake={onWake}
                                 onOpenSettings={onOpenSettings}
                                 onSetGroup={onSetGroup}
                                 onCreateGroup={onCreateGroup}

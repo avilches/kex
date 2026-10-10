@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeSavedGroups } from "./workspaceGroupsState";
+import { groupLabelOf, sanitizeSavedGroups } from "./workspaceGroupsState";
 
 describe("sanitizeSavedGroups", () => {
   it("keeps well-formed groups", () => {
@@ -21,5 +21,16 @@ describe("sanitizeSavedGroups", () => {
   it("drops entries with a non-string id or label", () => {
     const groups = [{ id: 1, label: "A" }, { id: "grp-a", label: 2 }];
     expect(sanitizeSavedGroups(groups)).toEqual([]);
+  });
+});
+
+describe("groupLabelOf", () => {
+  const groups = [{ id: "grp-a", label: "Group A" }];
+  it("returns the label of an existing group", () => {
+    expect(groupLabelOf("grp-a", groups)).toBe("Group A");
+  });
+  it("returns undefined for no group or a stale id", () => {
+    expect(groupLabelOf(undefined, groups)).toBeUndefined();
+    expect(groupLabelOf("grp-gone", groups)).toBeUndefined();
   });
 });
