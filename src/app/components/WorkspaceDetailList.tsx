@@ -33,13 +33,11 @@ function DetailTabRow({
   tab,
   visual,
   focused,
-  showIcon,
   onActivate,
 }: {
   tab: Tab;
   visual: DetailRow["visual"];
   focused: boolean;
-  showIcon: boolean;
   onActivate: (tabId: string) => void;
 }) {
   const info = useAgentTabTitle(tab);
@@ -58,11 +56,9 @@ function DetailTabRow({
           : "text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground",
       )}
     >
-      {showIcon && (
-        <span className="flex size-3.5 shrink-0 items-center justify-center">
-          {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
-        </span>
-      )}
+      <span className="flex size-3.5 shrink-0 items-center justify-center">
+        {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
+      </span>
       <span className="min-w-0 flex-1 truncate">{title}</span>
       <StatusMark visual={visual} />
     </button>
@@ -83,18 +79,11 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   onActivate: (tabId: string) => void;
 }) {
   const sessions = useAgentStore((s) => s.sessions);
-  const { rows, showIcon } = useMemo(() => {
+  const rows = useMemo(() => {
     const agentTabIds = new Set(
       tabs.filter((t) => t.kind === "terminal" && sessions[t.id]).map((t) => t.id),
     );
-    const rows = workspaceDetailRows(tabs, agentTabIds, entries ?? [], filter);
-    const tabsById = new Map(tabs.map((t) => [t.id, t]));
-    const kinds = new Set(
-      rows.map((r) =>
-        agentTabIds.has(r.tabId) ? "agent" : tabsById.get(r.tabId)?.kind,
-      ),
-    );
-    return { rows, showIcon: kinds.has("agent") || kinds.size > 1 };
+    return workspaceDetailRows(tabs, agentTabIds, entries ?? [], filter);
   }, [tabs, sessions, entries, filter]);
   const tabsById = useMemo(() => new Map(tabs.map((t) => [t.id, t])), [tabs]);
 
@@ -110,7 +99,6 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
             tab={tab}
             visual={row.visual}
             focused={row.tabId === focusedTabId}
-            showIcon={showIcon}
             onActivate={onActivate}
           />
         ) : null;

@@ -134,17 +134,11 @@ describe("WorkspaceDetailList kind icons", () => {
     unmount();
   });
 
-  it("shows an icon on every row when several kinds are mixed without agents", () => {
-    resetAgents();
-    const { rows, unmount } = mount({ terminals: "all", editors: true });
-    for (const r of rows()) expect(icon(r)).not.toBeNull();
-    unmount();
-  });
-
-  it("shows no icons when every row is the same plain kind", () => {
+  it("shows an icon on every row without agents, even when every row is a plain terminal", () => {
     resetAgents();
     const { rows, unmount } = mount({ terminals: "all" });
-    for (const r of rows()) expect(icon(r)).toBeNull();
+    expect(rows().length).toBeGreaterThan(0);
+    for (const r of rows()) expect(icon(r)).not.toBeNull();
     unmount();
   });
 });
