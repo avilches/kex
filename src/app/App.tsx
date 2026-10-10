@@ -153,6 +153,7 @@ import {
 } from "@/modules/workspaces/lib/collapsedGroupsState";
 import {
   getSavedGroups,
+  groupLabelOf,
   saveGroups,
 } from "@/modules/workspaces/lib/workspaceGroupsState";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
@@ -3541,6 +3542,10 @@ export default function App() {
               workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId) ??
               null
             }
+            groupLabel={groupLabelOf(
+              workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId)?.groupId,
+              groups,
+            )}
             onClose={hibernateFlow.cancel}
             onHibernate={handleHibernateFromDialog}
             onSaveTab={saveTabReportingErrors}

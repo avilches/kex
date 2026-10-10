@@ -445,7 +445,7 @@ HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as
 
 ### Hibernated workspaces
 
-A workspace can be hibernated (Cmd+Alt+Z, `workspace.hibernate`): its terminals and editors are closed and its tabs stay in the persisted tree, shown as a "Zzzzz" overlay with a Restore button. A review dialog warns about agents still working, unsaved documents and running commands that would not come back, with Save, Save all and Run on start actions. Waking resumes agent sessions and "Run on start" commands. Details in `docs/WORKSPACES.md`. Not present upstream.
+A workspace can be hibernated (Cmd+Alt+Z, `workspace.hibernate`, or Hibernate / Restore in the workspace context menu): its terminals and editors are closed and its tabs stay in the persisted tree, shown as a "Zzzzz" overlay with a Restore button. A review dialog warns about agents still working, unsaved documents and running commands that would not come back, with Save, Save all and Run on start actions. Waking resumes agent sessions and "Run on start" commands. Details in `docs/WORKSPACES.md`. Not present upstream.
 
 At startup every workspace except the active one starts hibernated, unless the setting "Restore all workspaces on startup" (Settings > Workspaces, default off) is on.
 

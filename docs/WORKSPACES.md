@@ -234,7 +234,7 @@ hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
    session, destroys the floating browsers and finally calls `hibernateWorkspace`. A set of
    in-flight workspace ids makes a double trigger hibernate once.
 
-The dialog title names the workspace and shows a small ball in its color (neutral when it has none).
+The dialog title names the workspace and starts with a `WorkspaceBadge` (`modules/workspaces/WorkspaceBadge.tsx`): a round badge in the chip color the bar uses, with the workspace icon inside when it has one, neutral when it has no color. A muted tag with the group label (`groupLabelOf`) follows the name when the workspace belongs to an existing group. The title keeps the last shown workspace and group so it does not flip during the exit animation. If the pending workspace disappears while the dialog is open, `isPendingStale` makes `App.tsx` cancel the request so the shortcut lock is released.
 While the dialog is open `shortcutsDisabled` returns true for every shortcut (the global listener
 runs in capture phase, before the Radix modal); Escape is not a registered shortcut and still closes it.
 `HibernateDialog` is reactive: it recomputes the review from the agent store and the running
