@@ -25,7 +25,7 @@ Workspace           — a named environment (local or WSL distro)
 
 **Workspace fields.** A `Workspace` carries additional configuration:
 - `color?: string | null` — optional workspace accent color (hex string or null)
-- `scripts?: Script[]` — list of saved scripts (command, name, optional cwd, optional tabId)
+- `scripts?: Script[]` — list of saved scripts (command, name, `cwdMode` of `workspace` | `context` | `fixed`, `cwd` used only in `fixed` mode, optional tabId)
 - `activeScript?: string` — id of the currently selected script in the Run button
 - `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
