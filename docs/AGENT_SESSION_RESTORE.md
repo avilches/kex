@@ -252,7 +252,7 @@ In `attachSession`, after the PTY is open:
 ```
 if plan = consumeRestorePlan(leafId):
   if plan.resumeCmd is non-empty:
-    startRestored(leafId, workspaceId, plan.agent)
+    stageRestoredSnapshot(leafId, plan)   // name + notification, applied later (see below)
     writeWhenShellReady(pty, " " + plan.resumeCmd + "\r")
   else:
     setRestoreError(leafId, workspaceId, plan.agent, plan.errorReason)
@@ -274,8 +274,9 @@ every agent tab whose snapshot changed (`changedSnapshots` in `agentSnapshot.ts`
 the session carries the amber dot, else empty (which clears it).
 
 On restore, `useTerminalSession` calls `stageRestoredSnapshot(plan)` when it injects the resume command. The state is
-applied by `applyStagedSnapshot` when the resumed agent registers its session (`ensureSession`/`ensureSessionIdle` in
-the bridge), not earlier: a shell that sets its own terminal title would overwrite the name, and the notification
+applied by `applyStagedSnapshot` on the first agent signal of that tab (`ensureSession`/`ensureSessionIdle` in the
+bridge, which run for the shell-integration `started` signal as well as for hook signals, whether or not the session
+already exists), not earlier: a shell that sets its own terminal title would overwrite the name, and the notification
 needs a session to attach to. It sets the OSC title, pushes the bell entry and, for `attention`, raises the amber dot,
 all silently (no toast, no OS notification). A staged snapshot expires after 90 seconds (`STAGED_SNAPSHOT_TTL_MS`): if the resume failed and the user starts an agent by hand in that tab much later, it must not inherit the old name and notification. If the user is already looking at that tab the bridge marks it seen.
 
@@ -361,7 +362,7 @@ Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an
 
 Actions:
 
-- `startRestored(tabId, workspaceId, agent)` — creates a session record with `restored: true`, `status: "working"`.
+- `startRestored(tabId, workspaceId, agent)` — creates a session record with `restored: true`, `status: "working"`. No production code calls it today (TASK-666); the session of a restored tab is created by the first agent signal.
 - `setRestoreError(tabId, workspaceId, agent, reason?)` — sets `restoreError: true`.
 - `setStatus` (existing) — clears `restored` on the first real state transition.
 
