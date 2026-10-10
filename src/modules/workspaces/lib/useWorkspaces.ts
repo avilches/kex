@@ -978,18 +978,21 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   }, []);
 
   // Menu variant of moveTabToWorkspace: a hibernated destination is woken first
-  // instead of refused. The preview runs on the woken list because the ref only
-  // catches up after the next render.
+  // instead of refused. The move is validated before waking so an impossible one
+  // does not wake anything, and the updater wakes `prev` itself because a wake
+  // already in flight makes wakeWorkspace return before it has applied.
   const moveTabToWorkspaceWaking = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
-      if (request.kind !== "new") await wakeWorkspace(request.workspaceId);
       const dest = buildMoveDestination(request);
       const { workspacePaneLimit } = usePreferencesStore.getState();
-      const woken = applyWake(workspacesRef.current, dest.workspaceId);
-      if (applyMoveTabToWorkspace(woken, sourceWorkspaceId, tabId, dest, workspacePaneLimit) === woken) {
+      const apply = (list: Workspace[]) =>
+        applyMoveTabToWorkspace(applyWake(list, dest.workspaceId), sourceWorkspaceId, tabId, dest, workspacePaneLimit);
+      const before = applyWake(workspacesRef.current, dest.workspaceId);
+      if (applyMoveTabToWorkspace(before, sourceWorkspaceId, tabId, dest, workspacePaneLimit) === before) {
         return null;
       }
-      setWorkspaces((prev) => applyMoveTabToWorkspace(prev, sourceWorkspaceId, tabId, dest, workspacePaneLimit));
+      if (request.kind !== "new") await wakeWorkspace(request.workspaceId);
+      setWorkspaces(apply);
       return dest.workspaceId;
     },
     [wakeWorkspace],
