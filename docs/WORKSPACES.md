@@ -210,7 +210,7 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
   `hibernated`; the terminals mount again and resume through the normal restore path. A set of
   in-flight workspace ids (`runOnce`) makes a double click on Restore wake once.
 - Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
-  `applyMoveTabToWorkspace` refuses it as a destination (and "Move to Workspace" does not list it),
+  `applyMoveTabToWorkspace` refuses it as a destination (drag and drop never offers it; the "Move to Workspace" menu lists it with a Zzz mark and wakes it first through `moveTabToWorkspaceWaking`),
   `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`
   blocks the shortcuts that need tabs (`blockedWhileHibernated`), `runWorkspaceConfig` does nothing,
   `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is empty.
@@ -516,10 +516,10 @@ split) the same array is returned and nothing moves. `lib/tabTransfer.ts` holds 
 (`attachTab`, `workspaceForTab`).
 
 The context menu of a tab has "Move to Workspace" (`TabContextMenuItems.tsx`, the menu body shared by the pane tab and the sidebar rows, fed by `WorkspaceMoveContext`):
-"New", then every other workspace with a dot of its color. Choosing a workspace uses the `auto`
+"New", then every other workspace with a dot of its color, hibernated ones included (marked Zzz; choosing one wakes it before the tab lands), and its icon when it has one. Choosing a workspace uses the `auto`
 placement: a single pane with tabs is split in two and the tab lands in the new right half; an already
 split workspace gets the tab in its active pane; a single empty pane receives it without splitting. The
-user stays in the current workspace. "New" creates a workspace right after the source (same group) whose
+user stays in the current workspace, unless the moved tab had the focus: then the destination workspace is selected and the tab focused in it. "New" creates a workspace right after the source (same group) whose
 only tab is the moved one, titled and rooted after the tab's cwd when it is a terminal. A source
 workspace that loses its last tab is not closed: it keeps an empty pane. `App.tsx` also calls
 `useAgentStore.reassignTabWorkspace` so the agent session and its notifications point at the new

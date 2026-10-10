@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
+import { applyWake } from "./hibernate";
 import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
@@ -511,6 +512,14 @@ describe("applyMoveTabToWorkspace", () => {
   it("refuses to move a tab into a hibernated workspace", () => {
     const input = [src(), dst({ hibernated: true })];
     expect(applyMoveTabToWorkspace(input, "src", "t1", autoDest, 8)).toBe(input);
+  });
+
+  it("moves the tab into a hibernated workspace once it has been woken", () => {
+    const woken = applyWake([src(), dst({ hibernated: true })], "dst");
+    const out = applyMoveTabToWorkspace(woken, "src", "t1", autoDest, 8);
+    const target = out.find((w) => w.id === "dst")!;
+    expect(target.hibernated).toBeUndefined();
+    expect(JSON.stringify(target.paneTree)).toContain('"id":"t1"');
   });
 
   it("keeps the source workspace with an empty pane when its last tab leaves", () => {

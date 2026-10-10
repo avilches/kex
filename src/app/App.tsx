@@ -245,6 +245,7 @@ export default function App() {
     setPaneDivider,
     moveTab,
     moveTabToWorkspace,
+    moveTabToWorkspaceWaking,
     reorderTab,
     splitPaneAndPlace,
     splitPaneAndOpenTab,
@@ -2033,16 +2034,38 @@ export default function App() {
     });
   }, [findTabGlobal]);
 
-  const handleMoveTabToWorkspace = useCallback(
-    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): string | null => {
-      const destinationId = moveTabToWorkspace(sourceWorkspaceId, tabId, request);
+  const settleMovedTab = useCallback(
+    (tabId: string, destinationId: string | null): string | null => {
       if (destinationId) {
         useAgentStore.getState().reassignTabWorkspace(tabId, destinationId);
         requestAnimationFrame(focusActiveTab);
       }
       return destinationId;
     },
-    [moveTabToWorkspace, focusActiveTab],
+    [focusActiveTab],
+  );
+
+  const handleMoveTabToWorkspace = useCallback(
+    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): string | null =>
+      settleMovedTab(tabId, moveTabToWorkspace(sourceWorkspaceId, tabId, request)),
+    [moveTabToWorkspace, settleMovedTab],
+  );
+
+  const handleMoveTabFromMenu = useCallback(
+    async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<void> => {
+      const source = workspacesRef.current.find((w) => w.id === activeWorkspaceIdRef.current);
+      const hadFocus =
+        source?.id === sourceWorkspaceId &&
+        findPane(source.paneTree, source.activePaneId)?.activeTabId === tabId;
+      const destinationId = await moveTabToWorkspaceWaking(sourceWorkspaceId, tabId, request);
+      settleMovedTab(tabId, destinationId);
+      if (hadFocus && destinationId) {
+        setActiveWorkspaceId(destinationId);
+        activateTab(destinationId, tabId);
+        setTimeout(focusActiveTab, 50);
+      }
+    },
+    [moveTabToWorkspaceWaking, settleMovedTab, setActiveWorkspaceId, activateTab, focusActiveTab],
   );
 
   const {
@@ -3327,7 +3350,7 @@ export default function App() {
 
           {/* 3-column layout */}
           <div className="flex min-h-0 flex-1">
-            <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabToWorkspace}>
+            <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabFromMenu}>
             <SidebarTabMenuProvider value={sidebarTabMenu}>
             <WorkspaceDndProvider
               workspaces={workspaces}
