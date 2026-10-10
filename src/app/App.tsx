@@ -6,8 +6,12 @@ import {
 import { tabLocations } from "@/modules/workspaces/lib/tabLocations";
 import {
   blockedWhileHibernated,
+  editorTabIds,
   enableRunOnStart,
+  terminalTabs,
 } from "@/modules/workspaces/lib/hibernate";
+import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
+import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -901,6 +905,10 @@ export default function App() {
         tabIds.length > 0 ? await closeTabsRef.current(tabIds) : true;
       if (!allClosed) return;
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
+      if (ws?.hibernated) {
+        discardUnflushedBuffers(editorTabIds(ws));
+        unmarkHibernating(terminalTabs(ws).map((t) => t.id));
+      }
       closeWorkspace(wsId);
     },
     [closeWorkspace, destroyWorkspaceFloats],
