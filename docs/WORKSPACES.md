@@ -501,7 +501,7 @@ drag is cancelled with Esc or dropped where nothing happens. While the pointer i
 Dropping the tab there, without waiting for the 600 ms switch, moves it with the `auto` placement
 (`handleDragEnd` checks the hovered workspace before looking at `over`): a single pane with tabs is
 split and the tab lands in the new right half, an already split workspace receives it in its active
-pane. Dropping on the tab's own workspace does nothing. Known limitation: workspaces inside a
+pane. Neither the tab's own workspace nor a hibernated one is a target (`canDropTabOnWorkspace`): they do not light up and dropping there does nothing. Known limitation: workspaces inside a
 collapsed group are not on screen, so they cannot be hover targets.
 
 ---

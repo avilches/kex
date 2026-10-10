@@ -45,6 +45,7 @@ import {
 } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
+import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
 import { useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
   ContextMenu,
@@ -187,8 +188,10 @@ function SortableWorkspaceItem({
   });
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
   const dropTarget = useWorkspaceDropTarget();
-  const tabDragActive = useWorkspaceDnd().draggingItem?.kind === "tab";
-  const dropHover = tabDragActive && dropTarget.id === ws.id;
+  const dragging = useWorkspaceDnd().draggingItem;
+  const tabDragActive = dragging?.kind === "tab";
+  const canDrop = dragging?.kind === "tab" && canDropTabOnWorkspace(dragging.workspaceId, ws);
+  const dropHover = canDrop && dropTarget.id === ws.id;
   const lit = active || dropHover;
 
   const style: CSSProperties = {
@@ -316,7 +319,7 @@ function SortableWorkspaceItem({
       style={style}
       onPointerEnter={() => {
         if (!tabDragActive) return;
-        dropTarget.set(ws.id);
+        if (canDrop) dropTarget.set(ws.id);
         hoverSwitch?.enter(ws.id);
       }}
       onPointerLeave={() => {

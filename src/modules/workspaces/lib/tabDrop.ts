@@ -87,3 +87,10 @@ export function originToRestore(
   if (placed || !originId || originId === currentId || !existingIds.includes(originId)) return null;
   return originId;
 }
+
+export function canDropTabOnWorkspace(
+  sourceWorkspaceId: string,
+  target: { id: string; hibernated?: boolean },
+): boolean {
+  return target.id !== sourceWorkspaceId && !target.hibernated;
+}

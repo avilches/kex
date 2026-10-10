@@ -15,7 +15,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { tabForDroppedPath } from "./lib/dropTab";
 import { allPanes, findOpenPathTab, findTabPane } from "./lib/splitNode";
-import { originToRestore, resolveTabDrop, type TabLocation } from "./lib/tabDrop";
+import { canDropTabOnWorkspace, originToRestore, resolveTabDrop, type TabLocation } from "./lib/tabDrop";
 import type { TabMoveRequest } from "./lib/tabTransfer";
 import {
   insertIntoLeafScratchpad,
@@ -227,9 +227,11 @@ export function WorkspaceDndProvider({
     const { active, over } = event;
     if (barWorkspaceId && draggingItem?.kind === "tab") {
       const source = idx.get(String(active.id));
+      const target = workspaces.find((w) => w.id === barWorkspaceId);
       const placed =
         !!source &&
-        source.wsId !== barWorkspaceId &&
+        !!target &&
+        canDropTabOnWorkspace(source.wsId, target) &&
         onMoveTabToWorkspace(source.wsId, String(active.id), { kind: "auto", workspaceId: barWorkspaceId }) !== null;
       restoreOrigin(placed);
       return;

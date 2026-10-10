@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { originToRestore, resolveTabDrop, type TabLocation } from "./tabDrop";
+import { canDropTabOnWorkspace, originToRestore, resolveTabDrop, type TabLocation } from "./tabDrop";
 import type { PaneNode, Tab, Workspace } from "./types";
 
 const term = (id: string): Tab => ({ id, kind: "terminal" });
@@ -108,5 +108,16 @@ describe("originToRestore", () => {
 
   it("returns null when the origin workspace was closed mid-drag", () => {
     expect(originToRestore("A", "B", false, ["B"])).toBeNull();
+  });
+});
+
+describe("canDropTabOnWorkspace", () => {
+  it("accepts another awake workspace", () => {
+    expect(canDropTabOnWorkspace("A", { id: "B" })).toBe(true);
+  });
+
+  it("rejects the tab's own workspace and hibernated ones", () => {
+    expect(canDropTabOnWorkspace("A", { id: "A" })).toBe(false);
+    expect(canDropTabOnWorkspace("A", { id: "B", hibernated: true })).toBe(false);
   });
 });
