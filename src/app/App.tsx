@@ -2962,6 +2962,8 @@ export default function App() {
 
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
+      // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
+      if (hibernateFlow.pendingWorkspaceId !== null) return true;
       if (activeWorkspace?.hibernated && blockedWhileHibernated(id)) return true;
       if (id === "editor.undo" || id === "editor.redo") {
         return activeTab?.kind !== "editor";
@@ -2989,7 +2991,7 @@ export default function App() {
 
       return false;
     },
-    [activeTab, activeWorkspace?.hibernated],
+    [activeTab, activeWorkspace?.hibernated, hibernateFlow.pendingWorkspaceId],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });

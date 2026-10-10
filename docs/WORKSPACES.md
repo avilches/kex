@@ -235,6 +235,8 @@ hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
    in-flight workspace ids makes a double trigger hibernate once.
 
 The dialog title names the workspace and shows a small ball in its color (neutral when it has none).
+While the dialog is open `shortcutsDisabled` returns true for every shortcut (the global listener
+runs in capture phase, before the Radix modal); Escape is not a registered shortcut and still closes it.
 `HibernateDialog` is reactive: it recomputes the review from the agent store and the running
 commands store, so a row disappears when its agent finishes or when "Run on start" is enabled
 (`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are
