@@ -3,57 +3,88 @@ import type {
   AgentEntryVisual,
 } from "@/modules/agents/lib/notificationList";
 
-export const WORKSPACE_DETAIL_MODES = [
-  "all-tabs",
+export const TERMINAL_DETAIL_MODES = [
+  "all",
   "agents",
   "active-agents",
   "none",
 ] as const;
 
-export type WorkspaceDetailMode = (typeof WORKSPACE_DETAIL_MODES)[number];
+export type TerminalDetail = (typeof TERMINAL_DETAIL_MODES)[number];
 
-export const WORKSPACE_DETAIL_LABELS: Record<WorkspaceDetailMode, string> = {
-  "all-tabs": "All tabs",
+export const TERMINAL_DETAIL_LABELS: Record<TerminalDetail, string> = {
+  all: "All terminals",
   agents: "Agents",
   "active-agents": "Active agents",
-  none: "None",
+  none: "No terminals",
+};
+
+export type DetailFilter = {
+  terminals: TerminalDetail;
+  editors: boolean;
+  browsers: boolean;
+  git: boolean;
 };
 
 export type DetailTab = { id: string; kind: string };
 
 export type DetailRow = { tabId: string; visual: AgentEntryVisual | null };
 
-export function isWorkspaceDetailMode(v: unknown): v is WorkspaceDetailMode {
-  return WORKSPACE_DETAIL_MODES.includes(v as WorkspaceDetailMode);
+export function isTerminalDetail(v: unknown): v is TerminalDetail {
+  return TERMINAL_DETAIL_MODES.includes(v as TerminalDetail);
+}
+
+function includesKind(kind: string, f: DetailFilter): boolean {
+  switch (kind) {
+    case "editor":
+    case "markdown":
+      return f.editors;
+    case "browser":
+      return f.browsers;
+    case "git-diff":
+    case "git-history":
+    case "git-commit-file":
+      return f.git;
+    default:
+      return false;
+  }
 }
 
 /**
- * The nested rows under a workspace. `all-tabs` and `agents` keep the tab
- * order; `active-agents` follows the urgency order of `entries`. A row carries
- * a visual only when its agent is active (idle agents have none).
+ * The nested rows under a workspace, in tab order. With `active-agents` the
+ * agents come first in the urgency order of `entries`, then the other included
+ * tabs. A row carries a visual only when its agent is active (idle agents and
+ * non-terminal tabs have none).
  */
 export function workspaceDetailRows(
   tabs: DetailTab[],
   agentTabIds: ReadonlySet<string>,
   entries: AgentEntry[],
-  mode: WorkspaceDetailMode,
+  filter: DetailFilter,
 ): DetailRow[] {
-  if (mode === "none") return [];
-
   const visualByTab = new Map<string, AgentEntryVisual>();
   for (const e of entries) visualByTab.set(e.tabId, e.visual);
-  const row = (t: DetailTab): DetailRow => ({
-    tabId: t.id,
-    visual: visualByTab.get(t.id) ?? null,
+  const row = (id: string): DetailRow => ({
+    tabId: id,
+    visual: visualByTab.get(id) ?? null,
   });
 
-  if (mode === "all-tabs") return tabs.map(row);
-  if (mode === "agents") return tabs.filter((t) => agentTabIds.has(t.id)).map(row);
+  const terminalOnly = (t: DetailTab) => t.kind === "terminal";
+  const wanted = (t: DetailTab): boolean => {
+    if (t.kind !== "terminal") return includesKind(t.kind, filter);
+    if (filter.terminals === "all") return true;
+    if (filter.terminals === "agents") return agentTabIds.has(t.id);
+    return false;
+  };
 
-  const present = new Set(tabs.map((t) => t.id));
-  return entries
-    .filter((e) => present.has(e.tabId))
-    .map((e) => ({ tabId: e.tabId, visual: e.visual }));
+  if (filter.terminals !== "active-agents") {
+    return tabs.filter(wanted).map((t) => row(t.id));
+  }
+
+  const present = new Set(tabs.filter(terminalOnly).map((t) => t.id));
+  const agents = entries.filter((e) => present.has(e.tabId)).map((e) => row(e.tabId));
+  const others = tabs.filter((t) => !terminalOnly(t) && wanted(t)).map((t) => row(t.id));
+  return [...agents, ...others];
 }
 
 export function activeAgentCount(entries: AgentEntry[] | undefined): number {

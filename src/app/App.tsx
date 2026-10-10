@@ -3156,6 +3156,7 @@ export default function App() {
         tabs: w.detailExpanded
           ? allPanes(w.paneTree).flatMap((p) => p.tabs)
           : NO_TABS,
+        focusedTabId: focusedTabId(w.paneTree, w.activePaneId),
         detailExpanded: w.detailExpanded,
       })),
     [workspaces],

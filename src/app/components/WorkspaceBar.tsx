@@ -80,8 +80,9 @@ import {
 import type { Tab, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import {
   activeAgentCount,
-  type WorkspaceDetailMode,
+  type DetailFilter,
 } from "@/modules/workspaces/lib/workspaceDetail";
+import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
 
 type WorkspaceItem = {
@@ -93,6 +94,7 @@ type WorkspaceItem = {
   icon?: string;
   groupId?: string;
   tabs: Tab[];
+  focusedTabId: string | null;
   detailExpanded?: boolean;
 };
 
@@ -133,7 +135,8 @@ function SortableWorkspaceItem({
   active,
   agentEntries,
   onJumpAgent,
-  detailMode,
+  detailEnabled,
+  detailFilter,
   onSetDetailExpanded,
   onActivateAgentTab,
   barWidth,
@@ -151,7 +154,8 @@ function SortableWorkspaceItem({
   active: boolean;
   agentEntries?: AgentEntry[];
   onJumpAgent: (workspaceId: string, entries: AgentEntry[]) => void;
-  detailMode: WorkspaceDetailMode;
+  detailEnabled: boolean;
+  detailFilter: DetailFilter;
   onSetDetailExpanded: (id: string, expanded: boolean) => void;
   onActivateAgentTab: (workspaceId: string, tabId: string) => void;
   barWidth: number;
@@ -233,7 +237,7 @@ function SortableWorkspaceItem({
   }
 
   const compact = barWidth <= 80;
-  const showDetail = !compact && detailMode !== "none";
+  const showDetail = !compact && detailEnabled;
   const expanded = showDetail && !!ws.detailExpanded;
   const agentCount = activeAgentCount(agentEntries);
 
@@ -400,7 +404,8 @@ function SortableWorkspaceItem({
         <WorkspaceDetailList
           tabs={ws.tabs}
           entries={agentEntries}
-          mode={detailMode}
+          filter={detailFilter}
+          focusedTabId={active ? ws.focusedTabId : null}
           onActivate={(tabId) => onActivateAgentTab(ws.id, tabId)}
         />
       )}
@@ -862,7 +867,8 @@ export function WorkspaceBar({
   >(undefined);
   const compact = width <= 80;
 
-  const detailMode = usePreferencesStore((s) => s.workspaceDetail);
+  const detailFilter = useDetailFilter();
+  const detailEnabled = usePreferencesStore((s) => s.workspaceDetailEnabled);
   const agentSessions = useAgentStore((s) => s.sessions);
   const agentNotifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
@@ -1053,7 +1059,8 @@ export function WorkspaceBar({
                                 active={true}
                                 agentEntries={agentEntriesByWs[activeWs.id]}
                                 onJumpAgent={jumpAgent}
-                                detailMode={detailMode}
+                                detailEnabled={detailEnabled}
+                                detailFilter={detailFilter}
                                 onSetDetailExpanded={onSetDetailExpanded}
                                 onActivateAgentTab={onActivateAgentTab}
                                 barWidth={width}
@@ -1082,7 +1089,8 @@ export function WorkspaceBar({
                                 active={ws.id === activeId}
                                 agentEntries={agentEntriesByWs[ws.id]}
                                 onJumpAgent={jumpAgent}
-                                detailMode={detailMode}
+                                detailEnabled={detailEnabled}
+                                detailFilter={detailFilter}
                                 onSetDetailExpanded={onSetDetailExpanded}
                                 onActivateAgentTab={onActivateAgentTab}
                                 barWidth={width}

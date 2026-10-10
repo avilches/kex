@@ -1,16 +1,22 @@
 import { describe, expect, test } from "vitest";
 import type { AgentEntry } from "@/modules/agents/lib/notificationList";
 import {
-  WORKSPACE_DETAIL_MODES,
+  type DetailFilter,
+  TERMINAL_DETAIL_MODES,
   activeAgentCount,
   workspaceDetailRows,
 } from "./workspaceDetail";
 
 const tabs = [
-  { id: "t1", kind: "terminal" as const },
-  { id: "t2", kind: "editor" as const },
-  { id: "t3", kind: "terminal" as const },
-  { id: "t4", kind: "terminal" as const },
+  { id: "t1", kind: "terminal" },
+  { id: "e1", kind: "editor" },
+  { id: "t2", kind: "terminal" },
+  { id: "m1", kind: "markdown" },
+  { id: "b1", kind: "browser" },
+  { id: "t3", kind: "terminal" },
+  { id: "g1", kind: "git-diff" },
+  { id: "g2", kind: "git-history" },
+  { id: "g3", kind: "git-commit-file" },
 ];
 
 function entry(tabId: string, visual: AgentEntry["visual"]): AgentEntry {
@@ -24,72 +30,107 @@ function entry(tabId: string, visual: AgentEntry["visual"]): AgentEntry {
   };
 }
 
-// t1 trabaja, t3 espera, t4 es un agente idle (sin entrada), t2 no es agente.
-const agentTabIds = new Set(["t1", "t3", "t4"]);
-const entries = [entry("t3", "attention"), entry("t1", "working")];
+// t1 trabaja, t2 espera, t3 es un agente idle (sin entrada).
+const agentTabIds = new Set(["t1", "t2", "t3"]);
+const entries = [entry("t2", "attention"), entry("t1", "working")];
 
-describe("workspaceDetailRows", () => {
-  test("none no devuelve filas", () => {
-    expect(workspaceDetailRows(tabs, agentTabIds, entries, "none")).toEqual([]);
-  });
+const off = { editors: false, browsers: false, git: false };
+const filter = (f: Partial<DetailFilter>): DetailFilter => ({
+  terminals: "all",
+  ...off,
+  ...f,
+});
+const ids = (f: Partial<DetailFilter>) =>
+  workspaceDetailRows(tabs, agentTabIds, entries, filter(f)).map((r) => r.tabId);
 
-  test("all-tabs devuelve todas las tabs en su orden, con estado solo las activas", () => {
-    expect(workspaceDetailRows(tabs, agentTabIds, entries, "all-tabs")).toEqual([
-      { tabId: "t1", visual: "working" },
-      { tabId: "t2", visual: null },
-      { tabId: "t3", visual: "attention" },
-      { tabId: "t4", visual: null },
-    ]);
-  });
-
-  test("agents devuelve las tabs con agente, incluido el idle, en el orden de las tabs", () => {
-    expect(workspaceDetailRows(tabs, agentTabIds, entries, "agents")).toEqual([
-      { tabId: "t1", visual: "working" },
-      { tabId: "t3", visual: "attention" },
-      { tabId: "t4", visual: null },
-    ]);
-  });
-
-  test("active-agents devuelve solo los agentes con entrada, en orden de urgencia", () => {
+describe("workspaceDetailRows: terminals", () => {
+  test("all lists every terminal in tab order, with a visual only for the active ones", () => {
     expect(
-      workspaceDetailRows(tabs, agentTabIds, entries, "active-agents"),
+      workspaceDetailRows(tabs, agentTabIds, entries, filter({ terminals: "all" })),
     ).toEqual([
-      { tabId: "t3", visual: "attention" },
       { tabId: "t1", visual: "working" },
+      { tabId: "t2", visual: "attention" },
+      { tabId: "t3", visual: null },
     ]);
   });
 
-  test("una entrada de una tab que ya no esta en el workspace se ignora", () => {
+  test("agents lists the terminals with an agent, idle ones included", () => {
+    expect(ids({ terminals: "agents" })).toEqual(["t1", "t2", "t3"]);
     expect(
-      workspaceDetailRows(tabs, agentTabIds, [entry("gone", "working")], "active-agents"),
+      workspaceDetailRows(tabs, new Set(["t2"]), entries, filter({ terminals: "agents" })).map(
+        (r) => r.tabId,
+      ),
+    ).toEqual(["t2"]);
+  });
+
+  test("active-agents lists only the ones with an entry, in urgency order", () => {
+    expect(ids({ terminals: "active-agents" })).toEqual(["t2", "t1"]);
+  });
+
+  test("none lists no terminals", () => {
+    expect(ids({ terminals: "none" })).toEqual([]);
+  });
+
+  test("an entry of a tab that is no longer in the workspace is ignored", () => {
+    expect(
+      workspaceDetailRows(tabs, agentTabIds, [entry("gone", "working")], filter({ terminals: "active-agents" })),
     ).toEqual([]);
   });
+});
 
-  test("sin agentes: all-tabs lista las tabs sin estado; el resto queda vacio", () => {
-    const none = new Set<string>();
-    expect(workspaceDetailRows(tabs, none, [], "all-tabs")).toHaveLength(4);
-    expect(workspaceDetailRows(tabs, none, [], "agents")).toEqual([]);
-    expect(workspaceDetailRows(tabs, none, [], "active-agents")).toEqual([]);
+describe("workspaceDetailRows: other kinds", () => {
+  test("editors adds editor and markdown tabs, always without a visual", () => {
+    expect(ids({ terminals: "none", editors: true })).toEqual(["e1", "m1"]);
+    expect(
+      workspaceDetailRows(tabs, agentTabIds, entries, filter({ terminals: "none", editors: true })),
+    ).toEqual([
+      { tabId: "e1", visual: null },
+      { tabId: "m1", visual: null },
+    ]);
+  });
+
+  test("browsers adds browser tabs", () => {
+    expect(ids({ terminals: "none", browsers: true })).toEqual(["b1"]);
+  });
+
+  test("git adds git-diff, git-history and git-commit-file tabs", () => {
+    expect(ids({ terminals: "none", git: true })).toEqual(["g1", "g2", "g3"]);
+  });
+
+  test("the checkboxes are independent of the terminals option", () => {
+    expect(ids({ terminals: "agents", editors: true, git: true })).toEqual([
+      "t1",
+      "e1",
+      "t2",
+      "m1",
+      "t3",
+      "g1",
+      "g2",
+      "g3",
+    ]);
+  });
+
+  test("active-agents puts the agents first by urgency, then the extra tabs in tab order", () => {
+    expect(
+      ids({ terminals: "active-agents", editors: true, browsers: true, git: true }),
+    ).toEqual(["t2", "t1", "e1", "m1", "b1", "g1", "g2", "g3"]);
+  });
+
+  test("everything off lists nothing", () => {
+    expect(ids({ terminals: "none" })).toEqual([]);
   });
 });
 
 describe("activeAgentCount", () => {
-  test("cuenta las entradas del workspace, errores incluidos", () => {
+  test("counts the entries of the workspace, errors included", () => {
     expect(activeAgentCount(undefined)).toBe(0);
     expect(activeAgentCount([])).toBe(0);
-    expect(
-      activeAgentCount([entry("a", "working"), entry("b", "error")]),
-    ).toBe(2);
+    expect(activeAgentCount([entry("a", "working"), entry("b", "error")])).toBe(2);
   });
 });
 
-describe("WORKSPACE_DETAIL_MODES", () => {
-  test("van de mas informacion a menos", () => {
-    expect(WORKSPACE_DETAIL_MODES).toEqual([
-      "all-tabs",
-      "agents",
-      "active-agents",
-      "none",
-    ]);
+describe("TERMINAL_DETAIL_MODES", () => {
+  test("go from more information to less", () => {
+    expect(TERMINAL_DETAIL_MODES).toEqual(["all", "agents", "active-agents", "none"]);
   });
 });
