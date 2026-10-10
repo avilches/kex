@@ -342,7 +342,6 @@ export const PaneView = memo(function PaneView({
           onRenameTab={callbacks.onRenameTab}
           onUpdateTab={callbacks.onUpdateTab}
           onNoteHover={handleNoteHover}
-          onFocusOnExplorer={callbacks.onFocusOnExplorer}
           gitStatus={gitStatus}
           gitColorScheme={gitColorScheme}
         />

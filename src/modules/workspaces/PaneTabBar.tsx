@@ -34,7 +34,6 @@ import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
-import { tabFilePath } from "./lib/tabPath";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
 
 type Props = {
@@ -56,7 +55,6 @@ type Props = {
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onNoteHover?: (tabId: string, hovering: boolean) => void;
-  onFocusOnExplorer?: (filePath: string) => void;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
 };
@@ -108,7 +106,6 @@ function DraggableTab({
   onRenameTab,
   onUpdateTab,
   onNoteHover,
-  onFocusOnExplorer,
   gitStatusMap,
   gitStatus,
   gitColorScheme,
@@ -135,7 +132,6 @@ function DraggableTab({
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onNoteHover?: (tabId: string, hovering: boolean) => void;
-  onFocusOnExplorer?: (filePath: string) => void;
   gitStatusMap?: Map<string, GitStatusCode> | null;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
@@ -156,9 +152,6 @@ function DraggableTab({
   const active = tab.id === activeTabId;
   // Every tab can be locked, no exception.
   const isLocked = tab.locked ?? false;
-  const focusFilePath = tabFilePath(tab);
-  const focusTarget =
-    focusFilePath ?? (tab.kind === "terminal" ? (tab.cwd ?? null) : null);
   const runningCommand = useSyncExternalStore(
     subscribeToRunningCommands,
     () => (tab.kind === "terminal" ? getRunningCommand(tab.id) : null),
@@ -452,22 +445,8 @@ function DraggableTab({
                 <ContextMenuSeparator />
               </>
             )}
-            {((onFocusOnExplorer && focusTarget) || isAutofocusTab(tab)) && (
+            {isAutofocusTab(tab) && (
               <>
-                {onFocusOnExplorer && focusTarget && (
-                  <ContextMenuItem
-                    disabled={isAutofocusTab(tab) && (tab.autofocus ?? false)}
-                    onSelect={() => onFocusOnExplorer(focusTarget)}
-                  >
-                    <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
-                    Focus on Sidebar
-                    {shortcutLabels["tab.focusOnExplorer"] && (
-                      <ContextMenuShortcut>
-                        {shortcutLabels["tab.focusOnExplorer"]}
-                      </ContextMenuShortcut>
-                    )}
-                  </ContextMenuItem>
-                )}
                 {isAutofocusTab(tab) && (
                   <ContextMenuItem
                     onSelect={() =>
@@ -621,7 +600,7 @@ function DraggableTab({
   );
 }
 
-export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onNoteHover, onFocusOnExplorer, gitStatus, gitColorScheme }: Props) {
+export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onNoteHover, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
@@ -824,7 +803,6 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           onRenameTab={onRenameTab}
           onUpdateTab={onUpdateTab}
           onNoteHover={onNoteHover}
-          onFocusOnExplorer={onFocusOnExplorer}
           gitStatusMap={gitStatusMap}
           gitStatus={gitStatus}
           gitColorScheme={gitColorScheme}
