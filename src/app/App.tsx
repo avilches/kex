@@ -1904,6 +1904,22 @@ export default function App() {
     await editorHandles.current.get(tabId)?.save();
   }, []);
 
+  const saveTabReportingErrors = useCallback(
+    async (tabId: string) => {
+      try {
+        await saveTab(tabId);
+      } catch (err) {
+        const tab = workspacesRef.current
+          .flatMap((w) => allPanes(w.paneTree))
+          .flatMap((p) => p.tabs)
+          .find((t) => t.id === tabId);
+        const name = tab && "path" in tab ? tab.path.split(/[\\/]/).pop() : tabId;
+        toast.error(`Could not save ${name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [saveTab],
+  );
+
   // Autosave-on-focus-loss: save every dirty editor (save() no-ops when clean).
   // Gated on the autosave preference; triggered by tab/workspace switch, window
   // blur, tab close, and app close.
@@ -3509,11 +3525,9 @@ export default function App() {
             }
             onClose={hibernateFlow.cancel}
             onHibernate={handleHibernateFromDialog}
-            onSaveTab={async (tabId) => {
-              await saveTab(tabId);
-            }}
+            onSaveTab={saveTabReportingErrors}
             onSaveAll={async (tabIds) => {
-              await Promise.all(tabIds.map((id) => saveTab(id).catch(() => {})));
+              await Promise.all(tabIds.map(saveTabReportingErrors));
             }}
             onEnableRunOnStart={(tabId, running) => {
               const id = hibernateFlow.pendingWorkspaceId;
