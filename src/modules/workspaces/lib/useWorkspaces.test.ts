@@ -316,6 +316,18 @@ describe("findReopenTarget", () => {
     });
   });
 
+  it("skips a hibernated original workspace and uses the active one", () => {
+    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")];
+    const entry: ClosedEntry = { tab: { id: "t1", kind: "terminal" }, paneId: "p1", workspaceId: "w1" };
+    expect(findReopenTarget(workspaces, "w2", entry)).toEqual({ workspaceId: "w2", paneId: "p3" });
+  });
+
+  it("returns null when the original and the active workspaces are both hibernated", () => {
+    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, { ...makeWs("w2", "p3"), hibernated: true }];
+    const entry: ClosedEntry = { tab: { id: "t1", kind: "terminal" }, paneId: "p1", workspaceId: "w1" };
+    expect(findReopenTarget(workspaces, "w2", entry)).toBeNull();
+  });
+
   it("returns null when no workspaces exist", () => {
     const entry: ClosedEntry = {
       tab: { id: "t1", kind: "terminal" },

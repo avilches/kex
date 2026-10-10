@@ -75,9 +75,8 @@ export function findReopenTarget(
   activeWorkspaceId: string,
   entry: ClosedEntry,
 ): { workspaceId: string; paneId: string } | null {
-  const targetWs =
-    workspaces.find((w) => w.id === entry.workspaceId) ??
-    workspaces.find((w) => w.id === activeWorkspaceId);
+  const awake = (id: string) => workspaces.find((w) => w.id === id && !w.hibernated);
+  const targetWs = awake(entry.workspaceId) ?? awake(activeWorkspaceId);
   if (!targetWs) return null;
   const pane = findPane(targetWs.paneTree, entry.paneId);
   return {
