@@ -572,7 +572,7 @@ export default function App() {
   const [groups, setGroups] = useState<WorkspaceGroup[]>(() =>
     getSavedGroups(),
   );
-  // Confirmed group change (context menu "Move to group" / "No group" / "New"):
+  // Confirmed group change (context menu "Move to Group" / "No group" / "New"):
   // moves the workspace, then reconciles the group list against the move.
   // reconcileGroupsAfterMove bakes the move into its own computation instead
   // of trusting `workspaces` state to already reflect it -- that state only

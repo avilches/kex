@@ -749,7 +749,7 @@ disparo el reporte original.
 ### Sintoma
 
 Al introducir los grupos de workspace por ventana (TASK-768, sustituyendo el antiguo "status"
-global), crear un grupo nuevo desde "Move to group" -> "New" funcionaba la primera vez: se podia
+global), crear un grupo nuevo desde "Move to Group" -> "New" funcionaba la primera vez: se podia
 escribir el nombre. Pero al crear un SEGUNDO grupo nuevo (sobre un workspace que ya pertenecia a
 otro grupo), el grupo recien creado desaparecia de la barra en cuanto se confirmaba, dejando el
 workspace suelto en la seccion "sin grupo", y ningun intento posterior de "New" volvia a funcionar.

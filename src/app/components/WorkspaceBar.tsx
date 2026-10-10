@@ -475,7 +475,7 @@ function SortableWorkspaceItem({
           <ContextMenuSub>
             <ContextMenuSubTrigger className="gap-2">
               <HugeiconsIcon icon={Folder01Icon} size={14} strokeWidth={2} />
-              Move to group
+              Move to Group
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
               <ContextMenuItem
