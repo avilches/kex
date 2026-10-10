@@ -446,11 +446,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
   customEditors: [],
   detectedEditors: [],
   randomWorkspaceColor: true,
-  workspaceDetailEnabled: false,
-  workspaceDetailTerminals: "agents",
-  workspaceDetailEditors: false,
-  workspaceDetailBrowsers: false,
-  workspaceDetailGit: false,
+  workspaceDetailEnabled: true,
+  workspaceDetailTerminals: "all",
+  workspaceDetailEditors: true,
+  workspaceDetailBrowsers: true,
+  workspaceDetailGit: true,
   uiFont: "",
 };
 

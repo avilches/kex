@@ -6,6 +6,8 @@ import { native } from "@/lib/native";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useTauriListen } from "@/lib/useTauriListen";
+import { applyStagedSnapshot } from "../lib/agentSessionRestore";
+import { startAgentSnapshotSync } from "../lib/agentSnapshotSync";
 import { routeAgentNotification } from "../lib/route";
 import { endsAgentSession, isRunningAgentSession } from "../lib/sessionEndPolicy";
 import type { AgentSession, AgentSignal } from "../lib/types";
@@ -110,12 +112,22 @@ function route(
   });
 }
 
+// A restored notification for the tab the user is already looking at is moot.
+function restoreStaged(tabId: string, ctx: Ctx): void {
+  applyStagedSnapshot(tabId);
+  const session = useAgentStore.getState().sessions[tabId];
+  if (session && isTabSeen(ctx, session.workspaceId, tabId)) {
+    useAgentStore.getState().markTabSeen(tabId);
+  }
+}
+
 function ensureSession(tabId: string, ctx: Ctx, agent: string): boolean {
   const store = useAgentStore.getState();
   if (isRunningAgentSession(store.sessions[tabId])) return true;
   const info = tabInfo(ctx.workspaces, tabId);
   if (!info) return false;
   store.start(tabId, info.workspaceId, agent);
+  restoreStaged(tabId, ctx);
   return true;
 }
 
@@ -125,6 +137,7 @@ function ensureSessionIdle(tabId: string, ctx: Ctx, agent: string): boolean {
   const info = tabInfo(ctx.workspaces, tabId);
   if (!info) return false;
   store.startIdle(tabId, info.workspaceId, agent);
+  restoreStaged(tabId, ctx);
   return true;
 }
 
@@ -223,6 +236,8 @@ export function AgentNotificationsBridge({
     const tabId = focusedTabId(ws.paneTree, ws.activePaneId);
     if (tabId) useAgentStore.getState().markTabSeen(tabId);
   }, [workspaces, activeWorkspaceId, focused]);
+
+  useEffect(() => startAgentSnapshotSync(), []);
 
   useTauriListen<AgentSignal>("kex:agent-signal", (e) =>
     handleSignal(e.payload, ctxRef.current),
