@@ -45,7 +45,7 @@ import {
 } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
-import { useWorkspaceDnd } from "@/modules/workspaces/WorkspaceDndProvider";
+import { useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -186,6 +186,10 @@ function SortableWorkspaceItem({
     data: { type: "workspace" },
   });
   const displayColor = resolveWorkspaceColor(ws.color, ws.id);
+  const dropTarget = useWorkspaceDropTarget();
+  const tabDragActive = useWorkspaceDnd().draggingItem?.kind === "tab";
+  const dropHover = tabDragActive && dropTarget.id === ws.id;
+  const lit = active || dropHover;
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -310,8 +314,16 @@ function SortableWorkspaceItem({
       ref={setNodeRef}
       className="group relative w-full px-1.5"
       style={style}
-      onPointerEnter={hoverSwitch ? () => hoverSwitch.enter(ws.id) : undefined}
-      onPointerLeave={hoverSwitch ? () => hoverSwitch.leave(ws.id) : undefined}
+      onPointerEnter={() => {
+        if (!tabDragActive) return;
+        dropTarget.set(ws.id);
+        hoverSwitch?.enter(ws.id);
+      }}
+      onPointerLeave={() => {
+        if (!tabDragActive) return;
+        if (dropTarget.id === ws.id) dropTarget.set(null);
+        hoverSwitch?.leave(ws.id);
+      }}
     >
       <div className="relative -mx-1.5 px-1.5">
         <button
@@ -329,12 +341,12 @@ function SortableWorkspaceItem({
             compact
               ? "h-9 justify-center text-[12px]"
               : "h-9 gap-2 px-2.5 text-[12px]",
-            active
+            lit
               ? "text-foreground"
               : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
           )}
           style={
-            active
+            lit
               ? displayColor !== null
                 ? {
                     backgroundColor: chipColorOnWhite(displayColor),

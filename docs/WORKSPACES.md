@@ -496,7 +496,12 @@ the active workspace, and only the active workspace renders drop zones, so the d
 workspaces) so the bar can read `draggingItem`. The provider's `DragOverlay` is `pointer-events-none`,
 otherwise the chip under the cursor would swallow the `pointerenter` of the bar items. The provider
 remembers the active workspace when a tab drag starts and goes back to it (`originToRestore`) when the
-drag is cancelled with Esc or dropped where nothing happens. Known limitation: workspaces inside a
+drag is cancelled with Esc or dropped where nothing happens. While the pointer is over a workspace of the bar, its item lights up at once as if active
+(`useWorkspaceDropTarget`, a context apart from `useWorkspaceDnd` so only the bar items re-render).
+Dropping the tab there, without waiting for the 600 ms switch, moves it with the `auto` placement
+(`handleDragEnd` checks the hovered workspace before looking at `over`): a single pane with tabs is
+split and the tab lands in the new right half, an already split workspace receives it in its active
+pane. Dropping on the tab's own workspace does nothing. Known limitation: workspaces inside a
 collapsed group are not on screen, so they cannot be hover targets.
 
 ---

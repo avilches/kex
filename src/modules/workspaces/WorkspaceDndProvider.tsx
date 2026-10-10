@@ -54,6 +54,16 @@ export function useWorkspaceDnd(): WorkspaceDndContextValue {
   return useContext(WorkspaceDndContext);
 }
 
+// Workspace of the WorkspaceBar under the pointer during a tab drag. Its own
+// context so hover changes only re-render the bar items that read it.
+type WorkspaceDropTarget = { id: string | null; set: (id: string | null) => void };
+
+const WorkspaceDropTargetContext = createContext<WorkspaceDropTarget>({ id: null, set: () => {} });
+
+export function useWorkspaceDropTarget(): WorkspaceDropTarget {
+  return useContext(WorkspaceDropTargetContext);
+}
+
 export function useWorkspaceDndInsert(): string | null {
   return useContext(WorkspaceDndInsertContext);
 }
@@ -97,6 +107,12 @@ export function WorkspaceDndProvider({
 }: Props) {
   const [draggingItem, setDraggingItem] = useState<DraggingItem | null>(null);
   const [tabInsertPaneId, setTabInsertPaneId] = useState<string | null>(null);
+  const [dropWorkspaceId, setDropWorkspaceIdState] = useState<string | null>(null);
+  const dropWorkspaceIdRef = useRef<string | null>(null);
+  const setDropWorkspaceId = useCallback((id: string | null) => {
+    dropWorkspaceIdRef.current = id;
+    setDropWorkspaceIdState(id);
+  }, []);
 
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
@@ -162,6 +178,7 @@ export function WorkspaceDndProvider({
     dragIndexRef.current = new Map();
     setDraggingItem(null);
     setTabInsertPaneId(null);
+    setDropWorkspaceId(null);
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -205,7 +222,18 @@ export function WorkspaceDndProvider({
     dragIndexRef.current = new Map();
     setDraggingItem(null);
     setTabInsertPaneId(null);
+    const barWorkspaceId = dropWorkspaceIdRef.current;
+    setDropWorkspaceId(null);
     const { active, over } = event;
+    if (barWorkspaceId && draggingItem?.kind === "tab") {
+      const source = idx.get(String(active.id));
+      const placed =
+        !!source &&
+        source.wsId !== barWorkspaceId &&
+        onMoveTabToWorkspace(source.wsId, String(active.id), { kind: "auto", workspaceId: barWorkspaceId }) !== null;
+      restoreOrigin(placed);
+      return;
+    }
     if (!over) {
       restoreOrigin(false);
       return;
@@ -334,6 +362,10 @@ export function WorkspaceDndProvider({
   }
 
   const ctxValue = useMemo(() => ({ draggingItem }), [draggingItem]);
+  const dropTargetValue = useMemo(
+    () => ({ id: dropWorkspaceId, set: setDropWorkspaceId }),
+    [dropWorkspaceId, setDropWorkspaceId],
+  );
 
   return (
     <DndContext
@@ -347,9 +379,11 @@ export function WorkspaceDndProvider({
       onDragCancel={handleDragCancel}
     >
       <WorkspaceDndContext.Provider value={ctxValue}>
-        <WorkspaceDndInsertContext.Provider value={tabInsertPaneId}>
-          {children}
-        </WorkspaceDndInsertContext.Provider>
+        <WorkspaceDropTargetContext.Provider value={dropTargetValue}>
+          <WorkspaceDndInsertContext.Provider value={tabInsertPaneId}>
+            {children}
+          </WorkspaceDndInsertContext.Provider>
+        </WorkspaceDropTargetContext.Provider>
       </WorkspaceDndContext.Provider>
       {/* Without pointer-events-none the overlay under the cursor swallows the WorkspaceBar hover. */}
       <DragOverlay dropAnimation={null} className="pointer-events-none">
