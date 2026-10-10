@@ -18,11 +18,9 @@ type Props = {
 export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTab, children }: Props) {
   const isRenaming = useTabRenameStore((s) => isRenamingAt(s, tabId, origin));
   const clearRename = useTabRenameStore((s) => s.clearRename);
-  const saveSeq = useTabRenameStore((s) => s.saveSeq);
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const handledRef = useRef(false);
-  const seenSaveSeq = useRef(saveSeq);
 
   useEffect(() => {
     if (isRenaming) handledRef.current = false;
@@ -47,11 +45,30 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
     handleSave();
   }
 
+  const saveRef = useRef(handleSave);
+  saveRef.current = handleSave;
+
+  // Subscribed only while this field is open, so the other tabs and rows do
+  // not re-render or run an effect on every save request.
   useEffect(() => {
-    if (saveSeq === seenSaveSeq.current) return;
-    seenSaveSeq.current = saveSeq;
-    if (isRenaming) handleSave();
-  });
+    if (!isRenaming) return;
+    let seen = useTabRenameStore.getState().saveSeq;
+    return useTabRenameStore.subscribe((state) => {
+      if (state.saveSeq === seen) return;
+      seen = state.saveSeq;
+      saveRef.current();
+    });
+  }, [isRenaming]);
+
+  // A row can unmount with its field open (collapsed list, detail filter,
+  // compact bar); without this the store keeps pointing at it forever.
+  useEffect(
+    () => () => {
+      const state = useTabRenameStore.getState();
+      if (isRenamingAt(state, tabId, origin)) state.clearRename();
+    },
+    [tabId, origin],
+  );
 
   return (
     <Popover
