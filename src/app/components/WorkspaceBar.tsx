@@ -28,7 +28,6 @@ import {
 } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
-  Cancel01Icon,
   ChevronRightIcon,
   Delete02Icon,
   Folder01Icon,
@@ -386,19 +385,6 @@ function SortableWorkspaceItem({
             style={{ backgroundColor: displayColor }}
           />
         )}
-        {onClose && !agentEntries && (
-          <button
-            type="button"
-            title="Close workspace"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose(ws.id);
-            }}
-            className="absolute right-0.5 top-0.5 hidden size-[14px] items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/80 hover:text-white group-hover:flex"
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-          </button>
-        )}
       </div>
       {expanded && (
         <WorkspaceDetailList
@@ -490,7 +476,7 @@ function SortableWorkspaceItem({
               className="text-destructive focus:text-destructive"
             >
               <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
-              Delete
+              Close Workspace
               {closeLabel && (
                 <ContextMenuShortcut>{closeLabel}</ContextMenuShortcut>
               )}
