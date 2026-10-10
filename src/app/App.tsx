@@ -8,6 +8,7 @@ import {
   blockedWhileHibernated,
   editorTabIds,
   enableRunOnStart,
+  isPendingStale,
   terminalTabs,
 } from "@/modules/workspaces/lib/hibernate";
 import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
@@ -1953,6 +1954,10 @@ export default function App() {
   const { requestHibernate, performHibernate } = hibernateFlow;
   const pendingHibernateRef = useRef<string | null>(null);
   pendingHibernateRef.current = hibernateFlow.pendingWorkspaceId;
+  const { cancel: cancelHibernate } = hibernateFlow;
+  useEffect(() => {
+    if (isPendingStale(hibernateFlow.pendingWorkspaceId, workspaces)) cancelHibernate();
+  }, [hibernateFlow.pendingWorkspaceId, workspaces, cancelHibernate]);
   const handleHibernateFromDialog = useCallback(() => {
     const id = pendingHibernateRef.current;
     if (id) void performHibernate(id);

@@ -5,6 +5,7 @@ import {
   applyWake,
   blockedWhileHibernated,
   editorTabIds,
+  isPendingStale,
   enableRunOnStart,
   stripTabs,
   strippedTree,
@@ -194,5 +195,17 @@ describe("applyStartupHibernation", () => {
   it("returns an empty array as is", () => {
     const input: Workspace[] = [];
     expect(applyStartupHibernation(input, 0, false)).toBe(input);
+  });
+});
+
+describe("isPendingStale", () => {
+  it("is false without a pending id", () => {
+    expect(isPendingStale(null, [{ id: "a" }])).toBe(false);
+  });
+  it("is false while the pending workspace exists", () => {
+    expect(isPendingStale("a", [{ id: "a" }, { id: "b" }])).toBe(false);
+  });
+  it("is true once the pending workspace is gone", () => {
+    expect(isPendingStale("a", [{ id: "b" }])).toBe(true);
   });
 });

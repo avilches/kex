@@ -89,3 +89,7 @@ export function enableRunOnStart(tab: Tab, runningCommand?: string): Tab {
     persistentCommand: tab.persistentCommand ?? runningCommand,
   };
 }
+
+export function isPendingStale(pendingId: string | null, workspaces: readonly { id: string }[]): boolean {
+  return pendingId !== null && !workspaces.some((w) => w.id === pendingId);
+}
