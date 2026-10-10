@@ -239,6 +239,16 @@ empty. Closing a hibernated workspace without waking it discards its carried buf
 hibernating marks. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
 is described above (`wakeWorkspace`).
 
+#### Startup hibernation
+
+With `restoreAllWorkspacesOnStartup` off (the default), `initWorkspaceState` applies
+`applyStartupHibernation` to the saved workspaces of each window: all but the active one are hibernated
+before the first render (this also clears `dirty` and `floating`, which matters because the floating
+browser restore runs right after startup). A workspace that was already hibernated stays so, even the
+active one. Consequently "Run on start" commands and agent sessions of the other workspaces are not
+launched at startup: they relaunch when each workspace is restored. With the setting on, nothing is
+hibernated at startup.
+
 ---
 
 ## Renderer slot pool (`rendererPool.ts`)

@@ -30,19 +30,20 @@ await invoke("pty_close_all").catch(() => {});
 
 // Seed before first paint so default tab mounts at target cwd (no flicker).
 await initLaunchDir();
+// Preferences are awaited first because restoreAllWorkspacesOnStartup decides
+// which saved workspaces start hibernated.
+const startupPrefs = await loadPreferences();
 // Load saved workspace layout for session restore.
-await initWorkspaceState();
+await initWorkspaceState(startupPrefs.restoreAllWorkspacesOnStartup);
 
 // Sync Claude Code hooks on startup — idempotent in both directions:
 // - integration ON:  install/update script and settings.json entries (no-op if up to date)
 // - integration OFF: remove any leftover entries from settings.json (no-op if already absent)
-loadPreferences().then((prefs) => {
-  if (prefs.agentNotifications) {
-    invoke("agent_enable_claude_hooks").catch(() => {});
-  } else {
-    invoke("agent_disable_claude_hooks").catch(() => {});
-  }
-});
+if (startupPrefs.agentNotifications) {
+  invoke("agent_enable_claude_hooks").catch(() => {});
+} else {
+  invoke("agent_disable_claude_hooks").catch(() => {});
+}
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <App />,
