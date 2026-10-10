@@ -162,6 +162,7 @@ export type Preferences = {
   editorCursorStyle: CursorStyle;
   warnOnCloseTabWithRunningProcess: boolean;
   warnOnCloseWorkspace: boolean;
+  restoreAllWorkspacesOnStartup: boolean;
   terminalFontFamily: string;
   terminalShell: string;
   terminalFontWeight: string;
@@ -224,6 +225,7 @@ const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_WARN_ON_CLOSE_WORKSPACE = "warnOnCloseWorkspace";
+const KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP = "restoreAllWorkspacesOnStartup";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_UI_FONT = "uiFont";
 const KEY_ZOOM_LEVEL = "zoomLevel";
@@ -408,6 +410,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorCursorStyle: "bar",
   warnOnCloseTabWithRunningProcess: true,
   warnOnCloseWorkspace: true,
+  restoreAllWorkspacesOnStartup: false,
   terminalFontFamily: "",
   terminalShell: "",
   terminalFontWeight: "normal",
@@ -601,6 +604,9 @@ export async function loadPreferences(): Promise<Preferences> {
     warnOnCloseWorkspace:
       getGeneral<boolean>(KEY_WARN_ON_CLOSE_WORKSPACE) ??
       DEFAULT_PREFERENCES.warnOnCloseWorkspace,
+    restoreAllWorkspacesOnStartup:
+      getGeneral<boolean>(KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP) ??
+      DEFAULT_PREFERENCES.restoreAllWorkspacesOnStartup,
     terminalFontFamily:
       getTerminal<string>(KEY_TERMINAL_FONT_FAMILY) ??
       DEFAULT_PREFERENCES.terminalFontFamily,
@@ -910,6 +916,10 @@ export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promi
 
 export async function setWarnOnCloseWorkspace(value: boolean): Promise<void> {
   await writePref(KEY_WARN_ON_CLOSE_WORKSPACE, value);
+}
+
+export async function setRestoreAllWorkspacesOnStartup(value: boolean): Promise<void> {
+  await writePref(KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP, value);
 }
 
 export async function setTerminalNewFolderMode(
@@ -1229,6 +1239,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
   [KEY_WARN_ON_CLOSE_WORKSPACE]: "warnOnCloseWorkspace",
+  [KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP]: "restoreAllWorkspacesOnStartup",
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
