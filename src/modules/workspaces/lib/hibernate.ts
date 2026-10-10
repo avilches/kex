@@ -1,6 +1,6 @@
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { allPanes } from "./splitNode";
-import type { PaneNode, SplitNode, Tab, Workspace } from "./types";
+import type { SplitNode, Tab, Workspace } from "./types";
 
 type TerminalTab = Extract<Tab, { kind: "terminal" }>;
 
@@ -9,8 +9,6 @@ export function stripTabs(node: SplitNode): SplitNode {
   return { ...node, first: stripTabs(node.first), second: stripTabs(node.second) };
 }
 
-// Editors are about to be unmounted (their unsaved state goes with them) and a
-// floating browser window is destroyed, so neither flag may outlive hibernation.
 const strippedCache = new WeakMap<SplitNode, SplitNode>();
 
 export function strippedTree(node: SplitNode): SplitNode {
@@ -30,9 +28,11 @@ export function blockedWhileHibernated(id: ShortcutId): boolean {
   return id === "search.focus" || id === "workspace.run" || BLOCKED_PREFIXES.some((p) => id.startsWith(p));
 }
 
+// Editors are about to be unmounted (their unsaved state goes with them) and a
+// floating browser window is destroyed, so neither flag may outlive hibernation.
 function clearTransientTabState(node: SplitNode): SplitNode {
   if (node.kind === "pane") {
-    const pane: PaneNode = {
+    return {
       ...node,
       tabs: node.tabs.map((t) => {
         if (t.kind === "editor" || t.kind === "markdown") return { ...t, dirty: false };
@@ -40,7 +40,6 @@ function clearTransientTabState(node: SplitNode): SplitNode {
         return t;
       }),
     };
-    return pane;
   }
   return { ...node, first: clearTransientTabState(node.first), second: clearTransientTabState(node.second) };
 }
