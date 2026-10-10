@@ -11,7 +11,7 @@ import type { TabCallbacks } from "./TabContent";
 import type { PaneNode } from "./lib/types";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
-import { isBulkClosable } from "./lib/tabClose";
+import { bulkClosableIds, otherBulkClosableIds } from "./lib/tabClose";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import { useWorkspaceDndInsert } from "./WorkspaceDndProvider";
@@ -264,14 +264,10 @@ export const PaneView = memo(function PaneView({
   const handleClose = useCallback((tabId: string) => onCloseTab(workspaceId, tabId), [onCloseTab, workspaceId]);
   const handleNewTerminal = useCallback(() => onNewTerminal(workspaceId, pane.id), [onNewTerminal, workspaceId, pane.id]);
   const handleCloseOtherTabs = useCallback((tabId: string) => {
-    const ids = pane.tabs
-      .filter((p) => p.id !== tabId && isBulkClosable(p))
-      .map((p) => p.id);
-    onCloseManyTabs(workspaceId, ids);
+    onCloseManyTabs(workspaceId, otherBulkClosableIds(pane.tabs, tabId));
   }, [pane.tabs, onCloseManyTabs, workspaceId]);
   const handleCloseAllTabs = useCallback(() => {
-    const ids = pane.tabs.filter(isBulkClosable).map((p) => p.id);
-    onCloseManyTabs(workspaceId, ids);
+    onCloseManyTabs(workspaceId, bulkClosableIds(pane.tabs));
   }, [pane.tabs, onCloseManyTabs, workspaceId]);
   const handleSplitTerminalRight = useCallback(() => onSplitTerminalRight(workspaceId, pane.id), [onSplitTerminalRight, workspaceId, pane.id]);
   const handleSplitTerminalDown = useCallback(() => onSplitTerminalDown(workspaceId, pane.id), [onSplitTerminalDown, workspaceId, pane.id]);

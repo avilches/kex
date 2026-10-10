@@ -7,34 +7,29 @@ import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
+import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
 import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
   ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuShortcut,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { PopoverAnchor } from "@/components/ui/popover";
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Add01Icon, Alert02Icon, ArrowRight01Icon, ArrowReloadHorizontalIcon, BrowserIcon, Cancel01Icon, CancelCircleIcon, CancelSquareIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, PencilEdit01Icon, SquareUnlock02Icon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
-import { useWorkspaceMove } from "./WorkspaceMoveContext";
+import { NewTabMenuButton } from "./NewTabMenuButton";
+import { TabContextMenuItems } from "./TabContextMenuItems";
+import { TabRenamePopover } from "./TabRenamePopover";
 
 type Props = {
   tabs: Tab[];
@@ -96,13 +91,6 @@ function DraggableTab({
   onClose,
   onCloseOtherTabs,
   onCloseAllTabs,
-  onNewTerminal,
-  onSplitTerminalRight,
-  onSplitTerminalDown,
-  onNewBrowser,
-  onSplitBrowserRight,
-  onSplitBrowserDown,
-  shortcutLabels,
   onRenameTab,
   onUpdateTab,
   onNoteHover,
@@ -122,13 +110,6 @@ function DraggableTab({
   onClose: (id: string) => void;
   onCloseOtherTabs: (tabId: string) => void;
   onCloseAllTabs: () => void;
-  onNewTerminal: () => void;
-  onSplitTerminalRight: () => void;
-  onSplitTerminalDown: () => void;
-  onNewBrowser: () => void;
-  onSplitBrowserRight: () => void;
-  onSplitBrowserDown: () => void;
-  shortcutLabels: Record<string, string | null>;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onNoteHover?: (tabId: string, hovering: boolean) => void;
@@ -137,8 +118,6 @@ function DraggableTab({
   gitColorScheme?: GitColorScheme;
 }) {
   const { attributes, listeners, setNodeRef, isDragging: isThisDragging } = useDraggable({ id: tab.id });
-  const { targets, moveTab } = useWorkspaceMove();
-  const otherTargets = targets.filter((t) => t.id !== workspaceId);
   const wrappedListeners = useMemo(() => ({
     ...listeners,
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
@@ -185,48 +164,10 @@ function DraggableTab({
       ? '...' + agentTitle.slice(-27)
       : agentTitle;
 
-  const isRenaming = useTabRenameStore((s) => s.renamingTabId === tab.id);
   const anyRenaming = useTabRenameStore((s) => s.renamingTabId !== null);
-  const clearRename = useTabRenameStore((s) => s.clearRename);
-  const startRename = useTabRenameStore((s) => s.startRename);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const handledRef = useRef(false);
   const lockFlashSnap = useSyncExternalStore(subscribeLockFlash, getLockFlashSnapshot);
   const lockFlashToken =
     lockFlashSnap.tabId === tab.id ? lockFlashSnap.seq : 0;
-
-  useEffect(() => {
-    if (isRenaming) handledRef.current = false;
-  }, [isRenaming]);
-
-  const saveSeq = useTabRenameStore((s) => s.saveSeq);
-  const seenSaveSeq = useRef(saveSeq);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  function handleSave() {
-    if (handledRef.current) return;
-    handledRef.current = true;
-    const title = (inputRef.current?.value ?? "").trim();
-    onRenameTab?.(tab.id, title || undefined);
-    clearRename();
-  }
-
-  function handleBlur(e: React.FocusEvent) {
-    if (popoverRef.current?.contains(e.relatedTarget as Node | null)) return;
-    handleSave();
-  }
-
-  useEffect(() => {
-    if (saveSeq === seenSaveSeq.current) return;
-    seenSaveSeq.current = saveSeq;
-    if (isRenaming) handleSave();
-  });
-
-  function handleCancel() {
-    if (handledRef.current) return;
-    handledRef.current = true;
-    clearRename();
-  }
 
   const nativeTooltip = (() => {
     const cwd = tab.kind === "terminal" ? tab.cwd : undefined;
@@ -396,9 +337,12 @@ function DraggableTab({
   );
 
   return (
-    <Popover
-      open={isRenaming}
-      onOpenChange={(open) => { if (!open) handleSave(); }}
+    <TabRenamePopover
+      tabId={tab.id}
+      origin="pane"
+      title={tab.title}
+      placeholder={title}
+      onRenameTab={onRenameTab}
     >
       <ContextMenu>
         <ContextMenuTrigger asChild>
@@ -407,213 +351,27 @@ function DraggableTab({
           </PopoverAnchor>
         </ContextMenuTrigger>
         <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
-            {onRenameTab && (
-              <>
-                <ContextMenuItem onSelect={() => startRename(tab.id)}>
-                  <HugeiconsIcon icon={PencilEdit01Icon} size={14} strokeWidth={2} />
-                  Rename Tab
-                  {shortcutLabels["tab.rename"] && (
-                    <ContextMenuShortcut>{shortcutLabels["tab.rename"]}</ContextMenuShortcut>
-                  )}
-                </ContextMenuItem>
-                {tab.title && (
-                  <ContextMenuItem onSelect={() => onRenameTab(tab.id, undefined)}>
-                    <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} strokeWidth={2} />
-                    Reset Tab Name
-                  </ContextMenuItem>
-                )}
-                {onUpdateTab && (
-                  <ContextMenuItem
-                    onSelect={() => {
-                      if (!isTabNoteOpen(tab)) onActivate(tab.id);
-                      onUpdateTab(tab.id, toggleTabNote);
-                    }}
-                  >
-                    <HugeiconsIcon icon={StickyNote03Icon} size={14} strokeWidth={2} />
-                    {isTabNoteOpen(tab) ? "Hide Note" : tab.note !== undefined ? "Show Note" : "Add Note"}
-                    {shortcutLabels["tab.note"] && (
-                      <ContextMenuShortcut>{shortcutLabels["tab.note"]}</ContextMenuShortcut>
-                    )}
-                  </ContextMenuItem>
-                )}
-                {onUpdateTab && tab.note !== undefined && (
-                  <ContextMenuItem onSelect={() => onUpdateTab(tab.id, removeTabNote)}>
-                    <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
-                    Remove Note
-                  </ContextMenuItem>
-                )}
-                {isAutofocusTab(tab) && (
-                  <ContextMenuItem
-                    onSelect={() =>
-                      onUpdateTab?.(tab.id, (p) =>
-                        isAutofocusTab(p)
-                          ? { ...p, autofocus: !p.autofocus }
-                          : p,
-                      )
-                    }
-                  >
-                    <HugeiconsIcon
-                      icon={CrosshairIcon}
-                      size={14}
-                      strokeWidth={2}
-                      className={tab.autofocus ? "text-primary" : undefined}
-                    />
-                    Autofocus Sidebar
-                    {shortcutLabels["tab.toggleAutofocus"] && (
-                      <ContextMenuShortcut>
-                        {shortcutLabels["tab.toggleAutofocus"]}
-                      </ContextMenuShortcut>
-                    )}
-                  </ContextMenuItem>
-                )}
-                <ContextMenuSub>
-                  <ContextMenuSubTrigger className="gap-2">
-                    <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
-                    Move to Workspace
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
-                    <ContextMenuItem onSelect={() => moveTab(workspaceId, tab.id, { kind: "new" })}>
-                      <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-                      New
-                    </ContextMenuItem>
-                    {otherTargets.length > 0 && <ContextMenuSeparator />}
-                    {otherTargets.map((t) => (
-                      <ContextMenuItem
-                        key={t.id}
-                        onSelect={() => moveTab(workspaceId, tab.id, { kind: "auto", workspaceId: t.id })}
-                      >
-                        <span
-                          aria-hidden
-                          className={cn("size-2 shrink-0 rounded-full", t.color === null && "border border-border")}
-                          style={t.color !== null ? { backgroundColor: t.color } : undefined}
-                        />
-                        <span className="truncate">{t.title}</span>
-                      </ContextMenuItem>
-                    ))}
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
-                <ContextMenuSeparator />
-              </>
-            )}
-            <ContextMenuItem
-              onSelect={() => onUpdateTab?.(tab.id, (p) => {
-                const newLocked = !isLocked;
-                return { ...p, locked: newLocked, ...(newLocked && (p.kind === "editor" || p.kind === "git-diff" || p.kind === "git-commit-file") ? { preview: false } : {}) };
-              })}
-            >
-              <HugeiconsIcon icon={isLocked ? SquareUnlock02Icon : LockKeyIcon} size={14} strokeWidth={2} />
-              {isLocked ? "Unlock Tab" : "Lock Tab"}
-              {shortcutLabels["tab.lock"] && (
-                <ContextMenuShortcut>{shortcutLabels["tab.lock"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuItem disabled={isLocked} onSelect={() => onClose(tab.id)}>
-              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
-              Close Tab
-              {!isLocked && shortcutLabels["tab.close"] && (
-                <ContextMenuShortcut>{shortcutLabels["tab.close"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuItem
-              disabled={tabsCount <= 1}
-              onSelect={() => onCloseOtherTabs(tab.id)}
-            >
-              <HugeiconsIcon icon={CancelCircleIcon} size={14} strokeWidth={2} />
-              Close Other Tabs
-            </ContextMenuItem>
-            <ContextMenuItem disabled={isLocked} onSelect={onCloseAllTabs}>
-              <HugeiconsIcon icon={CancelSquareIcon} size={14} strokeWidth={2} />
-              Close All Tabs
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onSelect={onNewTerminal}>
-              <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={2} />
-              New Terminal Tab
-              {shortcutLabels["tab.new"] && (
-                <ContextMenuShortcut>{shortcutLabels["tab.new"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={onSplitTerminalRight}>
-              <HugeiconsIcon icon={LayoutRightIcon} size={14} strokeWidth={2} />
-              New Terminal Split Right
-              {shortcutLabels["pane.splitRight"] && (
-                <ContextMenuShortcut>{shortcutLabels["pane.splitRight"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={onSplitTerminalDown}>
-              <HugeiconsIcon icon={LayoutBottomIcon} size={14} strokeWidth={2} />
-              New Terminal Split Down
-              {shortcutLabels["pane.splitDown"] && (
-                <ContextMenuShortcut>{shortcutLabels["pane.splitDown"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onSelect={onNewBrowser}>
-              <HugeiconsIcon icon={BrowserIcon} size={14} strokeWidth={2} />
-              New Browser Tab
-              {shortcutLabels["tab.newBrowser"] && (
-                <ContextMenuShortcut>{shortcutLabels["tab.newBrowser"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={onSplitBrowserRight}>
-              <HugeiconsIcon icon={LayoutRightIcon} size={14} strokeWidth={2} />
-              New Browser Split Right
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={onSplitBrowserDown}>
-              <HugeiconsIcon icon={LayoutBottomIcon} size={14} strokeWidth={2} />
-              New Browser Split Down
-            </ContextMenuItem>
+          <TabContextMenuItems
+            tab={tab}
+            workspaceId={workspaceId}
+            paneTabCount={tabsCount}
+            renameOrigin="pane"
+            onActivate={onActivate}
+            onClose={onClose}
+            onCloseOtherTabs={onCloseOtherTabs}
+            onCloseAllTabs={onCloseAllTabs}
+            onRenameTab={onRenameTab}
+            onUpdateTab={onUpdateTab}
+          />
         </ContextMenuContent>
       </ContextMenu>
-
-      <PopoverContent
-        ref={popoverRef}
-        side="bottom"
-        align="start"
-        sideOffset={4}
-        className="flex w-52 flex-col gap-1 rounded-lg p-2"
-        onEscapeKeyDown={(e) => { e.preventDefault(); handleCancel(); }}
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onFocusOutside={(e) => e.preventDefault()}
-      >
-        <span className="text-[12px] text-muted-foreground">Rename tab</span>
-        <input
-          ref={inputRef}
-          autoFocus
-          onFocus={(e) => { e.stopPropagation(); e.currentTarget.select(); }}
-          onBlur={handleBlur}
-          defaultValue={tab.title ?? ""}
-          placeholder={title}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); handleSave(); }
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="w-full rounded border border-input bg-transparent px-1.5 py-1 text-[12px] text-foreground outline-none focus:border-ring placeholder:text-muted-foreground/60"
-        />
-      </PopoverContent>
-    </Popover>
+    </TabRenamePopover>
   );
 }
 
 export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onNoteHover, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
-  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const shortcutLabels: Record<string, string | null> = useMemo(
-    () => ({
-      "tab.close":       getShortcutLabel("tab.close",       userShortcuts),
-      "tab.new":         getShortcutLabel("tab.new",         userShortcuts),
-      "pane.splitRight": getShortcutLabel("pane.splitRight", userShortcuts),
-      "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
-      "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
-      "tab.rename":      getShortcutLabel("tab.rename",      userShortcuts),
-      "tab.note":        getShortcutLabel("tab.note",        userShortcuts),
-      "tab.lock":        getShortcutLabel("tab.lock",        userShortcuts),
-      "tab.focusOnExplorer": getShortcutLabel("tab.focusOnExplorer", userShortcuts),
-      "tab.toggleAutofocus": getShortcutLabel("tab.toggleAutofocus", userShortcuts),
-    }),
-    [userShortcuts],
-  );
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -788,13 +546,6 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           onClose={onClose}
           onCloseOtherTabs={onCloseOtherTabs}
           onCloseAllTabs={onCloseAllTabs}
-          onNewTerminal={onNewTerminal}
-          onSplitTerminalRight={onSplitTerminalRight}
-          onSplitTerminalDown={onSplitTerminalDown}
-          onNewBrowser={onNewBrowser}
-          onSplitBrowserRight={onSplitBrowserRight}
-          onSplitBrowserDown={onSplitBrowserDown}
-          shortcutLabels={shortcutLabels}
           onRenameTab={onRenameTab}
           onUpdateTab={onUpdateTab}
           onNoteHover={onNoteHover}
@@ -809,14 +560,14 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           tabBarStyle === "connected" && "border-b border-border/40",
         )}
       >
-        <button
-          type="button"
-          onClick={onNewTerminal}
-          className="ml-1 shrink-0 px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          title="New terminal in this pane"
-        >
-          +
-        </button>
+        <NewTabMenuButton
+          onNewTerminal={onNewTerminal}
+          onSplitTerminalRight={onSplitTerminalRight}
+          onSplitTerminalDown={onSplitTerminalDown}
+          onNewBrowser={onNewBrowser}
+          onSplitBrowserRight={onSplitBrowserRight}
+          onSplitBrowserDown={onSplitBrowserDown}
+        />
       </div>
     </div>
   );
