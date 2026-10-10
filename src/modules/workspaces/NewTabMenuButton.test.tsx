@@ -2,6 +2,11 @@
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const dnd = vi.hoisted(() => ({ dragging: null as object | null }));
+vi.mock("./WorkspaceDndProvider", () => ({
+  useWorkspaceDnd: () => ({ draggingItem: dnd.dragging }),
+}));
+
 import { NewTabMenuButton } from "./NewTabMenuButton";
 import { HOVER_SWITCH_DELAY_MS } from "./lib/hoverSwitch";
 
@@ -14,14 +19,18 @@ function setup() {
     onSplitBrowserRight: vi.fn(),
     onSplitBrowserDown: vi.fn(),
   };
-  render(<NewTabMenuButton {...handlers} />);
-  return { ...handlers, plus: screen.getByText("+") };
+  const ui = () => <NewTabMenuButton {...handlers} />;
+  const view = render(ui());
+  return { ...handlers, plus: screen.getByText("+"), rerender: () => view.rerender(ui()) };
 }
 
 const menuOpen = () => screen.queryByText("New Terminal Tab") !== null;
 
 describe("NewTabMenuButton", () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => {
+    dnd.dragging = null;
+    vi.useFakeTimers();
+  });
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
@@ -84,6 +93,24 @@ describe("NewTabMenuButton", () => {
     fireEvent.contextMenu(plus);
     fireEvent.click(screen.getByText("New Browser Split Down"));
     expect(onSplitBrowserDown).toHaveBeenCalledTimes(1);
+    expect(menuOpen()).toBe(false);
+  });
+
+  it("does not arm the hover while something is being dragged", () => {
+    dnd.dragging = { kind: "tab" };
+    const { plus } = setup();
+    fireEvent.pointerEnter(plus);
+    act(() => vi.advanceTimersByTime(HOVER_SWITCH_DELAY_MS * 2));
+    expect(menuOpen()).toBe(false);
+  });
+
+  it("drops a pending hover when a drag starts before it fires", () => {
+    const { plus, rerender } = setup();
+    fireEvent.pointerEnter(plus);
+    act(() => vi.advanceTimersByTime(HOVER_SWITCH_DELAY_MS - 100));
+    dnd.dragging = { kind: "tab" };
+    rerender();
+    act(() => vi.advanceTimersByTime(1000));
     expect(menuOpen()).toBe(false);
   });
 });

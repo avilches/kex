@@ -21,8 +21,8 @@ import {
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { getShortcutLabel, type ShortcutId } from "@/modules/shortcuts/shortcuts";
+import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
+import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
@@ -42,8 +42,7 @@ type Props = {
 };
 
 function Shortcut({ id }: { id: ShortcutId }) {
-  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const label = getShortcutLabel(id, userShortcuts);
+  const label = useShortcutLabel(id);
   return label ? <ContextMenuShortcut>{label}</ContextMenuShortcut> : null;
 }
 

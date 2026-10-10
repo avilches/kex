@@ -14,9 +14,10 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { getShortcutLabel, type ShortcutId } from "@/modules/shortcuts/shortcuts";
+import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
+import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { createHoverSwitch } from "./lib/hoverSwitch";
+import { useWorkspaceDnd } from "./WorkspaceDndProvider";
 
 type Props = {
   onNewTerminal: () => void;
@@ -30,8 +31,7 @@ type Props = {
 const HOVER_ID = "new-tab-menu";
 
 function Shortcut({ id }: { id: ShortcutId }) {
-  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const label = getShortcutLabel(id, userShortcuts);
+  const label = useShortcutLabel(id);
   return label ? <DropdownMenuShortcut>{label}</DropdownMenuShortcut> : null;
 }
 
@@ -51,6 +51,12 @@ export function NewTabMenuButton({
   const [open, setOpen] = useState(false);
   const hover = useMemo(() => createHoverSwitch(() => setOpen(true)), []);
   useEffect(() => () => hover.cancel(), [hover]);
+
+  // A dragged tab or file passing over the button must not pop the menu open.
+  const dragging = useWorkspaceDnd().draggingItem !== null;
+  useEffect(() => {
+    if (dragging) hover.cancel();
+  }, [dragging, hover]);
 
   return (
     <DropdownMenu
@@ -74,7 +80,9 @@ export function NewTabMenuButton({
             hover.cancel();
             onNewTerminal();
           }}
-          onPointerEnter={() => hover.enter(HOVER_ID)}
+          onPointerEnter={() => {
+            if (!dragging) hover.enter(HOVER_ID);
+          }}
           onPointerLeave={() => hover.leave(HOVER_ID)}
           onContextMenu={(e) => {
             e.preventDefault();

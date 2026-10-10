@@ -200,10 +200,9 @@ function SortableWorkspaceItem({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const wsId = ws.id;
   const activateDetailTab = useCallback(
-    (tabId: string) => onActivateAgentTab(wsId, tabId),
-    [onActivateAgentTab, wsId],
+    (tabId: string) => onActivateAgentTab(ws.id, tabId),
+    [onActivateAgentTab, ws.id],
   );
 
   const isRenaming = useWorkspaceRenameStore((s) => s.renamingId === ws.id);
