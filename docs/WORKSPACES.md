@@ -207,8 +207,11 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
   `leafIdForPty` returns `null`, so without it a phantom spinner would stay.
 - `wakeWorkspace` seeds the agent resume plans (`seedWakePlans`, same "Run on start" gate as the
   reopen flow), discards the carried unsaved editor buffers (`unflushedBuffers.ts`) and then clears
-  `hibernated`; the terminals mount again and resume through the normal restore path.
-- Guards: `openTab` and `splitPaneAndOpenTab` ignore a hibernated workspace, `shortcutsDisabled`
+  `hibernated`; the terminals mount again and resume through the normal restore path. A set of
+  in-flight workspace ids (`runOnce`) makes a double click on Restore wake once.
+- Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
+  `applyMoveTabToWorkspace` refuses it as a destination (and "Move to Workspace" does not list it),
+  `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`
   blocks the shortcuts that need tabs (`blockedWhileHibernated`), `runWorkspaceConfig` does nothing,
   `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is empty.
 
@@ -221,7 +224,8 @@ The shortcut `workspace.hibernate` (Cmd+Alt+Z, never blocked while hibernated) c
 1. With autosave on, `flushDirtyEditors` runs and two animation frames pass so the dirty flags
    reach the workspace state.
 2. `hibernateReview` (`lib/hibernateReview.ts`) lists what would be lost: agents still working,
-   unsaved documents and running commands without "Run on start". If the review is empty the
+   unsaved documents and running commands without "Run on start". An agent only counts as
+   coming back when it has a stored session (`hasResumed`); otherwise it is listed as a command. If the review is empty the
    workspace hibernates immediately; otherwise `pendingWorkspaceId` opens `HibernateDialog`.
 3. `performHibernate` clears the pending id, marks the terminal tabs with `markHibernating`
    (so the exit of their PTYs is not reported as an agent failure), calls `finish` on each agent
@@ -231,7 +235,8 @@ The shortcut `workspace.hibernate` (Cmd+Alt+Z, never blocked while hibernated) c
 `HibernateDialog` is reactive: it recomputes the review from the agent store and the running
 commands store, so a row disappears when its agent finishes or when "Run on start" is enabled
 (`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are
-empty. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
+empty. Closing a hibernated workspace without waking it discards its carried buffers and
+hibernating marks. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
 is described above (`wakeWorkspace`).
 
 ---

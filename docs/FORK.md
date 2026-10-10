@@ -441,11 +441,11 @@ HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as
 - **Immutable .md files** — Kex never writes frontmatter, metadata, or any other data into user `.md` files. State is stored exclusively in `kex.json`.
 - **Opens into the rich editor** — clicking a note creates a `markdown` tab, so notes render in Live Preview.
 
+- **Move a tab to another workspace** from its context menu ("Move to Workspace") or by dragging it (see `docs/WORKSPACES.md`). Not present upstream.
+
 ### Hibernated workspaces
 
 A workspace can be hibernated (Cmd+Alt+Z, `workspace.hibernate`): its terminals and editors are closed and its tabs stay in the persisted tree, shown as a "Zzzzz" overlay with a Restore button. A review dialog warns about agents still working, unsaved documents and running commands that would not come back, with Save, Save all and Run on start actions. Waking resumes agent sessions and "Run on start" commands. Details in `docs/WORKSPACES.md`. Not present upstream.
-
-- **Move a tab to another workspace** from its context menu ("Move to Workspace") or by dragging it (see `docs/WORKSPACES.md`). Not present upstream.
 
 ---
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
-import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -635,5 +635,31 @@ describe("seedWakePlans", () => {
     });
     await seedWakePlans(w, async (id) => (asked.push(id), null), () => {});
     expect(asked).toEqual([]);
+  });
+});
+
+describe("runOnce", () => {
+  it("ignores a second call for the same key while the first is in flight", async () => {
+    const inFlight = new Set<string>();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let runs = 0;
+    const task = async () => {
+      runs++;
+      await gate;
+    };
+    const first = runOnce(inFlight, "w1", task);
+    await runOnce(inFlight, "w1", task);
+    expect(runs).toBe(1);
+    release();
+    await first;
+    await runOnce(inFlight, "w1", task);
+    expect(runs).toBe(2);
+  });
+
+  it("frees the key when the task throws", async () => {
+    const inFlight = new Set<string>();
+    await expect(runOnce(inFlight, "w1", async () => { throw new Error("x"); })).rejects.toThrow("x");
+    expect(inFlight.size).toBe(0);
   });
 });

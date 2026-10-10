@@ -70,6 +70,20 @@ export async function seedWakePlans(
   );
 }
 
+// A double click on Restore would otherwise seed the resume plans twice, and a
+// leftover plan could resurrect a stale session on a later wake.
+export async function runOnce(inFlight: Set<string>, key: string, task: () => Promise<void>): Promise<void> {
+  if (inFlight.has(key)) return;
+  inFlight.add(key);
+  try {
+    await task();
+  } finally {
+    inFlight.delete(key);
+  }
+}
+
+const wakesInFlight = new Set<string>();
+
 export function findReopenTarget(
   workspaces: Workspace[],
   activeWorkspaceId: string,
@@ -954,10 +968,12 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   const wakeWorkspace = useCallback(async (workspaceId: string) => {
     const ws = workspacesRef.current.find((w) => w.id === workspaceId);
     if (!ws?.hibernated) return;
-    await seedWakePlans(ws, previewResumeCmd, seedRestorePlan);
-    discardUnflushedBuffers(editorTabIds(ws));
-    unmarkHibernating(terminalTabs(ws).map((t) => t.id));
-    setWorkspaces((prev) => applyWake(prev, workspaceId));
+    await runOnce(wakesInFlight, workspaceId, async () => {
+      await seedWakePlans(ws, previewResumeCmd, seedRestorePlan);
+      discardUnflushedBuffers(editorTabIds(ws));
+      unmarkHibernating(terminalTabs(ws).map((t) => t.id));
+      setWorkspaces((prev) => applyWake(prev, workspaceId));
+    });
   }, []);
 
   // ── Derived ───────────────────────────────────────────────────────────────
