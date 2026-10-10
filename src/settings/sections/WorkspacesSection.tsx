@@ -7,9 +7,9 @@ import {
   setWarnOnCloseWorkspace,
   setWorkspaceDetailBrowsers,
   setWorkspaceDetailEditors,
-  setWorkspaceDetailEnabled,
   setWorkspaceDetailGit,
   setWorkspaceDetailTerminals,
+  setWorkspaceDetailTerminalsEnabled,
 } from "@/modules/settings/store";
 import {
   TERMINAL_DETAIL_LABELS,
@@ -22,7 +22,7 @@ import { SettingRow } from "../components/SettingRow";
 export function WorkspacesSection() {
   const warnOnCloseWorkspace = usePreferencesStore((s) => s.warnOnCloseWorkspace);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
-  const detailEnabled = usePreferencesStore((s) => s.workspaceDetailEnabled);
+  const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
   const detailTerminals = usePreferencesStore((s) => s.workspaceDetailTerminals);
   const detailEditors = usePreferencesStore((s) => s.workspaceDetailEditors);
   const detailBrowsers = usePreferencesStore((s) => s.workspaceDetailBrowsers);
@@ -63,61 +63,64 @@ export function WorkspacesSection() {
           />
         </SettingRow>
         <SettingRow
-          title="Show tabs under each workspace"
-          description="Adds an expand arrow to each workspace in the bar. The number of active agents is always shown."
+          title="Tabs under each workspace"
+          description="Which tabs the expand arrow of each workspace lists. With nothing included there is no arrow. The number of active agents is always shown. Editors include markdown and html."
         >
-          <Switch
-            checked={detailEnabled}
-            onCheckedChange={(v) => void setWorkspaceDetailEnabled(v)}
-          />
-        </SettingRow>
-        {detailEnabled && (
-          <>
-            <SettingRow
-              title="Terminals"
-              description="Which terminals the expand arrow lists."
-            >
-              <RadioGroup
-                value={detailTerminals}
-                onValueChange={(v) => void setWorkspaceDetailTerminals(v as TerminalDetail)}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="workspace-detail-terminals"
+                checked={terminalsEnabled}
+                onCheckedChange={(v) => void setWorkspaceDetailTerminalsEnabled(v === true)}
+              />
+              <label
+                htmlFor="workspace-detail-terminals"
+                className="cursor-pointer text-[12px]"
               >
-                {TERMINAL_DETAIL_MODES.map((mode) => (
-                  <div key={mode} className="flex items-center gap-2">
-                    <RadioGroupItem value={mode} id={`workspace-detail-${mode}`} />
-                    <label
-                      htmlFor={`workspace-detail-${mode}`}
-                      className="cursor-pointer text-[12px]"
-                    >
-                      {TERMINAL_DETAIL_LABELS[mode]}
-                    </label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </SettingRow>
-            <SettingRow
-              title="Other tabs"
-              description="Also list these tabs, whatever the terminals option. Editors include markdown and html."
+                Include terminals
+              </label>
+            </div>
+            <RadioGroup
+              className="ml-6"
+              value={detailTerminals}
+              onValueChange={(v) => void setWorkspaceDetailTerminals(v as TerminalDetail)}
             >
-              <div className="flex flex-col gap-2">
-                {otherKinds.map((k) => (
-                  <div key={k.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`workspace-detail-${k.id}`}
-                      checked={k.checked}
-                      onCheckedChange={(v) => void k.onChange(v === true)}
-                    />
-                    <label
-                      htmlFor={`workspace-detail-${k.id}`}
-                      className="cursor-pointer text-[12px]"
-                    >
-                      {k.label}
-                    </label>
-                  </div>
-                ))}
+              {TERMINAL_DETAIL_MODES.map((mode) => (
+                <div
+                  key={mode}
+                  className={`flex items-center gap-2 ${terminalsEnabled ? "" : "opacity-50"}`}
+                >
+                  <RadioGroupItem
+                    value={mode}
+                    id={`workspace-detail-${mode}`}
+                    disabled={!terminalsEnabled}
+                  />
+                  <label
+                    htmlFor={`workspace-detail-${mode}`}
+                    className={`text-[12px] ${terminalsEnabled ? "cursor-pointer" : ""}`}
+                  >
+                    {TERMINAL_DETAIL_LABELS[mode]}
+                  </label>
+                </div>
+              ))}
+            </RadioGroup>
+            {otherKinds.map((k) => (
+              <div key={k.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={`workspace-detail-${k.id}`}
+                  checked={k.checked}
+                  onCheckedChange={(v) => void k.onChange(v === true)}
+                />
+                <label
+                  htmlFor={`workspace-detail-${k.id}`}
+                  className="cursor-pointer text-[12px]"
+                >
+                  {k.label}
+                </label>
               </div>
-            </SettingRow>
-          </>
-        )}
+            ))}
+          </div>
+        </SettingRow>
       </div>
     </div>
   );

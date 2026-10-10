@@ -79,6 +79,7 @@ import {
 import type { Tab, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import {
   activeAgentCount,
+  hasDetail,
   type DetailFilter,
 } from "@/modules/workspaces/lib/workspaceDetail";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
@@ -134,7 +135,6 @@ function SortableWorkspaceItem({
   active,
   agentEntries,
   onJumpAgent,
-  detailEnabled,
   detailFilter,
   onSetDetailExpanded,
   onActivateAgentTab,
@@ -153,7 +153,6 @@ function SortableWorkspaceItem({
   active: boolean;
   agentEntries?: AgentEntry[];
   onJumpAgent: (workspaceId: string, entries: AgentEntry[]) => void;
-  detailEnabled: boolean;
   detailFilter: DetailFilter;
   onSetDetailExpanded: (id: string, expanded: boolean) => void;
   onActivateAgentTab: (workspaceId: string, tabId: string) => void;
@@ -236,7 +235,7 @@ function SortableWorkspaceItem({
   }
 
   const compact = barWidth <= 80;
-  const showDetail = !compact && detailEnabled;
+  const showDetail = !compact && hasDetail(detailFilter);
   const expanded = showDetail && !!ws.detailExpanded;
   const agentCount = activeAgentCount(agentEntries);
 
@@ -854,7 +853,6 @@ export function WorkspaceBar({
   const compact = width <= 80;
 
   const detailFilter = useDetailFilter();
-  const detailEnabled = usePreferencesStore((s) => s.workspaceDetailEnabled);
   const agentSessions = useAgentStore((s) => s.sessions);
   const agentNotifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
@@ -1045,7 +1043,6 @@ export function WorkspaceBar({
                                 active={true}
                                 agentEntries={agentEntriesByWs[activeWs.id]}
                                 onJumpAgent={jumpAgent}
-                                detailEnabled={detailEnabled}
                                 detailFilter={detailFilter}
                                 onSetDetailExpanded={onSetDetailExpanded}
                                 onActivateAgentTab={onActivateAgentTab}
@@ -1075,7 +1072,6 @@ export function WorkspaceBar({
                                 active={ws.id === activeId}
                                 agentEntries={agentEntriesByWs[ws.id]}
                                 onJumpAgent={jumpAgent}
-                                detailEnabled={detailEnabled}
                                 detailFilter={detailFilter}
                                 onSetDetailExpanded={onSetDetailExpanded}
                                 onActivateAgentTab={onActivateAgentTab}

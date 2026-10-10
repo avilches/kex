@@ -200,7 +200,7 @@ export type Preferences = {
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
   randomWorkspaceColor: boolean;
-  workspaceDetailEnabled: boolean;
+  workspaceDetailTerminalsEnabled: boolean;
   workspaceDetailTerminals: TerminalDetail;
   workspaceDetailEditors: boolean;
   workspaceDetailBrowsers: boolean;
@@ -234,7 +234,7 @@ const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
 const KEY_RANDOM_WORKSPACE_COLOR = "randomWorkspaceColor";
-const KEY_WORKSPACE_DETAIL_ENABLED = "workspaceDetailEnabled";
+const KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED = "workspaceDetailTerminalsEnabled";
 const KEY_WORKSPACE_DETAIL_TERMINALS = "workspaceDetailTerminals";
 const KEY_WORKSPACE_DETAIL_EDITORS = "workspaceDetailEditors";
 const KEY_WORKSPACE_DETAIL_BROWSERS = "workspaceDetailBrowsers";
@@ -446,7 +446,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   customEditors: [],
   detectedEditors: [],
   randomWorkspaceColor: true,
-  workspaceDetailEnabled: true,
+  workspaceDetailTerminalsEnabled: true,
   workspaceDetailTerminals: "all",
   workspaceDetailEditors: true,
   workspaceDetailBrowsers: true,
@@ -745,9 +745,9 @@ export async function loadPreferences(): Promise<Preferences> {
     randomWorkspaceColor:
       getGeneral<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
       DEFAULT_PREFERENCES.randomWorkspaceColor,
-    workspaceDetailEnabled:
-      getGeneral<boolean>(KEY_WORKSPACE_DETAIL_ENABLED) ??
-      DEFAULT_PREFERENCES.workspaceDetailEnabled,
+    workspaceDetailTerminalsEnabled:
+      getGeneral<boolean>(KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED) ??
+      DEFAULT_PREFERENCES.workspaceDetailTerminalsEnabled,
     workspaceDetailTerminals: (() => {
       const v = getGeneral<string>(KEY_WORKSPACE_DETAIL_TERMINALS);
       return isTerminalDetail(v) ? v : DEFAULT_PREFERENCES.workspaceDetailTerminals;
@@ -1080,8 +1080,10 @@ export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
   await writePref(KEY_RANDOM_WORKSPACE_COLOR, value);
 }
 
-export async function setWorkspaceDetailEnabled(value: boolean): Promise<void> {
-  await writePref(KEY_WORKSPACE_DETAIL_ENABLED, value);
+export async function setWorkspaceDetailTerminalsEnabled(
+  value: boolean,
+): Promise<void> {
+  await writePref(KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED, value);
 }
 
 export async function setWorkspaceDetailTerminals(
@@ -1235,7 +1237,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
-  [KEY_WORKSPACE_DETAIL_ENABLED]: "workspaceDetailEnabled",
+  [KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED]: "workspaceDetailTerminalsEnabled",
   [KEY_WORKSPACE_DETAIL_TERMINALS]: "workspaceDetailTerminals",
   [KEY_WORKSPACE_DETAIL_EDITORS]: "workspaceDetailEditors",
   [KEY_WORKSPACE_DETAIL_BROWSERS]: "workspaceDetailBrowsers",

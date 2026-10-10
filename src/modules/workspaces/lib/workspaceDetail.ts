@@ -7,20 +7,18 @@ export const TERMINAL_DETAIL_MODES = [
   "all",
   "agents",
   "active-agents",
-  "none",
 ] as const;
 
 export type TerminalDetail = (typeof TERMINAL_DETAIL_MODES)[number];
 
 export const TERMINAL_DETAIL_LABELS: Record<TerminalDetail, string> = {
   all: "All terminals",
-  agents: "Agents",
-  "active-agents": "Active agents",
-  none: "No terminals",
+  agents: "Only agents",
+  "active-agents": "Only active agents",
 };
 
 export type DetailFilter = {
-  terminals: TerminalDetail;
+  terminals: TerminalDetail | "none";
   editors: boolean;
   browsers: boolean;
   git: boolean;
@@ -29,6 +27,10 @@ export type DetailFilter = {
 export type DetailTab = { id: string; kind: string };
 
 export type DetailRow = { tabId: string; visual: AgentEntryVisual | null };
+
+export function hasDetail(f: DetailFilter): boolean {
+  return f.terminals !== "none" || f.editors || f.browsers || f.git;
+}
 
 export function isTerminalDetail(v: unknown): v is TerminalDetail {
   return TERMINAL_DETAIL_MODES.includes(v as TerminalDetail);
