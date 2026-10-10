@@ -433,18 +433,20 @@ const NOTIFICATION_KINDS: [&str; 3] = ["attention", "finished", "error"];
 /// Stores the tab name and the pending notification of an already recorded session. An empty
 /// `title` keeps the stored one (the title also goes empty while the app is closing, which
 /// must not erase it); an empty or unknown `notification` clears it. Tabs without a record are
-/// ignored: only a session that can be resumed has anything to restore.
-pub fn set_snapshot(tab_id: &str, title: &str, notification: &str) {
-    if let Some(path) = store_path() {
-        set_snapshot_at_path(&path, tab_id, title, notification);
+/// ignored (returns false): only a session that can be resumed has anything to restore, and
+/// the caller retries once something changes.
+pub fn set_snapshot(tab_id: &str, title: &str, notification: &str) -> bool {
+    match store_path() {
+        Some(path) => set_snapshot_at_path(&path, tab_id, title, notification),
+        None => false,
     }
 }
 
-fn set_snapshot_at_path(path: &Path, tab_id: &str, title: &str, notification: &str) {
+fn set_snapshot_at_path(path: &Path, tab_id: &str, title: &str, notification: &str) -> bool {
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
-    let Ok(content) = std::fs::read_to_string(path) else { return };
-    let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return };
-    let Some(record) = store.tabs.get_mut(tab_id) else { return };
+    let Ok(content) = std::fs::read_to_string(path) else { return false };
+    let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return false };
+    let Some(record) = store.tabs.get_mut(tab_id) else { return false };
     let next_title = if title.is_empty() {
         record.title.clone()
     } else {
@@ -454,7 +456,7 @@ fn set_snapshot_at_path(path: &Path, tab_id: &str, title: &str, notification: &s
         .contains(&notification)
         .then(|| notification.to_string());
     if record.title == next_title && record.notification == next_notification {
-        return;
+        return true;
     }
     record.title = next_title;
     record.notification = next_notification;
@@ -465,6 +467,7 @@ fn set_snapshot_at_path(path: &Path, tab_id: &str, title: &str, notification: &s
             let _ = std::fs::rename(&tmp, path);
         }
     }
+    true
 }
 
 /// Remove a tab entry from agent-sessions.json.
@@ -1047,8 +1050,8 @@ mod tests {
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
 
-        set_snapshot_at_path(&path, "tab-1", "x", "bogus");
-        set_snapshot_at_path(&path, "tab-2", "y", "attention");
+        assert!(set_snapshot_at_path(&path, "tab-1", "x", "bogus"));
+        assert!(!set_snapshot_at_path(&path, "tab-2", "y", "attention"));
 
         let store = read_store(&path);
         assert_eq!(store.tabs["tab-1"].notification, None);
