@@ -496,6 +496,11 @@ describe("applyMoveTabToWorkspace", () => {
     expect(target.activePaneId).toBe("px");
   });
 
+  it("refuses to move a tab into a hibernated workspace", () => {
+    const input = [src(), dst({ hibernated: true })];
+    expect(applyMoveTabToWorkspace(input, "src", "t1", autoDest, 8)).toBe(input);
+  });
+
   it("keeps the source workspace with an empty pane when its last tab leaves", () => {
     const onlyTab = src({ paneTree: leaf("sp1", [term("t1")]) });
     const out = applyMoveTabToWorkspace([onlyTab, dst()], "src", "t1", autoDest, 8);

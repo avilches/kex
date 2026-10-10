@@ -284,6 +284,7 @@ export function applyMoveTabToWorkspace(
 
   if (dest.workspaceId === sourceWorkspaceId) return workspaces;
   const target = workspaces.find((w) => w.id === dest.workspaceId);
+  if (target?.hibernated) return workspaces;
   const attached = target ? attachTab(target, tab, dest.placement, paneLimit) : null;
   if (!attached) return workspaces;
   return applyCloseTab(workspaces, sourceWorkspaceId, tabId).map((w) =>
