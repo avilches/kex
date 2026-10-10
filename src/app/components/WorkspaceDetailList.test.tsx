@@ -4,7 +4,9 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildAgentEntries } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import type { Tab } from "@/modules/workspaces/lib/types";
+import { SidebarTabMenuProvider } from "@/modules/workspaces/SidebarTabMenuContext";
 import type { DetailFilter } from "@/modules/workspaces/lib/workspaceDetail";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
 
@@ -29,6 +31,7 @@ function mount(filter: Partial<DetailFilter>, focusedTabId: string | null = null
   act(() => {
     root.render(
       createElement(WorkspaceDetailList, {
+        workspaceId: "ws-1",
         tabs,
         entries,
         filter: { ...base, ...filter },
@@ -139,6 +142,87 @@ describe("WorkspaceDetailList kind icons", () => {
     const { rows, unmount } = mount({ terminals: "all" });
     expect(rows().length).toBeGreaterThan(0);
     for (const r of rows()) expect(icon(r)).not.toBeNull();
+    unmount();
+  });
+});
+
+describe("WorkspaceDetailList context menu", () => {
+  const actions = {
+    paneTabCount: () => 3,
+    onClose: vi.fn(),
+    onCloseOtherTabs: vi.fn(),
+    onCloseAllTabs: vi.fn(),
+    onRenameTab: vi.fn(),
+    onUpdateTab: vi.fn(),
+  };
+
+  function mountWithMenu() {
+    const { container, rows, unmount } = mountProvided();
+    act(() => {
+      rows()[0].dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 4, clientY: 4 }),
+      );
+    });
+    return { container, rows, unmount };
+  }
+
+  function mountProvided() {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        createElement(
+          SidebarTabMenuProvider,
+          { value: actions },
+          createElement(WorkspaceDetailList, {
+            workspaceId: "ws-1",
+            tabs,
+            entries: buildAgentEntries(useAgentStore.getState().sessions, [], null),
+            filter: { ...base },
+            focusedTabId: null,
+            onActivate: vi.fn(),
+          }),
+        ),
+      );
+    });
+    const rows = () => Array.from(container.querySelectorAll("button"));
+    return { container, rows, unmount: () => act(() => root.unmount()) };
+  }
+
+  beforeEach(() => {
+    for (const fn of Object.values(actions)) if (vi.isMockFunction(fn)) fn.mockClear();
+    useTabRenameStore.setState({ renamingTabId: null, renamingOrigin: "pane", saveSeq: 0 });
+  });
+
+  it("offers the tab actions and none of the New ones", () => {
+    const { unmount } = mountWithMenu();
+    const text = document.body.textContent ?? "";
+    for (const label of ["Rename Tab", "Lock Tab", "Close Tab", "Close Other Tabs", "Close All Tabs", "Move to Workspace"]) {
+      expect(text).toContain(label);
+    }
+    expect(text).not.toContain("New Terminal");
+    expect(text).not.toContain("New Browser");
+    unmount();
+  });
+
+  it("Close Other Tabs reports the tab the menu was opened on", () => {
+    const { unmount } = mountWithMenu();
+    const item = (label: string) =>
+      Array.from(document.body.querySelectorAll('[role="menuitem"]')).find((e) => e.textContent?.startsWith(label)) as HTMLElement;
+    act(() => item("Close Other Tabs").click());
+    expect(actions.onCloseOtherTabs).toHaveBeenCalledWith("t-work");
+    unmount();
+  });
+
+  it("Rename Tab starts a sidebar rename that opens the field on the row", () => {
+    const { unmount } = mountWithMenu();
+    const rename = Array.from(document.body.querySelectorAll('[role="menuitem"]')).find((e) =>
+      e.textContent?.startsWith("Rename Tab"),
+    ) as HTMLElement;
+    act(() => rename.click());
+    expect(useTabRenameStore.getState()).toMatchObject({ renamingTabId: "t-work", renamingOrigin: "sidebar" });
+    expect(document.body.textContent).toContain("Rename tab");
     unmount();
   });
 });

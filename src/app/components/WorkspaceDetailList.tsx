@@ -1,11 +1,17 @@
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { PopoverAnchor } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentEntry } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
+import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import type { Tab } from "@/modules/workspaces/lib/types";
+import { useSidebarTabMenu } from "@/modules/workspaces/SidebarTabMenuContext";
+import { TabContextMenuItems } from "@/modules/workspaces/TabContextMenuItems";
+import { TabRenamePopover } from "@/modules/workspaces/TabRenamePopover";
 import {
   type DetailFilter,
   type DetailRow,
@@ -29,13 +35,41 @@ function StatusMark({ visual }: { visual: DetailRow["visual"] }) {
   );
 }
 
+function DetailTabMenu({
+  tab,
+  workspaceId,
+  onActivate,
+}: {
+  tab: Tab;
+  workspaceId: string;
+  onActivate: (tabId: string) => void;
+}) {
+  const actions = useSidebarTabMenu();
+  return (
+    <TabContextMenuItems
+      tab={tab}
+      workspaceId={workspaceId}
+      paneTabCount={actions.paneTabCount(tab.id)}
+      renameOrigin="sidebar"
+      onActivate={onActivate}
+      onClose={actions.onClose}
+      onCloseOtherTabs={actions.onCloseOtherTabs}
+      onCloseAllTabs={actions.onCloseAllTabs}
+      onRenameTab={actions.onRenameTab}
+      onUpdateTab={actions.onUpdateTab}
+    />
+  );
+}
+
 function DetailTabRow({
   tab,
+  workspaceId,
   visual,
   focused,
   onActivate,
 }: {
   tab: Tab;
+  workspaceId: string;
   visual: DetailRow["visual"];
   focused: boolean;
   onActivate: (tabId: string) => void;
@@ -43,35 +77,63 @@ function DetailTabRow({
   const info = useAgentTabTitle(tab);
   const title = info?.displayTitle ?? tab.id;
   const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
+  const { onRenameTab } = useSidebarTabMenu();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeSignal = useContextMenuCloseStore((s) => s.signal);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: closeSignal is a bump counter, only its change matters
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [closeSignal]);
+
   return (
-    <button
-      type="button"
-      title={title}
-      aria-current={focused || undefined}
-      onClick={() => onActivate(tab.id)}
-      className={cn(
-        "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
-        focused
-          ? "bg-foreground/[0.16] font-medium text-foreground"
-          : "text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground",
-      )}
+    <TabRenamePopover
+      tabId={tab.id}
+      origin="sidebar"
+      title={tab.title}
+      placeholder={title}
+      onRenameTab={onRenameTab}
     >
-      <span className="flex size-3.5 shrink-0 items-center justify-center">
-        {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{title}</span>
-      <StatusMark visual={visual} />
-    </button>
+      <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <ContextMenuTrigger asChild>
+          <PopoverAnchor asChild>
+            <button
+              type="button"
+              title={title}
+              aria-current={focused || undefined}
+              onClick={() => onActivate(tab.id)}
+              className={cn(
+                "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
+                focused
+                  ? "bg-foreground/[0.16] font-medium text-foreground"
+                  : "text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground",
+              )}
+            >
+              <span className="flex size-3.5 shrink-0 items-center justify-center">
+                {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{title}</span>
+              <StatusMark visual={visual} />
+            </button>
+          </PopoverAnchor>
+        </ContextMenuTrigger>
+        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+          <DetailTabMenu tab={tab} workspaceId={workspaceId} onActivate={onActivate} />
+        </ContextMenuContent>
+      </ContextMenu>
+    </TabRenamePopover>
   );
 }
 
 export const WorkspaceDetailList = memo(function WorkspaceDetailList({
+  workspaceId,
   tabs,
   entries,
   filter,
   focusedTabId,
   onActivate,
 }: {
+  workspaceId: string;
   tabs: Tab[];
   entries: AgentEntry[] | undefined;
   filter: DetailFilter;
@@ -97,6 +159,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
           <DetailTabRow
             key={row.tabId}
             tab={tab}
+            workspaceId={workspaceId}
             visual={row.visual}
             focused={row.tabId === focusedTabId}
             onActivate={onActivate}

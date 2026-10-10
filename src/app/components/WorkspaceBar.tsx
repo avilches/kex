@@ -200,6 +200,12 @@ function SortableWorkspaceItem({
     opacity: isDragging ? 0.4 : 1,
   };
 
+  const wsId = ws.id;
+  const activateDetailTab = useCallback(
+    (tabId: string) => onActivateAgentTab(wsId, tabId),
+    [onActivateAgentTab, wsId],
+  );
+
   const isRenaming = useWorkspaceRenameStore((s) => s.renamingId === ws.id);
   const clearRename = useWorkspaceRenameStore((s) => s.clearRename);
   const startRename = useWorkspaceRenameStore((s) => s.startRename);
@@ -410,11 +416,12 @@ function SortableWorkspaceItem({
       </div>
       {expanded && (
         <WorkspaceDetailList
+          workspaceId={ws.id}
           tabs={ws.tabs}
           entries={agentEntries}
           filter={detailFilter}
           focusedTabId={active ? ws.focusedTabId : null}
-          onActivate={(tabId) => onActivateAgentTab(ws.id, tabId)}
+          onActivate={activateDetailTab}
         />
       )}
     </div>

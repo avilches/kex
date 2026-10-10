@@ -105,6 +105,10 @@ import {
 import type { Script, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceMoveProvider } from "@/modules/workspaces/WorkspaceMoveContext";
+import {
+  SidebarTabMenuProvider,
+  type SidebarTabMenuActions,
+} from "@/modules/workspaces/SidebarTabMenuContext";
 import type { TabMoveRequest } from "@/modules/workspaces/lib/tabTransfer";
 import { WorkspaceDndProvider } from "@/modules/workspaces/WorkspaceDndProvider";
 import { EditorChromeProvider } from "@/modules/workspaces/EditorChromeContext";
@@ -2613,6 +2617,34 @@ export default function App() {
     if (ids.length) closeTabsRef.current(ids);
   }, [activePane]);
 
+  const tabCallbacksRef = useRef(tabCallbacks);
+  tabCallbacksRef.current = tabCallbacks;
+  const sidebarTabMenu = useMemo<SidebarTabMenuActions>(() => {
+    const paneOf = (tabId: string) => {
+      for (const ws of workspacesRef.current) {
+        const found = findTabPane(ws.paneTree, tabId);
+        if (found) return found.pane;
+      }
+      return null;
+    };
+    return {
+      paneTabCount: (tabId) => paneOf(tabId)?.tabs.length ?? 0,
+      onClose: (tabId) => void closeTabsRef.current([tabId]),
+      onCloseOtherTabs: (tabId) => {
+        const pane = paneOf(tabId);
+        const ids = pane ? otherBulkClosableIds(pane.tabs, tabId) : [];
+        if (ids.length) void closeTabsRef.current(ids);
+      },
+      onCloseAllTabs: (tabId) => {
+        const pane = paneOf(tabId);
+        const ids = pane ? bulkClosableIds(pane.tabs) : [];
+        if (ids.length) void closeTabsRef.current(ids);
+      },
+      onRenameTab: (tabId, title) => tabCallbacksRef.current.onRenameTab?.(tabId, title),
+      onUpdateTab: (tabId, updater) => tabCallbacksRef.current.onUpdateTab?.(tabId, updater),
+    };
+  }, []);
+
   const cycleWorkspace = useCallback(
     (delta: 1 | -1) => {
       const visible = visibleWorkspaceOrder(
@@ -2764,7 +2796,10 @@ export default function App() {
             (tag === "INPUT" || tag === "TEXTAREA") &&
             !active?.classList.contains("xterm-helper-textarea"),
         });
-        if (action === "start" && activeTabId) store.startRename(activeTabId);
+        if (action === "start" && activeTabId) {
+          useContextMenuCloseStore.getState().closeAll();
+          store.startRename(activeTabId);
+        }
         else if (action === "save") store.requestSave();
       },
       "tab.note": () => {
@@ -3314,6 +3349,7 @@ export default function App() {
           {/* 3-column layout */}
           <div className="flex min-h-0 flex-1">
             <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabToWorkspace}>
+            <SidebarTabMenuProvider value={sidebarTabMenu}>
             <WorkspaceDndProvider
               workspaces={workspaces}
               activeWorkspaceId={activeWorkspaceId}
@@ -3538,6 +3574,7 @@ export default function App() {
                 )}
               </ResizablePanelGroup>
             </WorkspaceDndProvider>
+            </SidebarTabMenuProvider>
             </WorkspaceMoveProvider>
           </div>
 
