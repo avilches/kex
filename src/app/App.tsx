@@ -172,6 +172,11 @@ import type { RevealRequest } from "@/modules/explorer";
 import type { RevealAction } from "@/modules/explorer/lib/pendingAction";
 import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
+import {
+  buildScriptInput,
+  resolveScriptCwd,
+} from "@/modules/workspaces/lib/scriptCwd";
+import { IS_WINDOWS } from "@/lib/platform";
 import { isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -269,6 +274,7 @@ export default function App() {
 
   const activeCwdRef = useRef<string | null>(null);
   const contextCwdRef = useRef<string | null>(null);
+  const scriptFocusFolderRef = useRef<string | null>(null);
   const homeRef = useRef<string | null>(null);
 
   // ── Active tab derivation ───────────────────────────────────────────────
@@ -713,6 +719,13 @@ export default function App() {
       // The user's own leaf, captured up front so a same-workspace script run
       // reveals its tab without moving activePaneId or focus away from here.
       const userPaneId = activeWorkspace.activePaneId;
+      const scriptCwd = resolveScriptCwd({
+        mode: config.cwdMode,
+        fixedFolder: config.cwd,
+        focusFolder: scriptFocusFolderRef.current,
+        workspaceRoot: activeWorkspace.workspaceRoot,
+        workspaceCwd: activeWorkspace.cwd,
+      });
       const userLeafId = focusedTabId(activeWorkspace.paneTree, userPaneId);
 
       // Case 1: tab already exists -- reveal it (same workspace, different
@@ -737,10 +750,15 @@ export default function App() {
           }
           if (!getScriptRunningSnapshot().get(config.tabId)) {
             const tabId = config.tabId;
+            const input = buildScriptInput(
+              config.command,
+              config.cwdMode === "context" ? scriptCwd : undefined,
+              IS_WINDOWS,
+            );
             const tryWrite = (attempts = 0) => {
               const handle = terminalHandles.current.get(tabId);
               if (handle) {
-                handle.write(config.command + "\r");
+                handle.write(input);
                 setScriptRunning(tabId, "running");
               } else if (attempts < 20) {
                 setTimeout(() => tryWrite(attempts + 1), 100);
@@ -753,12 +771,10 @@ export default function App() {
       }
 
       const freshTabId = newTabId();
-      const tabCwd =
-        config.cwd ?? activeWorkspace.workspaceRoot ?? activeWorkspace.cwd;
       const tab: Tab = {
         id: freshTabId,
         kind: "terminal",
-        cwd: tabCwd,
+        cwd: scriptCwd,
         title: config.name || undefined,
       };
 
@@ -812,7 +828,7 @@ export default function App() {
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(freshTabId);
         if (handle) {
-          handle.write(config.command + "\r");
+          handle.write(buildScriptInput(config.command, undefined, IS_WINDOWS));
           setScriptRunning(freshTabId, "running");
         } else if (attempts < 20) {
           setTimeout(() => tryWrite(attempts + 1), 100);
@@ -1085,6 +1101,7 @@ export default function App() {
   const agentWorktree = useAgentStore((s) =>
     activeTabId ? (s.sessions[activeTabId]?.meta?.worktreeCwd ?? null) : null,
   );
+  scriptFocusFolderRef.current = agentWorktree ?? contextCwdRef.current;
 
   const focusSidebar = useCallback(
     (

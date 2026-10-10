@@ -507,7 +507,10 @@ src/
     │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/TabContent,
     │                                WorkspaceDndProvider (DndContext + file/tab drag handlers).
     │                                Workspace carries: color (accent color, hex or null), scripts (array of
-    │                                Script entries with command, name, optional cwd/tabId),
+    │                                Script entries with command, name, optional tabId, `cwdMode`
+    │                                (`workspace` default | `context` | `fixed`) and `cwd` used only in `fixed` mode;
+    │                                the folder is resolved by `lib/scriptCwd.ts`, and in `context` mode an
+    │                                already-open idle script tab gets a `cd` before the command),
     │                                activeScript (selected script id), and statusId (optional foreign key
     │                                to a WorkspaceStatus id in the preferences store). See WORKSPACES.md for render
     │                                tree details.

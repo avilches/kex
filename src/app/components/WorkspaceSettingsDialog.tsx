@@ -8,6 +8,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { newScriptId } from "@/lib/ids";
 import {
   DndContext,
@@ -38,7 +45,7 @@ import {
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
-import type { Workspace, Script } from "@/modules/workspaces/lib/types";
+import type { Workspace, Script, ScriptCwdMode } from "@/modules/workspaces/lib/types";
 
 type Props = {
   workspaces: Workspace[];
@@ -505,7 +512,7 @@ const ScriptRow = forwardRef<
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: config.id,
   });
-  const [showCwd, setShowCwd] = useState(!!config.cwd);
+  const cwdMode: ScriptCwdMode = config.cwdMode ?? "workspace";
   const commandRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({
@@ -556,19 +563,37 @@ const ScriptRow = forwardRef<
           <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
         </button>
       </div>
-      <button
-        type="button"
-        className="self-start text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-        onClick={() => setShowCwd((v) => !v)}
-      >
-        {showCwd ? "Hide working dir" : "+ Working dir"}
-      </button>
-      {showCwd && (
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          Run in
+        </span>
+        <Select
+          value={cwdMode}
+          onValueChange={(v) => onUpdate({ cwdMode: v as ScriptCwdMode })}
+        >
+          <SelectTrigger size="sm" className="h-8 w-60 text-[12px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="workspace" className="text-[12px]">
+              Workspace root folder
+            </SelectItem>
+            <SelectItem value="context" className="text-[12px]">
+              Last folder from terminal or editor
+            </SelectItem>
+            <SelectItem value="fixed" className="text-[12px]">
+              Fixed folder
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {cwdMode === "fixed" && (
         <input
-          className="h-8 w-full rounded-md border border-border/60 bg-background px-3 font-mono text-sm outline-none ring-ring focus-visible:ring-1"
-          placeholder="Working dir (optional)"
+          className="h-8 w-full rounded border border-border bg-transparent px-2.5 font-mono text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          placeholder="Folder path"
+          spellCheck={false}
           defaultValue={config.cwd ?? ""}
-          onBlur={(e) => onUpdate({ cwd: e.target.value || undefined })}
+          onBlur={(e) => onUpdate({ cwd: e.target.value.trim() || undefined })}
         />
       )}
     </div>
