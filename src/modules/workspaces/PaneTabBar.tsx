@@ -442,11 +442,6 @@ function DraggableTab({
                     Remove Note
                   </ContextMenuItem>
                 )}
-                <ContextMenuSeparator />
-              </>
-            )}
-            {isAutofocusTab(tab) && (
-              <>
                 {isAutofocusTab(tab) && (
                   <ContextMenuItem
                     onSelect={() =>
@@ -471,6 +466,32 @@ function DraggableTab({
                     )}
                   </ContextMenuItem>
                 )}
+                <ContextMenuSub>
+                  <ContextMenuSubTrigger className="gap-2">
+                    <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
+                    Move to Workspace
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
+                    <ContextMenuItem onSelect={() => moveTab(workspaceId, tab.id, { kind: "new" })}>
+                      <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+                      New
+                    </ContextMenuItem>
+                    {otherTargets.length > 0 && <ContextMenuSeparator />}
+                    {otherTargets.map((t) => (
+                      <ContextMenuItem
+                        key={t.id}
+                        onSelect={() => moveTab(workspaceId, tab.id, { kind: "auto", workspaceId: t.id })}
+                      >
+                        <span
+                          aria-hidden
+                          className={cn("size-2 shrink-0 rounded-full", t.color === null && "border border-border")}
+                          style={t.color !== null ? { backgroundColor: t.color } : undefined}
+                        />
+                        <span className="truncate">{t.title}</span>
+                      </ContextMenuItem>
+                    ))}
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
                 <ContextMenuSeparator />
               </>
             )}
@@ -486,32 +507,6 @@ function DraggableTab({
                 <ContextMenuShortcut>{shortcutLabels["tab.lock"]}</ContextMenuShortcut>
               )}
             </ContextMenuItem>
-            <ContextMenuSub>
-              <ContextMenuSubTrigger className="gap-2">
-                <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
-                Move to Workspace
-              </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="max-h-[420px] overflow-y-auto">
-                <ContextMenuItem onSelect={() => moveTab(workspaceId, tab.id, { kind: "new" })}>
-                  <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-                  New
-                </ContextMenuItem>
-                {otherTargets.length > 0 && <ContextMenuSeparator />}
-                {otherTargets.map((t) => (
-                  <ContextMenuItem
-                    key={t.id}
-                    onSelect={() => moveTab(workspaceId, tab.id, { kind: "auto", workspaceId: t.id })}
-                  >
-                    <span
-                      aria-hidden
-                      className={cn("size-2 shrink-0 rounded-full", t.color === null && "border border-border")}
-                      style={t.color !== null ? { backgroundColor: t.color } : undefined}
-                    />
-                    <span className="truncate">{t.title}</span>
-                  </ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
             <ContextMenuItem disabled={isLocked} onSelect={() => onClose(tab.id)}>
               <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
               Close Tab
