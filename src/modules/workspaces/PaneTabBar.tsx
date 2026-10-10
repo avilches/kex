@@ -14,23 +14,20 @@ import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
   ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 import { PopoverAnchor } from "@/components/ui/popover";
 import { useTabRenameStore } from "./lib/tabRenameStore";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon, BrowserIcon, ComputerTerminal01Icon, CrosshairIcon, LayoutBottomIcon, LayoutRightIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
 import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
+import { NewTabMenuButton } from "./NewTabMenuButton";
 import { TabContextMenuItems } from "./TabContextMenuItems";
 import { TabRenamePopover } from "./TabRenamePopover";
 
@@ -94,13 +91,6 @@ function DraggableTab({
   onClose,
   onCloseOtherTabs,
   onCloseAllTabs,
-  onNewTerminal,
-  onSplitTerminalRight,
-  onSplitTerminalDown,
-  onNewBrowser,
-  onSplitBrowserRight,
-  onSplitBrowserDown,
-  shortcutLabels,
   onRenameTab,
   onUpdateTab,
   onNoteHover,
@@ -120,13 +110,6 @@ function DraggableTab({
   onClose: (id: string) => void;
   onCloseOtherTabs: (tabId: string) => void;
   onCloseAllTabs: () => void;
-  onNewTerminal: () => void;
-  onSplitTerminalRight: () => void;
-  onSplitTerminalDown: () => void;
-  onNewBrowser: () => void;
-  onSplitBrowserRight: () => void;
-  onSplitBrowserDown: () => void;
-  shortcutLabels: Record<string, string | null>;
   onRenameTab?: (tabId: string, title: string | undefined) => void;
   onUpdateTab?: (tabId: string, updater: (p: Tab) => Tab) => void;
   onNoteHover?: (tabId: string, hovering: boolean) => void;
@@ -380,44 +363,6 @@ function DraggableTab({
             onRenameTab={onRenameTab}
             onUpdateTab={onUpdateTab}
           />
-          <ContextMenuSeparator />
-            <ContextMenuItem onSelect={onNewTerminal}>
-              <HugeiconsIcon icon={ComputerTerminal01Icon} size={14} strokeWidth={2} />
-              New Terminal Tab
-              {shortcutLabels["tab.new"] && (
-                <ContextMenuShortcut>{shortcutLabels["tab.new"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={onSplitTerminalRight}>
-              <HugeiconsIcon icon={LayoutRightIcon} size={14} strokeWidth={2} />
-              New Terminal Split Right
-              {shortcutLabels["pane.splitRight"] && (
-                <ContextMenuShortcut>{shortcutLabels["pane.splitRight"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={onSplitTerminalDown}>
-              <HugeiconsIcon icon={LayoutBottomIcon} size={14} strokeWidth={2} />
-              New Terminal Split Down
-              {shortcutLabels["pane.splitDown"] && (
-                <ContextMenuShortcut>{shortcutLabels["pane.splitDown"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onSelect={onNewBrowser}>
-              <HugeiconsIcon icon={BrowserIcon} size={14} strokeWidth={2} />
-              New Browser Tab
-              {shortcutLabels["tab.newBrowser"] && (
-                <ContextMenuShortcut>{shortcutLabels["tab.newBrowser"]}</ContextMenuShortcut>
-              )}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={onSplitBrowserRight}>
-              <HugeiconsIcon icon={LayoutRightIcon} size={14} strokeWidth={2} />
-              New Browser Split Right
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={onSplitBrowserDown}>
-              <HugeiconsIcon icon={LayoutBottomIcon} size={14} strokeWidth={2} />
-              New Browser Split Down
-            </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
     </TabRenamePopover>
@@ -427,16 +372,6 @@ function DraggableTab({
 export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWorkspaceActive, onActivate, onClose, onNewTerminal, onCloseOtherTabs, onCloseAllTabs, onSplitTerminalRight, onSplitTerminalDown, onNewBrowser, onSplitBrowserRight, onSplitBrowserDown, onRenameTab, onUpdateTab, onNoteHover, gitStatus, gitColorScheme }: Props) {
   const gitStatusMap = useMemo(() => gitStatus ? buildGitStatusMap(gitStatus) : null, [gitStatus]);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
-  const userShortcuts = usePreferencesStore((s) => s.shortcuts);
-  const shortcutLabels: Record<string, string | null> = useMemo(
-    () => ({
-      "tab.new":         getShortcutLabel("tab.new",         userShortcuts),
-      "pane.splitRight": getShortcutLabel("pane.splitRight", userShortcuts),
-      "pane.splitDown":  getShortcutLabel("pane.splitDown",  userShortcuts),
-      "tab.newBrowser":  getShortcutLabel("tab.newBrowser",  userShortcuts),
-    }),
-    [userShortcuts],
-  );
   const [insertionIndex, setInsertionIndex] = useState<number | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -611,13 +546,6 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           onClose={onClose}
           onCloseOtherTabs={onCloseOtherTabs}
           onCloseAllTabs={onCloseAllTabs}
-          onNewTerminal={onNewTerminal}
-          onSplitTerminalRight={onSplitTerminalRight}
-          onSplitTerminalDown={onSplitTerminalDown}
-          onNewBrowser={onNewBrowser}
-          onSplitBrowserRight={onSplitBrowserRight}
-          onSplitBrowserDown={onSplitBrowserDown}
-          shortcutLabels={shortcutLabels}
           onRenameTab={onRenameTab}
           onUpdateTab={onUpdateTab}
           onNoteHover={onNoteHover}
@@ -632,14 +560,14 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           tabBarStyle === "connected" && "border-b border-border/40",
         )}
       >
-        <button
-          type="button"
-          onClick={onNewTerminal}
-          className="ml-1 shrink-0 px-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          title="New terminal in this pane"
-        >
-          +
-        </button>
+        <NewTabMenuButton
+          onNewTerminal={onNewTerminal}
+          onSplitTerminalRight={onSplitTerminalRight}
+          onSplitTerminalDown={onSplitTerminalDown}
+          onNewBrowser={onNewBrowser}
+          onSplitBrowserRight={onSplitBrowserRight}
+          onSplitBrowserDown={onSplitBrowserDown}
+        />
       </div>
     </div>
   );
