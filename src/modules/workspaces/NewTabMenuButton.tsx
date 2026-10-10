@@ -94,7 +94,7 @@ export function NewTabMenuButton({
         </button>
       </span>
       <DropdownMenuContent
-        className="min-w-56"
+        className="w-max min-w-56"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DropdownMenuItem onSelect={onNewTerminal}>
