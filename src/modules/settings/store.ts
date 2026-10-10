@@ -11,8 +11,8 @@ import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import {
-  isWorkspaceDetailMode,
-  type WorkspaceDetailMode,
+  isTerminalDetail,
+  type TerminalDetail,
 } from "@/modules/workspaces/lib/workspaceDetail";
 
 export type ThemePref = "system" | "light" | "dark";
@@ -200,7 +200,11 @@ export type Preferences = {
   customEditors: CustomEditor[];
   detectedEditors: DetectedEditor[];
   randomWorkspaceColor: boolean;
-  workspaceDetail: WorkspaceDetailMode;
+  workspaceDetailEnabled: boolean;
+  workspaceDetailTerminals: TerminalDetail;
+  workspaceDetailEditors: boolean;
+  workspaceDetailBrowsers: boolean;
+  workspaceDetailGit: boolean;
   uiFont: string;
 };
 
@@ -230,7 +234,11 @@ const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
 const KEY_RANDOM_WORKSPACE_COLOR = "randomWorkspaceColor";
-const KEY_WORKSPACE_DETAIL = "workspaceDetail";
+const KEY_WORKSPACE_DETAIL_ENABLED = "workspaceDetailEnabled";
+const KEY_WORKSPACE_DETAIL_TERMINALS = "workspaceDetailTerminals";
+const KEY_WORKSPACE_DETAIL_EDITORS = "workspaceDetailEditors";
+const KEY_WORKSPACE_DETAIL_BROWSERS = "workspaceDetailBrowsers";
+const KEY_WORKSPACE_DETAIL_GIT = "workspaceDetailGit";
 
 // Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
@@ -438,7 +446,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
   customEditors: [],
   detectedEditors: [],
   randomWorkspaceColor: true,
-  workspaceDetail: "none",
+  workspaceDetailEnabled: false,
+  workspaceDetailTerminals: "agents",
+  workspaceDetailEditors: false,
+  workspaceDetailBrowsers: false,
+  workspaceDetailGit: false,
   uiFont: "",
 };
 
@@ -733,10 +745,22 @@ export async function loadPreferences(): Promise<Preferences> {
     randomWorkspaceColor:
       getGeneral<boolean>(KEY_RANDOM_WORKSPACE_COLOR) ??
       DEFAULT_PREFERENCES.randomWorkspaceColor,
-    workspaceDetail: (() => {
-      const v = getGeneral<string>(KEY_WORKSPACE_DETAIL);
-      return isWorkspaceDetailMode(v) ? v : DEFAULT_PREFERENCES.workspaceDetail;
+    workspaceDetailEnabled:
+      getGeneral<boolean>(KEY_WORKSPACE_DETAIL_ENABLED) ??
+      DEFAULT_PREFERENCES.workspaceDetailEnabled,
+    workspaceDetailTerminals: (() => {
+      const v = getGeneral<string>(KEY_WORKSPACE_DETAIL_TERMINALS);
+      return isTerminalDetail(v) ? v : DEFAULT_PREFERENCES.workspaceDetailTerminals;
     })(),
+    workspaceDetailEditors:
+      getGeneral<boolean>(KEY_WORKSPACE_DETAIL_EDITORS) ??
+      DEFAULT_PREFERENCES.workspaceDetailEditors,
+    workspaceDetailBrowsers:
+      getGeneral<boolean>(KEY_WORKSPACE_DETAIL_BROWSERS) ??
+      DEFAULT_PREFERENCES.workspaceDetailBrowsers,
+    workspaceDetailGit:
+      getGeneral<boolean>(KEY_WORKSPACE_DETAIL_GIT) ??
+      DEFAULT_PREFERENCES.workspaceDetailGit,
     uiFont: getGeneral<string>(KEY_UI_FONT) ?? DEFAULT_PREFERENCES.uiFont,
   };
 
@@ -1056,10 +1080,26 @@ export async function setRandomWorkspaceColor(value: boolean): Promise<void> {
   await writePref(KEY_RANDOM_WORKSPACE_COLOR, value);
 }
 
-export async function setWorkspaceDetail(
-  value: WorkspaceDetailMode,
+export async function setWorkspaceDetailEnabled(value: boolean): Promise<void> {
+  await writePref(KEY_WORKSPACE_DETAIL_ENABLED, value);
+}
+
+export async function setWorkspaceDetailTerminals(
+  value: TerminalDetail,
 ): Promise<void> {
-  await writePref(KEY_WORKSPACE_DETAIL, value);
+  await writePref(KEY_WORKSPACE_DETAIL_TERMINALS, value);
+}
+
+export async function setWorkspaceDetailEditors(value: boolean): Promise<void> {
+  await writePref(KEY_WORKSPACE_DETAIL_EDITORS, value);
+}
+
+export async function setWorkspaceDetailBrowsers(value: boolean): Promise<void> {
+  await writePref(KEY_WORKSPACE_DETAIL_BROWSERS, value);
+}
+
+export async function setWorkspaceDetailGit(value: boolean): Promise<void> {
+  await writePref(KEY_WORKSPACE_DETAIL_GIT, value);
 }
 
 export async function setZoomLevel(value: number): Promise<void> {
@@ -1195,7 +1235,11 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
-  [KEY_WORKSPACE_DETAIL]: "workspaceDetail",
+  [KEY_WORKSPACE_DETAIL_ENABLED]: "workspaceDetailEnabled",
+  [KEY_WORKSPACE_DETAIL_TERMINALS]: "workspaceDetailTerminals",
+  [KEY_WORKSPACE_DETAIL_EDITORS]: "workspaceDetailEditors",
+  [KEY_WORKSPACE_DETAIL_BROWSERS]: "workspaceDetailBrowsers",
+  [KEY_WORKSPACE_DETAIL_GIT]: "workspaceDetailGit",
   [KEY_UI_FONT]: "uiFont",
 };
 

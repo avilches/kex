@@ -1,12 +1,13 @@
 import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentEntry } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import {
+  type DetailFilter,
   type DetailRow,
-  type WorkspaceDetailMode,
   workspaceDetailRows,
 } from "@/modules/workspaces/lib/workspaceDetail";
 
@@ -30,21 +31,37 @@ function StatusMark({ visual }: { visual: DetailRow["visual"] }) {
 function DetailTabRow({
   tab,
   visual,
+  focused,
+  iconSlot,
   onActivate,
 }: {
   tab: Tab;
   visual: DetailRow["visual"];
+  focused: boolean;
+  iconSlot: boolean;
   onActivate: (tabId: string) => void;
 }) {
   const info = useAgentTabTitle(tab);
   const title = info?.displayTitle ?? tab.id;
+  const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
   return (
     <button
       type="button"
       title={title}
+      aria-current={focused || undefined}
       onClick={() => onActivate(tab.id)}
-      className="flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] text-muted-foreground transition-colors select-none hover:bg-foreground/[0.08] hover:text-foreground"
+      className={cn(
+        "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
+        focused
+          ? "bg-foreground/[0.16] font-medium text-foreground"
+          : "text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground",
+      )}
     >
+      {agent ? (
+        <AgentIcon agent={agent} size={12} className="shrink-0" />
+      ) : iconSlot ? (
+        <span className="size-3 shrink-0" />
+      ) : null}
       <span className="min-w-0 flex-1 truncate">{title}</span>
       <StatusMark visual={visual} />
     </button>
@@ -54,21 +71,24 @@ function DetailTabRow({
 export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   tabs,
   entries,
-  mode,
+  filter,
+  focusedTabId,
   onActivate,
 }: {
   tabs: Tab[];
   entries: AgentEntry[] | undefined;
-  mode: WorkspaceDetailMode;
+  filter: DetailFilter;
+  focusedTabId: string | null;
   onActivate: (tabId: string) => void;
 }) {
   const sessions = useAgentStore((s) => s.sessions);
-  const rows = useMemo(() => {
+  const { rows, iconSlot } = useMemo(() => {
     const agentTabIds = new Set(
       tabs.filter((t) => t.kind === "terminal" && sessions[t.id]).map((t) => t.id),
     );
-    return workspaceDetailRows(tabs, agentTabIds, entries ?? [], mode);
-  }, [tabs, sessions, entries, mode]);
+    const rows = workspaceDetailRows(tabs, agentTabIds, entries ?? [], filter);
+    return { rows, iconSlot: rows.some((r) => agentTabIds.has(r.tabId)) };
+  }, [tabs, sessions, entries, filter]);
   const tabsById = useMemo(() => new Map(tabs.map((t) => [t.id, t])), [tabs]);
 
   if (rows.length === 0) return null;
@@ -82,6 +102,8 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
             key={row.tabId}
             tab={tab}
             visual={row.visual}
+            focused={row.tabId === focusedTabId}
+            iconSlot={iconSlot}
             onActivate={onActivate}
           />
         ) : null;
