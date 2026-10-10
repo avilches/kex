@@ -1,10 +1,14 @@
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type { ExplorerRootMode };
 
+export type ScriptCwdMode = "workspace" | "context" | "fixed";
+
 export type Script = {
   id: string;
   name: string;
   command: string;
+  cwdMode?: ScriptCwdMode;
+  /** Only used when cwdMode is "fixed". */
   cwd?: string;
   tabId?: string;
 };
