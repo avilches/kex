@@ -571,7 +571,11 @@ const ScriptRow = forwardRef<
           value={cwdMode}
           onValueChange={(v) => onUpdate({ cwdMode: v as ScriptCwdMode })}
         >
-          <SelectTrigger size="sm" className="h-8 w-60 text-[12px]">
+          <SelectTrigger
+            size="sm"
+            aria-label="Run in"
+            className="h-8 w-60 text-[12px]"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -590,7 +594,8 @@ const ScriptRow = forwardRef<
       {cwdMode === "fixed" && (
         <input
           className="h-8 w-full rounded border border-border bg-transparent px-2.5 font-mono text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          placeholder="Folder path"
+          aria-label="Fixed folder path"
+          placeholder="Absolute path"
           spellCheck={false}
           defaultValue={config.cwd ?? ""}
           onBlur={(e) => onUpdate({ cwd: e.target.value.trim() || undefined })}
