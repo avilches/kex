@@ -49,8 +49,17 @@ export async function loadRestorePlans(): Promise<void> {
   }
 }
 
-type StagedSnapshot = { title: string | null; notification: NotificationKind | null };
+type StagedSnapshot = {
+  title: string | null;
+  notification: NotificationKind | null;
+  stagedAt: number;
+};
 const stagedSnapshots = new Map<string, StagedSnapshot>();
+
+// The resumed agent registers within seconds of the command being typed. A session that
+// shows up much later (the resume failed and the user launched an agent by hand) is a
+// different one and must not inherit the old name and notification.
+export const STAGED_SNAPSHOT_TTL_MS = 90_000;
 
 function isNotificationKind(v: string | null | undefined): v is NotificationKind {
   return v === "attention" || v === "finished" || v === "error";
@@ -62,7 +71,13 @@ function isNotificationKind(v: string | null | undefined): v is NotificationKind
 export function stageRestoredSnapshot(plan: RestorePlan): void {
   const title = plan.title || null;
   const notification = isNotificationKind(plan.notification) ? plan.notification : null;
-  if (title || notification) stagedSnapshots.set(plan.tabId, { title, notification });
+  const now = Date.now();
+  for (const [tabId, staged] of stagedSnapshots) {
+    if (now - staged.stagedAt > STAGED_SNAPSHOT_TTL_MS) stagedSnapshots.delete(tabId);
+  }
+  if (title || notification) {
+    stagedSnapshots.set(plan.tabId, { title, notification, stagedAt: now });
+  }
 }
 
 // Puts the staged name and notification back, silently: no toast and no OS notification,
@@ -71,6 +86,7 @@ export function applyStagedSnapshot(tabId: string): void {
   const staged = stagedSnapshots.get(tabId);
   if (!staged) return;
   stagedSnapshots.delete(tabId);
+  if (Date.now() - staged.stagedAt > STAGED_SNAPSHOT_TTL_MS) return;
   const store = useAgentStore.getState();
   const session = store.sessions[tabId];
   if (staged.title) setOscTitle(tabId, staged.title);

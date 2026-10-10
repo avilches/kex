@@ -7,6 +7,7 @@ import {
   consumeRestorePlan,
   seedRestorePlan,
   stageRestoredSnapshot,
+  STAGED_SNAPSHOT_TTL_MS,
   type RestorePlan,
 } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
@@ -96,5 +97,40 @@ describe("staged restore snapshot", () => {
     applyStagedSnapshot("t3");
     applyStagedSnapshot("t3");
     expect(getOscTitle("t3")).toBe("once");
+  });
+
+  it("drops a staged snapshot the agent never claimed in time, so a later manual agent starts clean", () => {
+    vi.useFakeTimers();
+    try {
+      stageRestoredSnapshot(makePlan({ tabId: "t4", title: "old", notification: "attention" }));
+      vi.advanceTimersByTime(STAGED_SNAPSHOT_TTL_MS + 1);
+      useAgentStore.getState().start("t4", "ws", "claude");
+
+      applyStagedSnapshot("t4");
+
+      expect(getOscTitle("t4")).toBeUndefined();
+      expect(useAgentStore.getState().notifications).toHaveLength(0);
+      expect(useAgentStore.getState().sessions.t4.status).toBe("working");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("prunes expired entries when another tab is staged", () => {
+    vi.useFakeTimers();
+    try {
+      stageRestoredSnapshot(makePlan({ tabId: "t5", title: "stale" }));
+      vi.advanceTimersByTime(STAGED_SNAPSHOT_TTL_MS + 1);
+      stageRestoredSnapshot(makePlan({ tabId: "t6", title: "fresh" }));
+      vi.advanceTimersByTime(1000);
+
+      applyStagedSnapshot("t5");
+      applyStagedSnapshot("t6");
+
+      expect(getOscTitle("t5")).toBeUndefined();
+      expect(getOscTitle("t6")).toBe("fresh");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -277,7 +277,7 @@ On restore, `useTerminalSession` calls `stageRestoredSnapshot(plan)` when it inj
 applied by `applyStagedSnapshot` when the resumed agent registers its session (`ensureSession`/`ensureSessionIdle` in
 the bridge), not earlier: a shell that sets its own terminal title would overwrite the name, and the notification
 needs a session to attach to. It sets the OSC title, pushes the bell entry and, for `attention`, raises the amber dot,
-all silently (no toast, no OS notification). If the user is already looking at that tab the bridge marks it seen.
+all silently (no toast, no OS notification). A staged snapshot expires after 90 seconds (`STAGED_SNAPSHOT_TTL_MS`): if the resume failed and the user starts an agent by hand in that tab much later, it must not inherit the old name and notification. If the user is already looking at that tab the bridge marks it seen.
 
 ### Reopening a closed terminal tab
 
