@@ -128,7 +128,7 @@ If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcri
 `title` and `notification` are optional too. `title` is the name the tab showed (the title the agent sent over OSC,
 else the session title); `notification` is the kind (`attention`, `finished` or `error`) of the notification the tab
 still had unread. Neither comes from the hooks: the frontend reports them through `agent_session_set_snapshot`
-(see *Name and notification* below). A later `SessionStart` rewrites the record but keeps both. An empty title
+(see *Name and notification* below). A later `SessionStart` rewrites the record but keeps both when the session id is the same (a resume keeps it; `/clear` or an agent launched by hand brings a new one and starts clean). An empty title
 never overwrites the stored one, because titles go empty while the app closes.
 
 Initialized via `session_store::init(data_dir)` in `lib.rs` `setup()` using a `OnceLock<PathBuf>`.
@@ -268,7 +268,7 @@ silently lost (see `WORKSPACES_GOTCHAS.md`, Bug 14). The same wait applies to a 
 
 A restored tab used to lose the name the agent had given it (the agent only resends it when the tab gets focus) and
 whether it had a notification waiting. `startAgentSnapshotSync` (`agentSnapshotSync.ts`, mounted by
-`AgentNotificationsBridge`) watches `agentStore` and the OSC title store and, 1.5s after the last change, sends
+`AgentNotificationsBridge`) watches `agentStore` and the OSC title store and, 1.5s after the first change of a burst, sends
 every agent tab whose snapshot changed (`changedSnapshots` in `agentSnapshot.ts`, pure) to
 `agent_session_set_snapshot`. The notification is the kind of the tab's unread bell entry, else `attention` if
 the session carries the amber dot, else empty (which clears it).
@@ -277,7 +277,7 @@ On restore, `useTerminalSession` calls `stageRestoredSnapshot(plan)` when it inj
 applied by `applyStagedSnapshot` when the resumed agent registers its session (`ensureSession`/`ensureSessionIdle` in
 the bridge), not earlier: a shell that sets its own terminal title would overwrite the name, and the notification
 needs a session to attach to. It sets the OSC title, pushes the bell entry and, for `attention`, raises the amber dot,
-all silently (no toast, no OS notification). If the user is already looking at that tab the bridge marks it seen.
+all silently (no toast, no OS notification). A staged snapshot expires after 90 seconds (`STAGED_SNAPSHOT_TTL_MS`): if the resume failed and the user starts an agent by hand in that tab much later, it must not inherit the old name and notification. If the user is already looking at that tab the bridge marks it seen.
 
 ### Reopening a closed terminal tab
 

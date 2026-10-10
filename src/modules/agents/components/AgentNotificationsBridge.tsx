@@ -114,7 +114,7 @@ function route(
 
 // A restored notification for the tab the user is already looking at is moot.
 function restoreStaged(tabId: string, ctx: Ctx): void {
-  applyStagedSnapshot(tabId);
+  if (!applyStagedSnapshot(tabId)) return;
   const session = useAgentStore.getState().sessions[tabId];
   if (session && isTabSeen(ctx, session.workspaceId, tabId)) {
     useAgentStore.getState().markTabSeen(tabId);
@@ -123,7 +123,10 @@ function restoreStaged(tabId: string, ctx: Ctx): void {
 
 function ensureSession(tabId: string, ctx: Ctx, agent: string): boolean {
   const store = useAgentStore.getState();
-  if (isRunningAgentSession(store.sessions[tabId])) return true;
+  if (isRunningAgentSession(store.sessions[tabId])) {
+    restoreStaged(tabId, ctx);
+    return true;
+  }
   const info = tabInfo(ctx.workspaces, tabId);
   if (!info) return false;
   store.start(tabId, info.workspaceId, agent);
@@ -133,7 +136,10 @@ function ensureSession(tabId: string, ctx: Ctx, agent: string): boolean {
 
 function ensureSessionIdle(tabId: string, ctx: Ctx, agent: string): boolean {
   const store = useAgentStore.getState();
-  if (isRunningAgentSession(store.sessions[tabId])) return true;
+  if (isRunningAgentSession(store.sessions[tabId])) {
+    restoreStaged(tabId, ctx);
+    return true;
+  }
   const info = tabInfo(ctx.workspaces, tabId);
   if (!info) return false;
   store.startIdle(tabId, info.workspaceId, agent);
