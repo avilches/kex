@@ -4,7 +4,11 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { tabLocations } from "@/modules/workspaces/lib/tabLocations";
-import { blockedWhileHibernated } from "@/modules/workspaces/lib/hibernate";
+import {
+  blockedWhileHibernated,
+  enableRunOnStart,
+} from "@/modules/workspaces/lib/hibernate";
+import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -122,6 +126,7 @@ import {
   useState,
 } from "react";
 import { CloseDialogs } from "./components/CloseDialogs";
+import { HibernateDialog } from "./components/HibernateDialog";
 import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
@@ -222,6 +227,7 @@ export default function App() {
     splitPaneAndPlace,
     splitPaneAndOpenTab,
     openTab,
+    hibernateWorkspace,
     wakeWorkspace,
     activateTab,
     revealTab,
@@ -1914,6 +1920,20 @@ export default function App() {
   const flushDirtyEditorsRef = useRef(flushDirtyEditors);
   flushDirtyEditorsRef.current = flushDirtyEditors;
 
+  const hibernateFlow = useHibernateFlow({
+    workspacesRef,
+    hibernateWorkspace,
+    flushDirtyEditors,
+    destroyWorkspaceFloats,
+  });
+  const { requestHibernate, performHibernate } = hibernateFlow;
+  const pendingHibernateRef = useRef<string | null>(null);
+  pendingHibernateRef.current = hibernateFlow.pendingWorkspaceId;
+  const handleHibernateFromDialog = useCallback(() => {
+    const id = pendingHibernateRef.current;
+    if (id) void performHibernate(id);
+  }, [performHibernate]);
+
   useEffect(() => {
     setEditorFlush(() => flushDirtyEditorsRef.current());
     return () => setEditorFlush(null);
@@ -2637,6 +2657,9 @@ export default function App() {
           }
         }
       },
+      "workspace.hibernate": () => {
+        if (activeWorkspace) void requestHibernate(activeWorkspace.id);
+      },
       "workspace.run": () => {
         if (!activeWorkspace) return;
         const configs = activeWorkspace.scripts ?? [];
@@ -2909,6 +2932,7 @@ export default function App() {
       toggleSplitPreview,
       runWorkspaceConfig,
       stopWorkspaceConfig,
+      requestHibernate,
     ],
   );
 
@@ -3476,6 +3500,25 @@ export default function App() {
             onRemoveScript={removeScript}
             onReorderScripts={reorderScripts}
             onRestoreFocus={restoreLeafFocus}
+          />
+
+          <HibernateDialog
+            workspace={
+              workspaces.find((w) => w.id === hibernateFlow.pendingWorkspaceId) ??
+              null
+            }
+            onClose={hibernateFlow.cancel}
+            onHibernate={handleHibernateFromDialog}
+            onSaveTab={async (tabId) => {
+              await saveTab(tabId);
+            }}
+            onSaveAll={async (tabIds) => {
+              await Promise.all(tabIds.map((id) => saveTab(id).catch(() => {})));
+            }}
+            onEnableRunOnStart={(tabId, running) => {
+              const id = hibernateFlow.pendingWorkspaceId;
+              if (id) updateTabData(id, tabId, (t) => enableRunOnStart(t, running));
+            }}
           />
 
           <CloseDialogs

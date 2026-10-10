@@ -212,6 +212,28 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
   blocks the shortcuts that need tabs (`blockedWhileHibernated`), `runWorkspaceConfig` does nothing,
   `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is empty.
 
+#### Hibernate and wake flow
+
+The shortcut `workspace.hibernate` (Cmd+Alt+Z, never blocked while hibernated) calls
+`requestHibernate` from `useHibernateFlow` (`lib/useHibernateFlow.ts`; the framework-free
+`createHibernateFlow` holds the logic so it is testable without React):
+
+1. With autosave on, `flushDirtyEditors` runs and two animation frames pass so the dirty flags
+   reach the workspace state.
+2. `hibernateReview` (`lib/hibernateReview.ts`) lists what would be lost: agents still working,
+   unsaved documents and running commands without "Run on start". If the review is empty the
+   workspace hibernates immediately; otherwise `pendingWorkspaceId` opens `HibernateDialog`.
+3. `performHibernate` clears the pending id, marks the terminal tabs with `markHibernating`
+   (so the exit of their PTYs is not reported as an agent failure), calls `finish` on each agent
+   session, destroys the floating browsers and finally calls `hibernateWorkspace`. A set of
+   in-flight workspace ids makes a double trigger hibernate once.
+
+`HibernateDialog` is reactive: it recomputes the review from the agent store and the running
+commands store, so a row disappears when its agent finishes or when "Run on start" is enabled
+(`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are
+empty. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
+is described above (`wakeWorkspace`).
+
 ---
 
 ## Renderer slot pool (`rendererPool.ts`)
