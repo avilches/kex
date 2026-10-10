@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { warn } from "@tauri-apps/plugin-log";
 import { toast } from "sonner";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { setOscTitle } from "@/modules/terminal/lib/oscTitleStore";
+import type { NotificationKind } from "@/modules/agents/lib/types";
 import {
   RESUME_CHECK_MS,
   describeSilentResume,
@@ -14,6 +16,8 @@ export type RestorePlan = {
   resumeCmd: string;
   cwdLaunch: string;
   errorReason: string;
+  title?: string | null;
+  notification?: string | null;
 };
 
 let restorePlans: Map<string, RestorePlan> | null = null;
@@ -43,6 +47,42 @@ export async function loadRestorePlans(): Promise<void> {
   } finally {
     readyResolve();
   }
+}
+
+type StagedSnapshot = { title: string | null; notification: NotificationKind | null };
+const stagedSnapshots = new Map<string, StagedSnapshot>();
+
+function isNotificationKind(v: string | null | undefined): v is NotificationKind {
+  return v === "attention" || v === "finished" || v === "error";
+}
+
+// The name and notification the tab had when Kex closed. They are applied when the
+// resumed agent registers its session, not before: a shell prompt that sets its own
+// terminal title would overwrite the name, and the notification needs a session to attach to.
+export function stageRestoredSnapshot(plan: RestorePlan): void {
+  const title = plan.title || null;
+  const notification = isNotificationKind(plan.notification) ? plan.notification : null;
+  if (title || notification) stagedSnapshots.set(plan.tabId, { title, notification });
+}
+
+// Puts the staged name and notification back, silently: no toast and no OS notification,
+// since the user already knew about it before restarting.
+export function applyStagedSnapshot(tabId: string): void {
+  const staged = stagedSnapshots.get(tabId);
+  if (!staged) return;
+  stagedSnapshots.delete(tabId);
+  const store = useAgentStore.getState();
+  const session = store.sessions[tabId];
+  if (staged.title) setOscTitle(tabId, staged.title);
+  if (!staged.notification || !session) return;
+  store.pushNotification({
+    source: "terminal",
+    tabId,
+    workspaceId: session.workspaceId,
+    agent: session.agent,
+    kind: staged.notification,
+  });
+  if (staged.notification === "attention") store.setStatus(tabId, "attention");
 }
 
 // Injects a plan fetched on demand (e.g. via previewResumeCmd for a reopened closed

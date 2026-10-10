@@ -914,6 +914,7 @@ pub fn run() {
             agent::agent_disable_claude_hooks,
             agent::agent_claude_hooks_status,
             agent::agent_detach_session,
+            agent::agent_session_set_snapshot,
             agent::pending_nav::agent_queue_nav,
             agent_session_restore_plan,
             agent_session_preview_cmd,

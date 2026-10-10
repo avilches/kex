@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { consumeRestorePlan, restorePlansReady, watchResume } from "@/modules/agents/lib/agentSessionRestore";
+import { consumeRestorePlan, restorePlansReady, stageRestoredSnapshot, watchResume } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -901,6 +901,7 @@ function attachSession(
           if (!runOnStart) return;
           if (plan) {
             if (plan.resumeCmd) {
+              stageRestoredSnapshot(plan);
               void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
               watchResume(plan);
             } else if (plan.errorReason) {

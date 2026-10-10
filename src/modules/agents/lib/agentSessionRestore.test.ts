@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
-import { seedRestorePlan, consumeRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import {
+  applyStagedSnapshot,
+  consumeRestorePlan,
+  seedRestorePlan,
+  stageRestoredSnapshot,
+  type RestorePlan,
+} from "@/modules/agents/lib/agentSessionRestore";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { _clearAll, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 
 function makePlan(overrides: Partial<RestorePlan> = {}): RestorePlan {
   return {
@@ -45,5 +53,48 @@ describe("seedRestorePlan", () => {
     const consumed = consumeRestorePlan("tab-error");
     expect(consumed?.resumeCmd).toBe("");
     expect(consumed?.errorReason).toBe("launch directory no longer exists");
+  });
+});
+
+describe("staged restore snapshot", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [], closedSessions: {} });
+    _clearAll();
+  });
+
+  it("puts the name back and raises the attention dot and bell entry without a new signal", () => {
+    stageRestoredSnapshot(makePlan({ tabId: "t1", title: "fixing the build", notification: "attention" }));
+    useAgentStore.getState().startIdle("t1", "ws", "claude");
+
+    applyStagedSnapshot("t1");
+
+    const s = useAgentStore.getState();
+    expect(getOscTitle("t1")).toBe("fixing the build");
+    expect(s.sessions.t1.status).toBe("attention");
+    expect(s.notifications).toHaveLength(1);
+    expect(s.notifications[0]).toMatchObject({ tabId: "t1", kind: "attention", read: false });
+  });
+
+  it("a finished notification adds the bell entry but leaves the session idle", () => {
+    stageRestoredSnapshot(makePlan({ tabId: "t2", notification: "finished" }));
+    useAgentStore.getState().startIdle("t2", "ws", "claude");
+
+    applyStagedSnapshot("t2");
+
+    const s = useAgentStore.getState();
+    expect(s.sessions.t2.status).toBe("idle");
+    expect(s.notifications[0].kind).toBe("finished");
+  });
+
+  it("applies once and ignores plans with nothing to restore or an unknown kind", () => {
+    stageRestoredSnapshot(makePlan({ tabId: "t3", notification: "bogus", title: null }));
+    useAgentStore.getState().startIdle("t3", "ws", "claude");
+    applyStagedSnapshot("t3");
+    expect(useAgentStore.getState().notifications).toHaveLength(0);
+
+    stageRestoredSnapshot(makePlan({ tabId: "t3", title: "once" }));
+    applyStagedSnapshot("t3");
+    applyStagedSnapshot("t3");
+    expect(getOscTitle("t3")).toBe("once");
   });
 });
