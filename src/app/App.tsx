@@ -174,8 +174,10 @@ import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
   buildScriptInput,
+  isSafeScriptCwd,
   planReusedTabInput,
   resolveScriptCwd,
+  scriptShellFor,
   type ScriptShell,
 } from "@/modules/workspaces/lib/scriptCwd";
 import { IS_WINDOWS } from "@/lib/platform";
@@ -721,10 +723,10 @@ export default function App() {
       // The user's own leaf, captured up front so a same-workspace script run
       // reveals its tab without moving activePaneId or focus away from here.
       const userPaneId = activeWorkspace.activePaneId;
-      const scriptShell: ScriptShell =
-        IS_WINDOWS && useWorkspaceEnvStore.getState().env.kind !== "wsl"
-          ? "powershell"
-          : "posix";
+      const scriptShell: ScriptShell = scriptShellFor(
+        IS_WINDOWS,
+        useWorkspaceEnvStore.getState().env.kind,
+      );
       const scriptCwd = resolveScriptCwd({
         mode: config.cwdMode,
         fixedFolder: config.cwd,
@@ -732,6 +734,12 @@ export default function App() {
         workspaceRoot: activeWorkspace.workspaceRoot,
         workspaceCwd: activeWorkspace.cwd,
       });
+      if (scriptCwd && !isSafeScriptCwd(scriptCwd)) {
+        toast.error("Script not run: the folder name has control characters", {
+          duration: 4000,
+        });
+        return;
+      }
       const userLeafId = focusedTabId(activeWorkspace.paneTree, userPaneId);
 
       // Case 1: tab already exists -- reveal it (same workspace, different
@@ -762,13 +770,15 @@ export default function App() {
             scriptShell,
           );
           if (input !== null) {
+            setScriptRunning(tabId, "running");
             const tryWrite = (attempts = 0) => {
               const handle = terminalHandles.current.get(tabId);
               if (handle) {
                 handle.write(input);
-                setScriptRunning(tabId, "running");
               } else if (attempts < 20) {
                 setTimeout(() => tryWrite(attempts + 1), 100);
+              } else {
+                setScriptRunning(tabId, false);
               }
             };
             setTimeout(tryWrite, 50);
@@ -832,13 +842,15 @@ export default function App() {
 
       updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
 
+      setScriptRunning(freshTabId, "running");
       const tryWrite = (attempts = 0) => {
         const handle = terminalHandles.current.get(freshTabId);
         if (handle) {
           handle.write(buildScriptInput(config.command, undefined, scriptShell));
-          setScriptRunning(freshTabId, "running");
         } else if (attempts < 20) {
           setTimeout(() => tryWrite(attempts + 1), 100);
+        } else {
+          setScriptRunning(freshTabId, false);
         }
       };
       setTimeout(tryWrite, 150);
