@@ -43,6 +43,8 @@ export function scriptShellFor(
   return isWindows && envKind !== "wsl" ? "powershell" : "posix";
 }
 
+// The blank line before "}" keeps a command ending in "\" (or a PowerShell
+// backtick) from joining its line break with the closing brace.
 // Limitations: cmd.exe is not told apart from PowerShell (a Windows workspace
 // is assumed to run PowerShell), and fish before 4.1 has no `{ }` group, so
 // there the typed line is a syntax error and nothing runs.
@@ -57,9 +59,9 @@ export function buildScriptInput(
   }
   if (shell === "powershell") {
     const literal = `'${cwd.replace(POWERSHELL_QUOTES, (q) => q + q)}'`;
-    return `Set-Location -LiteralPath ${literal}; if ($?) { ${command}\n}\r`;
+    return `Set-Location -LiteralPath ${literal}; if ($?) { ${command}\n\n}\r`;
   }
-  return `cd ${quoteShellArg(cwd, false)} && { ${command}\n}\r`;
+  return `cd ${quoteShellArg(cwd, false)} && { ${command}\n\n}\r`;
 }
 
 /** What to type into an existing script tab, or null if it is still busy. */

@@ -511,16 +511,20 @@ src/
     │                                (`workspace` default | `context` | `fixed`) and `cwd` used only in `fixed` mode;
     │                                the folder is resolved by `lib/scriptCwd.ts`, and an
     │                                already-open idle script tab gets a `cd` to it before the command).
-    │                                The typed line groups the whole command behind the cd: `cd X && { cmd\n}`
-    │                                (posix) or `Set-Location -LiteralPath 'X'; if ($?) { cmd\n}` (PowerShell;
-    │                                the closing brace is on its own line so a trailing `#` comment cannot
-    │                                swallow it). A folder with a control character is refused with a toast and
-    │                                nothing runs. The tab is marked running before the delayed write, so a
-    │                                double click cannot type twice; it is unmarked if no terminal handle shows
-    │                                up. Known limits: cmd.exe is not told apart from PowerShell (a cmd.exe tab
+    │                                The typed line groups the whole command behind the cd: `cd X && { cmd\n\n}`
+    │                                (posix) or `Set-Location -LiteralPath 'X'; if ($?) { cmd\n\n}` (PowerShell;
+    │                                the closing brace is on its own line, after a blank one, so neither a
+    │                                trailing `#` comment nor a final `\` or backtick can swallow it; the
+    │                                comment case only holds where the interactive shell recognizes `#`: bash
+    │                                does, interactive zsh does not unless `interactive_comments` is set, and
+    │                                the real-bash test runs non-interactive bash). A folder with a control
+    │                                character is refused with a toast and nothing runs. The tab is marked
+    │                                running before the delayed write, so a double click cannot type twice; the
+    │                                pending write is dropped if the mark is gone (Stop, tab closed) and the mark
+    │                                is removed if no terminal handle shows up. Known limits: cmd.exe is not told apart from PowerShell (a cmd.exe tab
     │                                gets PowerShell syntax and the cd fails), and the frontend does not know
     │                                the user's shell, so fish before 4.1 (no `{ }` group) gets a syntax error
-    │                                and the script does not run in a reused tab with a folder,
+    │                                and the script does not run in a reused tab with a folder),
     │                                activeScript (selected script id), and statusId (optional foreign key
     │                                to a WorkspaceStatus id in the preferences store). See WORKSPACES.md for render
     │                                tree details.
