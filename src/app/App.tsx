@@ -3421,6 +3421,8 @@ export default function App() {
               onOpenSettings={(id) =>
                 useWorkspaceSettingsStore.getState().openSettings(id)
               }
+              onSetColor={setWorkspaceColor}
+              onSetIcon={setWorkspaceIcon}
               width={workspaceBarWidth}
               onWidthChange={handleBarWidthChange}
               workspaceGroups={groups}
