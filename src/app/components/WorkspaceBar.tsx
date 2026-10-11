@@ -23,10 +23,13 @@ import {
 } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
+  Cancel01Icon,
   ChevronRightIcon,
   Delete02Icon,
   Folder01Icon,
   FolderAddIcon,
+  Image01Icon,
+  PaintBoardIcon,
   PencilEdit01Icon,
   Settings01Icon,
   SleepingIcon,
@@ -39,8 +42,9 @@ import { cn } from "@/lib/utils";
 import {
   chipColorOnWhite,
   resolveWorkspaceColor,
+  WORKSPACE_COLOR_PALETTE,
 } from "@/modules/workspaces/lib/workspaceColor";
-import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
+import { getWorkspaceIcon, WORKSPACE_ICON_PALETTE } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
 import { useBarDndBinding, useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
@@ -115,6 +119,8 @@ export type WorkspaceBarProps = {
   onHibernate?: (id: string) => void;
   onWake?: (id: string) => void;
   onOpenSettings: (id: string) => void;
+  onSetColor: (id: string, color: string | null) => void;
+  onSetIcon: (id: string, icon: string | null) => void;
   width: number;
   onWidthChange: (w: number) => void;
   collapsedGroups: Set<string>;
@@ -147,6 +153,8 @@ function SortableWorkspaceItem({
   onHibernate,
   onWake,
   onOpenSettings,
+  onSetColor,
+  onSetIcon,
   onSetGroup,
   onCreateGroup,
   onRestoreFocus,
@@ -167,6 +175,8 @@ function SortableWorkspaceItem({
   onHibernate?: (id: string) => void;
   onWake?: (id: string) => void;
   onOpenSettings: (id: string) => void;
+  onSetColor: (id: string, color: string | null) => void;
+  onSetIcon: (id: string, icon: string | null) => void;
   onSetGroup: (id: string, groupId: string | null) => void;
   onCreateGroup: (workspaceId: string) => string;
   onRestoreFocus: () => void;
@@ -493,6 +503,95 @@ function SortableWorkspaceItem({
                   )}
                 </ContextMenuItem>
               )}
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="gap-2">
+              <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={2} />
+              Color
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="p-2">
+              <div className="grid grid-cols-6 gap-1.5">
+                <button
+                  type="button"
+                  title="No color"
+                  onClick={() => {
+                    onSetColor(ws.id, null);
+                    setMenuOpen(false);
+                  }}
+                  className={cn(
+                    "flex size-6 items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
+                    ws.color === null
+                      ? "border-foreground"
+                      : "border-transparent hover:border-muted-foreground/50",
+                  )}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
+                </button>
+                {WORKSPACE_COLOR_PALETTE.map((hex) => (
+                  <button
+                    key={hex}
+                    type="button"
+                    title={hex}
+                    onClick={() => {
+                      onSetColor(ws.id, hex);
+                      setMenuOpen(false);
+                    }}
+                    className={cn(
+                      "size-6 rounded-full border-2 transition-colors",
+                      ws.color === hex
+                        ? "border-foreground"
+                        : "border-transparent hover:border-foreground/40",
+                    )}
+                    style={{ backgroundColor: hex }}
+                  />
+                ))}
+              </div>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="gap-2">
+              <HugeiconsIcon icon={Image01Icon} size={14} strokeWidth={2} />
+              Icon
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="max-h-[320px] w-[296px] overflow-y-auto p-2">
+              <div className="flex flex-wrap gap-0.5">
+                <button
+                  type="button"
+                  title="No icon"
+                  onClick={() => {
+                    onSetIcon(ws.id, null);
+                    setMenuOpen(false);
+                  }}
+                  className={cn(
+                    "flex size-8 items-center justify-center rounded border-2 bg-muted text-muted-foreground transition-colors",
+                    ws.icon == null
+                      ? "border-foreground"
+                      : "border-transparent hover:border-muted-foreground/50",
+                  )}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                </button>
+                {WORKSPACE_ICON_PALETTE.map((entry) => (
+                  <button
+                    key={entry.name}
+                    type="button"
+                    title={entry.label}
+                    onClick={() => {
+                      onSetIcon(ws.id, entry.name);
+                      setMenuOpen(false);
+                    }}
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded border-2 text-foreground transition-colors",
+                      ws.icon === entry.name
+                        ? "border-foreground bg-muted"
+                        : "border-transparent hover:border-muted-foreground/40 hover:bg-muted/60",
+                    )}
+                  >
+                    <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
+                  </button>
+                ))}
+              </div>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
           <ContextMenuSub>
             <ContextMenuSubTrigger className="gap-2">
               <HugeiconsIcon icon={Folder01Icon} size={14} strokeWidth={2} />
@@ -898,6 +997,8 @@ export function WorkspaceBar({
   onHibernate,
   onWake,
   onOpenSettings,
+  onSetColor,
+  onSetIcon,
   width,
   onWidthChange,
   collapsedGroups,
@@ -1167,6 +1268,8 @@ export function WorkspaceBar({
                                 onHibernate={onHibernate}
                                 onWake={onWake}
                                 onOpenSettings={onOpenSettings}
+                                onSetColor={onSetColor}
+                                onSetIcon={onSetIcon}
                                 onSetGroup={onSetGroup}
                                 onCreateGroup={onCreateGroup}
                                 onRestoreFocus={onRestoreFocus}
@@ -1199,6 +1302,8 @@ export function WorkspaceBar({
                                 onHibernate={onHibernate}
                                 onWake={onWake}
                                 onOpenSettings={onOpenSettings}
+                                onSetColor={onSetColor}
+                                onSetIcon={onSetIcon}
                                 onSetGroup={onSetGroup}
                                 onCreateGroup={onCreateGroup}
                                 onRestoreFocus={onRestoreFocus}
