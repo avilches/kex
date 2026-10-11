@@ -36,18 +36,23 @@ type Props = {
 export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, onSaveTab, onSaveAll, onEnableRunOnStart, onStopBusy }: Props) {
   const sessions = useAgentStore((s) => s.sessions);
   const commands = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
-  const scripts = useSyncExternalStore(subscribeToScriptRunning, getScriptRunningSnapshot);
+  const scriptStates = useSyncExternalStore(subscribeToScriptRunning, getScriptRunningSnapshot);
   const review = useMemo(
     () =>
       workspace
         ? hibernateReview(workspace, {
             agentOf: (id) => liveAgent(sessions[id]),
             runningCommand: (id) => commands.get(id),
-            scriptState: (id) => scripts.get(id),
+            scriptState: (id) => scriptStates.get(id),
           })
         : null,
-    [workspace, sessions, commands, scripts],
+    [workspace, sessions, commands, scriptStates],
   );
+
+  const agents = review?.busy.filter((b) => b.kind === "agent") ?? [];
+  const scripts = review?.busy.filter((b) => b.kind === "script") ?? [];
+  const onlyAgentsPending =
+    agents.length > 0 && scripts.length === 0 && review?.docs.length === 0 && review?.commands.length === 0;
 
   // Radix keeps the content mounted during the exit animation, after `workspace` is already null.
   const shown = useRef<{ workspace: Workspace; groupLabel?: string } | null>(null);
@@ -79,17 +84,13 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
             )}
           </AlertDialogTitle>
         </AlertDialogHeader>
-        {review && review.busy.length > 0 && (
+        {agents.length > 0 && (
           <section className="flex flex-col gap-1">
-            <h3 className="text-[12px] font-medium">Waiting for these to finish</h3>
-            {review.busy.map((b) => (
+            <h3 className="text-[12px] font-medium">Waiting for these agents to finish</h3>
+            {agents.map((b) => (
               <div key={b.tabId} className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-                  {b.agent ? (
-                    <AgentIcon agent={b.agent} size={12} className="shrink-0" />
-                  ) : (
-                    <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
-                  )}
+                  <AgentIcon agent={b.agent ?? b.name} size={12} className="shrink-0" />
                   <span className="truncate">{b.name}</span>
                   <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
                 </span>
@@ -107,20 +108,42 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={b.stopping}
-                    title={b.kind === "agent" ? "Interrupt this agent so the workspace can hibernate now" : "Stop this script"}
+                    title="Interrupt this agent so the workspace can hibernate now"
                     onClick={() => onStopBusy(b)}
                   >
-                    {b.stopping ? "Stopping" : b.kind === "agent" ? "Kill" : "Stop"}
+                    Kill
                   </Button>
                 </span>
               </div>
             ))}
-            {review.docs.length === 0 && review.commands.length === 0 && (
+            {onlyAgentsPending && (
               <p className="text-[12px] text-muted-foreground">
                 The workspace will hibernate as soon as they are done.
               </p>
             )}
+          </section>
+        )}
+        {scripts.length > 0 && (
+          <section className="flex flex-col gap-1">
+            <h3 className="text-[12px] font-medium">Running scripts that will be stopped</h3>
+            {scripts.map((b) => (
+              <div key={b.tabId} className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
+                  <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
+                  <span className="truncate">{b.name}</span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={b.stopping}
+                  title="Stop this script"
+                  onClick={() => onStopBusy(b)}
+                >
+                  {b.stopping ? "Stopping" : "Stop"}
+                </Button>
+              </div>
+            ))}
           </section>
         )}
         {review && review.docs.length > 0 && (

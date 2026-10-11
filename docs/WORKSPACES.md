@@ -241,7 +241,7 @@ runs in capture phase, before the Radix modal); Escape is not a registered short
 `HibernateDialog` is reactive: it recomputes the review from the agent store, the running
 commands store and the script state map, so a row disappears when its agent finishes or when "Run on start" is enabled
 (`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are
-empty. A busy row has "Kill" (agent: Ctrl+C plus status idle, the session survives) or "Stop"
+empty. Busy rows are split in two sections: agents (spinner, "Waiting for these agents to finish", and a line saying it hibernates on its own, shown only when nothing else is pending) and running scripts (no spinner, no waiting line: a script cannot be told apart as finite like a build or endless like `top`, so the user decides). A busy row has "Kill" (agent: Ctrl+C plus status idle, the session survives) or "Stop"
 (script: the same stop the RunButton sends, without moving focus; disabled as "Stopping" while
 `waiting`). Closing a hibernated workspace without waking it discards its carried buffers and
 hibernating marks. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
