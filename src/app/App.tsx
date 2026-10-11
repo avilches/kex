@@ -2022,6 +2022,7 @@ export default function App() {
   const hibernateFlow = useHibernateFlow({
     workspacesRef,
     saveWorkspaceDocs,
+    isActive: (id) => activeWorkspaceIdRef.current === id,
     hibernateWorkspace,
     flushDirtyEditors,
     destroyWorkspaceFloats,

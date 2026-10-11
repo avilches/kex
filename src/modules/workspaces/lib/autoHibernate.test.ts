@@ -33,6 +33,11 @@ describe("touchActivity", () => {
     expect(seen.get("c")).toBe(100);
     expect(seen.has("gone")).toBe(false);
   });
+  it("restarts the clock of a hibernated workspace so waking it does not re-hibernate it", () => {
+    const seen = new Map([["h", 1]]);
+    touchActivity(seen, [ws("h", { hibernated: true }), ws("a")], "a", 100);
+    expect(seen.get("h")).toBe(100);
+  });
 });
 
 describe("autoHibernateCandidates", () => {

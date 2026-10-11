@@ -16,8 +16,10 @@ export function useAutoHibernate(deps: Deps) {
   depsRef.current = deps;
   const mode = usePreferencesStore((s) => s.autoHibernate);
 
+  const seenRef = useRef(new Map<string, number>());
+
   useEffect(() => {
-    const seen = new Map<string, number>();
+    const seen = seenRef.current;
     let running = false;
     const tick = async () => {
       const { workspacesRef, activeWorkspaceIdRef, requestAutoHibernate } = depsRef.current;

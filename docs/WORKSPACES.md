@@ -257,7 +257,12 @@ already hibernated workspace. For each candidate `createHibernateFlow().requestA
 markdown tab of that workspace even with autosave off (`saveWorkspaceDocs`; a failed save aborts), waits for the
 dirty flags to settle and then runs the same `hibernateReview` as the manual flow: it hibernates only if the review
 is empty, that is, no agent working, no script running, no unsaved document and no command without "Run on start".
-It never opens `HibernateDialog`; anything else leaves the workspace awake until the next check.
+An agent in `attention` (waiting for the user) also blocks it, and `requestAuto` re-checks that the workspace is still
+not the active one after saving, so entering a queued workspace mid-check cancels it. A hibernated workspace keeps its
+clock at "now", so restoring it without activating it does not hibernate it again at the next tick. Changing the
+setting keeps the existing clocks. A document that changed on disk while dirty is still overwritten by the save
+(same as `saveTab` everywhere else). `requestAuto` never opens `HibernateDialog`; anything else leaves the workspace
+awake until the next check.
 
 #### Startup hibernation
 

@@ -37,7 +37,7 @@ export function touchActivity(
   const ids = new Set(workspaces.map((w) => w.id));
   for (const id of seen.keys()) if (!ids.has(id)) seen.delete(id);
   for (const w of workspaces) {
-    if (w.id === activeId || !seen.has(w.id)) seen.set(w.id, now);
+    if (w.id === activeId || w.hibernated || !seen.has(w.id)) seen.set(w.id, now);
   }
 }
 

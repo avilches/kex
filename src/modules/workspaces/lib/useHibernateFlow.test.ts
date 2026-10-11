@@ -20,6 +20,7 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
     autosaveEnabled: () => false,
     flushDirtyEditors: async () => void calls.push("flush"),
     saveWorkspaceDocs: async () => true,
+    isActive: () => false,
     settle: async () => void calls.push("settle"),
     live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined }),
     finishAgent: (id) => void calls.push(`finish:${id}`),
@@ -94,6 +95,34 @@ describe("createHibernateFlow", () => {
       await flow.requestAuto("w1");
       expect(saved).toEqual(["w1"]);
       expect(calls).toContain("hibernate");
+    });
+
+    it("does nothing when the workspace becomes active while it was saving", async () => {
+      let active = false;
+      const { flow, calls } = setup(ws([term("t1")]), {
+        saveWorkspaceDocs: async () => ((active = true), true),
+        isActive: () => active,
+      });
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
+    });
+
+    it("does nothing for the active workspace", async () => {
+      const { flow, calls } = setup(ws([term("t1")]), { isActive: () => true });
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
+    });
+
+    it("does nothing when an agent is waiting for the user", async () => {
+      const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true })]), {
+        live: () => ({
+          agentOf: () => ({ agent: "claude", status: "attention", resumable: true }),
+          runningCommand: () => undefined,
+          scriptState: () => undefined,
+        }),
+      });
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
     });
 
     it("does nothing when a save fails", async () => {
