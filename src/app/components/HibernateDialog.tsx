@@ -56,7 +56,7 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
 
   return (
     <AlertDialog open={workspace !== null} onOpenChange={(open) => !open && onClose()}>
-      <AlertDialogContent>
+      <AlertDialogContent className="grid-cols-[minmax(0,1fr)]">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             {titleWs && (
@@ -93,7 +93,7 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
                 <span className="truncate text-[12px] text-muted-foreground" title={d.path}>
                   {pathBasename(d.path)}
                 </span>
-                <Button size="sm" variant="outline" title="Save this document" onClick={() => void onSaveTab(d.tabId)}>
+                <Button size="sm" variant="outline" className="shrink-0" title="Save this document" onClick={() => void onSaveTab(d.tabId)}>
                   Save
                 </Button>
               </div>
@@ -118,6 +118,7 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
                 <Button
                   size="sm"
                   variant="outline"
+                  className="shrink-0"
                   title="Run this command again when the workspace is restored"
                   onClick={() => onEnableRunOnStart(c.tabId, commands.get(c.tabId))}
                 >
