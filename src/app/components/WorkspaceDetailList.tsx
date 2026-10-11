@@ -1,5 +1,7 @@
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { LockKeyIcon } from "@hugeicons/core-free-icons";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { PopoverAnchor } from "@/components/ui/popover";
@@ -85,7 +87,8 @@ function DetailTabRow({
   const info = useAgentTabTitle(tab);
   const title = info?.displayTitle ?? tab.id;
   const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
-  const { onRenameTab } = useSidebarTabMenu();
+  const { onRenameTab, onClose, onUpdateTab } = useSidebarTabMenu();
+  const isLocked = tab.locked ?? false;
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: sidebarTabDragId(tab.id),
@@ -139,7 +142,7 @@ function DetailTabRow({
               aria-current={focused || undefined}
               onClick={() => onActivate(tab.id)}
               className={cn(
-                "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
+                "group flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
                 isDragging && "opacity-40",
                 focused
                   ? "bg-foreground/[0.16] font-medium text-foreground"
@@ -150,7 +153,44 @@ function DetailTabRow({
                 {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
               </span>
               <span className="min-w-0 flex-1 truncate">{title}</span>
-              <StatusMark visual={visual} />
+              {isLocked ? (
+                // biome-ignore lint/a11y/useSemanticElements: a button cannot nest inside the row button
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  className="flex size-[16px] shrink-0 items-center justify-center rounded text-foreground transition-colors hover:bg-muted"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateTab(tab.id, (p) => ({ ...p, locked: false }));
+                  }}
+                  title="Unlock tab"
+                >
+                  <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
+                </span>
+              ) : (
+                <span className="relative flex size-[16px] shrink-0 items-center justify-center">
+                  {visual !== null && (
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0">
+                      <StatusMark visual={visual} />
+                    </span>
+                  )}
+                  {/* biome-ignore lint/a11y/useSemanticElements: a button cannot nest inside the row button */}
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity hover:bg-muted group-hover:opacity-60 hover:!opacity-100"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClose(tab.id);
+                    }}
+                    title="Close tab"
+                  >
+                    <span className="text-[13px] leading-none">×</span>
+                  </span>
+                </span>
+              )}
             </button>
           </PopoverAnchor>
         </ContextMenuTrigger>
