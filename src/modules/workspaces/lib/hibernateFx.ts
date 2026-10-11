@@ -13,10 +13,14 @@ export function useJustWoken(hibernated: boolean | undefined): number | null {
   useEffect(() => {
     const was = prev.current;
     prev.current = !!hibernated;
-    if (!was || hibernated) return;
+    if (hibernated) {
+      setWokenAt(null);
+      return;
+    }
+    if (!was) return;
     setWokenAt(Date.now());
     const timer = setTimeout(() => setWokenAt(null), WAKE_FX_MS);
     return () => clearTimeout(timer);
   }, [hibernated]);
-  return wokenAt;
+  return hibernated ? null : wokenAt;
 }
