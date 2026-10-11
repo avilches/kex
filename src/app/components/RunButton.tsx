@@ -165,11 +165,9 @@ export function RunButton({
         }}
         className={cn(
           "flex h-7 items-center gap-1.5 rounded-l-md px-2 text-[11px] transition-colors",
-          isRunning
-            ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
-            : isWaiting
-              ? "bg-amber-500/10 text-amber-500/70 cursor-not-allowed"
-              : "text-muted-foreground hover:bg-accent hover:text-foreground",
+          isWaiting
+            ? "bg-amber-500/10 text-amber-500/70 cursor-not-allowed"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
         )}
       >
         {isWaiting ? (
@@ -179,7 +177,7 @@ export function RunButton({
             icon={isActive_ ? StopIcon : PlayIcon}
             size={13}
             strokeWidth={2}
-            className={!isActive_ ? "text-green-500" : undefined}
+            className={isRunning ? "text-destructive" : !isActive_ ? "text-green-500" : undefined}
           />
         )}
         <span className="max-w-[120px] truncate">
