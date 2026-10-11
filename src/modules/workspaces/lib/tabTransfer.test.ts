@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { attachTab, workspaceForTab, workspaceTitleFromCwd } from "./tabTransfer";
-import type { PaneNode, Tab, Workspace } from "./types";
+import type { PaneNode, SplitNode, Tab, Workspace } from "./types";
 
 const tab = (id: string, extra: Partial<Extract<Tab, { kind: "terminal" }>> = {}): Tab => ({
   id,
@@ -81,32 +81,22 @@ describe("attachTab with a split placement", () => {
 });
 
 describe("attachTab with the auto placement", () => {
-  const auto = { kind: "auto", splitId: "s1", newPaneId: "p9" } as const;
+  const auto = { kind: "auto" } as const;
+  const tabsOf = (n: unknown) => (n as PaneNode).tabs.map((t) => t.id);
 
-  it("splits a single pane that already has tabs and uses the right half", () => {
+  it("never splits: a single pane with tabs just receives the tab", () => {
     const out = attachTab(wsWith(), moved, auto, 8)!;
-    expect(out.paneTree.kind).toBe("split");
-    if (out.paneTree.kind !== "split") return;
-    expect(out.paneTree.orientation).toBe("horizontal");
-    expect((out.paneTree.first as PaneNode).tabs.map((t) => t.id)).toEqual(["a"]);
-    expect((out.paneTree.second as PaneNode).id).toBe("p9");
-    expect((out.paneTree.second as PaneNode).tabs.map((t) => t.id)).toEqual(["moved"]);
-    expect(out.activePaneId).toBe("p9");
+    expect(out.paneTree.kind).toBe("pane");
+    expect(tabsOf(out.paneTree)).toEqual(["a", "moved"]);
+    expect(out.activePaneId).toBe("p1");
   });
 
-  it("uses a single empty pane without splitting it", () => {
+  it("uses a single empty pane", () => {
     const out = attachTab(wsWith({ paneTree: pane("p1", []) }), moved, auto, 8)!;
-    expect(out.paneTree.kind).toBe("pane");
-    expect((out.paneTree as PaneNode).tabs.map((t) => t.id)).toEqual(["moved"]);
+    expect(tabsOf(out.paneTree)).toEqual(["moved"]);
   });
 
-  it("does not split a single pane when the limit leaves no room", () => {
-    const out = attachTab(wsWith(), moved, auto, 1)!;
-    expect(out.paneTree.kind).toBe("pane");
-    expect((out.paneTree as PaneNode).tabs.map((t) => t.id)).toEqual(["a", "moved"]);
-  });
-
-  it("adds to the active pane of a workspace that is already split", () => {
+  it("goes to the right half of a side-by-side split, whatever the active pane", () => {
     const split: Workspace = wsWith({
       paneTree: {
         kind: "split",
@@ -116,30 +106,42 @@ describe("attachTab with the auto placement", () => {
         first: pane("p1", [tab("a")]),
         second: pane("p2", [tab("b")]),
       },
-      activePaneId: "p2",
+      activePaneId: "p1",
     });
     const out = attachTab(split, moved, auto, 8)!;
     if (out.paneTree.kind !== "split") throw new Error("expected split");
-    expect((out.paneTree.first as PaneNode).tabs.map((t) => t.id)).toEqual(["a"]);
-    expect((out.paneTree.second as PaneNode).tabs.map((t) => t.id)).toEqual(["b", "moved"]);
+    expect(tabsOf(out.paneTree.first)).toEqual(["a"]);
+    expect(tabsOf(out.paneTree.second)).toEqual(["b", "moved"]);
     expect(out.activePaneId).toBe("p2");
   });
 
-  it("falls back to the first pane when activePaneId is stale", () => {
+  it("goes to the top pane of a stacked split on the right edge", () => {
     const split: Workspace = wsWith({
       paneTree: {
         kind: "split",
         id: "s0",
-        orientation: "vertical",
+        orientation: "horizontal",
         dividerPosition: 0.5,
         first: pane("p1", [tab("a")]),
-        second: pane("p2", [tab("b")]),
+        second: {
+          kind: "split",
+          id: "s1",
+          orientation: "vertical",
+          dividerPosition: 0.5,
+          first: pane("p2", [tab("b")]),
+          second: pane("p3", [tab("c")]),
+        },
       },
-      activePaneId: "gone",
+      activePaneId: "p1",
     });
     const out = attachTab(split, moved, auto, 8)!;
-    if (out.paneTree.kind !== "split") throw new Error("expected split");
-    expect((out.paneTree.first as PaneNode).tabs.map((t) => t.id)).toEqual(["a", "moved"]);
+    expect(out.activePaneId).toBe("p2");
+    expect(JSON.stringify(out.paneTree)).toContain('"id":"moved"');
+    expect(tabsOf((out.paneTree as Extract<SplitNode, { kind: "split" }>).first)).toEqual(["a"]);
+  });
+
+  it("ignores the pane limit because it never creates a pane", () => {
+    expect(attachTab(wsWith(), moved, auto, 1)).not.toBeNull();
   });
 });
 

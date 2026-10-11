@@ -2047,20 +2047,36 @@ export default function App() {
     [moveTabToWorkspace, focusActiveTab],
   );
 
-  const handleMoveTabFromMenu = useCallback(
-    async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<void> => {
-      const source = workspacesRef.current.find((w) => w.id === activeWorkspaceIdRef.current);
-      const hadFocus =
-        source?.id === sourceWorkspaceId &&
-        findPane(source.paneTree, source.activePaneId)?.activeTabId === tabId;
+  // The current tab of its workspace takes the focus with it, from the menu and
+  // from a drag alike. A drag may already have switched to the destination by
+  // hovering it, so there the source does not have to be the active workspace.
+  const handleMoveTabFollowingFocus = useCallback(
+    async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest, fromDrag = false): Promise<string | null> => {
+      const source = workspacesRef.current.find((w) => w.id === sourceWorkspaceId);
+      const wasCurrent = !!source && findPane(source.paneTree, source.activePaneId)?.activeTabId === tabId;
+      const hadFocus = wasCurrent && (fromDrag || activeWorkspaceIdRef.current === sourceWorkspaceId);
       const destinationId = await handleMoveTabToWorkspace(sourceWorkspaceId, tabId, request);
       if (hadFocus && destinationId) {
         setActiveWorkspaceId(destinationId);
         activateTab(destinationId, tabId);
         setTimeout(focusActiveTab, 50);
       }
+      return destinationId;
     },
     [handleMoveTabToWorkspace, setActiveWorkspaceId, activateTab, focusActiveTab],
+  );
+
+  const handleMoveTabFromMenu = useCallback(
+    async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<void> => {
+      await handleMoveTabFollowingFocus(sourceWorkspaceId, tabId, request);
+    },
+    [handleMoveTabFollowingFocus],
+  );
+
+  const handleDropTabOnWorkspace = useCallback(
+    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest) =>
+      handleMoveTabFollowingFocus(sourceWorkspaceId, tabId, request, true),
+    [handleMoveTabFollowingFocus],
   );
 
   const {
@@ -3357,7 +3373,7 @@ export default function App() {
               onSplitPaneAndPlace={splitPaneAndPlace}
               onSplitPaneAndOpenTab={splitPaneAndOpenTab}
               onOpenTab={openTab}
-              onMoveTabToWorkspace={handleMoveTabToWorkspace}
+              onMoveTabToWorkspace={handleDropTabOnWorkspace}
               onSelectWorkspace={setActiveWorkspaceId}
             >
             {/* LEFT: workspace bar */}

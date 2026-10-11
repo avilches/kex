@@ -1,12 +1,12 @@
 import { allPanes, findPane, splitPaneAndInsertTab, updatePane } from "./splitNode";
-import type { Tab, Workspace } from "./types";
+import type { PaneNode, SplitNode, Tab, Workspace } from "./types";
 
 export type SplitDirection = "left" | "right" | "top" | "bottom";
 
 export type TabPlacement =
   | { kind: "pane"; paneId: string; index?: number }
   | { kind: "split"; paneId: string; direction: SplitDirection; splitId: string; newPaneId: string }
-  | { kind: "auto"; splitId: string; newPaneId: string };
+  | { kind: "auto" };
 
 export type TabMoveRequest =
   | { kind: "pane"; workspaceId: string; paneId: string; index?: number }
@@ -27,6 +27,13 @@ function insertIntoPane(ws: Workspace, paneId: string, tab: Tab, index?: number)
     return { ...p, tabs, activeTabId: tab.id };
   });
   return { ...ws, paneTree, activePaneId: paneId };
+}
+
+// Follows the right edge of the layout: through a side-by-side split it goes to
+// the right half, through a stacked one it stays on the top half.
+export function rightmostPane(node: SplitNode): PaneNode {
+  if (node.kind === "pane") return node;
+  return rightmostPane(node.orientation === "horizontal" ? node.second : node.first);
 }
 
 function splitInto(
@@ -52,19 +59,8 @@ export function attachTab(ws: Workspace, tab: Tab, placement: TabPlacement, pane
       return insertIntoPane(ws, placement.paneId, tab, placement.index);
     case "split":
       return splitInto(ws, placement.paneId, placement.direction, placement.splitId, placement.newPaneId, tab, paneLimit);
-    case "auto": {
-      const panes = allPanes(ws.paneTree);
-      if (panes.length === 1) {
-        const only = panes[0]!;
-        if (only.tabs.length === 0) return insertIntoPane(ws, only.id, tab);
-        return (
-          splitInto(ws, only.id, "right", placement.splitId, placement.newPaneId, tab, paneLimit) ??
-          insertIntoPane(ws, only.id, tab)
-        );
-      }
-      const target = findPane(ws.paneTree, ws.activePaneId) ?? panes[0]!;
-      return insertIntoPane(ws, target.id, tab);
-    }
+    case "auto":
+      return insertIntoPane(ws, rightmostPane(ws.paneTree).id, tab);
   }
 }
 

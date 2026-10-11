@@ -496,7 +496,7 @@ describe("applyMoveTabToWorkspace", () => {
   const autoDest = {
     kind: "existing",
     workspaceId: "dst",
-    placement: { kind: "auto", splitId: "sx", newPaneId: "px" },
+    placement: { kind: "auto" },
   } as const;
 
   it("moves the tab keeping its id and removes it from the source", () => {
@@ -506,7 +506,7 @@ describe("applyMoveTabToWorkspace", () => {
     expect((source.paneTree as { tabs: Tab[] }).tabs.map((t) => t.id)).toEqual(["t2"]);
     const panes = JSON.stringify(target.paneTree);
     expect(panes).toContain('"id":"t1"');
-    expect(target.activePaneId).toBe("px");
+    expect(target.activePaneId).toBe("dp1");
   });
 
   it("refuses to move a tab into a hibernated workspace", () => {
@@ -570,7 +570,7 @@ describe("applyMoveTabToWorkspace", () => {
     const same = { kind: "existing", workspaceId: "src", placement: { kind: "pane", paneId: "sp1" } } as const;
     expect(applyMoveTabToWorkspace(input, "src", "t1", same, 8)).toBe(input);
     expect(applyMoveTabToWorkspace(input, "src", "nope", autoDest, 8)).toBe(input);
-    const ghost = { kind: "existing", workspaceId: "ghost", placement: { kind: "auto", splitId: "s", newPaneId: "p" } } as const;
+    const ghost = { kind: "existing", workspaceId: "ghost", placement: { kind: "auto" } } as const;
     expect(applyMoveTabToWorkspace(input, "src", "t1", ghost, 8)).toBe(input);
   });
 

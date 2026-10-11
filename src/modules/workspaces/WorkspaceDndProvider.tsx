@@ -182,6 +182,21 @@ export function WorkspaceDndProvider({
     if (target) onSelectWorkspace(target);
   }
 
+  // A focused terminal swallows Escape before dnd-kit's sensor sees it, so the
+  // key is caught on the way down and replayed on the document, where the sensor listens.
+  const dragging = draggingItem !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Escape" || !e.isTrusted) return;
+      e.stopPropagation();
+      e.preventDefault();
+      document.dispatchEvent(new KeyboardEvent("keydown", { code: "Escape", key: "Escape", bubbles: true }));
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [dragging]);
+
   function handleDragCancel() {
     restoreOrigin(false, takeOrigin());
     document.body.style.cursor = "";

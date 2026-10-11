@@ -502,9 +502,9 @@ remembers the active workspace when a tab drag starts and goes back to it (`orig
 drag is cancelled with Esc or dropped where nothing happens. While the pointer is over a workspace of the bar, its item lights up at once as if active
 (`useWorkspaceDropTarget`, a context apart from `useWorkspaceDnd` so only the bar items re-render).
 Dropping the tab there, without waiting for the 600 ms switch, moves it with the `auto` placement
-(`handleDragEnd` checks the hovered workspace before looking at `over`): a single pane with tabs is
-split and the tab lands in the new right half, an already split workspace receives it in its active
-pane. The tab's own workspace is not a target (`canDropTabOnWorkspace`): it does not light up and dropping there does nothing. A hibernated workspace is a target: it is woken before the tab lands (`moveTabToWorkspace`, async, so `handleDragEnd` restores the origin workspace only once it settles). Once the 600 ms switch shows a hibernated workspace, its `HibernatedOverlay` is itself a droppable (`hibernated:<id>`, enabled only for a tab dragged from another workspace, ringed while hovered) because it has no panes to drop on; `resolveTabDrop` turns it into the same `auto` transfer. Known limitation: workspaces inside a
+(`handleDragEnd` checks the hovered workspace before looking at `over`): the tab goes into the rightmost
+pane, with no split (see below). While a drag is on, Escape is caught in the capture phase and replayed
+on the document, because a focused terminal swallows it before dnd-kit's sensor sees it. The tab's own workspace is not a target (`canDropTabOnWorkspace`): it does not light up and dropping there does nothing. A hibernated workspace is a target: it is woken before the tab lands (`moveTabToWorkspace`, async, so `handleDragEnd` restores the origin workspace only once it settles). Once the 600 ms switch shows a hibernated workspace, its `HibernatedOverlay` is itself a droppable (`hibernated:<id>`, enabled only for a tab dragged from another workspace, ringed while hovered) because it has no panes to drop on; `resolveTabDrop` turns it into the same `auto` transfer. Known limitation: workspaces inside a
 collapsed group are not on screen, so they cannot be hover targets.
 
 ---
@@ -520,9 +520,9 @@ split) the same array is returned and nothing moves. `lib/tabTransfer.ts` holds 
 
 The context menu of a tab has "Move to Workspace" (`TabContextMenuItems.tsx`, the menu body shared by the pane tab and the sidebar rows, fed by `WorkspaceMoveContext`):
 "New", then every other workspace with a dot of its color, hibernated ones included (marked Zzz; choosing one wakes it before the tab lands), and its icon when it has one. Choosing a workspace uses the `auto`
-placement: a single pane with tabs is split in two and the tab lands in the new right half; an already
-split workspace gets the tab in its active pane; a single empty pane receives it without splitting. The
-user stays in the current workspace, unless the moved tab had the focus: then the destination workspace is selected and the tab focused in it. "New" creates a workspace right after the source (same group) whose
+placement: no pane is ever split, the tab goes into the rightmost pane (`rightmostPane`: right half of a
+side-by-side split, top half of a stacked one). The user stays in the current workspace, unless the
+moved tab was the current tab of its workspace (menu or drag): then the destination workspace is selected and the tab focused in it (`handleMoveTabFollowingFocus`, focus after 50 ms because the refs are only fresh after the commit). "New" creates a workspace right after the source (same group) whose
 only tab is the moved one, titled and rooted after the tab's cwd when it is a terminal. A source
 workspace that loses its last tab is not closed: it keeps an empty pane. `App.tsx` also calls
 `useAgentStore.reassignTabWorkspace` so the agent session and its notifications point at the new

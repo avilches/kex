@@ -366,7 +366,7 @@ function buildMoveDestination(request: TabMoveRequest): TabMoveDestination {
       ? { kind: "pane", paneId: request.paneId, index: request.index }
       : request.kind === "split"
         ? { kind: "split", paneId: request.paneId, direction: request.direction, ...fresh }
-        : { kind: "auto", ...fresh };
+        : { kind: "auto" };
   return { kind: "existing", workspaceId: request.workspaceId, placement };
 }
 
