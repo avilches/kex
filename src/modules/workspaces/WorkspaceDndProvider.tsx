@@ -114,6 +114,9 @@ export function WorkspaceDndProvider({
     setDropWorkspaceIdState(id);
   }, []);
 
+  const workspaceIdsRef = useRef<string[]>([]);
+  workspaceIdsRef.current = workspaces.map((w) => w.id);
+
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
 
@@ -166,14 +169,21 @@ export function WorkspaceDndProvider({
     }
   }
 
-  function restoreOrigin(placed: boolean) {
-    const target = originToRestore(originWorkspaceIdRef.current, activeWorkspaceIdRef.current, placed, workspaces.map((w) => w.id));
+  // Taken synchronously when a drag ends: a transfer settles later, by which
+  // time a new drag may already have stored its own origin.
+  function takeOrigin(): string | null {
+    const id = originWorkspaceIdRef.current;
     originWorkspaceIdRef.current = null;
+    return id;
+  }
+
+  function restoreOrigin(placed: boolean, originId: string | null) {
+    const target = originToRestore(originId, activeWorkspaceIdRef.current, placed, workspaceIdsRef.current);
     if (target) onSelectWorkspace(target);
   }
 
   function handleDragCancel() {
-    restoreOrigin(false);
+    restoreOrigin(false, takeOrigin());
     document.body.style.cursor = "";
     dragIndexRef.current = new Map();
     setDraggingItem(null);
@@ -217,6 +227,7 @@ export function WorkspaceDndProvider({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    const originId = takeOrigin();
     document.body.style.cursor = "";
     const idx = dragIndexRef.current;
     dragIndexRef.current = new Map();
@@ -229,16 +240,16 @@ export function WorkspaceDndProvider({
       const source = idx.get(String(active.id));
       const target = workspaces.find((w) => w.id === barWorkspaceId);
       if (!source || !target || !canDropTabOnWorkspace(source.wsId, target)) {
-        restoreOrigin(false);
+        restoreOrigin(false, originId);
         return;
       }
       void onMoveTabToWorkspace(source.wsId, String(active.id), { kind: "auto", workspaceId: barWorkspaceId }).then(
-        (destinationId) => restoreOrigin(destinationId !== null),
+        (destinationId) => restoreOrigin(destinationId !== null, originId),
       );
       return;
     }
     if (!over) {
-      restoreOrigin(false);
+      restoreOrigin(false, originId);
       return;
     }
 
@@ -262,8 +273,8 @@ export function WorkspaceDndProvider({
     }
 
     const placed = handleTabDragEnd(activeId, overId, idx);
-    if (typeof placed === "boolean") restoreOrigin(placed);
-    else void placed.then(restoreOrigin);
+    if (typeof placed === "boolean") restoreOrigin(placed, originId);
+    else void placed.then((ok) => restoreOrigin(ok, originId));
   }
 
   // A file/folder dropped on a terminal's scratchpad bar inserts its path,

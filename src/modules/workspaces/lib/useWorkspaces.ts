@@ -963,20 +963,26 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, []);
 
-  // A hibernated destination is woken first instead of refused. The move is validated before waking so an impossible one
-  // does not wake anything, and the updater wakes `prev` itself because a wake
-  // already in flight makes wakeWorkspace return before it has applied.
+  // A hibernated destination is woken first instead of refused. The move is
+  // validated before waking so an impossible one does not wake anything, and
+  // again after it in case the tab went away meanwhile. The updater wakes `prev`
+  // itself because a wake already in flight makes wakeWorkspace return before it
+  // has applied.
   const moveTabToWorkspace = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
       const dest = buildMoveDestination(request);
       const { workspacePaneLimit } = usePreferencesStore.getState();
       const apply = (list: Workspace[]) =>
         applyMoveTabToWorkspace(applyWake(list, dest.workspaceId), sourceWorkspaceId, tabId, dest, workspacePaneLimit);
-      const before = applyWake(workspacesRef.current, dest.workspaceId);
-      if (applyMoveTabToWorkspace(before, sourceWorkspaceId, tabId, dest, workspacePaneLimit) === before) {
-        return null;
+      const canMove = () => {
+        const base = applyWake(workspacesRef.current, dest.workspaceId);
+        return applyMoveTabToWorkspace(base, sourceWorkspaceId, tabId, dest, workspacePaneLimit) !== base;
+      };
+      if (!canMove()) return null;
+      if (request.kind !== "new") {
+        await wakeWorkspace(request.workspaceId);
+        if (!canMove()) return null;
       }
-      if (request.kind !== "new") await wakeWorkspace(request.workspaceId);
       setWorkspaces(apply);
       return dest.workspaceId;
     },
