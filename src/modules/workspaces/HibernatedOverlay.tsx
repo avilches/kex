@@ -2,10 +2,12 @@ import { useDroppable } from "@dnd-kit/core";
 import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { formatHibernatedFor } from "./lib/hibernate";
+import { HIBERNATE_FX, hibernateFxFor, isFreshHibernate } from "./lib/hibernateFx";
 import { allPanes } from "./lib/splitNode";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
@@ -55,15 +57,22 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
   const shortcutLabel = useShortcutLabel("workspace.hibernate");
   const tabs = useMemo(() => allPanes(workspace.paneTree).flatMap((p) => p.tabs), [workspace.paneTree]);
   const now = useNow(active && workspace.hibernatedAt !== undefined);
+  const [fx] = useState(() =>
+    isFreshHibernate(workspace.hibernatedAt) ? hibernateFxFor(workspaceId, workspace.hibernatedAt!) : null,
+  );
+  useEffect(() => {
+    if (fx) toast(`Hibernate effect ${HIBERNATE_FX.indexOf(fx) + 1}/${HIBERNATE_FX.length}: ${fx}`);
+  }, [fx]);
   return (
     <div
       ref={setNodeRef}
       className={cn(
         "absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-background text-muted-foreground",
         acceptsDrop && isOver && "ring-2 ring-inset ring-primary/60",
+        fx && `hib-ov-${fx}`,
       )}
     >
-      <HugeiconsIcon icon={SleepingIcon} size={112} strokeWidth={1} className="opacity-70" />
+      <HugeiconsIcon icon={SleepingIcon} size={112} strokeWidth={1} className={cn("opacity-70", fx && "hib-ov-icon")} />
       <div className="flex max-w-[80%] flex-col items-center gap-1.5">
         <span className="flex items-center gap-2 text-[15px] text-foreground">
           <WorkspaceMark id={workspaceId} color={workspace.color} icon={workspace.icon} size={22} />

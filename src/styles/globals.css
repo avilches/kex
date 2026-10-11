@@ -408,3 +408,30 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
    * functional cue (revealed file, locked tab) and animates opacity only, with
    * no spatial movement, so it does not trigger motion sensitivity. */
 }
+
+/* Hibernate transition candidates (temporary, one is picked later). The overlay
+ * classes animate the pane area; the chip classes animate a layer inside the
+ * WorkspaceBar button. */
+@keyframes hib-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hib-sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes hib-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(80% at 50% 50%); } }
+@keyframes hib-curtain { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes hib-blur { from { opacity: 0; filter: blur(14px) saturate(2); transform: scale(1.04); } to { opacity: 1; filter: none; transform: none; } }
+@keyframes hib-icon-drift { 0% { opacity: 0; transform: translateY(18px) scale(0.85); } 100% { opacity: 0.7; transform: none; } }
+.hib-ov-fade { animation: hib-fade 700ms var(--ease-soft) both; }
+.hib-ov-sweep { animation: hib-sweep 800ms var(--ease-premium) both; }
+.hib-ov-iris { animation: hib-iris 900ms var(--ease-premium) both; }
+.hib-ov-curtain { animation: hib-curtain 800ms var(--ease-premium) both; }
+.hib-ov-blur { animation: hib-blur 900ms var(--ease-premium) both; }
+.hib-ov-icon { animation: hib-icon-drift 900ms var(--ease-premium) 250ms both; }
+
+@keyframes hib-chip-fade { 0% { opacity: 0.9; } 100% { opacity: 0; } }
+@keyframes hib-chip-sweep { 0% { transform: scaleX(0); opacity: 0.9; } 70% { transform: scaleX(1); opacity: 0.9; } 100% { transform: scaleX(1); opacity: 0; } }
+@keyframes hib-chip-iris { 0% { transform: scale(0); opacity: 0.9; } 100% { transform: scale(2.5); opacity: 0; } }
+@keyframes hib-chip-curtain { 0% { transform: scaleY(0); opacity: 0.9; } 70% { transform: scaleY(1); opacity: 0.9; } 100% { transform: scaleY(1); opacity: 0; } }
+@keyframes hib-chip-blur { 0%, 40% { opacity: 0.7; } 20% { opacity: 0.1; } 100% { opacity: 0; } }
+.hib-chip-fade { animation: hib-chip-fade 1100ms var(--ease-soft) both; }
+.hib-chip-sweep { transform-origin: left; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }
+.hib-chip-iris { border-radius: 9999px; animation: hib-chip-iris 1000ms var(--ease-premium) both; }
+.hib-chip-curtain { transform-origin: top; animation: hib-chip-curtain 1000ms var(--ease-premium) both; }
+.hib-chip-blur { animation: hib-chip-blur 1100ms var(--ease-soft) both; }

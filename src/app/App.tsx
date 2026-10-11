@@ -3344,6 +3344,7 @@ export default function App() {
         focusedTabId: focusedTabId(w.paneTree, w.activePaneId),
         detailExpanded: w.detailExpanded,
         hibernated: w.hibernated,
+        hibernatedAt: w.hibernatedAt,
       })),
     [workspaces],
   );

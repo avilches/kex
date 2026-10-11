@@ -47,6 +47,7 @@ import {
 import { getWorkspaceIcon, WORKSPACE_ICON_PALETTE } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
+import { hibernateFxFor, isFreshHibernate } from "@/modules/workspaces/lib/hibernateFx";
 import { useBarDndBinding, useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
   ContextMenu,
@@ -99,6 +100,7 @@ type WorkspaceItem = {
   focusedTabId: string | null;
   detailExpanded?: boolean;
   hibernated?: boolean;
+  hibernatedAt?: number;
 };
 
 export type WorkspaceBarProps = {
@@ -261,6 +263,9 @@ function SortableWorkspaceItem({
     clearRename();
   }
 
+  const chipFx = isFreshHibernate(ws.hibernatedAt) && ws.hibernated
+    ? hibernateFxFor(ws.id, ws.hibernatedAt!)
+    : null;
   const compact = barWidth <= 80;
   const showDetail = !compact && hasDetail(detailFilter);
   const expanded = showDetail && !!ws.detailExpanded && !ws.hibernated;
@@ -359,6 +364,7 @@ function SortableWorkspaceItem({
             compact
               ? "h-9 justify-center text-[12px]"
               : "h-9 gap-2 px-2.5 text-[12px]",
+            chipFx && "relative overflow-hidden",
             lit
               ? "text-foreground"
               : ws.hibernated
@@ -383,6 +389,13 @@ function SortableWorkspaceItem({
           {...listeners}
           aria-pressed={active}
         >
+          {chipFx && (
+            <span
+              key={ws.hibernatedAt}
+              aria-hidden
+              className={cn("pointer-events-none absolute inset-0 bg-primary/40", `hib-chip-${chipFx}`)}
+            />
+          )}
           {compact ? (
             ws.icon && getWorkspaceIcon(ws.icon) ? (
               <HugeiconsIcon
