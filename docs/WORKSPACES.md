@@ -225,9 +225,10 @@ hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
 
 1. With autosave on, `flushDirtyEditors` runs and two animation frames pass so the dirty flags
    reach the workspace state.
-2. `hibernateReview` (`lib/hibernateReview.ts`) lists what would be lost: agents still working,
-   unsaved documents and running commands without "Run on start". An agent only counts as
-   coming back when it has a stored session (`hasResumed`); otherwise it is listed as a command. If the review is empty the
+2. `hibernateReview` (`lib/hibernateReview.ts`) lists what would be lost: busy tabs (agents still
+   working and RunButton scripts in `running` or `waiting`), unsaved documents and commands without
+   "Run on start". An agent only counts as coming back when it has a stored session (`hasResumed`);
+   a busy agent that would not come back carries `runOnStart` so its row offers the button, and an idle one is listed as a command. If the review is empty the
    workspace hibernates immediately; otherwise `pendingWorkspaceId` opens `HibernateDialog`.
 3. `performHibernate` clears the pending id, marks the terminal tabs with `markHibernating`
    (so the exit of their PTYs is not reported as an agent failure), calls `finish` on each agent
@@ -237,10 +238,12 @@ hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
 The dialog title names the workspace and starts with a `WorkspaceMark` (`modules/workspaces/WorkspaceMark.tsx`): the workspace icon painted in its color, or a color dot when it has no icon, plus a sleeping icon if it is hibernated. The Header title and the "Move to Workspace" menu use the same mark. A muted tag with the group label (`groupLabelOf`) follows the name when the workspace belongs to an existing group. The title keeps the last shown workspace and group so it does not flip during the exit animation. If the pending workspace disappears while the dialog is open, `isPendingStale` makes `App.tsx` cancel the request so the shortcut lock is released.
 While the dialog is open `shortcutsDisabled` returns true for every shortcut (the global listener
 runs in capture phase, before the Radix modal); Escape is not a registered shortcut and still closes it.
-`HibernateDialog` is reactive: it recomputes the review from the agent store and the running
-commands store, so a row disappears when its agent finishes or when "Run on start" is enabled
+`HibernateDialog` is reactive: it recomputes the review from the agent store, the running
+commands store and the script state map, so a row disappears when its agent finishes or when "Run on start" is enabled
 (`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are
-empty. Closing a hibernated workspace without waking it discards its carried buffers and
+empty. A busy row has "Kill" (agent: Ctrl+C plus status idle, the session survives) or "Stop"
+(script: the same stop the RunButton sends, without moving focus; disabled as "Stopping" while
+`waiting`). Closing a hibernated workspace without waking it discards its carried buffers and
 hibernating marks. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
 is described above (`wakeWorkspace`).
 

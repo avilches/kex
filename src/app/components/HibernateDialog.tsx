@@ -9,12 +9,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { PlayIcon } from "@hugeicons/core-free-icons";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   getRunningCommandsSnapshot,
+  getScriptRunningSnapshot,
   subscribeToRunningCommands,
+  subscribeToScriptRunning,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { hibernateReview, isReviewEmpty, liveAgent } from "@/modules/workspaces/lib/hibernateReview";
+import { hibernateReview, isReviewEmpty, liveAgent, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 
@@ -26,21 +30,23 @@ type Props = {
   onSaveTab: (tabId: string) => Promise<void>;
   onSaveAll: (tabIds: string[]) => Promise<void>;
   onEnableRunOnStart: (tabId: string, runningCommand?: string) => void;
-  onKillAgent: (tabId: string) => void;
+  onStopBusy: (row: BusyRow) => void;
 };
 
-export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, onSaveTab, onSaveAll, onEnableRunOnStart, onKillAgent }: Props) {
+export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, onSaveTab, onSaveAll, onEnableRunOnStart, onStopBusy }: Props) {
   const sessions = useAgentStore((s) => s.sessions);
   const commands = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
+  const scripts = useSyncExternalStore(subscribeToScriptRunning, getScriptRunningSnapshot);
   const review = useMemo(
     () =>
       workspace
         ? hibernateReview(workspace, {
             agentOf: (id) => liveAgent(sessions[id]),
             runningCommand: (id) => commands.get(id),
+            scriptState: (id) => scripts.get(id),
           })
         : null,
-    [workspace, sessions, commands],
+    [workspace, sessions, commands, scripts],
   );
 
   // Radix keeps the content mounted during the exit animation, after `workspace` is already null.
@@ -73,25 +79,41 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
             )}
           </AlertDialogTitle>
         </AlertDialogHeader>
-        {review && review.agents.length > 0 && (
+        {review && review.busy.length > 0 && (
           <section className="flex flex-col gap-1">
-            <h3 className="text-[12px] font-medium">Waiting for these agents to finish</h3>
-            {review.agents.map((a) => (
-              <div key={a.tabId} className="flex items-center justify-between gap-2">
+            <h3 className="text-[12px] font-medium">Waiting for these to finish</h3>
+            {review.busy.map((b) => (
+              <div key={b.tabId} className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-                  <AgentIcon agent={a.agent} size={12} className="shrink-0" />
-                  <span className="truncate">{a.title ?? a.agent}</span>
+                  {b.agent ? (
+                    <AgentIcon agent={b.agent} size={12} className="shrink-0" />
+                  ) : (
+                    <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
+                  )}
+                  <span className="truncate">{b.name}</span>
                   <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  title="Interrupt this agent so the workspace can hibernate now"
-                  onClick={() => onKillAgent(a.tabId)}
-                >
-                  Kill
-                </Button>
+                <span className="flex shrink-0 items-center gap-2">
+                  {b.runOnStart && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      title="Run this agent again when the workspace is restored"
+                      onClick={() => onEnableRunOnStart(b.tabId, commands.get(b.tabId))}
+                    >
+                      Run on start
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={b.stopping}
+                    title={b.kind === "agent" ? "Interrupt this agent so the workspace can hibernate now" : "Stop this script"}
+                    onClick={() => onStopBusy(b)}
+                  >
+                    {b.stopping ? "Stopping" : b.kind === "agent" ? "Kill" : "Stop"}
+                  </Button>
+                </span>
               </div>
             ))}
             {review.docs.length === 0 && review.commands.length === 0 && (
@@ -150,7 +172,7 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
             Close
           </Button>
           <Button onClick={onHibernate} autoFocus>
-            {review && review.agents.length > 0 ? "Hibernate now" : "Hibernate anyway"}
+            {review && review.busy.length > 0 ? "Hibernate now" : "Hibernate anyway"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

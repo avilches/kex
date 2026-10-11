@@ -20,7 +20,7 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
     autosaveEnabled: () => false,
     flushDirtyEditors: async () => void calls.push("flush"),
     settle: async () => void calls.push("settle"),
-    live: () => ({ agentOf: () => undefined, runningCommand: () => undefined }),
+    live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined }),
     finishAgent: (id) => void calls.push(`finish:${id}`),
     destroyFloats: async () => void calls.push("floats"),
     hibernate: () => void calls.push("hibernate"),
@@ -42,7 +42,7 @@ describe("createHibernateFlow", () => {
 
   it("opens the dialog instead when a command would be lost", async () => {
     const { flow, calls } = setup(ws([term("t1")]), {
-      live: () => ({ agentOf: () => undefined, runningCommand: () => "npm run dev" }),
+      live: () => ({ agentOf: () => undefined, runningCommand: () => "npm run dev", scriptState: () => undefined }),
     });
     await flow.request("w1");
     expect(calls).toContain("pending:w1");

@@ -1,11 +1,13 @@
 import type { AgentStatus } from "@/modules/agents/lib/types";
 import { hasResumed } from "@/modules/agents/lib/restoreCheck";
 import { allPanes } from "./splitNode";
+import type { ScriptState } from "./terminalEphemeralStore";
 import type { Tab, Workspace } from "./types";
 
 export type HibernateLive = {
   agentOf: (tabId: string) => { agent: string; status: AgentStatus; resumable: boolean } | undefined;
   runningCommand: (tabId: string) => string | undefined;
+  scriptState: (tabId: string) => ScriptState | undefined;
 };
 
 export function liveAgent(
@@ -14,13 +16,20 @@ export function liveAgent(
   return session && { agent: session.agent, status: session.status, resumable: hasResumed(session) };
 }
 
-export type AgentRow = { tabId: string; title: string | undefined; agent: string };
+export type BusyRow = {
+  tabId: string;
+  kind: "agent" | "script";
+  name: string;
+  agent?: string;
+  stopping: boolean;
+  runOnStart: boolean;
+};
 export type DocRow = { tabId: string; title: string | undefined; path: string };
 export type CommandRow = { tabId: string; title: string | undefined; command: string };
-export type HibernateReview = { agents: AgentRow[]; docs: DocRow[]; commands: CommandRow[] };
+export type HibernateReview = { busy: BusyRow[]; docs: DocRow[]; commands: CommandRow[] };
 
 export function isReviewEmpty(r: HibernateReview): boolean {
-  return r.agents.length === 0 && r.docs.length === 0 && r.commands.length === 0;
+  return r.busy.length === 0 && r.docs.length === 0 && r.commands.length === 0;
 }
 
 // Mirrors what useTerminalSession does on spawn: with restoreOnRestart not
@@ -32,8 +41,8 @@ function comesBack(tab: Extract<Tab, { kind: "terminal" }>, isAgent: boolean): b
 }
 
 export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateReview {
-  const scriptTabs = new Set((ws.scripts ?? []).map((s) => s.tabId).filter((id): id is string => !!id));
-  const review: HibernateReview = { agents: [], docs: [], commands: [] };
+  const scriptByTab = new Map((ws.scripts ?? []).flatMap((s) => (s.tabId ? [[s.tabId, s] as const] : [])));
+  const review: HibernateReview = { busy: [], docs: [], commands: [] };
 
   for (const tab of allPanes(ws.paneTree).flatMap((p) => p.tabs)) {
     if (tab.kind === "editor" || tab.kind === "markdown") {
@@ -44,10 +53,30 @@ export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateRe
 
     const agent = live.agentOf(tab.id);
     if (agent?.status === "working") {
-      review.agents.push({ tabId: tab.id, title: tab.title, agent: agent.agent });
+      review.busy.push({
+        tabId: tab.id,
+        kind: "agent",
+        name: tab.title ?? agent.agent,
+        agent: agent.agent,
+        stopping: false,
+        runOnStart: !comesBack(tab, agent.resumable),
+      });
       continue;
     }
-    if (scriptTabs.has(tab.id)) continue;
+    const script = scriptByTab.get(tab.id);
+    if (script) {
+      const state = live.scriptState(tab.id);
+      if (state) {
+        review.busy.push({
+          tabId: tab.id,
+          kind: "script",
+          name: script.name,
+          stopping: state === "waiting",
+          runOnStart: false,
+        });
+      }
+      continue;
+    }
     if (comesBack(tab, agent?.resumable === true)) continue;
     const command = live.runningCommand(tab.id) ?? tab.persistentCommand ?? agent?.agent;
     if (!command) continue;

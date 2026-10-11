@@ -3639,7 +3639,14 @@ export default function App() {
             onSaveAll={async (tabIds) => {
               await Promise.all(tabIds.map(saveTabReportingErrors));
             }}
-            onKillAgent={interruptAgentLeaf}
+            onStopBusy={(row) => {
+              if (row.kind === "agent") {
+                interruptAgentLeaf(row.tabId);
+                return;
+              }
+              setScriptRunning(row.tabId, "waiting");
+              terminalHandles.current.get(row.tabId)?.write("\x03");
+            }}
             onEnableRunOnStart={(tabId, running) => {
               const id = hibernateFlow.pendingWorkspaceId;
               if (!id) return;
