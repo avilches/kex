@@ -48,7 +48,7 @@ import {
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
-import { useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
+import { TabDragPreview, useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -916,7 +916,7 @@ export function WorkspaceBar({
   );
   const [isDragging, setIsDragging] = useState(false);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
-  const [dragKind, setDragKind] = useState<"workspace" | "group" | null>(null);
+  const [dragKind, setDragKind] = useState<"workspace" | "group" | "tab" | null>(null);
   // null = "had no group"; undefined = "no drag in progress"
   const [dragStartGroup, setDragStartGroup] = useState<
     string | null | undefined
@@ -951,7 +951,7 @@ export function WorkspaceBar({
     ? `New workspace (${newWorkspaceLabel})`
     : "New workspace";
 
-  const { draggingItem } = useWorkspaceDnd();
+  const { draggingItem, barTabDrag } = useWorkspaceDnd();
   const tabDragging = draggingItem?.kind === "tab";
   const hoverSwitch = useMemo(() => createHoverSwitch(onSelect), [onSelect]);
   useEffect(() => {
@@ -970,11 +970,15 @@ export function WorkspaceBar({
 
   function handleDragStart(event: DragStartEvent) {
     setIsDragging(true);
-    const kind =
-      event.active.data.current?.type === "group" ? "group" : "workspace";
+    const type = event.active.data.current?.type;
+    const kind = type === "group" || type === "tab" ? type : "workspace";
     setDragKind(kind);
     const id = String(event.active.id);
     setDragActiveId(id);
+    if (kind === "tab") {
+      barTabDrag.start(id);
+      return;
+    }
     if (kind === "workspace") {
       const ws = workspaces.find((w) => w.id === id);
       setDragStartGroup(ws?.groupId ?? null);
@@ -982,7 +986,7 @@ export function WorkspaceBar({
   }
 
   function handleDragOver(event: DragOverEvent) {
-    if (dragKind === "group") return;
+    if (dragKind === "group" || dragKind === "tab") return;
     const { active, over } = event;
     if (!over) return;
     const overId = String(over.id);
@@ -1005,6 +1009,10 @@ export function WorkspaceBar({
     setDragActiveId(null);
     setDragStartGroup(undefined);
     setDragKind(null);
+    if (kind === "tab") {
+      barTabDrag.cancel();
+      return;
+    }
     if (kind === "workspace" && id !== null && saved !== undefined) {
       onPreviewGroup(id, saved);
     }
@@ -1019,6 +1027,11 @@ export function WorkspaceBar({
     setDragStartGroup(undefined);
     setDragKind(null);
     const { active, over } = event;
+
+    if (kind === "tab") {
+      barTabDrag.end(String(active.id));
+      return;
+    }
 
     if (kind === "group") {
       if (over) {
@@ -1046,6 +1059,8 @@ export function WorkspaceBar({
     if (id !== null && saved !== undefined) onCommitGroupMove();
   }
 
+  const dragActiveTab =
+    dragKind === "tab" && draggingItem?.kind === "tab" ? draggingItem : null;
   const dragActiveWs =
     dragKind === "workspace" && dragActiveId
       ? workspaces.find((w) => w.id === dragActiveId)
@@ -1069,6 +1084,7 @@ export function WorkspaceBar({
         onDragCancel={handleDragCancel}
       >
         <SortableContext
+ disabled={dragKind === "tab"}
           items={sortableGroupIds}
           strategy={verticalListSortingStrategy}
         >
@@ -1106,6 +1122,7 @@ export function WorkspaceBar({
                           if (!activeWs) return null;
                           return (
                             <SortableContext
+ disabled={dragKind === "tab"}
                               items={[activeWs.id]}
                               strategy={verticalListSortingStrategy}
                             >
@@ -1135,6 +1152,7 @@ export function WorkspaceBar({
                         }
                         return (
                           <SortableContext
+ disabled={dragKind === "tab"}
                             items={group.items.map((w) => w.id)}
                             strategy={verticalListSortingStrategy}
                           >
@@ -1181,7 +1199,10 @@ export function WorkspaceBar({
           </div>
         </SortableContext>
 
-        <DragOverlay dropAnimation={dropAnimation}>
+        <DragOverlay dropAnimation={dragActiveTab ? null : dropAnimation} className="pointer-events-none">
+          {dragActiveTab && (
+            <TabDragPreview tab={dragActiveTab.tab} workspaceId={dragActiveTab.workspaceId} />
+          )}
           {dragActiveWs
             ? (() => {
                 const displayColor = resolveWorkspaceColor(

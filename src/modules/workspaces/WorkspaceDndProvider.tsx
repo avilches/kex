@@ -38,17 +38,39 @@ type DraggingItem =
   // synthetic root and ".." rows), never participate in internal explorer moves.
   | { kind: "file"; path: string; isDir: boolean; paneOnly?: boolean };
 
+// The WorkspaceBar runs its own nested DndContext (workspace sorting), so a row
+// dragged from the bar never reaches this provider's context. The bar forwards
+// the start, end and cancel of such a drag through these callbacks instead.
+export type BarTabDrag = {
+  start: (tabId: string) => void;
+  end: (tabId: string) => void;
+  cancel: () => void;
+};
+
 type WorkspaceDndContextValue = {
   draggingItem: DraggingItem | null;
+  barTabDrag: BarTabDrag;
 };
+
+const noop = () => {};
 
 const WorkspaceDndContext = createContext<WorkspaceDndContextValue>({
   draggingItem: null,
+  barTabDrag: { start: noop, end: noop, cancel: noop },
 });
 
 // Separate context so tabInsertPaneId changes (every dragover) only re-render
 // PaneDropOverlay, not the entire workspace tree.
 const WorkspaceDndInsertContext = createContext<string | null>(null);
+
+export function TabDragPreview({ tab, workspaceId }: { tab: Tab; workspaceId: string }) {
+  return (
+    <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
+      <span className="shrink-0 opacity-70">{tabIcon(tab, workspaceId)}</span>
+      <span className="max-w-[120px] truncate">{tabTitle(tab)}</span>
+    </div>
+  );
+}
 
 export function useWorkspaceDnd(): WorkspaceDndContextValue {
   return useContext(WorkspaceDndContext);
@@ -141,9 +163,12 @@ export function WorkspaceDndProvider({
   );
 
   function handleDragStart(event: DragStartEvent) {
+    startDrag(String(event.active.id));
+  }
+
+  function startDrag(activeId: string) {
     document.body.style.cursor = "grabbing";
     dragIndexRef.current = buildDragIndex();
-    const activeId = String(event.active.id);
     if (activeId.startsWith("file:")) {
       setDraggingItem({ kind: "file", path: activeId.slice(5), isDir: false });
       return;
@@ -242,6 +267,10 @@ export function WorkspaceDndProvider({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    endDrag(String(event.active.id), event.over?.id ? String(event.over.id) : null);
+  }
+
+  function endDrag(activeId: string, overId: string | null) {
     const originId = takeOrigin();
     document.body.style.cursor = "";
     const idx = dragIndexRef.current;
@@ -250,26 +279,22 @@ export function WorkspaceDndProvider({
     setTabInsertPaneId(null);
     const barWorkspaceId = dropWorkspaceIdRef.current;
     setDropWorkspaceId(null);
-    const { active, over } = event;
     if (barWorkspaceId && draggingItem?.kind === "tab") {
-      const source = idx.get(String(active.id));
+      const source = idx.get(activeId);
       const target = workspaces.find((w) => w.id === barWorkspaceId);
       if (!source || !target || !canDropTabOnWorkspace(source.wsId, target)) {
         restoreOrigin(false, originId);
         return;
       }
-      void onMoveTabToWorkspace(source.wsId, String(active.id), { kind: "auto", workspaceId: barWorkspaceId }).then(
+      void onMoveTabToWorkspace(source.wsId, activeId, { kind: "auto", workspaceId: barWorkspaceId }).then(
         (destinationId) => restoreOrigin(destinationId !== null, originId),
       );
       return;
     }
-    if (!over) {
+    if (overId === null) {
       restoreOrigin(false, originId);
       return;
     }
-
-    const activeId = String(active.id);
-    const overId = String(over.id);
 
     if (activeId.startsWith("file:")) {
       if (handleScratchpadDrop(activeId.slice(5), overId)) return;
@@ -392,7 +417,17 @@ export function WorkspaceDndProvider({
     }
   }
 
-  const ctxValue = useMemo(() => ({ draggingItem }), [draggingItem]);
+  const latest = useRef({ startDrag, endDrag, handleDragCancel });
+  latest.current = { startDrag, endDrag, handleDragCancel };
+  const barTabDrag = useMemo<BarTabDrag>(
+    () => ({
+      start: (tabId) => latest.current.startDrag(tabId),
+      end: (tabId) => latest.current.endDrag(tabId, null),
+      cancel: () => latest.current.handleDragCancel(),
+    }),
+    [],
+  );
+  const ctxValue = useMemo(() => ({ draggingItem, barTabDrag }), [draggingItem, barTabDrag]);
   const dropTargetValue = useMemo(
     () => ({ id: dropWorkspaceId, set: setDropWorkspaceId }),
     [dropWorkspaceId, setDropWorkspaceId],
@@ -419,10 +454,7 @@ export function WorkspaceDndProvider({
       {/* Without pointer-events-none the overlay under the cursor swallows the WorkspaceBar hover. */}
       <DragOverlay dropAnimation={null} className="pointer-events-none">
         {draggingItem?.kind === "tab" && (
-          <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
-            <span className="shrink-0 opacity-70">{tabIcon(draggingItem.tab, draggingItem.workspaceId)}</span>
-            <span className="max-w-[120px] truncate">{tabTitle(draggingItem.tab)}</span>
-          </div>
+          <TabDragPreview tab={draggingItem.tab} workspaceId={draggingItem.workspaceId} />
         )}
         {draggingItem?.kind === "file" && (
           <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">

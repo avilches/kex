@@ -1,3 +1,4 @@
+import { useDraggable } from "@dnd-kit/core";
 import { memo, useEffect, useMemo, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { PopoverAnchor } from "@/components/ui/popover";
@@ -79,6 +80,11 @@ function DetailTabRow({
   const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
   const { onRenameTab } = useSidebarTabMenu();
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: tab.id,
+    data: { type: "tab" },
+  });
+
   const [menuOpen, setMenuOpen] = useState(false);
   const closeSignal = useContextMenuCloseStore((s) => s.signal);
   // biome-ignore lint/correctness/useExhaustiveDependencies: closeSignal is a bump counter, only its change matters
@@ -98,12 +104,16 @@ function DetailTabRow({
         <ContextMenuTrigger asChild>
           <PopoverAnchor asChild>
             <button
+              ref={setNodeRef}
+              {...attributes}
+              {...listeners}
               type="button"
               title={title}
               aria-current={focused || undefined}
               onClick={() => onActivate(tab.id)}
               className={cn(
                 "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
+                isDragging && "opacity-40",
                 focused
                   ? "bg-foreground/[0.16] font-medium text-foreground"
                   : "text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground",

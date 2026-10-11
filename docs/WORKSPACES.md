@@ -495,6 +495,7 @@ physically smaller and registered on top). Pane zones handle the content area an
 Cross-workspace drops are supported. While a tab is dragged, each workspace of the `WorkspaceBar` is a
 hover target: keeping the pointer on it for 600 ms (`createHoverSwitch`, `lib/hoverSwitch.ts`) makes it
 the active workspace, and only the active workspace renders drop zones, so the drop uses the usual zones.
+The tab rows under a workspace in the `WorkspaceBar` (`WorkspaceDetailList`) are draggable too. The bar has its own nested `DndContext` for sorting workspaces, so those rows belong to it and forward `start`/`end`/`cancel` to this provider through `useWorkspaceDnd().barTabDrag`; such a drag can only land on a workspace of the bar (the pane drop zones live in the outer context), and the bar disables its sortable contexts while it lasts.
 `WorkspaceDndProvider` wraps the `WorkspaceBar` (which keeps its own nested `DndContext` for reordering
 workspaces) so the bar can read `draggingItem`. The provider's `DragOverlay` is `pointer-events-none`,
 otherwise the chip under the cursor would swallow the `pointerenter` of the bar items. The provider
