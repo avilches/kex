@@ -264,7 +264,7 @@ function DraggableTab({
               : <AgentIcon agent={agentSession!.agent} size={12} />
           : tab.kind === "browser" && tab.floating
             ? <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
-            : tabIcon(tab, workspaceId)}
+            : tabIcon(tab, !!runningCommand)}
       </span>
       <span
         className={cn(

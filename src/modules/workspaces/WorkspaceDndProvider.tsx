@@ -554,7 +554,7 @@ export function WorkspaceDndProvider({
         {!draggingItem && barOverlay?.node}
         {draggingItem?.kind === "tab" && (
           <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
-            <span className="shrink-0 opacity-70">{tabIcon(draggingItem.tab, draggingItem.workspaceId)}</span>
+            <span className="shrink-0 opacity-70">{tabIcon(draggingItem.tab)}</span>
             <span className="max-w-[120px] truncate">{tabTitle(draggingItem.tab)}</span>
           </div>
         )}

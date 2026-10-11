@@ -16,6 +16,7 @@ export type AgentTabTitleInfo = {
   displayTitle: string;
   isDescription: boolean;
   hasAgent: boolean;
+  isRunning: boolean;
   agentSession: AgentSession | undefined;
 };
 
@@ -47,5 +48,5 @@ export function useAgentTabTitle(tab: Tab | null): AgentTabTitleInfo | null {
   );
   const isDescription = !!(tab.title || oscTitle || sessionTitle);
 
-  return { displayTitle, isDescription, hasAgent, agentSession };
+  return { displayTitle, isDescription, hasAgent, isRunning: !!runningCommand, agentSession };
 }

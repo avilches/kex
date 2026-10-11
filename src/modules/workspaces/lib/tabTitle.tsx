@@ -1,4 +1,5 @@
 import {
+  AppWindowMacIcon,
   ComputerTerminal01Icon,
   GitCommitIcon,
   GitCompareIcon,
@@ -66,9 +67,10 @@ const TAB_ICONS: Record<Exclude<Tab["kind"], "editor" | "markdown">, IconSvgElem
   "git-commit-file": GitCommitIcon,
 };
 
-export function tabIcon(tab: Tab, _workspaceId?: string): ReactNode {
+export function tabIcon(tab: Tab, running = false): ReactNode {
   if (tab.kind === "editor" || tab.kind === "markdown") {
     return <img src={fileIconUrl(basename(tab.path))} alt="" className="size-3.5 shrink-0" />;
   }
-  return <HugeiconsIcon icon={TAB_ICONS[tab.kind]} size={13} strokeWidth={2} />;
+  const icon = tab.kind === "terminal" && running ? AppWindowMacIcon : TAB_ICONS[tab.kind];
+  return <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />;
 }
