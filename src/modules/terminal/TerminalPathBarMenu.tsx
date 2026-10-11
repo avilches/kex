@@ -133,7 +133,6 @@ export function TerminalPathBarMenu({
             <CopyIdButton value={tabId} label="tab id" />
           </span>
         </div>
-        <DropdownMenuSeparator />
         {agentSession && (
           <>
             <DropdownMenuSeparator />
