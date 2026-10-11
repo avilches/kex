@@ -109,3 +109,19 @@ describe("PaneTabBar rename and note", () => {
     expect(getTab().note).toBe("x");
   });
 });
+
+describe("PaneTabBar plus button", () => {
+  beforeEach(() => vi.stubGlobal("ResizeObserver", RO));
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("sits outside the scrolling tab strip so it never scrolls out of view", () => {
+    setup({ id: "tab-1", kind: "terminal" });
+    const plus = screen.getByText("+");
+    const strip = document.querySelector("[data-tab-id]")!.parentElement!;
+    expect(strip.contains(plus)).toBe(false);
+    expect(strip.className).toContain("overflow-x-auto");
+  });
+});
