@@ -258,19 +258,20 @@ function SortableWorkspaceItem({
 
   const compact = barWidth <= 80;
   const showDetail = !compact && hasDetail(detailFilter);
-  const expanded = showDetail && !!ws.detailExpanded;
+  const expanded = showDetail && !!ws.detailExpanded && !ws.hibernated;
   const agentCount = activeAgentCount(agentEntries);
 
   const detailToggle = showDetail ? (
     <span
       role="button"
       aria-expanded={expanded}
-      title={expanded ? "Hide tabs" : "Show tabs"}
+      title={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
-        onSetDetailExpanded(ws.id, !expanded);
+        if (ws.hibernated) onWake?.(ws.id);
+        else onSetDetailExpanded(ws.id, !expanded);
       }}
       className="flex size-[14px] shrink-0 items-center justify-center rounded opacity-60 hover:opacity-100"
     >
@@ -345,7 +346,7 @@ function SortableWorkspaceItem({
             if (active) onRestoreFocus();
             else onSelect(ws.id);
           }}
-          onDoubleClick={() => onOpenSettings(ws.id)}
+          onDoubleClick={() => (ws.hibernated ? onWake?.(ws.id) : onOpenSettings(ws.id))}
           className={cn(
             "flex w-full items-center rounded-lg font-semibold transition-all select-none",
             compact
@@ -407,7 +408,8 @@ function SortableWorkspaceItem({
                   }}
                   onDoubleClick={(e) => e.stopPropagation()}
                 >
-                  <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} />
+                  <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="group-hover:hidden" />
+                  <HugeiconsIcon icon={Undo02Icon} size={13} strokeWidth={1.75} className="hidden group-hover:block" />
                 </span>
               )}
               {agentCount > 0 && (
