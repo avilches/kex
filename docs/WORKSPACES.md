@@ -260,8 +260,10 @@ is empty, that is, no agent working, no script running, no unsaved document and 
 An agent in `attention` (waiting for the user) also blocks it, and `requestAuto` re-checks that the workspace is still
 not the active one after saving, so entering a queued workspace mid-check cancels it. A hibernated workspace keeps its
 clock at "now", so restoring it without activating it does not hibernate it again at the next tick. Changing the
-setting keeps the existing clocks. A document that changed on disk while dirty is still overwritten by the save
-(same as `saveTab` everywhere else). `requestAuto` never opens `HibernateDialog`; anything else leaves the workspace
+setting keeps the existing clocks. A document with a pending reload conflict (changed on disk while dirty)
+blocks it: `useDocument.save` throws `CONFLICT_SAVE_ERROR` while the conflict overlay is up, so `saveWorkspaceDocs`
+fails. The same guard applies to every save path (manual save reports it as a toast, the autosave timer and the
+unmount flush skip the write and the unmount carries the buffer in memory instead). `requestAuto` never opens `HibernateDialog`; anything else leaves the workspace
 awake until the next check.
 
 #### Startup hibernation

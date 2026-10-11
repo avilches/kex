@@ -15,7 +15,7 @@ vi.mock("@/modules/settings/preferences", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { useDocument, type DocumentState } from "./useDocument";
+import { CONFLICT_SAVE_ERROR, useDocument, type DocumentState } from "./useDocument";
 
 type Hook = ReturnType<typeof useDocument>;
 
@@ -169,6 +169,33 @@ describe("useDocument reload", () => {
       content: "on disk",
       size: 7,
     } satisfies DocumentState);
+
+    harness.unmount();
+  });
+
+  it("refuses to save while a conflict is pending, and saves once the user keeps the local edit", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const harness = mountUseDocument("/tmp/c.txt");
+    await flush();
+    act(() => {
+      harness.hook.onChange("local edit");
+    });
+    act(() => {
+      harness.hook.reload();
+    });
+    expect(harness.hook.conflict).toBe(true);
+    vi.mocked(invoke).mockClear();
+
+    await expect(harness.hook.save()).rejects.toThrow(CONFLICT_SAVE_ERROR);
+    expect(invoke).not.toHaveBeenCalledWith("fs_write_file", expect.anything());
+
+    act(() => {
+      harness.hook.keepLocalChanges();
+    });
+    await act(async () => {
+      await harness.hook.save();
+    });
+    expect(invoke).toHaveBeenCalledWith("fs_write_file", expect.objectContaining({ content: "local edit" }));
 
     harness.unmount();
   });
