@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { act, createElement } from "react";
-import { createRoot } from "react-dom/client";
+import { DndContext } from "@dnd-kit/core";
+import { createRoot as createDomRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildAgentEntries } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
@@ -9,6 +10,14 @@ import type { Tab } from "@/modules/workspaces/lib/types";
 import { SidebarTabMenuProvider } from "@/modules/workspaces/SidebarTabMenuContext";
 import type { DetailFilter } from "@/modules/workspaces/lib/workspaceDetail";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
+
+// The rows register with dnd-kit, so they always render inside a DndContext in the app.
+function createRoot(container: Element) {
+  const root = createDomRoot(container);
+  const render = root.render.bind(root);
+  root.render = (el) => render(createElement(DndContext, null, el));
+  return root;
+}
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -101,7 +110,7 @@ describe("WorkspaceDetailList", () => {
   it("renders nothing when there is nothing to list", () => {
     resetAgents();
     const { container, unmount } = mount({ terminals: "active-agents" });
-    expect(container.innerHTML).toBe("");
+    expect(container.querySelector("button")).toBeNull();
     unmount();
   });
 });

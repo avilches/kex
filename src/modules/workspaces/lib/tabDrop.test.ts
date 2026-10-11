@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { canDropTabOnWorkspace, HIBERNATED_DROP_PREFIX, originToRestore, resolveTabDrop, type TabLocation } from "./tabDrop";
+import {
+  canDropTabOnWorkspace,
+  HIBERNATED_DROP_PREFIX,
+  originToRestore,
+  resolveSideRowDrop,
+  resolveTabDrop,
+  sideRowSide,
+  type SideRowDropData,
+  type TabLocation,
+} from "./tabDrop";
 import type { PaneNode, Tab, Workspace } from "./types";
 
 const term = (id: string): Tab => ({ id, kind: "terminal" });
@@ -137,5 +146,49 @@ describe("canDropTabOnWorkspace", () => {
 
   it("rejects the tab's own workspace", () => {
     expect(canDropTabOnWorkspace("A", { id: "A" })).toBe(false);
+  });
+});
+
+describe("pane-index drops", () => {
+  it("reorders, moves or transfers to an explicit index", () => {
+    expect(resolveTabDrop("pane-index:pa1:0", "t2", workspaces, idx, 8)).toEqual({
+      kind: "reorder", workspaceId: "A", tabId: "t2", index: 0,
+    });
+    expect(resolveTabDrop("pane-index:pa1:0", "t3", workspaces, idx, 8)).toEqual({
+      kind: "move", workspaceId: "A", tabId: "t3", paneId: "pa1", index: 0,
+    });
+    expect(resolveTabDrop("pane-index:pb1:0", "t1", workspaces, idx, 8)).toEqual({
+      kind: "transfer",
+      sourceWorkspaceId: "A",
+      tabId: "t1",
+      request: { kind: "pane", workspaceId: "B", paneId: "pb1", index: 0 },
+    });
+  });
+
+  it("rejects an unknown pane or a bad index", () => {
+    expect(resolveTabDrop("pane-index:nope:0", "t1", workspaces, idx, 8)).toBeNull();
+    expect(resolveTabDrop("pane-index:pa1:x", "t1", workspaces, idx, 8)).toBeNull();
+    expect(resolveTabDrop("pane-index:pa1:-1", "t1", workspaces, idx, 8)).toBeNull();
+  });
+});
+
+describe("sidebar row drops", () => {
+  const row = (tabId: string, prevTabId: string | null): SideRowDropData => ({
+    sideRow: true, workspaceId: "A", tabId, prevTabId,
+  });
+
+  it("picks the side from the pointer position over the row", () => {
+    expect(sideRowSide({ top: 100, height: 20 }, 105)).toBe("before");
+    expect(sideRowSide({ top: 100, height: 20 }, 115)).toBe("after");
+  });
+
+  it("drops after the tab above, or after the hovered tab in the lower half", () => {
+    expect(resolveSideRowDrop(row("t3", "t2"), "before", workspaces)).toBe("tab-insert:t2:after");
+    expect(resolveSideRowDrop(row("t3", "t2"), "after", workspaces)).toBe("tab-insert:t3:after");
+  });
+
+  it("drops at the start of the first pane above the first row", () => {
+    expect(resolveSideRowDrop(row("t1", null), "before", workspaces)).toBe("pane-index:pa1:0");
+    expect(resolveSideRowDrop({ ...row("t1", null), workspaceId: "nope" }, "before", workspaces)).toBeNull();
   });
 });

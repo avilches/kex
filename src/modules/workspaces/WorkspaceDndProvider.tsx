@@ -19,7 +19,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { closestCenter } from "@dnd-kit/core";
 import { tabForDroppedPath } from "./lib/dropTab";
 import { allPanes, findOpenPathTab, findTabPane } from "./lib/splitNode";
-import { canDropTabOnWorkspace, originToRestore, resolveTabDrop, type TabLocation } from "./lib/tabDrop";
+import {
+  canDropTabOnWorkspace,
+  originToRestore,
+  resolveSideRowDrop,
+  resolveTabDrop,
+  SIDE_ROW_DROP_PREFIX,
+  sideRowSide,
+  type SideRowDropData,
+  type TabLocation,
+} from "./lib/tabDrop";
 import type { TabMoveRequest } from "./lib/tabTransfer";
 import {
   insertIntoLeafScratchpad,
@@ -109,6 +118,10 @@ export function sidebarTabDragId(tabId: string): string {
   return SIDEBAR_TAB_PREFIX + tabId;
 }
 
+function sideRowData(data: Record<string, unknown> | undefined): SideRowDropData | null {
+  return data?.sideRow === true ? (data as unknown as SideRowDropData) : null;
+}
+
 function draggedId(id: string | number): string {
   const s = String(id);
   return s.startsWith(SIDEBAR_TAB_PREFIX) ? s.slice(SIDEBAR_TAB_PREFIX.length) : s;
@@ -140,8 +153,10 @@ const tabCollisionDetection: CollisionDetection = (args) => {
   const onScratchpad = collisions.find((c) =>
     String(c.id).startsWith(SCRATCHPAD_DROP_PREFIX),
   );
-  if (!onScratchpad) return collisions;
-  return [onScratchpad, ...collisions.filter((c) => c !== onScratchpad)];
+  // A sidebar row sits inside its workspace's sortable item, which also collides.
+  const preferred = onScratchpad ?? collisions.find((c) => String(c.id).startsWith(SIDE_ROW_DROP_PREFIX));
+  if (!preferred) return collisions;
+  return [preferred, ...collisions.filter((c) => c !== preferred)];
 };
 
 type Props = {
@@ -350,6 +365,21 @@ export function WorkspaceDndProvider({
     const barWorkspaceId = dropWorkspaceIdRef.current;
     setDropWorkspaceId(null);
     const { active, over } = event;
+    // The rows sit inside their workspace's hover area, so a row drop must win over the workspace drop.
+    const sideRow = draggingItem?.kind === "tab" ? sideRowData(over?.data.current) : null;
+    if (sideRow && over) {
+      const pointer = getEventCoordinates(event.activatorEvent);
+      const side = sideRowSide(over.rect, (pointer?.y ?? 0) + event.delta.y);
+      const rowOverId = resolveSideRowDrop(sideRow, side, workspaces);
+      if (!rowOverId) {
+        restoreOrigin(false, originId);
+        return;
+      }
+      const placed = handleTabDragEnd(draggedId(active.id), rowOverId, idx);
+      if (typeof placed === "boolean") restoreOrigin(placed, originId);
+      else void placed.then((ok) => restoreOrigin(ok, originId));
+      return;
+    }
     if (barWorkspaceId && draggingItem?.kind === "tab") {
       const source = idx.get(draggedId(active.id));
       const target = workspaces.find((w) => w.id === barWorkspaceId);
