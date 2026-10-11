@@ -150,7 +150,7 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
             Close
           </Button>
           <Button onClick={onHibernate} autoFocus>
-            Hibernate anyway
+            {review && review.agents.length > 0 ? "Hibernate now" : "Hibernate anyway"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
