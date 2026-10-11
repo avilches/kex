@@ -24,6 +24,7 @@ export type ThemePref = "system" | "light" | "dark";
 type TabBarStyle = "connected" | "pill";
 
 export type GitColorScheme = "vscode" | "jetbrains";
+export type AutofocusMode = "manual" | "new-tabs" | "always";
 
 export type ScmViewMode = "list" | "tree";
 
@@ -156,7 +157,7 @@ export type Preferences = {
   editorLetterSpacing: number;
   editorLineHeight: number;
   autostart: boolean;
-  autofocusNewTabs: boolean;
+  autofocusMode: AutofocusMode;
   explorerGitColorScheme: GitColorScheme;
   scmViewMode: ScmViewMode;
   terminalWebglEnabled: boolean;
@@ -226,7 +227,7 @@ const KEY_THEME_ID = "themeId";
 const KEY_TERMINAL_THEME = "terminalTheme";
 const KEY_THEME_AUTO = "themeAuto";
 const KEY_AUTOSTART = "autostart";
-const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
+const KEY_AUTOFOCUS_MODE = "autofocusMode";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_WARN_ON_CLOSE_WORKSPACE = "warnOnCloseWorkspace";
@@ -406,7 +407,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorLetterSpacing: LETTER_SPACING_DEFAULT,
   editorLineHeight: EDITOR_LINE_HEIGHT_DEFAULT,
   autostart: false,
-  autofocusNewTabs: false,
+  autofocusMode: "manual",
   explorerGitColorScheme: "vscode",
   scmViewMode: "tree",
   terminalWebglEnabled: true,
@@ -578,9 +579,11 @@ export async function loadPreferences(): Promise<Preferences> {
       getEditor<number>(KEY_EDITOR_LINE_HEIGHT) ??
       DEFAULT_PREFERENCES.editorLineHeight,
     autostart: getGeneral<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
-    autofocusNewTabs:
-      getGeneral<boolean>(KEY_AUTOFOCUS_NEW_TABS) ??
-      DEFAULT_PREFERENCES.autofocusNewTabs,
+    autofocusMode: (() => {
+      const v = getGeneral<string>(KEY_AUTOFOCUS_MODE);
+      if (v === "manual" || v === "new-tabs" || v === "always") return v;
+      return DEFAULT_PREFERENCES.autofocusMode;
+    })(),
     explorerGitColorScheme: (() => {
       const v = getGeneral<string>(KEY_EXPLORER_GIT_COLOR_SCHEME);
       if (v === "vscode" || v === "jetbrains") return v;
@@ -877,8 +880,8 @@ export async function setAutostart(value: boolean): Promise<void> {
   await writePref(KEY_AUTOSTART, value);
 }
 
-export async function setAutofocusNewTabs(value: boolean): Promise<void> {
-  await writePref(KEY_AUTOFOCUS_NEW_TABS, value);
+export async function setAutofocusMode(value: AutofocusMode): Promise<void> {
+  await writePref(KEY_AUTOFOCUS_MODE, value);
 }
 
 export async function setExplorerGitColorScheme(value: GitColorScheme): Promise<void> {
@@ -1249,7 +1252,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_TERMINAL_THEME]: "terminalTheme",
   [KEY_THEME_AUTO]: "themeAuto",
   [KEY_AUTOSTART]: "autostart",
-  [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
+  [KEY_AUTOFOCUS_MODE]: "autofocusMode",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
   [KEY_WARN_ON_CLOSE_WORKSPACE]: "warnOnCloseWorkspace",

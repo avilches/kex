@@ -1,5 +1,6 @@
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type { ExplorerRootMode };
+import type { AutofocusMode } from "@/modules/settings/store";
 
 export type ScriptCwdMode = "workspace" | "context" | "fixed";
 
@@ -50,6 +51,12 @@ export type Tab =
 // Only browser (web URL) and git-history (no single file) lack it.
 export function isAutofocusTab(p: Tab): boolean {
   return p.kind === "terminal" || "path" in p;
+}
+
+// In "always" mode every capable tab drives the sidebar; the per-tab flag is
+// kept untouched so it applies again when the mode is switched back.
+export function isAutofocusActive(p: Tab, mode: AutofocusMode): boolean {
+  return isAutofocusTab(p) && (mode === "always" || p.autofocus === true);
 }
 
 export type PaneNode = {

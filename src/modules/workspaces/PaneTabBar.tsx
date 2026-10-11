@@ -140,6 +140,7 @@ function DraggableTab({
     () => (tab.kind === "terminal" ? getOscTitle(tab.id) : undefined),
   );
   const title = tabTitle(tab, runningCommand, oscTitle);
+  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
   const agentTabTitle = useAgentTabTitle(tab);
@@ -290,7 +291,7 @@ function DraggableTab({
         />
       )}
       {isLocked && statusIndicator && <span className="ml-0.5 flex shrink-0 items-center">{statusIndicator}</span>}
-      {isAutofocusTab(tab) && tab.autofocus && (
+      {isAutofocusTab(tab) && tab.autofocus && autofocusMode !== "always" && (
         <span
           className="ml-0.5 shrink-0 text-muted-foreground"
           title="Autofocus: this tab drives the sidebar"

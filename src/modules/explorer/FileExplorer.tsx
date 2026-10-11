@@ -417,6 +417,7 @@ export const FileExplorer = memo(
 
     const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
     const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+    const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
     const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
     const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -1216,17 +1217,19 @@ export const FileExplorer = memo(
           >
             <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={onFocusActiveTab}
-            disabled={!onFocusActiveTab}
-            title="Focus the active tab's file or folder in the explorer"
-            aria-label="Focus active tab in explorer"
-          >
-            <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
-          </Button>
+          {autofocusMode !== "always" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={onFocusActiveTab}
+              disabled={!onFocusActiveTab}
+              title="Focus the active tab's file or folder in the explorer"
+              aria-label="Focus active tab in explorer"
+            >
+              <HugeiconsIcon icon={CrosshairIcon} size={13} strokeWidth={2} />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"

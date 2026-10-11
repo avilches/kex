@@ -26,6 +26,7 @@ import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
@@ -64,6 +65,7 @@ export function TabContextMenuItems({
   onRenameTab,
   onUpdateTab,
 }: Props) {
+  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const { targets, moveTab } = useWorkspaceMove();
   const startRename = useTabRenameStore((s) => s.startRename);
   const otherTargets = targets.filter((t) => t.id !== workspaceId);
@@ -114,7 +116,7 @@ export function TabContextMenuItems({
               Remove Note
             </ContextMenuItem>
           )}
-          {isAutofocusTab(tab) && (
+          {isAutofocusTab(tab) && autofocusMode !== "always" && (
             <ContextMenuItem
               onSelect={() =>
                 onUpdateTab?.(tab.id, (p) =>

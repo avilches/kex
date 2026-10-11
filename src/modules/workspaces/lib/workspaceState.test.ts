@@ -12,13 +12,30 @@ import {
   sanitizeTab,
   sanitizeWorkspace,
 } from "./workspaceState";
-import type { Tab } from "./types";
+import { isAutofocusActive, type Tab } from "./types";
 import type { Workspace } from "./types";
 
 describe("sanitizeTab", () => {
   it("preserves the terminal autofocus flag", () => {
     const p: Tab = { id: "t1", kind: "terminal", cwd: "/a", autofocus: true };
     expect(sanitizeTab(p)).toMatchObject({ autofocus: true });
+  });
+});
+
+describe("isAutofocusActive", () => {
+  const off: Tab = { id: "t1", kind: "terminal", cwd: "/a" };
+  const on: Tab = { ...off, autofocus: true };
+  const web: Tab = { id: "b1", kind: "browser", url: "https://x" };
+
+  it("follows the per-tab flag in manual and new-tabs modes", () => {
+    expect(isAutofocusActive(on, "manual")).toBe(true);
+    expect(isAutofocusActive(off, "manual")).toBe(false);
+    expect(isAutofocusActive(off, "new-tabs")).toBe(false);
+  });
+
+  it("is true for every capable tab in always mode, never for the rest", () => {
+    expect(isAutofocusActive(off, "always")).toBe(true);
+    expect(isAutofocusActive(web, "always")).toBe(false);
   });
 });
 
