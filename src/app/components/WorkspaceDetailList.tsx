@@ -142,7 +142,7 @@ function DetailTabRow({
               aria-current={focused || undefined}
               onClick={() => onActivate(tab.id)}
               className={cn(
-                "group flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
+                "group/tab flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
                 isDragging && "opacity-40",
                 focused
                   ? "bg-foreground/[0.16] font-medium text-foreground"
@@ -171,7 +171,7 @@ function DetailTabRow({
               ) : (
                 <span className="relative flex size-[16px] shrink-0 items-center justify-center">
                   {visual !== null && (
-                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover:opacity-0">
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover/tab:opacity-0">
                       <StatusMark visual={visual} />
                     </span>
                   )}
@@ -179,7 +179,7 @@ function DetailTabRow({
                   <span
                     role="button"
                     tabIndex={-1}
-                    className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity hover:bg-muted group-hover:opacity-60 hover:!opacity-100"
+                    className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity hover:bg-muted group-hover/tab:opacity-60 hover:!opacity-100"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
