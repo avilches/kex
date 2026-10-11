@@ -1,3 +1,5 @@
+import { SleepingIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import type { Tab, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
@@ -28,7 +30,6 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
         id={workspace.id}
         color={workspace.color}
         icon={workspace.icon}
-        hibernated={workspace.hibernated}
         size={26}
       />
       <div className="flex min-w-0 flex-col justify-center gap-0.5">
@@ -36,6 +37,14 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
           <span className="truncate text-[13.5px] font-semibold leading-none text-foreground">
             {workspace.title || "Workspace"}
           </span>
+          {workspace.hibernated && (
+            <HugeiconsIcon
+              icon={SleepingIcon}
+              size={12}
+              strokeWidth={1.75}
+              className="shrink-0 text-muted-foreground opacity-50"
+            />
+          )}
           {group && (
             <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[10.5px] font-medium leading-none text-muted-foreground">
               {group.label}
