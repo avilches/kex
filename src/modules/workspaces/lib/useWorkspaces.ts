@@ -104,7 +104,7 @@ export function findReopenTarget(
 // here, so their persisted flag is preserved.
 function withNewTabAutofocus(tab: Tab): Tab {
   if (!isAutofocusTab(tab) || tab.autofocus !== undefined) return tab;
-  return usePreferencesStore.getState().autofocusNewTabs
+  return usePreferencesStore.getState().autofocusMode === "new-tabs"
     ? { ...tab, autofocus: true }
     : tab;
 }

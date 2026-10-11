@@ -1,8 +1,10 @@
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  type AutofocusMode,
   setAgentNotifications,
-  setAutofocusNewTabs,
+  setAutofocusMode,
   setAutostart,
   setPreviewOnClick,
 } from "@/modules/settings/store";
@@ -17,7 +19,7 @@ import { SettingRow } from "../components/SettingRow";
 
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
-  const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
+  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
@@ -74,18 +76,46 @@ export function GeneralSection() {
         <SettingRow
           title={
             <>
-              Enable autofocus in new tabs{"  "}
+              Autofocus{"  "}
               <span className="inline-flex translate-y-[2px] text-primary">
                 <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
               </span>
             </>
           }
-          description="Tabs with autofocus refresh the sidebar when selected. You can toggle autofocus per tab from its context menu."
+          description="Tabs with autofocus refresh the sidebar when selected."
         >
-          <Switch
-            checked={autofocusNewTabs}
-            onCheckedChange={(v) => void setAutofocusNewTabs(v)}
-          />
+          <RadioGroup
+            value={autofocusMode}
+            onValueChange={(v) => void setAutofocusMode(v as AutofocusMode)}
+          >
+            <div className="flex items-start gap-2">
+              <RadioGroupItem value="manual" id="autofocus-manual" className="mt-0.5" />
+              <label htmlFor="autofocus-manual" className="cursor-pointer text-[12px]">
+                Manual{" "}
+                <span className="text-[10.5px] text-muted-foreground">
+                  Only tabs where you turn it on from their context menu
+                </span>
+              </label>
+            </div>
+            <div className="flex items-start gap-2">
+              <RadioGroupItem value="new-tabs" id="autofocus-new-tabs" className="mt-0.5" />
+              <label htmlFor="autofocus-new-tabs" className="cursor-pointer text-[12px]">
+                New tabs{" "}
+                <span className="text-[10.5px] text-muted-foreground">
+                  New tabs start with autofocus on; existing tabs keep their own setting
+                </span>
+              </label>
+            </div>
+            <div className="flex items-start gap-2">
+              <RadioGroupItem value="always" id="autofocus-always" className="mt-0.5" />
+              <label htmlFor="autofocus-always" className="cursor-pointer text-[12px]">
+                Always{" "}
+                <span className="text-[10.5px] text-muted-foreground">
+                  Every tab refreshes the sidebar when selected; per-tab toggles are hidden but each tab keeps its saved setting
+                </span>
+              </label>
+            </div>
+          </RadioGroup>
         </SettingRow>
       </div>
 

@@ -202,7 +202,7 @@ import {
   type ScriptShell,
 } from "@/modules/workspaces/lib/scriptCwd";
 import { IS_WINDOWS } from "@/lib/platform";
-import { isAutofocusTab } from "@/modules/workspaces/lib/types";
+import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename } from "@/lib/pathUtils";
 import { arrayMove } from "@dnd-kit/sortable";
 
@@ -1237,10 +1237,11 @@ export default function App() {
     }
   }, [activeTabFocusTarget, focusSidebar]);
 
+  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const prevAutofocusSignalRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     const ap = activeTab;
-    const target = ap && isAutofocusTab(ap) && ap.autofocus ? activeTabFocusTarget : null;
+    const target = ap && isAutofocusActive(ap, autofocusMode) ? activeTabFocusTarget : null;
     const signal = target ? `${activeTabId}|${agentWorktree ?? ""}` : null;
     const prev = prevAutofocusSignalRef.current;
     prevAutofocusSignalRef.current = signal;
@@ -1248,7 +1249,7 @@ export default function App() {
     if (signal && signal !== prev && target) {
       focusSidebar(target, { fromShortcut: false });
     }
-  }, [activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar]);
+  }, [activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar, autofocusMode]);
 
   // Whether the saved workspace root still exists on disk, so the selector can
   // disable the option when it is unset or missing.
@@ -2349,7 +2350,7 @@ export default function App() {
             if (
               found.workspace.id === activeWorkspace?.id &&
               found.tab.kind === "terminal" &&
-              found.tab.autofocus
+              isAutofocusActive(found.tab, autofocusMode)
             ) {
               focusSidebar(
                 useAgentStore.getState().sessions[tabId]?.meta?.worktreeCwd ??
@@ -2531,6 +2532,7 @@ export default function App() {
         activeWorkspace ? findOpenPathTab(activeWorkspace.paneTree, path) !== null : false,
     }),
     [
+      autofocusMode,
       activeWorkspace,
       openFileInTab,
       activeTabId,
@@ -2986,6 +2988,7 @@ export default function App() {
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
       "tab.toggleAutofocus": () => {
+        if (autofocusMode === "always") return;
         if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
         const found = findTabGlobal(activeTabId);
         if (found)
@@ -3014,6 +3017,7 @@ export default function App() {
       },
     }),
     [
+      autofocusMode,
       activeWorkspace,
       activeWorkspaceId,
       activePane,
