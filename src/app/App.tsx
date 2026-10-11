@@ -142,7 +142,6 @@ import {
 import { CloseDialogs } from "./components/CloseDialogs";
 import { HibernateDialog } from "./components/HibernateDialog";
 import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
-import { HibernatedSidebarCover } from "@/modules/workspaces/HibernatedSidebarCover";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceBar } from "./components/WorkspaceBar";
@@ -3471,7 +3470,7 @@ export default function App() {
                 className="min-h-0 flex-1"
               >
                 {/* Tool sidebar on LEFT when sidebarSide === "left" */}
-                {sidebarOpen && sidebarSide === "left" && (
+                {sidebarOpen && !activeWorkspace?.hibernated && sidebarSide === "left" && (
                   <>
                     <ResizablePanel
                       id="tool-sidebar"
@@ -3480,8 +3479,7 @@ export default function App() {
                       maxSize="70%"
                       onResize={(size) => setSidebarWidth(size.asPercentage)}
                     >
-                      <HibernatedSidebarCover hibernated={activeWorkspace?.hibernated === true}>
-                      <Sidebar
+                                            <Sidebar
                         ref={sidebarRef}
                         view={sidebarView}
                         onChangeView={setSidebarView}
@@ -3535,8 +3533,7 @@ export default function App() {
                         onOpenCommitFile={onOpenCommitFileStable}
                         onSearchHandle={setGitHistoryHandle}
                       />
-                      </HibernatedSidebarCover>
-                    </ResizablePanel>
+                                          </ResizablePanel>
                     <ResizableHandle />
                   </>
                 )}
@@ -3581,7 +3578,7 @@ export default function App() {
                 </ResizablePanel>
 
                 {/* Tool sidebar on RIGHT when sidebarSide === "right" (default) */}
-                {sidebarOpen && sidebarSide === "right" && (
+                {sidebarOpen && !activeWorkspace?.hibernated && sidebarSide === "right" && (
                   <>
                     <ResizableHandle />
                     <ResizablePanel
@@ -3591,8 +3588,7 @@ export default function App() {
                       maxSize="70%"
                       onResize={(size) => setSidebarWidth(size.asPercentage)}
                     >
-                      <HibernatedSidebarCover hibernated={activeWorkspace?.hibernated === true}>
-                      <Sidebar
+                                            <Sidebar
                         ref={sidebarRef}
                         view={sidebarView}
                         onChangeView={setSidebarView}
@@ -3646,8 +3642,7 @@ export default function App() {
                         onOpenCommitFile={onOpenCommitFileStable}
                         onSearchHandle={setGitHistoryHandle}
                       />
-                      </HibernatedSidebarCover>
-                    </ResizablePanel>
+                                          </ResizablePanel>
                   </>
                 )}
               </ResizablePanelGroup>

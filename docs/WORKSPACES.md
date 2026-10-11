@@ -198,7 +198,7 @@ has no mounted tabs at all. Its tabs stay in the persisted `paneTree`, but `Work
 `strippedTree(ws.paneTree)` (a memoized copy with every pane emptied) and passes `hibernated` down
 through `SplitNodeView` to `PaneView`, which returns a bordered empty box right before its main
 `return` (after the last hook). `HibernatedOverlay` (large sleeping icon, `WorkspaceMark` and name, "Hibernated for 3h 20m" from `Workspace.hibernatedAt` via `formatHibernatedFor`, and a primary Restore button with the undo icon; wired to
-`wakeWorkspace` through the `onWake` prop) covers the workspace, and `HibernatedSidebarCover` hides the Sidebar (explorer, source control) behind an opaque panel while the active workspace sleeps.
+`wakeWorkspace` through the `onWake` prop) covers the workspace, and the Sidebar (explorer, source control) and its resize handle are not mounted while the active workspace sleeps, so the overlay is centered in the full width.
 
 - The live-tab sweep in `App.tsx` skips hibernated workspaces, so their terminals leave the live
   set and are disposed by the normal path (PTY closed). That sweep now also calls
