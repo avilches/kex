@@ -364,7 +364,7 @@ function SortableWorkspaceItem({
             compact
               ? "h-9 justify-center text-[12px]"
               : "h-9 gap-2 px-2.5 text-[12px]",
-            chipFx && "relative overflow-hidden",
+            chipFx && "relative overflow-hidden hib-chip-pop",
             lit
               ? "text-foreground"
               : ws.hibernated
@@ -393,7 +393,7 @@ function SortableWorkspaceItem({
             <span
               key={ws.hibernatedAt}
               aria-hidden
-              className={cn("pointer-events-none absolute inset-0 bg-primary/40", `hib-chip-${chipFx}`)}
+              className={cn("pointer-events-none absolute inset-0 bg-primary/75", `hib-chip-${chipFx}`)}
             />
           )}
           {compact ? (

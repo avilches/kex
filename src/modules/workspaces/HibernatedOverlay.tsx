@@ -69,11 +69,11 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
       className={cn(
         "absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-background text-muted-foreground",
         acceptsDrop && isOver && "ring-2 ring-inset ring-primary/60",
-        fx && `hib-ov-${fx}`,
+        fx && `overflow-hidden hib-ov-${fx}`,
       )}
     >
       <HugeiconsIcon icon={SleepingIcon} size={112} strokeWidth={1} className={cn("opacity-70", fx && "hib-ov-icon")} />
-      <div className="flex max-w-[80%] flex-col items-center gap-1.5">
+      <div className={cn("flex max-w-[80%] flex-col items-center gap-1.5", fx && "hib-item [animation-delay:350ms]")}>
         <span className="flex items-center gap-2 text-[15px] text-foreground">
           <WorkspaceMark id={workspaceId} color={workspace.color} icon={workspace.icon} size={22} />
           <span className="truncate">{workspace.title || "Workspace"}</span>
@@ -85,17 +85,18 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
         )}
       </div>
       {tabs.length > 0 && (
-        <ul className="flex max-h-[40%] w-64 max-w-[80%] flex-col gap-px overflow-y-auto border-l border-border/60 pl-0.5">
+        <ul className={cn("flex max-h-[40%] w-64 max-w-[80%] flex-col gap-px overflow-y-auto border-l border-border/60 pl-0.5", fx && "hib-item [animation-delay:500ms]")}>
           {tabs.map((tab) => (
             <SleepingTabRow key={tab.id} tab={tab} />
           ))}
         </ul>
       )}
-      <Button size="lg" onClick={onWake} autoFocus={active} className="gap-2">
+      <Button size="lg" onClick={onWake} autoFocus={active} className={cn("gap-2", fx && "hib-item [animation-delay:650ms]")}>
         <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
         Restore
         {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
       </Button>
+      {fx && <span aria-hidden className={`hib-wash hib-wash-${fx}`} />}
     </div>
   );
 }
