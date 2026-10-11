@@ -31,6 +31,9 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
+export const CONFLICT_SAVE_ERROR =
+  "the file changed on disk while it had unsaved edits. Keep your changes or reload from disk first";
+
 type Options = {
   path: string;
   tabId: string;
@@ -61,6 +64,9 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
 
   const docStatusRef = useRef<DocumentState["status"]>("loading");
   docStatusRef.current = doc.status;
+
+  const conflictRef = useRef(false);
+  conflictRef.current = conflict;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: autoSaveRef is a stable ref from useAutoSaveTimer, read fresh on each call
   const saveNow = useCallback(async () => {
@@ -237,6 +243,7 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
     // Compare buffers (updated synchronously in onChange) instead of the dirty
     // React state, which lags a render behind a focus-loss flush after a keystroke.
     if (bufferRef.current === savedRef.current) return;
+    if (conflictRef.current) throw new Error(CONFLICT_SAVE_ERROR);
     await saveNow();
   }, [clearAutoSaveTimer, saveNow]);
 
@@ -252,7 +259,7 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
   // Guards against the file being detected as deleted between scheduling the
   // autosave and it actually firing.
   const saveIfNotDeleted = useCallback(async () => {
-    if (docStatusRef.current === "deleted") return;
+    if (docStatusRef.current === "deleted" || conflictRef.current) return;
     await saveNow();
   }, [saveNow]);
 
@@ -276,7 +283,7 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
         // covering a pane move. Auto-save off: the user opted out of
         // unprompted disk writes, so the edit is carried in memory instead
         // and picked up if the same tab mounts again (see unflushedBuffers).
-        if (autoSaveRef.current.autoSave) {
+        if (autoSaveRef.current.autoSave && !conflictRef.current) {
           saveNow().catch((e) => {
             console.error("[autosave flush]", e);
           });
