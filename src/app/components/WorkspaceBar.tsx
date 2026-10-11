@@ -361,7 +361,9 @@ function SortableWorkspaceItem({
               : "h-9 gap-2 px-2.5 text-[12px]",
             lit
               ? "text-foreground"
-              : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
+              : ws.hibernated
+                ? "bg-foreground/[0.04] text-muted-foreground/60 hover:bg-foreground/[0.09] hover:text-muted-foreground"
+                : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
           )}
           style={
             lit
@@ -407,7 +409,7 @@ function SortableWorkspaceItem({
                 <span
                   role="button"
                   title="Restore"
-                  className="group/wake ml-auto shrink-0 opacity-60 hover:opacity-100"
+                  className="group/wake ml-auto shrink-0 opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
