@@ -54,13 +54,26 @@ export function WorkspacesSection() {
 
       <div className="flex flex-col gap-2">
         <SettingRow
-          title="Restore all workspaces on startup"
-          description="Reopen the terminals, agents and editors of every workspace when Kex starts. This can use a lot of memory and CPU if you have many workspaces. When it is off, only the workspace you were in is restored and the others start hibernated: nothing is lost, and each one comes back when you restore it manually. Workspaces that were already hibernated stay hibernated until you restore them. Applies the next time Kex starts."
+          title="Restore on startup"
+          description="Which workspaces reopen their terminals, agents and editors when Kex starts. Restoring all of them uses more memory and CPU, especially with many workspaces. With only the active one, the others start hibernated: nothing is lost, and you can restore each one manually later. Workspaces that were already hibernated stay hibernated until you restore them. Applies the next time Kex starts."
         >
-          <Switch
-            checked={restoreAll}
-            onCheckedChange={(v) => void setRestoreAllWorkspacesOnStartup(v)}
-          />
+          <RadioGroup
+            value={restoreAll ? "all" : "active"}
+            onValueChange={(v) => void setRestoreAllWorkspacesOnStartup(v === "all")}
+          >
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="active" id="restore-startup-active" />
+              <label htmlFor="restore-startup-active" className="cursor-pointer text-[12px]">
+                Only the active workspace
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="all" id="restore-startup-all" />
+              <label htmlFor="restore-startup-all" className="cursor-pointer text-[12px]">
+                All workspaces (uses more memory)
+              </label>
+            </div>
+          </RadioGroup>
         </SettingRow>
         <SettingRow
           title="Auto-hibernate"
