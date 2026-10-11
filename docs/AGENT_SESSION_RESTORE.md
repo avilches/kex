@@ -308,7 +308,7 @@ writes a fresh record under the new tab id, and is cleaned up the same way any o
 Session metadata that was previously accessible from the floating tab HoverCard (which has been removed) is now
 surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side of `TerminalPathBar` (tab id and agent
 session details). "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
-`Run on Start` submenu with an `Enabled` checkbox and a `Command` submenu. The path bar has no run-on-start icon; while
+`Run on Start` submenu with an `Enabled` checkbox and the command field inline (no third submenu). The path bar has no run-on-start icon; while
 an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
 dot either, only the model name, because the tab icon already carries the working and attention states.
 
@@ -321,8 +321,10 @@ dot either, only the model name, because the tab icon already carries the workin
   restore plan — `claude --resume <id>` once the JSONL transcript exists, `claude --session-id <id>` before that — so it
   always matches what will actually be injected; it is not the `persistentCommand` field and cannot be edited. If the
   tab has no agent session (a plain "Run on start" command like `lazygit`), or an agent session with no matching entry
-  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the `Command` submenu falls back to the old editable
-  `persistentCommand` input instead. This replaces the previous behaviour where the input always showed
+  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the inline field is an editable input instead (disabled while `Enabled` is off). Without a manual edit it follows the
+  command running in the terminal and writes it to `persistentCommand` while the menu is open; once the user types a
+  value it is kept (`persistentCommandManual: true`), and clearing the field makes it follow the terminal again
+  (`modules/terminal/lib/runOnStartCommand.ts`). This replaces the previous behaviour where the input always showed
   `persistentCommand`: a value captured once from the currently running command the first time the checkbox was
   toggled on, then frozen forever, unrelated to the id/transcript-based command the app actually resumes with.
 

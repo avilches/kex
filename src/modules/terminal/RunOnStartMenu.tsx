@@ -13,6 +13,12 @@ import {
   getRunningCommandsSnapshot,
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
+import { cn } from "@/lib/utils";
+import {
+  commitRunOnStartEdit,
+  effectiveRunOnStartCommand,
+  syncFollowedCommand,
+} from "@/modules/terminal/lib/runOnStartCommand";
 import type { Tab } from "@/modules/workspaces/lib/types";
 
 type Props = {
@@ -28,14 +34,14 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
   const running =
     useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(tab.id) ??
     null;
-  const [commandOpen, setCommandOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const sessionId = agentSession?.meta?.sessionId;
 
   // Preview of the command the next launch will run, from the same Rust code as the startup
   // restore plan. undefined = not fetched yet, null = no plan (plain editable command).
   const [previewPlan, setPreviewPlan] = useState<RestorePlan | null | undefined>(undefined);
   useEffect(() => {
-    if (!commandOpen || !agentSession) {
+    if (!open || !agentSession) {
       setPreviewPlan(undefined);
       return;
     }
@@ -47,18 +53,71 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [commandOpen, tab.id, agentSession, sessionId]);
+  }, [open, tab.id, agentSession, sessionId]);
 
   // Agents default to restore=true; plain terminals default to false.
   const enabled = agentSession ? tab.restoreOnRestart !== false : (tab.restoreOnRestart ?? false);
 
+  const [draft, setDraft] = useState<string | null>(null);
+  const plain = !agentSession || (previewPlan !== undefined && !previewPlan?.resumeCmd && !previewPlan?.errorReason);
+
+  // A followed command has to reach the persisted tab, otherwise restart would replay a stale one.
+  useEffect(() => {
+    if (!open || !enabled || !plain) return;
+    const patch = syncFollowedCommand(tab, running);
+    if (patch) onUpdateTab(tab.id, (p) => (p.kind === "terminal" ? { ...p, ...patch } : p));
+  }, [open, enabled, plain, tab, running, onUpdateTab]);
+
+  const commitDraft = () => {
+    if (draft === null) return;
+    const patch = commitRunOnStartEdit(draft, running);
+    setDraft(null);
+    onUpdateTab(tab.id, (p) => (p.kind === "terminal" ? { ...p, ...patch } : p));
+  };
+
+  const commandField =
+    agentSession && previewPlan === undefined ? (
+      <div className="h-6 w-full rounded border border-border/60 bg-background/50 px-1.5 py-1 text-[11px] text-muted-foreground">
+        &hellip;
+      </div>
+    ) : agentSession && previewPlan?.resumeCmd ? (
+      <input
+        type="text"
+        readOnly
+        disabled={!enabled}
+        value={previewPlan.resumeCmd}
+        title={previewPlan.resumeCmd}
+        onFocus={(e) => e.currentTarget.select()}
+        onKeyDown={(e) => e.stopPropagation()}
+        className="h-6 w-full cursor-text rounded border border-border/60 bg-background/50 px-1.5 font-mono text-[11px] text-muted-foreground outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+      />
+    ) : agentSession && previewPlan?.errorReason ? (
+      <div className="break-words px-0.5 py-1 text-[11px] text-destructive">
+        {previewPlan.errorReason}
+      </div>
+    ) : (
+      <input
+        type="text"
+        disabled={!enabled}
+        placeholder="command to run (e.g. lazygit)"
+        value={draft ?? effectiveRunOnStartCommand(tab, running)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          e.stopPropagation();
+        }}
+        className={cn(INPUT_CLASS, "font-mono disabled:cursor-not-allowed disabled:opacity-50")}
+      />
+    );
+
   return (
-    <ContextMenuSub>
+    <ContextMenuSub onOpenChange={setOpen}>
       <ContextMenuSubTrigger className="gap-2">
         <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
         Run on Start
       </ContextMenuSubTrigger>
-      <ContextMenuSubContent className="w-56">
+      <ContextMenuSubContent className="w-80">
         <ContextMenuCheckboxItem
           checked={enabled}
           onSelect={(e) => e.preventDefault()}
@@ -74,45 +133,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
         >
           Enabled
         </ContextMenuCheckboxItem>
-        <ContextMenuSub onOpenChange={setCommandOpen}>
-          <ContextMenuSubTrigger className="gap-2">Command</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="w-80 p-2">
-            {agentSession && previewPlan === undefined ? (
-              <div className="h-6 w-full rounded border border-border/60 bg-background/50 px-1.5 py-1 text-[11px] text-muted-foreground">
-                &hellip;
-              </div>
-            ) : agentSession && previewPlan?.resumeCmd ? (
-              <input
-                type="text"
-                readOnly
-                value={previewPlan.resumeCmd}
-                title={previewPlan.resumeCmd}
-                onFocus={(e) => e.currentTarget.select()}
-                onKeyDown={(e) => e.stopPropagation()}
-                className="h-6 w-full cursor-text rounded border border-border/60 bg-background/50 px-1.5 font-mono text-[11px] text-muted-foreground outline-none focus:border-primary"
-              />
-            ) : agentSession && previewPlan?.errorReason ? (
-              <div className="break-words px-0.5 py-1 text-[11px] text-destructive">
-                {previewPlan.errorReason}
-              </div>
-            ) : (
-              <input
-                type="text"
-                placeholder="command to run (e.g. lazygit)"
-                defaultValue={tab.persistentCommand ?? ""}
-                onBlur={(e) => {
-                  const v = e.target.value.trim();
-                  onUpdateTab(tab.id, (p) => ({ ...p, persistentCommand: v || undefined }));
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                  e.stopPropagation();
-                }}
-                className={INPUT_CLASS}
-              />
-            )}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
+        <div className="p-1.5">{commandField}</div>
       </ContextMenuSubContent>
     </ContextMenuSub>
   );
