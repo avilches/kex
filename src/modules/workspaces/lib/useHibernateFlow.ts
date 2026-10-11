@@ -11,6 +11,10 @@ export type HibernateFlowDeps = {
   getWorkspace: (workspaceId: string) => Workspace | undefined;
   autosaveEnabled: () => boolean;
   flushDirtyEditors: () => Promise<void>;
+  // Saves every dirty document of the workspace whatever the autosave
+  // preference says; resolves false when any save failed.
+  saveWorkspaceDocs: (workspaceId: string) => Promise<boolean>;
+  isActive: (workspaceId: string) => boolean;
   // Lets the dirty flags written by the flush reach the workspace state.
   settle: () => Promise<void>;
   live: () => HibernateLive;
@@ -55,7 +59,25 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     d.setPending(workspaceId);
   }
 
-  return { request, perform };
+  // Unattended variant: saves what is dirty and hibernates only when nothing
+  // is left to ask about (no busy tab, no unsaved document, no command that
+  // would be lost). It never opens the dialog.
+  async function requestAuto(workspaceId: string): Promise<boolean> {
+    if (d.getWorkspace(workspaceId)?.hibernated || inFlight.has(workspaceId) || d.isActive(workspaceId)) {
+      return false;
+    }
+    if (!(await d.saveWorkspaceDocs(workspaceId))) return false;
+    await d.settle();
+    const ws = d.getWorkspace(workspaceId);
+    if (!ws || ws.hibernated || d.isActive(workspaceId)) return false;
+    const live = d.live();
+    if (!isReviewEmpty(hibernateReview(ws, live))) return false;
+    if (terminalTabs(ws).some((t) => live.agentOf(t.id)?.status === "attention")) return false;
+    await perform(workspaceId);
+    return true;
+  }
+
+  return { request, requestAuto, perform };
 }
 
 const nextFrames = () =>
@@ -63,6 +85,8 @@ const nextFrames = () =>
 
 type HookDeps = {
   workspacesRef: { current: Workspace[] };
+  saveWorkspaceDocs: (workspaceId: string) => Promise<boolean>;
+  isActive: (workspaceId: string) => boolean;
   hibernateWorkspace: (workspaceId: string) => void;
   flushDirtyEditors: () => Promise<void>;
   destroyWorkspaceFloats: (workspaceId: string, workspaces: Workspace[]) => Promise<void>;
@@ -79,6 +103,8 @@ export function useHibernateFlow(deps: HookDeps) {
         getWorkspace: (id) => depsRef.current.workspacesRef.current.find((w) => w.id === id),
         autosaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
         flushDirtyEditors: () => depsRef.current.flushDirtyEditors(),
+        saveWorkspaceDocs: (id) => depsRef.current.saveWorkspaceDocs(id),
+        isActive: (id) => depsRef.current.isActive(id),
         settle: nextFrames,
         live: () => {
           const sessions = useAgentStore.getState().sessions;
@@ -103,6 +129,7 @@ export function useHibernateFlow(deps: HookDeps) {
   return {
     pendingWorkspaceId,
     requestHibernate: flow.request,
+    requestAutoHibernate: flow.requestAuto,
     performHibernate: flow.perform,
     cancel,
   };

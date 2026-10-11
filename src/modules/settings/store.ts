@@ -11,6 +11,10 @@ import type { CustomEditor } from "@/modules/external-editors/types";
 import type { DetectedEditor } from "@/modules/external-editors/types";
 import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import {
+  parseAutoHibernate,
+  type AutoHibernate,
+} from "@/modules/workspaces/lib/autoHibernate";
+import {
   isTerminalDetail,
   type TerminalDetail,
 } from "@/modules/workspaces/lib/workspaceDetail";
@@ -163,6 +167,7 @@ export type Preferences = {
   warnOnCloseTabWithRunningProcess: boolean;
   warnOnCloseWorkspace: boolean;
   restoreAllWorkspacesOnStartup: boolean;
+  autoHibernate: AutoHibernate;
   terminalFontFamily: string;
   terminalShell: string;
   terminalFontWeight: string;
@@ -226,6 +231,7 @@ const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
 const KEY_WARN_ON_CLOSE_WORKSPACE = "warnOnCloseWorkspace";
 const KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP = "restoreAllWorkspacesOnStartup";
+const KEY_AUTO_HIBERNATE = "autoHibernate";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_UI_FONT = "uiFont";
 const KEY_ZOOM_LEVEL = "zoomLevel";
@@ -411,6 +417,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   warnOnCloseTabWithRunningProcess: true,
   warnOnCloseWorkspace: true,
   restoreAllWorkspacesOnStartup: false,
+  autoHibernate: "4h",
   terminalFontFamily: "",
   terminalShell: "",
   terminalFontWeight: "normal",
@@ -607,6 +614,7 @@ export async function loadPreferences(): Promise<Preferences> {
     restoreAllWorkspacesOnStartup:
       getGeneral<boolean>(KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP) ??
       DEFAULT_PREFERENCES.restoreAllWorkspacesOnStartup,
+    autoHibernate: parseAutoHibernate(getGeneral<string>(KEY_AUTO_HIBERNATE)),
     terminalFontFamily:
       getTerminal<string>(KEY_TERMINAL_FONT_FAMILY) ??
       DEFAULT_PREFERENCES.terminalFontFamily,
@@ -920,6 +928,10 @@ export async function setWarnOnCloseWorkspace(value: boolean): Promise<void> {
 
 export async function setRestoreAllWorkspacesOnStartup(value: boolean): Promise<void> {
   await writePref(KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP, value);
+}
+
+export async function setAutoHibernate(value: AutoHibernate): Promise<void> {
+  await writePref(KEY_AUTO_HIBERNATE, value);
 }
 
 export async function setTerminalNewFolderMode(
@@ -1242,6 +1254,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
   [KEY_WARN_ON_CLOSE_WORKSPACE]: "warnOnCloseWorkspace",
   [KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP]: "restoreAllWorkspacesOnStartup",
+  [KEY_AUTO_HIBERNATE]: "autoHibernate",
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",

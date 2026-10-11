@@ -13,6 +13,7 @@ import {
 } from "@/modules/workspaces/lib/hibernate";
 import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
+import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -1999,13 +2000,37 @@ export default function App() {
   const flushDirtyEditorsRef = useRef(flushDirtyEditors);
   flushDirtyEditorsRef.current = flushDirtyEditors;
 
+  const saveWorkspaceDocs = useCallback(
+    async (workspaceId: string) => {
+      const ws = workspacesRef.current.find((w) => w.id === workspaceId);
+      if (!ws) return false;
+      const ids = allPanes(ws.paneTree)
+        .flatMap((p) => p.tabs)
+        .filter((t) => t.kind === "editor" || t.kind === "markdown")
+        .map((t) => t.id);
+      const results = await Promise.all(
+        ids.map((id) =>
+          saveTab(id).then(
+            () => true,
+            () => false,
+          ),
+        ),
+      );
+      return results.every(Boolean);
+    },
+    [saveTab],
+  );
+
   const hibernateFlow = useHibernateFlow({
     workspacesRef,
+    saveWorkspaceDocs,
+    isActive: (id) => activeWorkspaceIdRef.current === id,
     hibernateWorkspace,
     flushDirtyEditors,
     destroyWorkspaceFloats,
   });
-  const { requestHibernate, performHibernate } = hibernateFlow;
+  const { requestHibernate, performHibernate, requestAutoHibernate } = hibernateFlow;
+  useAutoHibernate({ workspacesRef, activeWorkspaceIdRef, requestAutoHibernate });
   const pendingHibernateRef = useRef<string | null>(null);
   pendingHibernateRef.current = hibernateFlow.pendingWorkspaceId;
   const { cancel: cancelHibernate } = hibernateFlow;

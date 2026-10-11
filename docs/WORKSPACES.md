@@ -247,6 +247,23 @@ empty. Busy rows are split in two sections: agents (spinner, "Waiting for these 
 hibernating marks. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
 is described above (`wakeWorkspace`).
 
+#### Auto-hibernate
+
+The `autoHibernate` preference (Settings > Workspaces: Never, 30 minutes, 4 hours, 2 days; default 4 hours)
+hibernates idle workspaces. `useAutoHibernate` checks every minute. A workspace is idle for the time since it was
+last the active one (`touchActivity` stamps the active workspace each tick; a workspace seen for the first time,
+for instance after a restart, starts its clock then). `autoHibernateCandidates` never picks the active or an
+already hibernated workspace. For each candidate `createHibernateFlow().requestAuto` saves every dirty editor and
+markdown tab of that workspace even with autosave off (`saveWorkspaceDocs`; a failed save aborts), waits for the
+dirty flags to settle and then runs the same `hibernateReview` as the manual flow: it hibernates only if the review
+is empty, that is, no agent working, no script running, no unsaved document and no command without "Run on start".
+An agent in `attention` (waiting for the user) also blocks it, and `requestAuto` re-checks that the workspace is still
+not the active one after saving, so entering a queued workspace mid-check cancels it. A hibernated workspace keeps its
+clock at "now", so restoring it without activating it does not hibernate it again at the next tick. Changing the
+setting keeps the existing clocks. A document that changed on disk while dirty is still overwritten by the save
+(same as `saveTab` everywhere else). `requestAuto` never opens `HibernateDialog`; anything else leaves the workspace
+awake until the next check.
+
 #### Startup hibernation
 
 With `restoreAllWorkspacesOnStartup` off (the default), `initWorkspaceState` applies

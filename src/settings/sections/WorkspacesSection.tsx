@@ -3,6 +3,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  AUTO_HIBERNATE_LABELS,
+  AUTO_HIBERNATE_MODES,
+  type AutoHibernate,
+} from "@/modules/workspaces/lib/autoHibernate";
+import {
+  setAutoHibernate,
   setRandomWorkspaceColor,
   setRestoreAllWorkspacesOnStartup,
   setWarnOnCloseWorkspace,
@@ -22,6 +28,7 @@ import { SettingRow } from "../components/SettingRow";
 
 export function WorkspacesSection() {
   const restoreAll = usePreferencesStore((s) => s.restoreAllWorkspacesOnStartup);
+  const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
   const warnOnCloseWorkspace = usePreferencesStore((s) => s.warnOnCloseWorkspace);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
@@ -54,6 +61,24 @@ export function WorkspacesSection() {
             checked={restoreAll}
             onCheckedChange={(v) => void setRestoreAllWorkspacesOnStartup(v)}
           />
+        </SettingRow>
+        <SettingRow
+          title="Auto-hibernate"
+          description="Hibernate a workspace after it has been inactive for this long. Only workspaces without activity are hibernated: not the one you are in, none with an agent working or a script running, and only when every command in them has Run on start enabled, so nothing is lost. Unsaved documents are saved first; if saving fails, the workspace is not hibernated."
+        >
+          <RadioGroup
+            value={autoHibernate}
+            onValueChange={(v) => void setAutoHibernate(v as AutoHibernate)}
+          >
+            {AUTO_HIBERNATE_MODES.map((mode) => (
+              <div key={mode} className="flex items-center gap-2">
+                <RadioGroupItem value={mode} id={`auto-hibernate-${mode}`} />
+                <label htmlFor={`auto-hibernate-${mode}`} className="cursor-pointer text-[12px]">
+                  {AUTO_HIBERNATE_LABELS[mode]}
+                </label>
+              </div>
+            ))}
+          </RadioGroup>
         </SettingRow>
         <SettingRow
           title="Warn when closing a workspace"

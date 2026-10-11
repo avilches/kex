@@ -19,6 +19,8 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
     getWorkspace: () => workspace,
     autosaveEnabled: () => false,
     flushDirtyEditors: async () => void calls.push("flush"),
+    saveWorkspaceDocs: async () => true,
+    isActive: () => false,
     settle: async () => void calls.push("settle"),
     live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined }),
     finishAgent: (id) => void calls.push(`finish:${id}`),
@@ -74,5 +76,73 @@ describe("createHibernateFlow", () => {
     await flow.request("w1");
     await flow.perform("w1");
     expect(calls).toEqual([]);
+  });
+
+  describe("requestAuto", () => {
+    const busy = { agentOf: () => undefined, runningCommand: () => "npm run dev", scriptState: () => undefined };
+
+    it("hibernates when nothing would be lost", async () => {
+      const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true, persistentCommand: "make" })]));
+      expect(await flow.requestAuto("w1")).toBe(true);
+      expect(calls).toContain("hibernate");
+    });
+
+    it("saves the documents before hibernating", async () => {
+      const saved: string[] = [];
+      const { flow, calls } = setup(ws([term("t1")]), {
+        saveWorkspaceDocs: async (id) => (saved.push(id), true),
+      });
+      await flow.requestAuto("w1");
+      expect(saved).toEqual(["w1"]);
+      expect(calls).toContain("hibernate");
+    });
+
+    it("does nothing when the workspace becomes active while it was saving", async () => {
+      let active = false;
+      const { flow, calls } = setup(ws([term("t1")]), {
+        saveWorkspaceDocs: async () => ((active = true), true),
+        isActive: () => active,
+      });
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
+    });
+
+    it("does nothing for the active workspace", async () => {
+      const { flow, calls } = setup(ws([term("t1")]), { isActive: () => true });
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
+    });
+
+    it("does nothing when an agent is waiting for the user", async () => {
+      const { flow, calls } = setup(ws([term("t1", { restoreOnRestart: true })]), {
+        live: () => ({
+          agentOf: () => ({ agent: "claude", status: "attention", resumable: true }),
+          runningCommand: () => undefined,
+          scriptState: () => undefined,
+        }),
+      });
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
+    });
+
+    it("does nothing when a save fails", async () => {
+      const { flow, calls } = setup(ws([term("t1")]), { saveWorkspaceDocs: async () => false });
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
+    });
+
+    it("does nothing, and never opens the dialog, when a command would be lost", async () => {
+      const { flow, calls } = setup(ws([term("t1")]), { live: () => busy });
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
+      expect(calls).not.toContain("pending:w1");
+    });
+
+    it("does nothing when a document is still dirty after saving", async () => {
+      const dirty = { id: "e1", kind: "editor", path: "/a.ts", dirty: true } as Tab;
+      const { flow, calls } = setup(ws([dirty]));
+      expect(await flow.requestAuto("w1")).toBe(false);
+      expect(calls).not.toContain("hibernate");
+    });
   });
 });
