@@ -10,6 +10,7 @@ import {
   LockKeyIcon,
   FloppyDiskIcon,
   PencilEdit01Icon,
+  SleepingIcon,
   SquareUnlock02Icon,
   StickyNote03Icon,
 } from "@hugeicons/core-free-icons";
@@ -153,8 +154,16 @@ export function TabContextMenuItems({
                   key={t.id}
                   onSelect={() => moveTab(workspaceId, tab.id, { kind: "auto", workspaceId: t.id })}
                 >
-                  <WorkspaceMark id={t.id} color={t.color} icon={t.icon} hibernated={t.hibernated} />
+                  <WorkspaceMark id={t.id} color={t.color} icon={t.icon} />
                   <span className="truncate">{t.title}</span>
+                  {t.hibernated && (
+                    <HugeiconsIcon
+                      icon={SleepingIcon}
+                      size={13}
+                      strokeWidth={1.75}
+                      className="ml-auto shrink-0 text-muted-foreground opacity-60"
+                    />
+                  )}
                 </ContextMenuItem>
               ))}
             </ContextMenuSubContent>

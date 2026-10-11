@@ -407,7 +407,7 @@ function SortableWorkspaceItem({
                 <span
                   role="button"
                   title="Restore"
-                  className="ml-auto shrink-0 opacity-60 hover:opacity-100"
+                  className="group/wake ml-auto shrink-0 opacity-60 hover:opacity-100"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -415,8 +415,8 @@ function SortableWorkspaceItem({
                   }}
                   onDoubleClick={(e) => e.stopPropagation()}
                 >
-                  <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="group-hover:hidden" />
-                  <HugeiconsIcon icon={UploadCircle01Icon} size={13} strokeWidth={1.75} className="hidden group-hover:block" />
+                  <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="group-hover/wake:hidden" />
+                  <HugeiconsIcon icon={UploadCircle01Icon} size={13} strokeWidth={1.75} className="hidden group-hover/wake:block" />
                 </span>
               )}
               {agentCount > 0 && (
