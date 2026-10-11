@@ -32,7 +32,9 @@ import {
   Delete02Icon,
   Folder01Icon,
   FolderAddIcon,
+  Moon02Icon,
   PencilEdit01Icon,
+  PlayCircleIcon,
   Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -461,11 +463,13 @@ function SortableWorkspaceItem({
           {ws.hibernated
             ? onWake && (
                 <ContextMenuItem onSelect={() => onWake(ws.id)}>
+                  <HugeiconsIcon icon={PlayCircleIcon} size={14} strokeWidth={2} />
                   Restore
                 </ContextMenuItem>
               )
             : onHibernate && (
                 <ContextMenuItem onSelect={() => onHibernate(ws.id)}>
+                  <HugeiconsIcon icon={Moon02Icon} size={14} strokeWidth={2} />
                   Hibernate
                   {hibernateLabel && (
                     <ContextMenuShortcut>{hibernateLabel}</ContextMenuShortcut>
