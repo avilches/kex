@@ -33,9 +33,9 @@ import {
   Folder01Icon,
   FolderAddIcon,
   PencilEdit01Icon,
-  PlayCircleIcon,
   Settings01Icon,
   SleepingIcon,
+  Undo02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties, ReactNode } from "react";
@@ -463,7 +463,7 @@ function SortableWorkspaceItem({
           {ws.hibernated
             ? onWake && (
                 <ContextMenuItem onSelect={() => onWake(ws.id)}>
-                  <HugeiconsIcon icon={PlayCircleIcon} size={14} strokeWidth={2} />
+                  <HugeiconsIcon icon={Undo02Icon} size={14} strokeWidth={2} />
                   Restore
                 </ContextMenuItem>
               )
