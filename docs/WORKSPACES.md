@@ -210,7 +210,7 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
   `hibernated`; the terminals mount again and resume through the normal restore path. A set of
   in-flight workspace ids (`runOnce`) makes a double click on Restore wake once.
 - Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
-  `applyMoveTabToWorkspace` refuses it as a destination (drag and drop never offers it; the "Move to Workspace" menu lists it with a Zzz mark and wakes it first through `moveTabToWorkspaceWaking`),
+  `applyMoveTabToWorkspace` refuses it as a destination, so `moveTabToWorkspace` wakes it first (the menu lists it with a Zzz mark; drag and drop accepts its bar row and its overlay),
   `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`
   blocks the shortcuts that need tabs (`blockedWhileHibernated`), `runWorkspaceConfig` does nothing,
   `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is empty.
@@ -501,7 +501,7 @@ drag is cancelled with Esc or dropped where nothing happens. While the pointer i
 Dropping the tab there, without waiting for the 600 ms switch, moves it with the `auto` placement
 (`handleDragEnd` checks the hovered workspace before looking at `over`): a single pane with tabs is
 split and the tab lands in the new right half, an already split workspace receives it in its active
-pane. Neither the tab's own workspace nor a hibernated one is a target (`canDropTabOnWorkspace`): they do not light up and dropping there does nothing. Known limitation: workspaces inside a
+pane. The tab's own workspace is not a target (`canDropTabOnWorkspace`): it does not light up and dropping there does nothing. A hibernated workspace is a target: it is woken before the tab lands (`moveTabToWorkspace`, async, so `handleDragEnd` restores the origin workspace only once it settles). Once the 600 ms switch shows a hibernated workspace, its `HibernatedOverlay` is itself a droppable (`hibernated:<id>`, enabled only for a tab dragged from another workspace, ringed while hovered) because it has no panes to drop on; `resolveTabDrop` turns it into the same `auto` transfer. Known limitation: workspaces inside a
 collapsed group are not on screen, so they cannot be hover targets.
 
 ---

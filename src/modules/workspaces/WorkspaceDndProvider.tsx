@@ -88,7 +88,7 @@ type Props = {
   onSplitPaneAndPlace: UseWorkspacesReturn["splitPaneAndPlace"];
   onSplitPaneAndOpenTab: UseWorkspacesReturn["splitPaneAndOpenTab"];
   onOpenTab: UseWorkspacesReturn["openTab"];
-  onMoveTabToWorkspace: (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest) => string | null;
+  onMoveTabToWorkspace: (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest) => Promise<string | null>;
   onSelectWorkspace: (id: string) => void;
   children: ReactNode;
 };
@@ -113,6 +113,9 @@ export function WorkspaceDndProvider({
     dropWorkspaceIdRef.current = id;
     setDropWorkspaceIdState(id);
   }, []);
+
+  const workspaceIdsRef = useRef<string[]>([]);
+  workspaceIdsRef.current = workspaces.map((w) => w.id);
 
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
@@ -166,14 +169,21 @@ export function WorkspaceDndProvider({
     }
   }
 
-  function restoreOrigin(placed: boolean) {
-    const target = originToRestore(originWorkspaceIdRef.current, activeWorkspaceIdRef.current, placed, workspaces.map((w) => w.id));
+  // Taken synchronously when a drag ends: a transfer settles later, by which
+  // time a new drag may already have stored its own origin.
+  function takeOrigin(): string | null {
+    const id = originWorkspaceIdRef.current;
     originWorkspaceIdRef.current = null;
+    return id;
+  }
+
+  function restoreOrigin(placed: boolean, originId: string | null) {
+    const target = originToRestore(originId, activeWorkspaceIdRef.current, placed, workspaceIdsRef.current);
     if (target) onSelectWorkspace(target);
   }
 
   function handleDragCancel() {
-    restoreOrigin(false);
+    restoreOrigin(false, takeOrigin());
     document.body.style.cursor = "";
     dragIndexRef.current = new Map();
     setDraggingItem(null);
@@ -217,6 +227,7 @@ export function WorkspaceDndProvider({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    const originId = takeOrigin();
     document.body.style.cursor = "";
     const idx = dragIndexRef.current;
     dragIndexRef.current = new Map();
@@ -228,16 +239,17 @@ export function WorkspaceDndProvider({
     if (barWorkspaceId && draggingItem?.kind === "tab") {
       const source = idx.get(String(active.id));
       const target = workspaces.find((w) => w.id === barWorkspaceId);
-      const placed =
-        !!source &&
-        !!target &&
-        canDropTabOnWorkspace(source.wsId, target) &&
-        onMoveTabToWorkspace(source.wsId, String(active.id), { kind: "auto", workspaceId: barWorkspaceId }) !== null;
-      restoreOrigin(placed);
+      if (!source || !target || !canDropTabOnWorkspace(source.wsId, target)) {
+        restoreOrigin(false, originId);
+        return;
+      }
+      void onMoveTabToWorkspace(source.wsId, String(active.id), { kind: "auto", workspaceId: barWorkspaceId }).then(
+        (destinationId) => restoreOrigin(destinationId !== null, originId),
+      );
       return;
     }
     if (!over) {
-      restoreOrigin(false);
+      restoreOrigin(false, originId);
       return;
     }
 
@@ -260,7 +272,9 @@ export function WorkspaceDndProvider({
       return;
     }
 
-    restoreOrigin(handleTabDragEnd(activeId, overId, idx));
+    const placed = handleTabDragEnd(activeId, overId, idx);
+    if (typeof placed === "boolean") restoreOrigin(placed, originId);
+    else void placed.then((ok) => restoreOrigin(ok, originId));
   }
 
   // A file/folder dropped on a terminal's scratchpad bar inserts its path,
@@ -345,7 +359,7 @@ export function WorkspaceDndProvider({
     }
   }
 
-  function handleTabDragEnd(tabId: string, overId: string, idx: Map<string, TabLocation>): boolean {
+  function handleTabDragEnd(tabId: string, overId: string, idx: Map<string, TabLocation>): boolean | Promise<boolean> {
     const action = resolveTabDrop(overId, tabId, workspaces, idx, usePreferencesStore.getState().workspacePaneLimit);
     if (!action) return false;
     switch (action.kind) {
@@ -359,7 +373,7 @@ export function WorkspaceDndProvider({
         onSplitPaneAndPlace(action.workspaceId, action.paneId, action.direction, action.tabId);
         return true;
       case "transfer":
-        return onMoveTabToWorkspace(action.sourceWorkspaceId, action.tabId, action.request) !== null;
+        return onMoveTabToWorkspace(action.sourceWorkspaceId, action.tabId, action.request).then((id) => id !== null);
     }
   }
 
