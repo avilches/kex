@@ -10,8 +10,7 @@ import {
 import { useMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { AgentSession } from "@/modules/agents/lib/types";
-import type { Tab } from "@/modules/workspaces/lib/types";
-import { ComputerTerminal01Icon, ReloadIcon } from "@hugeicons/core-free-icons";
+import { ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
 import { TerminalPathBarMenu } from "./TerminalPathBarMenu";
@@ -26,9 +25,6 @@ type Props = {
   home: string | null;
   workspaceRoot: string | null;
   gitRootPath: string | null;
-  restoreOnRestart?: boolean;
-  persistentCommand?: string;
-  onUpdateTab?: (updater: (p: Tab) => Tab) => void;
   onReveal?: (path: string) => void;
   onSetAsRoot?: (path: string) => void;
   onNewWorkspaceFromFolder?: (path: string) => void;
@@ -42,9 +38,6 @@ export function TerminalPathBar({
   home,
   workspaceRoot,
   gitRootPath,
-  restoreOnRestart,
-  persistentCommand,
-  onUpdateTab,
   onReveal,
   onSetAsRoot,
   onNewWorkspaceFromFolder,
@@ -111,22 +104,10 @@ export function TerminalPathBar({
             <span>{formatMem(metrics.memBytes)}</span>
           </>
         )}
-        {!agentSession && restoreOnRestart !== false && persistentCommand && (
-          <span
-            title={persistentCommand}
-            className="flex size-[22px] items-center justify-center text-muted-foreground"
-          >
-            <HugeiconsIcon icon={ReloadIcon} size={11} strokeWidth={1.75} />
-          </span>
-        )}
         {agentSession && <AgentChipIndicator session={agentSession} />}
         <TerminalPathBarMenu
           tabId={tabId}
-          restoreOnRestart={restoreOnRestart}
-          persistentCommand={persistentCommand}
-          onUpdateTab={onUpdateTab ?? (() => {})}
           agentSession={agentSession}
-          runningCommand={running}
         />
       </div>
     </div>

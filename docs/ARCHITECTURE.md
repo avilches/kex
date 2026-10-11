@@ -486,11 +486,10 @@ src/
     │   │                            `dirSegmentMenuItems`): Set as Workspace Root, New Workspace from Folder, Open in
     │   │                            Terminal, Reveal in Finder, Copy Relative/Absolute Path, Add to .gitignore.
     │   │                            The right side shows `pid / process / CPU% / RAM`. `process` is the OSC-133
-    │   │                            foreground command when one is running, or the shell name at rest. A run-on-start
-    │   │                            icon appears when `restoreOnRestart !== false && persistentCommand` is set; an
+    │   │                            foreground command when one is running, or the shell name at rest. An
     │   │                            agent chip (status dot + model name) appears when an agent session is active.
-    │   │                            A `[...]` DropdownMenu (`TerminalPathBarMenu`) holds: the run-on-start checkbox
-    │   │                            and persistent command input; and for agent sessions: session id (copy), transcript
+    │   │                            A `[...]` DropdownMenu (`TerminalPathBarMenu`) holds: the tab id and, for agent
+    │   │                            sessions: session id (copy), transcript
     │   │                            path (Reveal in Finder), started elapsed, and restore error if any.
     │   │                            Metrics come from the ephemeral `terminalMetricsStore`
     │   │                            (`useSyncExternalStore`, never persisted, outside the workspaces tree). A single

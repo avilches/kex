@@ -222,7 +222,7 @@ if it received `tab_id` instead.
 `agent_session_preview_cmd` command. It shares `build_plans_from` with `load_restore_plan`, but calls it with
 `store_path: None`, which skips every `remove_panel_from_store` call in that function — so, unlike
 `load_restore_plan`, it never mutates `agent-sessions.json` and can be called repeatedly while a session is live (e.g.
-each time the "Run on start" menu opens) without racing the real startup restore.
+each time the "Command" submenu opens) without racing the real startup restore.
 
 ---
 
@@ -237,7 +237,7 @@ result in a module-level `Map<tabId, RestorePlan>`. `consumeRestorePlan(tabId)` 
 given tab — consume-once semantics prevent double injection.
 
 `previewResumeCmd(tabId)` is a separate, non-consuming call to `agent_session_preview_cmd`, used on demand by
-`TerminalPathBarMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below), and by
+`RunOnStartMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below), and by
 `useWorkspaces.ts`'s `reopenClosed` (see "Reopening a closed terminal tab" below). It reads `agent-sessions.json`
 fresh each time and never mutates it, unlike `load_restore_plan`.
 
@@ -306,12 +306,13 @@ writes a fresh record under the new tab id, and is cleaned up the same way any o
 ## Terminal path bar UI
 
 Session metadata that was previously accessible from the floating tab HoverCard (which has been removed) is now
-surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side of `TerminalPathBar`:
+surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side of `TerminalPathBar` (tab id and agent
+session details). "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
+`Run on Start` submenu with an `Enabled` checkbox and a `Command` submenu. The path bar has no run-on-start icon; while
+an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
+dot either, only the model name, because the tab icon already carries the working and attention states.
 
-- **Run on start** checkbox: toggles `restoreOnRestart` on the panel. When enabled (and a `persistentCommand` is set), a
-  reload icon appears inline in the path bar as a visual indicator, except while an agent is alive: the agent icon of
-  the tab (struck through when it is off) already says it, and the path bar shows no status dot either, only the
-  model name, because the tab icon already carries the working and attention states. For agent sessions the checkbox defaults to checked
+- **Enabled** checkbox: toggles `restoreOnRestart` on the panel. For agent sessions it defaults to checked
   and enabling it captures the current running command as the `persistentCommand` if none is already set — this is only
   a fallback default now (see below), not what normally gets shown or run.
 - **Command preview**: for a tab with a live agent session, this is a *live, read-only* preview of the resume command
@@ -320,7 +321,7 @@ surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side o
   restore plan — `claude --resume <id>` once the JSONL transcript exists, `claude --session-id <id>` before that — so it
   always matches what will actually be injected; it is not the `persistentCommand` field and cannot be edited. If the
   tab has no agent session (a plain "Run on start" command like `lazygit`), or an agent session with no matching entry
-  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the menu falls back to the old editable
+  in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the `Command` submenu falls back to the old editable
   `persistentCommand` input instead. This replaces the previous behaviour where the input always showed
   `persistentCommand`: a value captured once from the currently running command the first time the checkbox was
   toggled on, then frozen forever, unrelated to the id/transcript-based command the app actually resumes with.

@@ -235,9 +235,6 @@ export function TabContent({ tab, visible, focused, callbacks, onFloatBrowserTab
             home={home}
             workspaceRoot={workspaceRoot}
             gitRootPath={gitRootPath}
-            restoreOnRestart={tab.restoreOnRestart}
-            persistentCommand={tab.persistentCommand}
-            onUpdateTab={(updater) => callbacks.onUpdateTab?.(tab.id, updater)}
             onReveal={(p) => callbacks.onFocusOnExplorer?.(p)}
             onSetAsRoot={callbacks.onSetAsRoot}
             onNewWorkspaceFromFolder={callbacks.onNewWorkspaceFromFolder}

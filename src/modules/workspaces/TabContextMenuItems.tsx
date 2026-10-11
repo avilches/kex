@@ -26,6 +26,7 @@ import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
+import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
@@ -130,6 +131,9 @@ export function TabContextMenuItems({
               Autofocus Sidebar
               <Shortcut id="tab.toggleAutofocus" />
             </ContextMenuItem>
+          )}
+          {tab.kind === "terminal" && onUpdateTab && (
+            <RunOnStartMenu tab={tab} onUpdateTab={onUpdateTab} />
           )}
           <ContextMenuSub>
             <ContextMenuSubTrigger className="gap-2">
