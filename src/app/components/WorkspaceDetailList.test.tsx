@@ -154,6 +154,7 @@ describe("WorkspaceDetailList context menu", () => {
     onCloseAllTabs: vi.fn(),
     onRenameTab: vi.fn(),
     onUpdateTab: vi.fn(),
+    onSaveTab: vi.fn(),
   };
 
   function mountWithMenu() {

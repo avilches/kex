@@ -13,6 +13,7 @@ export type SidebarTabMenuActions = {
   onCloseAllTabs: (tabId: string) => void;
   onRenameTab: (tabId: string, title: string | undefined) => void;
   onUpdateTab: (tabId: string, updater: (p: Tab) => Tab) => void;
+  onSaveTab: (tabId: string) => void;
 };
 
 const noop = () => {};
@@ -24,6 +25,7 @@ const SidebarTabMenuContext = createContext<SidebarTabMenuActions>({
   onCloseAllTabs: noop,
   onRenameTab: noop,
   onUpdateTab: noop,
+  onSaveTab: noop,
 });
 
 export const SidebarTabMenuProvider = SidebarTabMenuContext.Provider;
@@ -35,6 +37,7 @@ export function useSidebarTabMenu(): SidebarTabMenuActions {
 type ActionSources = {
   workspacesRef: RefObject<Pick<Workspace, "paneTree">[]>;
   closeTabsRef: RefObject<(tabIds: string[]) => unknown>;
+  saveTabRef: RefObject<(tabId: string) => unknown>;
   tabCallbacksRef: RefObject<{
     onRenameTab?: SidebarTabMenuActions["onRenameTab"];
     onUpdateTab?: SidebarTabMenuActions["onUpdateTab"];
@@ -46,6 +49,7 @@ type ActionSources = {
 export function useSidebarTabMenuActions({
   workspacesRef,
   closeTabsRef,
+  saveTabRef,
   tabCallbacksRef,
 }: ActionSources): SidebarTabMenuActions {
   return useMemo(() => {
@@ -58,8 +62,9 @@ export function useSidebarTabMenuActions({
       onClose: (tabId) => void closeTabsRef.current([tabId]),
       onCloseOtherTabs: (tabId) => closeIds(tabId, "others"),
       onCloseAllTabs: (tabId) => closeIds(tabId, "all"),
+      onSaveTab: (tabId) => void saveTabRef.current(tabId),
       onRenameTab: (tabId, title) => tabCallbacksRef.current.onRenameTab?.(tabId, title),
       onUpdateTab: (tabId, updater) => tabCallbacksRef.current.onUpdateTab?.(tabId, updater),
     };
-  }, [workspacesRef, closeTabsRef, tabCallbacksRef]);
+  }, [workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef]);
 }
