@@ -1,18 +1,13 @@
 import {
-  DndContext,
   closestCenter,
   defaultDropAnimationSideEffects,
   pointerWithin,
   useDroppable,
-  PointerSensor,
-  useSensor,
-  useSensors,
   type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
   type DropAnimation,
-  DragOverlay,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -48,7 +43,7 @@ import {
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
-import { useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
+import { useBarDndBinding, useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -911,9 +906,6 @@ export function WorkspaceBar({
   onActivateAgentTab,
   onSetDetailExpanded,
 }: WorkspaceBarProps) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-  );
   const [isDragging, setIsDragging] = useState(false);
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
   const [dragKind, setDragKind] = useState<"workspace" | "group" | null>(null);
@@ -952,6 +944,7 @@ export function WorkspaceBar({
     : "New workspace";
 
   const { draggingItem } = useWorkspaceDnd();
+  const nonBarDrag = draggingItem !== null;
   const tabDragging = draggingItem?.kind === "tab";
   const hoverSwitch = useMemo(() => createHoverSwitch(onSelect), [onSelect]);
   useEffect(() => {
@@ -1051,6 +1044,60 @@ export function WorkspaceBar({
       ? workspaces.find((w) => w.id === dragActiveId)
       : null;
 
+  const barBinding = useBarDndBinding();
+  useEffect(() => {
+    barBinding.setHandlers({
+      collision: groupAwareCollision,
+      onDragStart: handleDragStart,
+      onDragOver: handleDragOver,
+      onDragEnd: handleDragEnd,
+      onDragCancel: handleDragCancel,
+    });
+  });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the overlay only depends on the dragged workspace and the bar width
+  useEffect(() => {
+    barBinding.setOverlay(
+      <>
+          {dragActiveWs
+            ? (() => {
+                const displayColor = resolveWorkspaceColor(
+                  dragActiveWs.color,
+                  dragActiveWs.id,
+                );
+                return (
+                  <div
+                    className={cn(
+                      "flex items-center justify-center rounded-lg font-semibold opacity-90",
+                      compact ? "h-9 w-9 text-[11px]" : "h-9 px-2 text-[11px]",
+                    )}
+                    style={
+                      displayColor
+                        ? {
+                            backgroundColor: chipColorOnWhite(displayColor),
+                            color: "#ffffff",
+                          }
+                        : {
+                            backgroundColor: "var(--muted)",
+                            color: "var(--foreground)",
+                          }
+                    }
+                  >
+                    {compact ? (
+                      abbrev(dragActiveWs.title, dragActiveWs.kind)
+                    ) : (
+                      <span className="max-w-full truncate text-center">
+                        {dragActiveWs.title || dragActiveWs.kind}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()
+            : null}
+        </>,
+      dropAnimation,
+    );
+  }, [barBinding, dragActiveWs, compact]);
+
   return (
     <nav
       aria-label="Workspaces"
@@ -1060,15 +1107,9 @@ export function WorkspaceBar({
       )}
       style={{ width }}
     >
-      <DndContext
-        sensors={sensors}
-        collisionDetection={groupAwareCollision}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
+      <>
         <SortableContext
+ disabled={nonBarDrag}
           items={sortableGroupIds}
           strategy={verticalListSortingStrategy}
         >
@@ -1106,6 +1147,7 @@ export function WorkspaceBar({
                           if (!activeWs) return null;
                           return (
                             <SortableContext
+ disabled={nonBarDrag}
                               items={[activeWs.id]}
                               strategy={verticalListSortingStrategy}
                             >
@@ -1135,6 +1177,7 @@ export function WorkspaceBar({
                         }
                         return (
                           <SortableContext
+ disabled={nonBarDrag}
                             items={group.items.map((w) => w.id)}
                             strategy={verticalListSortingStrategy}
                           >
@@ -1181,44 +1224,8 @@ export function WorkspaceBar({
           </div>
         </SortableContext>
 
-        <DragOverlay dropAnimation={dropAnimation}>
-          {dragActiveWs
-            ? (() => {
-                const displayColor = resolveWorkspaceColor(
-                  dragActiveWs.color,
-                  dragActiveWs.id,
-                );
-                return (
-                  <div
-                    className={cn(
-                      "flex items-center justify-center rounded-lg font-semibold opacity-90",
-                      compact ? "h-9 w-9 text-[11px]" : "h-9 px-2 text-[11px]",
-                    )}
-                    style={
-                      displayColor
-                        ? {
-                            backgroundColor: chipColorOnWhite(displayColor),
-                            color: "#ffffff",
-                          }
-                        : {
-                            backgroundColor: "var(--muted)",
-                            color: "var(--foreground)",
-                          }
-                    }
-                  >
-                    {compact ? (
-                      abbrev(dragActiveWs.title, dragActiveWs.kind)
-                    ) : (
-                      <span className="max-w-full truncate text-center">
-                        {dragActiveWs.title || dragActiveWs.kind}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()
-            : null}
-        </DragOverlay>
-      </DndContext>
+
+      </>
 
       <button
         type="button"
