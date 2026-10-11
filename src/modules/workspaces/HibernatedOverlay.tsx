@@ -1,5 +1,5 @@
 import { useDroppable } from "@dnd-kit/core";
-import { SleepingIcon, Undo02Icon } from "@hugeicons/core-free-icons";
+import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
         )}
       </div>
       <Button size="lg" onClick={onWake} autoFocus={active} className="gap-2">
-        <HugeiconsIcon icon={Undo02Icon} size={16} strokeWidth={2} />
+        <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
         Restore
         {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
       </Button>

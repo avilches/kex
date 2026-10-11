@@ -30,7 +30,7 @@ import {
   PencilEdit01Icon,
   Settings01Icon,
   SleepingIcon,
-  Undo02Icon,
+  UploadCircle01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties, ReactNode } from "react";
@@ -406,7 +406,7 @@ function SortableWorkspaceItem({
                   onDoubleClick={(e) => e.stopPropagation()}
                 >
                   <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="group-hover:hidden" />
-                  <HugeiconsIcon icon={Undo02Icon} size={13} strokeWidth={1.75} className="hidden group-hover:block" />
+                  <HugeiconsIcon icon={UploadCircle01Icon} size={13} strokeWidth={1.75} className="hidden group-hover:block" />
                 </span>
               )}
               {agentCount > 0 && (
@@ -477,7 +477,7 @@ function SortableWorkspaceItem({
           {ws.hibernated
             ? onWake && (
                 <ContextMenuItem onSelect={() => onWake(ws.id)}>
-                  <HugeiconsIcon icon={Undo02Icon} size={14} strokeWidth={2} />
+                  <HugeiconsIcon icon={UploadCircle01Icon} size={14} strokeWidth={2} />
                   Restore
                   {hibernateLabel && (
                     <ContextMenuShortcut>{hibernateLabel}</ContextMenuShortcut>
