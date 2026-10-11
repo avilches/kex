@@ -166,7 +166,6 @@ export type Preferences = {
   editorCursorBlinkRate: number;
   editorCursorStyle: CursorStyle;
   warnOnCloseTabWithRunningProcess: boolean;
-  warnOnCloseWorkspace: boolean;
   restoreAllWorkspacesOnStartup: boolean;
   autoHibernate: AutoHibernate;
   terminalFontFamily: string;
@@ -230,7 +229,6 @@ const KEY_AUTOSTART = "autostart";
 const KEY_AUTOFOCUS_MODE = "autofocusMode";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
-const KEY_WARN_ON_CLOSE_WORKSPACE = "warnOnCloseWorkspace";
 const KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP = "restoreAllWorkspacesOnStartup";
 const KEY_AUTO_HIBERNATE = "autoHibernate";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
@@ -416,7 +414,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorCursorBlinkRate: EDITOR_BLINK_RATE_DEFAULT,
   editorCursorStyle: "bar",
   warnOnCloseTabWithRunningProcess: true,
-  warnOnCloseWorkspace: true,
   restoreAllWorkspacesOnStartup: false,
   autoHibernate: "4h",
   terminalFontFamily: "",
@@ -611,9 +608,6 @@ export async function loadPreferences(): Promise<Preferences> {
     warnOnCloseTabWithRunningProcess:
       getTerminal<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
       DEFAULT_PREFERENCES.warnOnCloseTabWithRunningProcess,
-    warnOnCloseWorkspace:
-      getGeneral<boolean>(KEY_WARN_ON_CLOSE_WORKSPACE) ??
-      DEFAULT_PREFERENCES.warnOnCloseWorkspace,
     restoreAllWorkspacesOnStartup:
       getGeneral<boolean>(KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP) ??
       DEFAULT_PREFERENCES.restoreAllWorkspacesOnStartup,
@@ -923,10 +917,6 @@ export async function setEditorCursorStyle(value: CursorStyle): Promise<void> {
 
 export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promise<void> {
   await writeTerminalPref(KEY_WARN_ON_CLOSE_RUNNING, value);
-}
-
-export async function setWarnOnCloseWorkspace(value: boolean): Promise<void> {
-  await writePref(KEY_WARN_ON_CLOSE_WORKSPACE, value);
 }
 
 export async function setRestoreAllWorkspacesOnStartup(value: boolean): Promise<void> {
@@ -1255,7 +1245,6 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AUTOFOCUS_MODE]: "autofocusMode",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
-  [KEY_WARN_ON_CLOSE_WORKSPACE]: "warnOnCloseWorkspace",
   [KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP]: "restoreAllWorkspacesOnStartup",
   [KEY_AUTO_HIBERNATE]: "autoHibernate",
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",

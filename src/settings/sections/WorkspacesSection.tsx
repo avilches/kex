@@ -11,7 +11,6 @@ import {
   setAutoHibernate,
   setRandomWorkspaceColor,
   setRestoreAllWorkspacesOnStartup,
-  setWarnOnCloseWorkspace,
   setWorkspaceDetailBrowsers,
   setWorkspaceDetailEditors,
   setWorkspaceDetailGit,
@@ -29,7 +28,6 @@ import { SettingRow } from "../components/SettingRow";
 export function WorkspacesSection() {
   const restoreAll = usePreferencesStore((s) => s.restoreAllWorkspacesOnStartup);
   const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
-  const warnOnCloseWorkspace = usePreferencesStore((s) => s.warnOnCloseWorkspace);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
   const detailTerminals = usePreferencesStore((s) => s.workspaceDetailTerminals);
@@ -92,15 +90,6 @@ export function WorkspacesSection() {
               </div>
             ))}
           </RadioGroup>
-        </SettingRow>
-        <SettingRow
-          title="Warn when closing a workspace"
-          description="Confirm before closing a workspace and its tabs."
-        >
-          <Switch
-            checked={warnOnCloseWorkspace}
-            onCheckedChange={(v) => void setWarnOnCloseWorkspace(v)}
-          />
         </SettingRow>
         <SettingRow
           title="Set a random color to new workspaces"
