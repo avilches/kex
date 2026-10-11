@@ -425,5 +425,5 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
 .hib-item { animation: hib-item-in 800ms var(--ease-premium) both; }
 .hib-ov-icon { animation: hib-icon-drift 900ms var(--ease-premium) 250ms both; }
 .hib-chip-pop { animation: hib-chip-pop 700ms var(--ease-premium); }
-.hib-chip-sweep-in { transform-origin: left; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }
-.hib-chip-sweep-out { transform-origin: right; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }
+.hib-chip-sweep-in { transform-origin: right; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }
+.hib-chip-sweep-out { transform-origin: left; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }

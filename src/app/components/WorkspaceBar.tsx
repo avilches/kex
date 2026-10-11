@@ -201,7 +201,7 @@ function SortableWorkspaceItem({
   const tabDragActive = dragging?.kind === "tab";
   const canDrop = dragging?.kind === "tab" && canDropTabOnWorkspace(dragging.workspaceId, ws);
   const dropHover = canDrop && dropTarget.id === ws.id;
-  const lit = active || dropHover;
+  const lit = (active && !ws.hibernated) || dropHover;
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
