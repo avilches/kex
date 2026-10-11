@@ -159,14 +159,16 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
                 </Button>
               </div>
             ))}
-            <Button
-              size="sm"
-              className="self-end"
-              title="Save every unsaved document"
-              onClick={() => void onSaveAll(review.docs.map((d) => d.tabId))}
-            >
-              Save all
-            </Button>
+            {review.docs.length > 2 && (
+              <Button
+                size="sm"
+                className="self-end"
+                title="Save every unsaved document"
+                onClick={() => void onSaveAll(review.docs.map((d) => d.tabId))}
+              >
+                Save all
+              </Button>
+            )}
           </section>
         )}
         {review && review.commands.length > 0 && (

@@ -2757,7 +2757,9 @@ export default function App() {
         }
       },
       "workspace.hibernate": () => {
-        if (activeWorkspace) void requestHibernate(activeWorkspace.id);
+        if (!activeWorkspace) return;
+        if (activeWorkspace.hibernated) void wakeWorkspace(activeWorkspace.id);
+        else void requestHibernate(activeWorkspace.id);
       },
       "workspace.run": () => {
         if (!activeWorkspace) return;

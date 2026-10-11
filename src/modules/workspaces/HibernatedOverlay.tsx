@@ -8,6 +8,7 @@ import { formatHibernatedFor } from "./lib/hibernate";
 import { HIBERNATED_DROP_PREFIX } from "./lib/tabDrop";
 import type { Workspace } from "./lib/types";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
+import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { WorkspaceMark } from "./WorkspaceMark";
 
 type Props = { workspace: Workspace; onWake: () => void; active: boolean };
@@ -33,6 +34,7 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
     id: `${HIBERNATED_DROP_PREFIX}${workspaceId}`,
     disabled: !acceptsDrop,
   });
+  const shortcutLabel = useShortcutLabel("workspace.hibernate");
   const now = useNow(active && workspace.hibernatedAt !== undefined);
   return (
     <div
@@ -57,6 +59,7 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
       <Button size="lg" onClick={onWake} autoFocus={active} className="gap-2">
         <HugeiconsIcon icon={Undo02Icon} size={16} strokeWidth={2} />
         Restore
+        {shortcutLabel && <span className="text-[11px] font-normal opacity-70">{shortcutLabel}</span>}
       </Button>
     </div>
   );

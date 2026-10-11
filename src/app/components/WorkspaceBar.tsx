@@ -396,7 +396,19 @@ function SortableWorkspaceItem({
               )}
               <span className="truncate">{ws.title || ws.kind}</span>
               {ws.hibernated && (
-                <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="shrink-0 opacity-60" />
+                <span
+                  role="button"
+                  title="Restore"
+                  className="ml-auto shrink-0 opacity-60 hover:opacity-100"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onWake?.(ws.id);
+                  }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                >
+                  <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} />
+                </span>
               )}
               {agentCount > 0 && (
                 <span
@@ -468,6 +480,9 @@ function SortableWorkspaceItem({
                 <ContextMenuItem onSelect={() => onWake(ws.id)}>
                   <HugeiconsIcon icon={Undo02Icon} size={14} strokeWidth={2} />
                   Restore
+                  {hibernateLabel && (
+                    <ContextMenuShortcut>{hibernateLabel}</ContextMenuShortcut>
+                  )}
                 </ContextMenuItem>
               )
             : onHibernate && (
