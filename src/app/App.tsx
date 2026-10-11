@@ -2656,7 +2656,9 @@ export default function App() {
 
   const tabCallbacksRef = useRef(tabCallbacks);
   tabCallbacksRef.current = tabCallbacks;
-  const sidebarTabMenu = useSidebarTabMenuActions({ workspacesRef, closeTabsRef, tabCallbacksRef });
+  const saveTabRef = useRef(saveTabReportingErrors);
+  saveTabRef.current = saveTabReportingErrors;
+  const sidebarTabMenu = useSidebarTabMenuActions({ workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef });
 
   const cycleWorkspace = useCallback(
     (delta: 1 | -1) => {

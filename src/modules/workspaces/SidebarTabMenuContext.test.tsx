@@ -20,11 +20,20 @@ function setup() {
   const closeTabs = vi.fn();
   const closeTabsRef = { current: closeTabs };
   const tabCallbacksRef = { current: {} as { onRenameTab?: (id: string, t?: string) => void } };
-  const hook = renderHook(() => useSidebarTabMenuActions({ workspacesRef, closeTabsRef, tabCallbacksRef }));
-  return { hook, workspacesRef, closeTabs, tabCallbacksRef };
+  const saveTabRef = { current: vi.fn() };
+  const hook = renderHook(() =>
+    useSidebarTabMenuActions({ workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef }),
+  );
+  return { hook, workspacesRef, closeTabs, saveTabRef, tabCallbacksRef };
 }
 
 describe("useSidebarTabMenuActions", () => {
+  it("saves through the latest save callback", () => {
+    const { hook, saveTabRef } = setup();
+    hook.result.current.onSaveTab("a");
+    expect(saveTabRef.current).toHaveBeenCalledWith("a");
+  });
+
   it("keeps the same object across renders", () => {
     const { hook } = setup();
     const first = hook.result.current;

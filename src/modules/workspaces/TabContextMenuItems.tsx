@@ -8,6 +8,7 @@ import {
   CancelSquareIcon,
   CrosshairIcon,
   LockKeyIcon,
+  FloppyDiskIcon,
   PencilEdit01Icon,
   SquareUnlock02Icon,
   StickyNote03Icon,
@@ -26,6 +27,7 @@ import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { WorkspaceMark } from "./WorkspaceMark";
+import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
 
 type Props = {
@@ -64,10 +66,22 @@ export function TabContextMenuItems({
   const { targets, moveTab } = useWorkspaceMove();
   const startRename = useTabRenameStore((s) => s.startRename);
   const otherTargets = targets.filter((t) => t.id !== workspaceId);
+  const { onSaveTab } = useSidebarTabMenu();
   const isLocked = tab.locked ?? false;
+  const canSave = (tab.kind === "editor" || tab.kind === "markdown") && tab.dirty;
 
   return (
     <>
+      {canSave && (
+        <>
+          <ContextMenuItem onSelect={() => onSaveTab(tab.id)}>
+            <HugeiconsIcon icon={FloppyDiskIcon} size={14} strokeWidth={2} />
+            Save
+            <Shortcut id="editor.save" />
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+        </>
+      )}
       {onRenameTab && (
         <>
           <ContextMenuItem onSelect={() => startRename(tab.id, renameOrigin)}>
