@@ -792,6 +792,8 @@ export default function App() {
             requestLeafFocus(config.tabId);
           }
           const tabId = config.tabId;
+          const wasBusy = !!getScriptRunningSnapshot().get(tabId);
+          if (wasBusy) flashTab(tabId);
           const input = planReusedTabInput(
             !!getScriptRunningSnapshot().get(tabId),
             config.command,
