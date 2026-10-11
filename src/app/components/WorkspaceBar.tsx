@@ -47,6 +47,7 @@ import {
 import { getWorkspaceIcon, WORKSPACE_ICON_PALETTE } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
+import { SlideReveal } from "@/app/components/SlideReveal";
 import { isFreshHibernate, useJustWoken } from "@/modules/workspaces/lib/hibernateFx";
 import { useBarDndBinding, useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
@@ -455,7 +456,7 @@ function SortableWorkspaceItem({
           />
         )}
       </div>
-      {expanded && (
+      <SlideReveal open={expanded}>
         <WorkspaceDetailList
           workspaceId={ws.id}
           tabs={ws.tabs}
@@ -464,7 +465,7 @@ function SortableWorkspaceItem({
           focusedTabId={active ? ws.focusedTabId : null}
           onActivate={activateDetailTab}
         />
-      )}
+      </SlideReveal>
     </div>
   );
 
