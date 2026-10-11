@@ -7,6 +7,7 @@ import {
   editorTabIds,
   isPendingStale,
   enableRunOnStart,
+  formatHibernatedFor,
   stripTabs,
   strippedTree,
   terminalTabs,
@@ -85,6 +86,37 @@ describe("applyHibernate", () => {
     const m = (tabs.second as Extract<SplitNode, { kind: "pane" }>).tabs[0]!;
     expect(e.kind === "editor" && e.dirty).toBe(false);
     expect(m.kind === "markdown" && m.dirty).toBe(false);
+  });
+});
+
+describe("applyHibernate timestamp", () => {
+  it("stamps the moment of hibernation and keeps the first one if repeated", () => {
+    const once = applyHibernate([ws()], "w1", 1000);
+    expect(once[0]!.hibernatedAt).toBe(1000);
+    expect(applyHibernate(once, "w1", 5000)[0]!.hibernatedAt).toBe(1000);
+  });
+
+  it("drops the timestamp on wake", () => {
+    const out = applyWake(applyHibernate([ws()], "w1", 1000), "w1")[0]!;
+    expect("hibernatedAt" in out).toBe(false);
+  });
+});
+
+describe("formatHibernatedFor", () => {
+  const MIN = 60_000;
+  const H = 60 * MIN;
+  const D = 24 * H;
+  it("shows at most two units", () => {
+    expect(formatHibernatedFor(10_000)).toBe("less than a minute");
+    expect(formatHibernatedFor(5 * MIN)).toBe("5m");
+    expect(formatHibernatedFor(3 * H + 20 * MIN + 59_000)).toBe("3h 20m");
+    expect(formatHibernatedFor(2 * D + 4 * H + 30 * MIN)).toBe("2d 4h");
+  });
+
+  it("leaves out a zero second unit and survives a negative span", () => {
+    expect(formatHibernatedFor(2 * H)).toBe("2h");
+    expect(formatHibernatedFor(3 * D)).toBe("3d");
+    expect(formatHibernatedFor(-5)).toBe("less than a minute");
   });
 });
 

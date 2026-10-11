@@ -99,6 +99,8 @@ export type Workspace = {
   // The workspace keeps its pane tree and tabs in the JSON but mounts none of
   // them; waking it brings editors, commands and agents back.
   hibernated?: boolean;
+  // Epoch ms when it was hibernated; absent in workspaces hibernated before it existed.
+  hibernatedAt?: number;
 };
 
 export type ClosedEntry = {
