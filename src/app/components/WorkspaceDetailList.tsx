@@ -1,5 +1,6 @@
-import { useDraggable } from "@dnd-kit/core";
-import { memo, useEffect, useMemo, useState } from "react";
+import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
+import { getEventCoordinates } from "@dnd-kit/utilities";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { PopoverAnchor } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,8 @@ import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCl
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { useSidebarTabMenu } from "@/modules/workspaces/SidebarTabMenuContext";
 import { TabContextMenuItems } from "@/modules/workspaces/TabContextMenuItems";
-import { sidebarTabDragId } from "@/modules/workspaces/WorkspaceDndProvider";
+import { sidebarTabDragId, useWorkspaceDnd } from "@/modules/workspaces/WorkspaceDndProvider";
+import { SIDE_ROW_DROP_PREFIX, type SideRowDropData, sideRowSide } from "@/modules/workspaces/lib/tabDrop";
 import { TabRenamePopover } from "@/modules/workspaces/TabRenamePopover";
 import {
   type DetailFilter,
@@ -68,12 +70,16 @@ function DetailTabRow({
   workspaceId,
   visual,
   focused,
+  prevTabId,
+  insertSide,
   onActivate,
 }: {
   tab: Tab;
   workspaceId: string;
   visual: DetailRow["visual"];
   focused: boolean;
+  prevTabId: string | null;
+  insertSide: "before" | "after" | null;
   onActivate: (tabId: string) => void;
 }) {
   const info = useAgentTabTitle(tab);
@@ -86,6 +92,17 @@ function DetailTabRow({
     data: { type: "tab" },
   });
 
+  const tabDragActive = useWorkspaceDnd().draggingItem?.kind === "tab";
+  const dropData = useMemo<SideRowDropData>(
+    () => ({ sideRow: true, workspaceId, tabId: tab.id, prevTabId }),
+    [workspaceId, tab.id, prevTabId],
+  );
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: `${SIDE_ROW_DROP_PREFIX}${tab.id}`,
+    data: dropData,
+    disabled: !tabDragActive,
+  });
+
   const [menuOpen, setMenuOpen] = useState(false);
   const closeSignal = useContextMenuCloseStore((s) => s.signal);
   // biome-ignore lint/correctness/useExhaustiveDependencies: closeSignal is a bump counter, only its change matters
@@ -94,6 +111,15 @@ function DetailTabRow({
   }, [closeSignal]);
 
   return (
+    <div ref={setDropRef} className="relative">
+      {insertSide && (
+        <span
+          className={cn(
+            "pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded-full bg-primary",
+            insertSide === "before" ? "-top-px" : "-bottom-px",
+          )}
+        />
+      )}
     <TabRenamePopover
       tabId={tab.id}
       origin="sidebar"
@@ -133,6 +159,7 @@ function DetailTabRow({
         </ContextMenuContent>
       </ContextMenu>
     </TabRenamePopover>
+    </div>
   );
 }
 
@@ -158,13 +185,30 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     );
     return workspaceDetailRows(tabs, agentTabIds, entries ?? [], filter);
   }, [tabs, sessions, entries, filter]);
+  const [insert, setInsert] = useState<{ tabId: string; side: "before" | "after" } | null>(null);
+  const trackInsert = useCallback(
+    (e: DragMoveEvent) => {
+      const data = e.over?.data.current;
+      if (!e.over || data?.sideRow !== true || data.workspaceId !== workspaceId) {
+        setInsert((cur) => (cur === null ? cur : null));
+        return;
+      }
+      const pointer = getEventCoordinates(e.activatorEvent);
+      const side = sideRowSide(e.over.rect, (pointer?.y ?? 0) + e.delta.y);
+      const tabId = String(data.tabId);
+      setInsert((cur) => (cur?.tabId === tabId && cur.side === side ? cur : { tabId, side }));
+    },
+    [workspaceId],
+  );
+  const clearInsert = useCallback(() => setInsert(null), []);
+  useDndMonitor({ onDragMove: trackInsert, onDragEnd: clearInsert, onDragCancel: clearInsert });
   const tabsById = useMemo(() => new Map(tabs.map((t) => [t.id, t])), [tabs]);
 
   if (rows.length === 0) return null;
 
   return (
     <div className="ml-3 mt-0.5 flex flex-col gap-px border-l border-border/60 pl-0.5">
-      {rows.map((row) => {
+      {rows.map((row, i) => {
         const tab = tabsById.get(row.tabId);
         return tab ? (
           <DetailTabRow
@@ -173,6 +217,8 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
             workspaceId={workspaceId}
             visual={row.visual}
             focused={row.tabId === focusedTabId}
+            prevTabId={rows[i - 1]?.tabId ?? null}
+            insertSide={insert?.tabId === row.tabId ? insert.side : null}
             onActivate={onActivate}
           />
         ) : null;

@@ -13,7 +13,23 @@ export type TabDropAction =
 // A hibernated workspace has no panes to drop on, so its overlay is one droppable.
 export const HIBERNATED_DROP_PREFIX = "hibernated:";
 
+// Insertion at an explicit index of a pane, used for the very top of a sidebar list.
+export const PANE_INDEX_PREFIX = "pane-index:";
+
 const DIRECTIONS: ReadonlySet<string> = new Set(["top", "bottom", "left", "right"]);
+
+function placeAt(source: TabLocation, tabId: string, target: TabLocation, index: number): TabDropAction {
+  if (target.wsId !== source.wsId) {
+    return {
+      kind: "transfer",
+      sourceWorkspaceId: source.wsId,
+      tabId,
+      request: { kind: "pane", workspaceId: target.wsId, paneId: target.paneId, index },
+    };
+  }
+  if (source.paneId === target.paneId) return { kind: "reorder", workspaceId: source.wsId, tabId, index };
+  return { kind: "move", workspaceId: source.wsId, tabId, paneId: target.paneId, index };
+}
 
 export function resolveTabDrop(
   overId: string,
@@ -35,16 +51,15 @@ export function resolveTabDrop(
     const refIndex = pane ? pane.tabs.findIndex((t) => t.id === refTabId) : -1;
     if (refIndex === -1) return null;
     const index = refIndex + (side === "after" ? 1 : 0);
-    if (target.wsId !== source.wsId) {
-      return {
-        kind: "transfer",
-        sourceWorkspaceId: source.wsId,
-        tabId,
-        request: { kind: "pane", workspaceId: target.wsId, paneId: target.paneId, index },
-      };
-    }
-    if (source.paneId === target.paneId) return { kind: "reorder", workspaceId: source.wsId, tabId, index };
-    return { kind: "move", workspaceId: source.wsId, tabId, paneId: target.paneId, index };
+    return placeAt(source, tabId, target, index);
+  }
+
+  if (overId.startsWith(PANE_INDEX_PREFIX)) {
+    const [, paneId, rawIndex] = overId.split(":");
+    const index = Number(rawIndex);
+    const targetWs = workspaces.find((w) => paneId && findPane(w.paneTree, paneId));
+    if (!paneId || !targetWs || !Number.isInteger(index) || index < 0) return null;
+    return placeAt(source, tabId, { wsId: targetWs.id, paneId }, index);
   }
 
   if (overId.startsWith(HIBERNATED_DROP_PREFIX)) {
@@ -104,4 +119,27 @@ export function originToRestore(
 
 export function canDropTabOnWorkspace(sourceWorkspaceId: string, target: { id: string }): boolean {
   return target.id !== sourceWorkspaceId;
+}
+
+// A row of a workspace's sidebar list is a droppable; the rows are in tab order,
+// so a drop between two rows lands in the pane of the tab above it, right after
+// that tab, and above the first row it lands at the start of the first pane.
+export const SIDE_ROW_DROP_PREFIX = "side-row:";
+
+export type SideRowDropData = { sideRow: true; workspaceId: string; tabId: string; prevTabId: string | null };
+
+export function sideRowSide(rect: { top: number; height: number }, pointerY: number): "before" | "after" {
+  return pointerY < rect.top + rect.height / 2 ? "before" : "after";
+}
+
+export function resolveSideRowDrop(
+  row: SideRowDropData,
+  side: "before" | "after",
+  workspaces: Workspace[],
+): string | null {
+  const refTabId = side === "before" ? row.prevTabId : row.tabId;
+  if (refTabId) return `tab-insert:${refTabId}:after`;
+  const ws = workspaces.find((w) => w.id === row.workspaceId);
+  const first = ws ? allPanes(ws.paneTree)[0] : undefined;
+  return first ? `${PANE_INDEX_PREFIX}${first.id}:0` : null;
 }
