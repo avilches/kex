@@ -10,7 +10,7 @@ import {
 import { useMetrics } from "@/modules/workspaces/lib/terminalMetricsStore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import type { AgentSession } from "@/modules/agents/lib/types";
-import { ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
+import { AppWindowMacIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
 import { TerminalPathBarMenu } from "./TerminalPathBarMenu";
@@ -81,7 +81,7 @@ export function TerminalPathBar({
             )}
           >
             <HugeiconsIcon
-              icon={ComputerTerminal01Icon}
+              icon={running ? AppWindowMacIcon : ComputerTerminal01Icon}
               size={12}
               strokeWidth={1.75}
               className="shrink-0"
