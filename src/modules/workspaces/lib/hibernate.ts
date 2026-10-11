@@ -44,10 +44,29 @@ function clearTransientTabState(node: SplitNode): SplitNode {
   return { ...node, first: clearTransientTabState(node.first), second: clearTransientTabState(node.second) };
 }
 
-export function applyHibernate(workspaces: Workspace[], workspaceId: string): Workspace[] {
+export function applyHibernate(workspaces: Workspace[], workspaceId: string, now: number = Date.now()): Workspace[] {
   return workspaces.map((w) =>
-    w.id === workspaceId ? { ...w, hibernated: true, paneTree: clearTransientTabState(w.paneTree) } : w,
+    w.id === workspaceId
+      ? {
+          ...w,
+          hibernated: true,
+          hibernatedAt: w.hibernated ? w.hibernatedAt : now,
+          paneTree: clearTransientTabState(w.paneTree),
+        }
+      : w,
   );
+}
+
+// Two units at most: "5m", "3h 20m", "2d 4h". A zero second unit is left out.
+export function formatHibernatedFor(ms: number): string {
+  const minutes = Math.floor(Math.max(0, ms) / 60_000);
+  if (minutes < 1) return "less than a minute";
+  const unit = (big: number, bigLabel: string, small: number, smallLabel: string) =>
+    small > 0 ? `${big}${bigLabel} ${small}${smallLabel}` : `${big}${bigLabel}`;
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return unit(hours, "h", minutes % 60, "m");
+  return unit(Math.floor(hours / 24), "d", hours % 24, "h");
 }
 
 export function applyStartupHibernation(
@@ -63,7 +82,7 @@ export function applyStartupHibernation(
 export function applyWake(workspaces: Workspace[], workspaceId: string): Workspace[] {
   return workspaces.map((w) => {
     if (w.id !== workspaceId) return w;
-    const { hibernated: _hibernated, ...rest } = w;
+    const { hibernated: _hibernated, hibernatedAt: _hibernatedAt, ...rest } = w;
     return rest;
   });
 }

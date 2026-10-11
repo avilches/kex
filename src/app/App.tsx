@@ -141,6 +141,7 @@ import {
 import { CloseDialogs } from "./components/CloseDialogs";
 import { HibernateDialog } from "./components/HibernateDialog";
 import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
+import { HibernatedSidebarCover } from "@/modules/workspaces/HibernatedSidebarCover";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceBar } from "./components/WorkspaceBar";
@@ -3402,6 +3403,7 @@ export default function App() {
                       maxSize="70%"
                       onResize={(size) => setSidebarWidth(size.asPercentage)}
                     >
+                      <HibernatedSidebarCover hibernated={activeWorkspace?.hibernated === true}>
                       <Sidebar
                         ref={sidebarRef}
                         view={sidebarView}
@@ -3456,6 +3458,7 @@ export default function App() {
                         onOpenCommitFile={onOpenCommitFileStable}
                         onSearchHandle={setGitHistoryHandle}
                       />
+                      </HibernatedSidebarCover>
                     </ResizablePanel>
                     <ResizableHandle />
                   </>
@@ -3511,6 +3514,7 @@ export default function App() {
                       maxSize="70%"
                       onResize={(size) => setSidebarWidth(size.asPercentage)}
                     >
+                      <HibernatedSidebarCover hibernated={activeWorkspace?.hibernated === true}>
                       <Sidebar
                         ref={sidebarRef}
                         view={sidebarView}
@@ -3565,6 +3569,7 @@ export default function App() {
                         onOpenCommitFile={onOpenCommitFileStable}
                         onSearchHandle={setGitHistoryHandle}
                       />
+                      </HibernatedSidebarCover>
                     </ResizablePanel>
                   </>
                 )}

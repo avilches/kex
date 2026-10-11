@@ -20,11 +20,14 @@ vi.mock("./WorkspaceDndProvider", () => ({
 }));
 
 import { HibernatedOverlay } from "./HibernatedOverlay";
+import type { Workspace } from "./lib/types";
+
+const workspaceB = { id: "B", title: "Beta", hibernated: true } as Workspace;
 
 const tabFrom = (workspaceId: string) => ({ kind: "tab", tab: { id: "t1", kind: "terminal" }, workspaceId });
 
 function mount(active = true) {
-  return render(<HibernatedOverlay workspaceId="B" active={active} onWake={() => {}} />);
+  return render(<HibernatedOverlay workspace={workspaceB} active={active} onWake={() => {}} />);
 }
 
 describe("HibernatedOverlay drop zone", () => {
