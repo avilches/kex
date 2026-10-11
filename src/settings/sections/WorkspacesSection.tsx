@@ -5,7 +5,6 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setRandomWorkspaceColor,
   setRestoreAllWorkspacesOnStartup,
-  setWarnOnCloseWorkspace,
   setWorkspaceDetailBrowsers,
   setWorkspaceDetailEditors,
   setWorkspaceDetailGit,
@@ -22,7 +21,6 @@ import { SettingRow } from "../components/SettingRow";
 
 export function WorkspacesSection() {
   const restoreAll = usePreferencesStore((s) => s.restoreAllWorkspacesOnStartup);
-  const warnOnCloseWorkspace = usePreferencesStore((s) => s.warnOnCloseWorkspace);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
   const detailTerminals = usePreferencesStore((s) => s.workspaceDetailTerminals);
@@ -53,15 +51,6 @@ export function WorkspacesSection() {
           <Switch
             checked={restoreAll}
             onCheckedChange={(v) => void setRestoreAllWorkspacesOnStartup(v)}
-          />
-        </SettingRow>
-        <SettingRow
-          title="Warn when closing a workspace"
-          description="Confirm before closing a workspace and its tabs."
-        >
-          <Switch
-            checked={warnOnCloseWorkspace}
-            onCheckedChange={(v) => void setWarnOnCloseWorkspace(v)}
           />
         </SettingRow>
         <SettingRow

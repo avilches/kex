@@ -14,6 +14,7 @@ import {
 import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
+import { useCloseWorkspaceFlow } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -52,7 +53,6 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
   setWarnOnCloseTabWithRunningProcess,
-  setWarnOnCloseWorkspace,
 } from "@/modules/settings/store";
 import {
   useGlobalShortcuts,
@@ -945,19 +945,8 @@ export default function App() {
   const handleCloseWorkspace = useCallback(
     async (wsId: string) => {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
-      const tabIds = ws
-        ? allPanes(ws.paneTree).flatMap((p) => p.tabs.map((t) => t.id))
-        : [];
-      // closeTabsRef reports whether every tab actually closed (false if a
-      // cancel, e.g. "Cancel" on a dirty-editor prompt, stopped the run
-      // early); re-reading workspace state here instead would race the
-      // re-render those closes trigger, since it isn't guaranteed to have
-      // happened yet right after the await.
-      const allClosed =
-        tabIds.length > 0 ? await closeTabsRef.current(tabIds) : true;
-      if (!allClosed) return;
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
-      if (ws?.hibernated) {
+      if (ws) {
         discardUnflushedBuffers(editorTabIds(ws));
         unmarkHibernating(terminalTabs(ws).map((t) => t.id));
       }
@@ -965,42 +954,6 @@ export default function App() {
     },
     [closeWorkspace, destroyWorkspaceFloats],
   );
-  // Stored in a ref so Task 5 (WorkspaceBar close button) can consume it
-  // without re-triggering effects that depend on the callback identity.
-  const handleCloseWorkspaceRef = useRef(handleCloseWorkspace);
-  handleCloseWorkspaceRef.current = handleCloseWorkspace;
-
-  const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState<{
-    id: string;
-    scriptCount: number;
-  } | null>(null);
-  const [pendingWorkspaceProcesses, setPendingWorkspaceProcesses] = useState<{
-    id: string;
-    processes: { tabId: string; label: string }[];
-  } | null>(null);
-
-  const requestCloseWorkspace = useCallback(async (wsId: string) => {
-    const prefs = usePreferencesStore.getState();
-    const ws = workspacesRef.current.find((w) => w.id === wsId);
-    if (prefs.warnOnCloseTabWithRunningProcess && ws) {
-      const processes = await collectRunningTerminals(
-        ws,
-        leafHasForegroundProcess,
-        (id) => getRunningCommandsSnapshot().get(id),
-      );
-      if (processes.length > 0) {
-        setPendingWorkspaceProcesses({ id: wsId, processes });
-        return;
-      }
-    }
-    if (prefs.warnOnCloseWorkspace) {
-      const scriptCount =
-        ws?.scripts?.filter((s) => s.command.trim()).length ?? 0;
-      setPendingCloseWorkspace({ id: wsId, scriptCount });
-      return;
-    }
-    void handleCloseWorkspaceRef.current(wsId);
-  }, []);
 
   const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
   const setWorkspaceEnv = useWorkspaceEnvStore((s) => s.setEnv);
@@ -2014,6 +1967,20 @@ export default function App() {
     const id = pendingHibernateRef.current;
     if (id) void performHibernate(id);
   }, [performHibernate]);
+
+  const closeFlow = useCloseWorkspaceFlow({
+    workspacesRef,
+    flushDirtyEditors,
+    collectProcesses: (ws) =>
+      collectRunningTerminals(ws, leafHasForegroundProcess, (id) =>
+        getRunningCommandsSnapshot().get(id),
+      ),
+    close: handleCloseWorkspace,
+  });
+  const requestCloseWorkspace = closeFlow.requestClose;
+  useEffect(() => {
+    if (isPendingStale(closeFlow.pending?.id ?? null, workspaces)) closeFlow.cancel();
+  }, [closeFlow, workspaces]);
 
   useEffect(() => {
     setEditorFlush(() => flushDirtyEditorsRef.current());
@@ -3673,6 +3640,29 @@ export default function App() {
             }}
           />
 
+          <HibernateDialog
+            mode="close"
+            workspace={
+              workspaces.find((w) => w.id === closeFlow.pending?.id) ?? null
+            }
+            groupLabel={groupLabelOf(
+              workspaces.find((w) => w.id === closeFlow.pending?.id)?.groupId,
+              groups,
+            )}
+            processes={closeFlow.pending?.processes}
+            onClose={closeFlow.cancel}
+            onHibernate={() => {
+              const id = closeFlow.pending?.id;
+              if (id) void closeFlow.performClose(id);
+            }}
+            onSaveTab={saveTabReportingErrors}
+            onSaveAll={async (tabIds) => {
+              await Promise.all(tabIds.map(saveTabReportingErrors));
+            }}
+            onStopBusy={() => {}}
+            onEnableRunOnStart={() => {}}
+          />
+
           <CloseDialogs
             pendingCloseTab={pendingCloseTab}
             onCancelClose={() => resolveEditor({ type: "cancel" })}
@@ -3686,24 +3676,6 @@ export default function App() {
             pendingDeleteTabs={pendingDeleteTabs}
             onCancelDeleteClose={cancelDeleteClose}
             onConfirmDeleteClose={confirmDeleteClose}
-            pendingCloseWorkspace={pendingCloseWorkspace}
-            onCancelCloseWorkspace={() => setPendingCloseWorkspace(null)}
-            onConfirmCloseWorkspace={(dontAskAgain) => {
-              const id = pendingCloseWorkspace?.id;
-              setPendingCloseWorkspace(null);
-              if (dontAskAgain) void setWarnOnCloseWorkspace(false);
-              if (id) void handleCloseWorkspaceRef.current(id);
-            }}
-            pendingWorkspaceProcesses={pendingWorkspaceProcesses}
-            onCancelWorkspaceProcesses={() =>
-              setPendingWorkspaceProcesses(null)
-            }
-            onConfirmWorkspaceProcesses={(dontAskAgain) => {
-              const id = pendingWorkspaceProcesses?.id;
-              setPendingWorkspaceProcesses(null);
-              if (dontAskAgain) void setWarnOnCloseTabWithRunningProcess(false);
-              if (id) void handleCloseWorkspaceRef.current(id);
-            }}
           />
         </div>
       </TooltipProvider>
