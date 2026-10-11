@@ -270,8 +270,10 @@ function SortableWorkspaceItem({
       onDoubleClick={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
-        if (ws.hibernated) onWake?.(ws.id);
-        else onSetDetailExpanded(ws.id, !expanded);
+        if (ws.hibernated) {
+          onSetDetailExpanded(ws.id, true);
+          onWake?.(ws.id);
+        } else onSetDetailExpanded(ws.id, !expanded);
       }}
       className="flex size-[14px] shrink-0 items-center justify-center rounded opacity-60 hover:opacity-100"
     >
