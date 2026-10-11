@@ -489,12 +489,16 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
 
   return (
     <div
+      className={cn(
+        "flex h-8 shrink-0 items-center bg-card/60",
+        tabBarStyle === "connected" ? "border-t border-border/60" : "border-b border-border/60 px-1",
+      )}
+    >
+    <div
       ref={scrollContainerRef}
       className={cn(
-        "flex h-8 shrink-0 items-center overflow-x-auto bg-card/60 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        tabBarStyle === "connected"
-          ? "gap-0 border-t border-border/60"
-          : "gap-0.5 border-b border-border/60 px-1",
+        "flex min-w-0 flex-1 items-center self-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        tabBarStyle === "connected" ? "gap-0" : "gap-0.5",
       )}
       onMouseEnter={() => {
         mouseInsideRef.current = true;
@@ -554,21 +558,23 @@ export function PaneTabBar({ tabs, activeTabId, paneFocused, workspaceId, isWork
           gitColorScheme={gitColorScheme}
         />
       ))}
-      <div
-        className={cn(
-          "flex flex-1 items-center self-stretch",
-          tabBarStyle === "connected" && "border-b border-border/40",
-        )}
-      >
-        <NewTabMenuButton
-          onNewTerminal={onNewTerminal}
-          onSplitTerminalRight={onSplitTerminalRight}
-          onSplitTerminalDown={onSplitTerminalDown}
-          onNewBrowser={onNewBrowser}
-          onSplitBrowserRight={onSplitBrowserRight}
-          onSplitBrowserDown={onSplitBrowserDown}
-        />
-      </div>
+      <div className={cn("flex-1 self-stretch", tabBarStyle === "connected" && "border-b border-border/40")} />
+    </div>
+    <div
+      className={cn(
+        "flex shrink-0 items-center self-stretch",
+        tabBarStyle === "connected" && "border-b border-border/40",
+      )}
+    >
+      <NewTabMenuButton
+        onNewTerminal={onNewTerminal}
+        onSplitTerminalRight={onSplitTerminalRight}
+        onSplitTerminalDown={onSplitTerminalDown}
+        onNewBrowser={onNewBrowser}
+        onSplitBrowserRight={onSplitBrowserRight}
+        onSplitBrowserDown={onSplitBrowserDown}
+      />
+    </div>
     </div>
   );
 }

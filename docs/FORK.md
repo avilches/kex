@@ -96,7 +96,7 @@ Workspace  (UUID, title, cwd, binary pane tree)
 - `splitNode.ts` — pure tree-operation library (split, remove, find, flatten, sibling lookup, directional neighbor lookup via `findPaneInDirection`). Fully unit-tested.
 - `WorkspaceView` → `SplitNodeView` (recursive) → `PaneView` → `PanelContent` — new rendering path. All content kinds (
   terminal, editor, preview, git-*) now live as panels inside panes.
-- `PaneTabBar` — per-pane tab strip with close buttons and a `+` button to open a new terminal panel in that pane. Hovering the `+` (or right-clicking it) opens a menu with the terminal and browser New / Split actions.
+- `PaneTabBar` — per-pane tab strip with close buttons and a `+` button, pinned to the right edge outside the scrolling strip, to open a new terminal panel in that pane. Hovering the `+` (or right-clicking it) opens a menu with the terminal and browser New / Split actions.
 - `dividerPosition` stored explicitly on split nodes (0.0–1.0) — layout persists without relying on
   `react-resizable-panels` internal state.
 - PTY session key migrated from `leafId: number` to `panelId: string` (UUID) throughout: `useTerminalSession`,
