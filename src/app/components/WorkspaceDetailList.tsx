@@ -12,6 +12,7 @@ import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCl
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { useSidebarTabMenu } from "@/modules/workspaces/SidebarTabMenuContext";
 import { TabContextMenuItems } from "@/modules/workspaces/TabContextMenuItems";
+import { sidebarTabDragId } from "@/modules/workspaces/WorkspaceDndProvider";
 import { TabRenamePopover } from "@/modules/workspaces/TabRenamePopover";
 import {
   type DetailFilter,
@@ -81,7 +82,7 @@ function DetailTabRow({
   const { onRenameTab } = useSidebarTabMenu();
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: tab.id,
+    id: sidebarTabDragId(tab.id),
     data: { type: "tab" },
   });
 

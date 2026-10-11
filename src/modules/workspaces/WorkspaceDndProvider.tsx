@@ -100,6 +100,20 @@ function isBarDrag(active: BarDragSource): boolean {
   return type === "workspace" || type === "group";
 }
 
+// A row of the WorkspaceBar and the tab it shows in a pane are both draggable
+// and share this context, so the row needs its own draggable id or dnd-kit
+// would track whichever node registered last.
+const SIDEBAR_TAB_PREFIX = "side-tab:";
+
+export function sidebarTabDragId(tabId: string): string {
+  return SIDEBAR_TAB_PREFIX + tabId;
+}
+
+function draggedId(id: string | number): string {
+  const s = String(id);
+  return s.startsWith(SIDEBAR_TAB_PREFIX) ? s.slice(SIDEBAR_TAB_PREFIX.length) : s;
+}
+
 // A row of the WorkspaceBar is much wider than its ghost, so the overlay is
 // pinned next to the pointer instead of keeping the row's own offset.
 const GHOST_OFFSET = 8;
@@ -216,7 +230,7 @@ export function WorkspaceDndProvider({
     }
     document.body.style.cursor = "grabbing";
     dragIndexRef.current = buildDragIndex();
-    const activeId = String(event.active.id);
+    const activeId = draggedId(event.active.id);
     if (activeId.startsWith("file:")) {
       setDraggingItem({ kind: "file", path: activeId.slice(5), isDir: false });
       return;
@@ -298,7 +312,7 @@ export function WorkspaceDndProvider({
     if (!refTabId) { setTabInsertPaneId(null); return; }
 
     const idx = dragIndexRef.current;
-    const activeId = String(event.active.id);
+    const activeId = draggedId(event.active.id);
     const isFileDrag =
       activeId.startsWith("file:") ||
       activeId.startsWith("dir:") ||
@@ -337,13 +351,13 @@ export function WorkspaceDndProvider({
     setDropWorkspaceId(null);
     const { active, over } = event;
     if (barWorkspaceId && draggingItem?.kind === "tab") {
-      const source = idx.get(String(active.id));
+      const source = idx.get(draggedId(active.id));
       const target = workspaces.find((w) => w.id === barWorkspaceId);
       if (!source || !target || !canDropTabOnWorkspace(source.wsId, target)) {
         restoreOrigin(false, originId);
         return;
       }
-      void onMoveTabToWorkspace(source.wsId, String(active.id), { kind: "auto", workspaceId: barWorkspaceId }).then(
+      void onMoveTabToWorkspace(source.wsId, draggedId(active.id), { kind: "auto", workspaceId: barWorkspaceId }).then(
         (destinationId) => restoreOrigin(destinationId !== null, originId),
       );
       return;
@@ -353,7 +367,7 @@ export function WorkspaceDndProvider({
       return;
     }
 
-    const activeId = String(active.id);
+    const activeId = draggedId(active.id);
     const overId = String(over.id);
 
     if (activeId.startsWith("file:")) {
