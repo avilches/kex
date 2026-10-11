@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import {
   AlertDialog,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { pathBasename } from "@/lib/pathUtils";
+import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   getRunningCommandsSnapshot,
@@ -26,9 +26,10 @@ type Props = {
   onSaveTab: (tabId: string) => Promise<void>;
   onSaveAll: (tabIds: string[]) => Promise<void>;
   onEnableRunOnStart: (tabId: string, runningCommand?: string) => void;
+  onKillAgent: (tabId: string) => void;
 };
 
-export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, onSaveTab, onSaveAll, onEnableRunOnStart }: Props) {
+export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, onSaveTab, onSaveAll, onEnableRunOnStart, onKillAgent }: Props) {
   const sessions = useAgentStore((s) => s.sessions);
   const commands = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const review = useMemo(
@@ -71,18 +72,33 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
               </span>
             )}
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            Hibernating closes every terminal and editor. The items below cannot be recovered when you restore it.
-          </AlertDialogDescription>
         </AlertDialogHeader>
         {review && review.agents.length > 0 && (
           <section className="flex flex-col gap-1">
-            <h3 className="text-[12px] font-medium">Agents working</h3>
+            <h3 className="text-[12px] font-medium">Waiting for these agents to finish</h3>
             {review.agents.map((a) => (
-              <p key={a.tabId} className="text-[12px] text-muted-foreground">
-                {a.title ?? a.agent} is still working
-              </p>
+              <div key={a.tabId} className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
+                  <AgentIcon agent={a.agent} size={12} className="shrink-0" />
+                  <span className="truncate">{a.title ?? a.agent}</span>
+                  <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  title="Interrupt this agent so the workspace can hibernate now"
+                  onClick={() => onKillAgent(a.tabId)}
+                >
+                  Kill
+                </Button>
+              </div>
             ))}
+            {review.docs.length === 0 && review.commands.length === 0 && (
+              <p className="text-[12px] text-muted-foreground">
+                The workspace will hibernate as soon as they are done.
+              </p>
+            )}
           </section>
         )}
         {review && review.docs.length > 0 && (
@@ -100,6 +116,7 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
             ))}
             <Button
               size="sm"
+              className="self-end"
               title="Save every unsaved document"
               onClick={() => void onSaveAll(review.docs.map((d) => d.tabId))}
             >

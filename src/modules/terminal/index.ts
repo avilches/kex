@@ -5,6 +5,7 @@ export {
   disposeSession,
   insertIntoLeafScratchpad,
   leafCwd,
+  interruptAgentLeaf,
   leafHasForegroundProcess,
   leafIdForPty,
   leaveLeafScratchpad,

@@ -70,6 +70,7 @@ import {
 import {
   clearFocusedTerminal,
   disposeSession,
+  interruptAgentLeaf,
   leafHasForegroundProcess,
   leaveLeafScratchpad,
   requestLeafFocus,
@@ -3633,6 +3634,7 @@ export default function App() {
             onSaveAll={async (tabIds) => {
               await Promise.all(tabIds.map(saveTabReportingErrors));
             }}
+            onKillAgent={interruptAgentLeaf}
             onEnableRunOnStart={(tabId, running) => {
               const id = hibernateFlow.pendingWorkspaceId;
               if (!id) return;

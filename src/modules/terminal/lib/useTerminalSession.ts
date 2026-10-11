@@ -299,6 +299,12 @@ export function submitToLeaf(leafId: string, text: string): void {
   else queuePendingInput(s, data);
 }
 
+export function interruptAgentLeaf(leafId: string): void {
+  useAgentStore.getState().setStatus(leafId, "idle");
+  const s = sessions.get(leafId);
+  if (s?.pty) void s.pty.write("\x03");
+}
+
 export function interruptLeaf(leafId: string): void {
   clearAgentSessionForLeaf(leafId);
   sessions.get(leafId)?.pty?.write("\x03");
