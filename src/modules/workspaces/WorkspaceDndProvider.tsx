@@ -10,7 +10,9 @@ import {
   type DragOverEvent,
   type DragStartEvent,
   type DropAnimation,
+  type Modifier,
 } from "@dnd-kit/core";
+import { getEventCoordinates } from "@dnd-kit/utilities";
 import { File01Icon, Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -97,6 +99,20 @@ function isBarDrag(active: BarDragSource): boolean {
   const type = active.data.current?.type;
   return type === "workspace" || type === "group";
 }
+
+// A row of the WorkspaceBar is much wider than its ghost, so the overlay is
+// pinned next to the pointer instead of keeping the row's own offset.
+const GHOST_OFFSET = 8;
+const pinSidebarTabGhost: Modifier = ({ active, activatorEvent, draggingNodeRect, transform }) => {
+  if (active?.data.current?.type !== "tab" || !draggingNodeRect || !activatorEvent) return transform;
+  const pointer = getEventCoordinates(activatorEvent);
+  if (!pointer) return transform;
+  return {
+    ...transform,
+    x: transform.x + pointer.x - draggingNodeRect.left + GHOST_OFFSET,
+    y: transform.y + pointer.y - draggingNodeRect.top + GHOST_OFFSET,
+  };
+};
 
 export function useWorkspaceDndInsert(): string | null {
   return useContext(WorkspaceDndInsertContext);
@@ -487,6 +503,7 @@ export function WorkspaceDndProvider({
       </WorkspaceDndContext.Provider>
       {/* Without pointer-events-none the overlay under the cursor swallows the WorkspaceBar hover. */}
       <DragOverlay
+        modifiers={[pinSidebarTabGhost]}
         dropAnimation={draggingItem ? null : (barOverlay?.dropAnimation ?? null)}
         className="pointer-events-none"
       >
