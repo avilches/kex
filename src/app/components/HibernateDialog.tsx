@@ -15,7 +15,7 @@ import {
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { hibernateReview, isReviewEmpty, liveAgent } from "@/modules/workspaces/lib/hibernateReview";
-import { WorkspaceBadge } from "@/modules/workspaces/WorkspaceBadge";
+import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import type { Workspace } from "@/modules/workspaces/lib/types";
 
 type Props = {
@@ -61,7 +61,7 @@ export function HibernateDialog({ workspace, groupLabel, onClose, onHibernate, o
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             {titleWs && (
-              <WorkspaceBadge id={titleWs.id} color={titleWs.color} icon={titleWs.icon} />
+              <WorkspaceMark id={titleWs.id} color={titleWs.color} icon={titleWs.icon} size={18} />
             )}
             <span className="truncate">
               {titleWs?.title ? `Hibernate "${titleWs.title}"?` : "Hibernate this workspace?"}

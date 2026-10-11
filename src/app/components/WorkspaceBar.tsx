@@ -395,6 +395,9 @@ function SortableWorkspaceItem({
                 />
               )}
               <span className="truncate">{ws.title || ws.kind}</span>
+              {ws.hibernated && (
+                <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="shrink-0 opacity-60" />
+              )}
               {agentCount > 0 && (
                 <span
                   title={`${agentCount} active ${agentCount === 1 ? "agent" : "agents"}`}

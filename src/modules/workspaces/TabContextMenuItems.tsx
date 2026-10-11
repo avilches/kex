@@ -20,13 +20,12 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from "@/components/ui/context-menu";
-import { cn } from "@/lib/utils";
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { isTabNoteOpen, removeTabNote, toggleTabNote } from "./lib/tabNote";
 import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
-import { getWorkspaceIcon } from "./lib/workspaceIcon";
+import { WorkspaceMark } from "./WorkspaceMark";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
 
 type Props = {
@@ -134,16 +133,8 @@ export function TabContextMenuItems({
                   key={t.id}
                   onSelect={() => moveTab(workspaceId, tab.id, { kind: "auto", workspaceId: t.id })}
                 >
-                  <span
-                    aria-hidden
-                    className={cn("size-2 shrink-0 rounded-full", t.color === null && "border border-border")}
-                    style={t.color !== null ? { backgroundColor: t.color } : undefined}
-                  />
-                  {t.icon && getWorkspaceIcon(t.icon) && (
-                    <HugeiconsIcon icon={getWorkspaceIcon(t.icon)!} size={14} strokeWidth={1.5} className="shrink-0" />
-                  )}
+                  <WorkspaceMark id={t.id} color={t.color} icon={t.icon} hibernated={t.hibernated} />
                   <span className="truncate">{t.title}</span>
-                  {t.hibernated && <span className="ml-auto text-muted-foreground">Zzz</span>}
                 </ContextMenuItem>
               ))}
             </ContextMenuSubContent>

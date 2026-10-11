@@ -1,12 +1,10 @@
-import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import type { Tab, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
-import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
-import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
+import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 
 type Props = {
-  workspace: Pick<Workspace, "id" | "title" | "icon" | "color" | "groupId"> | null;
+  workspace: Pick<Workspace, "id" | "title" | "icon" | "color" | "groupId" | "hibernated"> | null;
   tab: Tab | null;
   groups: WorkspaceGroup[];
 };
@@ -16,8 +14,6 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
 
   if (!workspace) return null;
 
-  const color = resolveWorkspaceColor(workspace.color, workspace.id);
-  const icon = workspace.icon ? getWorkspaceIcon(workspace.icon) : null;
   const group = workspace.groupId
     ? (groups.find((g) => g.id === workspace.groupId) ?? null)
     : null;
@@ -28,20 +24,13 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
 
   return (
     <div className="flex min-w-0 max-w-[340px] items-center gap-2">
-      {icon ? (
-        <HugeiconsIcon
-          icon={icon}
-          size={26}
-          strokeWidth={1.75}
-          className="shrink-0"
-          style={color ? { color } : undefined}
-        />
-      ) : (
-        <span
-          className="size-3 shrink-0 rounded-full"
-          style={{ backgroundColor: color ?? "hsl(var(--muted-foreground))" }}
-        />
-      )}
+      <WorkspaceMark
+        id={workspace.id}
+        color={workspace.color}
+        icon={workspace.icon}
+        hibernated={workspace.hibernated}
+        size={26}
+      />
       <div className="flex min-w-0 flex-col justify-center gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-[13.5px] font-semibold leading-none text-foreground">
