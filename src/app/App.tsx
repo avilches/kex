@@ -1497,6 +1497,19 @@ export default function App() {
     [activeWorkspace, activateTab, openTab, splitPaneAndOpenTab],
   );
 
+  const openPlannedDiffTab = useCallback(
+    (
+      workspaceId: string,
+      activePaneId: string,
+      plan: { paneId: string; index?: number },
+      tab: Tab,
+    ) => {
+      openTab(workspaceId, plan.paneId, tab, plan.index);
+      if (plan.paneId !== activePaneId) focusPane(workspaceId, plan.paneId);
+    },
+    [openTab, focusPane],
+  );
+
   const openGitDiffInTab = useCallback(
     (
       params: {
@@ -1545,9 +1558,14 @@ export default function App() {
         );
         return;
       }
-      openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
+      openPlannedDiffTab(
+        activeWorkspace.id,
+        activeWorkspace.activePaneId,
+        plan,
+        newTab,
+      );
     },
-    [activeWorkspace, activateTab, updateTabData, replaceTab, openTab],
+    [activeWorkspace, activateTab, updateTabData, replaceTab, openPlannedDiffTab],
   );
 
   const openGitHistoryInTab = useCallback(
@@ -1894,9 +1912,9 @@ export default function App() {
         replaceTab(ws.id, plan.paneId, plan.oldTabId, newTab);
         return;
       }
-      openTab(ws.id, ws.activePaneId, newTab);
+      openPlannedDiffTab(ws.id, ws.activePaneId, plan, newTab);
     },
-    [activeWorkspaceId, activateTab, updateTabData, replaceTab, openTab],
+    [activeWorkspaceId, activateTab, updateTabData, replaceTab, openPlannedDiffTab],
   );
 
   // ── TabCallbacks ─────────────────────────────────────────────────────────
@@ -2505,7 +2523,12 @@ export default function App() {
           );
           return;
         }
-        openTab(activeWorkspace.id, activeWorkspace.activePaneId, newTab);
+        openPlannedDiffTab(
+          activeWorkspace.id,
+          activeWorkspace.activePaneId,
+          plan,
+          newTab,
+        );
       },
       onGitHistorySearchHandle: (_tabId, handle) => {
         setGitHistoryHandle(handle);
@@ -2573,6 +2596,7 @@ export default function App() {
       updateTabData,
       activeWorkspace,
       openTab,
+      openPlannedDiffTab,
       handleRenameFileFromTab,
       focusSidebar,
       handleSetAsRoot,
