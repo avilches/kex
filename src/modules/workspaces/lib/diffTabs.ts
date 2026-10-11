@@ -33,13 +33,14 @@ function sameDiff(tab: DiffTab, candidate: DiffIdentity): boolean {
 
 export type DiffTabPlan =
   | { action: "activate"; tabId: string; shouldUnpin: boolean }
-  | { action: "replace"; oldTabId: string }
+  | { action: "replace"; oldTabId: string; paneId: string }
   | { action: "create" };
 
 // Decides what opening `candidate` should do to the tab layout, without
 // touching any state itself: reuse an already-open match anywhere in the
-// workspace, recycle the active pane's reusable preview slot (git-diff and
-// git-commit-file share the same slot), or create a new tab. `pin` is true
+// workspace, recycle the repo's preview slot wherever it lives (one per
+// repoRoot per workspace, preferring the active pane; git-diff and
+// git-commit-file share it), or create a new tab. `pin` is true
 // for a gesture (double click, explicit menu action) that must leave the
 // diff open permanently instead of in the recyclable preview slot.
 export function planDiffTabOpen(
@@ -56,11 +57,16 @@ export function planDiffTabOpen(
     }
   }
   if (!pin) {
-    const activePane = panes.find((p) => p.id === activePaneId);
-    const existingPreview = activePane?.tabs.find((tab) => isDiffTab(tab) && tab.preview);
-    if (existingPreview) {
-      return { action: "replace", oldTabId: existingPreview.id };
+    let found: { oldTabId: string; paneId: string } | null = null;
+    for (const pane of panes) {
+      const tab = pane.tabs.find(
+        (t) => isDiffTab(t) && t.preview && t.repoRoot === candidate.repoRoot,
+      );
+      if (!tab) continue;
+      if (pane.id === activePaneId) return { action: "replace", oldTabId: tab.id, paneId: pane.id };
+      found ??= { oldTabId: tab.id, paneId: pane.id };
     }
+    if (found) return { action: "replace", ...found };
   }
   return { action: "create" };
 }

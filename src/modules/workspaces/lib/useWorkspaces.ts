@@ -723,6 +723,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
         if (w.id !== workspaceId) return w;
         return {
           ...w,
+          activePaneId: paneId,
           paneTree: updatePane(w.paneTree, paneId, (p) => {
             const idx = p.tabs.findIndex((tab) => tab.id === oldTabId);
             if (idx === -1) return p;
