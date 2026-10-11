@@ -1,12 +1,16 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SleepingIcon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { formatHibernatedFor } from "./lib/hibernate";
+import { allPanes } from "./lib/splitNode";
+import { tabIcon } from "./lib/tabTitle";
+import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 import { HIBERNATED_DROP_PREFIX } from "./lib/tabDrop";
-import type { Workspace } from "./lib/types";
+import type { Tab, Workspace } from "./lib/types";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { WorkspaceMark } from "./WorkspaceMark";
@@ -26,6 +30,20 @@ function useNow(enabled: boolean): number {
   return now;
 }
 
+function SleepingTabRow({ tab }: { tab: Tab }) {
+  const info = useAgentTabTitle(tab);
+  const title = info?.displayTitle ?? tab.id;
+  const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
+  return (
+    <li title={title} className="flex h-6 items-center gap-1.5 px-2 text-[12px]">
+      <span className="flex size-3.5 shrink-0 items-center justify-center">
+        {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
+      </span>
+      <span className="min-w-0 flex-1 truncate">{title}</span>
+    </li>
+  );
+}
+
 export function HibernatedOverlay({ workspace, onWake, active }: Props) {
   const workspaceId = workspace.id;
   const dragging = useWorkspaceDnd().draggingItem;
@@ -35,6 +53,7 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
     disabled: !acceptsDrop,
   });
   const shortcutLabel = useShortcutLabel("workspace.hibernate");
+  const tabs = useMemo(() => allPanes(workspace.paneTree).flatMap((p) => p.tabs), [workspace.paneTree]);
   const now = useNow(active && workspace.hibernatedAt !== undefined);
   return (
     <div
@@ -56,6 +75,13 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
           </span>
         )}
       </div>
+      {tabs.length > 0 && (
+        <ul className="flex max-h-[40%] w-64 max-w-[80%] flex-col gap-px overflow-y-auto border-l border-border/60 pl-0.5">
+          {tabs.map((tab) => (
+            <SleepingTabRow key={tab.id} tab={tab} />
+          ))}
+        </ul>
+      )}
       <Button size="lg" onClick={onWake} autoFocus={active} className="gap-2">
         <HugeiconsIcon icon={UploadCircle01Icon} size={16} strokeWidth={2} />
         Restore

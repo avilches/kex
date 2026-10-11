@@ -22,7 +22,13 @@ vi.mock("./WorkspaceDndProvider", () => ({
 import { HibernatedOverlay } from "./HibernatedOverlay";
 import type { Workspace } from "./lib/types";
 
-const workspaceB = { id: "B", title: "Beta", hibernated: true } as Workspace;
+const tab = { id: "t1", kind: "terminal", title: "build" };
+const workspaceB = {
+  id: "B",
+  title: "Beta",
+  hibernated: true,
+  paneTree: { kind: "pane", id: "p", tabs: [tab], activeTabId: "t1" },
+} as unknown as Workspace;
 
 const tabFrom = (workspaceId: string) => ({ kind: "tab", tab: { id: "t1", kind: "terminal" }, workspaceId });
 
@@ -60,6 +66,11 @@ describe("HibernatedOverlay drop zone", () => {
     state.dragging = tabFrom("A");
     mount(false);
     expect(state.droppable.disabled).toBe(true);
+  });
+
+  it("lists the workspace tabs", () => {
+    const { getByText } = mount();
+    expect(getByText("build")).toBeTruthy();
   });
 
   it("highlights only while a valid drag is over it", () => {
