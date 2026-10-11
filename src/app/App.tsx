@@ -245,7 +245,6 @@ export default function App() {
     setPaneDivider,
     moveTab,
     moveTabToWorkspace,
-    moveTabToWorkspaceWaking,
     reorderTab,
     splitPaneAndPlace,
     splitPaneAndOpenTab,
@@ -2034,21 +2033,16 @@ export default function App() {
     });
   }, [findTabGlobal]);
 
-  const settleMovedTab = useCallback(
-    (tabId: string, destinationId: string | null): string | null => {
+  const handleMoveTabToWorkspace = useCallback(
+    async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
+      const destinationId = await moveTabToWorkspace(sourceWorkspaceId, tabId, request);
       if (destinationId) {
         useAgentStore.getState().reassignTabWorkspace(tabId, destinationId);
         requestAnimationFrame(focusActiveTab);
       }
       return destinationId;
     },
-    [focusActiveTab],
-  );
-
-  const handleMoveTabToWorkspace = useCallback(
-    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): string | null =>
-      settleMovedTab(tabId, moveTabToWorkspace(sourceWorkspaceId, tabId, request)),
-    [moveTabToWorkspace, settleMovedTab],
+    [moveTabToWorkspace, focusActiveTab],
   );
 
   const handleMoveTabFromMenu = useCallback(
@@ -2057,15 +2051,14 @@ export default function App() {
       const hadFocus =
         source?.id === sourceWorkspaceId &&
         findPane(source.paneTree, source.activePaneId)?.activeTabId === tabId;
-      const destinationId = await moveTabToWorkspaceWaking(sourceWorkspaceId, tabId, request);
-      settleMovedTab(tabId, destinationId);
+      const destinationId = await handleMoveTabToWorkspace(sourceWorkspaceId, tabId, request);
       if (hadFocus && destinationId) {
         setActiveWorkspaceId(destinationId);
         activateTab(destinationId, tabId);
         setTimeout(focusActiveTab, 50);
       }
     },
-    [moveTabToWorkspaceWaking, settleMovedTab, setActiveWorkspaceId, activateTab, focusActiveTab],
+    [handleMoveTabToWorkspace, setActiveWorkspaceId, activateTab, focusActiveTab],
   );
 
   const {

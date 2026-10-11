@@ -100,7 +100,7 @@ export function WorkspaceView({
             welcomeActions={rest.welcomeActions}
           />
           {ws.hibernated && (
-            <HibernatedOverlay active={ws.id === activeWorkspaceId} onWake={() => onWake(ws.id)} />
+            <HibernatedOverlay workspaceId={ws.id} active={ws.id === activeWorkspaceId} onWake={() => onWake(ws.id)} />
           )}
         </div>
       ))}

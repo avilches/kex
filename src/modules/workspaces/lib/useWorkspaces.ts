@@ -533,20 +533,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     );
   }, []);
 
-  const moveTabToWorkspace = useCallback(
-    (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): string | null => {
-      const dest = buildMoveDestination(request);
-      const { workspacePaneLimit } = usePreferencesStore.getState();
-      const current = workspacesRef.current;
-      if (applyMoveTabToWorkspace(current, sourceWorkspaceId, tabId, dest, workspacePaneLimit) === current) {
-        return null;
-      }
-      setWorkspaces((prev) => applyMoveTabToWorkspace(prev, sourceWorkspaceId, tabId, dest, workspacePaneLimit));
-      return dest.workspaceId;
-    },
-    [],
-  );
-
   const reorderTab = useCallback((workspaceId: string, tabId: string, insertionIndex: number) => {
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -977,11 +963,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     });
   }, []);
 
-  // Menu variant of moveTabToWorkspace: a hibernated destination is woken first
-  // instead of refused. The move is validated before waking so an impossible one
+  // A hibernated destination is woken first instead of refused. The move is validated before waking so an impossible one
   // does not wake anything, and the updater wakes `prev` itself because a wake
   // already in flight makes wakeWorkspace return before it has applied.
-  const moveTabToWorkspaceWaking = useCallback(
+  const moveTabToWorkspace = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
       const dest = buildMoveDestination(request);
       const { workspacePaneLimit } = usePreferencesStore.getState();
@@ -1038,7 +1023,6 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setPaneDivider,
     moveTab,
     moveTabToWorkspace,
-    moveTabToWorkspaceWaking,
     reorderTab,
     splitPaneAndPlace,
     splitPaneAndOpenTab,

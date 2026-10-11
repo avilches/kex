@@ -10,6 +10,9 @@ export type TabDropAction =
   | { kind: "split"; workspaceId: string; tabId: string; paneId: string; direction: SplitDirection }
   | { kind: "transfer"; sourceWorkspaceId: string; tabId: string; request: TabMoveRequest };
 
+// A hibernated workspace has no panes to drop on, so its overlay is one droppable.
+export const HIBERNATED_DROP_PREFIX = "hibernated:";
+
 const DIRECTIONS: ReadonlySet<string> = new Set(["top", "bottom", "left", "right"]);
 
 export function resolveTabDrop(
@@ -42,6 +45,17 @@ export function resolveTabDrop(
     }
     if (source.paneId === target.paneId) return { kind: "reorder", workspaceId: source.wsId, tabId, index };
     return { kind: "move", workspaceId: source.wsId, tabId, paneId: target.paneId, index };
+  }
+
+  if (overId.startsWith(HIBERNATED_DROP_PREFIX)) {
+    const workspaceId = overId.slice(HIBERNATED_DROP_PREFIX.length);
+    if (!workspaceId || workspaceId === source.wsId || !workspaces.some((w) => w.id === workspaceId)) return null;
+    return {
+      kind: "transfer",
+      sourceWorkspaceId: source.wsId,
+      tabId,
+      request: { kind: "auto", workspaceId },
+    };
   }
 
   if (!overId.startsWith("zone:")) return null;
@@ -88,9 +102,6 @@ export function originToRestore(
   return originId;
 }
 
-export function canDropTabOnWorkspace(
-  sourceWorkspaceId: string,
-  target: { id: string; hibernated?: boolean },
-): boolean {
-  return target.id !== sourceWorkspaceId && !target.hibernated;
+export function canDropTabOnWorkspace(sourceWorkspaceId: string, target: { id: string }): boolean {
+  return target.id !== sourceWorkspaceId;
 }

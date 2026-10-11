@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canDropTabOnWorkspace, originToRestore, resolveTabDrop, type TabLocation } from "./tabDrop";
+import { canDropTabOnWorkspace, HIBERNATED_DROP_PREFIX, originToRestore, resolveTabDrop, type TabLocation } from "./tabDrop";
 import type { PaneNode, Tab, Workspace } from "./types";
 
 const term = (id: string): Tab => ({ id, kind: "terminal" });
@@ -54,6 +54,24 @@ describe("resolveTabDrop within one workspace", () => {
       kind: "split", workspaceId: "A", tabId: "t1", paneId: "pa2", direction: "bottom",
     });
     expect(resolveTabDrop("zone:pa2:bottom", "t1", workspaces, idx, 2)).toBeNull();
+  });
+});
+
+describe("resolveTabDrop onto a hibernated workspace overlay", () => {
+  const sleeping: Workspace = { ...b, hibernated: true };
+
+  it("transfers the tab with the auto placement", () => {
+    expect(resolveTabDrop(`${HIBERNATED_DROP_PREFIX}B`, "t1", [a, sleeping], idx, 8)).toEqual({
+      kind: "transfer",
+      sourceWorkspaceId: "A",
+      tabId: "t1",
+      request: { kind: "auto", workspaceId: "B" },
+    });
+  });
+
+  it("ignores the tab's own workspace and unknown workspaces", () => {
+    expect(resolveTabDrop(`${HIBERNATED_DROP_PREFIX}A`, "t1", [a, sleeping], idx, 8)).toBeNull();
+    expect(resolveTabDrop(`${HIBERNATED_DROP_PREFIX}ghost`, "t1", [a, sleeping], idx, 8)).toBeNull();
   });
 });
 
@@ -112,12 +130,12 @@ describe("originToRestore", () => {
 });
 
 describe("canDropTabOnWorkspace", () => {
-  it("accepts another awake workspace", () => {
+  it("accepts another workspace, hibernated or not", () => {
     expect(canDropTabOnWorkspace("A", { id: "B" })).toBe(true);
+    expect(canDropTabOnWorkspace("A", { id: "B", hibernated: true } as { id: string })).toBe(true);
   });
 
-  it("rejects the tab's own workspace and hibernated ones", () => {
+  it("rejects the tab's own workspace", () => {
     expect(canDropTabOnWorkspace("A", { id: "A" })).toBe(false);
-    expect(canDropTabOnWorkspace("A", { id: "B", hibernated: true })).toBe(false);
   });
 });
