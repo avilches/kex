@@ -73,18 +73,20 @@ export function GeneralSection() {
       <SectionHeader title="General" />
 
       <div className="flex flex-col gap-2">
-        <SettingRow
-          title={
-            <>
+        <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-[12.5px] font-medium">
               Autofocus{"  "}
               <span className="inline-flex translate-y-[2px] text-primary">
                 <HugeiconsIcon icon={CrosshairIcon} size={14} strokeWidth={2} />
               </span>
-            </>
-          }
-          description="Tabs with autofocus refresh the sidebar when selected."
-        >
+            </span>
+            <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+              Tabs with autofocus refresh the sidebar when selected.
+            </span>
+          </div>
           <RadioGroup
+            className="gap-2"
             value={autofocusMode}
             onValueChange={(v) => void setAutofocusMode(v as AutofocusMode)}
           >
@@ -116,7 +118,7 @@ export function GeneralSection() {
               </label>
             </div>
           </RadioGroup>
-        </SettingRow>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
