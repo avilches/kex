@@ -5,6 +5,7 @@ import { allPanes } from "./lib/splitNode";
 import type { Workspace } from "./lib/types";
 import { SplitNodeView } from "./SplitNodeView";
 import { HibernatedOverlay } from "./HibernatedOverlay";
+import { useJustWoken } from "./lib/hibernateFx";
 import { strippedTree } from "./lib/hibernate";
 import type { TabCallbacks } from "./TabContent";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
@@ -99,6 +100,7 @@ export function WorkspaceView({
       onNavigateFloatBrowserTab={rest.onNavigateFloatBrowserTab}
             welcomeActions={rest.welcomeActions}
           />
+          <WakeWash hibernated={ws.hibernated} />
           {ws.hibernated && (
             <HibernatedOverlay workspace={ws} active={ws.id === activeWorkspaceId} onWake={() => onWake(ws.id)} />
           )}
@@ -106,4 +108,10 @@ export function WorkspaceView({
       ))}
     </div>
   );
+}
+
+function WakeWash({ hibernated }: { hibernated: boolean | undefined }) {
+  const wokenAt = useJustWoken(hibernated);
+  if (wokenAt === null) return null;
+  return <span key={wokenAt} aria-hidden className="hib-wash hib-wash-out" />;
 }

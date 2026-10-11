@@ -409,47 +409,21 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
    * no spatial movement, so it does not trigger motion sensitivity. */
 }
 
-/* Hibernate transition candidates (temporary, one is picked later). The overlay
- * classes animate the pane area; the chip classes animate a layer inside the
- * WorkspaceBar button. */
-@keyframes hib-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes hib-sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-@keyframes hib-iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(80% at 50% 50%); } }
-@keyframes hib-curtain { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
-@keyframes hib-blur { from { opacity: 0; filter: blur(14px) saturate(2); transform: scale(1.04); } to { opacity: 1; filter: none; transform: none; } }
-@keyframes hib-icon-drift { 0% { opacity: 0; transform: translateY(18px) scale(0.85); } 100% { opacity: 0.7; transform: none; } }
-.hib-ov-fade { animation: hib-fade 700ms var(--ease-soft) both; }
-.hib-ov-sweep { animation: hib-sweep 800ms var(--ease-premium) both; }
-.hib-ov-iris { animation: hib-iris 900ms var(--ease-premium) both; }
-.hib-ov-curtain { animation: hib-curtain 800ms var(--ease-premium) both; }
-.hib-ov-blur { animation: hib-blur 900ms var(--ease-premium) both; }
-.hib-ov-icon { animation: hib-icon-drift 900ms var(--ease-premium) 250ms both; }
-
-@keyframes hib-chip-fade { 0% { opacity: 0.9; } 100% { opacity: 0; } }
-@keyframes hib-chip-sweep { 0% { transform: scaleX(0); opacity: 0.9; } 70% { transform: scaleX(1); opacity: 0.9; } 100% { transform: scaleX(1); opacity: 0; } }
-@keyframes hib-chip-iris { 0% { transform: scale(0); opacity: 0.9; } 100% { transform: scale(2.5); opacity: 0; } }
-@keyframes hib-chip-curtain { 0% { transform: scaleY(0); opacity: 0.9; } 70% { transform: scaleY(1); opacity: 0.9; } 100% { transform: scaleY(1); opacity: 0; } }
-@keyframes hib-chip-blur { 0%, 40% { opacity: 0.7; } 20% { opacity: 0.1; } 100% { opacity: 0; } }
-.hib-chip-fade { animation: hib-chip-fade 1100ms var(--ease-soft) both; }
-.hib-chip-sweep { transform-origin: left; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }
-.hib-chip-iris { border-radius: 9999px; animation: hib-chip-iris 1000ms var(--ease-premium) both; }
-.hib-chip-curtain { transform-origin: top; animation: hib-chip-curtain 1000ms var(--ease-premium) both; }
-.hib-chip-blur { animation: hib-chip-blur 1100ms var(--ease-soft) both; }
-
-/* Full-pane color wash for the hibernate candidates: the overlay background is
- * the same as the empty panes below, so only a tinted layer makes it visible. */
-@keyframes hib-wash-fade { 0% { opacity: 0; } 30% { opacity: 0.5; } 100% { opacity: 0; } }
-@keyframes hib-wash-sweep { 0% { transform: scaleX(0); opacity: 0.55; } 65% { transform: scaleX(1); opacity: 0.55; } 100% { transform: scaleX(1); opacity: 0; } }
-@keyframes hib-wash-iris { 0% { transform: scale(0); opacity: 0.6; } 100% { transform: scale(1); opacity: 0; } }
-@keyframes hib-wash-curtain { 0% { transform: scaleY(0); opacity: 0.55; } 65% { transform: scaleY(1); opacity: 0.55; } 100% { transform: scaleY(1); opacity: 0; } }
-@keyframes hib-wash-blur { 0% { opacity: 0; } 20% { opacity: 0.55; } 40% { opacity: 0.15; } 60% { opacity: 0.45; } 100% { opacity: 0; } }
+/* Hibernate/wake transitions. The pane overlay shares its background with the
+ * empty panes below, so a tinted wash is what makes the transition visible:
+ * it closes inward on hibernate and opens outward on wake. The chip layer
+ * sweeps across the WorkspaceBar button in both directions. */
+@keyframes hib-iris-in { 0% { clip-path: circle(75% at 50% 50%); opacity: 0.6; } 100% { clip-path: circle(0% at 50% 50%); opacity: 0.6; } }
+@keyframes hib-iris-out { 0% { clip-path: circle(0% at 50% 50%); opacity: 0.6; } 100% { clip-path: circle(75% at 50% 50%); opacity: 0; } }
 @keyframes hib-item-in { 0% { opacity: 0; transform: translateY(14px) scale(0.96); filter: blur(6px); } 100% { opacity: 1; transform: none; filter: none; } }
+@keyframes hib-icon-drift { 0% { opacity: 0; transform: translateY(18px) scale(0.85); } 100% { opacity: 0.7; transform: none; } }
+@keyframes hib-chip-sweep { 0% { transform: scaleX(0); opacity: 0.9; } 65% { transform: scaleX(1); opacity: 0.9; } 100% { transform: scaleX(1); opacity: 0; } }
 @keyframes hib-chip-pop { 0% { transform: scale(1); } 25% { transform: scale(1.07); } 100% { transform: scale(1); } }
 .hib-wash { pointer-events: none; position: absolute; inset: 0; z-index: 30; background: var(--primary); }
-.hib-wash-fade { animation: hib-wash-fade 1500ms var(--ease-soft) both; }
-.hib-wash-sweep { transform-origin: left; animation: hib-wash-sweep 1500ms var(--ease-premium) both; }
-.hib-wash-iris { border-radius: 9999px; transform-origin: center; width: 160%; height: 160%; inset: -30%; animation: hib-wash-iris 1500ms var(--ease-premium) both; }
-.hib-wash-curtain { transform-origin: top; animation: hib-wash-curtain 1500ms var(--ease-premium) both; }
-.hib-wash-blur { animation: hib-wash-blur 1500ms var(--ease-soft) both; }
+.hib-wash-in { animation: hib-iris-in 1100ms var(--ease-premium) both; }
+.hib-wash-out { animation: hib-iris-out 1200ms var(--ease-premium) both; }
 .hib-item { animation: hib-item-in 800ms var(--ease-premium) both; }
+.hib-ov-icon { animation: hib-icon-drift 900ms var(--ease-premium) 250ms both; }
 .hib-chip-pop { animation: hib-chip-pop 700ms var(--ease-premium); }
+.hib-chip-sweep-in { transform-origin: left; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }
+.hib-chip-sweep-out { transform-origin: right; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }

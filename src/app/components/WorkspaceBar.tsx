@@ -47,7 +47,7 @@ import {
 import { getWorkspaceIcon, WORKSPACE_ICON_PALETTE } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
-import { hibernateFxFor, isFreshHibernate } from "@/modules/workspaces/lib/hibernateFx";
+import { isFreshHibernate, useJustWoken } from "@/modules/workspaces/lib/hibernateFx";
 import { useBarDndBinding, useWorkspaceDnd, useWorkspaceDropTarget } from "@/modules/workspaces/WorkspaceDndProvider";
 import {
   ContextMenu,
@@ -263,9 +263,10 @@ function SortableWorkspaceItem({
     clearRename();
   }
 
-  const chipFx = isFreshHibernate(ws.hibernatedAt) && ws.hibernated
-    ? hibernateFxFor(ws.id, ws.hibernatedAt!)
-    : null;
+  const wokenAt = useJustWoken(ws.hibernated);
+  const chipFx =
+    ws.hibernated && isFreshHibernate(ws.hibernatedAt) ? "in" : wokenAt !== null ? "out" : null;
+  const chipFxKey = chipFx === "in" ? ws.hibernatedAt : wokenAt;
   const compact = barWidth <= 80;
   const showDetail = !compact && hasDetail(detailFilter);
   const expanded = showDetail && !!ws.detailExpanded && !ws.hibernated;
@@ -391,9 +392,9 @@ function SortableWorkspaceItem({
         >
           {chipFx && (
             <span
-              key={ws.hibernatedAt}
+              key={chipFxKey}
               aria-hidden
-              className={cn("pointer-events-none absolute inset-0 bg-primary/75", `hib-chip-${chipFx}`)}
+              className={cn("pointer-events-none absolute inset-0 bg-primary/75", `hib-chip-sweep-${chipFx}`)}
             />
           )}
           {compact ? (

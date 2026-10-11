@@ -1,18 +1,22 @@
-export const HIBERNATE_FX = ["fade", "sweep", "iris", "curtain", "blur"] as const;
-export type HibernateFx = (typeof HIBERNATE_FX)[number];
+import { useEffect, useRef, useState } from "react";
 
 const FRESH_MS = 1500;
-const assigned = new Map<string, { at: number; fx: HibernateFx }>();
-let cursor = 0;
+const WAKE_FX_MS = 1600;
 
 export function isFreshHibernate(hibernatedAt: number | undefined, now = Date.now()): boolean {
   return hibernatedAt !== undefined && now - hibernatedAt < FRESH_MS;
 }
 
-export function hibernateFxFor(id: string, hibernatedAt: number): HibernateFx {
-  const known = assigned.get(id);
-  if (known && known.at === hibernatedAt) return known.fx;
-  const fx = HIBERNATE_FX[cursor++ % HIBERNATE_FX.length];
-  assigned.set(id, { at: hibernatedAt, fx });
-  return fx;
+export function useJustWoken(hibernated: boolean | undefined): number | null {
+  const prev = useRef(!!hibernated);
+  const [wokenAt, setWokenAt] = useState<number | null>(null);
+  useEffect(() => {
+    const was = prev.current;
+    prev.current = !!hibernated;
+    if (!was || hibernated) return;
+    setWokenAt(Date.now());
+    const timer = setTimeout(() => setWokenAt(null), WAKE_FX_MS);
+    return () => clearTimeout(timer);
+  }, [hibernated]);
+  return wokenAt;
 }
