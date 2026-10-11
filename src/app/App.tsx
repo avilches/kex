@@ -1539,7 +1539,7 @@ export default function App() {
       if (plan.action === "replace") {
         replaceTab(
           activeWorkspace.id,
-          activeWorkspace.activePaneId,
+          plan.paneId,
           plan.oldTabId,
           newTab,
         );
@@ -1891,7 +1891,7 @@ export default function App() {
         preview: !params.pin,
       };
       if (plan.action === "replace") {
-        replaceTab(ws.id, ws.activePaneId, plan.oldTabId, newTab);
+        replaceTab(ws.id, plan.paneId, plan.oldTabId, newTab);
         return;
       }
       openTab(ws.id, ws.activePaneId, newTab);
@@ -2499,7 +2499,7 @@ export default function App() {
         if (plan.action === "replace") {
           replaceTab(
             activeWorkspace.id,
-            activeWorkspace.activePaneId,
+            plan.paneId,
             plan.oldTabId,
             newTab,
           );

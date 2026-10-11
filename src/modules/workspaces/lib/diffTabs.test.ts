@@ -49,7 +49,7 @@ describe("planDiffTabOpen", () => {
     const preview = gitDiff("t1", { path: "src/old.ts", preview: true });
     const panes = [pane("p1", [preview])];
     const plan = planDiffTabOpen(panes, "p1", { kind: "git-diff", repoRoot: "/repo", path: "src/new.ts", mode: "-" }, false);
-    expect(plan).toEqual({ action: "replace", oldTabId: "t1" });
+    expect(plan).toEqual({ action: "replace", oldTabId: "t1", paneId: "p1" });
   });
 
   it("does not replace a pinned (non-preview) diff tab", () => {
@@ -88,11 +88,40 @@ describe("planDiffTabOpen", () => {
     expect(plan).toEqual({ action: "activate", tabId: "t1", shouldUnpin: false });
   });
 
-  it("only reuses the preview slot within the active pane", () => {
+  it("recycles the preview diff of the same repo living in another pane", () => {
     const preview = gitDiff("t1", { path: "src/old.ts", preview: true });
     const panes = [pane("p1", []), pane("p2", [preview])];
     const plan = planDiffTabOpen(panes, "p1", { kind: "git-diff", repoRoot: "/repo", path: "src/new.ts", mode: "-" }, false);
+    expect(plan).toEqual({ action: "replace", oldTabId: "t1", paneId: "p2" });
+  });
+
+  it("keeps a separate preview per repo", () => {
+    const preview = gitDiff("t1", { repoRoot: "/other", path: "src/old.ts", preview: true });
+    const panes = [pane("p1", [preview])];
+    const plan = planDiffTabOpen(panes, "p1", { kind: "git-diff", repoRoot: "/repo", path: "src/new.ts", mode: "-" }, false);
     expect(plan).toEqual({ action: "create" });
+  });
+
+  it("never recycles a pinned diff in another pane", () => {
+    const pinned = gitDiff("t1", { path: "src/old.ts", preview: false });
+    const panes = [pane("p1", []), pane("p2", [pinned])];
+    const plan = planDiffTabOpen(panes, "p1", { kind: "git-diff", repoRoot: "/repo", path: "src/new.ts", mode: "-" }, false);
+    expect(plan).toEqual({ action: "create" });
+  });
+
+  it("never recycles with pin", () => {
+    const preview = gitDiff("t1", { path: "src/old.ts", preview: true });
+    const panes = [pane("p1", [preview])];
+    const plan = planDiffTabOpen(panes, "p1", { kind: "git-diff", repoRoot: "/repo", path: "src/new.ts", mode: "-" }, true);
+    expect(plan).toEqual({ action: "create" });
+  });
+
+  it("prefers the preview in the active pane when several exist", () => {
+    const a = gitDiff("t1", { path: "src/x.ts", preview: true });
+    const b = gitDiff("t2", { path: "src/y.ts", preview: true });
+    const panes = [pane("p1", [a]), pane("p2", [b])];
+    const plan = planDiffTabOpen(panes, "p2", { kind: "git-diff", repoRoot: "/repo", path: "src/new.ts", mode: "-" }, false);
+    expect(plan).toEqual({ action: "replace", oldTabId: "t2", paneId: "p2" });
   });
 
   it("distinguishes staged and unstaged diffs of the same path", () => {
@@ -106,7 +135,7 @@ describe("planDiffTabOpen", () => {
     const preview = gitDiff("t1", { preview: true });
     const panes = [pane("p1", [preview])];
     const plan = planDiffTabOpen(panes, "p1", { kind: "git-commit-file", repoRoot: "/repo", sha: "abc123", path: "src/a.ts" }, false);
-    expect(plan).toEqual({ action: "replace", oldTabId: "t1" });
+    expect(plan).toEqual({ action: "replace", oldTabId: "t1", paneId: "p1" });
   });
 
   it("matches an existing git-commit-file diff by repo, sha and path", () => {
