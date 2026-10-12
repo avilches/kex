@@ -202,6 +202,10 @@ import {
   scriptShellFor,
   type ScriptShell,
 } from "@/modules/workspaces/lib/scriptCwd";
+import {
+  planDelayedWrite,
+  planScriptStop,
+} from "@/modules/workspaces/lib/scriptRunState";
 import { IS_WINDOWS } from "@/lib/platform";
 import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename } from "@/lib/pathUtils";
@@ -742,6 +746,27 @@ export default function App() {
 
   // ── Script execution ──────────────────────────────────────────────────────
 
+  const scheduleScriptWrite = useCallback(
+    (tabId: string, input: string, delay: number) => {
+      const tryWrite = (attempts = 0) => {
+        const step = planDelayedWrite(
+          getScriptRunningSnapshot().get(tabId),
+          terminalHandles.current.has(tabId),
+          attempts,
+        );
+        if (step === "write") {
+          terminalHandles.current.get(tabId)?.write(input);
+        } else if (step === "retry") {
+          setTimeout(() => tryWrite(attempts + 1), 100);
+        } else {
+          setScriptRunning(tabId, false);
+        }
+      };
+      setTimeout(tryWrite, delay);
+    },
+    [],
+  );
+
   const runWorkspaceConfig = useCallback(
     (config: Script) => {
       if (!activeWorkspace || activeWorkspace.hibernated) return;
@@ -803,18 +828,7 @@ export default function App() {
           );
           if (input !== null) {
             setScriptRunning(tabId, "running");
-            const tryWrite = (attempts = 0) => {
-              if (getScriptRunningSnapshot().get(tabId) !== "running") return;
-              const handle = terminalHandles.current.get(tabId);
-              if (handle) {
-                handle.write(input);
-              } else if (attempts < 20) {
-                setTimeout(() => tryWrite(attempts + 1), 100);
-              } else {
-                setScriptRunning(tabId, false);
-              }
-            };
-            setTimeout(tryWrite, 50);
+            scheduleScriptWrite(tabId, input, 50);
           }
           return;
         }
@@ -876,18 +890,11 @@ export default function App() {
       updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
 
       setScriptRunning(freshTabId, "running");
-      const tryWrite = (attempts = 0) => {
-        if (getScriptRunningSnapshot().get(freshTabId) !== "running") return;
-        const handle = terminalHandles.current.get(freshTabId);
-        if (handle) {
-          handle.write(buildScriptInput(config.command, undefined, scriptShell));
-        } else if (attempts < 20) {
-          setTimeout(() => tryWrite(attempts + 1), 100);
-        } else {
-          setScriptRunning(freshTabId, false);
-        }
-      };
-      setTimeout(tryWrite, 150);
+      scheduleScriptWrite(
+        freshTabId,
+        buildScriptInput(config.command, undefined, scriptShell),
+        150,
+      );
     },
     [
       activeWorkspace,
@@ -900,6 +907,7 @@ export default function App() {
       updateScript,
       openTab,
       setScriptPaneId,
+      scheduleScriptWrite,
     ],
   );
 
@@ -932,7 +940,10 @@ export default function App() {
         activateTab(activeWorkspaceId, config.tabId);
         requestLeafFocus(config.tabId);
       }
-      setScriptRunning(config.tabId, "waiting");
+      setScriptRunning(
+        config.tabId,
+        planScriptStop(scriptCommandSeen.current.has(config.tabId)),
+      );
       const handle = terminalHandles.current.get(config.tabId);
       handle?.write("\x03");
     },
@@ -3685,7 +3696,10 @@ export default function App() {
                 interruptAgentLeaf(row.tabId);
                 return;
               }
-              setScriptRunning(row.tabId, "waiting");
+              setScriptRunning(
+                row.tabId,
+                planScriptStop(scriptCommandSeen.current.has(row.tabId)),
+              );
               terminalHandles.current.get(row.tabId)?.write("\x03");
             }}
             onEnableRunOnStart={(tabId, running) => {
