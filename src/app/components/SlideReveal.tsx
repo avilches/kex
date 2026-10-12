@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode, type TransitionEvent } from "react";
-import { planReveal, REVEAL_FALLBACK_MS } from "./slideReveal";
+import { planReveal, REVEAL_FALLBACK_MS } from "./revealPlan";
 
 type Props = { open: boolean; children: ReactNode };
 

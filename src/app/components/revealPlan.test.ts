@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planReveal } from "./slideReveal";
+import { planReveal } from "./revealPlan";
 
 describe("planReveal", () => {
   it("settles at once when the content has no height, because no transition would run", () => {
