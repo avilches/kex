@@ -514,8 +514,12 @@ fn agent_session_preview_cmd(tab_id: String) -> Option<agent::session_store::Res
 
 /// Why `path` cannot host a restored terminal (missing, not a folder, unreadable), or `None`.
 #[tauri::command]
-fn check_launch_dir(path: String) -> Option<String> {
-    agent::session_store::launch_dir_problem(&path)
+async fn check_launch_dir(path: String) -> Option<String> {
+    // The path is arbitrary and may sit on a slow or hung mount; keep the stat off the async runtime threads.
+    tauri::async_runtime::spawn_blocking(move || agent::session_store::launch_dir_problem(&path))
+        .await
+        .ok()
+        .flatten()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
