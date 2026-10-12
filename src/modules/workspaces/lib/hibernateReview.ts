@@ -23,6 +23,7 @@ export type BusyRow = {
   tabId: string;
   kind: "agent" | "script";
   name: string;
+  command?: string;
   agent?: string;
   stopping: boolean;
   runOnStart: boolean;
@@ -82,7 +83,8 @@ export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateRe
         review.busy.push({
           tabId: tab.id,
           kind: "script",
-          name: script.name,
+          name: script.name.trim() || script.command.trim(),
+          command: script.command.trim() || undefined,
           stopping: state === "waiting",
           runOnStart: false,
         });
