@@ -20,8 +20,17 @@ import {
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
 import { scriptsToDelete, type RunningProcess } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
+import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import type { Workspace } from "@/modules/workspaces/lib/types";
+
+// A custom icon set on the tab wins over the agent's, as in the tab bar.
+function RowIcon({ agent, icon }: { agent?: string; icon?: string }) {
+  const custom = icon ? getWorkspaceIcon(icon) : null;
+  if (custom) return <HugeiconsIcon icon={custom} size={12} strokeWidth={2} className="shrink-0" />;
+  if (agent) return <AgentIcon agent={agent} size={12} className="shrink-0" />;
+  return <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} strokeWidth={2} className="shrink-0" />;
+}
 
 type Props = {
   workspace: Workspace | null;
@@ -120,7 +129,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
             {agents.map((b) => (
               <div key={b.tabId} className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-                  <AgentIcon agent={b.agent ?? b.name} size={12} className="shrink-0" />
+                  <RowIcon agent={b.agent ?? b.name} icon={b.icon} />
                   <span className="truncate">{b.name}</span>
                   <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
                 </span>
@@ -243,11 +252,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
               const agent = liveAgent(sessions[p.tabId])?.agent;
               return (
                 <span key={p.tabId} className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-                  {agent ? (
-                    <AgentIcon agent={agent} size={12} className="shrink-0" />
-                  ) : (
-                    <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} strokeWidth={2} className="shrink-0" />
-                  )}
+                  <RowIcon agent={agent} icon={p.icon} />
                   {p.title && p.title !== p.label && <span className="truncate">{p.title}</span>}
                   <span className="truncate font-mono" title={p.label}>{p.label}</span>
                 </span>
