@@ -964,7 +964,10 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     pty = await openPtyForSession(leafId, s, decision.cwd);
   } catch (e) {
     const command = plan?.resumeCmd || (input.runOnStart ? s.persistentCommand ?? "" : "");
-    blockStart(leafId, s, openFailureBlock(e, decision.cwd, command));
+    // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
+    // back to the saved command.
+    const agent = decision.inject === "resume" ? plan?.agent : undefined;
+    blockStart(leafId, s, openFailureBlock(e, decision.cwd, command, agent));
     return;
   }
   s.ptyOpening = false;

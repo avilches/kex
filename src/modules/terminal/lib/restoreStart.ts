@@ -58,7 +58,8 @@ export function openFailureBlock(
   error: unknown,
   dir: string | undefined,
   command: string,
+  agent?: string,
 ): RestoreBlock {
   const msg = error instanceof Error ? error.message : String(error);
-  return { reason: `Could not start the terminal: ${msg}`, dir: dir ?? "", command };
+  return { reason: `Could not start the terminal: ${msg}`, dir: dir ?? "", command, agent };
 }

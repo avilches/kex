@@ -82,6 +82,10 @@ describe("openFailureBlock", () => {
     });
   });
 
+  it("keeps the agent so a retry can fetch a fresh plan", () => {
+    expect(openFailureBlock("denied", "/work", "claude --resume 'a'", "claude").agent).toBe("claude");
+  });
+
   it("accepts a plain string error and no command", () => {
     expect(openFailureBlock("denied", undefined, "")).toEqual({
       reason: "Could not start the terminal: denied",
