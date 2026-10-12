@@ -396,7 +396,11 @@ function SortableWorkspaceItem({
             <span
               key={hibernatedLook === "out" ? wokenAt : ws.hibernatedAt}
               aria-hidden
-              className={cn("ws-hib-look", hibernatedLook !== "static" && `ws-hib-look-${hibernatedLook}`)}
+              className={cn(
+                "ws-hib-look",
+                hibernatedLook !== "static" && `ws-hib-look-${hibernatedLook}`,
+                active && ws.hibernated && "ws-hib-look-focused",
+              )}
             />
           )}
           {compact ? (
