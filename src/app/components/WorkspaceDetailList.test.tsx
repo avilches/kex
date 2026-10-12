@@ -19,6 +19,18 @@ function createRoot(container: Element) {
   return root;
 }
 
+const liveRoots = new Set<ReturnType<typeof createDomRoot>>();
+
+function track(root: ReturnType<typeof createDomRoot>) {
+  liveRoots.add(root);
+  return () =>
+    act(() => {
+      if (liveRoots.delete(root)) root.unmount();
+    });
+}
+
+const rowName = (b: Element) => b.querySelector(".truncate")?.textContent;
+
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const tabs: Tab[] = [
@@ -50,7 +62,7 @@ function mount(filter: Partial<DetailFilter>, focusedTabId: string | null = null
     );
   });
   const rows = () => Array.from(container.querySelectorAll("button"));
-  return { container, rows, onActivate, unmount: () => act(() => root.unmount()) };
+  return { container, rows, onActivate, unmount: track(root) };
 }
 
 function resetAgents() {
@@ -67,6 +79,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const root of liveRoots) act(() => root.unmount());
+  liveRoots.clear();
   resetAgents();
   document.body.innerHTML = "";
 });
@@ -74,7 +88,7 @@ afterEach(() => {
 describe("WorkspaceDetailList", () => {
   it("all terminals lists every terminal, with a spinner for working and an amber dot for waiting", () => {
     const { rows, unmount } = mount({ terminals: "all" });
-    expect(rows().map((b) => b.textContent)).toEqual(["api", "web", "docs", "shell"]);
+    expect(rows().map((b) => rowName(b))).toEqual(["api", "web", "docs", "shell"]);
     expect(rows()[0].querySelector(".animate-spin")).not.toBeNull();
     expect(rows()[1].querySelector(".bg-amber-400")).not.toBeNull();
     expect(rows()[2].querySelector(".animate-spin, .bg-amber-400, .bg-destructive")).toBeNull();
@@ -84,19 +98,19 @@ describe("WorkspaceDetailList", () => {
 
   it("agents lists the terminals with an agent, including the idle one", () => {
     const { rows, unmount } = mount({ terminals: "agents" });
-    expect(rows().map((b) => b.textContent)).toEqual(["api", "web", "docs"]);
+    expect(rows().map((b) => rowName(b))).toEqual(["api", "web", "docs"]);
     unmount();
   });
 
   it("active agents lists only working and waiting agents, waiting first", () => {
     const { rows, unmount } = mount({ terminals: "active-agents" });
-    expect(rows().map((b) => b.textContent)).toEqual(["web", "api"]);
+    expect(rows().map((b) => rowName(b))).toEqual(["web", "api"]);
     unmount();
   });
 
   it("include editors adds the editor tab even with no terminals", () => {
     const { rows, unmount } = mount({ terminals: "none", editors: true });
-    expect(rows().map((b) => b.textContent)).toEqual(["notes"]);
+    expect(rows().map((b) => rowName(b))).toEqual(["notes"]);
     unmount();
   });
 
@@ -197,7 +211,7 @@ describe("WorkspaceDetailList context menu", () => {
       );
     });
     const rows = () => Array.from(container.querySelectorAll("button"));
-    return { container, rows, unmount: () => act(() => root.unmount()) };
+    return { container, rows, unmount: track(root) };
   }
 
   beforeEach(() => {
