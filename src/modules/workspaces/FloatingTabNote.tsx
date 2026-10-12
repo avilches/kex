@@ -4,6 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeMirrorEditor";
+import { isLeavingNote } from "./lib/noteBlur";
 import { dropBlankTabNote, moveTabNote, setTabNoteText } from "./lib/tabNote";
 import { registerTabNoteFlush, useTabNoteStore } from "./lib/tabNoteStore";
 import { clampNotePos, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
@@ -60,6 +61,8 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
   const docked = !active;
   const draggable = sticky || active;
   const noteRef = useRef<HTMLDivElement>(null);
+  // Set by a press inside the note, so the blur it causes is not read as leaving.
+  const pointerDownInsideRef = useRef(false);
   const [m, setM] = useState<Measure | null>(null);
   const [dragPos, setDragPos] = useState<Point | null>(null);
   // pos lives here, not only in state: pointerup can fire before React re-renders the last move.
@@ -190,8 +193,20 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         onFocus={(e) => e.stopPropagation()}
         onPointerEnter={onPointerEnter}
         onPointerLeave={onPointerLeave}
+        onPointerDownCapture={() => {
+          pointerDownInsideRef.current = true;
+          setTimeout(() => {
+            pointerDownInsideRef.current = false;
+          }, 0);
+        }}
         onBlur={(e) => {
-          if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return;
+          const leaving = isLeavingNote({
+            relatedTarget: e.relatedTarget,
+            container: e.currentTarget,
+            pointerDownInside: pointerDownInsideRef.current,
+            documentHasFocus: document.hasFocus(),
+          });
+          if (!leaving) return;
           flush();
           onUpdateTab?.(tab.id, dropBlankTabNote);
           if (!sticky) onDismiss?.();
