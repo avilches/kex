@@ -5,9 +5,9 @@ import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeMirrorEditor";
 import { isLeavingNote } from "./lib/noteBlur";
-import { dropBlankTabNote, moveTabNote, setTabNoteText } from "./lib/tabNote";
+import { dropBlankTabNote, moveTabNote, resizeTabNote, setTabNoteText } from "./lib/tabNote";
 import { registerTabNoteFlush, useTabNoteStore } from "./lib/tabNoteStore";
-import { clampNotePos, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
+import { clampNotePos, clampNoteSize, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
 import type { Tab } from "./lib/types";
 
 const CodeMirrorEditor = lazy(() =>
@@ -66,6 +66,8 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
   const [m, setM] = useState<Measure | null>(null);
   const [dragPos, setDragPos] = useState<Point | null>(null);
   // pos lives here, not only in state: pointerup can fire before React re-renders the last move.
+  const [resizeSize, setResizeSize] = useState<Size | null>(null);
+  const resizeRef = useRef<{ startX: number; startY: number; origin: Size; size: Size | null } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; origin: Point; pos: Point | null } | null>(null);
 
   // Typing stays local and reaches the tab on a debounce: a state update per key re-renders the app.
@@ -146,6 +148,8 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
     ? resolveNotePos({ notePos: docked ? undefined : tab.notePos, tab: m.tab, pane: m.pane, note: m.note, tabBarHeight: m.tabBarHeight })
     : null;
   const pos = dragPos ?? resolved;
+  const storedSize = docked ? undefined : tab.noteSize;
+  const size = resizeSize ?? storedSize;
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0 || !resolved || !draggable) return;
@@ -178,6 +182,36 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
     setDragPos(null);
   }
 
+  function onResizeDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0 || !m || !draggable) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onPointerEnter?.();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    resizeRef.current = { startX: e.clientX, startY: e.clientY, origin: m.note, size: null };
+  }
+
+  function onResizeMove(e: React.PointerEvent<HTMLDivElement>) {
+    const r = resizeRef.current;
+    if (!r || !m || !pos) return;
+    const dx = e.clientX - r.startX;
+    const dy = e.clientY - r.startY;
+    if (!r.size && dx === 0 && dy === 0) return;
+    r.size = clampNoteSize({ width: r.origin.width + dx, height: r.origin.height + dy }, m.pane, pos);
+    setResizeSize(r.size);
+  }
+
+  function endResize(e: React.PointerEvent<HTMLDivElement>, commit: boolean) {
+    const r = resizeRef.current;
+    resizeRef.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (r?.size && commit) {
+      const target = r.size;
+      onUpdateTab?.(tab.id, (p) => resizeTabNote(p, target));
+    }
+    setResizeSize(null);
+  }
+
   return (
     <div className="pointer-events-none absolute inset-0 z-40">
       <div
@@ -186,9 +220,10 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         data-tab-note-id={tab.id}
         className={cn(
           "pointer-events-auto absolute w-80 max-w-full overflow-hidden rounded-lg border border-border bg-[var(--editor-background)] shadow-xl",
+          size && "flex flex-col",
           !pos && "invisible",
         )}
-        style={{ left: pos?.x ?? 0, top: pos?.y ?? 0 }}
+        style={{ left: pos?.x ?? 0, top: pos?.y ?? 0, ...(size && { width: size.width, height: size.height }) }}
         onMouseDown={(e) => e.stopPropagation()}
         onFocus={(e) => e.stopPropagation()}
         onPointerEnter={onPointerEnter}
@@ -241,7 +276,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
             if (dragRef.current) endDrag(e, false);
           }}
         />
-        <div className="min-h-8 text-[var(--editor-foreground)]">
+        <div className={cn("min-h-8 text-[var(--editor-foreground)]", size && "min-h-0 flex-1 overflow-hidden")}>
           <Suspense fallback={<pre className="whitespace-pre-wrap p-2 text-[12px]">{tab.note}</pre>}>
             <CodeMirrorEditor
               ref={setEditor}
@@ -249,7 +284,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
               syncKey={tab.id}
               path=""
               mode="rich"
-              maxHeight="16rem"
+              maxHeight={size ? undefined : "16rem"}
               onChange={(next) => {
                 draftRef.current = next;
                 if (flushTimer.current) clearTimeout(flushTimer.current);
@@ -258,6 +293,19 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
             />
           </Suspense>
         </div>
+        {draggable && (
+          <div
+            data-testid="tab-note-resize"
+            className={cn("absolute bottom-0 right-0 z-10 size-3 cursor-nwse-resize", resizeSize && "bg-border/40")}
+            onPointerDown={onResizeDown}
+            onPointerMove={onResizeMove}
+            onPointerUp={(e) => endResize(e, true)}
+            onPointerCancel={(e) => endResize(e, false)}
+            onLostPointerCapture={(e) => {
+              if (resizeRef.current) endResize(e, false);
+            }}
+          />
+        )}
       </div>
     </div>
   );

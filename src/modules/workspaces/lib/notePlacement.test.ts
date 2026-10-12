@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { clampNotePos, dockedNotePos, resolveNotePos } from "./notePlacement";
+import { clampNotePos, clampNoteSize, MIN_NOTE_SIZE, dockedNotePos, resolveNotePos } from "./notePlacement";
 
 const pane = { left: 100, top: 50, width: 800, height: 600 };
 const note = { width: 300, height: 200 };
@@ -60,5 +60,18 @@ describe("resolveNotePos", () => {
       x: 0,
       y: 36,
     });
+  });
+});
+
+describe("clampNoteSize", () => {
+  const size = { width: 800, height: 600 };
+  test("keeps a size that fits", () => {
+    expect(clampNoteSize({ width: 300, height: 200 }, size, { x: 10, y: 10 })).toEqual({ width: 300, height: 200 });
+  });
+  test("never goes below the minimum", () => {
+    expect(clampNoteSize({ width: 1, height: 1 }, size, { x: 0, y: 0 })).toEqual(MIN_NOTE_SIZE);
+  });
+  test("stops at the pane's right and bottom edges", () => {
+    expect(clampNoteSize({ width: 5000, height: 5000 }, size, { x: 100, y: 50 })).toEqual({ width: 700, height: 550 });
   });
 });

@@ -146,6 +146,20 @@ describe("FloatingTabNote", () => {
     expect(getTab().noteOpen).toBe(true);
   });
 
+  it("commits the new size once after a resize, clamped to the pane edge", () => {
+    const { onUpdateTab, getTab } = setup(open);
+    const grip = screen.getByTestId("tab-note-resize");
+    fireEvent.pointerDown(grip, { button: 0, clientX: 400, clientY: 90, pointerId: 1 });
+    fireEvent.pointerMove(grip, { clientX: 450, clientY: 150, pointerId: 1 });
+    expect(onUpdateTab).not.toHaveBeenCalled();
+    fireEvent.pointerUp(grip, { clientX: 450, clientY: 150, pointerId: 1 });
+    expect(onUpdateTab).toHaveBeenCalledTimes(1);
+    expect(getTab().noteSize).toEqual({ width: 370, height: 120 });
+    expect(getTab().noteOpen).toBe(true);
+    fireEvent.pointerDown(grip, { button: 0, clientX: 400, clientY: 90, pointerId: 1 });
+    fireEvent.pointerUp(grip, { clientX: 5000, clientY: 5000, pointerId: 1 });
+  });
+
   it("clamps a dragged note inside the pane and below the tab bar", () => {
     const { getTab } = setup(open);
     const handle = screen.getByTestId("tab-note-handle");

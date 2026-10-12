@@ -25,6 +25,8 @@ type TabCommon = {
   noteOpen?: boolean;
   // Relative to the pane's top-left; absent means docked under the tab.
   notePos?: { x: number; y: number };
+  // Set once the note is resized; absent means the default width and content-sized height.
+  noteSize?: { width: number; height: number };
   locked?: boolean;
   autofocus?: boolean;
   // Name from WORKSPACE_ICON_PALETTE that replaces the default icon of the kind.

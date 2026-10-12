@@ -12,6 +12,18 @@ export function clampNotePos(pos: Point, pane: Size, note: Size, minY = 0): Poin
   };
 }
 
+export const MIN_NOTE_SIZE: Size = { width: 160, height: 72 };
+
+// The note keeps its top-left corner, so it can only grow up to the pane's right and bottom edges.
+export function clampNoteSize(size: Size, pane: Size, pos: Point): Size {
+  const maxW = Math.max(MIN_NOTE_SIZE.width, pane.width - pos.x);
+  const maxH = Math.max(MIN_NOTE_SIZE.height, pane.height - pos.y);
+  return {
+    width: Math.min(Math.max(MIN_NOTE_SIZE.width, size.width), maxW),
+    height: Math.min(Math.max(MIN_NOTE_SIZE.height, size.height), maxH),
+  };
+}
+
 export function dockedNotePos(
   tab: Rect,
   pane: Rect,

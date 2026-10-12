@@ -13,6 +13,7 @@ function withoutNote<T extends Tab>(tab: T): T {
   delete next.note;
   delete next.noteOpen;
   delete next.notePos;
+  delete next.noteSize;
   return next;
 }
 
@@ -52,4 +53,10 @@ export function removeTabNote<T extends Tab>(tab: T): T {
 export function moveTabNote<T extends Tab>(tab: T, pos: { x: number; y: number }): T {
   if (tab.note === undefined) return tab;
   return { ...tab, noteOpen: true, notePos: { x: Math.round(pos.x), y: Math.round(pos.y) } };
+}
+
+// Resizing a note makes it sticky, like moving it.
+export function resizeTabNote<T extends Tab>(tab: T, size: { width: number; height: number }): T {
+  if (tab.note === undefined) return tab;
+  return { ...tab, noteOpen: true, noteSize: { width: Math.round(size.width), height: Math.round(size.height) } };
 }

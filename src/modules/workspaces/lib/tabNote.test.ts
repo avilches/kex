@@ -6,6 +6,7 @@ import {
   isTabNoteOpen,
   moveTabNote,
   removeTabNote,
+  resizeTabNote,
   setTabNoteText,
   toggleTabNote,
 } from "./tabNote";
@@ -75,6 +76,21 @@ describe("moveTabNote", () => {
 
   test("is a no-op for a tab without a note", () => {
     expect(moveTabNote(plain, { x: 1, y: 2 })).toBe(plain);
+  });
+});
+
+describe("resizeTabNote", () => {
+  test("stores a rounded size and makes the note sticky", () => {
+    const hidden: Tab = { ...plain, note: "text" };
+    expect(resizeTabNote(hidden, { width: 300.4, height: 200.6 })).toMatchObject({ noteOpen: true, noteSize: { width: 300, height: 201 } });
+  });
+
+  test("is a no-op for a tab without a note", () => {
+    expect(resizeTabNote(plain, { width: 1, height: 2 })).toBe(plain);
+  });
+
+  test("removing the note drops the size too", () => {
+    expect(removeTabNote({ ...open, noteSize: { width: 1, height: 2 } })).toEqual(plain);
   });
 });
 
