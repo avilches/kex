@@ -209,6 +209,13 @@ describe("FloatingTabNote", () => {
     expect(note.style.top).toBe("32px");
   });
 
+  it("keeps the saved size on a docked preview, capped to the pane", async () => {
+    setup({ ...open, noteOpen: false, noteSize: { width: 400, height: 5000 } }, false, { preview: true });
+    const note = document.querySelector("[data-tab-note]") as HTMLElement;
+    await waitFor(() => expect(note.style.width).toBe("400px"));
+    expect(note.style.height).toBe("568px");
+  });
+
   it("previews a closed note of the active tab at its saved position", async () => {
     setup({ ...open, noteOpen: false, notePos: { x: 400, y: 300 } }, true, { preview: true });
     const note = document.querySelector("[data-tab-note]") as HTMLElement;

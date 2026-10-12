@@ -192,8 +192,8 @@ function DetailTabRow({
           aria-label="Tab note"
           aria-pressed={!!tab.noteOpen}
           className={cn(
-            "absolute right-[26px] top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring",
-            tab.noteOpen && "text-foreground",
+            "absolute right-[26px] top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring",
+            tab.noteOpen ? "text-foreground" : "text-muted-foreground",
           )}
           onPointerEnter={() => onNoteHover(tab.id, true)}
           onPointerLeave={() => onNoteHover(tab.id, false)}

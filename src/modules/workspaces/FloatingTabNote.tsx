@@ -158,7 +158,8 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
       : resolveNotePos({ notePos: docked ? undefined : tab.notePos, tab: m.tab, pane: m.pane, note: m.note, tabBarHeight: m.tabBarHeight })
     : null;
   const pos = dragPos ?? resolved;
-  const storedSize = docked ? undefined : tab.noteSize;
+  // A docked note ignores the stored position but keeps the stored size, capped to what the pane can hold.
+  const storedSize = tab.noteSize && m ? clampNoteSize(tab.noteSize, m.pane, { x: 0, y: m.tabBarHeight }) : tab.noteSize;
   const size = resizeSize ?? storedSize;
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {

@@ -62,8 +62,8 @@ function TabNoteButton({ open, onToggle, onHover }: { open: boolean; onToggle: (
       aria-pressed={open}
       title={open ? "Hide note" : "Show note"}
       className={cn(
-        "ml-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground",
-        open && "text-foreground",
+        "ml-0.5 shrink-0 transition-colors",
+        open ? "text-foreground" : "text-muted-foreground",
       )}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerEnter={() => onHover?.(true)}
