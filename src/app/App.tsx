@@ -11,6 +11,7 @@ import {
   isPendingStale,
   terminalTabs,
 } from "@/modules/workspaces/lib/hibernate";
+import { claimToggle } from "@/modules/workspaces/lib/hibernateFx";
 import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
@@ -2794,7 +2795,7 @@ export default function App() {
         }
       },
       "workspace.hibernate": () => {
-        if (!activeWorkspace) return;
+        if (!activeWorkspace || !claimToggle(activeWorkspace.id)) return;
         if (activeWorkspace.hibernated) void wakeWorkspace(activeWorkspace.id);
         else void requestHibernate(activeWorkspace.id);
       },
