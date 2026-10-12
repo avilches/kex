@@ -7,6 +7,7 @@ import {
   CancelCircleIcon,
   CancelSquareIcon,
   CrosshairIcon,
+  Image01Icon,
   LockKeyIcon,
   FloppyDiskIcon,
   PencilEdit01Icon,
@@ -29,6 +30,7 @@ import { type RenameOrigin, useTabRenameStore } from "./lib/tabRenameStore";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { RunOnStartMenu } from "@/modules/terminal/RunOnStartMenu";
+import { IconPaletteGrid } from "./IconPaletteGrid";
 import { WorkspaceMark } from "./WorkspaceMark";
 import { useSidebarTabMenu } from "./SidebarTabMenuContext";
 import { useWorkspaceMove } from "./WorkspaceMoveContext";
@@ -116,6 +118,25 @@ export function TabContextMenuItems({
               <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
               Remove Note
             </ContextMenuItem>
+          )}
+          {onUpdateTab && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger className="gap-2">
+                <HugeiconsIcon icon={Image01Icon} size={14} strokeWidth={2} />
+                Icon
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="max-h-[320px] w-[296px] overflow-y-auto p-2">
+                <IconPaletteGrid
+                  value={tab.icon}
+                  onSelect={(icon) =>
+                    onUpdateTab(tab.id, (p) => {
+                      const { icon: _drop, ...rest } = p;
+                      return (icon ? { ...rest, icon } : rest) as Tab;
+                    })
+                  }
+                />
+              </ContextMenuSubContent>
+            </ContextMenuSub>
           )}
           {isAutofocusTab(tab) && autofocusMode !== "always" && (
             <ContextMenuItem

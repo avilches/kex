@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import type { Tab } from "./types";
+import { getWorkspaceIcon } from "./workspaceIcon";
 
 export function basename(path: string): string {
   return pathBasename(path, { tolerateTrailingSlash: true });
@@ -68,6 +69,8 @@ const TAB_ICONS: Record<Exclude<Tab["kind"], "editor" | "markdown">, IconSvgElem
 };
 
 export function tabIcon(tab: Tab, running = false): ReactNode {
+  const custom = tab.icon ? getWorkspaceIcon(tab.icon) : null;
+  if (custom) return <HugeiconsIcon icon={custom} size={13} strokeWidth={2} />;
   if (tab.kind === "editor" || tab.kind === "markdown") {
     return <img src={fileIconUrl(basename(tab.path))} alt="" className="size-3.5 shrink-0" />;
   }

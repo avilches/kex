@@ -44,7 +44,8 @@ import {
   resolveWorkspaceColor,
   WORKSPACE_COLOR_PALETTE,
 } from "@/modules/workspaces/lib/workspaceColor";
-import { getWorkspaceIcon, WORKSPACE_ICON_PALETTE } from "@/modules/workspaces/lib/workspaceIcon";
+import { IconPaletteGrid } from "@/modules/workspaces/IconPaletteGrid";
+import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
 import { SlideReveal } from "@/app/components/SlideReveal";
@@ -569,43 +570,13 @@ function SortableWorkspaceItem({
               Icon
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="max-h-[320px] w-[296px] overflow-y-auto p-2">
-              <div className="flex flex-wrap gap-0.5">
-                <button
-                  type="button"
-                  title="No icon"
-                  onClick={() => {
-                    onSetIcon(ws.id, null);
-                    setMenuOpen(false);
-                  }}
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded border-2 bg-muted text-muted-foreground transition-colors",
-                    ws.icon == null
-                      ? "border-foreground"
-                      : "border-transparent hover:border-muted-foreground/50",
-                  )}
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
-                </button>
-                {WORKSPACE_ICON_PALETTE.map((entry) => (
-                  <button
-                    key={entry.name}
-                    type="button"
-                    title={entry.label}
-                    onClick={() => {
-                      onSetIcon(ws.id, entry.name);
-                      setMenuOpen(false);
-                    }}
-                    className={cn(
-                      "flex size-8 items-center justify-center rounded border-2 text-foreground transition-colors",
-                      ws.icon === entry.name
-                        ? "border-foreground bg-muted"
-                        : "border-transparent hover:border-muted-foreground/40 hover:bg-muted/60",
-                    )}
-                  >
-                    <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
-                  </button>
-                ))}
-              </div>
+              <IconPaletteGrid
+                value={ws.icon}
+                onSelect={(icon) => {
+                  onSetIcon(ws.id, icon);
+                  setMenuOpen(false);
+                }}
+              />
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>
