@@ -82,6 +82,7 @@ function DetailTabRow({
   insertSide,
   onActivate,
   onNoteHover,
+  onNoteToggle,
 }: {
   tab: Tab;
   workspaceId: string;
@@ -91,6 +92,7 @@ function DetailTabRow({
   insertSide: "before" | "after" | null;
   onActivate: (tabId: string) => void;
   onNoteHover: (tabId: string, hovering: boolean) => void;
+  onNoteToggle: (tabId: string) => void;
 }) {
   const info = useAgentTabTitle(tab);
   const title = info?.displayTitle ?? tab.id;
@@ -197,7 +199,7 @@ function DetailTabRow({
           )}
           onPointerEnter={() => onNoteHover(tab.id, true)}
           onPointerLeave={() => onNoteHover(tab.id, false)}
-          onClick={() => onUpdateTab(tab.id, toggleTabNote)}
+          onClick={() => onNoteToggle(tab.id)}
         >
           <HugeiconsIcon icon={StickyNote03Icon} size={12} strokeWidth={2} />
         </button>
@@ -303,6 +305,15 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     },
     [focusedTabId, setSidebarHover, notePreview.show, notePreview.leave],
   );
+  // Toggling drops the hover preview, as in the pane: the pointer is still on the icon, so the
+  // preview would otherwise keep showing a note the click just hid.
+  const handleNoteToggle = useCallback(
+    (tabId: string) => {
+      notePreview.close();
+      onUpdateTab(tabId, toggleTabNote);
+    },
+    [notePreview.close, onUpdateTab],
+  );
   useEffect(() => () => setSidebarHover(null), [setSidebarHover]);
   const previewTab = notePreview.tabId ? tabsById.get(notePreview.tabId) : undefined;
 
@@ -323,6 +334,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
             insertSide={insert?.tabId === row.tabId ? insert.side : null}
             onActivate={onActivate}
             onNoteHover={handleNoteHover}
+            onNoteToggle={handleNoteToggle}
           />
         ) : null;
       })}

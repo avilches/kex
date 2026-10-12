@@ -83,4 +83,13 @@ describe("WorkspaceDetailList tab notes", () => {
     expect(useTabNoteStore.getState().sidebarHoverTabId).toBeNull();
     expect(document.querySelector('[data-tab-note-id="t-b"]')).not.toBeNull();
   });
+
+  it("clicking the icon drops the hover preview even though the pointer is still on it", () => {
+    const { noteButton } = mount("t-a");
+    const btn = noteButton("t-b")!;
+    hover(btn, true);
+    expect(document.querySelector('[data-tab-note-id="t-b"]')).not.toBeNull();
+    act(() => btn.click());
+    expect(document.querySelector('[data-tab-note-id="t-b"]')).toBeNull();
+  });
 });

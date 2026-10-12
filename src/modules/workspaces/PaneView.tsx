@@ -225,12 +225,17 @@ export const PaneView = memo(function PaneView({
   );
   const sidebarHoverId = useTabNoteStore((s) => s.sidebarHoverTabId);
   const prevSidebarHover = useRef<string | null>(null);
+  const paneTabsRef = useRef(pane.tabs);
+  paneTabsRef.current = pane.tabs;
+  // Only a change of the hovered icon opens or releases the preview: re-running on every tabs
+  // update would reopen it right after the click that hid the note.
   useEffect(() => {
     const prev = prevSidebarHover.current;
     prevSidebarHover.current = sidebarHoverId;
-    if (sidebarHoverId && pane.tabs.some((t) => t.id === sidebarHoverId)) notePreview.show(sidebarHoverId);
-    else if (prev && pane.tabs.some((t) => t.id === prev)) notePreview.leave(prev);
-  }, [sidebarHoverId, pane.tabs, notePreview.show, notePreview.leave]);
+    const has = (id: string) => paneTabsRef.current.some((t) => t.id === id);
+    if (sidebarHoverId && has(sidebarHoverId)) notePreview.show(sidebarHoverId);
+    else if (prev && has(prev)) notePreview.leave(prev);
+  }, [sidebarHoverId, notePreview.show, notePreview.leave]);
   const closeNote = (tabId: string) => {
     notePreview.close();
     callbacks.onUpdateTab?.(tabId, hideTabNote);
