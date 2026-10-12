@@ -125,7 +125,7 @@ export function TabContextMenuItems({
                 <HugeiconsIcon icon={Image01Icon} size={14} strokeWidth={2} />
                 Icon
               </ContextMenuSubTrigger>
-              <ContextMenuSubContent className="max-h-[320px] w-[296px] overflow-y-auto p-2">
+              <ContextMenuSubContent className="max-h-[320px] w-[288px] overflow-y-auto p-2">
                 <IconPaletteGrid
                   value={tab.icon}
                   onSelect={(icon) =>
