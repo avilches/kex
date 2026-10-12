@@ -2044,7 +2044,6 @@ export default function App() {
     saveWorkspaceDocs,
     isActive: (id) => activeWorkspaceIdRef.current === id,
     hibernateWorkspace,
-    flushDirtyEditors,
     destroyWorkspaceFloats,
   });
   const { requestHibernate, performHibernate, requestAutoHibernate } = hibernateFlow;

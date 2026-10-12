@@ -17,8 +17,6 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
   const calls: string[] = [];
   const deps: HibernateFlowDeps = {
     getWorkspace: () => workspace,
-    autosaveEnabled: () => false,
-    flushDirtyEditors: async () => void calls.push("flush"),
     saveWorkspaceDocs: async () => true,
     isActive: () => false,
     settle: async () => void calls.push("settle"),
@@ -51,11 +49,21 @@ describe("createHibernateFlow", () => {
     expect(calls).not.toContain("hibernate");
   });
 
-  it("flushes autosave and lets the state settle before reviewing", async () => {
-    const { flow, calls } = setup(ws([term("t1")]), { autosaveEnabled: () => true });
+  it("saves every document whatever the autosave preference says, then lets the state settle before reviewing", async () => {
+    const { flow, calls } = setup(ws([term("t1")]), {
+      saveWorkspaceDocs: async () => (calls.push("save"), true),
+    });
     await flow.request("w1");
-    expect(calls.indexOf("flush")).toBeLessThan(calls.indexOf("settle"));
+    expect(calls.indexOf("save")).toBeLessThan(calls.indexOf("settle"));
     expect(calls.indexOf("settle")).toBeLessThan(calls.indexOf("hibernate"));
+  });
+
+  it("opens the dialog for a document whose save failed instead of hibernating", async () => {
+    const dirty = { id: "e1", kind: "editor", path: "/a.ts", dirty: true } as Tab;
+    const { flow, calls } = setup(ws([dirty]), { saveWorkspaceDocs: async () => false });
+    await flow.request("w1");
+    expect(calls).toContain("pending:w1");
+    expect(calls).not.toContain("hibernate");
   });
 
   it("closes floats, then marks tabs and finishes each agent session right before flagging", async () => {
