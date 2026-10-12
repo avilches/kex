@@ -62,7 +62,7 @@ function mount(filter: Partial<DetailFilter>, focusedTabId: string | null = null
       }),
     );
   });
-  const rows = () => Array.from(container.querySelectorAll("button[data-detail-row]"));
+  const rows = () => Array.from(container.querySelectorAll<HTMLButtonElement>("button[data-detail-row]"));
   return { container, rows, onActivate, unmount: track(root) };
 }
 
@@ -224,7 +224,7 @@ describe("WorkspaceDetailList context menu", () => {
         ),
       );
     });
-    const rows = () => Array.from(container.querySelectorAll("button[data-detail-row]"));
+    const rows = () => Array.from(container.querySelectorAll<HTMLButtonElement>("button[data-detail-row]"));
     return { container, rows, unmount: track(root) };
   }
 

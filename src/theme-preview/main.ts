@@ -160,6 +160,37 @@ function panel(title: string, cls: string, ...kids: Node[]): HTMLElement {
   );
 }
 
+// Copies the hibernated chip of WorkspaceBar.tsx: the normal inactive chip with
+// the static `ws-hib-look` veil on top.
+function hibernatedItem(label: string): HTMLElement {
+  return h(
+    "div",
+    {
+      class: "relative flex h-9 items-center justify-center overflow-hidden rounded-lg bg-foreground/[0.09] text-[12px] text-muted-foreground",
+      "data-surface": "hibernated-chip",
+    },
+    h("span", { class: "ws-hib-look", "data-surface": "hibernated-chip-veil" }),
+    label,
+  );
+}
+
+// Copies HibernatedOverlay.tsx at rest: the .hib-wash tint only exists during
+// the entrance animation, so it is drawn here as a strip to show its color.
+function hibernatedOverlay(): HTMLElement {
+  return h(
+    "div",
+    {
+      class: "relative flex h-[300px] flex-1 flex-col items-center justify-center gap-4 overflow-hidden rounded-md border border-border bg-background text-muted-foreground",
+      "data-surface": "hibernated-overlay",
+    },
+    h("div", { class: "size-16 rounded-full border border-current opacity-70" }),
+    h("span", { class: "text-[15px] text-foreground" }, "kex"),
+    h("span", { class: "text-[12px]" }, "Hibernated for 2h"),
+    h("span", { class: "rounded-md bg-primary px-4 py-1.5 text-[13px] text-primary-foreground" }, "Restore"),
+    h("span", { class: "hib-wash", style: "inset:auto 0 0 0;height:18px", "data-surface": "hibernated-wash" }),
+  );
+}
+
 function workspaceBar(): HTMLElement {
   const item = (label: string, active: boolean) =>
     h(
@@ -174,7 +205,7 @@ function workspaceBar(): HTMLElement {
   return panel(
     "WorkspaceBar",
     "flex w-[110px] flex-col gap-1.5 border-border/60 bg-card/60",
-    item("kex", true), item("hub", false), item("wt", false),
+    item("kex", true), item("hub", false), item("wt", false), hibernatedItem("old"),
     h("span", { class: "h-px w-full bg-border/40" }),
     h("span", { class: "text-[11px] font-medium text-muted-foreground/60" }, "Group"),
   );
@@ -377,6 +408,10 @@ function appView(): HTMLElement {
     {},
     titled("Terminal pane focused, editor pane unfocused", appFrame("terminal")),
     titled("Editor pane focused, terminal pane unfocused", appFrame("editor")),
+    titled(
+      "Hibernated workspace: overlay and chip",
+      h("div", { class: "flex gap-2 rounded-lg border border-border bg-background p-2", "data-view": "hibernated" }, workspaceBar(), hibernatedOverlay()),
+    ),
   );
 }
 
@@ -481,6 +516,12 @@ function dump(): Record<string, string> {
     const v = gitStatusHexColor(code, state.scheme, state.mode);
     if (v) out[`git-${c}`] = toHex(v);
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-surface]")) {
+    const key = el.dataset.surface!;
+    if (key === "hibernated-chip-veil" || key === "hibernated-wash") {
+      out[key] = toHex(getComputedStyle(el).backgroundColor);
+    }
+  }
   return out;
 }
 
@@ -516,7 +557,7 @@ function render(): void {
   const surfaces = h(
     "div",
     { class: "flex flex-wrap items-start gap-3" },
-    workspaceBar(), sidebar(),
+    workspaceBar(), sidebar(), hibernatedOverlay(),
     h(
       "div",
       { class: "flex min-w-[380px] flex-1 flex-col gap-3" },
