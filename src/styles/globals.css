@@ -417,7 +417,6 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
 @keyframes hib-iris-out { 0% { clip-path: circle(0% at 50% 50%); opacity: 0.6; } 100% { clip-path: circle(75% at 50% 50%); opacity: 0; } }
 @keyframes hib-item-in { 0% { opacity: 0; transform: translateY(14px) scale(0.96); filter: blur(6px); } 100% { opacity: 1; transform: none; filter: none; } }
 @keyframes hib-icon-drift { 0% { opacity: 0; transform: translateY(18px) scale(0.85); } 100% { opacity: 0.7; transform: none; } }
-@keyframes hib-chip-sweep { 0% { transform: scaleX(0); opacity: 0.9; } 65% { transform: scaleX(1); opacity: 0.9; } 100% { transform: scaleX(1); opacity: 0; } }
 @keyframes hib-chip-pop { 0% { transform: scale(1); } 25% { transform: scale(1.07); } 100% { transform: scale(1); } }
 .hib-wash { pointer-events: none; position: absolute; inset: 0; z-index: 30; background: var(--primary); }
 .hib-wash-in { animation: hib-iris-in 1100ms var(--ease-premium) both; }
@@ -425,5 +424,19 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
 .hib-item { animation: hib-item-in 800ms var(--ease-premium) both; }
 .hib-ov-icon { animation: hib-icon-drift 900ms var(--ease-premium) 250ms both; }
 .hib-chip-pop { animation: hib-chip-pop 700ms var(--ease-premium); }
-.hib-chip-sweep-in { transform-origin: right; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }
-.hib-chip-sweep-out { transform-origin: left; animation: hib-chip-sweep 1000ms var(--ease-premium) both; }
+
+/* Hibernated workspace chip: a muted veil with diagonal hatching over the
+ * normal chip. It reveals from right to left on hibernate and retracts from
+ * left to right on wake, and it is the final state either way. */
+@keyframes ws-hib-in { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ws-hib-out { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); } }
+.ws-hib-look {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: color-mix(in srgb, var(--background) 62%, transparent);
+  background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 16%, transparent) 0 1px, transparent 1px 6px);
+}
+.ws-hib-look-in { animation: ws-hib-in 800ms var(--ease-premium) both; }
+.ws-hib-look-out { animation: ws-hib-out 800ms var(--ease-premium) both; }

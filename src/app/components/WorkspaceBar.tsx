@@ -265,9 +265,9 @@ function SortableWorkspaceItem({
   }
 
   const wokenAt = useJustWoken(ws.hibernated);
-  const chipFx =
-    ws.hibernated && isFreshHibernate(ws.hibernatedAt) ? "in" : wokenAt !== null ? "out" : null;
-  const chipFxKey = chipFx === "in" ? ws.hibernatedAt : wokenAt;
+  const fresh = !!ws.hibernated && isFreshHibernate(ws.hibernatedAt);
+  const chipFx = fresh ? "in" : wokenAt !== null ? "out" : null;
+  const hibernatedLook = ws.hibernated ? (fresh ? "in" : "static") : chipFx;
   const compact = barWidth <= 80;
   const showDetail = !compact && hasDetail(detailFilter);
   const expanded = showDetail && !!ws.detailExpanded && !ws.hibernated;
@@ -366,12 +366,11 @@ function SortableWorkspaceItem({
             compact
               ? "h-9 justify-center text-[12px]"
               : "h-9 gap-2 px-2.5 text-[12px]",
-            chipFx && "relative overflow-hidden hib-chip-pop",
+            hibernatedLook && "relative overflow-hidden",
+            chipFx && "hib-chip-pop",
             lit
               ? "text-foreground"
-              : ws.hibernated
-                ? "bg-foreground/[0.04] text-muted-foreground/60 hover:bg-foreground/[0.09] hover:text-muted-foreground"
-                : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
+              : "bg-foreground/[0.09] text-muted-foreground hover:bg-foreground/[0.14] hover:text-foreground",
           )}
           style={
             lit
@@ -391,11 +390,11 @@ function SortableWorkspaceItem({
           {...listeners}
           aria-pressed={active}
         >
-          {chipFx && (
+          {hibernatedLook && (
             <span
-              key={chipFxKey}
+              key={hibernatedLook === "out" ? wokenAt : ws.hibernatedAt}
               aria-hidden
-              className={cn("pointer-events-none absolute inset-0 bg-primary/75", `hib-chip-sweep-${chipFx}`)}
+              className={cn("ws-hib-look", hibernatedLook !== "static" && `ws-hib-look-${hibernatedLook}`)}
             />
           )}
           {compact ? (
