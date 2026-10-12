@@ -5,7 +5,7 @@ import { hibernateReview, liveAgent, type HibernateLive } from "./hibernateRevie
 import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
 import type { Workspace } from "./types";
 
-export type RunningProcess = { tabId: string; label: string; title?: string; icon?: string };
+export type RunningProcess = { tabId: string; label: string };
 export type PendingClose = { id: string; processes: RunningProcess[] };
 
 export function scriptsToDelete(ws: Workspace): number {
