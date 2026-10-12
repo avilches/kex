@@ -7,6 +7,8 @@ export type RestoreBlock = {
   dir: string;
   command: string;
   agent?: string;
+  // False for a PTY open failure: there is no terminal to continue in, so nothing is left pending.
+  restorable: boolean;
 };
 
 export type StartDecision =
@@ -37,6 +39,7 @@ export function decideStart(i: StartInput & { dirProblem: string | null }): Star
           dir: plan.cwdLaunch,
           command: plan.attemptedCmd,
           agent: plan.agent,
+          restorable: true,
         },
       };
     }
@@ -47,7 +50,12 @@ export function decideStart(i: StartInput & { dirProblem: string | null }): Star
     if (i.initialCwd && i.dirProblem) {
       return {
         kind: "blocked",
-        block: { reason: i.dirProblem, dir: i.initialCwd, command: i.persistentCommand },
+        block: {
+          reason: i.dirProblem,
+          dir: i.initialCwd,
+          command: i.persistentCommand,
+          restorable: true,
+        },
       };
     }
     return { kind: "spawn", cwd: i.initialCwd, inject: "command" };
@@ -62,7 +70,7 @@ export function openFailureBlock(
   agent?: string,
 ): RestoreBlock {
   const msg = error instanceof Error ? error.message : String(error);
-  return { reason: `Could not start the terminal: ${msg}`, dir: dir ?? "", command, agent };
+  return { reason: `Could not start the terminal: ${msg}`, dir: dir ?? "", command, agent, restorable: false };
 }
 
 type HeldSession = { restoreBlock: RestoreBlock | null; ptyOpening: boolean; disposed: boolean };
@@ -133,7 +141,13 @@ export function pendingAfterPlan(plan: RestorePlan | null, isWindows: boolean): 
   if (plan.errorReason) {
     return {
       kind: "blocked",
-      block: { reason: plan.errorReason, dir: plan.cwdLaunch, command: plan.attemptedCmd, agent: plan.agent },
+      block: {
+        reason: plan.errorReason,
+        dir: plan.cwdLaunch,
+        command: plan.attemptedCmd,
+        agent: plan.agent,
+        restorable: true,
+      },
     };
   }
   if (!plan.resumeCmd) return { kind: "gone" };

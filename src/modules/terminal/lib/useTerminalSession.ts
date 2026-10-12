@@ -922,13 +922,11 @@ function subscribeRestoreBlock(leafId: string, cb: () => void): () => void {
   };
 }
 
-// `restorable` is false for a PTY open failure: there is no terminal to continue in, so only
-// the modal (Try again) applies and nothing is left pending.
-function blockStart(leafId: string, s: Session, block: RestoreBlock, restorable: boolean): void {
+function blockStart(leafId: string, s: Session, block: RestoreBlock): void {
   s.ptyOpening = false;
   console.error(`[kex] terminal start blocked for tab ${leafId}: ${block.reason}`);
   if (block.agent) useAgentStore.getState().setRestoreError(leafId, leafId, block.agent, block.reason);
-  if (restorable) setPendingRestore(leafId, block);
+  if (block.restorable) setPendingRestore(leafId, block);
   setRestoreBlock(leafId, s, block);
 }
 
@@ -967,7 +965,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     return;
   }
   if (decision.kind === "blocked") {
-    blockStart(leafId, s, decision.block, true);
+    blockStart(leafId, s, decision.block);
     return;
   }
 
@@ -985,7 +983,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
     // back to the saved command.
     const agent = decision.inject === "resume" ? plan?.agent : undefined;
-    blockStart(leafId, s, openFailureBlock(e, decision.cwd, command, agent), false);
+    blockStart(leafId, s, openFailureBlock(e, decision.cwd, command, agent));
     return;
   }
   s.ptyOpening = false;

@@ -48,6 +48,7 @@ describe("decideStart", () => {
         dir: "/work",
         command: "claude --resume 'a'",
         agent: "claude",
+        restorable: true,
       },
     });
   });
@@ -65,7 +66,7 @@ describe("decideStart", () => {
     const d = decideStart({ ...base, persistentCommand: "pnpm dev", dirProblem: "Not a directory: /home" });
     expect(d).toEqual({
       kind: "blocked",
-      block: { reason: "Not a directory: /home", dir: "/home", command: "pnpm dev" },
+      block: { reason: "Not a directory: /home", dir: "/home", command: "pnpm dev", restorable: true },
     });
   });
 
@@ -90,6 +91,7 @@ describe("openFailureBlock", () => {
       reason: "Could not start the terminal: boom",
       dir: "/home",
       command: "pnpm dev",
+      restorable: false,
     });
   });
 
@@ -102,12 +104,13 @@ describe("openFailureBlock", () => {
       reason: "Could not start the terminal: denied",
       dir: "",
       command: "",
+      restorable: false,
     });
   });
 });
 
 describe("retryRestoreFlow and openWithoutRestoringFlow", () => {
-  const block = (over: Partial<RestoreBlock> = {}): RestoreBlock => ({ reason: "r", dir: "/work", command: "claude", ...over });
+  const block = (over: Partial<RestoreBlock> = {}): RestoreBlock => ({ reason: "r", dir: "/work", command: "claude", restorable: true, ...over });
   function setup(restoreBlock: RestoreBlock | null, over: Partial<RestoreActionDeps> = {}) {
     const s = { restoreBlock, ptyOpening: false, disposed: false };
     const calls: string[] = [];
@@ -198,7 +201,7 @@ describe("pendingAfterPlan", () => {
   });
   it("stays blocked with the new reason, directory and command", () => {
     const o = pendingAfterPlan(plan({ errorReason: "nope", cwdLaunch: "/d", attemptedCmd: "c" }), false);
-    expect(o).toEqual({ kind: "blocked", block: { reason: "nope", dir: "/d", command: "c", agent: "claude" } });
+    expect(o).toEqual({ kind: "blocked", block: { reason: "nope", dir: "/d", command: "c", agent: "claude", restorable: true } });
   });
   it("runs the resume command in its directory", () => {
     const o = pendingAfterPlan(plan({ resumeCmd: "claude -r", cwdLaunch: "/d" }), false);
@@ -207,7 +210,7 @@ describe("pendingAfterPlan", () => {
 });
 
 describe("pendingAfterDirCheck", () => {
-  const b: RestoreBlock = { reason: "old", dir: "/d", command: "npm start" };
+  const b: RestoreBlock = { reason: "old", dir: "/d", command: "npm start", restorable: true };
   it("keeps the block with the new problem", () => {
     expect(pendingAfterDirCheck(b, "gone", false)).toEqual({ kind: "blocked", block: { ...b, reason: "gone" } });
   });

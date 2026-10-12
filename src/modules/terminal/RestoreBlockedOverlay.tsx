@@ -42,10 +42,17 @@ export function RestoreBlockedOverlay({ leafId, block }: Props) {
         </div>
         <Field label="Directory" value={block.dir} />
         <Field label="Command" value={block.command} />
+        {block.restorable && (
+          <span className="text-[12px] text-muted-foreground">
+            The restore plan is kept. You can retry it later from Run on Start in this tab's menu.
+          </span>
+        )}
         <div className="flex justify-end gap-2">
-          <Button variant="outline" disabled={busy} onClick={() => run(openWithoutRestoring)}>
-            Cancel restore
-          </Button>
+          {block.restorable && (
+            <Button variant="outline" disabled={busy} onClick={() => run(openWithoutRestoring)}>
+              Open terminal without restoring
+            </Button>
+          )}
           <Button autoFocus disabled={busy} onClick={() => run(retryRestore)}>
             Try again
           </Button>

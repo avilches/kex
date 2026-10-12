@@ -10,6 +10,7 @@ const { retryRestore, openWithoutRestoring } = vi.hoisted(() => ({
 vi.mock("./lib/useTerminalSession", () => ({ retryRestore, openWithoutRestoring }));
 
 import { RestoreBlockedOverlay } from "./RestoreBlockedOverlay";
+import type { RestoreBlock } from "./lib/restoreStart";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -18,13 +19,14 @@ const block = {
   dir: "/mnt/Taxes",
   command: "claude --resume 'abc'",
   agent: "claude",
+  restorable: true,
 };
 
-function mount() {
+function mount(b: RestoreBlock = block) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => root.render(<RestoreBlockedOverlay leafId="tab-1" block={block} />));
+  act(() => root.render(<RestoreBlockedOverlay leafId="tab-1" block={b} />));
   return {
     container,
     unmount: () => {
@@ -57,11 +59,20 @@ describe("RestoreBlockedOverlay", () => {
     unmount();
   });
 
-  it("Cancel restore cancels the leaf", async () => {
+  it("Open terminal without restoring opens a plain shell and keeps the hint", async () => {
     const { container, unmount } = mount();
-    await act(async () => button(container, "Cancel restore").click());
+    expect(container.textContent).toContain("The restore plan is kept.");
+    expect(container.textContent).not.toContain("Cancel restore");
+    await act(async () => button(container, "Open terminal without restoring").click());
     expect(openWithoutRestoring).toHaveBeenCalledWith("tab-1");
     expect(retryRestore).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("an open failure offers only Try again and no hint", () => {
+    const { container, unmount } = mount({ ...block, restorable: false });
+    expect([...container.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Try again"]);
+    expect(container.textContent).not.toContain("restore plan is kept");
     unmount();
   });
 });

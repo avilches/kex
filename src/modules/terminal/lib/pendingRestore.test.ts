@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPendingRestore, setPendingRestore, subscribePendingRestore } from "./pendingRestore";
 
-const block = { reason: "r", dir: "/w", command: "claude" };
+const block = { reason: "r", dir: "/w", command: "claude", restorable: true };
 
 afterEach(() => {
   setPendingRestore("a", null);
