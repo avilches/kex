@@ -99,13 +99,14 @@ export function findReopenTarget(
   };
 }
 
-// New autofocus-capable tabs get the flag unless the mode is "manual" (also in
+// New autofocus-capable tabs get the flag when "autofocusNewTabs" is on (also in
 // "always", so they keep it if the mode is switched back),
 // unless they already carry an explicit flag. Restored tabs never pass through
 // here, so their persisted flag is preserved.
 function withNewTabAutofocus(tab: Tab): Tab {
   if (!isAutofocusTab(tab) || tab.autofocus !== undefined) return tab;
-  return usePreferencesStore.getState().autofocusMode !== "manual"
+  const { autofocusMode, autofocusNewTabs } = usePreferencesStore.getState();
+  return autofocusMode === "always" || autofocusNewTabs
     ? { ...tab, autofocus: true }
     : tab;
 }
