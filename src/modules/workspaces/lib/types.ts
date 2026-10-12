@@ -112,6 +112,10 @@ export type Workspace = {
   hibernated?: boolean;
   // Epoch ms when it was hibernated; absent in workspaces hibernated before it existed.
   hibernatedAt?: number;
+  // Epoch ms of the last time it was the active workspace, for auto-hibernate across restarts.
+  // Only the value loaded at startup lives in state; the live one is in the activity stamps
+  // and is merged in when the body is saved.
+  lastActiveAt?: number;
 };
 
 export type ClosedEntry = {

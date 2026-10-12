@@ -3,7 +3,9 @@ import {
   autoHibernateCandidates,
   autoHibernateDelayMs,
   parseAutoHibernate,
+  seedActivity,
   touchActivity,
+  withActivity,
 } from "./autoHibernate";
 import type { Workspace } from "./types";
 
@@ -52,5 +54,50 @@ describe("autoHibernateCandidates", () => {
   });
   it("is silent when off", () => {
     expect(autoHibernateCandidates(all, "a", seen, "off", 1e12)).toEqual([]);
+  });
+});
+
+describe("persisted activity", () => {
+  it("seeds stamps from the saved workspaces and skips those without one", () => {
+    const stamps = seedActivity([ws("a", { lastActiveAt: 5 }), ws("b")]);
+    expect([...stamps]).toEqual([["a", 5]]);
+  });
+  it("makes a restarted workspace due when its saved stamp is old enough", () => {
+    const list = [ws("a"), ws("b", { lastActiveAt: 0 })];
+    const stamps = seedActivity(list);
+    touchActivity(stamps, list, "a", 4 * 60 * MIN);
+    expect(autoHibernateCandidates(list, "a", stamps, "4h", 4 * 60 * MIN)).toEqual(["b"]);
+  });
+  it("stamps a workspace without a saved stamp with now, so it is not due", () => {
+    const list = [ws("a"), ws("b")];
+    const stamps = seedActivity(list);
+    touchActivity(stamps, list, "a", 1000);
+    expect(stamps.get("b")).toBe(1000);
+    expect(autoHibernateCandidates(list, "a", stamps, "30m", 1000)).toEqual([]);
+  });
+  it("renews the workspace that was active at startup even with an old stamp", () => {
+    const list = [ws("a", { lastActiveAt: 0 }), ws("b", { lastActiveAt: 0 })];
+    const stamps = seedActivity(list);
+    touchActivity(stamps, list, "a", 1e12);
+    expect(stamps.get("a")).toBe(1e12);
+    expect(autoHibernateCandidates(list, "a", stamps, "30m", 1e12)).toEqual(["b"]);
+  });
+  it("keeps a hibernated workspace out of the candidates and restarts its clock", () => {
+    const list = [ws("a"), ws("h", { hibernated: true, lastActiveAt: 0 })];
+    const stamps = seedActivity(list);
+    touchActivity(stamps, list, "a", 1e12);
+    expect(stamps.get("h")).toBe(1e12);
+    expect(autoHibernateCandidates(list, "a", stamps, "30m", 1e12)).toEqual([]);
+  });
+  it("returns none when the mode is off", () => {
+    const list = [ws("a"), ws("b", { lastActiveAt: 0 })];
+    expect(autoHibernateCandidates(list, "a", seedActivity(list), "off", 1e12)).toEqual([]);
+  });
+  it("merges live stamps into the bodies to persist without touching the others", () => {
+    const a = ws("a");
+    const b = ws("b");
+    const out = withActivity([a, b], new Map([["a", 7]]));
+    expect(out[0]!.lastActiveAt).toBe(7);
+    expect(out[1]).toBe(b);
   });
 });
