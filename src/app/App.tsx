@@ -2083,6 +2083,8 @@ export default function App() {
       const kind = findTabGlobal(tabId)?.tab.kind;
       requestAnimationFrame(() => {
         if (kind === "editor") editorHandles.current.get(tabId)?.focus();
+        else if (kind === "markdown") markdownHandles.current.get(tabId)?.focus();
+        else if (kind === "browser") browserHandles.current.get(tabId)?.focusAddressBar();
         else requestLeafFocus(tabId);
       });
     },
@@ -3058,13 +3060,7 @@ export default function App() {
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
       "tab.toggleAutofocus": () => {
-        if (autofocusMode === "always") {
-          toast.info("Autofocus is set to Always, so it cannot be toggled per tab", {
-            description: "Change the mode in Settings > General > Autofocus.",
-            action: { label: "Open Settings", onClick: () => void openSettingsWindow("general") },
-          });
-          return;
-        }
+        if (autofocusMode === "always") return;
         if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
         const found = findTabGlobal(activeTabId);
         if (found)
