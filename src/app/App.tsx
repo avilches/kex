@@ -1293,7 +1293,7 @@ export default function App() {
         cwd: resolveNewTerminalCwd({
           mode: terminalNewFolderMode,
           home: homeRef.current,
-          lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
+          lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
         }),
       });
@@ -1740,7 +1740,7 @@ export default function App() {
         cwd: resolveNewTerminalCwd({
           mode: terminalNewFolderMode,
           home: homeRef.current,
-          lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
+          lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
         }),
       });
@@ -1774,7 +1774,7 @@ export default function App() {
         cwd: resolveNewTerminalCwd({
           mode: terminalNewFolderMode,
           home: homeRef.current,
-          lastFolder: contextCwdRef.current ?? ws.cwd ?? null,
+          lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
         }),
       });
