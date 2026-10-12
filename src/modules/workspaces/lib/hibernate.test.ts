@@ -6,6 +6,7 @@ import {
   blockedWhileHibernated,
   editorTabIds,
   isPendingStale,
+  workspaceDialogPending,
   enableRunOnStart,
   formatHibernatedFor,
   stripTabs,
@@ -239,5 +240,13 @@ describe("isPendingStale", () => {
   });
   it("is true once the pending workspace is gone", () => {
     expect(isPendingStale("a", [{ id: "b" }])).toBe(true);
+  });
+});
+
+describe("workspaceDialogPending", () => {
+  it("is true while either the hibernate or the close dialog is open", () => {
+    expect(workspaceDialogPending(null, undefined)).toBe(false);
+    expect(workspaceDialogPending("w1", undefined)).toBe(true);
+    expect(workspaceDialogPending(null, "w2")).toBe(true);
   });
 });

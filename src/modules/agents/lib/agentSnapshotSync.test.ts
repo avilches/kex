@@ -8,6 +8,11 @@ import { _clearAll, setOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { useAgentStore } from "../store/agentStore";
 import { startAgentSnapshotSync } from "./agentSnapshotSync";
 
+function startSession() {
+  useAgentStore.getState().startIdle("t1", "ws", "claude");
+  useAgentStore.getState().setMeta("t1", { sessionId: "s1" });
+}
+
 let stop: (() => void) | null = null;
 
 beforeEach(() => {
@@ -27,7 +32,7 @@ afterEach(() => {
 describe("startAgentSnapshotSync", () => {
   it("sends a changed tab once, 1.5s after the last change", () => {
     stop = startAgentSnapshotSync();
-    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    startSession();
     setOscTitle("t1", "fixing the build");
     vi.advanceTimersByTime(1400);
     expect(invoke).not.toHaveBeenCalled();
@@ -36,6 +41,7 @@ describe("startAgentSnapshotSync", () => {
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenCalledWith("agent_session_set_snapshot", {
       tabId: "t1",
+      sessionId: "s1",
       title: "fixing the build",
       notification: "",
     });
@@ -47,7 +53,7 @@ describe("startAgentSnapshotSync", () => {
   it("sends the tab again on its next change when Rust had no record for it", async () => {
     invoke.mockResolvedValue(false);
     stop = startAgentSnapshotSync();
-    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    startSession();
     vi.advanceTimersByTime(1600);
     await Promise.resolve();
     await Promise.resolve();
@@ -59,7 +65,7 @@ describe("startAgentSnapshotSync", () => {
 
   it("does not resend a tab Rust accepted when nothing about it changed", async () => {
     stop = startAgentSnapshotSync();
-    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    startSession();
     vi.advanceTimersByTime(1600);
     await Promise.resolve();
     await Promise.resolve();
@@ -72,7 +78,7 @@ describe("startAgentSnapshotSync", () => {
   it("also sends the tab again after a failed call", async () => {
     invoke.mockRejectedValue(new Error("ipc down"));
     stop = startAgentSnapshotSync();
-    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    startSession();
     vi.advanceTimersByTime(1600);
     await Promise.resolve();
     await Promise.resolve();
@@ -84,14 +90,14 @@ describe("startAgentSnapshotSync", () => {
 
   it("flushes a pending change when the window is about to unload", () => {
     stop = startAgentSnapshotSync();
-    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    startSession();
     window.dispatchEvent(new Event("beforeunload"));
     expect(invoke).toHaveBeenCalledTimes(1);
   });
 
   it("flushes a pending change when stopped", () => {
     stop = startAgentSnapshotSync();
-    useAgentStore.getState().startIdle("t1", "ws", "claude");
+    startSession();
     stop();
     stop = null;
     expect(invoke).toHaveBeenCalledTimes(1);

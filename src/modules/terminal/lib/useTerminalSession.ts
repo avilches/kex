@@ -37,7 +37,10 @@ import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
 import {
   decideStart,
   needsDirCheck,
+  cancelRestoreFlow,
   openFailureBlock,
+  retryRestoreFlow,
+  type RestoreActionDeps,
   type RestoreBlock,
 } from "./restoreStart";
 import {
@@ -963,6 +966,12 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   try {
     pty = await openPtyForSession(leafId, s, decision.cwd);
   } catch (e) {
+    // The tab may have been closed or hibernated while openPty was failing; blocking would
+    // register a phantom agent session for a dead tab.
+    if (s.disposed) {
+      s.ptyOpening = false;
+      return;
+    }
     const command = plan?.resumeCmd || (input.runOnStart ? s.persistentCommand ?? "" : "");
     // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
     // back to the saved command.
@@ -990,28 +999,25 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   }
 }
 
+function restoreActionDeps(leafId: string, s: Session): RestoreActionDeps {
+  return {
+    setBlock: (block) => setRestoreBlock(leafId, s, block),
+    finishAgent: () => useAgentStore.getState().finish(leafId),
+    previewPlan: () => previewResumeCmd(leafId),
+    seedPlan: (plan) => seedRestorePlan(leafId, plan),
+    detachAgent: () => detachAgentSession(leafId),
+    start: (plain) => startLeaf(leafId, s, plain),
+  };
+}
+
 export async function retryRestore(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
-  if (!s || s.disposed || !s.restoreBlock) return;
-  const hadAgent = !!s.restoreBlock.agent;
-  setRestoreBlock(leafId, s, null);
-  if (hadAgent) {
-    useAgentStore.getState().finish(leafId);
-    const plan = await previewResumeCmd(leafId);
-    if (plan) seedRestorePlan(leafId, plan);
-  }
-  await startLeaf(leafId, s);
+  if (s) await retryRestoreFlow(s, restoreActionDeps(leafId, s));
 }
 
 export async function cancelRestore(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
-  if (!s || s.disposed || !s.restoreBlock) return;
-  if (s.restoreBlock.agent) {
-    useAgentStore.getState().finish(leafId);
-    await detachAgentSession(leafId).catch((e) => console.error("[kex] detach failed:", e));
-  }
-  setRestoreBlock(leafId, s, null);
-  await startLeaf(leafId, s, true);
+  if (s) await cancelRestoreFlow(s, restoreActionDeps(leafId, s));
 }
 
 function detachSession(leafId: string): void {

@@ -63,3 +63,64 @@ export function openFailureBlock(
   const msg = error instanceof Error ? error.message : String(error);
   return { reason: `Could not start the terminal: ${msg}`, dir: dir ?? "", command, agent };
 }
+
+type HeldSession = { restoreBlock: RestoreBlock | null; ptyOpening: boolean; disposed: boolean };
+
+export type RestoreActionDeps = {
+  setBlock: (block: RestoreBlock | null) => void;
+  finishAgent: () => void;
+  previewPlan: () => Promise<RestorePlan | null>;
+  seedPlan: (plan: RestorePlan) => void;
+  detachAgent: () => Promise<void>;
+  start: (plain: boolean) => Promise<void>;
+};
+
+// ptyOpening is claimed before the first await: once the block is cleared, attachSession would
+// otherwise see an idle session and start a second PTY while this one is still awaiting.
+async function leaveBlock(
+  s: HeldSession,
+  d: RestoreActionDeps,
+  prepare: (block: RestoreBlock) => Promise<void>,
+  plain: boolean,
+): Promise<void> {
+  const block = s.restoreBlock;
+  if (s.disposed || !block || s.ptyOpening) return;
+  s.ptyOpening = true;
+  d.setBlock(null);
+  try {
+    await prepare(block);
+  } catch (e) {
+    console.error("[kex] restore action failed:", e);
+    s.ptyOpening = false;
+    if (!s.disposed) d.setBlock(block);
+    return;
+  }
+  await d.start(plain);
+}
+
+export function retryRestoreFlow(s: HeldSession, d: RestoreActionDeps): Promise<void> {
+  return leaveBlock(
+    s,
+    d,
+    async (block) => {
+      if (!block.agent) return;
+      d.finishAgent();
+      const plan = await d.previewPlan();
+      if (plan) d.seedPlan(plan);
+    },
+    false,
+  );
+}
+
+export function cancelRestoreFlow(s: HeldSession, d: RestoreActionDeps): Promise<void> {
+  return leaveBlock(
+    s,
+    d,
+    async (block) => {
+      if (!block.agent) return;
+      d.finishAgent();
+      await d.detachAgent().catch((e) => console.error("[kex] detach failed:", e));
+    },
+    true,
+  );
+}

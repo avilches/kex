@@ -58,11 +58,45 @@ describe("createHibernateFlow", () => {
     expect(calls.indexOf("settle")).toBeLessThan(calls.indexOf("hibernate"));
   });
 
-  it("marks tabs, finishes each agent session and closes floats before flagging", async () => {
+  it("closes floats, then marks tabs and finishes each agent session right before flagging", async () => {
     const { flow, calls } = setup(ws([term("t1"), term("t2")]));
     await flow.perform("w1");
     expect(isHibernating("t1") && isHibernating("t2")).toBe(true);
-    expect(calls).toEqual(["pending:null", "finish:t1", "finish:t2", "floats", "hibernate"]);
+    expect(calls).toEqual(["pending:null", "floats", "finish:t1", "finish:t2", "hibernate"]);
+  });
+
+  it("leaves tabs unmarked and agents untouched when the workspace turns active while floats close", async () => {
+    let active = false;
+    const { flow, calls } = setup(ws([term("t1")]), {
+      isActive: () => active,
+      destroyFloats: async () => void (active = true),
+    });
+    expect(await flow.requestAuto("w1")).toBe(false);
+    expect(isHibernating("t1")).toBe(false);
+    expect(calls.some((c) => c.startsWith("finish") || c === "hibernate")).toBe(false);
+  });
+
+  it("aborts when a document became dirty while floats closed", async () => {
+    let tabs: Tab[] = [term("t1")];
+    const { flow, calls } = setup(ws(tabs), {
+      getWorkspace: () => ws(tabs),
+      destroyFloats: async () => {
+        tabs = [term("t1"), { id: "e1", kind: "editor", path: "/a.ts", dirty: true } as Tab];
+      },
+    });
+    await flow.request("w1");
+    expect(isHibernating("t1")).toBe(false);
+    expect(calls).not.toContain("hibernate");
+  });
+
+  it("unmarks the tabs when hibernating throws", async () => {
+    const { flow } = setup(ws([term("t1")]), {
+      hibernate: () => {
+        throw new Error("x");
+      },
+    });
+    await expect(flow.perform("w1")).rejects.toThrow("x");
+    expect(isHibernating("t1")).toBe(false);
   });
 
   it("hibernates once when performed twice at the same time", async () => {

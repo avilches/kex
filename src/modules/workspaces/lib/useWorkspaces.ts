@@ -71,18 +71,23 @@ export async function seedWakePlans(
 }
 
 // A double click on Restore would otherwise seed the resume plans twice, and a
-// leftover plan could resurrect a stale session on a later wake.
-export async function runOnce(inFlight: Set<string>, key: string, task: () => Promise<void>): Promise<void> {
-  if (inFlight.has(key)) return;
-  inFlight.add(key);
-  try {
-    await task();
-  } finally {
-    inFlight.delete(key);
-  }
+// leftover plan could resurrect a stale session on a later wake. The second
+// caller gets the in-flight promise so it only proceeds once the first applied.
+export function runOnce(inFlight: Map<string, Promise<void>>, key: string, task: () => Promise<void>): Promise<void> {
+  const running = inFlight.get(key);
+  if (running) return running;
+  const p = (async () => {
+    try {
+      await task();
+    } finally {
+      inFlight.delete(key);
+    }
+  })();
+  inFlight.set(key, p);
+  return p;
 }
 
-const wakesInFlight = new Set<string>();
+const wakesInFlight = new Map<string, Promise<void>>();
 
 export function findReopenTarget(
   workspaces: Workspace[],
@@ -969,8 +974,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
   // A hibernated destination is woken first instead of refused. The move is
   // validated before waking so an impossible one does not wake anything, and
   // again after it in case the tab went away meanwhile. The updater wakes `prev`
-  // itself because a wake already in flight makes wakeWorkspace return before it
-  // has applied.
+  // itself as a safety net; wakeWorkspace awaits any wake already in flight.
   const moveTabToWorkspace = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
       const dest = buildMoveDestination(request);

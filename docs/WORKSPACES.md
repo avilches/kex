@@ -213,8 +213,7 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
   `leafIdForPty` returns `null`, so without it a phantom spinner would stay.
 - `wakeWorkspace` seeds the agent resume plans (`seedWakePlans`, same "Run on start" gate as the
   reopen flow), discards the carried unsaved editor buffers (`unflushedBuffers.ts`) and then clears
-  `hibernated`; the terminals mount again and resume through the normal restore path. A set of
-  in-flight workspace ids (`runOnce`) makes a double click on Restore wake once. In the WorkspaceBar a hibernated item cannot be expanded (the nested tab list is empty): its chevron, its sleeping icon (which turns into the undo icon on hover) and a double click on it all wake the workspace, instead of opening its properties. The workspace keeps its `detailExpanded` flag while asleep, so waking by any gesture brings the chevron back as it was; only the chevron itself also expands it.
+  `hibernated`; the terminals mount again and resume through the normal restore path. `runOnce` keeps a map of in-flight wakes by workspace id: a second wake (double click, or `moveTabToWorkspace`) awaits the first one's promise, so it never proceeds before the resume plans are seeded. In the WorkspaceBar a hibernated item cannot be expanded (the nested tab list is empty): its chevron, its sleeping icon (which turns into the undo icon on hover) and a double click on it all wake the workspace, instead of opening its properties. The workspace keeps its `detailExpanded` flag while asleep, so waking by any gesture brings the chevron back as it was; only the chevron itself also expands it.
 - Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
   `applyMoveTabToWorkspace` refuses it as a destination, so `moveTabToWorkspace` wakes it first (the menu lists it with a Zzz mark; drag and drop accepts its bar row and its overlay),
   `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`
@@ -236,9 +235,11 @@ hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
    "Run on start". An agent only counts as coming back when it has a stored session (`hasResumed`);
    a busy agent that would not come back carries `runOnStart` so its row offers the button, and an idle one is listed as a command. If the review is empty the
    workspace hibernates immediately; otherwise `pendingWorkspaceId` opens `HibernateDialog`.
-3. `performHibernate` clears the pending id, marks the terminal tabs with `markHibernating`
-   (so the exit of their PTYs is not reported as an agent failure), calls `finish` on each agent
-   session, destroys the floating browsers and finally calls `hibernateWorkspace`. A set of
+3. `performHibernate` clears the pending id and destroys the floating browsers. Then, with no await
+   left, it rechecks (for the automatic and no-dialog paths: the review is still empty and the
+   workspace is still not the active one), marks the terminal tabs with `markHibernating` (so the
+   exit of their PTYs is not reported as an agent failure), calls `finish` on each agent session and
+   calls `hibernateWorkspace`; if the recheck fails or hibernating throws, nothing stays marked. A set of
    in-flight workspace ids makes a double trigger hibernate once.
 
 The dialog title names the workspace and starts with a `WorkspaceMark` (`modules/workspaces/WorkspaceMark.tsx`): the workspace icon painted in its color, or a color dot when it has no icon, plus a sleeping icon if it is hibernated. The Header title and the "Move to Workspace" menu use the same mark. A muted tag with the group label (`groupLabelOf`) follows the name when the workspace belongs to an existing group. The title keeps the last shown workspace and group so it does not flip during the exit animation. If the pending workspace disappears while the dialog is open, `isPendingStale` makes `App.tsx` cancel the request so the shortcut lock is released.
@@ -249,8 +250,8 @@ commands store and the script state map, so a row disappears when its agent fini
 (`enableRunOnStart`), and the dialog closes and hibernates on its own once all three lists are
 empty. Busy rows are split in two sections: agents (spinner, "Waiting for these agents to finish", and a line saying it hibernates on its own, shown only when nothing else is pending) and running scripts (no spinner, no waiting line: a script cannot be told apart as finite like a build or endless like `top`, so the user decides). A busy row has "Kill" (agent: Ctrl+C plus status idle, the session survives) or "Stop"
 (script: the same stop the RunButton sends, without moving focus; disabled as "Stopping" while
-`waiting`). Closing a hibernated workspace without waking it discards its carried buffers and
-hibernating marks. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
+`waiting`). Closing a workspace (hibernated or awake) abandons its carried buffers (`abandonUnflushedBuffers`: an awake workspace's editors unmount after the close and would stash their dirty text again, so the tabs are marked and later stashes are refused) and clears its
+hibernating marks. Closing a workspace does not go through `closeTab`, so its tabs are not recorded for `tab.reopenClosed`. Row buttons are plain `Button`s, not `AlertDialogAction`, so they do not close it. Waking
 is described above (`wakeWorkspace`).
 
 #### Auto-hibernate

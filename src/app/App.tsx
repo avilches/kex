@@ -6,13 +6,14 @@ import {
 import { tabLocations } from "@/modules/workspaces/lib/tabLocations";
 import {
   blockedWhileHibernated,
+  workspaceDialogPending,
   editorTabIds,
   enableRunOnStart,
   isPendingStale,
   terminalTabs,
 } from "@/modules/workspaces/lib/hibernate";
 import { claimToggle } from "@/modules/workspaces/lib/hibernateFx";
-import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
+import { abandonUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
@@ -978,7 +979,7 @@ export default function App() {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
       if (ws) {
-        discardUnflushedBuffers(editorTabIds(ws));
+        abandonUnflushedBuffers(editorTabIds(ws));
         unmarkHibernating(terminalTabs(ws).map((t) => t.id));
       }
       closeWorkspace(wsId);
@@ -3141,7 +3142,7 @@ export default function App() {
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
-      if (hibernateFlow.pendingWorkspaceId !== null) return true;
+      if (workspaceDialogPending(hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id)) return true;
       if (activeWorkspace?.hibernated && blockedWhileHibernated(id)) return true;
       if (
         id === "workspace.settings" &&
@@ -3178,7 +3179,7 @@ export default function App() {
 
       return false;
     },
-    [activeTab, activeWorkspace?.hibernated, hibernateFlow.pendingWorkspaceId],
+    [activeTab, activeWorkspace?.hibernated, hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });

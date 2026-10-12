@@ -18,6 +18,6 @@ export function detachesRecord(kind: AgentSignal["kind"], hibernating: boolean):
 // A failed restore leaves a placeholder session on the tab. It must not count as a running
 // agent, or the next `started` signal (the user launching claude by hand) never replaces it
 // and the tab stays flagged as failed until that agent exits.
-export function isRunningAgentSession(session: AgentSession | undefined): boolean {
+export function isRunningAgentSession(session: Pick<AgentSession, "restoreError"> | undefined): boolean {
   return session !== undefined && !session.restoreError;
 }

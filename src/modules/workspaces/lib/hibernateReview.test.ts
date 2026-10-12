@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hibernateReview, isBlockedByFailures, isReviewEmpty, type HibernateLive } from "./hibernateReview";
+import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
 import type { Tab, Workspace } from "./types";
 
 const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
@@ -187,5 +187,21 @@ describe("isBlockedByFailures", () => {
 
   it("ignores a stale failure for a document that is no longer listed", () => {
     expect(isBlockedByFailures(docs, { gone: "conflict" }, new Set())).toBe(false);
+  });
+});
+
+describe("liveAgent", () => {
+  it("ignores the placeholder session of a failed restore", () => {
+    const placeholder = { agent: "claude", status: "working" as const, restoreError: true };
+    expect(liveAgent(placeholder)).toBeUndefined();
+    const review = hibernateReview(
+      ws([term("t1", { restoreOnRestart: false })]),
+      { ...live(), agentOf: () => liveAgent(placeholder) },
+    );
+    expect(review.busy).toEqual([]);
+  });
+
+  it("keeps a real agent session", () => {
+    expect(liveAgent({ agent: "claude", status: "working", restoreError: false })).toMatchObject({ agent: "claude", status: "working" });
   });
 });
