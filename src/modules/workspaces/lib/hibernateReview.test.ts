@@ -142,7 +142,13 @@ describe("hibernateReview commands", () => {
   it("lists a running script as busy under its script name, without Run on start", () => {
     const w = ws([term("t1", { title: "tab" })], { scripts: [{ id: "s1", name: "dev", command: "npm run dev", tabId: "t1" }] });
     const r = hibernateReview(w, live({}, {}, { t1: "running" }));
-    expect(r.busy).toEqual([{ tabId: "t1", kind: "script", name: "dev", stopping: false, runOnStart: false }]);
+    expect(r.busy).toEqual([{ tabId: "t1", kind: "script", name: "dev", command: "npm run dev", stopping: false, runOnStart: false }]);
+  });
+
+  it("falls back to the script command when its name is empty", () => {
+    const w = ws([term("t1")], { scripts: [{ id: "s1", name: "  ", command: "npm run dev", tabId: "t1" }] });
+    const r = hibernateReview(w, live({}, {}, { t1: "running" }));
+    expect(r.busy[0]).toMatchObject({ name: "npm run dev", command: "npm run dev" });
     expect(r.commands).toEqual([]);
   });
 

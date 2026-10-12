@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { PlayIcon } from "@hugeicons/core-free-icons";
+import { ComputerTerminal01Icon, PlayIcon } from "@hugeicons/core-free-icons";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   getRunningCommandsSnapshot,
@@ -163,6 +163,9 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                 <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
                   <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
                   <span className="truncate">{b.name}</span>
+                  {b.command && b.command !== b.name && (
+                    <span className="truncate font-mono" title={b.command}>{b.command}</span>
+                  )}
                 </span>
                 {!closing && (
                   <Button
@@ -236,11 +239,20 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
         {closing && processes.length > 0 && (
           <section className="flex flex-col gap-1">
             <h3 className="text-[12px] font-medium">Running processes that will be killed</h3>
-            {processes.map((p) => (
-              <span key={p.tabId} className="truncate font-mono text-[12px] text-muted-foreground" title={p.label}>
-                {p.label}
-              </span>
-            ))}
+            {processes.map((p) => {
+              const agent = liveAgent(sessions[p.tabId])?.agent;
+              return (
+                <span key={p.tabId} className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
+                  {agent ? (
+                    <AgentIcon agent={agent} size={12} className="shrink-0" />
+                  ) : (
+                    <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} strokeWidth={2} className="shrink-0" />
+                  )}
+                  {p.title && p.title !== p.label && <span className="truncate">{p.title}</span>}
+                  <span className="truncate font-mono" title={p.label}>{p.label}</span>
+                </span>
+              );
+            })}
           </section>
         )}
         {closing && deletedScripts > 0 && (
