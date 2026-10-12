@@ -1941,16 +1941,19 @@ export default function App() {
   }, []);
 
   const saveTabReportingErrors = useCallback(
-    async (tabId: string) => {
+    async (tabId: string): Promise<string | null> => {
       try {
         await saveTab(tabId);
+        return null;
       } catch (err) {
         const tab = workspacesRef.current
           .flatMap((w) => allPanes(w.paneTree))
           .flatMap((p) => p.tabs)
           .find((t) => t.id === tabId);
         const name = tab && "path" in tab ? tab.path.split(/[\\/]/).pop() : tabId;
-        toast.error(`Could not save ${name}: ${err instanceof Error ? err.message : String(err)}`);
+        const reason = err instanceof Error ? err.message : String(err);
+        toast.error(`Could not save ${name}: ${reason}`);
+        return reason;
       }
     },
     [saveTab],
@@ -1971,6 +1974,17 @@ export default function App() {
   }, [saveTab]);
   const flushDirtyEditorsRef = useRef(flushDirtyEditors);
   flushDirtyEditorsRef.current = flushDirtyEditors;
+
+  const goToTab = useCallback(
+    (tabId: string) => {
+      const found = findTabGlobal(tabId);
+      if (!found) return;
+      setActiveWorkspaceId(found.workspace.id);
+      activateTab(found.workspace.id, tabId);
+      requestLeafFocus(tabId);
+    },
+    [activateTab, findTabGlobal, setActiveWorkspaceId],
+  );
 
   const saveWorkspaceDocs = useCallback(
     async (workspaceId: string) => {
@@ -3677,9 +3691,7 @@ export default function App() {
             onClose={hibernateFlow.cancel}
             onHibernate={handleHibernateFromDialog}
             onSaveTab={saveTabReportingErrors}
-            onSaveAll={async (tabIds) => {
-              await Promise.all(tabIds.map(saveTabReportingErrors));
-            }}
+            onGoToTab={goToTab}
             onStopBusy={(row) => {
               if (row.kind === "agent") {
                 interruptAgentLeaf(row.tabId);
@@ -3712,9 +3724,7 @@ export default function App() {
               if (id) void closeFlow.performClose(id);
             }}
             onSaveTab={saveTabReportingErrors}
-            onSaveAll={async (tabIds) => {
-              await Promise.all(tabIds.map(saveTabReportingErrors));
-            }}
+            onGoToTab={goToTab}
             onStopBusy={() => {}}
             onEnableRunOnStart={() => {}}
           />
