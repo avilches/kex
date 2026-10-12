@@ -115,9 +115,16 @@ describe("retryRestoreFlow and cancelRestoreFlow", () => {
         calls.push(b ? "block" : "unblock");
       },
       finishAgent: () => void calls.push("finish"),
-      previewPlan: async () => (calls.push("preview"), openingAt.preview = s.ptyOpening, plan({ resumeCmd: "claude -r" })),
+      previewPlan: async () => {
+        calls.push("preview");
+        openingAt.preview = s.ptyOpening;
+        return plan({ resumeCmd: "claude -r" });
+      },
       seedPlan: () => void calls.push("seed"),
-      detachAgent: async () => (calls.push("detach"), void (openingAt.detach = s.ptyOpening)),
+      detachAgent: async () => {
+        calls.push("detach");
+        openingAt.detach = s.ptyOpening;
+      },
       start: async (plain) => void calls.push(plain ? "start:plain" : "start"),
       ...over,
     };
