@@ -23,6 +23,7 @@ function setup(workspace: Workspace, over: Partial<HibernateFlowDeps> = {}) {
     live: () => ({ agentOf: () => undefined, runningCommand: () => undefined, scriptState: () => undefined }),
     finishAgent: (id) => void calls.push(`finish:${id}`),
     destroyFloats: async () => void calls.push("floats"),
+    snapshotTabs: async () => ({}),
     hibernate: () => void calls.push("hibernate"),
     setPending: (id) => void calls.push(`pending:${id}`),
     ...over,
@@ -38,6 +39,17 @@ describe("createHibernateFlow", () => {
     await flow.request("w1");
     expect(calls).toContain("hibernate");
     expect(calls).not.toContain("pending:w1");
+  });
+
+  it("hands the tab snapshots taken before the hibernation to the hibernate step", async () => {
+    const snap = { title: "Fix login", command: "claude --resume abc" };
+    let received: unknown;
+    const { flow } = setup(ws([term("t1")]), {
+      snapshotTabs: async () => ({ t1: snap }),
+      hibernate: (_id, snapshots) => void (received = snapshots),
+    });
+    await flow.request("w1");
+    expect(received).toEqual({ t1: snap });
   });
 
   it("opens the dialog instead when a command would be lost", async () => {

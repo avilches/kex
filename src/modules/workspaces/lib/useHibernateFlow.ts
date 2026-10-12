@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { markHibernating, unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
+import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { terminalTabs } from "./hibernate";
 import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
-import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
-import type { Workspace } from "./types";
+import { getRunningCommand, getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
+import { resolveAgentTabTitle } from "./useAgentTabTitle";
+import type { TabHibernation, Workspace } from "./types";
 
 export type HibernateFlowDeps = {
   getWorkspace: (workspaceId: string) => Workspace | undefined;
@@ -17,7 +20,9 @@ export type HibernateFlowDeps = {
   live: () => HibernateLive;
   finishAgent: (tabId: string) => void;
   destroyFloats: (workspaceId: string) => Promise<void>;
-  hibernate: (workspaceId: string) => void;
+  // Title, agent and restore command of every terminal tab, read while the PTYs are still alive.
+  snapshotTabs: (workspace: Workspace) => Promise<Record<string, TabHibernation>>;
+  hibernate: (workspaceId: string, snapshots: Record<string, TabHibernation>) => void;
   setPending: (workspaceId: string | null) => void;
 };
 
@@ -34,14 +39,17 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
     try {
       // First, so the dialog stops watching the stores this call is about to change.
       d.setPending(null);
-      await d.destroyFloats(workspaceId);
+      const [, snapshots] = await Promise.all([
+        d.destroyFloats(workspaceId),
+        ws.hibernated ? {} : d.snapshotTabs(ws),
+      ]);
       const current = d.getWorkspace(workspaceId);
       if (!current || current.hibernated || (stillValid && !stillValid(current))) return false;
       const ids = terminalTabs(current).map((t) => t.id);
       markHibernating(ids);
       try {
         for (const id of ids) d.finishAgent(id);
-        d.hibernate(workspaceId);
+        d.hibernate(workspaceId, snapshots);
       } catch (e) {
         unmarkHibernating(ids);
         throw e;
@@ -91,6 +99,22 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   return { request, requestAuto, perform };
 }
 
+// A tab that was added or retitled during the await keeps no snapshot or a slightly old one,
+// which the overlay tolerates by falling back to the live title.
+async function snapshotTerminalTabs(ws: Workspace): Promise<Record<string, TabHibernation>> {
+  const sessions = useAgentStore.getState().sessions;
+  const entries = await Promise.all(
+    terminalTabs(ws).map(async (tab): Promise<[string, TabHibernation]> => {
+      const session = sessions[tab.id];
+      const info = resolveAgentTabTitle(tab, getRunningCommand(tab.id), getOscTitle(tab.id), session);
+      const plan = session ? await previewResumeCmd(tab.id) : null;
+      const command = plan?.resumeCmd.trim() || (tab.restoreOnRestart ? tab.persistentCommand : undefined);
+      return [tab.id, { title: info.displayTitle, agent: session?.agent, command }];
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
 const nextFrames = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
@@ -98,7 +122,7 @@ type HookDeps = {
   workspacesRef: { current: Workspace[] };
   saveWorkspaceDocs: (workspaceId: string) => Promise<boolean>;
   isActive: (workspaceId: string) => boolean;
-  hibernateWorkspace: (workspaceId: string) => void;
+  hibernateWorkspace: (workspaceId: string, snapshots: Record<string, TabHibernation>) => void;
   destroyWorkspaceFloats: (workspaceId: string, workspaces: Workspace[]) => Promise<void>;
 };
 
@@ -126,7 +150,8 @@ export function useHibernateFlow(deps: HookDeps) {
         },
         finishAgent: (id) => useAgentStore.getState().finish(id),
         destroyFloats: (id) => depsRef.current.destroyWorkspaceFloats(id, depsRef.current.workspacesRef.current),
-        hibernate: (id) => depsRef.current.hibernateWorkspace(id),
+        snapshotTabs: snapshotTerminalTabs,
+        hibernate: (id, snapshots) => depsRef.current.hibernateWorkspace(id, snapshots),
         setPending: setPendingWorkspaceId,
       }),
     [],

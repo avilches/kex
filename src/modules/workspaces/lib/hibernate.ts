@@ -1,6 +1,6 @@
 import type { ShortcutId } from "@/modules/shortcuts/shortcuts";
 import { allPanes } from "./splitNode";
-import type { SplitNode, Tab, Workspace } from "./types";
+import type { SplitNode, Tab, TabHibernation, Workspace } from "./types";
 
 type TerminalTab = Extract<Tab, { kind: "terminal" }>;
 
@@ -30,28 +30,34 @@ export function blockedWhileHibernated(id: ShortcutId): boolean {
 
 // Editors are about to be unmounted (their unsaved state goes with them) and a
 // floating browser window is destroyed, so neither flag may outlive hibernation.
-function clearTransientTabState(node: SplitNode): SplitNode {
+function clearTransientTabState(node: SplitNode, snapshots: Readonly<Record<string, TabHibernation>>): SplitNode {
   if (node.kind === "pane") {
     return {
       ...node,
       tabs: node.tabs.map((t) => {
+        if (t.kind === "terminal") return snapshots[t.id] ? { ...t, hibernation: snapshots[t.id] } : t;
         if (t.kind === "editor" || t.kind === "markdown") return { ...t, dirty: false };
         if (t.kind === "browser") return { ...t, floating: false };
         return t;
       }),
     };
   }
-  return { ...node, first: clearTransientTabState(node.first), second: clearTransientTabState(node.second) };
+  return { ...node, first: clearTransientTabState(node.first, snapshots), second: clearTransientTabState(node.second, snapshots) };
 }
 
-export function applyHibernate(workspaces: Workspace[], workspaceId: string, now: number = Date.now()): Workspace[] {
+export function applyHibernate(
+  workspaces: Workspace[],
+  workspaceId: string,
+  now: number = Date.now(),
+  snapshots: Readonly<Record<string, TabHibernation>> = {},
+): Workspace[] {
   return workspaces.map((w) =>
     w.id === workspaceId
       ? {
           ...w,
           hibernated: true,
           hibernatedAt: w.hibernated ? w.hibernatedAt : now,
-          paneTree: clearTransientTabState(w.paneTree),
+          paneTree: clearTransientTabState(w.paneTree, snapshots),
         }
       : w,
   );
@@ -79,11 +85,25 @@ export function applyStartupHibernation(
   return workspaces.reduce((acc, w) => (w.id === active.id ? acc : applyHibernate(acc, w.id)), workspaces);
 }
 
+function clearTabSnapshots(node: SplitNode): SplitNode {
+  if (node.kind === "pane") {
+    return {
+      ...node,
+      tabs: node.tabs.map((t) => {
+        if (t.kind !== "terminal" || !t.hibernation) return t;
+        const { hibernation: _hibernation, ...rest } = t;
+        return rest;
+      }),
+    };
+  }
+  return { ...node, first: clearTabSnapshots(node.first), second: clearTabSnapshots(node.second) };
+}
+
 export function applyWake(workspaces: Workspace[], workspaceId: string): Workspace[] {
   return workspaces.map((w) => {
     if (w.id !== workspaceId) return w;
     const { hibernated: _hibernated, hibernatedAt: _hibernatedAt, ...rest } = w;
-    return rest;
+    return { ...rest, paneTree: clearTabSnapshots(rest.paneTree) };
   });
 }
 

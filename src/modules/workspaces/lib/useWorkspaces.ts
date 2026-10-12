@@ -25,7 +25,7 @@ import {
   updatePane,
 } from "./splitNode";
 import { attachTab, workspaceForTab, workspaceTitleFromCwd, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
-import { type ClosedEntry, type Tab, type PaneNode, type Script, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
+import { type ClosedEntry, type Tab, type PaneNode, type Script, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
 
@@ -956,8 +956,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
-  const hibernateWorkspace = useCallback((workspaceId: string) => {
-    setWorkspaces((prev) => applyHibernate(prev, workspaceId));
+  const hibernateWorkspace = useCallback((workspaceId: string, snapshots?: Record<string, TabHibernation>) => {
+    setWorkspaces((prev) => applyHibernate(prev, workspaceId, Date.now(), snapshots));
   }, []);
 
   const wakeWorkspace = useCallback(async (workspaceId: string) => {

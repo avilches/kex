@@ -33,14 +33,17 @@ function useNow(enabled: boolean): number {
 
 function SleepingTabRow({ tab }: { tab: Tab }) {
   const info = useAgentTabTitle(tab);
-  const title = info?.displayTitle ?? tab.id;
-  const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
+  const saved = tab.kind === "terminal" ? tab.hibernation : undefined;
+  const title = saved?.title ?? info?.displayTitle ?? tab.id;
+  const agent = saved ? saved.agent : info?.hasAgent ? info.agentSession?.agent : undefined;
+  const command = saved?.command;
   return (
-    <li title={title} className="flex h-6 items-center gap-1.5 px-2 text-[12px]">
+    <li title={command ? `${title}: ${command}` : title} className="flex h-6 items-center gap-1.5 px-2 text-[12px]">
       <span className="flex size-3.5 shrink-0 items-center justify-center">
         {agent && !tab.icon ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
       </span>
-      <span className="min-w-0 flex-1 truncate">{title}</span>
+      <span className="min-w-0 truncate">{title}</span>
+      {command && <span className="min-w-0 flex-1 truncate font-mono text-[11px] opacity-70">{command}</span>}
     </li>
   );
 }
@@ -80,7 +83,7 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
         )}
       </div>
       {tabs.length > 0 && (
-        <ul className={cn("flex max-h-[40%] w-64 max-w-[80%] flex-col gap-px overflow-y-auto border-l border-border/60 pl-0.5", fx && "hib-item [animation-delay:500ms]")}>
+        <ul className={cn("flex max-h-[40%] w-96 max-w-[80%] flex-col gap-px overflow-y-auto border-l border-border/60 pl-0.5", fx && "hib-item [animation-delay:500ms]")}>
           {tabs.map((tab) => (
             <SleepingTabRow key={tab.id} tab={tab} />
           ))}

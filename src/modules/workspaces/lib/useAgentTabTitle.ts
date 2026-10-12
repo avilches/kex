@@ -34,7 +34,15 @@ export function useAgentTabTitle(tab: Tab | null): AgentTabTitleInfo | null {
   const agentSession = useAgentStore((s) => (tab ? s.sessions[tab.id] : undefined));
 
   if (!tab) return null;
+  return resolveAgentTabTitle(tab, runningCommand, oscTitle, agentSession);
+}
 
+export function resolveAgentTabTitle(
+  tab: Tab,
+  runningCommand: string | null | undefined,
+  oscTitle: string | undefined,
+  agentSession: AgentSession | undefined,
+): AgentTabTitleInfo {
   const hasAgent = !!agentSession && tab.kind === "terminal";
   const sessionTitle = agentSession?.meta?.sessionTitle;
   const baseTitle = tabTitle(tab, runningCommand, oscTitle);

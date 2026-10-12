@@ -103,6 +103,23 @@ describe("applyHibernate timestamp", () => {
   });
 });
 
+describe("tab snapshots", () => {
+  const snap = { title: "Fix login", agent: "claude", command: "claude --resume abc" };
+  const firstTab = (w: Workspace) => (w.paneTree as Extract<SplitNode, { kind: "split" }>).first as Extract<SplitNode, { kind: "pane" }>;
+
+  it("stores the snapshot on the terminal tab it belongs to and on no other", () => {
+    const out = applyHibernate([ws()], "w1", 1000, { t1: snap })[0]!;
+    const tabs = firstTab(out).tabs;
+    expect((tabs[0] as Extract<Tab, { kind: "terminal" }>).hibernation).toEqual(snap);
+    expect("hibernation" in tabs[1]!).toBe(false);
+  });
+
+  it("drops the snapshot on wake", () => {
+    const woke = applyWake(applyHibernate([ws()], "w1", 1000, { t1: snap }), "w1")[0]!;
+    expect("hibernation" in firstTab(woke).tabs[0]!).toBe(false);
+  });
+});
+
 describe("formatHibernatedFor", () => {
   const MIN = 60_000;
   const H = 60 * MIN;
