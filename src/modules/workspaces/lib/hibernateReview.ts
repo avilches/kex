@@ -1,4 +1,5 @@
 import type { AgentStatus } from "@/modules/agents/lib/types";
+import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { hasResumed } from "@/modules/agents/lib/restoreCheck";
 import { allPanes } from "./splitNode";
 import type { ScriptState } from "./terminalEphemeralStore";
@@ -11,9 +12,11 @@ export type HibernateLive = {
 };
 
 export function liveAgent(
-  session: { agent: string; status: AgentStatus; meta?: { sessionId?: string } } | undefined,
+  session: { agent: string; status: AgentStatus; meta?: { sessionId?: string }; restoreError: boolean } | undefined,
 ): ReturnType<HibernateLive["agentOf"]> {
-  return session && { agent: session.agent, status: session.status, resumable: hasResumed(session) };
+  // A failed restore leaves a placeholder "working" session with no process behind it.
+  if (!session || !isRunningAgentSession(session)) return undefined;
+  return { agent: session.agent, status: session.status, resumable: hasResumed(session) };
 }
 
 export type BusyRow = {

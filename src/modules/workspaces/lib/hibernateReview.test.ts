@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hibernateReview, isReviewEmpty, type HibernateLive } from "./hibernateReview";
+import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
 import type { Tab, Workspace } from "./types";
 
 const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
@@ -164,5 +164,21 @@ describe("hibernateReview docs", () => {
     const r = hibernateReview(ws(tabs), live());
     expect(r.docs.map((d) => d.tabId)).toEqual(["e1", "m1"]);
     expect(r.docs[0]).toMatchObject({ path: "/a.ts" });
+  });
+});
+
+describe("liveAgent", () => {
+  it("ignores the placeholder session of a failed restore", () => {
+    const placeholder = { agent: "claude", status: "working" as const, restoreError: true };
+    expect(liveAgent(placeholder)).toBeUndefined();
+    const review = hibernateReview(
+      ws([term("t1", { restoreOnRestart: false })]),
+      { ...live(), agentOf: () => liveAgent(placeholder) },
+    );
+    expect(review.busy).toEqual([]);
+  });
+
+  it("keeps a real agent session", () => {
+    expect(liveAgent({ agent: "claude", status: "working", restoreError: false })).toMatchObject({ agent: "claude", status: "working" });
   });
 });
