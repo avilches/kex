@@ -3018,7 +3018,13 @@ export default function App() {
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
       "tab.toggleAutofocus": () => {
-        if (autofocusMode === "always") return;
+        if (autofocusMode === "always") {
+          toast.info("Autofocus is set to Always, so it cannot be toggled per tab", {
+            description: "Change the mode in Settings > General > Autofocus.",
+            action: { label: "Open Settings", onClick: () => void openSettingsWindow("general") },
+          });
+          return;
+        }
         if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
         const found = findTabGlobal(activeTabId);
         if (found)
