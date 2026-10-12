@@ -351,6 +351,7 @@ function SortableWorkspaceItem({
         hoverSwitch?.leave(ws.id);
       }}
     >
+      <PopoverAnchor asChild>
       <div className="relative -mx-1.5 px-1.5">
         <button
           type="button"
@@ -395,7 +396,11 @@ function SortableWorkspaceItem({
             <span
               key={hibernatedLook === "out" ? wokenAt : ws.hibernatedAt}
               aria-hidden
-              className={cn("ws-hib-look", hibernatedLook !== "static" && `ws-hib-look-${hibernatedLook}`)}
+              className={cn(
+                "ws-hib-look",
+                hibernatedLook !== "static" && `ws-hib-look-${hibernatedLook}`,
+                active && ws.hibernated && "ws-hib-look-focused",
+              )}
             />
           )}
           {compact ? (
@@ -457,6 +462,7 @@ function SortableWorkspaceItem({
           />
         )}
       </div>
+      </PopoverAnchor>
       <SlideReveal open={expanded}>
         <WorkspaceDetailList
           workspaceId={ws.id}
@@ -479,7 +485,7 @@ function SortableWorkspaceItem({
     >
       <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <ContextMenuTrigger asChild>
-          <PopoverAnchor asChild>{button}</PopoverAnchor>
+          {button}
         </ContextMenuTrigger>
         <ContextMenuContent
           onCloseAutoFocus={(e) => {
