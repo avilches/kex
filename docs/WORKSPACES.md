@@ -236,9 +236,11 @@ hibernated workspaces show "Restore" instead, wired to `wakeWorkspace`) call
    "Run on start". An agent only counts as coming back when it has a stored session (`hasResumed`);
    a busy agent that would not come back carries `runOnStart` so its row offers the button, and an idle one is listed as a command. If the review is empty the
    workspace hibernates immediately; otherwise `pendingWorkspaceId` opens `HibernateDialog`.
-3. `performHibernate` clears the pending id, marks the terminal tabs with `markHibernating`
-   (so the exit of their PTYs is not reported as an agent failure), calls `finish` on each agent
-   session, destroys the floating browsers and finally calls `hibernateWorkspace`. A set of
+3. `performHibernate` clears the pending id and destroys the floating browsers. Then, with no await
+   left, it rechecks (for the automatic and no-dialog paths: the review is still empty and the
+   workspace is still not the active one), marks the terminal tabs with `markHibernating` (so the
+   exit of their PTYs is not reported as an agent failure), calls `finish` on each agent session and
+   calls `hibernateWorkspace`; if the recheck fails or hibernating throws, nothing stays marked. A set of
    in-flight workspace ids makes a double trigger hibernate once.
 
 The dialog title names the workspace and starts with a `WorkspaceMark` (`modules/workspaces/WorkspaceMark.tsx`): the workspace icon painted in its color, or a color dot when it has no icon, plus a sleeping icon if it is hibernated. The Header title and the "Move to Workspace" menu use the same mark. A muted tag with the group label (`groupLabelOf`) follows the name when the workspace belongs to an existing group. The title keeps the last shown workspace and group so it does not flip during the exit animation. If the pending workspace disappears while the dialog is open, `isPendingStale` makes `App.tsx` cancel the request so the shortcut lock is released.
