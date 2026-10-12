@@ -6,12 +6,17 @@ type TabNoteStore = {
   focusTabId: string | null;
   requestFocus: (tabId: string) => void;
   clearFocus: () => void;
+  // Tab whose WorkspaceBar note icon is hovered and whose note lives in a pane: that pane previews it.
+  sidebarHoverTabId: string | null;
+  setSidebarHover: (tabId: string | null) => void;
 };
 
 export const useTabNoteStore = create<TabNoteStore>((set) => ({
   focusTabId: null,
   requestFocus: (tabId) => set({ focusTabId: tabId }),
   clearFocus: () => set({ focusTabId: null }),
+  sidebarHoverTabId: null,
+  setSidebarHover: (tabId) => set({ sidebarHoverTabId: tabId }),
 }));
 
 // Open note editors keep typing local and write it to the tab on a debounce, so each key

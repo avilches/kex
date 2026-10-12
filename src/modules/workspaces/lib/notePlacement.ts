@@ -33,6 +33,11 @@ export function dockedNotePos(
   return clampNotePos({ x: tab.left - pane.left, y: tabBarHeight }, pane, note, tabBarHeight);
 }
 
+// Docked to the right of a WorkspaceBar row, top-aligned with it.
+export function sideRowNotePos(row: Rect, pane: Rect, note: Size, gap = 4): Point {
+  return clampNotePos({ x: row.left + row.width - pane.left + gap, y: row.top - pane.top }, pane, note);
+}
+
 export function resolveNotePos(args: {
   notePos?: Point;
   tab: Rect | null;

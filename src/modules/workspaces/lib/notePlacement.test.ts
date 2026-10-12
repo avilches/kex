@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { clampNotePos, clampNoteSize, MIN_NOTE_SIZE, dockedNotePos, resolveNotePos } from "./notePlacement";
+import { clampNotePos, clampNoteSize, MIN_NOTE_SIZE, sideRowNotePos, dockedNotePos, resolveNotePos } from "./notePlacement";
 
 const pane = { left: 100, top: 50, width: 800, height: 600 };
 const note = { width: 300, height: 200 };
@@ -73,5 +73,15 @@ describe("clampNoteSize", () => {
   });
   test("stops at the pane's right and bottom edges", () => {
     expect(clampNoteSize({ width: 5000, height: 5000 }, size, { x: 100, y: 50 })).toEqual({ width: 700, height: 550 });
+  });
+});
+
+describe("sideRowNotePos", () => {
+  const viewport = { left: 0, top: 0, width: 1200, height: 800 };
+  test("sits to the right of the row, top-aligned", () => {
+    expect(sideRowNotePos({ left: 10, top: 120, width: 180, height: 24 }, viewport, note)).toEqual({ x: 194, y: 120 });
+  });
+  test("is clamped inside the viewport", () => {
+    expect(sideRowNotePos({ left: 10, top: 780, width: 180, height: 24 }, viewport, note)).toEqual({ x: 194, y: 600 });
   });
 });

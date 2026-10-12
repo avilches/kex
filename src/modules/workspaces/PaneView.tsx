@@ -7,6 +7,7 @@ import { FloatingTabNote, TAB_NOTE_ATTR } from "./FloatingTabNote";
 import { hideTabNote } from "./lib/tabNote";
 import { draggedId } from "./lib/tabDrop";
 import { useNotePreview } from "./lib/useNotePreview";
+import { useTabNoteStore } from "./lib/tabNoteStore";
 import { TabContent } from "./TabContent";
 import type { TabCallbacks } from "./TabContent";
 import type { PaneNode } from "./lib/types";
@@ -222,6 +223,14 @@ export const PaneView = memo(function PaneView({
     (tabId: string, hovering: boolean) => (hovering ? notePreview.show(tabId) : notePreview.leave(tabId)),
     [notePreview.show, notePreview.leave],
   );
+  const sidebarHoverId = useTabNoteStore((s) => s.sidebarHoverTabId);
+  const prevSidebarHover = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevSidebarHover.current;
+    prevSidebarHover.current = sidebarHoverId;
+    if (sidebarHoverId && pane.tabs.some((t) => t.id === sidebarHoverId)) notePreview.show(sidebarHoverId);
+    else if (prev && pane.tabs.some((t) => t.id === prev)) notePreview.leave(prev);
+  }, [sidebarHoverId, pane.tabs, notePreview.show, notePreview.leave]);
   const closeNote = (tabId: string) => {
     notePreview.close();
     callbacks.onUpdateTab?.(tabId, hideTabNote);

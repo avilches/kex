@@ -7,7 +7,7 @@ import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeM
 import { isLeavingNote } from "./lib/noteBlur";
 import { dropBlankTabNote, moveTabNote, resizeTabNote, setTabNoteText } from "./lib/tabNote";
 import { registerTabNoteFlush, useTabNoteStore } from "./lib/tabNoteStore";
-import { clampNotePos, clampNoteSize, resolveNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
+import { clampNotePos, clampNoteSize, resolveNotePos, sideRowNotePos, type Point, type Rect, type Size } from "./lib/notePlacement";
 import type { Tab } from "./lib/types";
 
 const CodeMirrorEditor = lazy(() =>
@@ -29,6 +29,8 @@ type Props = {
   // close button and goes away by itself; an inactive tab's one is docked under its tab
   // and cannot be dragged. Dragging an active tab's hover note makes it sticky.
   preview?: boolean;
+  // "side-row": docked to the right of the tab's WorkspaceBar row instead of under its pane tab.
+  dockTo?: "side-row";
   onClose?: () => void;
   onDismiss?: () => void;
   onPointerEnter?: () => void;
@@ -55,7 +57,7 @@ function sameMeasure(a: Measure, b: Measure) {
   );
 }
 
-export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab, preview, onClose, onDismiss, onPointerEnter, onPointerLeave }: Props) {
+export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab, preview, dockTo, onClose, onDismiss, onPointerEnter, onPointerLeave }: Props) {
   const visible = tab.note !== undefined && (!!preview || (active && !!tab.noteOpen));
   const sticky = active && !!tab.noteOpen;
   const docked = !active;
@@ -109,7 +111,9 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
     const paneEl = paneRef.current;
     const noteEl = noteRef.current;
     if (!paneEl || !noteEl) return;
-    const tabEl = paneEl.querySelector(`[data-tab-id="${CSS.escape(tab.id)}"]`);
+    const tabEl = dockTo
+      ? document.querySelector(`[data-detail-row-id="${CSS.escape(tab.id)}"]`)
+      : paneEl.querySelector(`[data-tab-id="${CSS.escape(tab.id)}"]`);
     const next: Measure = {
       pane: toRect(paneEl.getBoundingClientRect()),
       tab: tabEl ? toRect(tabEl.getBoundingClientRect()) : null,
@@ -117,7 +121,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
       tabBarHeight: tabBarRef.current?.offsetHeight ?? 0,
     };
     setM((prev) => (prev && sameMeasure(prev, next) ? prev : next));
-  }, [paneRef, tabBarRef, tab.id]);
+  }, [paneRef, tabBarRef, tab.id, dockTo]);
 
   useLayoutEffect(() => {
     if (visible) measure();
@@ -134,18 +138,24 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
     ro.observe(noteEl);
     // A tab before the active one changing width (title, badges) shifts the docked x.
     for (const el of barEl?.querySelectorAll("[data-tab-id]") ?? []) ro.observe(el);
+    if (dockTo) {
+      const rowEl = document.querySelector(`[data-detail-row-id="${CSS.escape(tabId)}"]`);
+      if (rowEl) ro.observe(rowEl);
+    }
     // scroll does not bubble; capture catches the tab strip's own scroll container.
     barEl?.addEventListener("scroll", measure, true);
     return () => {
       ro.disconnect();
       barEl?.removeEventListener("scroll", measure, true);
     };
-  }, [visible, measure, paneRef, tabBarRef, layoutKey]);
+  }, [visible, measure, paneRef, tabBarRef, layoutKey, dockTo, tabId]);
 
   if (!visible) return null;
 
   const resolved = m
-    ? resolveNotePos({ notePos: docked ? undefined : tab.notePos, tab: m.tab, pane: m.pane, note: m.note, tabBarHeight: m.tabBarHeight })
+    ? dockTo && m.tab
+      ? sideRowNotePos(m.tab, m.pane, m.note)
+      : resolveNotePos({ notePos: docked ? undefined : tab.notePos, tab: m.tab, pane: m.pane, note: m.note, tabBarHeight: m.tabBarHeight })
     : null;
   const pos = dragPos ?? resolved;
   const storedSize = docked ? undefined : tab.noteSize;

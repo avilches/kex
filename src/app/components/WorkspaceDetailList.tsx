@@ -1,14 +1,19 @@
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { LockKeyIcon } from "@hugeicons/core-free-icons";
+import { LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { PopoverAnchor } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentEntry } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { FloatingTabNote } from "@/modules/workspaces/FloatingTabNote";
+import { toggleTabNote } from "@/modules/workspaces/lib/tabNote";
+import { useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
+import { useNotePreview } from "@/modules/workspaces/lib/useNotePreview";
 import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
@@ -76,6 +81,7 @@ function DetailTabRow({
   prevTabId,
   insertSide,
   onActivate,
+  onNoteHover,
 }: {
   tab: Tab;
   workspaceId: string;
@@ -84,12 +90,14 @@ function DetailTabRow({
   prevTabId: string | null;
   insertSide: "before" | "after" | null;
   onActivate: (tabId: string) => void;
+  onNoteHover: (tabId: string, hovering: boolean) => void;
 }) {
   const info = useAgentTabTitle(tab);
   const title = info?.displayTitle ?? tab.id;
   const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
   const { onRenameTab, onClose, onUpdateTab } = useSidebarTabMenu();
   const isLocked = tab.locked ?? false;
+  const hasNote = tab.note !== undefined;
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: sidebarTabDragId(tab.id),
@@ -144,6 +152,7 @@ function DetailTabRow({
               {...listeners}
               type="button"
               data-detail-row=""
+              data-detail-row-id={tab.id}
               title={title}
               aria-current={focused || undefined}
               onClick={() => onActivate(tab.id)}
@@ -160,6 +169,7 @@ function DetailTabRow({
               </span>
               <span className="min-w-0 flex-1 truncate">{title}</span>
               <span aria-hidden className="size-[16px] shrink-0" />
+              {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
             </button>
           </PopoverAnchor>
         </ContextMenuTrigger>
@@ -175,6 +185,23 @@ function DetailTabRow({
         </ContextMenuContent>
       </ContextMenu>
     </TabRenamePopover>
+      {hasNote && (
+        <button
+          type="button"
+          title={tab.noteOpen ? "Hide note" : "Show note"}
+          aria-label="Tab note"
+          aria-pressed={!!tab.noteOpen}
+          className={cn(
+            "absolute right-[26px] top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring",
+            tab.noteOpen && "text-foreground",
+          )}
+          onPointerEnter={() => onNoteHover(tab.id, true)}
+          onPointerLeave={() => onNoteHover(tab.id, false)}
+          onClick={() => onUpdateTab(tab.id, toggleTabNote)}
+        >
+          <HugeiconsIcon icon={StickyNote03Icon} size={12} strokeWidth={2} />
+        </button>
+      )}
       {isLocked ? (
         <button
           type="button"
@@ -229,6 +256,8 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     );
     return workspaceDetailRows(tabs, agentTabIds, entries ?? [], filter);
   }, [tabs, sessions, entries, filter]);
+  const viewportRef = useRef<HTMLElement | null>(document.documentElement);
+  const noBarRef = useRef<HTMLElement | null>(null);
   const [insert, setInsert] = useState<{ tabId: string; side: "before" | "after" } | null>(null);
   const trackInsert = useCallback(
     (e: DragMoveEvent) => {
@@ -248,6 +277,35 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   useDndMonitor({ onDragMove: trackInsert, onDragEnd: clearInsert, onDragCancel: clearInsert });
   const tabsById = useMemo(() => new Map(tabs.map((t) => [t.id, t])), [tabs]);
 
+  const { onUpdateTab } = useSidebarTabMenu();
+  const setSidebarHover = useTabNoteStore((s) => s.setSidebarHover);
+  const notePreview = useNotePreview(
+    useCallback(
+      (id: string) =>
+        !!document
+          .querySelector(`[data-tab-note-id="${CSS.escape(id)}"]`)
+          ?.contains(document.activeElement),
+      [],
+    ),
+    focusedTabId ?? "",
+  );
+  // The focused tab's note lives in its pane, at its own position: the pane previews it.
+  // Any other tab's note is docked next to its row.
+  const handleNoteHover = useCallback(
+    (tabId: string, hovering: boolean) => {
+      if (tabId === focusedTabId) {
+        setSidebarHover(hovering ? tabId : null);
+      } else if (hovering) {
+        notePreview.show(tabId);
+      } else {
+        notePreview.leave(tabId);
+      }
+    },
+    [focusedTabId, setSidebarHover, notePreview.show, notePreview.leave],
+  );
+  useEffect(() => () => setSidebarHover(null), [setSidebarHover]);
+  const previewTab = notePreview.tabId ? tabsById.get(notePreview.tabId) : undefined;
+
   if (rows.length === 0) return null;
 
   return (
@@ -264,9 +322,30 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
             prevTabId={rows[i - 1]?.tabId ?? null}
             insertSide={insert?.tabId === row.tabId ? insert.side : null}
             onActivate={onActivate}
+            onNoteHover={handleNoteHover}
           />
         ) : null;
       })}
+      {previewTab && previewTab.note !== undefined && previewTab.id !== focusedTabId &&
+        createPortal(
+          <div className="pointer-events-none fixed inset-0 z-50">
+            <FloatingTabNote
+              key={`side-preview-${previewTab.id}`}
+              tab={previewTab}
+              active={false}
+              preview
+              dockTo="side-row"
+              paneRef={viewportRef}
+              tabBarRef={noBarRef}
+              layoutKey=""
+              onUpdateTab={onUpdateTab}
+              onDismiss={notePreview.close}
+              onPointerEnter={() => notePreview.show(previewTab.id)}
+              onPointerLeave={() => notePreview.leave(previewTab.id)}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 });
