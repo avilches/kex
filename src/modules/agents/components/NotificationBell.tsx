@@ -247,8 +247,8 @@ export function NotificationBell({ onActivate }: Props) {
               <span className="text-left">
                 <span className="block font-medium">
                   {installing
-                    ? "Installing hooks..."
-                    : "Install Claude Code hooks for Kex"}
+                    ? "Installing..."
+                    : "Install Kex integration"}
                 </span>
                 <span className="block text-[11px]">
                   Session restore on close · Tab notifications
