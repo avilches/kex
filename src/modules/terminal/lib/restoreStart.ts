@@ -1,4 +1,5 @@
 import type { RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { quoteShellPath } from "./quoteShellPath";
 
 // Why a terminal was not started: shown in the modal that holds the tab.
 export type RestoreBlock = {
@@ -112,15 +113,38 @@ export function retryRestoreFlow(s: HeldSession, d: RestoreActionDeps): Promise<
   );
 }
 
-export function cancelRestoreFlow(s: HeldSession, d: RestoreActionDeps): Promise<void> {
-  return leaveBlock(
-    s,
-    d,
-    async (block) => {
-      if (!block.agent) return;
-      d.finishAgent();
-      await d.detachAgent().catch((e) => console.error("[kex] detach failed:", e));
-    },
-    true,
-  );
+// The plan and the store entry survive: the tab only gets a plain shell.
+export function openWithoutRestoringFlow(s: HeldSession, d: RestoreActionDeps): Promise<void> {
+  return leaveBlock(s, d, async () => {}, true);
+}
+
+// PowerShell 5.1 has no `&&`. The leading space keeps the line out of shell history.
+export function restoreCommandLine(dir: string, command: string, isWindows: boolean): string {
+  return ` cd ${quoteShellPath(dir)}${isWindows ? "; " : " && "}${command}\r`;
+}
+
+export type PendingOutcome =
+  | { kind: "gone" }
+  | { kind: "blocked"; block: RestoreBlock }
+  | { kind: "run"; line: string };
+
+export function pendingAfterPlan(plan: RestorePlan | null, isWindows: boolean): PendingOutcome {
+  if (!plan) return { kind: "gone" };
+  if (plan.errorReason) {
+    return {
+      kind: "blocked",
+      block: { reason: plan.errorReason, dir: plan.cwdLaunch, command: plan.attemptedCmd, agent: plan.agent },
+    };
+  }
+  if (!plan.resumeCmd) return { kind: "gone" };
+  return { kind: "run", line: restoreCommandLine(plan.cwdLaunch, plan.resumeCmd, isWindows) };
+}
+
+export function pendingAfterDirCheck(
+  block: RestoreBlock,
+  problem: string | null,
+  isWindows: boolean,
+): PendingOutcome {
+  if (problem) return { kind: "blocked", block: { ...block, reason: problem } };
+  return { kind: "run", line: restoreCommandLine(block.dir, block.command, isWindows) };
 }

@@ -2,7 +2,7 @@ import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { cancelRestore, retryRestore } from "./lib/useTerminalSession";
+import { openWithoutRestoring, retryRestore } from "./lib/useTerminalSession";
 import type { RestoreBlock } from "./lib/restoreStart";
 
 type Props = { leafId: string; block: RestoreBlock };
@@ -43,7 +43,7 @@ export function RestoreBlockedOverlay({ leafId, block }: Props) {
         <Field label="Directory" value={block.dir} />
         <Field label="Command" value={block.command} />
         <div className="flex justify-end gap-2">
-          <Button variant="outline" disabled={busy} onClick={() => run(cancelRestore)}>
+          <Button variant="outline" disabled={busy} onClick={() => run(openWithoutRestoring)}>
             Cancel restore
           </Button>
           <Button autoFocus disabled={busy} onClick={() => run(retryRestore)}>

@@ -8,6 +8,7 @@ import {
   seedRestorePlan,
   stageRestoredSnapshot,
   watchResume,
+  type RestorePlan,
 } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
@@ -32,14 +33,19 @@ import {
   registerTitleHandler,
 } from "./osc-handlers";
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
+import { IS_WINDOWS } from "@/lib/platform";
+import { getPendingRestore, setPendingRestore } from "./pendingRestore";
 import { openPty, type PtySession } from "./pty-bridge";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
 import {
   decideStart,
   needsDirCheck,
-  cancelRestoreFlow,
   openFailureBlock,
+  openWithoutRestoringFlow,
+  pendingAfterDirCheck,
+  pendingAfterPlan,
   retryRestoreFlow,
+  type PendingOutcome,
   type RestoreActionDeps,
   type RestoreBlock,
 } from "./restoreStart";
@@ -916,10 +922,13 @@ function subscribeRestoreBlock(leafId: string, cb: () => void): () => void {
   };
 }
 
-function blockStart(leafId: string, s: Session, block: RestoreBlock): void {
+// `restorable` is false for a PTY open failure: there is no terminal to continue in, so only
+// the modal (Try again) applies and nothing is left pending.
+function blockStart(leafId: string, s: Session, block: RestoreBlock, restorable: boolean): void {
   s.ptyOpening = false;
   console.error(`[kex] terminal start blocked for tab ${leafId}: ${block.reason}`);
   if (block.agent) useAgentStore.getState().setRestoreError(leafId, leafId, block.agent, block.reason);
+  if (restorable) setPendingRestore(leafId, block);
   setRestoreBlock(leafId, s, block);
 }
 
@@ -958,7 +967,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     return;
   }
   if (decision.kind === "blocked") {
-    blockStart(leafId, s, decision.block);
+    blockStart(leafId, s, decision.block, true);
     return;
   }
 
@@ -976,7 +985,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
     // back to the saved command.
     const agent = decision.inject === "resume" ? plan?.agent : undefined;
-    blockStart(leafId, s, openFailureBlock(e, decision.cwd, command, agent));
+    blockStart(leafId, s, openFailureBlock(e, decision.cwd, command, agent), false);
     return;
   }
   s.ptyOpening = false;
@@ -984,6 +993,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     pty.close();
     return;
   }
+  if (!plain) setPendingRestore(leafId, null);
   s.pty = pty;
   if (s.pendingInput) {
     void pty.write(s.pendingInput);
@@ -1015,9 +1025,48 @@ export async function retryRestore(leafId: string): Promise<void> {
   if (s) await retryRestoreFlow(s, restoreActionDeps(leafId, s));
 }
 
-export async function cancelRestore(leafId: string): Promise<void> {
+// Plain shell; the plan stays pending so the user can still run or discard it later.
+export async function openWithoutRestoring(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
-  if (s) await cancelRestoreFlow(s, restoreActionDeps(leafId, s));
+  if (s) await openWithoutRestoringFlow(s, restoreActionDeps(leafId, s));
+}
+
+// Runs a pending restore inside the live shell. No-op while there is no PTY.
+export async function retryPendingRestore(leafId: string): Promise<void> {
+  const s = sessions.get(leafId);
+  const block = getPendingRestore(leafId);
+  const pty = s?.pty;
+  if (!s || !pty || !block) return;
+  const agentStore = useAgentStore.getState();
+  let outcome: PendingOutcome;
+  let plan: RestorePlan | null = null;
+  if (block.agent) {
+    plan = await previewResumeCmd(leafId);
+    outcome = pendingAfterPlan(plan, IS_WINDOWS);
+  } else {
+    const problem = await invoke<string | null>("check_launch_dir", { path: block.dir }).catch(() => null);
+    outcome = pendingAfterDirCheck(block, problem, IS_WINDOWS);
+  }
+  if (s.disposed || s.pty !== pty) return;
+  if (outcome.kind === "blocked") {
+    setPendingRestore(leafId, outcome.block);
+    return;
+  }
+  setPendingRestore(leafId, null);
+  if (block.agent) agentStore.finish(leafId);
+  if (outcome.kind === "gone" || !plan) return;
+  stageRestoredSnapshot(leafId, plan);
+  watchResume(plan);
+  await writeWhenShellReady(s, leafId, pty, outcome.line);
+}
+
+// The only place besides agent exit and tab close that deletes the agent session from the store.
+export async function discardPendingRestore(leafId: string): Promise<void> {
+  const block = getPendingRestore(leafId);
+  setPendingRestore(leafId, null);
+  if (!block?.agent) return;
+  useAgentStore.getState().finish(leafId);
+  await detachAgentSession(leafId).catch((e) => console.error("[kex] detach failed:", e));
 }
 
 function detachSession(leafId: string): void {
@@ -1098,6 +1147,7 @@ export function disposeSession(leafId: string): void {
   s.pty = null;
   s.pendingInput = "";
   clearOscTitle(leafId);
+  setPendingRestore(leafId, null);
   sessions.delete(leafId);
   blockViewportListeners.delete(leafId);
   scratchpadListeners.delete(leafId);

@@ -3,11 +3,11 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { retryRestore, cancelRestore } = vi.hoisted(() => ({
+const { retryRestore, openWithoutRestoring } = vi.hoisted(() => ({
   retryRestore: vi.fn(() => Promise.resolve()),
-  cancelRestore: vi.fn(() => Promise.resolve()),
+  openWithoutRestoring: vi.fn(() => Promise.resolve()),
 }));
-vi.mock("./lib/useTerminalSession", () => ({ retryRestore, cancelRestore }));
+vi.mock("./lib/useTerminalSession", () => ({ retryRestore, openWithoutRestoring }));
 
 import { RestoreBlockedOverlay } from "./RestoreBlockedOverlay";
 
@@ -53,14 +53,14 @@ describe("RestoreBlockedOverlay", () => {
     const { container, unmount } = mount();
     await act(async () => button(container, "Try again").click());
     expect(retryRestore).toHaveBeenCalledWith("tab-1");
-    expect(cancelRestore).not.toHaveBeenCalled();
+    expect(openWithoutRestoring).not.toHaveBeenCalled();
     unmount();
   });
 
   it("Cancel restore cancels the leaf", async () => {
     const { container, unmount } = mount();
     await act(async () => button(container, "Cancel restore").click());
-    expect(cancelRestore).toHaveBeenCalledWith("tab-1");
+    expect(openWithoutRestoring).toHaveBeenCalledWith("tab-1");
     expect(retryRestore).not.toHaveBeenCalled();
     unmount();
   });
