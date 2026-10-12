@@ -2047,7 +2047,7 @@ export default function App() {
     destroyWorkspaceFloats,
   });
   const { requestHibernate, performHibernate, requestAutoHibernate } = hibernateFlow;
-  useAutoHibernate({ workspacesRef, activeWorkspaceIdRef, requestAutoHibernate });
+  useAutoHibernate({ workspacesRef, activeWorkspaceId, activeWorkspaceIdRef, requestAutoHibernate });
   const pendingHibernateRef = useRef<string | null>(null);
   pendingHibernateRef.current = hibernateFlow.pendingWorkspaceId;
   const { cancel: cancelHibernate } = hibernateFlow;

@@ -1,12 +1,14 @@
 import { useEffect, useRef } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { autoHibernateCandidates, touchActivity } from "./autoHibernate";
+import { autoHibernateTick, hibernatedIds, stampSwitch } from "./autoHibernate";
 import type { Workspace } from "./types";
+import { activityStamps, saveWorkspaceState } from "./workspaceState";
 
 const CHECK_EVERY_MS = 60_000;
 
 type Deps = {
   workspacesRef: { current: Workspace[] };
+  activeWorkspaceId: string | null;
   activeWorkspaceIdRef: { current: string | null };
   requestAutoHibernate: (workspaceId: string) => Promise<boolean>;
 };
@@ -16,28 +18,38 @@ export function useAutoHibernate(deps: Deps) {
   depsRef.current = deps;
   const mode = usePreferencesStore((s) => s.autoHibernate);
 
-  const seenRef = useRef(new Map<string, number>());
+  const previousActiveRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousActiveRef.current;
+    previousActiveRef.current = deps.activeWorkspaceId;
+    stampSwitch(activityStamps, depsRef.current.workspacesRef.current, previous, deps.activeWorkspaceId, Date.now());
+  }, [deps.activeWorkspaceId]);
+
+  const hibernatedSeenRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    const seen = seenRef.current;
+    hibernatedSeenRef.current ??= hibernatedIds(depsRef.current.workspacesRef.current);
     let running = false;
     const tick = async () => {
-      const { workspacesRef, activeWorkspaceIdRef, requestAutoHibernate } = depsRef.current;
-      const now = Date.now();
-      touchActivity(seen, workspacesRef.current, activeWorkspaceIdRef.current, now);
-      if (running) return;
+      const busy = running;
       running = true;
       try {
-        const due = autoHibernateCandidates(
-          workspacesRef.current,
-          activeWorkspaceIdRef.current,
-          seen,
+        const { workspacesRef, activeWorkspaceIdRef, requestAutoHibernate } = depsRef.current;
+        const workspaces = workspacesRef.current;
+        await autoHibernateTick({
+          workspaces,
+          activeId: activeWorkspaceIdRef.current,
+          stamps: activityStamps,
+          hibernatedSeen: hibernatedSeenRef.current!,
           mode,
-          now,
-        );
-        for (const id of due) await requestAutoHibernate(id);
+          busy,
+          now: Date.now(),
+          save: () =>
+            saveWorkspaceState(workspaces, workspaces.findIndex((w) => w.id === activeWorkspaceIdRef.current)),
+          request: requestAutoHibernate,
+        });
       } finally {
-        running = false;
+        if (!busy) running = false;
       }
     };
     void tick();

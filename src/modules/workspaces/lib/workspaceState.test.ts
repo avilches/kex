@@ -7,7 +7,10 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
 }));
 
 import {
+  activityStamps,
+  flushWorkspaceState,
   getSavedWorkspaceState,
+  saveWorkspaceState,
   initWorkspaceState,
   sanitizeTab,
   sanitizeWorkspace,
@@ -102,5 +105,39 @@ describe("initWorkspaceState", () => {
   it("hibernates nothing when restoreAll is true", async () => {
     await initWorkspaceState(true);
     expect(getSavedWorkspaceState()!.workspaces.some((w) => w.hibernated)).toBe(false);
+  });
+});
+
+describe("activity stamps glue", () => {
+  const body = (id: string, over: Partial<Workspace> = {}): Workspace => ({
+    id,
+    title: id,
+    paneTree: { kind: "pane", id: `p-${id}`, tabs: [], activeTabId: null },
+    activePaneId: `p-${id}`,
+    ...over,
+  });
+
+  beforeEach(() => {
+    invokeMock.mockReset();
+    activityStamps.clear();
+  });
+
+  it("seeds activityStamps from the saved lastActiveAt on startup", async () => {
+    invokeMock.mockResolvedValueOnce({
+      workspaces: [body("a", { lastActiveAt: 10 }), body("b")],
+      activeIndex: 0,
+    });
+    await initWorkspaceState(true);
+    expect([...activityStamps]).toEqual([["a", 10]]);
+  });
+
+  it("merges the live stamps into the saved bodies", async () => {
+    invokeMock.mockResolvedValue(undefined);
+    activityStamps.set("a", 42);
+    saveWorkspaceState([body("a"), body("b")], 0);
+    await flushWorkspaceState();
+    const args = invokeMock.mock.calls.find((c) => c[0] === "window_save_workspace_state")![1];
+    expect(args.workspaces[0].lastActiveAt).toBe(42);
+    expect(args.workspaces[1].lastActiveAt).toBeUndefined();
   });
 });
