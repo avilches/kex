@@ -51,6 +51,12 @@ describe("RestoreBlockedOverlay", () => {
     unmount();
   });
 
+  it("focuses Try again on mount", () => {
+    const { container, unmount } = mount();
+    expect(document.activeElement).toBe(button(container, "Try again"));
+    unmount();
+  });
+
   it("Try again retries the leaf", async () => {
     const { container, unmount } = mount();
     await act(async () => button(container, "Try again").click());
