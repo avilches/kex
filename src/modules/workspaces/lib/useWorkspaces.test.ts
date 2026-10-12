@@ -648,26 +648,29 @@ describe("seedWakePlans", () => {
 });
 
 describe("runOnce", () => {
-  it("ignores a second call for the same key while the first is in flight", async () => {
-    const inFlight = new Set<string>();
+  it("runs the task once and hands the in-flight promise to a second caller", async () => {
+    const inFlight = new Map<string, Promise<void>>();
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     let runs = 0;
+    let done = false;
     const task = async () => {
       runs++;
       await gate;
+      done = true;
     };
     const first = runOnce(inFlight, "w1", task);
-    await runOnce(inFlight, "w1", task);
+    const second = runOnce(inFlight, "w1", task).then(() => done);
     expect(runs).toBe(1);
     release();
     await first;
+    expect(await second).toBe(true);
     await runOnce(inFlight, "w1", task);
     expect(runs).toBe(2);
   });
 
   it("frees the key when the task throws", async () => {
-    const inFlight = new Set<string>();
+    const inFlight = new Map<string, Promise<void>>();
     await expect(runOnce(inFlight, "w1", async () => { throw new Error("x"); })).rejects.toThrow("x");
     expect(inFlight.size).toBe(0);
   });
