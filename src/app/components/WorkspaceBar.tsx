@@ -351,6 +351,7 @@ function SortableWorkspaceItem({
         hoverSwitch?.leave(ws.id);
       }}
     >
+      <PopoverAnchor asChild>
       <div className="relative -mx-1.5 px-1.5">
         <button
           type="button"
@@ -457,6 +458,7 @@ function SortableWorkspaceItem({
           />
         )}
       </div>
+      </PopoverAnchor>
       <SlideReveal open={expanded}>
         <WorkspaceDetailList
           workspaceId={ws.id}
@@ -479,7 +481,7 @@ function SortableWorkspaceItem({
     >
       <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <ContextMenuTrigger asChild>
-          <PopoverAnchor asChild>{button}</PopoverAnchor>
+          {button}
         </ContextMenuTrigger>
         <ContextMenuContent
           onCloseAutoFocus={(e) => {
