@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   canDropTabOnWorkspace,
+  draggedId,
+  sidebarTabDragId,
+  tabDropRoute,
   HIBERNATED_DROP_PREFIX,
   originToRestore,
   resolveSideRowDrop,
@@ -190,5 +193,25 @@ describe("sidebar row drops", () => {
   it("drops at the start of the first pane above the first row", () => {
     expect(resolveSideRowDrop(row("t1", null), "before", workspaces)).toBe("pane-index:pa1:0");
     expect(resolveSideRowDrop({ ...row("t1", null), workspaceId: "nope" }, "before", workspaces)).toBeNull();
+  });
+});
+
+describe("dragged tab id", () => {
+  it("strips the sidebar row prefix so a row drag matches the tab id", () => {
+    expect(draggedId(sidebarTabDragId("tab-1"))).toBe("tab-1");
+    expect(draggedId("tab-1")).toBe("tab-1");
+    expect(draggedId("file:/a")).toBe("file:/a");
+  });
+});
+
+describe("tabDropRoute", () => {
+  it("prefers a sidebar row over a workspace over a pane zone", () => {
+    expect(tabDropRoute({ isTabDrag: true, overSideRow: true, barWorkspaceId: "w" })).toBe("side-row");
+    expect(tabDropRoute({ isTabDrag: true, overSideRow: false, barWorkspaceId: "w" })).toBe("workspace");
+    expect(tabDropRoute({ isTabDrag: true, overSideRow: false, barWorkspaceId: null })).toBe("zone");
+  });
+
+  it("sends non-tab drags to the zone handlers", () => {
+    expect(tabDropRoute({ isTabDrag: false, overSideRow: true, barWorkspaceId: "w" })).toBe("zone");
   });
 });

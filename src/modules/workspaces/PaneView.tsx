@@ -5,6 +5,7 @@ import { EmptyPaneWelcome, type WelcomeActions } from "./EmptyPaneWelcome";
 import { PaneTabBar } from "./PaneTabBar";
 import { FloatingTabNote, TAB_NOTE_ATTR } from "./FloatingTabNote";
 import { hideTabNote } from "./lib/tabNote";
+import { draggedId } from "./lib/tabDrop";
 import { useNotePreview } from "./lib/useNotePreview";
 import { TabContent } from "./TabContent";
 import type { TabCallbacks } from "./TabContent";
@@ -230,7 +231,7 @@ export const PaneView = memo(function PaneView({
   useDndMonitor({
     onDragStart: (event) => {
       setIsDragging(true);
-      setDraggedTabId(String(event.active.id));
+      setDraggedTabId(draggedId(event.active.id));
     },
     onDragEnd: () => { setIsDragging(false); setDraggedTabId(null); },
     onDragCancel: () => { setIsDragging(false); setDraggedTabId(null); },

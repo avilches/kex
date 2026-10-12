@@ -21,11 +21,14 @@ import { tabForDroppedPath } from "./lib/dropTab";
 import { allPanes, findOpenPathTab, findTabPane } from "./lib/splitNode";
 import {
   canDropTabOnWorkspace,
+  draggedId,
   originToRestore,
   resolveSideRowDrop,
   resolveTabDrop,
   SIDE_ROW_DROP_PREFIX,
   sideRowSide,
+  sidebarTabDragId,
+  tabDropRoute,
   type SideRowDropData,
   type TabLocation,
 } from "./lib/tabDrop";
@@ -109,22 +112,10 @@ function isBarDrag(active: BarDragSource): boolean {
   return type === "workspace" || type === "group";
 }
 
-// A row of the WorkspaceBar and the tab it shows in a pane are both draggable
-// and share this context, so the row needs its own draggable id or dnd-kit
-// would track whichever node registered last.
-const SIDEBAR_TAB_PREFIX = "side-tab:";
-
-export function sidebarTabDragId(tabId: string): string {
-  return SIDEBAR_TAB_PREFIX + tabId;
-}
+export { sidebarTabDragId };
 
 function sideRowData(data: Record<string, unknown> | undefined): SideRowDropData | null {
   return data?.sideRow === true ? (data as unknown as SideRowDropData) : null;
-}
-
-function draggedId(id: string | number): string {
-  const s = String(id);
-  return s.startsWith(SIDEBAR_TAB_PREFIX) ? s.slice(SIDEBAR_TAB_PREFIX.length) : s;
 }
 
 // A row of the WorkspaceBar is much wider than its ghost, so the overlay is
@@ -367,7 +358,12 @@ export function WorkspaceDndProvider({
     const { active, over } = event;
     // The rows sit inside their workspace's hover area, so a row drop must win over the workspace drop.
     const sideRow = draggingItem?.kind === "tab" ? sideRowData(over?.data.current) : null;
-    if (sideRow && over) {
+    const route = tabDropRoute({
+      isTabDrag: draggingItem?.kind === "tab",
+      overSideRow: sideRow !== null && over !== null,
+      barWorkspaceId,
+    });
+    if (route === "side-row" && sideRow && over) {
       const pointer = getEventCoordinates(event.activatorEvent);
       const side = sideRowSide(over.rect, (pointer?.y ?? 0) + event.delta.y);
       const rowOverId = resolveSideRowDrop(sideRow, side, workspaces);
@@ -380,7 +376,7 @@ export function WorkspaceDndProvider({
       else void placed.then((ok) => restoreOrigin(ok, originId));
       return;
     }
-    if (barWorkspaceId && draggingItem?.kind === "tab") {
+    if (route === "workspace" && barWorkspaceId) {
       const source = idx.get(draggedId(active.id));
       const target = workspaces.find((w) => w.id === barWorkspaceId);
       if (!source || !target || !canDropTabOnWorkspace(source.wsId, target)) {
