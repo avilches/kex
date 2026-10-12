@@ -143,3 +143,34 @@ export function resolveSideRowDrop(
   const first = ws ? allPanes(ws.paneTree)[0] : undefined;
   return first ? `${PANE_INDEX_PREFIX}${first.id}:0` : null;
 }
+
+// A row of the WorkspaceBar and the tab it shows in a pane are both draggable
+// and share one DndContext, so the row needs its own draggable id or dnd-kit
+// would track whichever node registered last.
+const SIDEBAR_TAB_PREFIX = "side-tab:";
+
+export function sidebarTabDragId(tabId: string): string {
+  return SIDEBAR_TAB_PREFIX + tabId;
+}
+
+// The id of the dragged entity with the sidebar-row prefix stripped, so every
+// consumer of a drag event compares the same tab id.
+export function draggedId(id: string | number): string {
+  const s = String(id);
+  return s.startsWith(SIDEBAR_TAB_PREFIX) ? s.slice(SIDEBAR_TAB_PREFIX.length) : s;
+}
+
+export type TabDropRoute = "side-row" | "workspace" | "zone";
+
+// A row sits inside its workspace's hover area, so a row drop wins over the
+// workspace drop, and both win over the pane zone under the pointer.
+export function tabDropRoute(opts: {
+  isTabDrag: boolean;
+  overSideRow: boolean;
+  barWorkspaceId: string | null;
+}): TabDropRoute {
+  if (!opts.isTabDrag) return "zone";
+  if (opts.overSideRow) return "side-row";
+  if (opts.barWorkspaceId) return "workspace";
+  return "zone";
+}

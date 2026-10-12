@@ -111,8 +111,10 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
         if (res.kind === "text") {
           const unflushed = takeUnflushedBuffer(tabId);
           savedRef.current = res.content;
-          bufferRef.current = unflushed ?? res.content;
-          setDirty(unflushed != null && unflushed !== res.content);
+          bufferRef.current = unflushed?.text ?? res.content;
+          const stillDirty = unflushed != null && unflushed.text !== res.content;
+          setDirty(stillDirty);
+          if (stillDirty && unflushed.conflict) setConflict(true);
           setDoc({
             status: "ready",
             content: bufferRef.current,
@@ -295,7 +297,7 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
             stashUnflushedBuffer(tabId, content);
           });
         } else {
-          stashUnflushedBuffer(tabId, content);
+          stashUnflushedBuffer(tabId, content, conflictRef.current);
         }
       }
     };

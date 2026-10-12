@@ -27,6 +27,7 @@ function makeDeps(
     saveTab: async (id) => {
       saved.push(id);
     },
+    reportSaveError: () => {},
     closeTab: (id) => {
       closed.push(id);
     },
@@ -142,20 +143,6 @@ describe("runCloseQueue", () => {
     expect(closed).toEqual(["a"]);
   });
 
-  it("with autosave on, a failed save throws and does not close the tab", async () => {
-    const { deps, closed } = makeDeps(
-      { a: { kind: "editor", dirty: true } },
-      {
-        isAutoSaveEnabled: () => true,
-        saveTab: async () => {
-          throw new Error("write failed");
-        },
-      },
-    );
-    await expect(runCloseQueue(["a"], deps)).rejects.toThrow("write failed");
-    expect(closed).toEqual([]);
-  });
-
   it("cancel on a dirty editor stops the queue", async () => {
     const { deps, closed } = makeDeps(
       { a: { kind: "editor", dirty: true }, b: { kind: "terminal" } },
@@ -174,20 +161,6 @@ describe("runCloseQueue", () => {
     await runCloseQueue(["a"], deps);
     expect(ask).not.toHaveBeenCalled();
     expect(closed).toEqual(["a"]);
-  });
-
-  it("a failed save throws and does not close the tab", async () => {
-    const { deps, closed } = makeDeps(
-      { a: { kind: "editor", dirty: true } },
-      {
-        askEditorClose: async () => ({ type: "save" }),
-        saveTab: async () => {
-          throw new Error("write failed");
-        },
-      },
-    );
-    await expect(runCloseQueue(["a"], deps)).rejects.toThrow("write failed");
-    expect(closed).toEqual([]);
   });
 
   it("asks before closing a dirty markdown tab, same as a dirty editor tab", async () => {
@@ -222,5 +195,25 @@ describe("runCloseQueue", () => {
     await runCloseQueue(["a"], deps);
     expect(ask).not.toHaveBeenCalled();
     expect(closed).toEqual(["a"]);
+  });
+
+  it("keeps a dirty tab open and reports when saving fails", async () => {
+    const reported: unknown[] = [];
+    const err = new Error("conflict");
+    for (const autoSave of [true, false]) {
+      const { deps, closed } = makeDeps(
+        { a: { kind: "editor", dirty: true }, b: { kind: "terminal" } },
+        {
+          isAutoSaveEnabled: () => autoSave,
+          saveTab: async () => {
+            throw err;
+          },
+          reportSaveError: (_id, e) => reported.push(e),
+        },
+      );
+      expect(await runCloseQueue(["a", "b"], deps)).toBe(false);
+      expect(closed).toEqual([]);
+    }
+    expect(reported).toEqual([err, err]);
   });
 });

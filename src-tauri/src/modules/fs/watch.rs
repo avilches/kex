@@ -14,6 +14,11 @@ use crate::modules::workspace::{resolve_path, WorkspaceEnv};
 const DEBOUNCE: Duration = Duration::from_millis(150);
 const MAX_WINDOW: Duration = Duration::from_millis(1000);
 
+// Upper bound on distinct watched directories: each one costs an OS watch handle
+// (inotify and kqueue both have per-user limits), and the explorer adds one per
+// expanded folder, so an unbounded caller could exhaust them for the whole machine.
+const MAX_WATCHES: usize = 2048;
+
 // Matched on the final path component. Never watched even when expanded: large
 // or generated trees where live updates cost more than they're worth.
 const SKIP_DIRS: &[&str] = &[
@@ -234,7 +239,13 @@ fn expand_aliases(paths: &mut HashSet<String>, aliases: &Aliases) {
                 continue;
             };
             for spelled in spellings.keys() {
-                extra.push(to_canon(Path::new(spelled).join(rel)));
+                // join("") appends a trailing slash, which would not equal the watched dir itself.
+                let aliased = if rel.as_os_str().is_empty() {
+                    Path::new(spelled).to_path_buf()
+                } else {
+                    Path::new(spelled).join(rel)
+                };
+                extra.push(to_canon(aliased));
             }
         }
     }
@@ -292,6 +303,25 @@ fn prepare_add(
         .collect()
 }
 
+// Directories already watched only gain a refcount, so only new ones count.
+fn check_capacity(watched: usize, new_dirs: usize) -> Result<(), String> {
+    if watched + new_dirs > MAX_WATCHES {
+        return Err(format!(
+            "too many watched directories (limit {MAX_WATCHES})"
+        ));
+    }
+    Ok(())
+}
+
+fn count_new_dirs(inner: &WatchInner, prepared: &[(PathBuf, String)]) -> usize {
+    prepared
+        .iter()
+        .map(|(canonical, _)| canonical)
+        .filter(|c| !inner.refcounts.contains_key(*c))
+        .collect::<HashSet<_>>()
+        .len()
+}
+
 #[tauri::command]
 pub fn fs_watch_add(
     paths: Vec<String>,
@@ -307,6 +337,7 @@ pub fn fs_watch_add(
     ensure_started(&state, &app)?;
     let mut guard = state.inner.lock().expect("fs watch state poisoned");
     if let Some(inner) = guard.as_mut() {
+        check_capacity(inner.refcounts.len(), count_new_dirs(inner, &prepared))?;
         add_paths(inner, prepared);
     }
     Ok(())
@@ -347,6 +378,23 @@ mod tests {
         let prepared = prepare_add(&WorkspaceEnv::Local, vec![dir.to_string_lossy().into_owned()]);
         std::fs::remove_dir_all(&dir).ok();
         assert_eq!(prepared.len(), 1);
+    }
+
+    #[test]
+    fn capacity_rejects_going_over_the_limit() {
+        assert!(check_capacity(0, MAX_WATCHES).is_ok());
+        assert!(check_capacity(MAX_WATCHES, 0).is_ok());
+        assert!(check_capacity(MAX_WATCHES, 1).is_err());
+        assert!(check_capacity(MAX_WATCHES - 1, 2).is_err());
+    }
+
+    #[test]
+    fn expand_keeps_the_watched_directory_itself_without_a_trailing_slash() {
+        let aliases = aliases_of("/real/dir", "/link/dir");
+        let mut paths = HashSet::from(["/real/dir".to_string()]);
+        expand_aliases(&mut paths, &aliases);
+        assert!(paths.contains("/link/dir"));
+        assert!(!paths.contains("/link/dir/"));
     }
 
     #[test]

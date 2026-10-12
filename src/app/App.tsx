@@ -1968,23 +1968,26 @@ export default function App() {
     await editorHandles.current.get(tabId)?.save();
   }, []);
 
+  const reportSaveError = useCallback((tabId: string, err: unknown) => {
+    const tab = workspacesRef.current
+      .flatMap((w) => allPanes(w.paneTree))
+      .flatMap((p) => p.tabs)
+      .find((t) => t.id === tabId);
+    const name = tab && "path" in tab ? tab.path.split(/[\\/]/).pop() : tabId;
+    toast.error(`Could not save ${name}: ${err instanceof Error ? err.message : String(err)}`);
+  }, []);
+
   const saveTabReportingErrors = useCallback(
     async (tabId: string): Promise<string | null> => {
       try {
         await saveTab(tabId);
         return null;
       } catch (err) {
-        const tab = workspacesRef.current
-          .flatMap((w) => allPanes(w.paneTree))
-          .flatMap((p) => p.tabs)
-          .find((t) => t.id === tabId);
-        const name = tab && "path" in tab ? tab.path.split(/[\\/]/).pop() : tabId;
-        const reason = err instanceof Error ? err.message : String(err);
-        toast.error(`Could not save ${name}: ${reason}`);
-        return reason;
+        reportSaveError(tabId, err);
+        return err instanceof Error ? err.message : String(err);
       }
     },
-    [saveTab],
+    [saveTab, reportSaveError],
   );
 
   // Autosave-on-focus-loss: save every dirty editor (save() no-ops when clean).
@@ -2075,6 +2078,17 @@ export default function App() {
     return () => setEditorFlush(null);
   }, []);
 
+  const focusTab = useCallback(
+    (tabId: string) => {
+      const kind = findTabGlobal(tabId)?.tab.kind;
+      requestAnimationFrame(() => {
+        if (kind === "editor") editorHandles.current.get(tabId)?.focus();
+        else requestLeafFocus(tabId);
+      });
+    },
+    [findTabGlobal],
+  );
+
   const focusActiveTab = useCallback(() => {
     const ws = workspacesRef.current.find(
       (w) => w.id === activeWorkspaceIdRef.current,
@@ -2083,12 +2097,8 @@ export default function App() {
     const pane = findPane(ws.paneTree, ws.activePaneId);
     const tabId = pane?.activeTabId;
     if (!tabId) return;
-    const kind = findTabGlobal(tabId)?.tab.kind;
-    requestAnimationFrame(() => {
-      if (kind === "editor") editorHandles.current.get(tabId)?.focus();
-      else requestLeafFocus(tabId);
-    });
-  }, [findTabGlobal]);
+    focusTab(tabId);
+  }, [focusTab]);
 
   const handleMoveTabToWorkspace = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
@@ -2155,6 +2165,7 @@ export default function App() {
     },
     findTab: findTabGlobal,
     saveTab,
+    reportSaveError,
     focusActiveTab,
     isWarnEnabled: () =>
       usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,
@@ -3047,7 +3058,13 @@ export default function App() {
       },
       "tab.focusOnExplorer": focusActiveTabInExplorer,
       "tab.toggleAutofocus": () => {
-        if (autofocusMode === "always") return;
+        if (autofocusMode === "always") {
+          toast.info("Autofocus is set to Always, so it cannot be toggled per tab", {
+            description: "Change the mode in Settings > General > Autofocus.",
+            action: { label: "Open Settings", onClick: () => void openSettingsWindow("general") },
+          });
+          return;
+        }
         if (!activeTabId || !activeTab || !isAutofocusTab(activeTab)) return;
         const found = findTabGlobal(activeTabId);
         if (found)
@@ -3180,9 +3197,9 @@ export default function App() {
       if (!live) return;
       setActiveWorkspaceId(live);
       onActivateTabStable(live, tabId);
-      setTimeout(() => requestLeafFocus(tabId), 50);
+      setTimeout(() => focusTab(tabId), 50);
     },
-    [setActiveWorkspaceId, onActivateTabStable],
+    [setActiveWorkspaceId, onActivateTabStable, focusTab],
   );
 
   useEffect(() => {
