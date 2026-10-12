@@ -316,7 +316,7 @@ export async function collectRunningTerminals(
   ws: Workspace,
   getForegroundProcess: (tabId: string) => Promise<string | null>,
   getCommand: (tabId: string) => string | undefined,
-): Promise<{ tabId: string; label: string; title: string | undefined }[]> {
+): Promise<{ tabId: string; label: string; title: string | undefined; icon: string | undefined }[]> {
   const terminals = allPanes(ws.paneTree)
     .flatMap((p) => p.tabs)
     .filter((tab): tab is Extract<Tab, { kind: "terminal" }> => tab.kind === "terminal");
@@ -325,11 +325,11 @@ export async function collectRunningTerminals(
       const processName = await getForegroundProcess(tab.id);
       if (processName === null) return null;
       const label = getCommand(tab.id) ?? (processName || tab.title || "shell");
-      return { tabId: tab.id, label, title: tab.title };
+      return { tabId: tab.id, label, title: tab.title, icon: tab.icon };
     }),
   );
   return checked.filter(
-    (x): x is { tabId: string; label: string; title: string | undefined } => x !== null,
+    (x): x is { tabId: string; label: string; title: string | undefined; icon: string | undefined } => x !== null,
   );
 }
 

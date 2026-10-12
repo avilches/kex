@@ -227,10 +227,10 @@ describe("collectRunningTerminals", () => {
       (id) => commands.get(id),
     );
     expect(out).toEqual([
-      { tabId: "t1", label: "pnpm dev", title: undefined },
-      { tabId: "t2", label: "Build", title: "Build" },
-      { tabId: "t3", label: "vim", title: undefined },
-      { tabId: "t4", label: "shell", title: undefined },
+      { tabId: "t1", label: "pnpm dev", title: undefined, icon: undefined },
+      { tabId: "t2", label: "Build", title: "Build", icon: undefined },
+      { tabId: "t3", label: "vim", title: undefined, icon: undefined },
+      { tabId: "t4", label: "shell", title: undefined, icon: undefined },
     ]);
   });
 

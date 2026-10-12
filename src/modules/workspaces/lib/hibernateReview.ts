@@ -25,6 +25,7 @@ export type BusyRow = {
   name: string;
   command?: string;
   agent?: string;
+  icon?: string;
   stopping: boolean;
   runOnStart: boolean;
 };
@@ -71,6 +72,7 @@ export function hibernateReview(ws: Workspace, live: HibernateLive): HibernateRe
         kind: "agent",
         name: tab.title ?? agent.agent,
         agent: agent.agent,
+        icon: tab.icon,
         stopping: false,
         runOnStart: !comesBack(tab, agent.resumable),
       });
