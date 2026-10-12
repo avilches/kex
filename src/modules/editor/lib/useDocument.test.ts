@@ -380,6 +380,28 @@ describe("useDocument reload", () => {
     second.unmount();
   });
 
+  it("keeps an unresolved disk conflict across a remount of the same tab", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const first = mountUseDocument("/tmp/c.txt", "tab-c");
+    await flush();
+    act(() => {
+      first.hook.onChange("local edit");
+    });
+    act(() => {
+      first.hook.reload();
+    });
+    expect(first.hook.conflict).toBe(true);
+    first.unmount();
+
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "changed outside", size: 15 });
+    const second = mountUseDocument("/tmp/c.txt", "tab-c");
+    await flush();
+    expect(second.hook.dirty).toBe(true);
+    expect(second.hook.conflict).toBe(true);
+    await expect(second.hook.save()).rejects.toThrow(CONFLICT_SAVE_ERROR);
+    second.unmount();
+  });
+
   it("keeps two tabs on the same path from stomping each other's unflushed buffer", async () => {
     // The same file can be open in two tabs (different panes or workspaces)
     // at once; the unflushed-buffer cache must be keyed by tab identity, not

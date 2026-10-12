@@ -9,8 +9,13 @@ import {
 describe("unflushedBuffers", () => {
   it("returns and removes a stashed buffer", () => {
     stashUnflushedBuffer("t1", "text");
-    expect(takeUnflushedBuffer("t1")).toBe("text");
+    expect(takeUnflushedBuffer("t1")).toEqual({ text: "text", conflict: false });
     expect(hasUnflushedBuffer("t1")).toBe(false);
+  });
+
+  it("carries the conflict flag with the buffer", () => {
+    stashUnflushedBuffer("t1", "text", true);
+    expect(takeUnflushedBuffer("t1")).toEqual({ text: "text", conflict: true });
   });
 
   it("discards the carried edits of the given tabs only", () => {
