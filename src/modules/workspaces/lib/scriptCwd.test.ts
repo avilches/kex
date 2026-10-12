@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -8,6 +8,8 @@ import {
   isSafeScriptCwd,
   planReusedTabInput,
   resolveScriptCwd,
+  scriptCwdProblem,
+  scriptFolderMissingMessage,
   scriptShellFor,
 } from "./scriptCwd";
 
@@ -102,14 +104,14 @@ describe("buildScriptInput", () => {
 
   it("groups the command after && on posix, quoting the path", () => {
     expect(buildScriptInput("pnpm dev", "/a b/it's", "posix")).toBe(
-      "cd '/a b/it'\\''s' && { pnpm dev\n\n}\r",
+      "cd -- '/a b/it'\\''s' && { pnpm dev\n\n}\r",
     );
   });
 
   it("keeps $, backtick, double quote and % literal on posix", () => {
     for (const p of ["/a/$HOME", "/a/`x`", '/a/"q"', "/a/%PATH%"]) {
       expect(buildScriptInput("ls", p, "posix")).toBe(
-        `cd '${p}' && { ls\n\n}\r`,
+        `cd -- '${p}' && { ls\n\n}\r`,
       );
     }
   });
@@ -235,6 +237,95 @@ describe.skipIf(!hasBash)("posix input run by a non-interactive bash", () => {
   });
 });
 
+describe("scriptCwdProblem", () => {
+  it("accepts absolute posix, drive and UNC folders", () => {
+    for (const p of ["/a", "/a b/-x", "C:/a", "C:\\a", "\\\\host\\share"]) {
+      expect(scriptCwdProblem(p)).toBeNull();
+    }
+  });
+
+  it("rejects ~, relative, dash-leading and control-character folders", () => {
+    for (const p of ["~", "~/x", "-x", "-", ".", "../x", "x/y", "/a\nb"]) {
+      expect(scriptCwdProblem(p)).not.toBeNull();
+      expect(() => buildScriptInput("ls", p, "posix")).toThrow();
+      expect(() => buildScriptInput("ls", p, "powershell")).toThrow();
+    }
+  });
+});
+
+describe("scriptFolderMissingMessage", () => {
+  it("is null for a folder", () => {
+    expect(scriptFolderMissingMessage("/a", { kind: "dir" })).toBeNull();
+  });
+
+  it("explains a missing folder and a file", () => {
+    expect(scriptFolderMissingMessage("/a", null)).toContain("does not exist");
+    expect(scriptFolderMissingMessage("/a", { kind: "file" })).toContain("not a folder");
+  });
+});
+
+const hasShell = (name: string) =>
+  process.platform !== "win32" &&
+  spawnSync(name, ["-c", "exit 0"]).status === 0;
+
+const awkwardFolders = [
+  "it's here",
+  "with space",
+  "$HOME",
+  "back`tick`",
+  'double"quote',
+  "double\\\\backslash",
+  "caf\u00e9 \u65e5\u672c",
+  "-dash",
+  "trailing\\",
+];
+
+for (const shell of ["bash", "zsh"]) {
+  describe.skipIf(!hasShell(shell))(`generated input run by ${shell}`, () => {
+    for (const name of awkwardFolders) {
+      it(`reaches the folder intact: ${JSON.stringify(name)}`, () => {
+        const base = mkdtempSync(join(tmpdir(), "kex-quote-"));
+        try {
+          const folder = join(base, name);
+          mkdirSync(folder);
+          const out = join(base, "out");
+          mkdirSync(out);
+          const input = buildScriptInput(
+            `pwd -P > ${out}/pwd; echo ran > ${out}/ran`,
+            folder,
+            "posix",
+          ).replace(/\r$/, "\n");
+          const res = spawnSync(shell, ["-c", input], { cwd: base });
+          expect(res.stderr.toString()).toBe("");
+          expect(res.status).toBe(0);
+          expect(readFileSync(join(out, "pwd"), "utf8").trimEnd()).toBe(
+            realpathSync(folder),
+          );
+          expect(readFileSync(join(out, "ran"), "utf8")).toBe("ran\n");
+        } finally {
+          rmSync(base, { recursive: true, force: true });
+        }
+      });
+    }
+
+    it("runs nothing when the folder does not exist", () => {
+      const base = mkdtempSync(join(tmpdir(), "kex-quote-"));
+      try {
+        const input = buildScriptInput(
+          `echo ran > ${base}/ran`,
+          join(base, "gone"),
+          "posix",
+        ).replace(/\r$/, "\n");
+        const res = spawnSync(shell, ["-c", input], { cwd: base });
+        expect(res.status).not.toBe(0);
+        expect(existsSync(join(base, "ran"))).toBe(false);
+      } finally {
+        rmSync(base, { recursive: true, force: true });
+      }
+    });
+  });
+}
+
 describe("planReusedTabInput", () => {
   it("writes nothing when the tab is busy", () => {
     expect(planReusedTabInput(true, "ls", "/a", "posix")).toBeNull();
@@ -242,7 +333,7 @@ describe("planReusedTabInput", () => {
 
   it("cds first on an idle tab whenever a folder resolves", () => {
     expect(planReusedTabInput(false, "ls", "/a", "posix")).toBe(
-      "cd '/a' && { ls\n\n}\r",
+      "cd -- '/a' && { ls\n\n}\r",
     );
   });
 

@@ -196,9 +196,10 @@ import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
   buildScriptInput,
-  isSafeScriptCwd,
   planReusedTabInput,
   resolveScriptCwd,
+  scriptCwdProblem,
+  scriptFolderMissingMessage,
   scriptShellFor,
   type ScriptShell,
 } from "@/modules/workspaces/lib/scriptCwd";
@@ -790,11 +791,21 @@ export default function App() {
         !!config.tabId &&
         !!findTabGlobal(config.tabId) &&
         !!getScriptRunningSnapshot().get(config.tabId);
-      if (scriptCwd && !isSafeScriptCwd(scriptCwd) && !busyReusedTab) {
-        toast.error("Script not run: the folder name has control characters", {
-          duration: 4000,
-        });
+      const cwdProblem = scriptCwd ? scriptCwdProblem(scriptCwd) : null;
+      if (cwdProblem && !busyReusedTab) {
+        toast.error(`Script not run: ${cwdProblem}`, { duration: 4000 });
         return;
+      }
+      // The typed cd already keeps the command from running in a missing
+      // folder; this only tells the user why nothing happened.
+      if (scriptCwd && !busyReusedTab) {
+        void native
+          .fsStat(scriptCwd)
+          .catch(() => null)
+          .then((stat) => {
+            const msg = scriptFolderMissingMessage(scriptCwd, stat);
+            if (msg) toast.error(msg, { duration: 6000 });
+          });
       }
       const userLeafId = focusedTabId(activeWorkspace.paneTree, userPaneId);
 
@@ -893,7 +904,7 @@ export default function App() {
       setScriptRunning(freshTabId, "running");
       scheduleScriptWrite(
         freshTabId,
-        buildScriptInput(config.command, undefined, scriptShell),
+        buildScriptInput(config.command, scriptCwd, scriptShell),
         150,
       );
     },
