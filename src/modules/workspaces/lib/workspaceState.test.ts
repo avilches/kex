@@ -27,10 +27,9 @@ describe("isAutofocusActive", () => {
   const on: Tab = { ...off, autofocus: true };
   const web: Tab = { id: "b1", kind: "browser", url: "https://x" };
 
-  it("follows the per-tab flag in manual and new-tabs modes", () => {
+  it("follows the per-tab flag in manual mode", () => {
     expect(isAutofocusActive(on, "manual")).toBe(true);
     expect(isAutofocusActive(off, "manual")).toBe(false);
-    expect(isAutofocusActive(off, "new-tabs")).toBe(false);
   });
 
   it("is true for every capable tab in always mode, never for the rest", () => {

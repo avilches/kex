@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -5,6 +6,7 @@ import {
   type AutofocusMode,
   setAgentNotifications,
   setAutofocusMode,
+  setAutofocusNewTabs,
   setAutostart,
   setPreviewOnClick,
 } from "@/modules/settings/store";
@@ -20,6 +22,7 @@ import { SettingRow } from "../components/SettingRow";
 export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
+  const autofocusNewTabs = usePreferencesStore((s) => s.autofocusNewTabs);
   const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
@@ -99,15 +102,18 @@ export function GeneralSection() {
                 </span>
               </label>
             </div>
-            <div className="flex items-start gap-2">
-              <RadioGroupItem value="new-tabs" id="autofocus-new-tabs" className="mt-0.5" />
-              <label htmlFor="autofocus-new-tabs" className="cursor-pointer text-[12px]">
-                New tabs{" "}
-                <span className="text-[10.5px] text-muted-foreground">
-                  New tabs start with autofocus on; existing tabs keep their own setting
-                </span>
-              </label>
-            </div>
+            {autofocusMode === "manual" && (
+              <div className="ml-6 flex items-center gap-2">
+                <Checkbox
+                  id="autofocus-new-tabs"
+                  checked={autofocusNewTabs}
+                  onCheckedChange={(v) => void setAutofocusNewTabs(v === true)}
+                />
+                <label htmlFor="autofocus-new-tabs" className="cursor-pointer text-[12px]">
+                  Enable autofocus on new tabs
+                </label>
+              </div>
+            )}
             <div className="flex items-start gap-2">
               <RadioGroupItem value="always" id="autofocus-always" className="mt-0.5" />
               <label htmlFor="autofocus-always" className="cursor-pointer text-[12px]">
