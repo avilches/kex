@@ -10,6 +10,10 @@ export function getPendingRestore(leafId: string): RestoreBlock | null {
   return pending.get(leafId) ?? null;
 }
 
+export function pendingRestoreLeafIds(): string[] {
+  return [...pending.keys()];
+}
+
 export function setPendingRestore(leafId: string, block: RestoreBlock | null): void {
   if (block) pending.set(leafId, block);
   else if (!pending.delete(leafId)) return;

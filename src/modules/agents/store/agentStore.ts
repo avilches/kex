@@ -40,6 +40,8 @@ type AgentStoreState = {
     reason?: string,
   ) => void;
   clearRestored: (tabId: string) => void;
+  // Removes only a failed-restore placeholder, never a running session.
+  clearRestoreError: (tabId: string) => void;
   setMeta: (tabId: string, meta: Partial<AgentSessionMeta>) => void;
   reassignTabWorkspace: (tabId: string, workspaceId: string) => void;
   setLocalAgent: (state: LocalAgentState) => void;
@@ -167,6 +169,14 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
           },
         },
       };
+    }),
+
+  clearRestoreError: (tabId) =>
+    set((s) => {
+      if (!s.sessions[tabId]?.restoreError) return s;
+      const next = { ...s.sessions };
+      delete next[tabId];
+      return { sessions: next };
     }),
 
   clearRestored: (tabId) =>

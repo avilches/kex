@@ -162,3 +162,72 @@ export function pendingAfterDirCheck(
   if (problem) return { kind: "blocked", block: { ...block, reason: problem } };
   return { kind: "run", line: restoreCommandLine(block.dir, block.command, isWindows) };
 }
+
+export type PendingActionDeps = {
+  leafId: string;
+  getBlock: () => RestoreBlock | null;
+  setPending: (block: RestoreBlock | null) => void;
+  // A running agent in the shell means the plan is moot and its stored record is the live one.
+  isAgentRunning: () => boolean;
+  clearPlaceholder: () => void;
+};
+
+export type RetryPendingDeps = PendingActionDeps & {
+  isWindows: boolean;
+  previewPlan: () => Promise<RestorePlan | null>;
+  checkDir: (path: string) => Promise<string | null>;
+  // True once the tab was closed or its PTY replaced while a check was awaiting.
+  isStale: () => boolean;
+  markBlocked: (block: RestoreBlock) => void;
+  adopt: (plan: RestorePlan) => void;
+  write: (line: string) => Promise<void>;
+};
+
+const retrying = new Set<string>();
+
+export async function retryPendingFlow(d: RetryPendingDeps): Promise<void> {
+  const block = d.getBlock();
+  if (!block || retrying.has(d.leafId)) return;
+  if (d.isAgentRunning()) {
+    d.setPending(null);
+    return;
+  }
+  retrying.add(d.leafId);
+  try {
+    let plan: RestorePlan | null = null;
+    let outcome: PendingOutcome;
+    if (block.agent) {
+      plan = await d.previewPlan();
+      outcome = pendingAfterPlan(plan, d.isWindows);
+    } else {
+      outcome = pendingAfterDirCheck(block, await d.checkDir(block.dir), d.isWindows);
+    }
+    if (d.isStale()) return;
+    if (d.isAgentRunning()) {
+      d.setPending(null);
+      return;
+    }
+    if (outcome.kind === "blocked") {
+      d.setPending(outcome.block);
+      if (block.agent) d.markBlocked(outcome.block);
+      return;
+    }
+    d.setPending(null);
+    if (block.agent) d.clearPlaceholder();
+    if (outcome.kind !== "run") return;
+    if (plan) d.adopt(plan);
+    await d.write(outcome.line);
+  } finally {
+    retrying.delete(d.leafId);
+  }
+}
+
+export async function discardPendingFlow(
+  d: PendingActionDeps & { detach: () => Promise<void> },
+): Promise<void> {
+  const block = d.getBlock();
+  d.setPending(null);
+  if (!block?.agent || d.isAgentRunning()) return;
+  d.clearPlaceholder();
+  await d.detach();
+}

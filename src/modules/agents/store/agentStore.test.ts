@@ -1,6 +1,24 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { useAgentStore } from "./agentStore";
 
+describe("agentStore.clearRestoreError", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {} });
+  });
+
+  test("removes a restore-error placeholder", () => {
+    useAgentStore.getState().setRestoreError("tab-1", "tab-1", "claude", "gone");
+    useAgentStore.getState().clearRestoreError("tab-1");
+    expect(useAgentStore.getState().sessions).toEqual({});
+  });
+
+  test("never removes a running session", () => {
+    useAgentStore.getState().start("tab-1", "tab-1", "claude");
+    useAgentStore.getState().clearRestoreError("tab-1");
+    expect(useAgentStore.getState().sessions["tab-1"]).toBeDefined();
+  });
+});
+
 describe("agentStore.setMeta", () => {
   beforeEach(() => {
     useAgentStore.setState({ sessions: {} });
