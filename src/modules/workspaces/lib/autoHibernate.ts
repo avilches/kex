@@ -25,27 +25,57 @@ export function autoHibernateDelayMs(mode: AutoHibernate): number | null {
   return mode === "off" ? null : DELAY_MS[mode];
 }
 
-// Loads the persisted stamps of a restored workspace list. A workspace without
-// one is left out and gets "now" in the first touchActivity.
-export function seedActivity(workspaces: readonly Workspace[]): Map<string, number> {
+function validStamp(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+// Loads the persisted stamps of a restored workspace list. A workspace without a
+// usable one is left out and gets "now" in the first touchActivity; a stamp from
+// the future (wrong clock) is clamped so it can never keep a workspace awake.
+export function seedActivity(workspaces: readonly Workspace[], now: number): Map<string, number> {
   const stamps = new Map<string, number>();
-  for (const w of workspaces) if (w.lastActiveAt !== undefined) stamps.set(w.id, w.lastActiveAt);
+  for (const w of workspaces) if (validStamp(w.lastActiveAt)) stamps.set(w.id, Math.min(w.lastActiveAt, now));
   return stamps;
 }
 
-// Keeps the last moment each workspace was the active one. The active one and
-// the hibernated ones are renewed, so waking a workspace restarts its clock;
-// one without a stamp (new, or saved before stamps existed) starts it now.
+export function hibernatedIds(workspaces: readonly Workspace[]): Set<string> {
+  return new Set(workspaces.filter((w) => w.hibernated).map((w) => w.id));
+}
+
+// Keeps the last moment each workspace was the active one. The awake active one is
+// renewed every tick. A hibernated workspace is stamped only when it changes state
+// (hibernated or woken, compared with `hibernatedSeen`, which this updates), so its
+// persisted body does not change every minute but waking it still restarts the clock.
+// One without a stamp (new, or saved before stamps existed) starts it now.
 export function touchActivity(
   stamps: Map<string, number>,
   workspaces: readonly Workspace[],
   activeId: string | null,
   now: number,
+  hibernatedSeen: Set<string>,
 ): void {
   const ids = new Set(workspaces.map((w) => w.id));
   for (const id of stamps.keys()) if (!ids.has(id)) stamps.delete(id);
+  for (const id of hibernatedSeen) if (!ids.has(id)) hibernatedSeen.delete(id);
   for (const w of workspaces) {
-    if (w.id === activeId || w.hibernated || !stamps.has(w.id)) stamps.set(w.id, now);
+    const asleep = !!w.hibernated;
+    const changed = hibernatedSeen.has(w.id) !== asleep;
+    if (asleep) hibernatedSeen.add(w.id);
+    else hibernatedSeen.delete(w.id);
+    if ((w.id === activeId && !asleep) || changed || !stamps.has(w.id)) stamps.set(w.id, now);
+  }
+}
+
+// The exact moment of a switch: the workspace left and the one entered, unless asleep.
+export function stampSwitch(
+  stamps: Map<string, number>,
+  workspaces: readonly Workspace[],
+  previousId: string | null,
+  nextId: string | null,
+  now: number,
+): void {
+  for (const id of [previousId, nextId]) {
+    if (id && workspaces.some((w) => w.id === id && !w.hibernated)) stamps.set(id, now);
   }
 }
 
@@ -57,8 +87,30 @@ export function withActivity(
 ): Workspace[] {
   return workspaces.map((w) => {
     const at = stamps.get(w.id);
-    return at === undefined ? w : { ...w, lastActiveAt: at };
+    return validStamp(at) ? { ...w, lastActiveAt: at } : w;
   });
+}
+
+export type AutoHibernateTick = {
+  workspaces: readonly Workspace[];
+  activeId: string | null;
+  stamps: Map<string, number>;
+  hibernatedSeen: Set<string>;
+  mode: AutoHibernate;
+  now: number;
+  save: () => void;
+  request: (workspaceId: string) => Promise<boolean>;
+  // A previous run is still hibernating; stamps are renewed and saved anyway.
+  busy?: boolean;
+};
+
+export async function autoHibernateTick(t: AutoHibernateTick): Promise<void> {
+  touchActivity(t.stamps, t.workspaces, t.activeId, t.now, t.hibernatedSeen);
+  t.save();
+  if (t.busy) return;
+  for (const id of autoHibernateCandidates(t.workspaces, t.activeId, t.stamps, t.mode, t.now)) {
+    await t.request(id);
+  }
 }
 
 export function autoHibernateCandidates(

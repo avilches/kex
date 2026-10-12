@@ -61,7 +61,7 @@ export async function initWorkspaceState(restoreAll: boolean): Promise<void> {
       : "null (no saved state)");
     if (entry && Array.isArray(entry.workspaces) && entry.workspaces.length > 0) {
       const sanitized = entry.workspaces.map(sanitizeWorkspace);
-      for (const [id, at] of seedActivity(sanitized)) activityStamps.set(id, at);
+      for (const [id, at] of seedActivity(sanitized, Date.now())) activityStamps.set(id, at);
       cached = {
         workspaces: applyStartupHibernation(sanitized, entry.activeIndex, restoreAll),
         activeIndex: entry.activeIndex,
