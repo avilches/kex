@@ -469,7 +469,7 @@ sits on top of the bar, the `DndContext` uses a custom `collisionDetection` that
 `pointerWithin` and promotes any `scratchpad:` collision to the front, so a path drop inserts a
 reference instead of opening a pane.
 
-**Tab drag**: `handleTabDragEnd` delegates to `resolveTabDrop` (`lib/tabDrop.ts`, pure). Given the
+**Tab drag**: a sidebar row drags under `side-tab:<tabId>`; every consumer of a drag event (the provider and `PaneView`'s own-only-tab check) must go through `draggedId` (`lib/tabDrop.ts`) to compare the real tab id. `tabDropRoute` fixes the preference order before anything else: sidebar row, then workspace in the bar, then the pane zone; `restoreOrigin` runs after each of them. `handleTabDragEnd` delegates to `resolveTabDrop` (`lib/tabDrop.ts`, pure). Given the
 `over` id, the dragged tab, every workspace and the drag index built at drag start, it returns one of
 four actions, or `null` when the drop does nothing:
 
