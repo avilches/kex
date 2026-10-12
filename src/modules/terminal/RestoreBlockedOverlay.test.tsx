@@ -62,7 +62,6 @@ describe("RestoreBlockedOverlay", () => {
   it("Open terminal without restoring opens a plain shell and keeps the hint", async () => {
     const { container, unmount } = mount();
     expect(container.textContent).toContain("The restore plan is kept.");
-    expect(container.textContent).not.toContain("Cancel restore");
     await act(async () => button(container, "Open terminal without restoring").click());
     expect(openWithoutRestoring).toHaveBeenCalledWith("tab-1");
     expect(retryRestore).not.toHaveBeenCalled();

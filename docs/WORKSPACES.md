@@ -155,8 +155,9 @@ Key fields of a `Session`:
 ### Blocked start
 
 A leaf whose start cannot happen (unusable restore directory, `openPty` failing) has no PTY and a non-null
-`Session.restoreBlock`; `attachSession` skips it. The modal that holds it covers that tab's content only. Flow, retry
-and cancel are described in `AGENT_SESSION_RESTORE.md`, "Blocked start".
+`Session.restoreBlock`; `attachSession` skips it. The modal that holds it covers that tab's content only. Flow, Try again,
+Open terminal without restoring and the pending restore (Retry restore / Discard restore plan in the Run on Start menu)
+are described in `AGENT_SESSION_RESTORE.md`, "Blocked start".
 
 ### Visible vs. hibernated
 

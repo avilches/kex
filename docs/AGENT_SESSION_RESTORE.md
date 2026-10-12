@@ -261,7 +261,7 @@ decision = decideStart(plan, persistentCommand, initialCwd, dirProblem)
                       writeWhenShellReady(pty, " " + plan.resumeCmd + "\r")
   spawn + command  -> open PTY at initialCwd, writeWhenShellReady(pty, persistentCommand + "\r")
   spawn + none     -> plain shell
-  blocked          -> no PTY; session.restoreBlock = { reason, dir, command, agent? }
+  blocked          -> no PTY; session.restoreBlock = { reason, dir, command, agent?, restorable }
 ```
 
 `dirProblem` comes from the `check_launch_dir` command and is only asked for a saved command without an agent plan
@@ -277,9 +277,35 @@ set. For an agent plan the tab also gets the `restoreError` placeholder (the `�
 - **Try again** (`retryRestore`): clears the block and the placeholder, fetches a fresh plan with `previewResumeCmd`
   (read-only, so the store entry survives a second failure), seeds it, and runs `startLeaf` again. Useful when the
   directory lives on a volume that was not mounted yet.
-- **Cancel restore** (`cancelRestore`): detaches the agent session from the store and opens a plain shell, in
-  `initialCwd` when that is usable and in the shell's default directory otherwise. The tab keeps its
-  `persistentCommand`, so the next launch tries again unless the user changes it.
+- **Open terminal without restoring** (`openWithoutRestoring`): opens a plain shell, in `initialCwd` when that is
+  usable and in the shell's default directory otherwise. It deletes nothing: the plan stays in `agent-sessions.json`
+  (or in the tab's `persistentCommand`), so it survives the plain shell and a Kex restart, and the next launch tries
+  again. The modal says so ("The restore plan is kept...").
+
+A PTY open failure (`openFailureBlock`, `restorable: false`) has no terminal to continue in, so its modal shows only
+Try again, without the hint, and leaves nothing pending. Every other block is `restorable: true`.
+
+#### Pending restore
+
+A pending restore is a restore plan that has not run and was not deleted. `blockStart` registers each restorable block
+in `pendingRestore.ts` (`setPendingRestore`, read in React with `usePendingRestore(leafId)`), apart from
+`Session.restoreBlock`, which is the modal and goes away when the user opens a plain shell. It is cleared when a start
+finally runs the plan, on Retry restore success, and on Discard restore plan.
+
+The `Run on Start` submenu (`RunOnStartMenu`) reacts to it:
+
+- The submenu trigger turns red (`text-destructive`).
+- The `Enabled` checkbox is not rendered (`runOnStartSections`): it makes no sense while a plan waits.
+- A red "Restore pending" block shows the reason and the command as it will be typed, two selectable mono lines:
+  `cd <dir>` and the command. It replaces the old red error text of the agent preview.
+- **Retry restore** (`retryPendingRestore`): works in the live shell. It rechecks the directory (a fresh plan with
+  `previewResumeCmd` for an agent, `check_launch_dir` for a saved command). If the problem persists the block stays
+  pending with the new reason; if the plan is gone it just clears; otherwise it types
+  ` cd <dir> && <command>` (joined with `; ` on Windows, where PowerShell 5.1 has no `&&`) once the shell is ready.
+  A rejection is logged with `console.error`.
+- **Discard restore plan** (`discardPendingRestore`): the only place besides agent exit and tab close that deletes the
+  agent entry from the store. For a saved command (no agent) it only forgets this start; `persistentCommand` is kept,
+  so the next launch tries it again.
 
 `restoreBlock` reaches React through `useSyncExternalStore` over a per-leaf listener map.
 
@@ -457,9 +483,12 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | Turn failed (`StopFailure`) or session ended (`SessionEnd`, incl. `/clear`, `/resume`) while the process lives | Store entry kept; the tab stays restorable |
 | Session started with `-p`/`--print` | `record_session` skips; session never written to store |
 | JSONL transcript missing (no messages sent) | Entry removed from store (unless the launch directory is unusable); `claude --session-id <id>` injected — new session reuses same UUID |
-| launch cwd deleted, not a folder, or unreadable | `resumeCmd` empty, `errorReason` and `attemptedCmd` set; no PTY, the tab is held on the Try again / Cancel restore modal and shows `⚠`; store entry kept |
+| launch cwd deleted, not a folder, or unreadable | `resumeCmd` empty, `errorReason` and `attemptedCmd` set; no PTY, the tab is held on the Try again / Open terminal without restoring modal and shows `⚠`; store entry kept |
 | saved command (no agent) whose directory is unusable | Same modal, built on the frontend from `check_launch_dir` |
-| `openPty` rejects at start | Same modal with the reason `Could not start the terminal: ...` |
+| `openPty` rejects at start | Modal with the reason `Could not start the terminal: ...` and only Try again; nothing is left pending |
+| Open terminal without restoring | Plain shell; plan kept and shown as pending in the Run on Start menu; survives a Kex restart |
+| Retry restore with the problem still there | Block stays pending with the new reason; nothing typed |
+| Discard restore plan on a saved command | Forgets this start only; `persistentCommand` kept |
 | session entered a worktree later deleted | restored in the worktree's `originalCwd` (from `worktree-state`), not in the worktree |
 | `KEX_TAB_ID` not set in shell | Hook exits silently; session not recorded |
 | `agent_session_restore_plan` IPC fails | `loadRestorePlans` catches and sets an empty Map; no crash |
