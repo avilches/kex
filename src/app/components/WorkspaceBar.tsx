@@ -273,21 +273,23 @@ function SortableWorkspaceItem({
   const expanded = showDetail && !!ws.detailExpanded && !ws.hibernated;
   const agentCount = activeAgentCount(agentEntries);
 
+  const sideControl =
+    "absolute top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+  const detailSpacer = showDetail ? <span aria-hidden className="size-[14px] shrink-0" /> : null;
   const detailToggle = showDetail ? (
-    <span
-      role="button"
-      aria-expanded={expanded}
+    <button
+      type="button"
+      aria-expanded={ws.hibernated ? undefined : expanded}
+      aria-label={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
       title={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
-      onPointerDown={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        e.stopPropagation();
+      onClick={() => {
         if (ws.hibernated) {
           onSetDetailExpanded(ws.id, true);
           onWake?.(ws.id);
         } else onSetDetailExpanded(ws.id, !expanded);
       }}
-      className="flex size-[14px] shrink-0 items-center justify-center rounded opacity-60 hover:opacity-100"
+      className={cn(sideControl, "left-4 size-[14px] opacity-60 hover:opacity-100 focus-visible:opacity-100")}
     >
       <HugeiconsIcon
         icon={ChevronRightIcon}
@@ -295,28 +297,26 @@ function SortableWorkspaceItem({
         strokeWidth={2}
         className={cn("transition-transform", expanded && "rotate-90")}
       />
-    </span>
+    </button>
   ) : null;
 
+  const agentLabel = agentEntries
+    ? agentEntries.length > 1
+      ? `${agentEntries.length} agents, click to visit the next`
+      : agentEntries[0].visual === "working"
+        ? "Agent working"
+        : "Agent needs you"
+    : "";
+  const agentSpacer = agentEntries && !compact ? <span aria-hidden className="size-[10px] shrink-0" /> : null;
   const agentIndicator = agentEntries ? (
-    <span
-      role="button"
-      title={
-        agentEntries.length > 1
-          ? `${agentEntries.length} agents, click to visit the next`
-          : agentEntries[0].visual === "working"
-            ? "Agent working"
-            : "Agent needs you"
-      }
-      onPointerDown={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        e.stopPropagation();
-        onJumpAgent(ws.id, agentEntries);
-      }}
+    <button
+      type="button"
+      title={agentLabel}
+      aria-label={agentLabel}
+      onClick={() => onJumpAgent(ws.id, agentEntries)}
       className={cn(
-        "flex shrink-0 items-center justify-center",
-        compact ? "absolute right-1 top-1 size-[10px]" : "size-[10px]",
+        "z-10 flex size-[10px] items-center justify-center rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        compact ? "absolute right-1 top-1" : "absolute right-4 top-1/2 -translate-y-1/2",
       )}
     >
       {agentEntries[0].visual === "working" ? (
@@ -331,7 +331,7 @@ function SortableWorkspaceItem({
           )}
         />
       )}
-    </span>
+    </button>
   ) : null;
 
   const button = (
@@ -409,7 +409,7 @@ function SortableWorkspaceItem({
             )
           ) : (
             <>
-              {detailToggle}
+              {detailSpacer}
               {ws.icon && getWorkspaceIcon(ws.icon) && (
                 <HugeiconsIcon
                   icon={getWorkspaceIcon(ws.icon)!}
@@ -419,22 +419,7 @@ function SortableWorkspaceItem({
                 />
               )}
               <span className="truncate">{ws.title || ws.kind}</span>
-              {ws.hibernated && (
-                <span
-                  role="button"
-                  title="Restore"
-                  className="group/wake ml-auto shrink-0 opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onWake?.(ws.id);
-                  }}
-                  onDoubleClick={(e) => e.stopPropagation()}
-                >
-                  <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="group-hover/wake:hidden" />
-                  <HugeiconsIcon icon={UploadCircle01Icon} size={13} strokeWidth={1.75} className="hidden group-hover/wake:block" />
-                </span>
-              )}
+              {ws.hibernated && <span aria-hidden className="ml-auto size-[13px] shrink-0" />}
               {agentCount > 0 && (
                 <span
                   title={`${agentCount} active ${agentCount === 1 ? "agent" : "agents"}`}
@@ -443,11 +428,27 @@ function SortableWorkspaceItem({
                   {agentCount}
                 </span>
               )}
-              {agentIndicator}
+              {agentSpacer}
             </>
           )}
         </button>
-        {agentIndicator && compact ? agentIndicator : null}
+        {!compact && detailToggle}
+        {!compact && ws.hibernated && (
+          <button
+            type="button"
+            title="Restore"
+            aria-label="Restore"
+            className={cn(
+              sideControl,
+              "group/wake right-4 opacity-0 transition-opacity group-hover:opacity-60 group-focus-within:opacity-60 hover:!opacity-100 focus-visible:!opacity-100",
+            )}
+            onClick={() => onWake?.(ws.id)}
+          >
+            <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="group-hover/wake:hidden group-focus-visible/wake:hidden" />
+            <HugeiconsIcon icon={UploadCircle01Icon} size={13} strokeWidth={1.75} className="hidden group-hover/wake:block group-focus-visible/wake:block" />
+          </button>
+        )}
+        {agentIndicator}
         {!active && displayColor && (
           <span
             className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"

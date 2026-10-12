@@ -2,7 +2,7 @@ import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { LockKeyIcon } from "@hugeicons/core-free-icons";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { PopoverAnchor } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import type { AgentEntry } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
+import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import type { Tab } from "@/modules/workspaces/lib/types";
 import { useSidebarTabMenu } from "@/modules/workspaces/SidebarTabMenuContext";
@@ -106,6 +107,7 @@ function DetailTabRow({
     disabled: !tabDragActive,
   });
 
+  const rowRef = useRef<HTMLButtonElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const closeSignal = useContextMenuCloseStore((s) => s.signal);
   // biome-ignore lint/correctness/useExhaustiveDependencies: closeSignal is a bump counter, only its change matters
@@ -114,7 +116,7 @@ function DetailTabRow({
   }, [closeSignal]);
 
   return (
-    <div ref={setDropRef} className="relative">
+    <div ref={setDropRef} className="group/tab relative">
       {insertSide && (
         <span
           className={cn(
@@ -134,15 +136,19 @@ function DetailTabRow({
         <ContextMenuTrigger asChild>
           <PopoverAnchor asChild>
             <button
-              ref={setNodeRef}
+              ref={(node) => {
+                rowRef.current = node;
+                setNodeRef(node);
+              }}
               {...attributes}
               {...listeners}
               type="button"
+              data-detail-row=""
               title={title}
               aria-current={focused || undefined}
               onClick={() => onActivate(tab.id)}
               className={cn(
-                "group/tab flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
+                "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
                 isDragging && "opacity-40",
                 focused
                   ? "bg-foreground/[0.16] font-medium text-foreground"
@@ -153,52 +159,50 @@ function DetailTabRow({
                 {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab, info?.isRunning)}
               </span>
               <span className="min-w-0 flex-1 truncate">{title}</span>
-              {isLocked ? (
-                // biome-ignore lint/a11y/useSemanticElements: a button cannot nest inside the row button
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  className="flex size-[16px] shrink-0 items-center justify-center rounded text-foreground transition-colors hover:bg-muted"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUpdateTab(tab.id, (p) => ({ ...p, locked: false }));
-                  }}
-                  title="Unlock tab"
-                >
-                  <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
-                </span>
-              ) : (
-                <span className="relative flex size-[16px] shrink-0 items-center justify-center">
-                  {visual !== null && (
-                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover/tab:opacity-0">
-                      <StatusMark visual={visual} />
-                    </span>
-                  )}
-                  {/* biome-ignore lint/a11y/useSemanticElements: a button cannot nest inside the row button */}
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    className="flex size-[16px] items-center justify-center rounded opacity-0 transition-opacity hover:bg-muted group-hover/tab:opacity-60 hover:!opacity-100"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClose(tab.id);
-                    }}
-                    title="Close tab"
-                  >
-                    <span className="text-[13px] leading-none">×</span>
-                  </span>
-                </span>
-              )}
+              <span aria-hidden className="size-[16px] shrink-0" />
             </button>
           </PopoverAnchor>
         </ContextMenuTrigger>
-        <ContextMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
+        <ContextMenuContent
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            // Opening the rename popover steals focus on purpose; any other
+            // close hands focus back to the row it was opened from.
+            if (useTabRenameStore.getState().renamingTabId !== tab.id) rowRef.current?.focus();
+          }}
+        >
           <DetailTabMenu tab={tab} workspaceId={workspaceId} onActivate={onActivate} />
         </ContextMenuContent>
       </ContextMenu>
     </TabRenamePopover>
+      {isLocked ? (
+        <button
+          type="button"
+          title="Unlock tab"
+          aria-label="Unlock tab"
+          className="absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
+          onClick={() => onUpdateTab(tab.id, (p) => ({ ...p, locked: false }))}
+        >
+          <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
+        </button>
+      ) : (
+        <>
+          {visual !== null && (
+            <span className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity group-focus-within/tab:opacity-0 group-hover/tab:opacity-0">
+              <StatusMark visual={visual} />
+            </span>
+          )}
+          <button
+            type="button"
+            title="Close tab"
+            aria-label="Close tab"
+            className="absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:bg-muted group-focus-within/tab:opacity-60 group-hover/tab:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+            onClick={() => onClose(tab.id)}
+          >
+            <span className="text-[13px] leading-none">×</span>
+          </button>
+        </>
+      )}
     </div>
   );
 }

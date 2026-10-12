@@ -29,6 +29,7 @@ function track(root: ReturnType<typeof createDomRoot>) {
     });
 }
 
+const wrap = (b: Element) => b.closest(".group\\/tab") as Element;
 const rowName = (b: Element) => b.querySelector(".truncate")?.textContent;
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -61,7 +62,7 @@ function mount(filter: Partial<DetailFilter>, focusedTabId: string | null = null
       }),
     );
   });
-  const rows = () => Array.from(container.querySelectorAll("button"));
+  const rows = () => Array.from(container.querySelectorAll("button[data-detail-row]"));
   return { container, rows, onActivate, unmount: track(root) };
 }
 
@@ -89,10 +90,10 @@ describe("WorkspaceDetailList", () => {
   it("all terminals lists every terminal, with a spinner for working and an amber dot for waiting", () => {
     const { rows, unmount } = mount({ terminals: "all" });
     expect(rows().map((b) => rowName(b))).toEqual(["api", "web", "docs", "shell"]);
-    expect(rows()[0].querySelector(".animate-spin")).not.toBeNull();
-    expect(rows()[1].querySelector(".bg-amber-400")).not.toBeNull();
-    expect(rows()[2].querySelector(".animate-spin, .bg-amber-400, .bg-destructive")).toBeNull();
-    expect(rows()[3].querySelector(".animate-spin, .bg-amber-400, .bg-destructive")).toBeNull();
+    expect(wrap(rows()[0]).querySelector(".animate-spin")).not.toBeNull();
+    expect(wrap(rows()[1]).querySelector(".bg-amber-400")).not.toBeNull();
+    expect(wrap(rows()[2]).querySelector(".animate-spin, .bg-amber-400, .bg-destructive")).toBeNull();
+    expect(wrap(rows()[3]).querySelector(".animate-spin, .bg-amber-400, .bg-destructive")).toBeNull();
     unmount();
   });
 
@@ -125,6 +126,19 @@ describe("WorkspaceDetailList", () => {
     resetAgents();
     const { container, unmount } = mount({ terminals: "active-agents" });
     expect(container.querySelector("button")).toBeNull();
+    unmount();
+  });
+});
+
+describe("WorkspaceDetailList row controls", () => {
+  it("renders the close control as a real button beside the row, reachable by keyboard", () => {
+    const { container, rows, unmount } = mount({ terminals: "all" });
+    const close = container.querySelectorAll<HTMLButtonElement>('button[aria-label="Close tab"]');
+    expect(close).toHaveLength(4);
+    for (const c of close) {
+      expect(c.tabIndex).toBe(0);
+      expect(rows().some((r) => r.contains(c))).toBe(false);
+    }
     unmount();
   });
 });
@@ -210,7 +224,7 @@ describe("WorkspaceDetailList context menu", () => {
         ),
       );
     });
-    const rows = () => Array.from(container.querySelectorAll("button"));
+    const rows = () => Array.from(container.querySelectorAll("button[data-detail-row]"));
     return { container, rows, unmount: track(root) };
   }
 
