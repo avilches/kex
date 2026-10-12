@@ -77,6 +77,7 @@ export type MarkdownTabHandle = {
   save(): Promise<void>;
   cycleView(): void;
   toggleOutline(): void;
+  focus(): void;
 };
 
 export type TabCallbacks = {

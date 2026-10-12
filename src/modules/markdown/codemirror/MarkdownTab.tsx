@@ -175,6 +175,11 @@ export function MarkdownTab(props: Props): JSX.Element {
   registerMarkdownHandleRef.current = props.callbacks.registerMarkdownHandle;
   const cycleViewRef = useRef(cycleView);
   cycleViewRef.current = cycleView;
+  const focusRef = useRef(() => {});
+  focusRef.current = () => {
+    if (viewMode === "preview") previewRef.current?.focus();
+    else editorRef.current?.focus();
+  };
   const toggleOutlineRef = useRef(toggleOutline);
   toggleOutlineRef.current = toggleOutline;
   useEffect(() => {
@@ -182,6 +187,7 @@ export function MarkdownTab(props: Props): JSX.Element {
       save: () => saveRef.current(),
       cycleView: () => cycleViewRef.current(),
       toggleOutline: () => toggleOutlineRef.current(),
+      focus: () => focusRef.current(),
     });
     return () => registerMarkdownHandleRef.current?.(props.tabId, null);
   }, [props.tabId]);
