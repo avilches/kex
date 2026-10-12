@@ -5,6 +5,7 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import type { NotificationKind } from "@/modules/agents/lib/types";
+import { isHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import {
   RESUME_CHECK_MS,
   describeSilentResume,
@@ -151,12 +152,20 @@ export async function detachAgentSession(tabId: string): Promise<void> {
 
 // Dev builds only: a resume command that was typed but never produced a SessionStart
 // (and so no session id in the store) is otherwise invisible until someone notices.
+const resumeWatches = new Map<string, ReturnType<typeof setTimeout>>();
+
 export function watchResume(plan: RestorePlan): void {
   if (!import.meta.env.DEV) return;
-  setTimeout(() => {
-    if (hasResumed(useAgentStore.getState().sessions[plan.tabId])) return;
-    const msg = describeSilentResume(plan);
-    void warn(`[agent-session] ${msg}`);
-    toast.warning(msg, { duration: 20_000 });
-  }, RESUME_CHECK_MS);
+  clearTimeout(resumeWatches.get(plan.tabId));
+  resumeWatches.set(
+    plan.tabId,
+    setTimeout(() => {
+      resumeWatches.delete(plan.tabId);
+      if (isHibernating(plan.tabId)) return;
+      if (hasResumed(useAgentStore.getState().sessions[plan.tabId])) return;
+      const msg = describeSilentResume(plan);
+      void warn(`[agent-session] ${msg}`);
+      toast.warning(msg, { duration: 20_000 });
+    }, RESUME_CHECK_MS),
+  );
 }
