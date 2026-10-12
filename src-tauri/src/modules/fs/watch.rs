@@ -234,7 +234,13 @@ fn expand_aliases(paths: &mut HashSet<String>, aliases: &Aliases) {
                 continue;
             };
             for spelled in spellings.keys() {
-                extra.push(to_canon(Path::new(spelled).join(rel)));
+                // join("") appends a trailing slash, which would not equal the watched dir itself.
+                let aliased = if rel.as_os_str().is_empty() {
+                    Path::new(spelled).to_path_buf()
+                } else {
+                    Path::new(spelled).join(rel)
+                };
+                extra.push(to_canon(aliased));
             }
         }
     }
@@ -347,6 +353,15 @@ mod tests {
         let prepared = prepare_add(&WorkspaceEnv::Local, vec![dir.to_string_lossy().into_owned()]);
         std::fs::remove_dir_all(&dir).ok();
         assert_eq!(prepared.len(), 1);
+    }
+
+    #[test]
+    fn expand_keeps_the_watched_directory_itself_without_a_trailing_slash() {
+        let aliases = aliases_of("/real/dir", "/link/dir");
+        let mut paths = HashSet::from(["/real/dir".to_string()]);
+        expand_aliases(&mut paths, &aliases);
+        assert!(paths.contains("/link/dir"));
+        assert!(!paths.contains("/link/dir/"));
     }
 
     #[test]
