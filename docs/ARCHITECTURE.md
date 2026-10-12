@@ -518,15 +518,24 @@ src/
     │                                Script entries with command, name, optional tabId, `cwdMode`
     │                                (`workspace` default | `context` | `fixed`) and `cwd` used only in `fixed` mode;
     │                                the folder is resolved by `lib/scriptCwd.ts`, and an
-    │                                already-open idle script tab gets a `cd` to it before the command).
-    │                                The typed line groups the whole command behind the cd: `cd X && { cmd\n\n}`
+    │                                script tab, new or already open and idle, gets a `cd` to it before the command).
+    │                                The typed line groups the whole command behind the cd: `cd -- X && { cmd\n\n}`
     │                                (posix) or `Set-Location -LiteralPath 'X'; if ($?) { cmd\n\n}` (PowerShell;
     │                                the closing brace is on its own line, after a blank one, so neither a
     │                                trailing `#` comment nor a final `\` or backtick can swallow it; the
     │                                comment case only holds where the interactive shell recognizes `#`: bash
     │                                does, interactive zsh does not unless `interactive_comments` is set, and
     │                                the real-bash test runs non-interactive bash). A folder with a control
-    │                                character is refused with a toast and nothing runs. The tab is marked
+    │                                character, or that is not absolute (`~`, `-x`, relative), is refused with a toast and nothing
+    │                                runs (the Fixed folder field shows the same message); a folder that does not
+    │                                exist or is a file makes the `cd` fail so nothing runs, and a toast says why.
+    │                                The PowerShell line (`{ cmd` + LF + blank LF + `}` + CR) has not been verified on
+    │                                Windows PowerShell 5.1 or 7: it needs a manual check there. The shell hook
+    │                                reports a script as its typed wrapper, so Run on Start persists the script's own
+    │                                command (`terminalEphemeralStore` keeps it while the mark exists) and never a
+    │                                report of 256 characters or more (the hook's cut-off). Stop on a script whose
+    │                                command never started clears the mark at once; bash emits `OSC 133;C` without
+    │                                text, and that bare start counts as a started command. The tab is marked
     │                                running before the delayed write, so a double click cannot type twice; the
     │                                pending write is dropped if the mark is gone (Stop, tab closed) and the mark
     │                                is removed if no terminal handle shows up. Known limits: cmd.exe is not told apart from PowerShell (a cmd.exe tab
