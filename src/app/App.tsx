@@ -1940,20 +1940,24 @@ export default function App() {
     await editorHandles.current.get(tabId)?.save();
   }, []);
 
+  const reportSaveError = useCallback((tabId: string, err: unknown) => {
+    const tab = workspacesRef.current
+      .flatMap((w) => allPanes(w.paneTree))
+      .flatMap((p) => p.tabs)
+      .find((t) => t.id === tabId);
+    const name = tab && "path" in tab ? tab.path.split(/[\\/]/).pop() : tabId;
+    toast.error(`Could not save ${name}: ${err instanceof Error ? err.message : String(err)}`);
+  }, []);
+
   const saveTabReportingErrors = useCallback(
     async (tabId: string) => {
       try {
         await saveTab(tabId);
       } catch (err) {
-        const tab = workspacesRef.current
-          .flatMap((w) => allPanes(w.paneTree))
-          .flatMap((p) => p.tabs)
-          .find((t) => t.id === tabId);
-        const name = tab && "path" in tab ? tab.path.split(/[\\/]/).pop() : tabId;
-        toast.error(`Could not save ${name}: ${err instanceof Error ? err.message : String(err)}`);
+        reportSaveError(tabId, err);
       }
     },
-    [saveTab],
+    [saveTab, reportSaveError],
   );
 
   // Autosave-on-focus-loss: save every dirty editor (save() no-ops when clean).
@@ -2113,6 +2117,7 @@ export default function App() {
     },
     findTab: findTabGlobal,
     saveTab,
+    reportSaveError,
     focusActiveTab,
     isWarnEnabled: () =>
       usePreferencesStore.getState().warnOnCloseTabWithRunningProcess,

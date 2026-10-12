@@ -21,6 +21,7 @@ type Params = {
   disposeTab: (workspaceId: string, tabId: string) => void;
   findTab: (tabId: string) => FoundTab | null;
   saveTab: (tabId: string) => Promise<void>;
+  reportSaveError: (tabId: string, error: unknown) => void;
   focusActiveTab: () => void;
   isWarnEnabled: () => boolean;
   setWarnEnabled: (value: boolean) => Promise<void>;
@@ -38,6 +39,7 @@ export function useTabCloseGuards({
   disposeTab,
   findTab,
   saveTab,
+  reportSaveError,
   focusActiveTab,
   isWarnEnabled,
   setWarnEnabled,
@@ -116,6 +118,7 @@ export function useTabCloseGuards({
           askTerminalClose,
           askEditorClose,
           saveTab,
+          reportSaveError,
           closeTab: (id) => {
             const found = findTab(id);
             if (found) disposeTab(found.workspace.id, id);
@@ -132,6 +135,7 @@ export function useTabCloseGuards({
       findTab,
       disposeTab,
       saveTab,
+      reportSaveError,
       focusActiveTab,
       isWarnEnabled,
       setWarnEnabled,

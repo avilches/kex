@@ -25,6 +25,7 @@ export type CloseQueueDeps = {
   ) => Promise<TerminalCloseDecision>;
   askEditorClose: (tabId: string) => Promise<EditorCloseDecision>;
   saveTab: (tabId: string) => Promise<void>;
+  reportSaveError: (tabId: string, error: unknown) => void;
   closeTab: (tabId: string) => void;
 };
 
@@ -33,7 +34,7 @@ export type CloseQueueDeps = {
  * queue until the user answers; a cancel stops the entire run before closing
  * the current tab. Once the user opts out of the running-process warning,
  * the rest of the run closes without re-asking. Returns whether every tab in
- * the list was actually closed (false if a cancel stopped the run early), so
+ * the list was actually closed (false if a cancel or a failed save, such as an unresolved disk conflict, stopped the run early), so
  * a caller that closes a whole workspace afterward doesn't have to infer it
  * from workspace state that may not have re-rendered yet.
  */
@@ -64,12 +65,19 @@ export async function runCloseQueue(
     } else if (tab.kind === "editor" || tab.kind === "markdown") {
       if (tab.locked) continue;
       if (tab.dirty) {
-        if (deps.isAutoSaveEnabled()) {
-          await deps.saveTab(tabId);
-        } else {
+        let shouldSave = deps.isAutoSaveEnabled();
+        if (!shouldSave) {
           const decision = await deps.askEditorClose(tabId);
           if (decision.type === "cancel") return false;
-          if (decision.type === "save") await deps.saveTab(tabId);
+          shouldSave = decision.type === "save";
+        }
+        if (shouldSave) {
+          try {
+            await deps.saveTab(tabId);
+          } catch (e) {
+            deps.reportSaveError(tabId, e);
+            return false;
+          }
         }
       }
     }
