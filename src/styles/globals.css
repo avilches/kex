@@ -439,3 +439,14 @@ html *:not(.cm-scroller):not(.thin-scrollbar)::-webkit-scrollbar {
 }
 .ws-hib-look-in { animation: ws-hib-in 800ms var(--ease-premium) both; }
 .ws-hib-look-out { animation: ws-hib-out 800ms var(--ease-premium) both; }
+
+/* The hibernate effects are decoration. The veil on the chip stays as the final
+ * state; only its sweep and every other movement or wash go away. */
+@media (prefers-reduced-motion: reduce) {
+  .hib-wash { display: none; }
+  .hib-item,
+  .hib-ov-icon,
+  .hib-chip-pop,
+  .ws-hib-look-in,
+  .ws-hib-look-out { animation: none; }
+}
