@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { PlayIcon } from "@hugeicons/core-free-icons";
+import { Delete02Icon, PlayIcon, ArrowReloadHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ContextMenuCheckboxItem,
+  ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -22,6 +24,9 @@ import {
   followableCommand,
   syncFollowedCommand,
 } from "@/modules/terminal/lib/runOnStartCommand";
+import { usePendingRestore } from "@/modules/terminal/lib/pendingRestore";
+import { pendingCdLine, runOnStartSections } from "@/modules/terminal/lib/runOnStartSections";
+import { discardPendingRestore, retryPendingRestore } from "@/modules/terminal/lib/useTerminalSession";
 import type { Tab } from "@/modules/workspaces/lib/types";
 
 type Props = {
@@ -38,6 +43,9 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(tab.id) ??
     null;
   const running = followableCommand(reported, getRunningScriptCommand(tab.id));
+  const pending = usePendingRestore(tab.id);
+  const sections = runOnStartSections(pending);
+  const cdLine = pending ? pendingCdLine(pending) : "";
   const [open, setOpen] = useState(false);
   const sessionId = agentSession?.meta?.sessionId;
 
@@ -100,7 +108,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
         onKeyDown={(e) => e.stopPropagation()}
         className="h-6 w-full cursor-text rounded border border-border/60 bg-background/50 px-1.5 font-mono text-[11px] text-muted-foreground outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
       />
-    ) : agentSession && previewPlan?.errorReason ? (
+    ) : agentSession && previewPlan?.errorReason && sections.showOldError ? (
       <div className="break-words px-0.5 py-1 text-[11px] text-destructive">
         {previewPlan.errorReason}
       </div>
@@ -127,27 +135,62 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
         if (!next) commitDraft();
       }}
     >
-      <ContextMenuSubTrigger className="gap-2">
+      <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
         <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
         Run on Start
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="w-80">
-        <ContextMenuCheckboxItem
-          checked={enabled}
-          onSelect={(e) => e.preventDefault()}
-          onCheckedChange={(next) =>
-            onUpdateTab(tab.id, (p) => ({
-              ...p,
-              restoreOnRestart: next,
-              persistentCommand: next
-                ? commandOnEnable(tab, running, agentSession !== null)
-                : tab.persistentCommand,
-            }))
-          }
-        >
-          Enabled
-        </ContextMenuCheckboxItem>
-        <div className="p-1.5">{commandField}</div>
+        {sections.showEnabled && (
+          <ContextMenuCheckboxItem
+            checked={enabled}
+            onSelect={(e) => e.preventDefault()}
+            onCheckedChange={(next) =>
+              onUpdateTab(tab.id, (p) => ({
+                ...p,
+                restoreOnRestart: next,
+                persistentCommand: next
+                  ? commandOnEnable(tab, running, agentSession !== null)
+                  : tab.persistentCommand,
+              }))
+            }
+          >
+            Enabled
+          </ContextMenuCheckboxItem>
+        )}
+        {pending ? (
+          <>
+            <div className="flex flex-col gap-1 px-2.5 py-1.5 text-destructive">
+              <span className="text-[12px] font-medium">Restore pending</span>
+              <span className="select-text break-words text-[11px]">{pending.reason}</span>
+              <code className="select-text break-words font-mono text-[11px]">
+                {cdLine && <div>{cdLine}</div>}
+                <div>{pending.command}</div>
+              </code>
+            </div>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="gap-2"
+              onSelect={() =>
+                void retryPendingRestore(tab.id).catch((e) => console.error("[kex] retry restore failed:", e))
+              }
+            >
+              <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} strokeWidth={2} />
+              Retry restore
+            </ContextMenuItem>
+            <ContextMenuItem
+              variant="destructive"
+              className="gap-2"
+              onSelect={() =>
+                void discardPendingRestore(tab.id).catch((e) => console.error("[kex] discard restore failed:", e))
+              }
+            >
+              <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
+              Discard restore plan
+            </ContextMenuItem>
+          </>
+        ) : (
+          <div className="p-1.5">{commandField}</div>
+        )}
       </ContextMenuSubContent>
     </ContextMenuSub>
   );

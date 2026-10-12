@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import {
-  cancelRestoreFlow,
   decideStart,
   needsDirCheck,
   openFailureBlock,
+  openWithoutRestoringFlow,
+  pendingAfterDirCheck,
+  pendingAfterPlan,
+  restoreCommandLine,
   retryRestoreFlow,
   type RestoreActionDeps,
   type RestoreBlock,
@@ -45,6 +48,7 @@ describe("decideStart", () => {
         dir: "/work",
         command: "claude --resume 'a'",
         agent: "claude",
+        restorable: true,
       },
     });
   });
@@ -62,7 +66,7 @@ describe("decideStart", () => {
     const d = decideStart({ ...base, persistentCommand: "pnpm dev", dirProblem: "Not a directory: /home" });
     expect(d).toEqual({
       kind: "blocked",
-      block: { reason: "Not a directory: /home", dir: "/home", command: "pnpm dev" },
+      block: { reason: "Not a directory: /home", dir: "/home", command: "pnpm dev", restorable: true },
     });
   });
 
@@ -87,6 +91,7 @@ describe("openFailureBlock", () => {
       reason: "Could not start the terminal: boom",
       dir: "/home",
       command: "pnpm dev",
+      restorable: false,
     });
   });
 
@@ -99,12 +104,13 @@ describe("openFailureBlock", () => {
       reason: "Could not start the terminal: denied",
       dir: "",
       command: "",
+      restorable: false,
     });
   });
 });
 
-describe("retryRestoreFlow and cancelRestoreFlow", () => {
-  const block = (over: Partial<RestoreBlock> = {}): RestoreBlock => ({ reason: "r", dir: "/work", command: "claude", ...over });
+describe("retryRestoreFlow and openWithoutRestoringFlow", () => {
+  const block = (over: Partial<RestoreBlock> = {}): RestoreBlock => ({ reason: "r", dir: "/work", command: "claude", restorable: true, ...over });
   function setup(restoreBlock: RestoreBlock | null, over: Partial<RestoreActionDeps> = {}) {
     const s = { restoreBlock, ptyOpening: false, disposed: false };
     const calls: string[] = [];
@@ -144,21 +150,10 @@ describe("retryRestoreFlow and cancelRestoreFlow", () => {
     expect(calls).toEqual(["unblock", "start"]);
   });
 
-  it("cancel claims ptyOpening before detaching, then starts a plain shell", async () => {
-    const { s, d, calls, openingAt } = setup(block({ agent: "claude" }));
-    await cancelRestoreFlow(s, d);
-    expect(openingAt.detach).toBe(true);
-    expect(calls).toEqual(["unblock", "finish", "detach", "start:plain"]);
-  });
-
-  it("cancel still starts when detaching fails", async () => {
-    const { s, d, calls } = setup(block({ agent: "claude" }), {
-      detachAgent: async () => {
-        throw new Error("x");
-      },
-    });
-    await cancelRestoreFlow(s, d);
-    expect(calls[calls.length - 1]).toBe("start:plain");
+  it("open without restoring starts a plain shell and keeps the agent session and its placeholder", async () => {
+    const { s, d, calls } = setup(block({ agent: "claude" }));
+    await openWithoutRestoringFlow(s, d);
+    expect(calls).toEqual(["unblock", "start:plain"]);
   });
 
   it("puts the block back and frees ptyOpening when the preview fails", async () => {
@@ -182,8 +177,44 @@ describe("retryRestoreFlow and cancelRestoreFlow", () => {
     gone.s.disposed = true;
     await retryRestoreFlow(gone.s, gone.d);
     const none = setup(null);
-    await cancelRestoreFlow(none.s, none.d);
+    await openWithoutRestoringFlow(none.s, none.d);
     expect(gone.calls).toEqual([]);
     expect(none.calls).toEqual([]);
+  });
+});
+
+describe("restoreCommandLine", () => {
+  it("cds with && on Unix and keeps a leading space", () => {
+    expect(restoreCommandLine("/work", "claude -r", false)).toBe(" cd /work && claude -r\r");
+  });
+  it("quotes a directory with spaces", () => {
+    expect(restoreCommandLine("/my work", "x", false)).toBe(" cd '/my work' && x\r");
+  });
+  it("joins with a semicolon on Windows", () => {
+    expect(restoreCommandLine("C:/w", "claude", true)).toBe(" cd C:/w; claude\r");
+  });
+});
+
+describe("pendingAfterPlan", () => {
+  it("is gone when the store entry no longer exists", () => {
+    expect(pendingAfterPlan(null, false)).toEqual({ kind: "gone" });
+  });
+  it("stays blocked with the new reason, directory and command", () => {
+    const o = pendingAfterPlan(plan({ errorReason: "nope", cwdLaunch: "/d", attemptedCmd: "c" }), false);
+    expect(o).toEqual({ kind: "blocked", block: { reason: "nope", dir: "/d", command: "c", agent: "claude", restorable: true } });
+  });
+  it("runs the resume command in its directory", () => {
+    const o = pendingAfterPlan(plan({ resumeCmd: "claude -r", cwdLaunch: "/d" }), false);
+    expect(o).toEqual({ kind: "run", line: " cd /d && claude -r\r" });
+  });
+});
+
+describe("pendingAfterDirCheck", () => {
+  const b: RestoreBlock = { reason: "old", dir: "/d", command: "npm start", restorable: true };
+  it("keeps the block with the new problem", () => {
+    expect(pendingAfterDirCheck(b, "gone", false)).toEqual({ kind: "blocked", block: { ...b, reason: "gone" } });
+  });
+  it("runs the saved command when the directory is fine", () => {
+    expect(pendingAfterDirCheck(b, null, false)).toEqual({ kind: "run", line: " cd /d && npm start\r" });
   });
 });

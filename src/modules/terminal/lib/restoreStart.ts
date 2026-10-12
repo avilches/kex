@@ -1,4 +1,5 @@
 import type { RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { quoteShellPath } from "./quoteShellPath";
 
 // Why a terminal was not started: shown in the modal that holds the tab.
 export type RestoreBlock = {
@@ -6,6 +7,8 @@ export type RestoreBlock = {
   dir: string;
   command: string;
   agent?: string;
+  // False for a PTY open failure: there is no terminal to continue in, so nothing is left pending.
+  restorable: boolean;
 };
 
 export type StartDecision =
@@ -36,6 +39,7 @@ export function decideStart(i: StartInput & { dirProblem: string | null }): Star
           dir: plan.cwdLaunch,
           command: plan.attemptedCmd,
           agent: plan.agent,
+          restorable: true,
         },
       };
     }
@@ -46,7 +50,12 @@ export function decideStart(i: StartInput & { dirProblem: string | null }): Star
     if (i.initialCwd && i.dirProblem) {
       return {
         kind: "blocked",
-        block: { reason: i.dirProblem, dir: i.initialCwd, command: i.persistentCommand },
+        block: {
+          reason: i.dirProblem,
+          dir: i.initialCwd,
+          command: i.persistentCommand,
+          restorable: true,
+        },
       };
     }
     return { kind: "spawn", cwd: i.initialCwd, inject: "command" };
@@ -61,7 +70,7 @@ export function openFailureBlock(
   agent?: string,
 ): RestoreBlock {
   const msg = error instanceof Error ? error.message : String(error);
-  return { reason: `Could not start the terminal: ${msg}`, dir: dir ?? "", command, agent };
+  return { reason: `Could not start the terminal: ${msg}`, dir: dir ?? "", command, agent, restorable: false };
 }
 
 type HeldSession = { restoreBlock: RestoreBlock | null; ptyOpening: boolean; disposed: boolean };
@@ -112,15 +121,113 @@ export function retryRestoreFlow(s: HeldSession, d: RestoreActionDeps): Promise<
   );
 }
 
-export function cancelRestoreFlow(s: HeldSession, d: RestoreActionDeps): Promise<void> {
-  return leaveBlock(
-    s,
-    d,
-    async (block) => {
-      if (!block.agent) return;
-      d.finishAgent();
-      await d.detachAgent().catch((e) => console.error("[kex] detach failed:", e));
-    },
-    true,
-  );
+// The plan and the store entry survive: the tab only gets a plain shell.
+export function openWithoutRestoringFlow(s: HeldSession, d: RestoreActionDeps): Promise<void> {
+  return leaveBlock(s, d, async () => {}, true);
+}
+
+// PowerShell 5.1 has no `&&`. The leading space keeps the line out of shell history.
+export function restoreCommandLine(dir: string, command: string, isWindows: boolean): string {
+  return ` cd ${quoteShellPath(dir)}${isWindows ? "; " : " && "}${command}\r`;
+}
+
+export type PendingOutcome =
+  | { kind: "gone" }
+  | { kind: "blocked"; block: RestoreBlock }
+  | { kind: "run"; line: string };
+
+export function pendingAfterPlan(plan: RestorePlan | null, isWindows: boolean): PendingOutcome {
+  if (!plan) return { kind: "gone" };
+  if (plan.errorReason) {
+    return {
+      kind: "blocked",
+      block: {
+        reason: plan.errorReason,
+        dir: plan.cwdLaunch,
+        command: plan.attemptedCmd,
+        agent: plan.agent,
+        restorable: true,
+      },
+    };
+  }
+  if (!plan.resumeCmd) return { kind: "gone" };
+  return { kind: "run", line: restoreCommandLine(plan.cwdLaunch, plan.resumeCmd, isWindows) };
+}
+
+export function pendingAfterDirCheck(
+  block: RestoreBlock,
+  problem: string | null,
+  isWindows: boolean,
+): PendingOutcome {
+  if (problem) return { kind: "blocked", block: { ...block, reason: problem } };
+  return { kind: "run", line: restoreCommandLine(block.dir, block.command, isWindows) };
+}
+
+export type PendingActionDeps = {
+  leafId: string;
+  getBlock: () => RestoreBlock | null;
+  setPending: (block: RestoreBlock | null) => void;
+  // A running agent in the shell means the plan is moot and its stored record is the live one.
+  isAgentRunning: () => boolean;
+  clearPlaceholder: () => void;
+};
+
+export type RetryPendingDeps = PendingActionDeps & {
+  isWindows: boolean;
+  previewPlan: () => Promise<RestorePlan | null>;
+  checkDir: (path: string) => Promise<string | null>;
+  // True once the tab was closed or its PTY replaced while a check was awaiting.
+  isStale: () => boolean;
+  markBlocked: (block: RestoreBlock) => void;
+  adopt: (plan: RestorePlan) => void;
+  write: (line: string) => Promise<void>;
+};
+
+const retrying = new Set<string>();
+
+export async function retryPendingFlow(d: RetryPendingDeps): Promise<void> {
+  const block = d.getBlock();
+  if (!block || retrying.has(d.leafId)) return;
+  if (d.isAgentRunning()) {
+    d.setPending(null);
+    return;
+  }
+  retrying.add(d.leafId);
+  try {
+    let plan: RestorePlan | null = null;
+    let outcome: PendingOutcome;
+    if (block.agent) {
+      plan = await d.previewPlan();
+      outcome = pendingAfterPlan(plan, d.isWindows);
+    } else {
+      outcome = pendingAfterDirCheck(block, await d.checkDir(block.dir), d.isWindows);
+    }
+    if (d.isStale()) return;
+    if (d.isAgentRunning()) {
+      d.setPending(null);
+      return;
+    }
+    if (outcome.kind === "blocked") {
+      d.setPending(outcome.block);
+      if (block.agent) d.markBlocked(outcome.block);
+      return;
+    }
+    d.setPending(null);
+    if (block.agent) d.clearPlaceholder();
+    if (outcome.kind !== "run") return;
+    if (plan) d.adopt(plan);
+    await d.write(outcome.line);
+  } finally {
+    retrying.delete(d.leafId);
+  }
+}
+
+export async function discardPendingFlow(
+  d: PendingActionDeps & { detach: () => Promise<void> },
+): Promise<void> {
+  const block = d.getBlock();
+  d.setPending(null);
+  if (!block?.agent || d.isAgentRunning()) return;
+  d.clearPlaceholder();
+  await d.detach();
 }

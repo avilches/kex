@@ -32,13 +32,18 @@ import {
   registerTitleHandler,
 } from "./osc-handlers";
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
+import { IS_WINDOWS } from "@/lib/platform";
+import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
+import { getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { openPty, type PtySession } from "./pty-bridge";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
 import {
   decideStart,
   needsDirCheck,
-  cancelRestoreFlow,
   openFailureBlock,
+  openWithoutRestoringFlow,
+  discardPendingFlow,
+  retryPendingFlow,
   retryRestoreFlow,
   type RestoreActionDeps,
   type RestoreBlock,
@@ -920,6 +925,7 @@ function blockStart(leafId: string, s: Session, block: RestoreBlock): void {
   s.ptyOpening = false;
   console.error(`[kex] terminal start blocked for tab ${leafId}: ${block.reason}`);
   if (block.agent) useAgentStore.getState().setRestoreError(leafId, leafId, block.agent, block.reason);
+  if (block.restorable) setPendingRestore(leafId, block);
   setRestoreBlock(leafId, s, block);
 }
 
@@ -947,7 +953,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   };
   const checkDir = (path: string) =>
     invoke<string | null>("check_launch_dir", { path }).catch(() => null);
-  // A cancelled restore falls back to the shell's default directory when the saved one is the problem.
+  // A plain start falls back to the shell's default directory when the saved one is the problem.
   const dirProblem =
     plain || needsDirCheck(input) ? await checkDir(s.initialCwd ?? "") : null;
   const decision = plain
@@ -984,6 +990,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     pty.close();
     return;
   }
+  if (!plain) setPendingRestore(leafId, null);
   s.pty = pty;
   if (s.pendingInput) {
     void pty.write(s.pendingInput);
@@ -1002,7 +1009,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
 function restoreActionDeps(leafId: string, s: Session): RestoreActionDeps {
   return {
     setBlock: (block) => setRestoreBlock(leafId, s, block),
-    finishAgent: () => useAgentStore.getState().finish(leafId),
+    finishAgent: () => useAgentStore.getState().clearRestoreError(leafId),
     previewPlan: () => previewResumeCmd(leafId),
     seedPlan: (plan) => seedRestorePlan(leafId, plan),
     detachAgent: () => detachAgentSession(leafId),
@@ -1015,9 +1022,59 @@ export async function retryRestore(leafId: string): Promise<void> {
   if (s) await retryRestoreFlow(s, restoreActionDeps(leafId, s));
 }
 
-export async function cancelRestore(leafId: string): Promise<void> {
+// Plain shell; the plan stays pending so the user can still run or discard it later.
+export async function openWithoutRestoring(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
-  if (s) await cancelRestoreFlow(s, restoreActionDeps(leafId, s));
+  if (s) await openWithoutRestoringFlow(s, restoreActionDeps(leafId, s));
+}
+
+const isAgentRunningIn = (leafId: string) =>
+  isRunningAgentSession(useAgentStore.getState().sessions[leafId]);
+
+function pendingActionDeps(leafId: string) {
+  return {
+    leafId,
+    getBlock: () => getPendingRestore(leafId),
+    setPending: (block: RestoreBlock | null) => setPendingRestore(leafId, block),
+    isAgentRunning: () => isAgentRunningIn(leafId),
+    clearPlaceholder: () => useAgentStore.getState().clearRestoreError(leafId),
+  };
+}
+
+// A hand-launched agent replaces the failed-restore placeholder; the plan is then moot.
+useAgentStore.subscribe((state) => {
+  for (const leafId of pendingRestoreLeafIds()) {
+    if (isRunningAgentSession(state.sessions[leafId])) setPendingRestore(leafId, null);
+  }
+});
+
+// Runs a pending restore inside the live shell. No-op while there is no PTY.
+export async function retryPendingRestore(leafId: string): Promise<void> {
+  const s = sessions.get(leafId);
+  const pty = s?.pty;
+  if (!s || !pty) return;
+  await retryPendingFlow({
+    ...pendingActionDeps(leafId),
+    isWindows: IS_WINDOWS,
+    previewPlan: () => previewResumeCmd(leafId),
+    checkDir: (path) => invoke<string | null>("check_launch_dir", { path }).catch(() => null),
+    isStale: () => s.disposed || s.pty !== pty,
+    markBlocked: (block) =>
+      useAgentStore.getState().setRestoreError(leafId, leafId, block.agent ?? "", block.reason),
+    adopt: (plan) => {
+      stageRestoredSnapshot(leafId, plan);
+      watchResume(plan);
+    },
+    write: (line) => writeWhenShellReady(s, leafId, pty, line),
+  });
+}
+
+// The only place besides agent exit and tab close that deletes the agent session from the store.
+export async function discardPendingRestore(leafId: string): Promise<void> {
+  await discardPendingFlow({
+    ...pendingActionDeps(leafId),
+    detach: () => detachAgentSession(leafId).catch((e) => console.error("[kex] detach failed:", e)),
+  });
 }
 
 function detachSession(leafId: string): void {
@@ -1098,6 +1155,7 @@ export function disposeSession(leafId: string): void {
   s.pty = null;
   s.pendingInput = "";
   clearOscTitle(leafId);
+  setPendingRestore(leafId, null);
   sessions.delete(leafId);
   blockViewportListeners.delete(leafId);
   scratchpadListeners.delete(leafId);
