@@ -179,6 +179,8 @@ import {
   clearRunningCommandEntry,
   clearScriptRunningEntry,
   getRunningCommandsSnapshot,
+  setScriptCommand,
+  getRunningScriptCommand,
   setScriptRunning,
   getScriptRunningSnapshot,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
@@ -196,12 +198,19 @@ import { tabFilePath } from "@/modules/workspaces/lib/tabPath";
 import { resolveNewTerminalCwd } from "@/modules/workspaces/lib/newTerminalCwd";
 import {
   buildScriptInput,
-  isSafeScriptCwd,
   planReusedTabInput,
   resolveScriptCwd,
+  scriptCwdProblem,
+  scriptFolderMissingMessage,
   scriptShellFor,
   type ScriptShell,
 } from "@/modules/workspaces/lib/scriptCwd";
+import {
+  planCommandEvent,
+  planDelayedWrite,
+  planScriptStop,
+} from "@/modules/workspaces/lib/scriptRunState";
+import { followableCommand } from "@/modules/terminal/lib/runOnStartCommand";
 import { IS_WINDOWS } from "@/lib/platform";
 import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename } from "@/lib/pathUtils";
@@ -742,6 +751,27 @@ export default function App() {
 
   // ── Script execution ──────────────────────────────────────────────────────
 
+  const scheduleScriptWrite = useCallback(
+    (tabId: string, input: string, delay: number) => {
+      const tryWrite = (attempts = 0) => {
+        const step = planDelayedWrite(
+          getScriptRunningSnapshot().get(tabId),
+          terminalHandles.current.has(tabId),
+          attempts,
+        );
+        if (step === "write") {
+          terminalHandles.current.get(tabId)?.write(input);
+        } else if (step === "retry") {
+          setTimeout(() => tryWrite(attempts + 1), 100);
+        } else {
+          setScriptRunning(tabId, false);
+        }
+      };
+      setTimeout(tryWrite, delay);
+    },
+    [],
+  );
+
   const runWorkspaceConfig = useCallback(
     (config: Script) => {
       if (!activeWorkspace || activeWorkspace.hibernated) return;
@@ -764,11 +794,21 @@ export default function App() {
         !!config.tabId &&
         !!findTabGlobal(config.tabId) &&
         !!getScriptRunningSnapshot().get(config.tabId);
-      if (scriptCwd && !isSafeScriptCwd(scriptCwd) && !busyReusedTab) {
-        toast.error("Script not run: the folder name has control characters", {
-          duration: 4000,
-        });
+      const cwdProblem = scriptCwd ? scriptCwdProblem(scriptCwd) : null;
+      if (cwdProblem && !busyReusedTab) {
+        toast.error(`Script not run: ${cwdProblem}`, { duration: 4000 });
         return;
+      }
+      // The typed cd already keeps the command from running in a missing
+      // folder; this only tells the user why nothing happened.
+      if (scriptCwd && !busyReusedTab) {
+        void native
+          .fsStat(scriptCwd)
+          .catch(() => null)
+          .then((stat) => {
+            const msg = scriptFolderMissingMessage(scriptCwd, stat);
+            if (msg) toast.error(msg, { duration: 6000 });
+          });
       }
       const userLeafId = focusedTabId(activeWorkspace.paneTree, userPaneId);
 
@@ -803,18 +843,8 @@ export default function App() {
           );
           if (input !== null) {
             setScriptRunning(tabId, "running");
-            const tryWrite = (attempts = 0) => {
-              if (getScriptRunningSnapshot().get(tabId) !== "running") return;
-              const handle = terminalHandles.current.get(tabId);
-              if (handle) {
-                handle.write(input);
-              } else if (attempts < 20) {
-                setTimeout(() => tryWrite(attempts + 1), 100);
-              } else {
-                setScriptRunning(tabId, false);
-              }
-            };
-            setTimeout(tryWrite, 50);
+            setScriptCommand(tabId, config.command);
+            scheduleScriptWrite(tabId, input, 50);
           }
           return;
         }
@@ -876,18 +906,12 @@ export default function App() {
       updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
 
       setScriptRunning(freshTabId, "running");
-      const tryWrite = (attempts = 0) => {
-        if (getScriptRunningSnapshot().get(freshTabId) !== "running") return;
-        const handle = terminalHandles.current.get(freshTabId);
-        if (handle) {
-          handle.write(buildScriptInput(config.command, undefined, scriptShell));
-        } else if (attempts < 20) {
-          setTimeout(() => tryWrite(attempts + 1), 100);
-        } else {
-          setScriptRunning(freshTabId, false);
-        }
-      };
-      setTimeout(tryWrite, 150);
+      setScriptCommand(freshTabId, config.command);
+      scheduleScriptWrite(
+        freshTabId,
+        buildScriptInput(config.command, scriptCwd, scriptShell),
+        150,
+      );
     },
     [
       activeWorkspace,
@@ -900,6 +924,7 @@ export default function App() {
       updateScript,
       openTab,
       setScriptPaneId,
+      scheduleScriptWrite,
     ],
   );
 
@@ -932,7 +957,10 @@ export default function App() {
         activateTab(activeWorkspaceId, config.tabId);
         requestLeafFocus(config.tabId);
       }
-      setScriptRunning(config.tabId, "waiting");
+      setScriptRunning(
+        config.tabId,
+        planScriptStop(scriptCommandSeen.current.has(config.tabId)),
+      );
       const handle = terminalHandles.current.get(config.tabId);
       handle?.write("\x03");
     },
@@ -2387,18 +2415,17 @@ export default function App() {
           }
         }
       },
-      onRunningCommand: (tabId, cmd) => {
+      onRunningCommand: (tabId, cmd, started) => {
         const found = findTabGlobal(tabId);
         if (found) setTerminalRunningCommand(found.workspace.id, tabId, cmd);
-        if (cmd !== null) {
-          scriptCommandSeen.current.add(tabId);
-        } else if (
-          scriptCommandSeen.current.has(tabId) &&
-          getScriptRunningSnapshot().has(tabId)
-        ) {
-          setScriptRunning(tabId, false);
-          scriptCommandSeen.current.delete(tabId);
-        }
+        const next = planCommandEvent(
+          { cmd, started },
+          scriptCommandSeen.current.has(tabId),
+          getScriptRunningSnapshot().has(tabId),
+        );
+        if (next.seen) scriptCommandSeen.current.add(tabId);
+        else scriptCommandSeen.current.delete(tabId);
+        if (next.clearMark) setScriptRunning(tabId, false);
       },
       onScratchpadEnabled: (tabId, enabled) => {
         const found = findTabGlobal(tabId);
@@ -3697,14 +3724,25 @@ export default function App() {
                 interruptAgentLeaf(row.tabId);
                 return;
               }
-              setScriptRunning(row.tabId, "waiting");
+              setScriptRunning(
+                row.tabId,
+                planScriptStop(scriptCommandSeen.current.has(row.tabId)),
+              );
               terminalHandles.current.get(row.tabId)?.write("\x03");
             }}
             onEnableRunOnStart={(tabId, running) => {
               const id = hibernateFlow.pendingWorkspaceId;
               if (!id) return;
               const isAgent = useAgentStore.getState().sessions[tabId] !== undefined;
-              updateTabData(id, tabId, (t) => enableRunOnStart(t, isAgent ? undefined : running));
+              updateTabData(id, tabId, (t) =>
+                enableRunOnStart(
+                  t,
+                  isAgent
+                    ? undefined
+                    : (followableCommand(running ?? null, getRunningScriptCommand(tabId)) ??
+                        undefined),
+                ),
+              );
             }}
           />
 

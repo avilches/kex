@@ -1,3 +1,4 @@
+import { scriptCwdProblem } from "@/modules/workspaces/lib/scriptCwd";
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -592,14 +593,21 @@ const ScriptRow = forwardRef<
         </Select>
       </div>
       {cwdMode === "fixed" && (
-        <input
-          className="h-8 w-full rounded border border-border bg-transparent px-2.5 font-mono text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          aria-label="Fixed folder path"
-          placeholder="Absolute path"
-          spellCheck={false}
-          defaultValue={config.cwd ?? ""}
-          onBlur={(e) => onUpdate({ cwd: e.target.value.trim() || undefined })}
-        />
+        <>
+          <input
+            className="h-8 w-full rounded border border-border bg-transparent px-2.5 font-mono text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            aria-label="Fixed folder path"
+            placeholder="Absolute path"
+            spellCheck={false}
+            defaultValue={config.cwd ?? ""}
+            onBlur={(e) => onUpdate({ cwd: e.target.value.trim() || undefined })}
+          />
+          {config.cwd && scriptCwdProblem(config.cwd) && (
+            <div className="text-[11px] text-destructive">
+              {scriptCwdProblem(config.cwd)}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

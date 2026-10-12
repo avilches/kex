@@ -53,7 +53,7 @@ type Props = {
   onSearchReady?: (tabId: string, addon: SearchAddon) => void;
   onExit?: (tabId: string, code: number) => void;
   onCwd?: (tabId: string, cwd: string) => void;
-  onRunningCommand?: (tabId: string, cmd: string | null) => void;
+  onRunningCommand?: (tabId: string, cmd: string | null, started?: boolean) => void;
   onScratchpadEnabled?: (tabId: string, enabled: boolean) => void;
 };
 
@@ -94,7 +94,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       onSearchReady: (a) => onSearchReady?.(tabId, a),
       onExit: (c) => onExit?.(tabId, c),
       onCwd: (c) => onCwd?.(tabId, c),
-      onRunningCommand: (cmd) => onRunningCommand?.(tabId, cmd),
+      onRunningCommand: (cmd, started) => onRunningCommand?.(tabId, cmd, started),
       onScratchpadEnabled: (enabled) => onScratchpadEnabled?.(tabId, enabled),
     });
 

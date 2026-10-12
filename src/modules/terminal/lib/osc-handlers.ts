@@ -44,7 +44,7 @@ export type PromptTracker = {
 export function registerPromptTracker(
   term: Terminal,
   state?: ShellIntegrationState,
-  onRunningCommand?: (cmd: string | null) => void,
+  onRunningCommand?: (cmd: string | null, started?: boolean) => void,
 ): PromptTracker {
   let marker: IMarker | null = null;
   const d = term.parser.registerOscHandler(133, (data) => {
@@ -62,7 +62,8 @@ export function registerPromptTracker(
       // OSC 133 C — command pre-execution: data is "C;<command text>".
       if (state) state.inCommand = true;
       const cmd = data.slice(2).trim();
-      onRunningCommand?.(cmd || null);
+      // bash emits C without text, so `started` is what tells a script tab it ran.
+      onRunningCommand?.(cmd || null, true);
     } else if (data.startsWith("D")) {
       // OSC 133 D — command ends.
       if (state) state.inCommand = false;

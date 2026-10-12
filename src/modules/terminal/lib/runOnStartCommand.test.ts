@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  commandOnEnable,
   commitRunOnStartEdit,
   effectiveRunOnStartCommand,
+  followableCommand,
   syncFollowedCommand,
 } from "./runOnStartCommand";
 
@@ -49,5 +51,38 @@ describe("syncFollowedCommand", () => {
     expect(syncFollowedCommand({ persistentCommandManual: true }, "b")).toBeNull();
     expect(syncFollowedCommand({}, null)).toBeNull();
     expect(syncFollowedCommand({ persistentCommand: "b" }, "b")).toBeNull();
+  });
+});
+
+describe("followableCommand", () => {
+  it("passes a plain running command through", () => {
+    expect(followableCommand("lazygit", null)).toBe("lazygit");
+    expect(followableCommand(null, null)).toBeNull();
+  });
+
+  it("replaces the typed wrapper of a running script with the script command", () => {
+    expect(followableCommand("cd '/a' && { pnpm dev }", "pnpm dev")).toBe("pnpm dev");
+  });
+
+  it("never follows a report as long as the hook limit", () => {
+    expect(followableCommand("x".repeat(256), null)).toBeNull();
+    expect(followableCommand("x".repeat(255), null)).toBe("x".repeat(255));
+  });
+
+  it("keeps a long script command whole", () => {
+    const long = "echo " + "y".repeat(400);
+    expect(followableCommand("cd '/a' && { echo yyyy", long)).toBe(long);
+  });
+});
+
+describe("commandOnEnable", () => {
+  it("keeps a stored command", () => {
+    expect(commandOnEnable({ persistentCommand: "make" }, "other", false)).toBe("make");
+  });
+  it("copies the followable command into a plain terminal", () => {
+    expect(commandOnEnable({}, "npm run dev", false)).toBe("npm run dev");
+  });
+  it("never copies it into an agent tab", () => {
+    expect(commandOnEnable({}, "claude", true)).toBeUndefined();
   });
 });
