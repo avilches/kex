@@ -158,9 +158,12 @@ For each session in the store:
    with a cwd), its `originalCwd` is used: it is where the command was launched from, while the `cwd` of the entries is
    the worktree, which may be deleted by restore time. Otherwise the first `cwd` field is used, and `cwd_launch` from
    the store if the transcript has none.
-4. **Verify the directory exists.** If the cwd is missing or was deleted, the plan carries a non-empty `error_reason`
-   and an empty `resume_cmd` (signals a restore error in the tab UI). The store entry is kept, so the session is not
-   lost; it goes away when the agent exits or the tab is closed.
+4. **Verify the directory is usable** (`launch_dir_problem`: missing, not a folder, or unreadable). If it is not, the
+   plan carries a non-empty `error_reason`, an empty `resume_cmd`, and the command that would have run in
+   `attempted_cmd`. The terminal does not start: the tab is held on a modal (see "Blocked start" below). The store
+   entry is kept, including when the transcript is also missing (the `--session-id` entry is only dropped once the
+   directory check passes), so "Try again" can still find the session; it goes away when the agent exits, the tab is
+   closed, or the user cancels the restore.
 5. **Build the command.**
    - JSONL found: if `launch_cmd` is present, `strip_for_resume_base(launch_cmd) + --resume <id>`;
      otherwise `claude --resume '<id>'` / `codex resume --last` / `gemini --resume '<id>'`
@@ -206,6 +209,7 @@ pub struct RestorePlan {
     pub tab_id: String,      // → "tabId" on the wire
     pub agent: String,
     pub resume_cmd: String,    // → "resumeCmd" on the wire; empty signals error
+    pub attempted_cmd: String, // → "attemptedCmd"; the blocked command, only set with error_reason
     pub cwd_launch: String,    // → "cwdLaunch" on the wire
     pub error_reason: String,
     pub title: Option<String>,
@@ -247,16 +251,37 @@ consumed through the one normal path, `consumeRestorePlan`.
 
 ### useTerminalSession.ts
 
-In `attachSession`, after the PTY is open:
+`attachSession` calls `startLeaf`, which waits for the plans, consumes the one for the tab and asks the pure
+`decideStart` (`restoreStart.ts`) what to do, before any PTY exists:
 
 ```
-if plan = consumeRestorePlan(leafId):
-  if plan.resumeCmd is non-empty:
-    stageRestoredSnapshot(leafId, plan)   // name + notification, applied later (see below)
-    writeWhenShellReady(pty, " " + plan.resumeCmd + "\r")
-  else:
-    setRestoreError(leafId, workspaceId, plan.agent, plan.errorReason)
+decision = decideStart(plan, persistentCommand, initialCwd, dirProblem)
+  spawn + resume   -> open PTY at plan.cwdLaunch, then:
+                      stageRestoredSnapshot(leafId, plan)   // name + notification, applied later (see below)
+                      writeWhenShellReady(pty, " " + plan.resumeCmd + "\r")
+  spawn + command  -> open PTY at initialCwd, writeWhenShellReady(pty, persistentCommand + "\r")
+  spawn + none     -> plain shell
+  blocked          -> no PTY; session.restoreBlock = { reason, dir, command, agent? }
 ```
+
+`dirProblem` comes from the `check_launch_dir` command and is only asked for a saved command without an agent plan
+(`needsDirCheck`); an agent plan already carries its verdict from Rust.
+
+### Blocked start
+
+A start that cannot happen (unusable directory, or `openPty` rejecting) leaves the session without a PTY and sets
+`restoreBlock`. `TerminalPane` then renders `RestoreBlockedOverlay` over that tab's content only, never over the pane
+or its tab bar, showing the reason, the directory and the command. `attachSession` does not retry while the block is
+set. For an agent plan the tab also gets the `restoreError` placeholder (the `⚠` icon).
+
+- **Try again** (`retryRestore`): clears the block and the placeholder, fetches a fresh plan with `previewResumeCmd`
+  (read-only, so the store entry survives a second failure), seeds it, and runs `startLeaf` again. Useful when the
+  directory lives on a volume that was not mounted yet.
+- **Cancel restore** (`cancelRestore`): detaches the agent session from the store and opens a plain shell, in
+  `initialCwd` when that is usable and in the shell's default directory otherwise. The tab keeps its
+  `persistentCommand`, so the next launch tries again unless the user changes it.
+
+`restoreBlock` reaches React through `useSyncExternalStore` over a per-leaf listener map.
 
 `writeWhenShellReady` waits for the `kex:shell-ready` event of that PTY (the first `OSC 133;B`, which the shell only
 emits when it actually renders its interactive prompt; `133;A` is not usable because the init scripts call
@@ -344,7 +369,7 @@ dot either, only the model name, because the tab icon already carries the workin
   there is no up-front IPC cost.
 - **Started elapsed**: how long ago the session started.
 - **Restore error**: shown when `restoreError` is set on the session (e.g. the resume command failed or the cwd was
-  deleted). The tab title turns red and a `⚠` icon appears; the menu surfaces the error reason for diagnosis. The session with `restoreError` is only a placeholder: when
+  deleted; the tab is also held on the "Blocked start" modal). The tab title turns red and a `⚠` icon appears; the menu surfaces the error reason for diagnosis. The session with `restoreError` is only a placeholder: when
   the user launches an agent by hand in that tab, the `started` signal replaces it (`isRunningAgentSession`) and the
   error clears.
 
@@ -431,8 +456,10 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | Agent process exited | `agent_detach_session` removes panel from store; not in plan |
 | Turn failed (`StopFailure`) or session ended (`SessionEnd`, incl. `/clear`, `/resume`) while the process lives | Store entry kept; the tab stays restorable |
 | Session started with `-p`/`--print` | `record_session` skips; session never written to store |
-| JSONL transcript missing (no messages sent) | Entry removed from store; `claude --session-id <id>` injected — new session reuses same UUID |
-| launch cwd deleted between sessions | `resumeCmd` empty, `errorReason` set; tab shows `⚠` restore error; store entry kept |
+| JSONL transcript missing (no messages sent) | Entry removed from store (unless the launch directory is unusable); `claude --session-id <id>` injected — new session reuses same UUID |
+| launch cwd deleted, not a folder, or unreadable | `resumeCmd` empty, `errorReason` and `attemptedCmd` set; no PTY, the tab is held on the Try again / Cancel restore modal and shows `⚠`; store entry kept |
+| saved command (no agent) whose directory is unusable | Same modal, built on the frontend from `check_launch_dir` |
+| `openPty` rejects at start | Same modal with the reason `Could not start the terminal: ...` |
 | session entered a worktree later deleted | restored in the worktree's `originalCwd` (from `worktree-state`), not in the worktree |
 | `KEX_TAB_ID` not set in shell | Hook exits silently; session not recorded |
 | `agent_session_restore_plan` IPC fails | `loadRestorePlans` catches and sets an empty Map; no crash |

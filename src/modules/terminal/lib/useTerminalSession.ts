@@ -1,11 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { consumeRestorePlan, restorePlansReady, stageRestoredSnapshot, watchResume } from "@/modules/agents/lib/agentSessionRestore";
+import {
+  consumeRestorePlan,
+  detachAgentSession,
+  previewResumeCmd,
+  restorePlansReady,
+  seedRestorePlan,
+  stageRestoredSnapshot,
+  watchResume,
+} from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SearchAddon } from "@xterm/addon-search";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { DormantRing } from "./dormantRing";
 import { estimateParkedTerminalBudget } from "./backgroundMemoryBudget";
 import {
@@ -26,6 +34,12 @@ import {
 import { clearOscTitle, setOscTitle } from "./oscTitleStore";
 import { openPty, type PtySession } from "./pty-bridge";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
+import {
+  decideStart,
+  needsDirCheck,
+  openFailureBlock,
+  type RestoreBlock,
+} from "./restoreStart";
 import {
   type BlockMatch,
   BlockDecorations,
@@ -79,6 +93,9 @@ type Session = {
   // this command (otherwise). `restoreOnRestart === false` disables both.
   restoreOnRestart: boolean | undefined;
   persistentCommand: string | undefined;
+  // Set while the start is held back (unusable directory, PTY refused to open): no PTY exists
+  // and the tab shows a modal until the user retries or cancels.
+  restoreBlock: RestoreBlock | null;
   lastCwd: string | null;
   pendingExit: number | null;
   shellExited: boolean;
@@ -669,6 +686,7 @@ function ensureSession(
     initialCwd,
     restoreOnRestart: undefined,
     persistentCommand: undefined,
+    restoreBlock: null,
     lastCwd: null,
     pendingExit: null,
     shellExited: false,
@@ -873,58 +891,127 @@ function attachSession(
 
   if (s.visibleNow) bindLeafToSlot(leafId, s);
 
-  if (!s.pty && !s.ptyOpening && !s.shellExited) {
-    s.ptyOpening = true;
-    // Wait until restore plans are loaded so the consume decision is correct,
-    // then spawn. One place owns "what to inject on a restored terminal":
-    //   - "Run on start" off              -> nothing
-    //   - had an agent (plan)             -> resume it (or surface its error)
-    //   - no agent, has a saved command   -> run that command
-    void restorePlansReady().then(() => {
-      if (s.disposed || s.pty) {
-        s.ptyOpening = false;
-        return;
-      }
-      // Consume the plan before spawning so the PTY starts in the agent's cwd
-      // directly, without needing a `cd` shell command.
-      const plan = consumeRestorePlan(leafId);
-      const runOnStart = s.restoreOnRestart !== false;
-      const ptyCwd = runOnStart && plan?.resumeCmd ? plan.cwdLaunch : s.initialCwd;
-
-      openPtyForSession(leafId, s, ptyCwd)
-        .then((pty) => {
-          s.ptyOpening = false;
-          if (s.disposed) {
-            pty.close();
-            return;
-          }
-          s.pty = pty;
-          if (s.pendingInput) {
-            void pty.write(s.pendingInput);
-            s.pendingInput = "";
-          }
-          if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
-          if (!runOnStart) return;
-          if (plan) {
-            if (plan.resumeCmd) {
-              stageRestoredSnapshot(leafId, plan);
-              void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
-              watchResume(plan);
-            } else if (plan.errorReason) {
-              console.error(`[kex] session restore failed for tab ${leafId} (${plan.agent}): ${plan.errorReason}`);
-              useAgentStore.getState().setRestoreError(leafId, leafId, plan.agent, plan.errorReason);
-            }
-            // else: no command, no error - PTY just opened at plan.cwdLaunch, nothing to do
-          } else if (s.persistentCommand) {
-            void writeWhenShellReady(s, leafId, pty, s.persistentCommand + "\r");
-          }
-        })
-        .catch((e) => {
-          s.ptyOpening = false;
-          console.error("[kex] openPty failed:", e);
-        });
-    });
+  if (!s.pty && !s.ptyOpening && !s.shellExited && !s.restoreBlock) {
+    void startLeaf(leafId, s);
   }
+}
+
+const restoreBlockListeners = new Map<string, Set<() => void>>();
+
+function setRestoreBlock(leafId: string, s: Session, block: RestoreBlock | null): void {
+  s.restoreBlock = block;
+  for (const l of restoreBlockListeners.get(leafId) ?? []) l();
+}
+
+function subscribeRestoreBlock(leafId: string, cb: () => void): () => void {
+  let set = restoreBlockListeners.get(leafId);
+  if (!set) restoreBlockListeners.set(leafId, (set = new Set()));
+  set.add(cb);
+  return () => {
+    set.delete(cb);
+    if (set.size === 0) restoreBlockListeners.delete(leafId);
+  };
+}
+
+function blockStart(leafId: string, s: Session, block: RestoreBlock): void {
+  s.ptyOpening = false;
+  console.error(`[kex] terminal start blocked for tab ${leafId}: ${block.reason}`);
+  if (block.agent) useAgentStore.getState().setRestoreError(leafId, leafId, block.agent, block.reason);
+  setRestoreBlock(leafId, s, block);
+}
+
+// Starts the PTY of a leaf once restore plans are loaded. One place owns "what to inject on a
+// restored terminal":
+//   - "Run on start" off              -> nothing
+//   - had an agent (plan)             -> resume it, or hold the tab on its error
+//   - no agent, has a saved command   -> run that command, or hold the tab if its directory is unusable
+// `plain` skips all of that (the user cancelled the restore) and only opens a shell.
+async function startLeaf(leafId: string, s: Session, plain = false): Promise<void> {
+  s.ptyOpening = true;
+  await restorePlansReady();
+  if (s.disposed || s.pty) {
+    s.ptyOpening = false;
+    return;
+  }
+  // Consume the plan before spawning so the PTY starts in the agent's cwd
+  // directly, without needing a `cd` shell command.
+  const plan = plain ? null : consumeRestorePlan(leafId);
+  const input = {
+    runOnStart: !plain && s.restoreOnRestart !== false,
+    plan,
+    persistentCommand: s.persistentCommand,
+    initialCwd: s.initialCwd,
+  };
+  const checkDir = (path: string) =>
+    invoke<string | null>("check_launch_dir", { path }).catch(() => null);
+  // A cancelled restore falls back to the shell's default directory when the saved one is the problem.
+  const dirProblem =
+    plain || needsDirCheck(input) ? await checkDir(s.initialCwd ?? "") : null;
+  const decision = plain
+    ? { kind: "spawn" as const, cwd: s.initialCwd && !dirProblem ? s.initialCwd : undefined, inject: "none" as const }
+    : decideStart({ ...input, dirProblem });
+  if (s.disposed || s.pty) {
+    s.ptyOpening = false;
+    return;
+  }
+  if (decision.kind === "blocked") {
+    blockStart(leafId, s, decision.block);
+    return;
+  }
+
+  let pty: PtySession;
+  try {
+    pty = await openPtyForSession(leafId, s, decision.cwd);
+  } catch (e) {
+    const command = plan?.resumeCmd || (input.runOnStart ? s.persistentCommand ?? "" : "");
+    // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
+    // back to the saved command.
+    const agent = decision.inject === "resume" ? plan?.agent : undefined;
+    blockStart(leafId, s, openFailureBlock(e, decision.cwd, command, agent));
+    return;
+  }
+  s.ptyOpening = false;
+  if (s.disposed) {
+    pty.close();
+    return;
+  }
+  s.pty = pty;
+  if (s.pendingInput) {
+    void pty.write(s.pendingInput);
+    s.pendingInput = "";
+  }
+  if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
+  if (decision.inject === "resume" && plan) {
+    stageRestoredSnapshot(leafId, plan);
+    void writeWhenShellReady(s, leafId, pty, " " + plan.resumeCmd + "\r");
+    watchResume(plan);
+  } else if (decision.inject === "command" && s.persistentCommand) {
+    void writeWhenShellReady(s, leafId, pty, s.persistentCommand + "\r");
+  }
+}
+
+export async function retryRestore(leafId: string): Promise<void> {
+  const s = sessions.get(leafId);
+  if (!s || s.disposed || !s.restoreBlock) return;
+  const hadAgent = !!s.restoreBlock.agent;
+  setRestoreBlock(leafId, s, null);
+  if (hadAgent) {
+    useAgentStore.getState().finish(leafId);
+    const plan = await previewResumeCmd(leafId);
+    if (plan) seedRestorePlan(leafId, plan);
+  }
+  await startLeaf(leafId, s);
+}
+
+export async function cancelRestore(leafId: string): Promise<void> {
+  const s = sessions.get(leafId);
+  if (!s || s.disposed || !s.restoreBlock) return;
+  if (s.restoreBlock.agent) {
+    useAgentStore.getState().finish(leafId);
+    await detachAgentSession(leafId).catch((e) => console.error("[kex] detach failed:", e));
+  }
+  setRestoreBlock(leafId, s, null);
+  await startLeaf(leafId, s, true);
 }
 
 function detachSession(leafId: string): void {
@@ -1188,6 +1275,11 @@ export function useTerminalSession({
     };
   }, [leafId, blocks]);
 
+  const restoreBlock = useSyncExternalStore(
+    useCallback((cb: () => void) => subscribeRestoreBlock(leafId, cb), [leafId]),
+    () => sessions.get(leafId)?.restoreBlock ?? null,
+  );
+
   const [scratchpadOpen, setScratchpadOpen] = useState<boolean>(
     () => sessions.get(leafId)?.scratchpadOpen ?? false,
   );
@@ -1361,6 +1453,7 @@ export function useTerminalSession({
       revealMatch,
       clearSearch,
       scratchpadOpen,
+      restoreBlock,
     }),
     [
       write,
@@ -1377,6 +1470,7 @@ export function useTerminalSession({
       revealMatch,
       clearSearch,
       scratchpadOpen,
+      restoreBlock,
     ],
   );
 }

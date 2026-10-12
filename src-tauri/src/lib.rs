@@ -512,6 +512,12 @@ fn agent_session_preview_cmd(tab_id: String) -> Option<agent::session_store::Res
     agent::session_store::preview_resume_cmd(&tab_id)
 }
 
+/// Why `path` cannot host a restored terminal (missing, not a folder, unreadable), or `None`.
+#[tauri::command]
+fn check_launch_dir(path: String) -> Option<String> {
+    agent::session_store::launch_dir_problem(&path)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cli_dir = parse_launch_dir();
@@ -918,6 +924,7 @@ pub fn run() {
             agent::pending_nav::agent_queue_nav,
             agent_session_restore_plan,
             agent_session_preview_cmd,
+            check_launch_dir,
             history::history_suggest,
             history::history_commands,
             history::history_record,

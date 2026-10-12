@@ -73,6 +73,9 @@ pub struct RestorePlan {
     pub tab_id: String,
     pub agent: String,
     pub resume_cmd: String,
+    /// The command that would have run had the launch directory been usable. Only set when
+    /// `error_reason` is, so the UI can show what is blocked without it ever being executed.
+    pub attempted_cmd: String,
     pub cwd_launch: String,
     pub error_reason: String,
     pub title: Option<String>,
@@ -262,6 +265,17 @@ fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
+/// Why `path` cannot be the working directory of a restored terminal, or `None` when it can.
+pub fn launch_dir_problem(path: &str) -> Option<String> {
+    let p = Path::new(path);
+    match std::fs::metadata(p) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(format!("Directory not found: {path}")),
+        Err(e) => Some(format!("Cannot access directory: {path} ({e})")),
+        Ok(m) if !m.is_dir() => Some(format!("Not a directory: {path}")),
+        Ok(_) => std::fs::read_dir(p).err().map(|e| format!("Cannot access directory: {path} ({e})")),
+    }
+}
+
 fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&PathBuf>) -> Vec<RestorePlan> {
     let mut plans = Vec::new();
     for (tab_id, record) in tabs {
@@ -291,9 +305,6 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
                  JSONL not found, reattaching with --session-id",
                 record.session_id
             );
-            if let Some(path) = store_path {
-                remove_panel_from_store(&tab_id, path);
-            }
             let cwd_launch = record.cwd_launch.clone();
             let cmd = match record.launch_cmd.as_deref() {
                 Some(lc) => {
@@ -305,17 +316,26 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
             (cwd_launch, cmd)
         };
 
-        if !PathBuf::from(&cwd_launch).exists() {
-            log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent} cwd not found: {cwd_launch}");
+        if let Some(reason) = launch_dir_problem(&cwd_launch) {
+            log::warn!("[agent-session] restore plan: tab={tab_id} agent={agent} {reason}");
             plans.push(RestorePlan {
                 tab_id, agent,
                 resume_cmd: String::new(),
-                cwd_launch: cwd_launch.clone(),
-                error_reason: format!("Directory not found: {cwd_launch}"),
+                attempted_cmd: cmd,
+                cwd_launch,
+                error_reason: reason,
                 title: record.title,
                 notification: record.notification,
             });
             continue;
+        }
+
+        // Dropped only now: a plan blocked by its directory keeps the entry so "Try again" can
+        // still find the session once the directory is back.
+        if jsonl.is_none() {
+            if let Some(path) = store_path {
+                remove_panel_from_store(&tab_id, path);
+            }
         }
 
         log::info!("[agent-session] restore plan: tab={tab_id} agent={agent} session={} cwd_launch={cwd_launch} cmd={cmd:?}", record.session_id);
@@ -323,6 +343,7 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
             tab_id,
             agent,
             resume_cmd: cmd,
+            attempted_cmd: String::new(),
             cwd_launch,
             error_reason: String::new(),
             title: record.title,
@@ -790,6 +811,82 @@ mod tests {
     }
 
     #[test]
+    fn restore_error_plan_carries_the_blocked_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("gone");
+        let lines = vec![format!(r#"{{"type":"user","cwd":"{}"}}"#, missing.display())];
+
+        let (plan, _) = plan_for_transcript(dir.path(), &lines, &missing);
+
+        assert_eq!(plan.resume_cmd, "");
+        assert!(plan.attempted_cmd.contains("--resume 'abc-123'"), "{}", plan.attempted_cmd);
+    }
+
+    #[test]
+    fn restore_keeps_store_entry_when_transcript_and_launch_dir_are_both_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("gone");
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), SessionRecord {
+            agent: Some("claude".to_string()),
+            session_id: "abc-123".to_string(),
+            cwd_launch: missing.display().to_string(),
+            transcript_path: dir.path().join("missing.jsonl").display().to_string(),
+            launch_cmd: None,
+            title: None,
+            notification: None,
+            updated_at: 0,
+        });
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert!(plans[0].error_reason.contains("Directory not found"));
+        assert!(plans[0].attempted_cmd.contains("--session-id 'abc-123'"));
+        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"));
+    }
+
+    #[test]
+    fn launch_dir_problem_is_none_for_a_readable_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(launch_dir_problem(&dir.path().display().to_string()), None);
+    }
+
+    #[test]
+    fn launch_dir_problem_reports_missing_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("gone").display().to_string();
+        assert_eq!(launch_dir_problem(&missing), Some(format!("Directory not found: {missing}")));
+    }
+
+    #[test]
+    fn launch_dir_problem_reports_a_file_as_not_a_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("f.txt");
+        std::fs::write(&file, "x").unwrap();
+        let file = file.display().to_string();
+        assert_eq!(launch_dir_problem(&file), Some(format!("Not a directory: {file}")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn launch_dir_problem_reports_an_unreadable_directory() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let locked = dir.path().join("locked");
+        std::fs::create_dir(&locked).unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let reason = launch_dir_problem(&locked.display().to_string());
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // Root can read anything, so only assert when the permission bits were honored.
+        if let Some(r) = reason {
+            assert!(r.starts_with("Cannot access directory"), "{r}");
+        }
+    }
+
+    #[test]
     fn load_restore_plan_returns_empty_when_no_file() {
         let plans = load_restore_plan();
         let _ = plans;
@@ -1011,6 +1108,7 @@ mod tests {
             tab_id: tab.to_string(),
             agent: "claude".to_string(),
             resume_cmd: String::new(),
+            attempted_cmd: String::new(),
             cwd_launch: String::new(),
             error_reason: String::new(),
             title: None,

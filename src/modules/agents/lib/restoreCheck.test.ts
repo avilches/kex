@@ -9,6 +9,7 @@ const plan = (tabId: string, agent = "claude"): RestorePlan => ({
   tabId,
   agent,
   resumeCmd: `${agent} --resume 'abc'`,
+  attemptedCmd: "",
   cwdLaunch: "/tmp",
   errorReason: "",
 });

@@ -16,6 +16,7 @@ export type RestorePlan = {
   tabId: string;
   agent: string;
   resumeCmd: string;
+  attemptedCmd: string;
   cwdLaunch: string;
   errorReason: string;
   title?: string | null;
