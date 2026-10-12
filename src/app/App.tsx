@@ -2037,6 +2037,17 @@ export default function App() {
     return () => setEditorFlush(null);
   }, []);
 
+  const focusTab = useCallback(
+    (tabId: string) => {
+      const kind = findTabGlobal(tabId)?.tab.kind;
+      requestAnimationFrame(() => {
+        if (kind === "editor") editorHandles.current.get(tabId)?.focus();
+        else requestLeafFocus(tabId);
+      });
+    },
+    [findTabGlobal],
+  );
+
   const focusActiveTab = useCallback(() => {
     const ws = workspacesRef.current.find(
       (w) => w.id === activeWorkspaceIdRef.current,
@@ -2045,12 +2056,8 @@ export default function App() {
     const pane = findPane(ws.paneTree, ws.activePaneId);
     const tabId = pane?.activeTabId;
     if (!tabId) return;
-    const kind = findTabGlobal(tabId)?.tab.kind;
-    requestAnimationFrame(() => {
-      if (kind === "editor") editorHandles.current.get(tabId)?.focus();
-      else requestLeafFocus(tabId);
-    });
-  }, [findTabGlobal]);
+    focusTab(tabId);
+  }, [focusTab]);
 
   const handleMoveTabToWorkspace = useCallback(
     async (sourceWorkspaceId: string, tabId: string, request: TabMoveRequest): Promise<string | null> => {
@@ -3144,9 +3151,9 @@ export default function App() {
       if (!live) return;
       setActiveWorkspaceId(live);
       onActivateTabStable(live, tabId);
-      setTimeout(() => requestLeafFocus(tabId), 50);
+      setTimeout(() => focusTab(tabId), 50);
     },
-    [setActiveWorkspaceId, onActivateTabStable],
+    [setActiveWorkspaceId, onActivateTabStable, focusTab],
   );
 
   useEffect(() => {
