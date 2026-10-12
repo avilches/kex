@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { markHibernating, unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import { terminalTabs } from "./hibernate";
 import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
 import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
@@ -9,8 +8,6 @@ import type { Workspace } from "./types";
 
 export type HibernateFlowDeps = {
   getWorkspace: (workspaceId: string) => Workspace | undefined;
-  autosaveEnabled: () => boolean;
-  flushDirtyEditors: () => Promise<void>;
   // Saves every dirty document of the workspace whatever the autosave
   // preference says; resolves false when any save failed.
   saveWorkspaceDocs: (workspaceId: string) => Promise<boolean>;
@@ -61,10 +58,10 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
 
   async function request(workspaceId: string): Promise<void> {
     if (d.getWorkspace(workspaceId)?.hibernated) return;
-    if (d.autosaveEnabled()) {
-      await d.flushDirtyEditors();
-      await d.settle();
-    }
+    // Whatever the autosave preference says: unsaved text outlives a hibernation only in memory.
+    // A document that fails to save stays dirty and shows up in the dialog.
+    await d.saveWorkspaceDocs(workspaceId);
+    await d.settle();
     const ws = d.getWorkspace(workspaceId);
     if (!ws || ws.hibernated) return;
     if (isReviewEmpty(hibernateReview(ws, d.live()))) {
@@ -102,7 +99,6 @@ type HookDeps = {
   saveWorkspaceDocs: (workspaceId: string) => Promise<boolean>;
   isActive: (workspaceId: string) => boolean;
   hibernateWorkspace: (workspaceId: string) => void;
-  flushDirtyEditors: () => Promise<void>;
   destroyWorkspaceFloats: (workspaceId: string, workspaces: Workspace[]) => Promise<void>;
 };
 
@@ -115,8 +111,6 @@ export function useHibernateFlow(deps: HookDeps) {
     () =>
       createHibernateFlow({
         getWorkspace: (id) => depsRef.current.workspacesRef.current.find((w) => w.id === id),
-        autosaveEnabled: () => usePreferencesStore.getState().editorAutoSave,
-        flushDirtyEditors: () => depsRef.current.flushDirtyEditors(),
         saveWorkspaceDocs: (id) => depsRef.current.saveWorkspaceDocs(id),
         isActive: (id) => depsRef.current.isActive(id),
         settle: nextFrames,
