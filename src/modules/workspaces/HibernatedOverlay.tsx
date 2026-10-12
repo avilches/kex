@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { formatHibernatedFor } from "./lib/hibernate";
-import { isFreshHibernate } from "./lib/hibernateFx";
+import { markHibernateFxPlayed, shouldPlayHibernateFx } from "./lib/hibernateFx";
 import { allPanes } from "./lib/splitNode";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
@@ -56,7 +56,8 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
   const shortcutLabel = useShortcutLabel("workspace.hibernate");
   const tabs = useMemo(() => allPanes(workspace.paneTree).flatMap((p) => p.tabs), [workspace.paneTree]);
   const now = useNow(active && workspace.hibernatedAt !== undefined);
-  const [fx] = useState(() => isFreshHibernate(workspace.hibernatedAt));
+  const [fx] = useState(() => shouldPlayHibernateFx(workspaceId, workspace.hibernatedAt));
+  useEffect(() => markHibernateFxPlayed(workspaceId, workspace.hibernatedAt), [workspaceId, workspace.hibernatedAt]);
   return (
     <div
       ref={setNodeRef}
