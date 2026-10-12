@@ -1336,7 +1336,7 @@ export function WorkspaceBar({
           e.currentTarget.setPointerCapture(e.pointerId);
           const onMove = (ev: PointerEvent) => {
             const next = Math.min(
-              220,
+              440,
               Math.max(52, startWidth + (ev.clientX - startX)),
             );
             onWidthChange(next);

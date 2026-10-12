@@ -2,7 +2,7 @@ import { debouncedInvoke } from "./debouncedInvoke";
 
 export const DEFAULT_WORKSPACE_BAR_WIDTH = 52;
 const BAR_WIDTH_MIN = 52;
-const BAR_WIDTH_MAX = 220;
+const BAR_WIDTH_MAX = 440;
 
 function clamp(v: number): number {
   return Math.min(BAR_WIDTH_MAX, Math.max(BAR_WIDTH_MIN, v));
