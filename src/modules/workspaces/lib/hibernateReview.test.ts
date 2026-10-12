@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hibernateReview, isReviewEmpty, type HibernateLive } from "./hibernateReview";
+import { hibernateReview, isBlockedByFailures, isReviewEmpty, type HibernateLive } from "./hibernateReview";
 import type { Tab, Workspace } from "./types";
 
 const ws = (tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
@@ -164,5 +164,28 @@ describe("hibernateReview docs", () => {
     const r = hibernateReview(ws(tabs), live());
     expect(r.docs.map((d) => d.tabId)).toEqual(["e1", "m1"]);
     expect(r.docs[0]).toMatchObject({ path: "/a.ts" });
+  });
+});
+
+describe("isBlockedByFailures", () => {
+  const docs = [
+    { tabId: "a", title: undefined, path: "/a" },
+    { tabId: "b", title: undefined, path: "/b" },
+  ];
+
+  it("is not blocked when no save failed", () => {
+    expect(isBlockedByFailures(docs, {}, new Set())).toBe(false);
+  });
+
+  it("is blocked by a failed document that is still listed", () => {
+    expect(isBlockedByFailures(docs, { a: "conflict" }, new Set())).toBe(true);
+  });
+
+  it("is released once the failed document is discarded", () => {
+    expect(isBlockedByFailures(docs, { a: "conflict" }, new Set(["a"]))).toBe(false);
+  });
+
+  it("ignores a stale failure for a document that is no longer listed", () => {
+    expect(isBlockedByFailures(docs, { gone: "conflict" }, new Set())).toBe(false);
   });
 });

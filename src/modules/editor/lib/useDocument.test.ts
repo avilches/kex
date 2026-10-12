@@ -1,21 +1,23 @@
 // @vitest-environment happy-dom
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("sonner", () => ({ toast: vi.fn() }));
 vi.mock("@/modules/workspace", () => ({ currentWorkspaceEnv: () => undefined }));
+const prefs = vi.hoisted(() => ({ autoSave: false }));
 vi.mock("@/modules/settings/preferences", () => ({
   usePreferencesStore: (
     selector: (state: { editorAutoSave: boolean; editorAutoSaveDelay: number }) => unknown,
-  ) => selector({ editorAutoSave: false, editorAutoSaveDelay: 500 }),
+  ) => selector({ editorAutoSave: prefs.autoSave, editorAutoSaveDelay: 500 }),
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { CONFLICT_SAVE_ERROR, useDocument, type DocumentState } from "./useDocument";
+import { discardUnflushedBuffers, hasUnflushedBuffer } from "./unflushedBuffers";
+import { CONFLICT_SAVE_ERROR, DELETED_SAVE_ERROR, useDocument, type DocumentState } from "./useDocument";
 
 type Hook = ReturnType<typeof useDocument>;
 
@@ -227,6 +229,30 @@ describe("useDocument reload", () => {
     harness.unmount();
   });
 
+  it("refuses to save a deleted file instead of silently recreating it", async () => {
+    vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+    const harness = mountUseDocument("/tmp/gone.txt");
+    await flush();
+    act(() => {
+      harness.hook.onChange("local edit");
+    });
+    vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+    act(() => {
+      harness.hook.reload();
+    });
+    await flush();
+    expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+    act(() => {
+      harness.hook.keepLocalChanges();
+    });
+    vi.mocked(invoke).mockClear();
+
+    await expect(harness.hook.save()).rejects.toThrow(DELETED_SAVE_ERROR);
+    expect(invoke).not.toHaveBeenCalledWith("fs_write_file", expect.anything());
+
+    harness.unmount();
+  });
+
   it("leaves the deleted state when the file reappears with the same content", async () => {
     vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
     const harness = mountUseDocument("/tmp/r1.txt");
@@ -344,6 +370,50 @@ describe("useDocument reload", () => {
     expect(harness.hook.conflict).toBe(true);
 
     harness.unmount();
+  });
+
+  describe("unmounting with autosave on", () => {
+    beforeEach(() => {
+      prefs.autoSave = true;
+      discardUnflushedBuffers(["/tmp/f.txt", "/tmp/g.txt"]);
+    });
+    afterEach(() => {
+      prefs.autoSave = false;
+    });
+
+    it("keeps the buffer in memory when the final write fails", async () => {
+      vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+      const harness = mountUseDocument("/tmp/f.txt");
+      await flush();
+      act(() => {
+        harness.hook.onChange("local edit");
+      });
+
+      vi.mocked(invoke).mockRejectedValue(new Error("EACCES"));
+      harness.unmount();
+      await flush();
+
+      expect(hasUnflushedBuffer("/tmp/f.txt")).toBe(true);
+    });
+
+    it("keeps the buffer in memory when the file was deleted", async () => {
+      vi.mocked(invoke).mockResolvedValue({ kind: "text", content: "on disk", size: 7 });
+      const harness = mountUseDocument("/tmp/g.txt");
+      await flush();
+      act(() => {
+        harness.hook.onChange("local edit");
+      });
+      vi.mocked(invoke).mockRejectedValue(new Error("ENOENT"));
+      act(() => {
+        harness.hook.reload();
+      });
+      await flush();
+      expect(harness.hook.doc).toEqual({ status: "deleted" } satisfies DocumentState);
+
+      harness.unmount();
+
+      expect(hasUnflushedBuffer("/tmp/g.txt")).toBe(true);
+    });
   });
 
   it("carries an unsaved edit across unmount instead of saving it, and restores it on remount", async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -18,7 +18,7 @@ import {
   subscribeToRunningCommands,
   subscribeToScriptRunning,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
-import { hibernateReview, isReviewEmpty, liveAgent, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
+import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
 import { scriptsToDelete, type RunningProcess } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import type { Workspace } from "@/modules/workspaces/lib/types";
@@ -31,13 +31,14 @@ type Props = {
   processes?: RunningProcess[];
   onClose: () => void;
   onHibernate: () => void;
-  onSaveTab: (tabId: string) => Promise<void>;
-  onSaveAll: (tabIds: string[]) => Promise<void>;
+  // Resolves to the failure reason, or null when the document was saved.
+  onSaveTab: (tabId: string) => Promise<string | null>;
+  onGoToTab: (tabId: string) => void;
   onEnableRunOnStart: (tabId: string, runningCommand?: string) => void;
   onStopBusy: (row: BusyRow) => void;
 };
 
-export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", processes = [], onClose, onHibernate, onSaveTab, onSaveAll, onEnableRunOnStart, onStopBusy }: Props) {
+export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", processes = [], onClose, onHibernate, onSaveTab, onGoToTab, onEnableRunOnStart, onStopBusy }: Props) {
   const sessions = useAgentStore((s) => s.sessions);
   const commands = useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot);
   const scriptStates = useSyncExternalStore(subscribeToScriptRunning, getScriptRunningSnapshot);
@@ -54,6 +55,25 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
   );
 
   const closing = mode === "close";
+  const [failures, setFailures] = useState<Record<string, string>>({});
+  const [discarded, setDiscarded] = useState<ReadonlySet<string>>(new Set());
+  const workspaceId = workspace?.id;
+  useEffect(() => {
+    setFailures({});
+    setDiscarded(new Set());
+  }, [workspaceId]);
+  const saveDocs = async (tabIds: string[]) => {
+    const results = await Promise.all(tabIds.map(async (id) => [id, await onSaveTab(id)] as const));
+    setFailures((prev) => {
+      const next = { ...prev };
+      for (const [id, reason] of results) {
+        if (reason === null) delete next[id];
+        else next[id] = reason;
+      }
+      return next;
+    });
+  };
+  const blockedByFailure = isBlockedByFailures(review?.docs ?? [], failures, discarded);
   const deletedScripts = workspace ? scriptsToDelete(workspace) : 0;
   // A hibernated workspace has no mounted editors, so there is nothing to save through.
   const canSave = !workspace?.hibernated;
@@ -165,24 +185,48 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
             <h3 className="text-[12px] font-medium">
               {closing ? "Unsaved documents that will be discarded" : "Unsaved documents"}
             </h3>
-            {review.docs.map((d) => (
-              <div key={d.tabId} className="flex items-center justify-between gap-2">
-                <span className="truncate text-[12px] text-muted-foreground" title={d.path}>
-                  {pathBasename(d.path)}
-                </span>
-                {canSave && (
-                  <Button size="sm" variant="outline" className="shrink-0" title="Save this document" onClick={() => void onSaveTab(d.tabId)}>
-                    Save
-                  </Button>
-                )}
-              </div>
-            ))}
+            {review.docs.map((d) => {
+              const failure = failures[d.tabId];
+              const isDiscarded = discarded.has(d.tabId);
+              return (
+                <div key={d.tabId} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[12px] text-muted-foreground" title={d.path}>
+                      {pathBasename(d.path)}
+                    </span>
+                    {isDiscarded ? (
+                      <span className="shrink-0 text-[12px] text-muted-foreground">Will be discarded</span>
+                    ) : failure !== undefined ? (
+                      <span className="flex shrink-0 items-center gap-2">
+                        <Button size="sm" variant="outline" title="Close this dialog and fix it in its tab" onClick={() => { onClose(); onGoToTab(d.tabId); }}>
+                          Go to tab
+                        </Button>
+                        {closing && (
+                          <Button size="sm" variant="outline" title="Lose the unsaved changes of this document" onClick={() => setDiscarded((prev) => new Set(prev).add(d.tabId))}>
+                            Discard
+                          </Button>
+                        )}
+                      </span>
+                    ) : (
+                      canSave && (
+                        <Button size="sm" variant="outline" className="shrink-0" title="Save this document" onClick={() => void saveDocs([d.tabId])}>
+                          Save
+                        </Button>
+                      )
+                    )}
+                  </div>
+                  {failure !== undefined && !isDiscarded && (
+                    <p className="text-[12px] text-destructive">Could not save: {failure}</p>
+                  )}
+                </div>
+              );
+            })}
             {canSave && review.docs.length > 2 && (
               <Button
                 size="sm"
                 className="self-end"
                 title="Save every unsaved document"
-                onClick={() => void onSaveAll(review.docs.map((d) => d.tabId))}
+                onClick={() => void saveDocs(review.docs.filter((d) => !discarded.has(d.tabId)).map((d) => d.tabId))}
               >
                 Save all
               </Button>
@@ -229,7 +273,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
           <Button variant="outline" onClick={onClose}>
             {closing ? "Cancel" : "Close"}
           </Button>
-          <Button onClick={onHibernate} autoFocus>
+          <Button onClick={onHibernate} autoFocus disabled={blockedByFailure}>
             {closing ? "Close workspace" : review && review.busy.length > 0 ? "Hibernate now" : "Hibernate anyway"}
           </Button>
         </AlertDialogFooter>

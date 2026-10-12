@@ -34,6 +34,9 @@ async function fileExists(path: string): Promise<boolean> {
 export const CONFLICT_SAVE_ERROR =
   "the file changed on disk while it had unsaved edits. Keep your changes or reload from disk first";
 
+export const DELETED_SAVE_ERROR =
+  "the file was deleted from disk. Recreate it from the tab or discard your changes";
+
 type Options = {
   path: string;
   tabId: string;
@@ -244,6 +247,7 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
     // React state, which lags a render behind a focus-loss flush after a keystroke.
     if (bufferRef.current === savedRef.current) return;
     if (conflictRef.current) throw new Error(CONFLICT_SAVE_ERROR);
+    if (docStatusRef.current === "deleted") throw new Error(DELETED_SAVE_ERROR);
     await saveNow();
   }, [clearAutoSaveTimer, saveNow]);
 
@@ -277,18 +281,21 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
   useEffect(() => {
     return () => {
       clearAutoSaveTimer();
-      if (docStatusRef.current !== "deleted" && bufferRef.current !== savedRef.current) {
+      if (bufferRef.current !== savedRef.current) {
+        const content = bufferRef.current;
         // Auto-save on: the preference already means "persist as things
         // happen", so this is the same safety net as before, just also
-        // covering a pane move. Auto-save off: the user opted out of
-        // unprompted disk writes, so the edit is carried in memory instead
-        // and picked up if the same tab mounts again (see unflushedBuffers).
-        if (autoSaveRef.current.autoSave && !conflictRef.current) {
+        // covering a pane move. Auto-save off, a conflict or a deleted file:
+        // the edit is carried in memory instead and picked up if the same
+        // tab mounts again (see unflushedBuffers). A failed final write falls
+        // back to the same carry so the edit is not lost.
+        if (autoSaveRef.current.autoSave && !conflictRef.current && docStatusRef.current !== "deleted") {
           saveNow().catch((e) => {
             console.error("[autosave flush]", e);
+            stashUnflushedBuffer(tabId, content);
           });
         } else {
-          stashUnflushedBuffer(tabId, bufferRef.current);
+          stashUnflushedBuffer(tabId, content);
         }
       }
     };

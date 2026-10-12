@@ -28,6 +28,15 @@ export type DocRow = { tabId: string; title: string | undefined; path: string };
 export type CommandRow = { tabId: string; title: string | undefined; command: string };
 export type HibernateReview = { busy: BusyRow[]; docs: DocRow[]; commands: CommandRow[] };
 
+// A document whose save failed must be fixed in its tab or, only when closing, explicitly discarded.
+export function isBlockedByFailures(
+  docs: readonly DocRow[],
+  failures: Readonly<Record<string, string>>,
+  discarded: ReadonlySet<string>,
+): boolean {
+  return docs.some((d) => failures[d.tabId] !== undefined && !discarded.has(d.tabId));
+}
+
 export function isReviewEmpty(r: HibernateReview): boolean {
   return r.busy.length === 0 && r.docs.length === 0 && r.commands.length === 0;
 }
