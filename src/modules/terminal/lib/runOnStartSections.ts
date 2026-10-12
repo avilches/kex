@@ -7,6 +7,6 @@ export function runOnStartSections(pending: RestoreBlock | null) {
   return { showEnabled: !pending, showOldError: !pending };
 }
 
-export function pendingLines(block: RestoreBlock): { cd: string; command: string } {
-  return { cd: block.dir ? `cd ${quoteShellPath(block.dir)}` : "", command: block.command };
+export function pendingCdLine(block: RestoreBlock): string {
+  return block.dir ? `cd ${quoteShellPath(block.dir)}` : "";
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pendingLines, runOnStartSections } from "./runOnStartSections";
+import { pendingCdLine, runOnStartSections } from "./runOnStartSections";
 
 const block = { reason: "r", dir: "/my dir", command: "claude --resume 'a'", restorable: true };
 
@@ -12,11 +12,11 @@ describe("runOnStartSections", () => {
   });
 });
 
-describe("pendingLines", () => {
+describe("pendingCdLine", () => {
   it("quotes the directory as it will be typed", () => {
-    expect(pendingLines(block)).toEqual({ cd: "cd '/my dir'", command: "claude --resume 'a'" });
+    expect(pendingCdLine(block)).toBe("cd '/my dir'");
   });
-  it("has no cd line without a directory", () => {
-    expect(pendingLines({ ...block, dir: "" }).cd).toBe("");
+  it("is empty without a directory", () => {
+    expect(pendingCdLine({ ...block, dir: "" })).toBe("");
   });
 });

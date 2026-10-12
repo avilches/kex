@@ -25,7 +25,7 @@ import {
   syncFollowedCommand,
 } from "@/modules/terminal/lib/runOnStartCommand";
 import { usePendingRestore } from "@/modules/terminal/lib/pendingRestore";
-import { pendingLines, runOnStartSections } from "@/modules/terminal/lib/runOnStartSections";
+import { pendingCdLine, runOnStartSections } from "@/modules/terminal/lib/runOnStartSections";
 import { discardPendingRestore, retryPendingRestore } from "@/modules/terminal/lib/useTerminalSession";
 import type { Tab } from "@/modules/workspaces/lib/types";
 
@@ -45,6 +45,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
   const running = followableCommand(reported, getRunningScriptCommand(tab.id));
   const pending = usePendingRestore(tab.id);
   const sections = runOnStartSections(pending);
+  const cdLine = pending ? pendingCdLine(pending) : "";
   const [open, setOpen] = useState(false);
   const sessionId = agentSession?.meta?.sessionId;
 
@@ -134,7 +135,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
         if (!next) commitDraft();
       }}
     >
-      <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive")}>
+      <ContextMenuSubTrigger className={cn("gap-2", pending && "text-destructive focus:text-destructive data-open:text-destructive")}>
         <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
         Run on Start
       </ContextMenuSubTrigger>
@@ -162,7 +163,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
               <span className="text-[12px] font-medium">Restore pending</span>
               <span className="select-text break-words text-[11px]">{pending.reason}</span>
               <code className="select-text break-words font-mono text-[11px]">
-                {pendingLines(pending).cd && <div>{pendingLines(pending).cd}</div>}
+                {cdLine && <div>{cdLine}</div>}
                 <div>{pending.command}</div>
               </code>
             </div>
