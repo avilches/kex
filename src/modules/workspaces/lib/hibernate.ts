@@ -112,3 +112,9 @@ export function enableRunOnStart(tab: Tab, runningCommand?: string): Tab {
 export function isPendingStale(pendingId: string | null, workspaces: readonly { id: string }[]): boolean {
   return pendingId !== null && !workspaces.some((w) => w.id === pendingId);
 }
+
+// The global shortcut listener runs in capture phase before the Radix dialog, so a modal
+// does not block it; any workspace dialog awaiting an answer must disable them.
+export function workspaceDialogPending(hibernatePendingId: string | null, closePendingId: string | null | undefined): boolean {
+  return hibernatePendingId !== null || (closePendingId ?? null) !== null;
+}

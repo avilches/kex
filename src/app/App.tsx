@@ -6,6 +6,7 @@ import {
 import { tabLocations } from "@/modules/workspaces/lib/tabLocations";
 import {
   blockedWhileHibernated,
+  workspaceDialogPending,
   editorTabIds,
   enableRunOnStart,
   isPendingStale,
@@ -3083,7 +3084,7 @@ export default function App() {
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
-      if (hibernateFlow.pendingWorkspaceId !== null) return true;
+      if (workspaceDialogPending(hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id)) return true;
       if (activeWorkspace?.hibernated && blockedWhileHibernated(id)) return true;
       if (
         id === "workspace.settings" &&
@@ -3120,7 +3121,7 @@ export default function App() {
 
       return false;
     },
-    [activeTab, activeWorkspace?.hibernated, hibernateFlow.pendingWorkspaceId],
+    [activeTab, activeWorkspace?.hibernated, hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
