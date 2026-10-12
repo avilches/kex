@@ -84,7 +84,7 @@ export type TabCallbacks = {
   onSearchReady?: (tabId: string, addon: SearchAddon) => void;
   onExit?: (tabId: string, code: number) => void;
   onCwd?: (tabId: string, cwd: string) => void;
-  onRunningCommand?: (tabId: string, cmd: string | null) => void;
+  onRunningCommand?: (tabId: string, cmd: string | null, started?: boolean) => void;
   onScratchpadEnabled?: (tabId: string, enabled: boolean) => void;
   registerTerminalHandle?: (tabId: string, handle: TerminalPaneHandle | null) => void;
   // Editor callbacks

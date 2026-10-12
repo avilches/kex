@@ -84,6 +84,20 @@ describe("OSC 7 cwd handler — gated by OSC 133 in-command state", () => {
     expect(onCwd).toHaveBeenCalledWith("/home/me/new-cwd");
   });
 
+  it("reports a bare OSC 133;C (bash) as a started command with no text", () => {
+    const { term, handlers } = makeFakeTerm();
+    const onRunning = vi.fn();
+    registerPromptTracker(term, undefined, onRunning);
+
+    handlers.get(133)?.("C");
+    handlers.get(133)?.("C;ls -la");
+    handlers.get(133)?.("D;0");
+
+    expect(onRunning).toHaveBeenNthCalledWith(1, null, true);
+    expect(onRunning).toHaveBeenNthCalledWith(2, "ls -la", true);
+    expect(onRunning).toHaveBeenNthCalledWith(3, null);
+  });
+
   it("works without state for backwards compatibility (legacy callers)", () => {
     // The state parameter is optional — when omitted, OSC 7 is always
     // honored (legacy behavior). Tests must confirm we didn't break this.

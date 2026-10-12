@@ -79,7 +79,7 @@ type Callbacks = {
   onSearchReady?: (addon: SearchAddon) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
-  onRunningCommand?: (cmd: string | null) => void;
+  onRunningCommand?: (cmd: string | null, started?: boolean) => void;
   onScratchpadEnabled?: (enabled: boolean) => void;
 };
 
@@ -839,7 +839,7 @@ function bindLeafToSlot(leafId: string, s: Session): void {
       // 7 emitted by untrusted command output (remote SSH, `cat` of an
       // attacker file, etc.).
       const shellState = createShellIntegrationState();
-      const prompt = registerPromptTracker(term, shellState, (cmd) => s.callbacks.onRunningCommand?.(cmd));
+      const prompt = registerPromptTracker(term, shellState, (cmd, started) => s.callbacks.onRunningCommand?.(cmd, started));
       const cwd = registerCwdHandler(
         term,
         (next) => {
@@ -1177,7 +1177,7 @@ type Options = {
   onSearchReady?: (addon: SearchAddon) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
-  onRunningCommand?: (cmd: string | null) => void;
+  onRunningCommand?: (cmd: string | null, started?: boolean) => void;
   onScratchpadEnabled?: (enabled: boolean) => void;
 };
 
@@ -1242,7 +1242,7 @@ export function useTerminalSession({
         onSearchReady: (a) => cbRef.current.onSearchReady?.(a),
         onExit: (c) => cbRef.current.onExit?.(c),
         onCwd: (c) => cbRef.current.onCwd?.(c),
-        onRunningCommand: (cmd) => cbRef.current.onRunningCommand?.(cmd),
+        onRunningCommand: (cmd, started) => cbRef.current.onRunningCommand?.(cmd, started),
         onScratchpadEnabled: (enabled) => cbRef.current.onScratchpadEnabled?.(enabled),
       });
       if (s.visibleNow && s.focusedNow && !s.blocks) {

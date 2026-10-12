@@ -203,6 +203,7 @@ import {
   type ScriptShell,
 } from "@/modules/workspaces/lib/scriptCwd";
 import {
+  planCommandEvent,
   planDelayedWrite,
   planScriptStop,
 } from "@/modules/workspaces/lib/scriptRunState";
@@ -2384,18 +2385,17 @@ export default function App() {
           }
         }
       },
-      onRunningCommand: (tabId, cmd) => {
+      onRunningCommand: (tabId, cmd, started) => {
         const found = findTabGlobal(tabId);
         if (found) setTerminalRunningCommand(found.workspace.id, tabId, cmd);
-        if (cmd !== null) {
-          scriptCommandSeen.current.add(tabId);
-        } else if (
-          scriptCommandSeen.current.has(tabId) &&
-          getScriptRunningSnapshot().has(tabId)
-        ) {
-          setScriptRunning(tabId, false);
-          scriptCommandSeen.current.delete(tabId);
-        }
+        const next = planCommandEvent(
+          { cmd, started },
+          scriptCommandSeen.current.has(tabId),
+          getScriptRunningSnapshot().has(tabId),
+        );
+        if (next.seen) scriptCommandSeen.current.add(tabId);
+        else scriptCommandSeen.current.delete(tabId);
+        if (next.clearMark) setScriptRunning(tabId, false);
       },
       onScratchpadEnabled: (tabId, enabled) => {
         const found = findTabGlobal(tabId);

@@ -26,3 +26,18 @@ export function planDelayedWrite(
 export function planScriptStop(commandSeen: boolean): ScriptState | false {
   return commandSeen ? "waiting" : false;
 }
+
+/**
+ * Reacts to a shell command boundary in a tab. A command counts as started
+ * when its text is known or the shell said it started without text (bash
+ * emits OSC 133;C bare); the mark is cleared at the first boundary after it.
+ */
+export function planCommandEvent(
+  event: { cmd: string | null; started?: boolean },
+  seen: boolean,
+  marked: boolean,
+): { seen: boolean; clearMark: boolean } {
+  if (event.cmd !== null || event.started) return { seen: true, clearMark: false };
+  if (seen && marked) return { seen: false, clearMark: true };
+  return { seen, clearMark: false };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planDelayedWrite, planScriptStop } from "./scriptRunState";
+import { planCommandEvent, planDelayedWrite, planScriptStop } from "./scriptRunState";
 import type { ScriptState } from "./terminalEphemeralStore";
 
 describe("planDelayedWrite", () => {
@@ -47,5 +47,26 @@ describe("Stop interleaved with the delayed write", () => {
     let mark: ScriptState | undefined = "waiting";
     if (planDelayedWrite(mark, true, 0) === "abandon") mark = undefined;
     expect(mark).toBeUndefined();
+  });
+});
+
+describe("planCommandEvent", () => {
+  it("marks a command with text as started", () => {
+    expect(planCommandEvent({ cmd: "ls" }, false, true)).toEqual({ seen: true, clearMark: false });
+  });
+
+  it("marks a bare start (bash, no command text) as started", () => {
+    expect(planCommandEvent({ cmd: null, started: true }, false, true)).toEqual({
+      seen: true,
+      clearMark: false,
+    });
+  });
+
+  it("clears the mark at the end of a seen command", () => {
+    expect(planCommandEvent({ cmd: null }, true, true)).toEqual({ seen: false, clearMark: true });
+  });
+
+  it("ignores a prompt boundary before the command started", () => {
+    expect(planCommandEvent({ cmd: null }, false, true)).toEqual({ seen: false, clearMark: false });
   });
 });
