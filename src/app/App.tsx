@@ -13,7 +13,7 @@ import {
   terminalTabs,
 } from "@/modules/workspaces/lib/hibernate";
 import { claimToggle } from "@/modules/workspaces/lib/hibernateFx";
-import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
+import { abandonUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
@@ -951,7 +951,7 @@ export default function App() {
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       await destroyWorkspaceFloats(wsId, workspacesRef.current);
       if (ws) {
-        discardUnflushedBuffers(editorTabIds(ws));
+        abandonUnflushedBuffers(editorTabIds(ws));
         unmarkHibernating(terminalTabs(ws).map((t) => t.id));
       }
       closeWorkspace(wsId);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  abandonUnflushedBuffers,
   discardUnflushedBuffers,
   hasUnflushedBuffer,
   stashUnflushedBuffer,
@@ -20,5 +21,13 @@ describe("unflushedBuffers", () => {
     expect(hasUnflushedBuffer("t1")).toBe(false);
     expect(hasUnflushedBuffer("t2")).toBe(true);
     discardUnflushedBuffers(["t2"]);
+  });
+
+  it("refuses a stash from the unmount of an abandoned tab", () => {
+    stashUnflushedBuffer("t3", "a");
+    abandonUnflushedBuffers(["t3"]);
+    expect(hasUnflushedBuffer("t3")).toBe(false);
+    stashUnflushedBuffer("t3", "late");
+    expect(hasUnflushedBuffer("t3")).toBe(false);
   });
 });

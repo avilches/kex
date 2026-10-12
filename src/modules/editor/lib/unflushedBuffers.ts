@@ -3,9 +3,12 @@
 // another pane). Keyed by tab id, not path: the same file can be open in two tabs at
 // once. Process-lifetime only.
 const buffers = new Map<string, string>();
+// Tabs of a closed workspace: their editors unmount after the close and would stash again.
+// Ids are never reused, so the mark is permanent.
+const abandoned = new Set<string>();
 
 export function stashUnflushedBuffer(tabId: string, text: string): void {
-  buffers.set(tabId, text);
+  if (!abandoned.has(tabId)) buffers.set(tabId, text);
 }
 
 export function takeUnflushedBuffer(tabId: string): string | undefined {
@@ -20,4 +23,11 @@ export function hasUnflushedBuffer(tabId: string): boolean {
 
 export function discardUnflushedBuffers(tabIds: Iterable<string>): void {
   for (const id of tabIds) buffers.delete(id);
+}
+
+export function abandonUnflushedBuffers(tabIds: Iterable<string>): void {
+  for (const id of tabIds) {
+    buffers.delete(id);
+    abandoned.add(id);
+  }
 }
