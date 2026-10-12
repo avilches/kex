@@ -25,9 +25,10 @@ export function startAgentSnapshotSync(): () => void {
     const { sessions, notifications } = useAgentStore.getState();
     const result = changedSnapshots(sessions, notifications, getOscTitle, sent);
     sent = result.sent;
-    for (const { tabId, snapshot } of result.changes) {
+    for (const { tabId, sessionId, snapshot } of result.changes) {
       invoke<boolean>("agent_session_set_snapshot", {
         tabId,
+        sessionId,
         title: snapshot.title,
         notification: snapshot.notification,
       })

@@ -457,19 +457,23 @@ const NOTIFICATION_KINDS: [&str; 3] = ["attention", "finished", "error"];
 /// `title` keeps the stored one (the title also goes empty while the app is closing, which
 /// must not erase it); an empty or unknown `notification` clears it. Tabs without a record are
 /// ignored (returns false): only a session that can be resumed has anything to restore, and
-/// the caller retries once something changes.
-pub fn set_snapshot(tab_id: &str, title: &str, notification: &str) -> bool {
+/// the caller retries once something changes. A record of another session id is ignored too, so
+/// a flush still in flight for the session before /clear cannot land on the one after it.
+pub fn set_snapshot(tab_id: &str, session_id: &str, title: &str, notification: &str) -> bool {
     match store_path() {
-        Some(path) => set_snapshot_at_path(&path, tab_id, title, notification),
+        Some(path) => set_snapshot_at_path(&path, tab_id, session_id, title, notification),
         None => false,
     }
 }
 
-fn set_snapshot_at_path(path: &Path, tab_id: &str, title: &str, notification: &str) -> bool {
+fn set_snapshot_at_path(path: &Path, tab_id: &str, session_id: &str, title: &str, notification: &str) -> bool {
     let _guard = store_lock().lock().unwrap_or_else(|e| e.into_inner());
     let Ok(content) = std::fs::read_to_string(path) else { return false };
     let Ok(mut store) = serde_json::from_str::<SessionStore>(&content) else { return false };
     let Some(record) = store.tabs.get_mut(tab_id) else { return false };
+    if record.session_id != session_id {
+        return false;
+    }
     let next_title = if title.is_empty() {
         record.title.clone()
     } else {
@@ -1126,7 +1130,7 @@ mod tests {
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
 
-        set_snapshot_at_path(&path, "tab-1", "fixing the build", "attention");
+        set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "attention");
 
         let rec = &read_store(&path).tabs["tab-1"];
         assert_eq!(rec.title.as_deref(), Some("fixing the build"));
@@ -1134,13 +1138,26 @@ mod tests {
     }
 
     #[test]
+    fn set_snapshot_ignores_a_write_scoped_to_another_session_of_the_tab() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+        record_session_at_path(&path, "tab-1", "claude", "new", "/tmp/s.jsonl", "/tmp/p");
+
+        assert!(!set_snapshot_at_path(&path, "tab-1", "old", "stale title", "attention"));
+
+        let rec = &read_store(&path).tabs["tab-1"];
+        assert_eq!(rec.title, None);
+        assert_eq!(rec.notification, None);
+    }
+
+    #[test]
     fn set_snapshot_empty_title_keeps_the_stored_one_but_empty_notification_clears() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
-        set_snapshot_at_path(&path, "tab-1", "fixing the build", "attention");
+        set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "attention");
 
-        set_snapshot_at_path(&path, "tab-1", "", "");
+        set_snapshot_at_path(&path, "tab-1", "abc", "", "");
 
         let rec = &read_store(&path).tabs["tab-1"];
         assert_eq!(rec.title.as_deref(), Some("fixing the build"));
@@ -1153,8 +1170,8 @@ mod tests {
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
 
-        assert!(set_snapshot_at_path(&path, "tab-1", "x", "bogus"));
-        assert!(!set_snapshot_at_path(&path, "tab-2", "y", "attention"));
+        assert!(set_snapshot_at_path(&path, "tab-1", "abc", "x", "bogus"));
+        assert!(!set_snapshot_at_path(&path, "tab-2", "abc", "y", "attention"));
 
         let store = read_store(&path);
         assert_eq!(store.tabs["tab-1"].notification, None);
@@ -1168,7 +1185,7 @@ mod tests {
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
         let long: String = "\u{00e9}\u{1F600}x".repeat(300);
 
-        set_snapshot_at_path(&path, "tab-1", &long, "bogus");
+        set_snapshot_at_path(&path, "tab-1", "abc", &long, "bogus");
 
         let rec = &read_store(&path).tabs["tab-1"];
         let title = rec.title.as_deref().unwrap();
@@ -1183,7 +1200,7 @@ mod tests {
         let path = dir.path().join("agent-sessions.json");
         let missing = dir.path().join("gone");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", &missing.display().to_string());
-        set_snapshot_at_path(&path, "tab-1", "fixing the build", "error");
+        set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "error");
 
         let plans = load_restore_plan_from_path(&path);
 
@@ -1197,11 +1214,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
-        set_snapshot_at_path(&path, "tab-1", "t", "error");
+        set_snapshot_at_path(&path, "tab-1", "abc", "t", "error");
         let bak = path.with_extension("json.bak");
         std::fs::remove_file(&bak).ok();
 
-        set_snapshot_at_path(&path, "tab-1", "t", "error");
+        set_snapshot_at_path(&path, "tab-1", "abc", "t", "error");
 
         assert!(!bak.exists(), "an identical snapshot must not write a backup");
     }
@@ -1211,7 +1228,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
-        set_snapshot_at_path(&path, "tab-1", "fixing the build", "finished");
+        set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "finished");
 
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
 
@@ -1225,7 +1242,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", "/tmp/s.jsonl", "/tmp/p");
-        set_snapshot_at_path(&path, "tab-1", "fixing the build", "finished");
+        set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "finished");
 
         record_session_at_path(&path, "tab-1", "claude", "def", "/tmp/s2.jsonl", "/tmp/p");
 
@@ -1244,7 +1261,7 @@ mod tests {
         std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
         let path = dir.path().join("agent-sessions.json");
         record_session_at_path(&path, "tab-1", "claude", "abc", &jsonl.display().to_string(), &cwd_launch.display().to_string());
-        set_snapshot_at_path(&path, "tab-1", "fixing the build", "attention");
+        set_snapshot_at_path(&path, "tab-1", "abc", "fixing the build", "attention");
 
         let plans = load_restore_plan_from_path(&path);
 

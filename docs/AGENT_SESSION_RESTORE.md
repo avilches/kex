@@ -295,7 +295,7 @@ A restored tab used to lose the name the agent had given it (the agent only rese
 whether it had a notification waiting. `startAgentSnapshotSync` (`agentSnapshotSync.ts`, mounted by
 `AgentNotificationsBridge`) watches `agentStore` and the OSC title store and, 1.5s after the first change of a burst, sends
 every agent tab whose snapshot changed (`changedSnapshots` in `agentSnapshot.ts`, pure) to
-`agent_session_set_snapshot`. The notification is the kind of the tab's unread bell entry, else `attention` if
+`agent_session_set_snapshot` together with the session id it captured (Rust ignores the write when the record belongs to another session, e.g. after `/clear`; a session whose id is not known yet waits for the next pass). The notification is the kind of the tab's unread bell entry, else `attention` if
 the session carries the amber dot, else empty (which clears it).
 
 On restore, `useTerminalSession` calls `stageRestoredSnapshot(plan)` when it injects the resume command. The state is

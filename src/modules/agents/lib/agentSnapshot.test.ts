@@ -13,6 +13,7 @@ function session(overrides: Partial<AgentSession> = {}): AgentSession {
     attentionSince: null,
     restored: false,
     restoreError: false,
+    meta: { sessionId: "s1" },
     ...overrides,
   };
 }
@@ -33,7 +34,7 @@ function notif(overrides: Partial<AgentNotification> = {}): AgentNotification {
 
 describe("agentSnapshot", () => {
   it("prefers the agent's title over the session title", () => {
-    const s = session({ meta: { sessionTitle: "from hook" } });
+    const s = session({ meta: { sessionId: "s1", sessionTitle: "from hook" } });
     expect(agentSnapshot(s, "from osc", []).title).toBe("from osc");
     expect(agentSnapshot(s, undefined, []).title).toBe("from hook");
     expect(agentSnapshot(session(), undefined, []).title).toBe("");
@@ -85,5 +86,17 @@ describe("changedSnapshots", () => {
 
     const failed = changedSnapshots({ t1: session({ restoreError: true }) }, [], titleOf, new Map());
     expect(failed.changes).toHaveLength(0);
+  });
+
+  it("carries the session id, resends after a new session id on the same tab, and waits for the id", () => {
+    const first = changedSnapshots({ t1: session() }, [], titleOf, new Map());
+    expect(first.changes[0].sessionId).toBe("s1");
+
+    const cleared = changedSnapshots({ t1: session({ meta: { sessionId: "s2" } }) }, [], titleOf, first.sent);
+    expect(cleared.changes.map((c) => c.sessionId)).toEqual(["s2"]);
+
+    const unknown = changedSnapshots({ t1: session({ meta: undefined }) }, [], titleOf, new Map());
+    expect(unknown.changes).toHaveLength(0);
+    expect(unknown.sent.size).toBe(0);
   });
 });

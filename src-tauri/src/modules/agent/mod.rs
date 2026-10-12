@@ -248,8 +248,13 @@ pub fn agent_detach_session(tab_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn agent_session_set_snapshot(tab_id: String, title: String, notification: String) -> bool {
-    session_store::set_snapshot(&tab_id, &title, &notification)
+pub async fn agent_session_set_snapshot(
+    tab_id: String,
+    session_id: String,
+    title: String,
+    notification: String,
+) -> bool {
+    session_store::set_snapshot(&tab_id, &session_id, &title, &notification)
 }
 
 #[tauri::command]
