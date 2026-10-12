@@ -165,7 +165,7 @@ function DetailTabRow({
               )}
             >
               <span className="flex size-3.5 shrink-0 items-center justify-center">
-                {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab, info?.isRunning)}
+                {agent && !tab.icon ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab, info?.isRunning)}
               </span>
               <span className="min-w-0 flex-1 truncate">{title}</span>
               <span aria-hidden className="size-[16px] shrink-0" />
