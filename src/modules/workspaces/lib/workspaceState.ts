@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { debouncedInvoke } from "./debouncedInvoke";
+import { seedActivity, withActivity } from "./autoHibernate";
 import { applyStartupHibernation } from "./hibernate";
 import type { Tab, SplitNode, Workspace } from "./types";
 import {
@@ -25,6 +26,10 @@ type WindowEntry = {
 };
 
 let cached: SavedState | null = null;
+
+// Last moment each workspace was active. Lives outside React state: it changes every
+// minute and must not re-render the tree; it is merged into the body on every save.
+export const activityStamps = new Map<string, number>();
 
 export function sanitizeTab(p: Tab): Tab {
   if (p.kind === "editor") return { ...p, dirty: false };
@@ -56,6 +61,7 @@ export async function initWorkspaceState(restoreAll: boolean): Promise<void> {
       : "null (no saved state)");
     if (entry && Array.isArray(entry.workspaces) && entry.workspaces.length > 0) {
       const sanitized = entry.workspaces.map(sanitizeWorkspace);
+      for (const [id, at] of seedActivity(sanitized)) activityStamps.set(id, at);
       cached = {
         workspaces: applyStartupHibernation(sanitized, entry.activeIndex, restoreAll),
         activeIndex: entry.activeIndex,
@@ -85,7 +91,7 @@ const workspaceStateSave = debouncedInvoke<PendingWorkspaceState>({
     if (import.meta.env.DEV) console.debug(`[workspace-state] saving ${workspaces.length} workspace(s) for window "${label}", activeIndex=${activeIndex}`);
     return {
       label,
-      workspaces: workspaces.map(sanitizeWorkspace),
+      workspaces: withActivity(workspaces, activityStamps).map(sanitizeWorkspace),
       activeIndex: Math.max(0, Math.min(activeIndex, workspaces.length - 1)),
     };
   },

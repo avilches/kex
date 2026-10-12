@@ -257,16 +257,22 @@ is described above (`wakeWorkspace`).
 #### Auto-hibernate
 
 The `autoHibernate` preference (Settings > Workspaces: Never, 30 minutes, 4 hours, 2 days; default 4 hours)
-hibernates idle workspaces. `useAutoHibernate` checks every minute. A workspace is idle for the time since it was
-last the active one (`touchActivity` stamps the active workspace each tick; a workspace seen for the first time,
-for instance after a restart, starts its clock then). `autoHibernateCandidates` never picks the active or an
+hibernates idle workspaces. `useAutoHibernate` checks every minute, and once right at startup. A workspace is idle for
+the time since it was last the active one. That moment is kept in `activityStamps` (`workspaceState.ts`), a module-level
+map outside React state so the minutely renewal does not re-render the tree. `touchActivity` renews the active and the
+hibernated workspaces each tick (a workspace without a stamp gets "now"), the switch effect stamps the workspace being
+left and the one entered, and every tick schedules the normal debounced `saveWorkspaceState`, whose `buildArgs` merges the
+stamps into each body as `lastActiveAt` (`withActivity`). `initWorkspaceState` seeds the map from the saved
+`lastActiveAt` (`seedActivity`), so the clocks survive a restart: a non-active workspace that was idle past the delay
+becomes due on the first tick. The workspace active at startup is renewed by that same tick and is never a candidate.
+`autoHibernateCandidates` never picks the active or an
 already hibernated workspace. For each candidate `createHibernateFlow().requestAuto` saves every dirty editor and
 markdown tab of that workspace even with autosave off (`saveWorkspaceDocs`; a failed save aborts), waits for the
 dirty flags to settle and then runs the same `hibernateReview` as the manual flow: it hibernates only if the review
 is empty, that is, no agent working, no script running, no unsaved document and no command without "Run on start".
 An agent in `attention` (waiting for the user) also blocks it, and `requestAuto` re-checks that the workspace is still
 not the active one after saving, so entering a queued workspace mid-check cancels it. A hibernated workspace keeps its
-clock at "now", so restoring it without activating it does not hibernate it again at the next tick. Changing the
+clock at "now", so waking it without activating it does not hibernate it again at the next tick. Changing the
 setting keeps the existing clocks. A document with a pending reload conflict (changed on disk while dirty)
 blocks it: `useDocument.save` throws `CONFLICT_SAVE_ERROR` while the conflict overlay is up, so `saveWorkspaceDocs`
 fails. The same guard applies to every save path (manual save reports it as a toast, the autosave timer and the
