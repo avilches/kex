@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { pathBasename } from "@/lib/pathUtils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ComputerTerminal01Icon, PlayIcon } from "@hugeicons/core-free-icons";
+import { PlayIcon } from "@hugeicons/core-free-icons";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   getRunningCommandsSnapshot,
@@ -20,16 +20,24 @@ import {
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
 import { scriptsToDelete, type RunningProcess } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
-import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import type { Workspace } from "@/modules/workspaces/lib/types";
+import { allPanes } from "@/modules/workspaces/lib/splitNode";
+import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
+import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
+import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
 
-// A custom icon set on the tab wins over the agent's, as in the tab bar.
-function RowIcon({ agent, icon }: { agent?: string; icon?: string }) {
-  const custom = icon ? getWorkspaceIcon(icon) : null;
-  if (custom) return <HugeiconsIcon icon={custom} size={12} strokeWidth={2} className="shrink-0" />;
-  if (agent) return <AgentIcon agent={agent} size={12} className="shrink-0" />;
-  return <HugeiconsIcon icon={ComputerTerminal01Icon} size={12} strokeWidth={2} className="shrink-0" />;
+// Same icon and title the tab bar shows: a custom tab icon wins over the agent's.
+function TabLabel({ tab, command }: { tab: Tab; command?: string }) {
+  const info = useAgentTabTitle(tab);
+  return (
+    <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
+      <span className="flex shrink-0 items-center">
+        {info?.agentSession && !tab.icon ? <AgentIcon agent={info.agentSession.agent} size={12} /> : tabIcon(tab, info?.isRunning)}
+      </span>
+      <span className="truncate">{info?.displayTitle}</span>
+      {command && <span className="truncate font-mono" title={command}>{command}</span>}
+    </span>
+  );
 }
 
 type Props = {
@@ -95,6 +103,10 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
   const shown = useRef<{ workspace: Workspace; groupLabel?: string } | null>(null);
   if (workspace) shown.current = { workspace, groupLabel };
   const titleWs = shown.current?.workspace;
+  const tabs = useMemo(
+    () => new Map(titleWs ? allPanes(titleWs.paneTree).flatMap((p) => p.tabs).map((t) => [t.id, t] as const) : []),
+    [titleWs],
+  );
   const titleGroup = shown.current?.groupLabel;
 
   // The dialog only opens when something is pending: once everything is
@@ -128,9 +140,12 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
             </h3>
             {agents.map((b) => (
               <div key={b.tabId} className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-                  <RowIcon agent={b.agent ?? b.name} icon={b.icon} />
-                  <span className="truncate">{b.name}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {tabs.get(b.tabId) ? (
+                    <TabLabel tab={tabs.get(b.tabId)!} command={commands.get(b.tabId)} />
+                  ) : (
+                    <span className="truncate text-[12px] text-muted-foreground">{b.name}</span>
+                  )}
                   <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
@@ -249,12 +264,12 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
           <section className="flex flex-col gap-1">
             <h3 className="text-[12px] font-medium">Running processes that will be killed</h3>
             {processes.map((p) => {
-              const agent = liveAgent(sessions[p.tabId])?.agent;
-              return (
-                <span key={p.tabId} className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-                  <RowIcon agent={agent} icon={p.icon} />
-                  {p.title && p.title !== p.label && <span className="truncate">{p.title}</span>}
-                  <span className="truncate font-mono" title={p.label}>{p.label}</span>
+              const tab = tabs.get(p.tabId);
+              return tab ? (
+                <TabLabel key={p.tabId} tab={tab} command={p.label} />
+              ) : (
+                <span key={p.tabId} className="truncate font-mono text-[12px] text-muted-foreground" title={p.label}>
+                  {p.label}
                 </span>
               );
             })}
@@ -270,9 +285,13 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
             <h3 className="text-[12px] font-medium">Commands that will not come back</h3>
             {review.commands.map((c) => (
               <div key={c.tabId} className="flex items-center justify-between gap-2">
-                <span className="truncate font-mono text-[12px] text-muted-foreground" title={c.command}>
-                  {c.command}
-                </span>
+                {tabs.get(c.tabId) ? (
+                  <TabLabel tab={tabs.get(c.tabId)!} command={c.command} />
+                ) : (
+                  <span className="truncate font-mono text-[12px] text-muted-foreground" title={c.command}>
+                    {c.command}
+                  </span>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
