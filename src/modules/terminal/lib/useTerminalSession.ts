@@ -966,6 +966,12 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   try {
     pty = await openPtyForSession(leafId, s, decision.cwd);
   } catch (e) {
+    // The tab may have been closed or hibernated while openPty was failing; blocking would
+    // register a phantom agent session for a dead tab.
+    if (s.disposed) {
+      s.ptyOpening = false;
+      return;
+    }
     const command = plan?.resumeCmd || (input.runOnStart ? s.persistentCommand ?? "" : "");
     // Keeps the agent of a consumed plan so "Try again" fetches a fresh plan instead of falling
     // back to the saved command.
