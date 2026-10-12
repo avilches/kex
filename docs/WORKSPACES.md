@@ -152,6 +152,12 @@ Key fields of a `Session`:
 | `altScreenAtRelease` | Whether the terminal was in alt-screen (TUI mode) when last unbound |
 | `visibleNow` / `focusedNow` | Current visibility/focus state |
 
+### Blocked start
+
+A leaf whose start cannot happen (unusable restore directory, `openPty` failing) has no PTY and a non-null
+`Session.restoreBlock`; `attachSession` skips it. The modal that holds it covers that tab's content only. Flow, retry
+and cancel are described in `AGENT_SESSION_RESTORE.md`, "Blocked start".
+
 ### Visible vs. hibernated
 
 When `visible` becomes **true**:

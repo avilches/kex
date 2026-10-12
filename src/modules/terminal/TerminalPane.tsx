@@ -20,6 +20,7 @@ import {
   submitToLeaf,
   useTerminalSession,
 } from "./lib/useTerminalSession";
+import { RestoreBlockedOverlay } from "./RestoreBlockedOverlay";
 import { ScratchpadBar } from "./ScratchpadBar";
 
 // Lazy: ShellInput pulls the CodeMirror stack, which must stay out of the
@@ -122,7 +123,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     if (blocks) {
       return (
         <div
-          className="zoom-exempt flex h-full w-full flex-col bg-[var(--terminal-background)]"
+          className="zoom-exempt relative flex h-full w-full flex-col bg-[var(--terminal-background)]"
           style={hideStyle}
         >
           <div
@@ -177,12 +178,15 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           {session.scratchpadOpen && focused && (
             <ScratchpadBar leafId={tabId} />
           )}
+          {session.restoreBlock && (
+            <RestoreBlockedOverlay leafId={tabId} block={session.restoreBlock} />
+          )}
         </div>
       );
     }
 
     return (
-      <div className="zoom-exempt flex h-full w-full flex-col bg-[var(--terminal-background)]" style={hideStyle}>
+      <div className="zoom-exempt relative flex h-full w-full flex-col bg-[var(--terminal-background)]" style={hideStyle}>
         <div
           ref={containerRef}
           className={cn(
@@ -193,6 +197,9 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         />
         {session.scratchpadOpen && focused && (
           <ScratchpadBar leafId={tabId} />
+        )}
+        {session.restoreBlock && (
+          <RestoreBlockedOverlay leafId={tabId} block={session.restoreBlock} />
         )}
       </div>
     );

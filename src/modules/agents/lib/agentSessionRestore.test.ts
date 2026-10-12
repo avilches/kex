@@ -20,6 +20,7 @@ function makePlan(overrides: Partial<RestorePlan> = {}): RestorePlan {
     tabId: "tab-old",
     agent: "claude",
     resumeCmd: "claude --resume 'sess-1'",
+    attemptedCmd: "",
     cwdLaunch: "/home/user/project",
     errorReason: "",
     ...overrides,

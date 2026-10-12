@@ -609,7 +609,7 @@ describe("planWake", () => {
 });
 
 describe("seedWakePlans", () => {
-  const plan = { tabId: "a", agent: "claude", resumeCmd: "claude --resume x", cwdLaunch: "/p", errorReason: "" };
+  const plan = { tabId: "a", agent: "claude", resumeCmd: "claude --resume x", attemptedCmd: "", cwdLaunch: "/p", errorReason: "" };
 
   it("seeds the plan under the same tab id for each terminal that has one", async () => {
     const seeded: [string, unknown][] = [];
