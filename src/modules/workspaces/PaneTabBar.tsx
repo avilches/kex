@@ -247,8 +247,8 @@ function DraggableTab({
           className={cn("absolute inset-x-0 top-0 bg-tab-focus-indicator", connected ? "h-[1.5px]" : "h-0.5 rounded-t")}
         />
       )}
-      <span className={cn("shrink-0", hasAgent ? "opacity-100" : "opacity-70")}>
-        {hasAgent
+      <span className={cn("shrink-0", hasAgent && !tab.icon ? "opacity-100" : "opacity-70")}>
+        {hasAgent && (isRestoreError || !tab.icon)
           ? isRestoreError
             ? <span className="text-amber-500" title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>
                 <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />

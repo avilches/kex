@@ -38,7 +38,7 @@ function SleepingTabRow({ tab }: { tab: Tab }) {
   return (
     <li title={title} className="flex h-6 items-center gap-1.5 px-2 text-[12px]">
       <span className="flex size-3.5 shrink-0 items-center justify-center">
-        {agent ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
+        {agent && !tab.icon ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab)}
       </span>
       <span className="min-w-0 flex-1 truncate">{title}</span>
     </li>
