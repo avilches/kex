@@ -179,6 +179,8 @@ import {
   clearRunningCommandEntry,
   clearScriptRunningEntry,
   getRunningCommandsSnapshot,
+  setScriptCommand,
+  getRunningScriptCommand,
   setScriptRunning,
   getScriptRunningSnapshot,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
@@ -208,6 +210,7 @@ import {
   planDelayedWrite,
   planScriptStop,
 } from "@/modules/workspaces/lib/scriptRunState";
+import { followableCommand } from "@/modules/terminal/lib/runOnStartCommand";
 import { IS_WINDOWS } from "@/lib/platform";
 import { isAutofocusActive, isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { pathBasename } from "@/lib/pathUtils";
@@ -840,6 +843,7 @@ export default function App() {
           );
           if (input !== null) {
             setScriptRunning(tabId, "running");
+            setScriptCommand(tabId, config.command);
             scheduleScriptWrite(tabId, input, 50);
           }
           return;
@@ -902,6 +906,7 @@ export default function App() {
       updateScript(activeWorkspace.id, config.id, { tabId: freshTabId });
 
       setScriptRunning(freshTabId, "running");
+      setScriptCommand(freshTabId, config.command);
       scheduleScriptWrite(
         freshTabId,
         buildScriptInput(config.command, scriptCwd, scriptShell),
@@ -3717,7 +3722,15 @@ export default function App() {
               const id = hibernateFlow.pendingWorkspaceId;
               if (!id) return;
               const isAgent = useAgentStore.getState().sessions[tabId] !== undefined;
-              updateTabData(id, tabId, (t) => enableRunOnStart(t, isAgent ? undefined : running));
+              updateTabData(id, tabId, (t) =>
+                enableRunOnStart(
+                  t,
+                  isAgent
+                    ? undefined
+                    : (followableCommand(running ?? null, getRunningScriptCommand(tabId)) ??
+                        undefined),
+                ),
+              );
             }}
           />
 

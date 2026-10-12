@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PlayIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -11,12 +11,15 @@ import { previewResumeCmd, type RestorePlan } from "@/modules/agents/lib/agentSe
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   getRunningCommandsSnapshot,
+  getRunningScriptCommand,
   subscribeToRunningCommands,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { cn } from "@/lib/utils";
 import {
+  commandOnEnable,
   commitRunOnStartEdit,
   effectiveRunOnStartCommand,
+  followableCommand,
   syncFollowedCommand,
 } from "@/modules/terminal/lib/runOnStartCommand";
 import type { Tab } from "@/modules/workspaces/lib/types";
@@ -31,9 +34,10 @@ const INPUT_CLASS =
 
 export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
   const agentSession = useAgentStore((s) => s.sessions[tab.id] ?? null);
-  const running =
+  const reported =
     useSyncExternalStore(subscribeToRunningCommands, getRunningCommandsSnapshot).get(tab.id) ??
     null;
+  const running = followableCommand(reported, getRunningScriptCommand(tab.id));
   const [open, setOpen] = useState(false);
   const sessionId = agentSession?.meta?.sessionId;
 
@@ -75,6 +79,11 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     onUpdateTab(tab.id, (p) => (p.kind === "terminal" ? { ...p, ...patch } : p));
   };
 
+  // Escape and outside clicks unmount the field without a blur, so closing persists the edit.
+  const latest = useRef(commitDraft);
+  latest.current = commitDraft;
+  useEffect(() => () => latest.current(), []);
+
   const commandField =
     agentSession && previewPlan === undefined ? (
       <div className="h-6 w-full rounded border border-border/60 bg-background/50 px-1.5 py-1 text-[11px] text-muted-foreground">
@@ -112,7 +121,12 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
     );
 
   return (
-    <ContextMenuSub onOpenChange={setOpen}>
+    <ContextMenuSub
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) commitDraft();
+      }}
+    >
       <ContextMenuSubTrigger className="gap-2">
         <HugeiconsIcon icon={PlayIcon} size={14} strokeWidth={2} />
         Run on Start
@@ -126,7 +140,7 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
               ...p,
               restoreOnRestart: next,
               persistentCommand: next
-                ? (tab.persistentCommand ?? running ?? undefined)
+                ? commandOnEnable(tab, running, agentSession !== null)
                 : tab.persistentCommand,
             }))
           }

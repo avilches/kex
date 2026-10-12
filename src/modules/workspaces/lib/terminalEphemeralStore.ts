@@ -83,7 +83,20 @@ export function setScriptRunning(tabId: string, state: ScriptState | false): voi
 }
 
 export function clearScriptRunningEntry(tabId: string): void {
+  scriptCommands.delete(tabId);
   if (!scriptRunning.has(tabId)) return;
   scriptRunning.delete(tabId);
   notifyScript();
+}
+
+// The user's own command of the script a tab is running. The shell reports the
+// typed wrapper (`cd -- '...' && { cmd }`), never this text.
+const scriptCommands = new Map<string, string>();
+
+export function setScriptCommand(tabId: string, command: string): void {
+  scriptCommands.set(tabId, command);
+}
+
+export function getRunningScriptCommand(tabId: string): string | null {
+  return scriptRunning.has(tabId) ? (scriptCommands.get(tabId) ?? null) : null;
 }
