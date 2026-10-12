@@ -27,6 +27,8 @@ type TabCommon = {
   notePos?: { x: number; y: number };
   locked?: boolean;
   autofocus?: boolean;
+  // Name from WORKSPACE_ICON_PALETTE that replaces the default icon of the kind.
+  icon?: string;
 };
 
 export type Tab =

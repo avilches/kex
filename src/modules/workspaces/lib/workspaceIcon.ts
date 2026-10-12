@@ -102,6 +102,8 @@ import type { IconSvgElement } from "@hugeicons/react";
 // Page 0: Dev & Code | Page 1: Infra & Hardware | Page 2: AI, Science & Design
 export const WORKSPACE_ICON_PALETTE = [
   // Page 0 – Dev & Code
+  { name: "HeartIcon", label: "Heart", icon: HeartIcon },
+  { name: "StarIcon", label: "Star", icon: StarIcon },
   { name: "CodeIcon", label: "Code", icon: CodeIcon },
   { name: "TerminalIcon", label: "Terminal", icon: TerminalIcon },
   { name: "ComputerTerminal01Icon", label: "Console", icon: ComputerTerminal01Icon },
@@ -132,8 +134,6 @@ export const WORKSPACE_ICON_PALETTE = [
   { name: "BlockchainIcon", label: "Blockchain", icon: BlockchainIcon },
   { name: "BookOpen01Icon", label: "Docs", icon: BookOpen01Icon },
   { name: "Analytics01Icon", label: "Analytics", icon: Analytics01Icon },
-  { name: "ArrowUpIcon", label: "Arrow Up", icon: ArrowUpIcon },
-  { name: "ArrowDownIcon", label: "Arrow Down", icon: ArrowDownIcon },
 
   // Page 1 – Infra & Hardware
   { name: "ServerStackIcon", label: "Server", icon: ServerStackIcon },
@@ -197,11 +197,11 @@ export const WORKSPACE_ICON_PALETTE = [
   { name: "BoltIcon", label: "Bolt", icon: BoltIcon },
   { name: "TargetIcon", label: "Target", icon: TargetIcon },
   { name: "MagnetIcon", label: "Magnet", icon: MagnetIcon },
-  { name: "StarIcon", label: "Star", icon: StarIcon },
   { name: "CrownIcon", label: "Crown", icon: CrownIcon },
   { name: "Award01Icon", label: "Award", icon: Award01Icon },
-  { name: "HeartIcon", label: "Heart", icon: HeartIcon },
   { name: "LeafIcon", label: "Eco", icon: LeafIcon },
+  { name: "ArrowUpIcon", label: "Arrow Up", icon: ArrowUpIcon },
+  { name: "ArrowDownIcon", label: "Arrow Down", icon: ArrowDownIcon },
 ] as const;
 
 export const PALETTE_PAGE_SIZE = 32;
