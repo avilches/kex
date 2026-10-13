@@ -66,7 +66,8 @@ model.
 - `WorkspaceSidebar` (52px vertical strip, left) — replaces the horizontal `TabBar`. Lists workspaces as icon avatars
   with stable colors derived from their ID. Keyboard-navigable.
 - `Sidebar` (collapsible, default 240px, right) — holds Explorer, Source Control, and Git History as tabs. Width,
-  active tab, open/closed state, and dock side persist via `window_save_sidebar` per OS window.
+  open/closed state, and dock side persist via `window_save_sidebar` per OS window; the active tab is per workspace
+  (see "Per-window sidebar state" below).
 - `sidebarSide` per-window state — moves the tool panel to the left of the center content for users who prefer that layout.
 - `SidebarRail` and `useSidebarPanel` deleted (replaced by Sidebar).
 - `Header` no longer owns the tab bar.
@@ -125,7 +126,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 
 **What was built:**
 
-- The sidebar chrome (open, active view, width, dock side) is now per OS window. It is persisted in the
+- The sidebar chrome (open, width, dock side) is now per OS window. It is persisted in the
   `workspaces.json` index as a `sidebar` field on each window entry and restored on startup, reusing the existing
   per-window state plumbing (`window_get_state`) plus the dedicated `window_save_sidebar` command. The frontend holds
   it in `useSidebarState(label)` (debounced save).
