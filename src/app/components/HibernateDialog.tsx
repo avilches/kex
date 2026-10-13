@@ -34,7 +34,7 @@ function TabLabel({ tab, command }: { tab: Tab; command?: string }) {
       <span className="flex shrink-0 items-center">
         {info?.agentSession && !tab.icon ? <AgentIcon agent={info.agentSession.agent} size={12} /> : tabIcon(tab, info?.isRunning)}
       </span>
-      <span className="truncate">{info?.displayTitle}</span>
+      <span className="shrink-[100] truncate">{info?.displayTitle}</span>
       {command && <span className="truncate font-mono" title={command}>{command}</span>}
     </span>
   );
@@ -186,7 +186,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
               <div key={b.tabId} className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
                   <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
-                  <span className="truncate">{b.name}</span>
+                  <span className="shrink-[100] truncate">{b.name}</span>
                   {b.command && b.command !== b.name && (
                     <span className="truncate font-mono" title={b.command}>{b.command}</span>
                   )}
