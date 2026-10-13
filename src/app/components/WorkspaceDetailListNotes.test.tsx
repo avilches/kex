@@ -36,34 +36,36 @@ function mount(visibleTabIds: string, tabs: Tab[] = baseTabs) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  act(() => {
-    root.render(
-      createElement(
-        SidebarTabMenuProvider,
-        { value: actions },
+  const draw = (current: Tab[]) =>
+    act(() => {
+      root.render(
         createElement(
-          DndContext,
-          null,
-          createElement(WorkspaceDetailList, {
-            workspaceId: "ws-1",
-            tabs,
-            entries: [],
-            filter,
-            focusedTabId: visibleTabIds.split(",")[0] ?? null,
-            visibleTabIds,
-            onActivate: () => {},
-          }),
+          SidebarTabMenuProvider,
+          { value: actions },
+          createElement(
+            DndContext,
+            null,
+            createElement(WorkspaceDetailList, {
+              workspaceId: "ws-1",
+              tabs: current,
+              entries: [],
+              filter,
+              focusedTabId: visibleTabIds.split(",")[0] ?? null,
+              visibleTabIds,
+              onActivate: () => {},
+            }),
+          ),
         ),
-      ),
-    );
-  });
+      );
+    });
+  draw(tabs);
   mounted.push(() => act(() => root.unmount()));
   const noteButton = (id: string) =>
     container
       .querySelector(`[data-detail-row-id="${id}"]`)
       ?.closest(".group\\/tab")
       ?.querySelector<HTMLButtonElement>('button[aria-label="Tab note"]');
-  return { container, noteButton, onUpdateTab };
+  return { container, noteButton, onUpdateTab, rerender: draw };
 }
 
 function hover(el: Element, over: boolean) {
@@ -126,6 +128,20 @@ describe("WorkspaceDetailList tab notes", () => {
     act(() => btn.click());
     expect(onUpdateTab).toHaveBeenCalledTimes(1);
     expect(docked("t-a")).toBeNull();
+  });
+
+  it("turning the note back on while the pointer stays on the icon shows the docked preview again", () => {
+    const on: Tab[] = [{ ...baseTabs[0], noteOpen: true }, baseTabs[1]];
+    const { noteButton, rerender } = mount("", on);
+    const btn = noteButton("t-a")!;
+    hover(btn, true);
+    act(() => btn.click());
+    rerender([baseTabs[0], baseTabs[1]]);
+    expect(docked("t-a")).toBeNull();
+    act(() => noteButton("t-a")!.click());
+    rerender(on);
+    expect(docked("t-a")).not.toBeNull();
+    expect(closeButton()).not.toBeNull();
   });
 
   it("a docked preview of an open note has a close button that hides the note", () => {

@@ -333,10 +333,12 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   // when it is turned off.
   const handleNoteToggle = useCallback(
     (tabId: string) => {
+      // The pointer is still on the icon, so no new enter event will reopen the preview.
       if (tabsById.get(tabId)?.noteOpen) notePreview.close();
+      else if (!visibleSet.has(tabId)) notePreview.show(tabId);
       onUpdateTab(tabId, toggleTabNote);
     },
-    [tabsById, notePreview.close, onUpdateTab],
+    [tabsById, visibleSet, notePreview.close, notePreview.show, onUpdateTab],
   );
   useEffect(() => () => setSidebarHover(null), [setSidebarHover]);
   const previewTab = notePreview.tabId ? tabsById.get(notePreview.tabId) : undefined;
