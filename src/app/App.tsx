@@ -156,6 +156,7 @@ import {
   flushSidebarSnapshotsNow,
   pushSidebarSnapshot,
   startSidebarSnapshotSync,
+  withSidebarSnapshotFlush,
 } from "@/modules/workspaces/lib/sidebarSnapshotSync";
 import { setEditorFlush } from "./lib/editorFlush";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
@@ -685,10 +686,20 @@ export default function App() {
     side: sidebarSide,
     width: sidebarWidth,
     stateRef: sidebarStateRef,
-    setOpen: setSidebarOpen,
-    setSide: setSidebarSide,
+    setOpen: setSidebarOpenNow,
+    setSide: setSidebarSideNow,
     setWidth: setSidebarWidth,
   } = useSidebarState(windowLabel);
+  // Opening, closing or moving the Sidebar remounts the explorer: flush first so it restores
+  // the latest snapshot instead of overwriting a pending one.
+  const setSidebarOpen = useMemo(
+    () => withSidebarSnapshotFlush(setSidebarOpenNow),
+    [setSidebarOpenNow],
+  );
+  const setSidebarSide = useMemo(
+    () => withSidebarSnapshotFlush(setSidebarSideNow),
+    [setSidebarSideNow],
+  );
   const sidebarView: SidebarView =
     activeWorkspace?.sidebar?.view ?? DEFAULT_WORKSPACE_SIDEBAR.view;
   const sidebarViewRef = useRef(sidebarView);
@@ -2071,7 +2082,8 @@ export default function App() {
     () => startSidebarSnapshotSync(applyExplorerSnapshotBatch),
     [applyExplorerSnapshotBatch],
   );
-  // Flush on cleanup so a restore after a switch or a Sidebar reopen never reads a stale snapshot.
+  // Flush on cleanup so a restore after a workspace switch never reads a stale snapshot; the
+  // open and side setters already flush synchronously, this is their safety net.
   useEffect(
     () => () => {
       flushSidebarSnapshotsNow();

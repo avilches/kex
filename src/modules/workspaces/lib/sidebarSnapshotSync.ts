@@ -26,6 +26,17 @@ export function flushSidebarSnapshotsNow(): boolean {
   return active?.flush() ?? false;
 }
 
+// For a change that remounts the Sidebar (side, open): the flush and the change
+// land in one render, so the new explorer never reads a snapshot older than a pending one.
+export function withSidebarSnapshotFlush<A extends unknown[]>(
+  fn: (...args: A) => void,
+): (...args: A) => void {
+  return (...args) => {
+    flushSidebarSnapshotsNow();
+    fn(...args);
+  };
+}
+
 // Same beat as flushAgentTitles: lets the state the flush set reach the debounced
 // workspace save before the caller flushes that.
 export async function flushSidebarSnapshots(): Promise<void> {
