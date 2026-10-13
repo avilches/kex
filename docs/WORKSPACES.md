@@ -101,8 +101,9 @@ or reopening the Sidebar mounts a fresh explorer that applies the snapshot once.
 the pure `restoreExplorerSnapshot(snapshot, root)`: it keeps what lies under the current root, opens
 the folders in between, and restores the scroll only on the root it was recorded on, so a root that
 moved up keeps everything, one that moved down keeps what is still under it and an unrelated one
-keeps nothing. Root changes inside a session do not use the snapshot: `expansionCache` and the
-JSON-only `keepFolderLayoutOnChangeExplorerRoot` still decide what stays open. Saving goes through a
+keeps nothing. A root change inside a session carries the open
+folders over through the same rule (`carryOverExpanded`, which also opens the previous root), with no
+per-root memory: what a move down dropped does not come back on the way up. Saving goes through a
 10 s coalescer, flushed before anything that remounts the explorer. The details (selection and
 scroll while folders load, reveal requests, flush points) are in the paragraph "Sidebar view state
 per workspace" of [ARCHITECTURE.md](ARCHITECTURE.md).

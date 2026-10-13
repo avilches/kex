@@ -185,8 +185,9 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   drive root) whose double-click climbs to the parent directory; the selector uses the hierarchy icon and its subtitle
   shows the current root path. If the current root is deleted while shown, the explorer silently relocates to the
   nearest existing ancestor instead of showing a recovery state. The current root is stored as `fsRoot` in
-  `workspace-state.json` (default home). A JSON-only preference `keepFolderLayoutOnChangeExplorerRoot` (default `false`)
-  controls whether the per-root tree expansion layout is restored on root change or the tree starts collapsed. The `..`
+  `workspace-state.json` (default home). A root change carries the open folders over through the same rule used to
+  restore a workspace snapshot (`carryOverExpanded`): folders under the new root stay open, going up also opens the old
+  root, and an unrelated root keeps nothing. The `..`
   row appears only in File System mode; Workspace Root mode is unaffected.
 - **Folder context actions** — a folder's context menu offers "Open in Terminal" (opens a new terminal tab in the
   current workspace's active pane, spawned directly with the folder as cwd, leaving the explorer view untouched) and

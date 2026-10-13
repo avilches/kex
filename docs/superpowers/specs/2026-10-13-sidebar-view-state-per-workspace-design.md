@@ -2,7 +2,7 @@
 
 ## Problem
 
-The Sidebar is a single instance shared by every workspace. Switching workspace changes its props and loses the view state: which explorer folders are open, which file is selected, the scroll position and the active view (explorer, git, history, notes). A hibernated workspace, or a closed Sidebar, unmounts it and loses the same state. The only memory today is `expansionCache` in `useFileTree.ts`: in memory, keyed by root path (not by workspace), 8 entries, gone after a restart, and it covers neither selection, scroll nor view.
+The Sidebar is a single instance shared by every workspace. Switching workspace changes its props and loses the view state: which explorer folders are open, which file is selected, the scroll position and the active view (explorer, git, history, notes). A hibernated workspace, or a closed Sidebar, unmounts it and loses the same state. The only memory was `expansionCache` in `useFileTree.ts` (since removed): in memory, keyed by root path (not by workspace), 8 entries, gone after a restart, and it covered neither selection, scroll nor view.
 
 ## Decisions
 
@@ -37,7 +37,7 @@ sidebar?: {
 
 A root that moves up keeps everything, a root that moves down keeps what is still under it, and an unrelated root keeps nothing. A restored folder that no longer exists on disk fails its directory read and is dropped silently; the rest still opens.
 
-The snapshot is applied only when a workspace becomes active or the Sidebar mounts (workspace switch, wake, reopening a closed Sidebar). A root change inside a session keeps today's behavior: `expansionCache` and the JSON-only preference `keepFolderLayoutOnChangeExplorerRoot` (default `false`, tree starts collapsed) are untouched. `useFileTree` takes an optional initial expanded set from the snapshot for the first load of a root, and keeps reporting its expanded set outward, so the snapshot always mirrors what the tree shows (a collapsed tree after a root change saves an empty list).
+The snapshot is applied only when a workspace becomes active or the Sidebar mounts (workspace switch, wake, reopening a closed Sidebar). A root change inside a session carries the current open folders over through the same rule (`carryOverExpanded`: the previous root is added to the set and `restoreExplorerSnapshot` keeps what lies under the new root plus the folders in between); `expansionCache` and the JSON-only preference `keepFolderLayoutOnChangeExplorerRoot` are removed, and there is no per-root memory. `useFileTree` takes an optional initial expanded set from the snapshot for the first load of a root, and keeps reporting its expanded set outward, so the snapshot always mirrors what the tree shows (a root change saves the carried-over list).
 
 ## Saving
 
@@ -71,7 +71,7 @@ Hibernating leaves the Sidebar unmounted as today; the snapshot is already saved
 
 ## Documentation
 
-`docs/ARCHITECTURE.md` and `docs/WORKSPACES.md` describe the state model and the restore rule, and state that `expansionCache` and `keepFolderLayoutOnChangeExplorerRoot` still govern root changes inside a session. `docs/IPC.md` is updated for the `window_save_sidebar` signature.
+`docs/ARCHITECTURE.md` and `docs/WORKSPACES.md` describe the state model and the restore rule, and state that a root change inside a session carries the open folders over through the same rule. `docs/IPC.md` is updated for the `window_save_sidebar` signature.
 
 ## Out of scope
 
