@@ -330,7 +330,7 @@ function SortableWorkspaceItem({
       )}
     >
       {agentEntries[0].visual === "working" ? (
-        <Spinner size={11} />
+        <Spinner size={11} className="text-white" />
       ) : (
         <span
           className={cn(
