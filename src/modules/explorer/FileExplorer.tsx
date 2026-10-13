@@ -64,6 +64,7 @@ import {
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { dirname, useFileTree } from "./lib/useFileTree";
+import { shouldClearSelection } from "./lib/staleSelection";
 import {
   restoreExplorerSnapshot,
   type ExplorerSnapshot,
@@ -591,11 +592,10 @@ export const FileExplorer = memo(
     }, [rows]);
 
     useEffect(() => {
-      if (!selectedPath || entryIndexByPath.has(selectedPath)) return;
-      // A restored selection sits under folders whose children are still
-      // loading; only drop it once its parent listing is known.
-      if (tree.nodes[dirname(selectedPath)]?.status !== "loaded") return;
-      setSelectedPath(null);
+      if (!selectedPath) return;
+      const parentStatus = tree.nodes[dirname(selectedPath)]?.status;
+      if (shouldClearSelection(entryIndexByPath.has(selectedPath), parentStatus))
+        setSelectedPath(null);
     }, [entryIndexByPath, selectedPath, tree.nodes]);
 
     useEffect(() => {
