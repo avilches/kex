@@ -167,7 +167,7 @@ function DetailTabRow({
                 isDragging && "opacity-40",
                 focused
                   ? "font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground",
+                  : "text-muted-foreground group-hover/tab:bg-foreground/[0.08] group-hover/tab:text-foreground",
               )}
               style={
                 focused
