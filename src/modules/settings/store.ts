@@ -167,7 +167,6 @@ export type Preferences = {
   editorCursorBlinkRate: number;
   editorCursorStyle: CursorStyle;
   warnOnCloseTabWithRunningProcess: boolean;
-  restoreAllWorkspacesOnStartup: boolean;
   autoHibernate: AutoHibernate;
   terminalFontFamily: string;
   terminalShell: string;
@@ -231,7 +230,6 @@ const KEY_AUTOFOCUS_MODE = "autofocusMode";
 const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
-const KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP = "restoreAllWorkspacesOnStartup";
 const KEY_AUTO_HIBERNATE = "autoHibernate";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_UI_FONT = "uiFont";
@@ -417,7 +415,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorCursorBlinkRate: EDITOR_BLINK_RATE_DEFAULT,
   editorCursorStyle: "bar",
   warnOnCloseTabWithRunningProcess: true,
-  restoreAllWorkspacesOnStartup: false,
   autoHibernate: "4h",
   terminalFontFamily: "",
   terminalShell: "",
@@ -614,9 +611,6 @@ export async function loadPreferences(): Promise<Preferences> {
     warnOnCloseTabWithRunningProcess:
       getTerminal<boolean>(KEY_WARN_ON_CLOSE_RUNNING) ??
       DEFAULT_PREFERENCES.warnOnCloseTabWithRunningProcess,
-    restoreAllWorkspacesOnStartup:
-      getGeneral<boolean>(KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP) ??
-      DEFAULT_PREFERENCES.restoreAllWorkspacesOnStartup,
     autoHibernate: parseAutoHibernate(getGeneral<string>(KEY_AUTO_HIBERNATE)),
     terminalFontFamily:
       getTerminal<string>(KEY_TERMINAL_FONT_FAMILY) ??
@@ -927,10 +921,6 @@ export async function setEditorCursorStyle(value: CursorStyle): Promise<void> {
 
 export async function setWarnOnCloseTabWithRunningProcess(value: boolean): Promise<void> {
   await writeTerminalPref(KEY_WARN_ON_CLOSE_RUNNING, value);
-}
-
-export async function setRestoreAllWorkspacesOnStartup(value: boolean): Promise<void> {
-  await writePref(KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP, value);
 }
 
 export async function setAutoHibernate(value: AutoHibernate): Promise<void> {
@@ -1256,7 +1246,6 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
-  [KEY_RESTORE_ALL_WORKSPACES_ON_STARTUP]: "restoreAllWorkspacesOnStartup",
   [KEY_AUTO_HIBERNATE]: "autoHibernate",
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",

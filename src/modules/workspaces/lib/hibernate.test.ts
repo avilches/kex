@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   applyHibernate,
-  applyStartupHibernation,
   applyWake,
   blockedWhileHibernated,
   editorTabIds,
@@ -198,53 +197,6 @@ describe("enableRunOnStart", () => {
   it("ignores non-terminal tabs", () => {
     const e = editor("e1", false);
     expect(enableRunOnStart(e, "x")).toBe(e);
-  });
-});
-
-describe("applyStartupHibernation", () => {
-  const three = () => [ws({ id: "a" }), ws({ id: "b" }), ws({ id: "c" })];
-
-  it("keeps the active workspace awake and hibernates the rest", () => {
-    const out = applyStartupHibernation(three(), 1, false);
-    expect(out.map((w) => w.hibernated)).toEqual([true, undefined, true]);
-  });
-
-  it("turns off floating on browser tabs of the hibernated workspaces", () => {
-    const b: Tab = { id: "b1", kind: "browser", url: "https://x.test", floating: true };
-    const w = ws({ id: "x", paneTree: { kind: "pane", id: "p1", tabs: [b], activeTabId: "b1" } });
-    const out = applyStartupHibernation([ws({ id: "a" }), w], 0, false);
-    const pane = out[1]!.paneTree as Extract<SplitNode, { kind: "pane" }>;
-    const tab = pane.tabs[0]!;
-    expect(tab.kind === "browser" && tab.floating).toBe(false);
-  });
-
-  it("leaves already hibernated workspaces hibernated", () => {
-    const out = applyStartupHibernation([ws({ id: "a" }), ws({ id: "b", hibernated: true })], 0, false);
-    expect(out.map((w) => w.hibernated)).toEqual([undefined, true]);
-  });
-
-  it("keeps the active workspace hibernated if it already was", () => {
-    const out = applyStartupHibernation([ws({ id: "a", hibernated: true }), ws({ id: "b" })], 0, false);
-    expect(out.map((w) => w.hibernated)).toEqual([true, true]);
-  });
-
-  it("returns the same array when restoreAll is true", () => {
-    const input = three();
-    expect(applyStartupHibernation(input, 0, true)).toBe(input);
-  });
-
-  it("clamps an out-of-range activeIndex", () => {
-    expect(applyStartupHibernation(three(), 99, false).map((w) => w.hibernated)).toEqual([true, true, undefined]);
-    expect(applyStartupHibernation(three(), -3, false).map((w) => w.hibernated)).toEqual([undefined, true, true]);
-  });
-
-  it("does not touch a single workspace", () => {
-    expect(applyStartupHibernation([ws()], 0, false)[0]!.hibernated).toBeUndefined();
-  });
-
-  it("returns an empty array as is", () => {
-    const input: Workspace[] = [];
-    expect(applyStartupHibernation(input, 0, false)).toBe(input);
   });
 });
 

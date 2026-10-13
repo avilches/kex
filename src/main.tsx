@@ -31,15 +31,13 @@ await invoke("pty_close_all").catch(() => {});
 
 // Seed before first paint so default tab mounts at target cwd (no flicker).
 await initLaunchDir();
-// Preferences are awaited first because restoreAllWorkspacesOnStartup decides
-// which saved workspaces start hibernated.
-// A failed load must not stop the window from showing: restore everything then.
+// A failed load must not stop the window from showing.
 const startupPrefs = await loadPreferences().catch((err) => {
   console.error("loadPreferences failed at startup:", err);
   return null;
 });
 // Load saved workspace layout for session restore.
-await initWorkspaceState(startupPrefs?.restoreAllWorkspacesOnStartup ?? true);
+await initWorkspaceState();
 
 // Sync Claude Code hooks on startup — idempotent in both directions:
 // - integration ON:  install/update script and settings.json entries (no-op if up to date)

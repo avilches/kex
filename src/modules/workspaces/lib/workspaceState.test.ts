@@ -95,16 +95,15 @@ describe("initWorkspaceState", () => {
     });
   });
 
-  it("hibernates every saved workspace but the active one when restoreAll is false", async () => {
-    await initWorkspaceState(false);
+  it("restores every saved workspace as it was, keeping hibernated ones hibernated", async () => {
+    invokeMock.mockResolvedValue({
+      workspaces: [saved("a"), { ...saved("b"), hibernated: true }, saved("c")],
+      activeIndex: 0,
+    });
+    await initWorkspaceState();
     const state = getSavedWorkspaceState()!;
-    expect(state.activeIndex).toBe(1);
-    expect(state.workspaces.map((w) => w.hibernated)).toEqual([true, undefined, true]);
-  });
-
-  it("hibernates nothing when restoreAll is true", async () => {
-    await initWorkspaceState(true);
-    expect(getSavedWorkspaceState()!.workspaces.some((w) => w.hibernated)).toBe(false);
+    expect(state.activeIndex).toBe(0);
+    expect(state.workspaces.map((w) => w.hibernated)).toEqual([undefined, true, undefined]);
   });
 });
 
@@ -127,7 +126,7 @@ describe("activity stamps glue", () => {
       workspaces: [body("a", { lastActiveAt: 10 }), body("b")],
       activeIndex: 0,
     });
-    await initWorkspaceState(true);
+    await initWorkspaceState();
     expect([...activityStamps]).toEqual([["a", 10]]);
   });
 
