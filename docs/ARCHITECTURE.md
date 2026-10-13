@@ -403,12 +403,10 @@ workspace restores the same layout and tabs. Limitations: scripts launched from 
 not relaunched on wake, unsaved editor edits are discarded, and an agent that cannot be resumed
 follows the existing restore error path. Rendering details are in `docs/WORKSPACES.md`.
 
-Startup: unless the global preference `restoreAllWorkspacesOnStartup` (Settings > Workspaces, default
-off) is on, `initWorkspaceState(restoreAll)` hibernates every saved workspace of the window except the
-one at the saved `activeIndex` (`applyStartupHibernation`), with no review dialog because nothing is
-running yet. `main.tsx` awaits `loadPreferences()` before `initWorkspaceState` for that reason. The
-preference is read at startup only, so a change applies from the next launch. Nothing is lost: the
-tabs stay in the workspace JSON and each workspace comes back with Restore.
+Startup: there is no startup preference. `initWorkspaceState()` restores every saved workspace as it was:
+the ones that were hibernated (manually or by auto-hibernate) stay hibernated, the rest mount normally. Their
+`lastActiveAt` is seeded into `activityStamps`, so auto-hibernate keeps counting their inactivity from the
+last real activity instead of restarting the clock. Memory is controlled by auto-hibernate alone.
 
 ### 5.8 Workspace authorization and file opening
 
