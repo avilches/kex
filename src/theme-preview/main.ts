@@ -284,7 +284,7 @@ function tabBar(): HTMLElement {
     "flex flex-wrap items-center gap-1 border-border bg-card text-muted-foreground",
     active,
     tab("idle", "bg-muted/40"),
-    tab("working", "bg-muted/40", "ml-0.5 size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70"),
+    tab("working", "bg-muted/40", "ml-0.5 size-[11px] animate-spin rounded-full border-2 border-transparent border-t-primary"),
     tab("attention", "bg-muted/40", "ml-0.5 inline-block size-[6px] rounded-full bg-amber-400"),
     tab("restore error", "bg-muted/40 text-destructive/70", "ml-0.5 inline-block size-[6px] rounded-full bg-destructive"),
     gitTab,

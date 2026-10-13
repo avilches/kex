@@ -1,10 +1,10 @@
+import { Spinner } from "@/components/ui/spinner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ArrowDown01Icon,
   PlayIcon,
   StopIcon,
   Tick02Icon,
-  Loading03Icon,
 } from "@hugeicons/core-free-icons";
 import {
   DropdownMenu,
@@ -105,7 +105,7 @@ export function RunButton({
               )}
             >
               {cfgWaiting ? (
-                <HugeiconsIcon icon={Loading03Icon} size={12} strokeWidth={2} className="animate-spin" />
+                <Spinner size={14} className="text-current" />
               ) : (
                 <HugeiconsIcon icon={cfgRunning ? StopIcon : PlayIcon} size={12} strokeWidth={2} />
               )}
@@ -179,7 +179,7 @@ export function RunButton({
           )}
         >
           {isWaiting ? (
-            <HugeiconsIcon icon={Loading03Icon} size={13} strokeWidth={2} className="animate-spin" />
+            <Spinner size={15} className="text-current" />
           ) : (
             <HugeiconsIcon
               icon={isActive_ ? StopIcon : PlayIcon}

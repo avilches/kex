@@ -6,13 +6,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  SPINNER_STYLES,
+  type SpinnerStyle,
   setExplorerGitColorScheme,
+  setSpinnerStyle,
   setUiFont,
   setZoomLevel,
 } from "@/modules/settings/store";
@@ -50,6 +54,12 @@ function fromSelectValue(selectValue: string): string {
   return selectValue === DEFAULT_FONT_SENTINEL ? "" : selectValue;
 }
 
+const SPINNER_STYLE_LABELS: Record<SpinnerStyle, string> = {
+  arc: "Arc",
+  braille: "Braille",
+  cursor: "Cursor",
+};
+
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
 const ZOOM_STEP = 0.05;
@@ -57,6 +67,7 @@ const ZOOM_STEP = 0.05;
 export function AppearanceSection() {
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
+  const spinnerStyle = usePreferencesStore((s) => s.spinnerStyle);
   const uiFont = usePreferencesStore((s) => s.uiFont);
   const hydrated = usePreferencesStore((s) => s.hydrated);
 
@@ -156,6 +167,33 @@ export function AppearanceSection() {
             >
               <HugeiconsIcon icon={Refresh01Icon} size={11} />
             </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <FieldLabel>Spinner</FieldLabel>
+        <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+          <span className="text-[12.5px] font-medium">Loading indicator</span>
+          <div className="grid grid-cols-3 gap-2">
+            {SPINNER_STYLES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => void setSpinnerStyle(s)}
+                className={cn(
+                  "flex flex-col items-center gap-2 rounded-lg border p-2.5 transition-all",
+                  spinnerStyle === s
+                    ? "border-foreground/60 ring-1 ring-foreground/20"
+                    : "border-border/60 hover:border-border",
+                )}
+              >
+                <span className="flex h-6 items-center">
+                  <Spinner size={20} style={s} />
+                </span>
+                <span className="text-[12px] font-medium">{SPINNER_STYLE_LABELS[s]}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>

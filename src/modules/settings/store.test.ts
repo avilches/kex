@@ -12,6 +12,7 @@ import {
   parseCursorInactiveStyle,
   parseCursorStyle,
   parseScmViewMode,
+  parseSpinnerStyle,
   parseTerminalNewFolderMode,
   parseThemePref,
   DEFAULT_PREFERENCES,
@@ -98,6 +99,20 @@ describe("scmViewMode", () => {
     expect(parseScmViewMode(undefined)).toBe("tree");
     expect(parseScmViewMode(null)).toBe("tree");
     expect(parseScmViewMode(42)).toBe("tree");
+  });
+});
+
+describe("spinnerStyle", () => {
+  it("defaults to arc", () => {
+    expect(DEFAULT_PREFERENCES.spinnerStyle).toBe("arc");
+  });
+
+  it("accepts only the known styles", () => {
+    expect(parseSpinnerStyle("arc")).toBe("arc");
+    expect(parseSpinnerStyle("braille")).toBe("braille");
+    expect(parseSpinnerStyle("cursor")).toBe("cursor");
+    expect(parseSpinnerStyle("dots")).toBe("arc");
+    expect(parseSpinnerStyle(undefined)).toBe("arc");
   });
 });
 

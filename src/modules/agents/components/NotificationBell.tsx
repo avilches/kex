@@ -1,13 +1,12 @@
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import {
   Cancel01Icon,
-  Loading03Icon,
   Notification01Icon,
   Notification03Icon,
 } from "@hugeicons/core-free-icons";
@@ -50,7 +49,7 @@ function EntryDot({ visual }: { visual: AgentEntry["visual"] }) {
   // Mirrors the tab indicators in PaneTabBar so the bell stays visually in sync.
   if (visual === "working") {
     return (
-      <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
+      <Spinner size={11} />
     );
   }
   if (visual === "error") {
@@ -243,12 +242,11 @@ export function NotificationBell({ onActivate }: Props) {
               disabled={installing}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
             >
-              <HugeiconsIcon
-                icon={installing ? Loading03Icon : Notification03Icon}
-                size={14}
-                strokeWidth={1.75}
-                className={cn(installing && "animate-spin")}
-              />
+              {installing ? (
+                <Spinner size={16} className="text-current" />
+              ) : (
+                <HugeiconsIcon icon={Notification03Icon} size={14} strokeWidth={1.75} />
+              )}
               <span className="text-left">
                 <span className="block font-medium">
                   {installing

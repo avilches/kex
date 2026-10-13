@@ -1,3 +1,4 @@
+import { Spinner } from "@/components/ui/spinner";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   AlertDialog,
@@ -146,7 +147,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                   ) : (
                     <span className="truncate text-[12px] text-muted-foreground">{b.name}</span>
                   )}
-                  <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-foreground/70" />
+                  <Spinner size={11} />
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   {!closing && b.runOnStart && (

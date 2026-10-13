@@ -86,7 +86,7 @@ export function WorktreePicker({ label, path, onFetchWorktrees, onSelect }: Prop
           <CommandList className="max-h-[60vh] pt-1">
             {loading ? (
               <div className="flex items-center justify-center py-4">
-                <Spinner className="size-4" />
+                <Spinner size={18} />
               </div>
             ) : (
               <>

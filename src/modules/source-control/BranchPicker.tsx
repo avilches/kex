@@ -140,7 +140,7 @@ export function BranchPicker({
           <CommandList className="max-h-64">
             {loading ? (
               <div className="flex items-center justify-center py-4">
-                <Spinner className="size-4" />
+                <Spinner size={18} />
               </div>
             ) : (
               <>
@@ -183,7 +183,7 @@ export function BranchPicker({
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11.5px] transition-colors hover:bg-accent disabled:opacity-50"
               >
                 {busyName === searchValue.trim() ? (
-                  <Spinner className="size-3 shrink-0" />
+                  <Spinner size={14} />
                 ) : (
                   <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={1.9} className="shrink-0 text-muted-foreground" />
                 )}
@@ -226,7 +226,7 @@ function BranchItem({
     >
       <span className="flex size-3.5 shrink-0 items-center justify-center">
         {isBusy ? (
-          <Spinner className="size-3" />
+          <Spinner size={14} />
         ) : (
           <HugeiconsIcon
             icon={GitBranchIcon}

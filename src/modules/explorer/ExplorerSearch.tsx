@@ -1,3 +1,4 @@
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -242,7 +243,9 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
       {open ? (
         <div className="relative shrink-0 px-2 py-1.5 animate-in fade-in-0 slide-in-from-top-3 duration-200 ease-out">
           {searching ? (
-            <div className="absolute top-1/2 left-4 -translate-y-1/2 size-[13px] rounded-full border border-transparent border-t-foreground/70 animate-spin" />
+            <span className="absolute top-1/2 left-4 flex -translate-y-1/2 items-center">
+              <Spinner size={15} />
+            </span>
           ) : (
             <HugeiconsIcon
               icon={Search01Icon}

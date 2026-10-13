@@ -1,3 +1,4 @@
+import { Spinner } from "@/components/ui/spinner";
 import { chipColorOnWhite } from "@/modules/workspaces/lib/workspaceColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
@@ -34,7 +35,7 @@ import {
 function StatusMark({ visual }: { visual: DetailRow["visual"] }) {
   if (visual === "working") {
     return (
-      <span className="size-[8px] shrink-0 animate-spin rounded-full border border-transparent border-t-current opacity-70" />
+      <Spinner size={11} />
     );
   }
   if (visual === null) return null;

@@ -442,7 +442,7 @@ export function GitDiffPane({ source, chipLabel, active, onNavigateDiff }: Props
       <div className="min-h-0 flex-1 overflow-hidden">
         {state.kind === "loading" || state.kind === "idle" ? (
           <div className="flex h-full items-center justify-center gap-2 text-[11px] text-muted-foreground">
-            <Spinner className="size-3" />
+            <Spinner size={14} />
             Loading diff...
           </div>
         ) : state.kind === "error" ? (
