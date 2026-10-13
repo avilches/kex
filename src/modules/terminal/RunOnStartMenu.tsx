@@ -159,8 +159,8 @@ export function RunOnStartMenu({ tab, onUpdateTab }: Props) {
         )}
         {pending ? (
           <>
-            <div className="flex flex-col gap-1 px-2.5 py-1.5 text-destructive">
-              <span className="text-[12px] font-medium">Restore pending</span>
+            <div className="flex flex-col gap-1 px-2.5 py-1.5">
+              <span className="text-[12px] font-medium text-destructive">Restore pending</span>
               <span className="select-text break-words text-[11px]">{pending.reason}</span>
               <code className="select-text break-words font-mono text-[11px]">
                 {cdLine && <div>{cdLine}</div>}

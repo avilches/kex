@@ -99,6 +99,13 @@ describe("RunOnStartMenu pending restore", () => {
     expect(trigger.className).toContain("text-destructive");
     expect(trigger.className).toContain("data-open:text-destructive");
 
+    const spanWith = (s: string) =>
+      [...document.body.querySelectorAll("span")].find((e) => e.textContent === s) as HTMLElement;
+    expect(spanWith("Restore pending").className).toContain("text-destructive");
+    expect(spanWith("Directory not found: /mnt/Taxes").className).not.toContain("text-destructive");
+    const code = document.body.querySelector("code") as HTMLElement;
+    expect(code.closest(".text-destructive")).toBeNull();
+
     await act(async () => menuItem("Retry restore").click());
     expect(retryPendingRestore).toHaveBeenCalledWith("tab-1");
     expect(discardPendingRestore).not.toHaveBeenCalled();
