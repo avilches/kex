@@ -469,7 +469,7 @@ function SortableWorkspaceItem({
           </button>
         )}
         {agentIndicator}
-        {!active && displayColor && (
+        {displayColor && (
           <span
             className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
             style={{ backgroundColor: displayColor }}
