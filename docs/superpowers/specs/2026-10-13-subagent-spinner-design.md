@@ -33,7 +33,7 @@ Limite de la medida: una sola captura, en modo `-p`, con un subagente. Se repite
 
 ### Hooks y script
 
-- `SESSION_HOOK_EVENTS` pasa de 8 a 10 eventos: se anaden `SubagentStart` y `SubagentStop`.
+- `SESSION_HOOK_EVENTS` pasa de 8 a 10 eventos: se anaden `SubagentStart` y `SubagentStop`. Hay que cambiar el tamano del array (`[&str; 8]`) y el comentario "All 8 events"; los tests existentes recorren el array y no necesitan tocarse.
 - `trigger-event.sh` los reenvia por el socket igual que el resto, y sube a `kex-session-v6`. Quien tenga el v5 instalado vera otra vez el boton "Set up Claude Code".
 
 ### Rust (`pty/ipc.rs`)
@@ -47,6 +47,8 @@ Limite de la medida: una sola captura, en modo `-p`, con un subagente. Se repite
 - `AgentSession.subagents: Record<agentId, { agentType, description?, startedAt }>`, vacio por defecto.
 - Acciones: `subagentStarted`, `subagentStopped` y `reconcileSubagents(tabId, lista)`, que sustituye el conjunto entero.
 - `finish()` borra la sesion y con ella el conjunto, asi que al terminar la sesion no queda nada.
+- El campo es obligatorio. `AgentSession` se construye en 4 sitios de `agentStore.ts` (`start`, `startIdle`, `startRestored`, `setRestoreError`), que pasan a poner `subagents: {}`, y en los fixtures de 4 ficheros de test (`sessionEndPolicy`, `agentSnapshot`, `notificationVisibility`, `notificationList`).
+- Una sesion restaurada arranca con el conjunto vacio: los subagentes no sobreviven a cerrar Kex.
 
 ### Regla de estado (funcion pura nueva, con tests)
 
@@ -84,4 +86,4 @@ El criterio 2 de TASK-822 decia que al terminar el ultimo subagente se aplicaba 
 
 ## Documentacion a actualizar
 
-`docs/IPC.md` (senales nuevas y campos de `Stop`) y `docs/ARCHITECTURE.md` (modelo de sesion de agente).
+`docs/IPC.md` (senales nuevas y campos de `Stop`), `docs/ARCHITECTURE.md` (modelo de sesion de agente), `AGENTS.md` (marcador `kex-session-v5` pasa a v6) y `docs/AGENT_SESSION_RESTORE.md` (marcador y "all 8 registered" pasan a v6 y 10).
