@@ -64,7 +64,7 @@ import {
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { dirname, useFileTree } from "./lib/useFileTree";
-import { shouldClearSelection } from "./lib/staleSelection";
+import { ancestorListingPending, shouldClearSelection } from "./lib/staleSelection";
 import {
   restoreExplorerSnapshot,
   type ExplorerSnapshot,
@@ -600,10 +600,14 @@ export const FileExplorer = memo(
 
     useEffect(() => {
       if (!selectedPath) return;
-      const parentStatus = tree.nodes[dirname(selectedPath)]?.status;
-      if (shouldClearSelection(entryIndexByPath.has(selectedPath), parentStatus))
-        setSelectedPath(null);
-    }, [entryIndexByPath, selectedPath, tree.nodes]);
+      const statusOf = (p: string) => tree.nodes[p]?.status;
+      const clear = shouldClearSelection(
+        entryIndexByPath.has(selectedPath),
+        statusOf(dirname(selectedPath)),
+        ancestorListingPending(rootPath, selectedPath, statusOf),
+      );
+      if (clear) setSelectedPath(null);
+    }, [entryIndexByPath, selectedPath, tree.nodes, rootPath]);
 
     useEffect(() => {
       const top = pendingScrollRef.current;
