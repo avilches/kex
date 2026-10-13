@@ -95,13 +95,14 @@ async function leaveBlock(
   const block = s.restoreBlock;
   if (s.disposed || !block || s.ptyOpening) return;
   s.ptyOpening = true;
-  d.setBlock(null);
+  // A retry keeps the modal up so its button can show the spinner; the start clears or replaces it.
+  if (plain) d.setBlock(null);
   try {
     await prepare(block);
   } catch (e) {
     console.error("[kex] restore action failed:", e);
     s.ptyOpening = false;
-    if (!s.disposed) d.setBlock(block);
+    if (plain && !s.disposed) d.setBlock(block);
     return;
   }
   await d.start(plain);

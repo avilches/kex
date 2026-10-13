@@ -2,6 +2,8 @@ import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { useRestoreBusy } from "./lib/restoreBusy";
 import { openWithoutRestoring, retryRestore } from "./lib/useTerminalSession";
 import type { RestoreBlock } from "./lib/restoreStart";
 
@@ -20,10 +22,12 @@ function Field({ label, value }: { label: string; value: string }) {
 
 // Covers only the tab whose terminal could not start: the rest of the pane stays usable.
 export function RestoreBlockedOverlay({ leafId, block }: Props) {
-  const [busy, setBusy] = useState(false);
+  const [acting, setActing] = useState(false);
+  const retrying = useRestoreBusy(leafId);
+  const busy = acting || retrying;
   const run = (action: (id: string) => Promise<void>) => {
-    setBusy(true);
-    void action(leafId).finally(() => setBusy(false));
+    setActing(true);
+    void action(leafId).finally(() => setActing(false));
   };
   return (
     <div
@@ -53,7 +57,8 @@ export function RestoreBlockedOverlay({ leafId, block }: Props) {
               Open terminal without restoring
             </Button>
           )}
-          <Button autoFocus disabled={busy} onClick={() => run(retryRestore)}>
+          <Button autoFocus disabled={busy} onClick={() => run(retryRestore)} className="gap-2">
+            {retrying && <Spinner className="size-3.5" />}
             Try again
           </Button>
         </div>

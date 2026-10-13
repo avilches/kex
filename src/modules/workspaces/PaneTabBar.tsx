@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
 import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
+import { useRestoreBusy } from "@/modules/terminal/lib/restoreBusy";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
@@ -183,12 +184,16 @@ function DraggableTab({
     return parts.join(" - ") || undefined;
   })();
 
-  const statusIndicator = !hasAgent
+  const restoreBusy = useRestoreBusy(tab.id);
+  const spinner = <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />;
+  const statusIndicator = restoreBusy
+    ? spinner
+    : !hasAgent
     ? null
     : isRestoreError
       ? <span className="inline-block size-[6px] rounded-full bg-destructive" />
       : agentSession?.status === "working"
-        ? <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />
+        ? spinner
         : agentSession?.status === "attention"
           ? <span className="inline-block size-[6px] rounded-full bg-amber-400" />
           : null;

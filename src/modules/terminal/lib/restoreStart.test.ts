@@ -141,13 +141,21 @@ describe("retryRestoreFlow and openWithoutRestoringFlow", () => {
     const { s, d, calls, openingAt } = setup(block({ agent: "claude" }));
     await retryRestoreFlow(s, d);
     expect(openingAt.preview).toBe(true);
-    expect(calls).toEqual(["unblock", "finish", "preview", "seed", "start"]);
+    expect(calls).toEqual(["finish", "preview", "seed", "start"]);
   });
 
   it("retry without an agent just starts", async () => {
     const { s, d, calls } = setup(block());
     await retryRestoreFlow(s, d);
-    expect(calls).toEqual(["unblock", "start"]);
+    expect(calls).toEqual(["start"]);
+  });
+
+  it("retry keeps the modal up while it works, so the button can show its spinner", async () => {
+    const b = block({ agent: "claude" });
+    const seen: Array<RestoreBlock | null> = [];
+    const { s, d } = setup(b, { start: async () => void seen.push(s.restoreBlock) });
+    await retryRestoreFlow(s, d);
+    expect(seen).toEqual([b]);
   });
 
   it("open without restoring starts a plain shell and keeps the agent session and its placeholder", async () => {
