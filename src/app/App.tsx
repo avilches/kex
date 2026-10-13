@@ -1191,6 +1191,7 @@ export default function App() {
           setRevealRequest((r) => ({
             path: folder,
             nonce: (r?.nonce ?? 0) + 1,
+            workspaceId: ws.id,
             pendingAction: opts.pendingAction,
           }));
         });

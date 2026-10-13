@@ -88,9 +88,14 @@ import {
   isUnder,
   type ExplorerRootMode,
 } from "@/modules/workspaces/lib/explorerRoot";
-import { dispatchRevealAction, type RevealAction } from "./lib/pendingAction";
+import { dispatchRevealAction } from "./lib/pendingAction";
+import {
+  initialConsumedNonce,
+  shouldConsumeReveal,
+  type RevealRequest,
+} from "./lib/revealRequest";
 
-export type RevealRequest = { path: string; nonce: number; pendingAction?: RevealAction };
+export type { RevealRequest };
 
 export type FileExplorerHandle = {
   focus: () => void;
@@ -458,7 +463,9 @@ export const FileExplorer = memo(
       setIsSearchOpen(false);
       onSearchClose?.();
     }, [onSearchClose]);
-    const [searchReveal, setSearchReveal] = useState<RevealRequest | null>(null);
+    const [searchReveal, setSearchReveal] = useState<{ path: string; nonce: number } | null>(
+      null,
+    );
     const searchRevealNonce = useRef(0);
     const revealInExplorer = useCallback(
       (path: string) => {
@@ -813,10 +820,9 @@ export const FileExplorer = memo(
 
     // Focus on Explorer: reveal a file or folder requested by the app (without
     // stealing focus).
-    const revealConsumedRef = useRef<number | null>(null);
+    const revealConsumedRef = useRef(initialConsumedNonce(revealRequest));
     useEffect(() => {
-      if (!revealRequest) return;
-      if (revealConsumedRef.current === revealRequest.nonce) return;
+      if (!revealRequest || !shouldConsumeReveal(revealRequest, revealConsumedRef.current)) return;
       if (applyRevealTarget(revealRequest.path) === "pending") return;
       revealConsumedRef.current = revealRequest.nonce;
       if (revealRequest.pendingAction && entryIndexByPath.has(revealRequest.path)) {
@@ -836,8 +842,8 @@ export const FileExplorer = memo(
     // Reveal a search result in the tree (from the search context menu).
     const searchRevealConsumedRef = useRef<number | null>(null);
     useEffect(() => {
-      if (!searchReveal) return;
-      if (searchRevealConsumedRef.current === searchReveal.nonce) return;
+      if (!searchReveal || !shouldConsumeReveal(searchReveal, searchRevealConsumedRef.current))
+        return;
       if (applyRevealTarget(searchReveal.path) === "pending") return;
       searchRevealConsumedRef.current = searchReveal.nonce;
     }, [searchReveal, applyRevealTarget]);

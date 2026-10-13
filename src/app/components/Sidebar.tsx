@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import {
   FileExplorer,
   type FileExplorerHandle,
+  revealForWorkspace,
   type RevealRequest,
 } from "@/modules/explorer";
 import {
@@ -179,7 +180,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
               gitRootPath={props.gitRootPath}
               workspaceRootPath={props.workspaceRootPath}
               workspaceRootExists={props.workspaceRootExists}
-              revealRequest={props.revealRequest}
+              revealRequest={revealForWorkspace(props.revealRequest, props.workspaceId)}
               onOpenFile={props.onOpenFile}
               onPathRenamed={props.onPathRenamed}
               onPathDeleted={props.onPathDeleted}
