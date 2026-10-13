@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 import { listen } from "@tauri-apps/api/event";
 import {
   consumeRestorePlan,
@@ -1053,14 +1054,20 @@ useAgentStore.subscribe((state) => {
 // Runs a pending restore inside the live shell. No-op while there is no PTY.
 export async function retryPendingRestore(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
-  const pty = s?.pty;
-  if (!s || !pty) return;
+  if (!s) return;
+  const pty = s.pty;
+  if (!pty) {
+    // The modal is still up (no shell yet): the menu action is its Try again.
+    if (s.restoreBlock) await retryRestore(leafId);
+    return;
+  }
   await withRestoreBusy(leafId, () => retryPendingFlow({
     ...pendingActionDeps(leafId),
     isWindows: IS_WINDOWS,
     previewPlan: () => previewResumeCmd(leafId),
     checkDir: (path) => invoke<string | null>("check_launch_dir", { path }).catch(() => null),
     isStale: () => s.disposed || s.pty !== pty,
+    stillBlocked: (block) => toast.error("Restore still failing", { description: block.reason }),
     markBlocked: (block) =>
       useAgentStore.getState().setRestoreError(leafId, leafId, block.agent ?? "", block.reason),
     adopt: (plan) => {

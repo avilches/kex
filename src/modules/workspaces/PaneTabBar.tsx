@@ -10,7 +10,9 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
 import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
 import { subscribe as subscribeOscTitles, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
+import { usePendingRestore } from "@/modules/terminal/lib/pendingRestore";
 import { useRestoreBusy } from "@/modules/terminal/lib/restoreBusy";
+import { tabStatusIndicator } from "./lib/tabStatusIndicator";
 import { subscribeLockFlash, getLockFlashSnapshot } from "./lib/lockFlashStore";
 import {
   ContextMenu,
@@ -185,18 +187,24 @@ function DraggableTab({
   })();
 
   const restoreBusy = useRestoreBusy(tab.id);
-  const spinner = <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />;
-  const statusIndicator = restoreBusy
-    ? spinner
-    : !hasAgent
-    ? null
-    : isRestoreError
-      ? <span className="inline-block size-[6px] rounded-full bg-destructive" />
-      : agentSession?.status === "working"
-        ? spinner
-        : agentSession?.status === "attention"
-          ? <span className="inline-block size-[6px] rounded-full bg-amber-400" />
-          : null;
+  const restorePending = usePendingRestore(tab.id) !== null;
+  const indicatorKind = tabStatusIndicator({
+    restoreBusy,
+    restorePending,
+    hasAgent,
+    isRestoreError,
+    status: agentSession?.status,
+  });
+  const statusIndicator =
+    indicatorKind === "restoring" ? (
+      <span className="size-[11px] animate-spin rounded-full border-2 border-foreground/25 border-t-foreground" />
+    ) : indicatorKind === "restore-failed" ? (
+      <span className="inline-block size-[6px] rounded-full bg-destructive" />
+    ) : indicatorKind === "working" ? (
+      <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />
+    ) : indicatorKind === "attention" ? (
+      <span className="inline-block size-[6px] rounded-full bg-amber-400" />
+    ) : null;
 
   const tabDiv = (
     <div

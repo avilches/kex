@@ -26,6 +26,7 @@ function mk(block: RestoreBlock | null, over: Partial<RetryPendingDeps> = {}) {
     write: vi.fn((_line: string) => Promise.resolve()),
     adopt: vi.fn(),
     markBlocked: vi.fn(),
+    stillBlocked: vi.fn(),
     clearPlaceholder: vi.fn(),
   };
   const d: RetryPendingDeps = {
@@ -61,6 +62,7 @@ describe("retryPendingFlow", () => {
     await retryPendingFlow(t.d);
     expect(t.pending()?.reason).toBe("still gone");
     expect(t.calls.markBlocked).toHaveBeenCalledWith(expect.objectContaining({ reason: "still gone" }));
+    expect(t.calls.stillBlocked).toHaveBeenCalledWith(expect.objectContaining({ reason: "still gone" }));
     expect(t.calls.write).not.toHaveBeenCalled();
     expect(t.calls.clearPlaceholder).not.toHaveBeenCalled();
   });
@@ -78,6 +80,7 @@ describe("retryPendingFlow", () => {
     await retryPendingFlow(t.d);
     expect(t.pending()).toBeNull();
     expect(t.calls.write).toHaveBeenCalledWith(" cd /proj && npm run dev\r");
+    expect(t.calls.stillBlocked).not.toHaveBeenCalled();
     expect(t.calls.adopt).not.toHaveBeenCalled();
     expect(t.calls.markBlocked).not.toHaveBeenCalled();
   });
@@ -88,6 +91,7 @@ describe("retryPendingFlow", () => {
     expect(t.pending()?.reason).toBe("not a directory");
     expect(t.calls.write).not.toHaveBeenCalled();
     expect(t.calls.markBlocked).not.toHaveBeenCalled();
+    expect(t.calls.stillBlocked).toHaveBeenCalledWith(expect.objectContaining({ reason: "not a directory" }));
   });
 
   it("bails out and clears pending when an agent already runs in the shell", async () => {
