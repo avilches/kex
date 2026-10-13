@@ -178,7 +178,10 @@ import {
   groupLabelOf,
   saveGroups,
 } from "@/modules/workspaces/lib/workspaceGroupsState";
-import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
+import {
+  effectiveSidebarView,
+  type SidebarView,
+} from "@/modules/workspaces/lib/sidebarState";
 import { DEFAULT_WORKSPACE_SIDEBAR } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { isTabNoteOpen, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
@@ -700,8 +703,10 @@ export default function App() {
     () => withSidebarSnapshotFlush(setSidebarSideNow),
     [setSidebarSideNow],
   );
-  const sidebarView: SidebarView =
-    activeWorkspace?.sidebar?.view ?? DEFAULT_WORKSPACE_SIDEBAR.view;
+  const sidebarView: SidebarView = effectiveSidebarView(
+    activeWorkspace?.sidebar?.view ?? DEFAULT_WORKSPACE_SIDEBAR.view,
+    activeWorkspace?.workspaceRoot ?? null,
+  );
   const sidebarViewRef = useRef(sidebarView);
   sidebarViewRef.current = sidebarView;
   const setSidebarView = useCallback(

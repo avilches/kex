@@ -37,6 +37,12 @@ export function parseView(value: unknown): SidebarView {
     : "explorer";
 }
 
+// The Notes view only exists with a workspace root; a stored "notes" on a
+// workspace whose root was cleared shows Explorer instead.
+export function effectiveSidebarView(view: SidebarView, notesRoot: string | null): SidebarView {
+  return view === "notes" && !notesRoot ? "explorer" : view;
+}
+
 function parseSide(value: unknown): SidebarSide {
   return value === "right" ? "right" : "left";
 }

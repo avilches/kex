@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SIDEBAR_STATE,
+  effectiveSidebarView,
   sanitizeSidebarState,
 } from "./sidebarState";
+
+describe("effectiveSidebarView", () => {
+  it("shows Explorer for a stored notes view on a workspace without a root", () => {
+    expect(effectiveSidebarView("notes", null)).toBe("explorer");
+  });
+
+  it("keeps notes when the workspace has a root, and every other view as is", () => {
+    expect(effectiveSidebarView("notes", "/p")).toBe("notes");
+    expect(effectiveSidebarView("history", null)).toBe("history");
+    expect(effectiveSidebarView("explorer", null)).toBe("explorer");
+  });
+});
 
 describe("sanitizeSidebarState", () => {
   // Defaults and null/undefined input

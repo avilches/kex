@@ -17,7 +17,10 @@ import type {
 } from "@/modules/source-control";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 import type { ExplorerSnapshot } from "@/modules/workspaces/lib/sidebarSnapshot";
-import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
+import {
+  effectiveSidebarView,
+  type SidebarView,
+} from "@/modules/workspaces/lib/sidebarState";
 import { GitCommitIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { forwardRef, useImperativeHandle, useRef } from "react";
@@ -109,8 +112,7 @@ const VIEWS: { id: SidebarView; label: string }[] = [
 
 export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
   function Sidebar(props, ref) {
-    const view: SidebarView =
-      props.view === "notes" && !props.notesRoot ? "explorer" : props.view;
+    const view = effectiveSidebarView(props.view, props.notesRoot);
     const views = props.notesRoot
       ? [...VIEWS, { id: "notes" as const, label: "Notes" }]
       : VIEWS;
