@@ -280,8 +280,7 @@ function SortableWorkspaceItem({
 
   const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
   const showCountdown =
-    import.meta.env.DEV && !active && !ws.hibernated && !compact && autoHibernateDelayMs(autoHibernate) !== null;
-  const countdownSpacer = showCountdown ? <span aria-hidden className="w-[30px] shrink-0" /> : null;
+    !active && !ws.hibernated && !compact && autoHibernateDelayMs(autoHibernate) !== null;
 
   const sideControl =
     "absolute top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded outline-none focus-visible:ring-1 focus-visible:ring-ring";
@@ -443,7 +442,7 @@ function SortableWorkspaceItem({
                   {agentCount}
                 </span>
               )}
-              {countdownSpacer}
+              {showCountdown && <AutoHibernateCountdown workspaceId={ws.id} mode={autoHibernate} />}
               {agentSpacer}
             </>
           )}
@@ -463,13 +462,6 @@ function SortableWorkspaceItem({
             <HugeiconsIcon icon={SleepingIcon} size={13} strokeWidth={1.75} className="group-hover/wake:hidden group-focus-visible/wake:hidden" />
             <HugeiconsIcon icon={UploadCircle01Icon} size={13} strokeWidth={1.75} className="hidden group-hover/wake:block group-focus-visible/wake:block" />
           </button>
-        )}
-        {showCountdown && (
-          <AutoHibernateCountdown
-            workspaceId={ws.id}
-            mode={autoHibernate}
-            className={agentEntries ? "right-[28px]" : "right-4"}
-          />
         )}
         {agentIndicator}
         {!active && displayColor && (

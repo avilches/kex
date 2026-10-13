@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
 import {
   autoHibernateRemainingMs,
   formatCountdown,
@@ -19,23 +18,15 @@ function useSecondClock(): number {
 export function AutoHibernateCountdown({
   workspaceId,
   mode,
-  className,
 }: {
   workspaceId: string;
   mode: AutoHibernate;
-  className?: string;
 }) {
   const now = useSecondClock();
   const remaining = autoHibernateRemainingMs(activityStamps.get(workspaceId), mode, now);
   if (remaining === null) return null;
   return (
-    <span
-      title="Time left until auto-hibernate (dev only)"
-      className={cn(
-        "pointer-events-none absolute top-1/2 z-10 w-[30px] -translate-y-1/2 text-right text-[10px] font-normal tabular-nums text-muted-foreground opacity-60",
-        className,
-      )}
-    >
+    <span className="pointer-events-none ml-auto shrink-0 pl-1 pr-1 text-[10px] font-normal tabular-nums text-muted-foreground opacity-60">
       {formatCountdown(remaining)}
     </span>
   );
