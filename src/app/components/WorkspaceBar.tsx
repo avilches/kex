@@ -378,7 +378,11 @@ function SortableWorkspaceItem({
           )}
           style={
             lit
-              ? displayColor !== null
+              ? expanded
+                ? {
+                    boxShadow: `inset 0 0 0 1px ${displayColor ?? "var(--ring)"}`,
+                  }
+                : displayColor !== null
                 ? {
                     backgroundColor: chipColorOnWhite(displayColor),
                     color: "#ffffff",
@@ -472,6 +476,7 @@ function SortableWorkspaceItem({
           entries={agentEntries}
           filter={detailFilter}
           focusedTabId={active ? ws.focusedTabId : null}
+          color={displayColor}
           visibleTabIds={active ? ws.visibleTabIds : ""}
           onActivate={activateDetailTab}
         />
