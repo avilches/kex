@@ -163,6 +163,15 @@ function DetailTabRow({
               title={title}
               aria-current={focused || undefined}
               onClick={() => onActivate(tab.id)}
+              onMouseDown={(e) => {
+                if (e.button === 1) e.preventDefault();
+              }}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.stopPropagation();
+                  onClose(tab.id);
+                }
+              }}
               className={cn(
                 "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
                 isDragging && "opacity-40",
