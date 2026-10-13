@@ -27,6 +27,8 @@ export type GitColorScheme = "vscode" | "jetbrains";
 export type AutofocusMode = "manual" | "always";
 
 export type ScmViewMode = "list" | "tree";
+export const SPINNER_STYLES = ["arc", "braille", "cursor"] as const;
+export type SpinnerStyle = (typeof SPINNER_STYLES)[number];
 
 export type TerminalNewFolderMode = "home" | "workspace" | "context";
 
@@ -161,6 +163,7 @@ export type Preferences = {
   autofocusNewTabs: boolean;
   explorerGitColorScheme: GitColorScheme;
   scmViewMode: ScmViewMode;
+  spinnerStyle: SpinnerStyle;
   terminalWebglEnabled: boolean;
   terminalCursorBlink: boolean;
   editorCursorBlink: boolean;
@@ -230,6 +233,7 @@ const KEY_AUTOFOCUS_MODE = "autofocusMode";
 const KEY_AUTOFOCUS_NEW_TABS = "autofocusNewTabs";
 const KEY_EXPLORER_GIT_COLOR_SCHEME = "explorerGitColorScheme";
 const KEY_SCM_VIEW_MODE = "scmViewMode";
+const KEY_SPINNER_STYLE = "spinnerStyle";
 const KEY_AUTO_HIBERNATE = "autoHibernate";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_UI_FONT = "uiFont";
@@ -409,6 +413,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autofocusNewTabs: false,
   explorerGitColorScheme: "vscode",
   scmViewMode: "tree",
+  spinnerStyle: "arc",
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
   editorCursorBlink: false,
@@ -486,6 +491,10 @@ const PREFS_CHANGED_EVENT = "kex://prefs-changed";
 
 type StoreId = "general" | "terminal" | "editor" | "tools" | "shortcuts";
 type PrefsChangedPayload = { store: StoreId; key: string; value: unknown };
+
+export function parseSpinnerStyle(value: unknown): SpinnerStyle {
+  return SPINNER_STYLES.find((s) => s === value) ?? DEFAULT_PREFERENCES.spinnerStyle;
+}
 
 export function parseScmViewMode(value: unknown): ScmViewMode {
   return value === "list" ? "list" : "tree";
@@ -590,6 +599,7 @@ export async function loadPreferences(): Promise<Preferences> {
       return DEFAULT_PREFERENCES.explorerGitColorScheme;
     })(),
     scmViewMode: parseScmViewMode(getGeneral<string>(KEY_SCM_VIEW_MODE)),
+    spinnerStyle: parseSpinnerStyle(getGeneral<string>(KEY_SPINNER_STYLE)),
     terminalWebglEnabled:
       getTerminal<boolean>(KEY_TERMINAL_WEBGL_ENABLED) ??
       DEFAULT_PREFERENCES.terminalWebglEnabled,
@@ -884,6 +894,10 @@ export async function setAutofocusNewTabs(value: boolean): Promise<void> {
 
 export async function setExplorerGitColorScheme(value: GitColorScheme): Promise<void> {
   await writePref(KEY_EXPLORER_GIT_COLOR_SCHEME, value);
+}
+
+export async function setSpinnerStyle(value: SpinnerStyle): Promise<void> {
+  await writePref(KEY_SPINNER_STYLE, value);
 }
 
 export async function setScmViewMode(value: ScmViewMode): Promise<void> {
@@ -1246,6 +1260,7 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_AUTOFOCUS_NEW_TABS]: "autofocusNewTabs",
   [KEY_EXPLORER_GIT_COLOR_SCHEME]: "explorerGitColorScheme",
   [KEY_SCM_VIEW_MODE]: "scmViewMode",
+  [KEY_SPINNER_STYLE]: "spinnerStyle",
   [KEY_AUTO_HIBERNATE]: "autoHibernate",
   [KEY_LAST_WSL_DISTRO]: "lastWslDistro",
   [KEY_ZOOM_LEVEL]: "zoomLevel",

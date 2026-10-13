@@ -885,22 +885,24 @@ export const SourceControlPanel = memo(
                 <div className="flex shrink-0 items-center gap-0.5">
                   <RemoteActionButton
                     label={fetchLabel}
+                    busy={fetchBusy}
                     disabled={!canFetch}
                     onClick={handleFetch}
                   >
                     {fetchBusy ? (
-                      <Spinner className="size-3" />
+                      <Spinner size={14} />
                     ) : (
                       <HugeiconsIcon icon={SquareArrowDown03Icon} size={17} strokeWidth={1.85} />
                     )}
                   </RemoteActionButton>
                   <RemoteActionButton
                     label={pullLabel}
+                    busy={pullBusy}
                     disabled={!canPull}
                     onClick={handlePull}
                   >
                     {pullBusy ? (
-                      <Spinner className="size-3" />
+                      <Spinner size={14} />
                     ) : (
                       <span className={cn(
                         "inline-flex items-center gap-1",
@@ -917,11 +919,12 @@ export const SourceControlPanel = memo(
                   </RemoteActionButton>
                   <RemoteActionButton
                     label={pushLabel}
+                    busy={pushBusy}
                     disabled={!scm.canPush || !!scm.actionBusy}
                     onClick={() => void scm.push()}
                   >
                     {pushBusy ? (
-                      <Spinner className="size-3" />
+                      <Spinner size={14} />
                     ) : (
                       <span className={cn(
                         "inline-flex items-center gap-1",
@@ -1055,7 +1058,7 @@ export const SourceControlPanel = memo(
                   ) : (
                     <div className="flex items-center gap-1.5">
                       <span className="flex flex-1 items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <Spinner className="size-3 shrink-0" />
+                        <Spinner size={14} />
                         Cloning{cloneElapsed > 0 ? ` (${cloneElapsed}s)` : "..."}
                       </span>
                       <Button
@@ -1237,11 +1240,12 @@ export const SourceControlPanel = memo(
                   </IconActionButton>
                   <IconActionButton
                     label="Refresh source control"
+                    busy={isRefreshing}
                     disabled={isRefreshing || !!scm.actionBusy}
                     onClick={handleRefresh}
                   >
                     {isRefreshing ? (
-                      <Spinner className="size-3.5" />
+                      <Spinner size={16} />
                     ) : (
                       <HugeiconsIcon
                         icon={Refresh01Icon}
@@ -1784,7 +1788,7 @@ const EntryRow = memo(function EntryRow({
                 onClick={() => void onUnstageEntry(entry)}
               >
                 {isUnstageBusy ? (
-                  <Spinner className="size-3" />
+                  <Spinner size={14} />
                 ) : (
                   <HugeiconsIcon
                     icon={MinusSignIcon}
@@ -1801,7 +1805,7 @@ const EntryRow = memo(function EntryRow({
                   onClick={() => onDiscardEntry(entry)}
                 >
                   {isDiscardBusy ? (
-                    <Spinner className="size-3" />
+                    <Spinner size={14} />
                   ) : (
                     <HugeiconsIcon
                       icon={RemoveSquareIcon}
@@ -1816,7 +1820,7 @@ const EntryRow = memo(function EntryRow({
                   onClick={() => void onStageEntry(entry)}
                 >
                   {isStageBusy ? (
-                    <Spinner className="size-3" />
+                    <Spinner size={14} />
                   ) : (
                     <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={1.9} />
                   )}
@@ -1928,11 +1932,13 @@ const EntryRow = memo(function EntryRow({
 function RemoteActionButton({
   label,
   disabled,
+  busy,
   onClick,
   children,
 }: {
   label: string;
   disabled?: boolean;
+  busy?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
@@ -1946,7 +1952,7 @@ function RemoteActionButton({
       className={cn(
         "flex h-6 min-w-6 items-center justify-center gap-1 rounded-md px-1.5 text-muted-foreground transition-colors",
         disabled
-          ? "cursor-default opacity-40"
+          ? cn("cursor-default", !busy && "opacity-40")
           : "hover:bg-accent hover:text-foreground",
       )}
     >
@@ -1958,11 +1964,13 @@ function RemoteActionButton({
 function IconActionButton({
   label,
   disabled,
+  busy,
   onClick,
   children,
 }: {
   label: string;
   disabled?: boolean;
+  busy?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
@@ -1970,7 +1978,10 @@ function IconActionButton({
     <Button
       size="icon-sm"
       variant="ghost"
-      className="size-6 p-3 rounded-md text-muted-foreground hover:text-foreground disabled:cursor-not-allowed"
+      className={cn(
+        "size-6 p-3 rounded-md text-muted-foreground hover:text-foreground disabled:cursor-not-allowed",
+        busy && "disabled:opacity-100",
+      )}
       aria-label={label}
       title={label}
       disabled={disabled}

@@ -1,3 +1,4 @@
+import { Spinner } from "@/components/ui/spinner";
 import {
   closestCenter,
   defaultDropAnimationSideEffects,
@@ -324,12 +325,12 @@ function SortableWorkspaceItem({
       aria-label={agentLabel}
       onClick={() => onJumpAgent(ws.id, agentEntries)}
       className={cn(
-        "z-10 flex size-[10px] items-center justify-center rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        "z-10 flex size-[12px] items-center justify-center rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-ring",
         compact ? "absolute right-1 top-1" : "absolute right-4 top-1/2 -translate-y-1/2",
       )}
     >
       {agentEntries[0].visual === "working" ? (
-        <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-current opacity-70" />
+        <Spinner size={11} />
       ) : (
         <span
           className={cn(

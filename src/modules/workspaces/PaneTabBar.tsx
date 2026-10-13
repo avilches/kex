@@ -1,3 +1,4 @@
+import { Spinner } from "@/components/ui/spinner";
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
@@ -197,11 +198,11 @@ function DraggableTab({
   });
   const statusIndicator =
     indicatorKind === "restoring" ? (
-      <span className="size-[11px] animate-spin rounded-full border-2 border-foreground/25 border-t-foreground" />
+      <Spinner size={13} />
     ) : indicatorKind === "restore-failed" ? (
       <span className="inline-block size-[6px] rounded-full bg-destructive" />
     ) : indicatorKind === "working" ? (
-      <span className="size-[8px] animate-spin rounded-full border border-transparent border-t-foreground/70" />
+      <Spinner size={11} />
     ) : indicatorKind === "attention" ? (
       <span className="inline-block size-[6px] rounded-full bg-amber-400" />
     ) : null;
