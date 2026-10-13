@@ -66,7 +66,8 @@ model.
 - `WorkspaceSidebar` (52px vertical strip, left) — replaces the horizontal `TabBar`. Lists workspaces as icon avatars
   with stable colors derived from their ID. Keyboard-navigable.
 - `Sidebar` (collapsible, default 240px, right) — holds Explorer, Source Control, and Git History as tabs. Width,
-  active tab, open/closed state, and dock side persist via `window_save_sidebar` per OS window.
+  open/closed state, and dock side persist via `window_save_sidebar` per OS window; the active tab is per workspace
+  (see "Per-window sidebar state" below).
 - `sidebarSide` per-window state — moves the tool panel to the left of the center content for users who prefer that layout.
 - `SidebarRail` and `useSidebarPanel` deleted (replaced by Sidebar).
 - `Header` no longer owns the tab bar.
@@ -125,12 +126,13 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 
 **What was built:**
 
-- The sidebar chrome (open, active view, width, dock side) is now per OS window. It is persisted in the
+- The sidebar chrome (open, width, dock side) is now per OS window. It is persisted in the
   `workspaces.json` index as a `sidebar` field on each window entry and restored on startup, reusing the existing
   per-window state plumbing (`window_get_state`) plus the dedicated `window_save_sidebar` command. The frontend holds
   it in `useSidebarState(label)` (debounced save).
 - `showHidden` moved from a global preference to a per-workspace field on `Workspace`, mirroring `explorerRootMode`, so
   each workspace tab remembers its own.
+- The active Sidebar view, the open explorer folders, the selection and the scroll are per workspace and persisted (`Workspace.sidebar`), so switching workspaces or restarting brings each one back as it was; only open, side and width remain per window.
 - The old global preferences and their setters were removed, along with the "Sidebar position" control in Settings (dock
   side is now per window, toggled from each window header).
 
@@ -183,8 +185,9 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   drive root) whose double-click climbs to the parent directory; the selector uses the hierarchy icon and its subtitle
   shows the current root path. If the current root is deleted while shown, the explorer silently relocates to the
   nearest existing ancestor instead of showing a recovery state. The current root is stored as `fsRoot` in
-  `workspace-state.json` (default home). A JSON-only preference `keepFolderLayoutOnChangeExplorerRoot` (default `false`)
-  controls whether the per-root tree expansion layout is restored on root change or the tree starts collapsed. The `..`
+  `workspace-state.json` (default home). A root change carries the open folders over through the same rule used to
+  restore a workspace snapshot (`carryOverExpanded`): folders under the new root stay open, going up also opens the old
+  root, and an unrelated root keeps nothing. The `..`
   row appears only in File System mode; Workspace Root mode is unaffected.
 - **Folder context actions** — a folder's context menu offers "Open in Terminal" (opens a new terminal tab in the
   current workspace's active pane, spawned directly with the folder as cwd, leaving the explorer view untouched) and

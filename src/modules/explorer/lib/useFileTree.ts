@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { currentWorkspaceEnv } from "@/modules/workspace";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import { pathDirname, pathBasename, pathJoin } from "@/lib/pathUtils";
 import { native } from "@/lib/native";
 import { suggestDuplicateName } from "@/modules/explorer/lib/duplicateName";
@@ -14,6 +13,11 @@ import {
   resolveDestDir,
 } from "@/modules/explorer/lib/clipboardPaste";
 import { isUnder } from "@/modules/workspaces/lib/explorerRoot";
+import {
+  carryOverExpanded,
+  restoreExplorerSnapshot,
+  type ExplorerSnapshot,
+} from "@/modules/workspaces/lib/sidebarSnapshot";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
 export type DirEntry = {
@@ -49,27 +53,6 @@ export const joinPath = pathJoin;
 
 export const dirname = pathDirname;
 
-const EXPANSION_CACHE_LIMIT = 8;
-const expansionCache = new Map<string, string[]>();
-
-function rememberExpansion(root: string, expanded: Set<string>): void {
-  expansionCache.delete(root);
-  if (expanded.size > 0) expansionCache.set(root, [...expanded]);
-  while (expansionCache.size > EXPANSION_CACHE_LIMIT) {
-    const oldest = expansionCache.keys().next().value;
-    if (oldest === undefined) break;
-    expansionCache.delete(oldest);
-  }
-}
-
-function recallExpansion(root: string): string[] {
-  const v = expansionCache.get(root);
-  if (!v) return [];
-  expansionCache.delete(root);
-  expansionCache.set(root, v);
-  return v;
-}
-
 // mtime/size are ignored on purpose: the tree never renders them, so a watcher
 // refetch that only bumps mtime (saving a file) must not count as a change.
 function sameDirListing(a: DirEntry[], b: DirEntry[]): boolean {
@@ -89,6 +72,7 @@ type Options = {
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   showHidden?: boolean;
+  initialSnapshot?: ExplorerSnapshot | null;
 };
 
 export function useFileTree(rootPath: string | null, options?: Options) {
@@ -96,12 +80,12 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   optionsRef.current = options;
   const showHidden = options?.showHidden ?? false;
   const showHiddenRef = useRef(showHidden);
-  const keepLayout = usePreferencesStore(
-    (s) => s.keepFolderLayoutOnChangeExplorerRoot,
-  );
-  const keepLayoutRef = useRef(keepLayout);
   const [nodes, setNodes] = useState<TreeState>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [restoredRoot, setRestoredRoot] = useState<string | null>(null);
+  const initialSnapshotRef = useRef(options?.initialSnapshot ?? null);
+  const initialRootRef = useRef<string | null>(null);
+  const previousRootRef = useRef<string | null>(null);
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
     null,
   );
@@ -120,10 +104,6 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   useEffect(() => {
     showHiddenRef.current = showHidden;
   }, [showHidden]);
-
-  useEffect(() => {
-    keepLayoutRef.current = keepLayout;
-  }, [keepLayout]);
 
   useEffect(() => {
     expandedRef.current = expanded;
@@ -217,12 +197,13 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     }
   }, []);
 
-  // Root change → restore the cached expansion for this root, re-scope watches,
-  // and persist the outgoing root's expansion on the way out.
+  // Root change → carry the open folders over to the new root, re-scope watches.
   useEffect(() => {
     if (!rootPath) {
+      previousRootRef.current = null;
       setNodes({});
       setExpanded(new Set());
+      setRestoredRoot(null);
       setPendingCreate(null);
       setPendingDuplicate(null);
       setRenaming(null);
@@ -232,7 +213,21 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     setPendingDuplicate(null);
     setRenaming(null);
 
-    const restored = keepLayoutRef.current ? recallExpansion(rootPath) : [];
+    let restored: string[];
+    const initial = initialSnapshotRef.current;
+    if (initial && (initialRootRef.current ?? rootPath) === rootPath) {
+      initialRootRef.current = rootPath;
+      restored = restoreExplorerSnapshot(initial, rootPath).expanded;
+    } else {
+      initialSnapshotRef.current = null;
+      restored = carryOverExpanded(
+        expandedRef.current,
+        previousRootRef.current,
+        rootPath,
+      );
+    }
+    previousRootRef.current = rootPath;
+    setRestoredRoot(rootPath);
     setExpanded(new Set(restored));
     setNodes({});
 
@@ -243,7 +238,6 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     watchAdd(toWatch);
 
     return () => {
-      rememberExpansion(rootPath, expandedRef.current);
       if (watchedRef.current.size > 0) {
         watchRemove([...watchedRef.current]);
         watchedRef.current.clear();
@@ -636,6 +630,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   return {
     nodes,
     expanded,
+    restoredRoot,
     pendingCreate,
     pendingDuplicate,
     renaming,

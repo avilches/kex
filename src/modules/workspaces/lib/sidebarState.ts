@@ -1,23 +1,22 @@
 import { debouncedInvoke } from "./debouncedInvoke";
 
-// Sidebar chrome is per-window state (not per-workspace, not a global
-// preference): which view is shown, whether it is open, its width, and which
-// side it docks to. Persisted in the window index (workspaces.json) via a
-// dedicated lightweight command, separate from the heavy workspace-body save.
+// Sidebar chrome that is per-window (not per-workspace, not a global
+// preference): whether it is open, its width, and which side it docks to. The
+// active view is per workspace (Workspace.sidebar.view). Persisted in the
+// window index (workspaces.json) via a dedicated lightweight command, separate
+// from the heavy workspace-body save.
 
 export type SidebarView = "explorer" | "git" | "history" | "notes";
 export type SidebarSide = "left" | "right";
 
 export type SidebarUiState = {
   open: boolean;
-  view: SidebarView;
   side: SidebarSide;
   width: number;
 };
 
 export const DEFAULT_SIDEBAR_STATE: SidebarUiState = {
   open: true,
-  view: "explorer",
   side: "left",
   width: 20,
 };
@@ -32,10 +31,16 @@ function clampWidth(v: unknown): number {
   return DEFAULT_SIDEBAR_STATE.width;
 }
 
-function parseView(value: unknown): SidebarView {
+export function parseView(value: unknown): SidebarView {
   return value === "git" || value === "history" || value === "notes"
     ? value
     : "explorer";
+}
+
+// The Notes view only exists with a workspace root; a stored "notes" on a
+// workspace whose root was cleared shows Explorer instead.
+export function effectiveSidebarView(view: SidebarView, notesRoot: string | null): SidebarView {
+  return view === "notes" && !notesRoot ? "explorer" : view;
 }
 
 function parseSide(value: unknown): SidebarSide {
@@ -51,7 +56,6 @@ export function sanitizeSidebarState(
       typeof raw.open === "boolean"
         ? raw.open
         : DEFAULT_SIDEBAR_STATE.open,
-    view: parseView(raw.view),
     side: parseSide(raw.side),
     width: clampWidth(raw.width),
   };
@@ -77,7 +81,6 @@ const sidebarSave = debouncedInvoke<{ label: string; state: SidebarUiState }>({
   buildArgs: ({ label, state }) => ({
     label,
     open: state.open,
-    view: state.view,
     side: state.side,
     width: Math.round(state.width),
   }),

@@ -436,14 +436,13 @@ fn window_save_sidebar(
     app: tauri::AppHandle,
     label: String,
     open: bool,
-    view: String,
     side: String,
     width: u32,
 ) {
     let mgr = app.state::<window_state::WindowStateManager>();
     mgr.update_sidebar(
         &label,
-        window_state::SidebarState { open, view, side, width },
+        window_state::SidebarState { open, side, width },
     );
     mgr.save();
 }

@@ -63,7 +63,13 @@ import {
 } from "./lib/contextActions";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
-import { useFileTree } from "./lib/useFileTree";
+import { dirname, useFileTree } from "./lib/useFileTree";
+import { ancestorListingPending, shouldClearSelection } from "./lib/staleSelection";
+import { listingsSettled, resolvePendingScroll } from "./lib/pendingScroll";
+import {
+  restoreExplorerSnapshot,
+  type ExplorerSnapshot,
+} from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useGitStatus } from "./lib/useGitStatus";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { cn } from "@/lib/utils";
@@ -83,9 +89,14 @@ import {
   isUnder,
   type ExplorerRootMode,
 } from "@/modules/workspaces/lib/explorerRoot";
-import { dispatchRevealAction, type RevealAction } from "./lib/pendingAction";
+import { dispatchRevealAction } from "./lib/pendingAction";
+import {
+  initialConsumedNonce,
+  shouldConsumeReveal,
+  type RevealRequest,
+} from "./lib/revealRequest";
 
-export type RevealRequest = { path: string; nonce: number; pendingAction?: RevealAction };
+export type { RevealRequest };
 
 export type FileExplorerHandle = {
   focus: () => void;
@@ -123,6 +134,8 @@ type Props = {
   gitStatus?: GitStatusSnapshot | null;
   onSearchClose?: () => void;
   active?: boolean;
+  initialExplorer?: ExplorerSnapshot | null;
+  onExplorerSnapshot?: (snapshot: ExplorerSnapshot) => void;
 };
 
 const ROOT_MODES: {
@@ -383,6 +396,8 @@ export const FileExplorer = memo(
       gitStatus,
       onSearchClose,
       active = true,
+      initialExplorer,
+      onExplorerSnapshot,
     },
     ref,
   ) {
@@ -390,6 +405,7 @@ export const FileExplorer = memo(
       onPathRenamed,
       onPathDeleted,
       showHidden,
+      initialSnapshot: initialExplorer,
     });
 
     // Move a dragged file/folder when dropped on a folder row. The drop target
@@ -421,6 +437,21 @@ export const FileExplorer = memo(
     const previewOnClick = usePreferencesStore((s) => s.previewOnClick);
     const { lookup: lookupGitStatus } = useGitStatus(rootPath, gitStatus, true);
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
+    const initialExplorerRef = useRef(initialExplorer ?? null);
+    const pendingScrollRef = useRef(0);
+    useEffect(() => {
+      const snap = initialExplorerRef.current;
+      // A later root change must not inherit an offset meant for the restored root.
+      if (!snap) {
+        pendingScrollRef.current = 0;
+        return;
+      }
+      if (!rootPath) return;
+      initialExplorerRef.current = null;
+      const r = restoreExplorerSnapshot(snap, rootPath);
+      setSelectedPath(r.selectedPath);
+      pendingScrollRef.current = r.scrollTop;
+    }, [rootPath]);
     // Drives the attention flash on the just-revealed row. The token bumps on
     // every reveal so revealing the same path again replays the animation.
     const [flash, setFlash] = useState<{ path: string; token: number }>({
@@ -438,7 +469,9 @@ export const FileExplorer = memo(
       setIsSearchOpen(false);
       onSearchClose?.();
     }, [onSearchClose]);
-    const [searchReveal, setSearchReveal] = useState<RevealRequest | null>(null);
+    const [searchReveal, setSearchReveal] = useState<{ path: string; nonce: number } | null>(
+      null,
+    );
     const searchRevealNonce = useRef(0);
     const revealInExplorer = useCallback(
       (path: string) => {
@@ -572,10 +605,55 @@ export const FileExplorer = memo(
     }, [rows]);
 
     useEffect(() => {
-      if (selectedPath && !entryIndexByPath.has(selectedPath)) {
-        setSelectedPath(null);
-      }
-    }, [entryIndexByPath, selectedPath]);
+      if (!selectedPath) return;
+      const statusOf = (p: string) => tree.nodes[p]?.status;
+      const clear = shouldClearSelection(
+        entryIndexByPath.has(selectedPath),
+        statusOf(dirname(selectedPath)),
+        ancestorListingPending(rootPath, selectedPath, statusOf),
+      );
+      if (clear) setSelectedPath(null);
+    }, [entryIndexByPath, selectedPath, tree.nodes, rootPath]);
+
+    const reportRef = useRef(onExplorerSnapshot);
+    reportRef.current = onExplorerSnapshot;
+    const report = useCallback(() => {
+      if (!rootPath || tree.restoredRoot !== rootPath) return;
+      reportRef.current?.({
+        expanded: [...tree.expanded],
+        selectedPath,
+        scroll: {
+          root: rootPath,
+          top:
+            pendingScrollRef.current > 0
+              ? pendingScrollRef.current
+              : (scrollRef.current?.scrollTop ?? 0),
+        },
+      });
+    }, [rootPath, tree.restoredRoot, tree.expanded, selectedPath]);
+    useEffect(() => {
+      report();
+    }, [report]);
+
+    useEffect(() => {
+      const top = pendingScrollRef.current;
+      const el = scrollRef.current;
+      if (!top || !el) return;
+      const next = resolvePendingScroll(
+        top,
+        el.scrollHeight,
+        el.clientHeight,
+        listingsSettled(rootPath, tree.nodes),
+      );
+      if (!next.done) return;
+      pendingScrollRef.current = 0;
+      if (next.scrollTo !== null) el.scrollTop = next.scrollTo;
+      report();
+    }, [rows, rootPath, tree.nodes, report]);
+
+    const dropPendingScroll = useCallback(() => {
+      pendingScrollRef.current = 0;
+    }, []);
 
     const virtualizer = useVirtualizer({
       count: rows.length,
@@ -736,6 +814,7 @@ export const FileExplorer = memo(
         // from the sidebar selects it on click, and the autofocus tab would
         // otherwise re-reveal that same file in a circular flash.
         const alreadySelected = selectedPath === file;
+        pendingScrollRef.current = 0;
         setSelectedPath(file);
         requestAnimationFrame(() => {
           scrollEntryIntoView(file, { topRatio: 0.2 });
@@ -762,10 +841,9 @@ export const FileExplorer = memo(
 
     // Focus on Explorer: reveal a file or folder requested by the app (without
     // stealing focus).
-    const revealConsumedRef = useRef<number | null>(null);
+    const revealConsumedRef = useRef(initialConsumedNonce(revealRequest));
     useEffect(() => {
-      if (!revealRequest) return;
-      if (revealConsumedRef.current === revealRequest.nonce) return;
+      if (!revealRequest || !shouldConsumeReveal(revealRequest, revealConsumedRef.current)) return;
       if (applyRevealTarget(revealRequest.path) === "pending") return;
       revealConsumedRef.current = revealRequest.nonce;
       if (revealRequest.pendingAction && entryIndexByPath.has(revealRequest.path)) {
@@ -785,8 +863,8 @@ export const FileExplorer = memo(
     // Reveal a search result in the tree (from the search context menu).
     const searchRevealConsumedRef = useRef<number | null>(null);
     useEffect(() => {
-      if (!searchReveal) return;
-      if (searchRevealConsumedRef.current === searchReveal.nonce) return;
+      if (!searchReveal || !shouldConsumeReveal(searchReveal, searchRevealConsumedRef.current))
+        return;
       if (applyRevealTarget(searchReveal.path) === "pending") return;
       searchRevealConsumedRef.current = searchReveal.nonce;
     }, [searchReveal, applyRevealTarget]);
@@ -889,6 +967,7 @@ export const FileExplorer = memo(
         target.isContentEditable
       )
         return;
+      dropPendingScroll();
       if (matchesShortcut(e.nativeEvent, "file.paste", userShortcuts)) {
         e.preventDefault();
         if (selectedPath) {
@@ -1327,6 +1406,9 @@ export const FileExplorer = memo(
                       setRootDropRef(node);
                     }}
                     data-explorer-drop=""
+                    onScroll={report}
+                    onWheel={dropPendingScroll}
+                    onPointerDown={dropPendingScroll}
                     className={cn(
                       "thin-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]",
                       rootIsDropTarget &&

@@ -93,6 +93,21 @@ via `restore_window_geometry` IPC called from `main.tsx` before `show()`. Window
 restored (see [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md)). The workspace sidebar (52px, left
 edge) lists workspaces; clicking switches `activeWorkspaceId`.
 
+**Sidebar view state.** Each workspace keeps its own Sidebar state in `Workspace.sidebar`
+(`sidebarSnapshot.ts`): the active view, the open explorer folders, the selected path and the
+scroll offset with the root it was measured on. Only `open`, `side` and `width` stay per window.
+There is one Sidebar instance; the explorer inside it is keyed by workspace id, so a switch, a wake
+or reopening the Sidebar mounts a fresh explorer that applies the snapshot once. The restore rule is
+the pure `restoreExplorerSnapshot(snapshot, root)`: it keeps what lies under the current root, opens
+the folders in between, and restores the scroll only on the root it was recorded on, so a root that
+moved up keeps everything, one that moved down keeps what is still under it and an unrelated one
+keeps nothing. A root change inside a session carries the open
+folders over through the same rule (`carryOverExpanded`, which also opens the previous root), with no
+per-root memory: what a move down dropped does not come back on the way up. Saving goes through a
+10 s coalescer, flushed before anything that remounts the explorer. The details (selection and
+scroll while folders load, reveal requests, flush points) are in the paragraph "Sidebar view state
+per workspace" of [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ---
 
 ## Render tree
@@ -205,7 +220,7 @@ has no mounted tabs at all. Its tabs stay in the persisted `paneTree`, but `Work
 `strippedTree(ws.paneTree)` (a memoized copy with every pane emptied) and passes `hibernated` down
 through `SplitNodeView` to `PaneView`, which returns a bordered empty box right before its main
 `return` (after the last hook). `HibernatedOverlay` (large sleeping icon, `WorkspaceMark` and name, "Hibernated for 3h 20m" from `Workspace.hibernatedAt` via `formatHibernatedFor`, and a primary Restore button with the undo icon; wired to
-`wakeWorkspace` through the `onWake` prop) covers the workspace. Under the name it lists every tab with its icon, title and, in monospace, the command the restore will run (the agent resume command or the run-on-start command). The title is `tab.title` (the user's rename), else `Tab.agentTitle`, the last name an agent sent through OSC or its hooks: `startAgentTitleSync` (`agentTitleSync.ts`) copies it into the tab through one shared 10 s window (the first change saves at once, later ones from any tab wait for the rest of the window and go out together; hibernation and window close flush it), so it survives a restart. The agent and the resume command die with the PTY, so `createHibernateFlow` captures them as `Tab.hibernation` (`TabHibernation`) before ending the agent sessions, `applyHibernate` stores them and `applyWake` drops them. A workspace hibernated at startup has no snapshot: the overlay asks `previewResumeCmd` for the same plan the wake uses. The Sidebar (explorer, source control) and its resize handle are not mounted while the active workspace sleeps, so the overlay is centered in the full width.
+`wakeWorkspace` through the `onWake` prop) covers the workspace. Under the name it lists every tab with its icon, title and, in monospace, the command the restore will run (the agent resume command or the run-on-start command). The title is `tab.title` (the user's rename), else `Tab.agentTitle`, the last name an agent sent through OSC or its hooks: `startAgentTitleSync` (`agentTitleSync.ts`) copies it into the tab through one shared 10 s window (the first change saves at once, later ones from any tab wait for the rest of the window and go out together; hibernation and window close flush it), so it survives a restart. The agent and the resume command die with the PTY, so `createHibernateFlow` captures them as `Tab.hibernation` (`TabHibernation`) before ending the agent sessions, `applyHibernate` stores them and `applyWake` drops them. A workspace hibernated at startup has no snapshot: the overlay asks `previewResumeCmd` for the same plan the wake uses. The Sidebar (explorer, source control) and its resize handle are not mounted while the active workspace sleeps, so the overlay is centered in the full width. Waking remounts the Sidebar, which gets its `Workspace.sidebar` (view, open folders, selection, scroll) back; hibernating flushes the pending Sidebar snapshots first. A workspace switch or a wake does not itself trigger the autofocus reveal (`autofocusDecision`), so the explorer does not jump away from the restored state; a later change inside the woken workspace does, such as focusing another tab or a resumed agent in the focused tab reporting the worktree it entered.
 
 - The live-tab sweep in `App.tsx` skips hibernated workspaces, so their terminals leave the live
   set and are disposed by the normal path (PTY closed). That sweep now also calls

@@ -149,6 +149,16 @@ import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceBar } from "./components/WorkspaceBar";
 import { startAgentTitleSync } from "@/modules/workspaces/lib/agentTitleSync";
+import {
+  autofocusDecision,
+  type AutofocusKey,
+} from "@/modules/workspaces/lib/autofocusDecision";
+import {
+  flushSidebarSnapshotsNow,
+  pushSidebarSnapshot,
+  startSidebarSnapshotSync,
+  withSidebarSnapshotFlush,
+} from "@/modules/workspaces/lib/sidebarSnapshotSync";
 import { setEditorFlush } from "./lib/editorFlush";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
@@ -169,7 +179,11 @@ import {
   groupLabelOf,
   saveGroups,
 } from "@/modules/workspaces/lib/workspaceGroupsState";
-import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
+import {
+  effectiveSidebarView,
+  type SidebarView,
+} from "@/modules/workspaces/lib/sidebarState";
+import { DEFAULT_WORKSPACE_SIDEBAR } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { isTabNoteOpen, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
@@ -266,6 +280,7 @@ export default function App() {
     openTab,
     hibernateWorkspace,
     setAgentTitles,
+    applyExplorerSnapshotBatch,
     wakeWorkspace,
     activateTab,
     revealTab,
@@ -277,6 +292,7 @@ export default function App() {
     setWorkspaceCwd,
     setExplorerRootMode,
     setShowHidden,
+    setWorkspaceSidebarView,
     setWorkspaceRoot,
     clearWorkspaceRoot,
     setFsRoot,
@@ -671,15 +687,35 @@ export default function App() {
   );
   const {
     open: sidebarOpen,
-    view: sidebarView,
     side: sidebarSide,
     width: sidebarWidth,
     stateRef: sidebarStateRef,
-    setOpen: setSidebarOpen,
-    setView: setSidebarView,
-    setSide: setSidebarSide,
+    setOpen: setSidebarOpenNow,
+    setSide: setSidebarSideNow,
     setWidth: setSidebarWidth,
   } = useSidebarState(windowLabel);
+  // Opening, closing or moving the Sidebar remounts the explorer: flush first so it restores
+  // the latest snapshot instead of overwriting a pending one.
+  const setSidebarOpen = useMemo(
+    () => withSidebarSnapshotFlush(setSidebarOpenNow),
+    [setSidebarOpenNow],
+  );
+  const setSidebarSide = useMemo(
+    () => withSidebarSnapshotFlush(setSidebarSideNow),
+    [setSidebarSideNow],
+  );
+  const sidebarView: SidebarView = effectiveSidebarView(
+    activeWorkspace?.sidebar?.view ?? DEFAULT_WORKSPACE_SIDEBAR.view,
+    activeWorkspace?.workspaceRoot ?? null,
+  );
+  const sidebarViewRef = useRef(sidebarView);
+  sidebarViewRef.current = sidebarView;
+  const setSidebarView = useCallback(
+    (view: SidebarView) => {
+      if (activeWorkspaceId) setWorkspaceSidebarView(activeWorkspaceId, view);
+    },
+    [activeWorkspaceId, setWorkspaceSidebarView],
+  );
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
@@ -1172,6 +1208,7 @@ export default function App() {
           setRevealRequest((r) => ({
             path: folder,
             nonce: (r?.nonce ?? 0) + 1,
+            workspaceId: ws.id,
             pendingAction: opts.pendingAction,
           }));
         });
@@ -1185,7 +1222,7 @@ export default function App() {
         const shouldSwitchToExplorer = opts.pendingAction
           ? true
           : lastFocusFolderRef.current === folder;
-        if (shouldSwitchToExplorer && sidebar.view !== "explorer") {
+        if (shouldSwitchToExplorer && sidebarViewRef.current !== "explorer") {
           setSidebarView("explorer");
         }
       }
@@ -1226,18 +1263,22 @@ export default function App() {
   }, [activeTabFocusTarget, focusSidebar]);
 
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
-  const prevAutofocusSignalRef = useRef<string | null | undefined>(undefined);
+  const prevAutofocusRef = useRef<AutofocusKey | undefined>(undefined);
   useEffect(() => {
     const ap = activeTab;
     const target = ap && isAutofocusActive(ap, autofocusMode) ? activeTabFocusTarget : null;
-    const signal = target ? `${activeTabId}|${agentWorktree ?? ""}` : null;
-    const prev = prevAutofocusSignalRef.current;
-    prevAutofocusSignalRef.current = signal;
-    if (prev === undefined) return; // skip initial mount
-    if (signal && signal !== prev && target) {
-      focusSidebar(target, { fromShortcut: false });
-    }
-  }, [activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar, autofocusMode]);
+    const next: AutofocusKey = {
+      workspaceId: activeWorkspaceId,
+      signal: target ? `${activeTabId}|${agentWorktree ?? ""}` : null,
+    };
+    const fire = autofocusDecision(prevAutofocusRef.current, next);
+    prevAutofocusRef.current = next;
+    if (fire && target) focusSidebar(target, { fromShortcut: false });
+  }, [activeWorkspaceId, activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar, autofocusMode]);
+
+  useEffect(() => {
+    lastFocusFolderRef.current = null;
+  }, [activeWorkspaceId]);
 
   // Whether the saved workspace root still exists on disk, so the selector can
   // disable the option when it is unset or missing.
@@ -2060,6 +2101,18 @@ export default function App() {
   );
 
   useEffect(() => startAgentTitleSync(setAgentTitles), [setAgentTitles]);
+  useEffect(
+    () => startSidebarSnapshotSync(applyExplorerSnapshotBatch),
+    [applyExplorerSnapshotBatch],
+  );
+  // Flush on cleanup so a restore after a workspace switch never reads a stale snapshot; the
+  // open and side setters already flush synchronously, this is their safety net.
+  useEffect(
+    () => () => {
+      flushSidebarSnapshotsNow();
+    },
+    [activeWorkspaceId, sidebarOpen],
+  );
 
   const hibernateFlow = useHibernateFlow({
     workspacesRef,
@@ -2269,7 +2322,7 @@ export default function App() {
       if (!sidebar.open) {
         setSidebarOpen(true);
         setSidebarView(tab);
-      } else if (sidebar.view === tab) {
+      } else if (sidebarViewRef.current === tab) {
         setSidebarOpen(false);
       } else {
         setSidebarView(tab);
@@ -2304,7 +2357,7 @@ export default function App() {
   // System (idempotent). It never closes the sidebar (use sidebar.toggle).
   const rotateExplorerRoot = useCallback(() => {
     const sidebar = sidebarStateRef.current;
-    const inExplorer = sidebar.open && sidebar.view === "explorer";
+    const inExplorer = sidebar.open && sidebarViewRef.current === "explorer";
     if (!inExplorer) {
       showSidebarView("explorer");
       return;
@@ -2819,7 +2872,7 @@ export default function App() {
 
   const handleExplorerSearch = useCallback(() => {
     const sidebar = sidebarStateRef.current;
-    if (sidebar.open && sidebar.view === "explorer") {
+    if (sidebar.open && sidebarViewRef.current === "explorer") {
       sidebarRef.current?.toggleExplorerSearch?.();
     } else {
       pendingExplorerSearch.current = true;
@@ -3531,6 +3584,11 @@ export default function App() {
                     >
                                             <Sidebar
                         ref={sidebarRef}
+                        workspaceId={activeWorkspaceId}
+                        initialExplorer={activeWorkspace?.sidebar ?? null}
+                        onExplorerSnapshot={(s) => {
+                          if (activeWorkspaceId) pushSidebarSnapshot(activeWorkspaceId, s);
+                        }}
                         view={sidebarView}
                         onChangeView={setSidebarView}
                         notesRoot={workspaceRootPath}
@@ -3640,6 +3698,11 @@ export default function App() {
                     >
                                             <Sidebar
                         ref={sidebarRef}
+                        workspaceId={activeWorkspaceId}
+                        initialExplorer={activeWorkspace?.sidebar ?? null}
+                        onExplorerSnapshot={(s) => {
+                          if (activeWorkspaceId) pushSidebarSnapshot(activeWorkspaceId, s);
+                        }}
                         view={sidebarView}
                         onChangeView={setSidebarView}
                         notesRoot={workspaceRootPath}

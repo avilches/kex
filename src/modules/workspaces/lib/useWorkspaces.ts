@@ -28,6 +28,8 @@ import {
 import { attachTab, workspaceForTab, workspaceTitleFromCwd, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
 import { type ClosedEntry, type Tab, type PaneNode, type Script, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
+import { applyExplorerSnapshots, applySidebarView, type ExplorerSnapshot } from "./sidebarSnapshot";
+import type { SidebarView } from "./sidebarState";
 import { newWorkspaceId, newPaneId, newSplitId, newTabId } from "@/lib/ids";
 
 export function captureClosedEntry(
@@ -804,6 +806,14 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
+  const setWorkspaceSidebarView = useCallback((workspaceId: string, view: SidebarView) => {
+    setWorkspaces((prev) => applySidebarView(prev, workspaceId, view));
+  }, []);
+
+  const applyExplorerSnapshotBatch = useCallback((batch: Map<string, ExplorerSnapshot>) => {
+    setWorkspaces((prev) => applyExplorerSnapshots(prev, batch));
+  }, []);
+
   const setWorkspaceRoot = useCallback((workspaceId: string, path: string) => {
     setWorkspaces((prev) => applyWorkspaceRoot(prev, workspaceId, path));
   }, []);
@@ -1058,6 +1068,8 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     setWorkspaceCwd,
     setExplorerRootMode,
     setShowHidden,
+    setWorkspaceSidebarView,
+    applyExplorerSnapshotBatch,
     setWorkspaceRoot,
     clearWorkspaceRoot,
     setFsRoot,

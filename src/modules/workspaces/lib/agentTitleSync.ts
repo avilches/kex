@@ -1,51 +1,17 @@
+import { createCoalescer, type Coalescer } from "./coalescer";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { getOscTitle, subscribe as subscribeOscTitles } from "@/modules/terminal/lib/oscTitleStore";
 
 export const AGENT_TITLE_SAVE_MS = 10_000;
 
-type Coalescer = {
-  push: (tabId: string, title: string) => void;
-  flush: () => boolean;
-  dispose: () => void;
-};
-
-// One shared window for every tab: a change flushes right away when the last flush is older
-// than `intervalMs`, otherwise it waits for the rest of the window, and all the titles that
-// changed meanwhile go out together. A burst from ten tabs costs one save, not ten.
 export function createTitleCoalescer(
   apply: (titles: Map<string, string>) => void,
   intervalMs: number = AGENT_TITLE_SAVE_MS,
-): Coalescer {
-  let pending = new Map<string, string>();
-  let lastFlush = Number.NEGATIVE_INFINITY;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const flush = () => {
-    if (timer !== null) clearTimeout(timer);
-    timer = null;
-    if (pending.size === 0) return false;
-    const batch = pending;
-    pending = new Map();
-    lastFlush = Date.now();
-    apply(batch);
-    return true;
-  };
-
-  return {
-    push(tabId, title) {
-      pending.set(tabId, title);
-      const wait = lastFlush + intervalMs - Date.now();
-      if (wait <= 0) flush();
-      else if (timer === null) timer = setTimeout(flush, wait);
-    },
-    flush,
-    dispose() {
-      flush();
-    },
-  };
+): Coalescer<string, string> {
+  return createCoalescer<string, string>(apply, intervalMs);
 }
 
-let active: Coalescer | null = null;
+let active: Coalescer<string, string> | null = null;
 
 // Saves the pending titles now (hibernation, window close). Resolves after a beat so the state
 // the flush just set reaches the debounced workspace save before the caller flushes that.
