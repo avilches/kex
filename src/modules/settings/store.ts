@@ -199,7 +199,6 @@ export type Preferences = {
   tabBarStyle: TabBarStyle;
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
-  keepFolderLayoutOnChangeExplorerRoot: boolean; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
   textEditorMode: TextEditorMode;
   preferredFileEditorId: string | null;
@@ -240,7 +239,6 @@ const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
-const KEY_KEEP_FOLDER_LAYOUT = "keepFolderLayoutOnChangeExplorerRoot";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
 const KEY_RANDOM_WORKSPACE_COLOR = "randomWorkspaceColor";
 const KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED = "workspaceDetailTerminalsEnabled";
@@ -449,7 +447,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   tabBarStyle: "connected",
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
-  keepFolderLayoutOnChangeExplorerRoot: false,
   scratchpadEnterSends: true,
   textEditorMode: "workspace-and-files",
   preferredFileEditorId: null,
@@ -738,9 +735,6 @@ export async function loadPreferences(): Promise<Preferences> {
       }
       return DEFAULT_PREFERENCES.paneSplitLimit;
     })(),
-    keepFolderLayoutOnChangeExplorerRoot:
-      getGeneral<boolean>(KEY_KEEP_FOLDER_LAYOUT) ??
-      DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot,
     scratchpadEnterSends:
       getTerminal<boolean>(KEY_SCRATCHPAD_ENTER_SENDS) ??
       DEFAULT_PREFERENCES.scratchpadEnterSends,
@@ -785,7 +779,6 @@ export async function loadPreferences(): Promise<Preferences> {
   const configDefaults: [string, unknown][] = [];
   if (!generalMap.has(KEY_WORKSPACE_PANE_LIMIT)) configDefaults.push([KEY_WORKSPACE_PANE_LIMIT, DEFAULT_PREFERENCES.workspacePaneLimit]);
   if (!generalMap.has(KEY_PANE_SPLIT_LIMIT)) configDefaults.push([KEY_PANE_SPLIT_LIMIT, DEFAULT_PREFERENCES.paneSplitLimit]);
-  if (!generalMap.has(KEY_KEEP_FOLDER_LAYOUT)) configDefaults.push([KEY_KEEP_FOLDER_LAYOUT, DEFAULT_PREFERENCES.keepFolderLayoutOnChangeExplorerRoot]);
   if (configDefaults.length > 0) {
     void Promise.all(configDefaults.map(([k, v]) => store.set(k, v))).then(() => store.save());
   }
