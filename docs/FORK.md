@@ -131,6 +131,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   it in `useSidebarState(label)` (debounced save).
 - `showHidden` moved from a global preference to a per-workspace field on `Workspace`, mirroring `explorerRootMode`, so
   each workspace tab remembers its own.
+- The active Sidebar view, the open explorer folders, the selection and the scroll are per workspace and persisted (`Workspace.sidebar`), so switching workspaces or restarting brings each one back as it was; only open, side and width remain per window.
 - The old global preferences and their setters were removed, along with the "Sidebar position" control in Settings (dock
   side is now per window, toggled from each window header).
 
