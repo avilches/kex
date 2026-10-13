@@ -133,6 +133,53 @@ describe("applySidebarView / applyExplorerSnapshots", () => {
     expect(out[0].sidebar).toEqual({ view: "git", expanded: ["/p/x"], selectedPath: null, scroll: null });
   });
 
+  it("returns the same array when the pushed snapshot equals the stored one", () => {
+    const stored = {
+      ...DEFAULT_WORKSPACE_SIDEBAR,
+      expanded: ["/p/a", "/p/b"],
+      selectedPath: "/p/a/x.ts",
+      scroll: { root: "/p", top: 40 },
+    };
+    const list = [ws("a", stored), ws("b")];
+    const same = snap({
+      expanded: ["/p/a", "/p/b"],
+      selectedPath: "/p/a/x.ts",
+      scroll: { root: "/p", top: 40 },
+    });
+    expect(applyExplorerSnapshots(list, new Map([["a", same]]))).toBe(list);
+  });
+
+  it("returns a new array when any explorer field differs", () => {
+    const stored = {
+      ...DEFAULT_WORKSPACE_SIDEBAR,
+      expanded: ["/p/a"],
+      scroll: { root: "/p", top: 40 },
+    };
+    const list = [ws("a", stored)];
+    const variants = [
+      snap({ expanded: ["/p/b"], scroll: { root: "/p", top: 40 } }),
+      snap({ expanded: ["/p/a", "/p/b"], scroll: { root: "/p", top: 40 } }),
+      snap({ expanded: ["/p/a"], selectedPath: "/p/a/x.ts", scroll: { root: "/p", top: 40 } }),
+      snap({ expanded: ["/p/a"], scroll: { root: "/p", top: 41 } }),
+      snap({ expanded: ["/p/a"], scroll: { root: "/q", top: 40 } }),
+      snap({ expanded: ["/p/a"], scroll: null }),
+    ];
+    for (const v of variants) {
+      expect(applyExplorerSnapshots(list, new Map([["a", v]]))).not.toBe(list);
+    }
+  });
+
+  it("stores a first snapshot for a workspace that had none", () => {
+    const list = [ws("a")];
+    expect(applyExplorerSnapshots(list, new Map([["a", snap()]]))).not.toBe(list);
+  });
+
+  it("returns the same array when the view does not change", () => {
+    const list = [ws("a", { ...DEFAULT_WORKSPACE_SIDEBAR, view: "history" })];
+    expect(applySidebarView(list, "a", "history")).toBe(list);
+    expect(applySidebarView(list, "missing", "history")).toBe(list);
+  });
+
   it("ignores snapshots for workspaces that no longer exist and keeps the array when nothing applies", () => {
     const list = [ws("a")];
     const out = applyExplorerSnapshots(list, new Map([["gone", snap()]]));

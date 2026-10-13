@@ -81,13 +81,29 @@ export function applySidebarView(
   id: string,
   view: SidebarView,
 ): Workspace[] {
+  const target = workspaces.find((w) => w.id === id);
+  if (!target || (target.sidebar?.view ?? DEFAULT_WORKSPACE_SIDEBAR.view) === view) {
+    return workspaces;
+  }
   return workspaces.map((w) =>
-    w.id === id
+    w === target
       ? { ...w, sidebar: { ...(w.sidebar ?? DEFAULT_WORKSPACE_SIDEBAR), view } }
       : w,
   );
 }
 
+function sameExplorer(a: ExplorerSnapshot, b: ExplorerSnapshot): boolean {
+  return (
+    a.selectedPath === b.selectedPath &&
+    a.scroll?.root === b.scroll?.root &&
+    a.scroll?.top === b.scroll?.top &&
+    a.expanded.length === b.expanded.length &&
+    a.expanded.every((p, i) => p === b.expanded[i])
+  );
+}
+
+// Every explorer mount reports a snapshot that usually equals the stored one;
+// returning the same array spares a re-render and a workspace save.
 export function applyExplorerSnapshots(
   workspaces: Workspace[],
   batch: Map<string, ExplorerSnapshot>,
@@ -95,7 +111,7 @@ export function applyExplorerSnapshots(
   let changed = false;
   const next = workspaces.map((w) => {
     const snap = batch.get(w.id);
-    if (!snap) return w;
+    if (!snap || (w.sidebar && sameExplorer(w.sidebar, snap))) return w;
     changed = true;
     return { ...w, sidebar: { ...(w.sidebar ?? DEFAULT_WORKSPACE_SIDEBAR), ...snap } };
   });
