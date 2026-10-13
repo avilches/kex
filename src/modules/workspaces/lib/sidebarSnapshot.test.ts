@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyExplorerSnapshots,
   applySidebarView,
+  carryOverExpanded,
   DEFAULT_WORKSPACE_SIDEBAR,
   restoreExplorerSnapshot,
   sanitizeWorkspaceSidebar,
@@ -208,5 +209,55 @@ describe("applySidebarView / applyExplorerSnapshots", () => {
     const list = [ws("a")];
     const out = applyExplorerSnapshots(list, new Map([["gone", snap()]]));
     expect(out).toBe(list);
+  });
+});
+
+describe("carryOverExpanded", () => {
+  it("keeps everything and opens the old root when the root goes up", () => {
+    expect(carryOverExpanded(["/a/b/c", "/a/b/d"], "/a/b", "/a")).toEqual([
+      "/a/b",
+      "/a/b/c",
+      "/a/b/d",
+    ]);
+  });
+
+  it("drops what is outside the new root when the root goes down", () => {
+    expect(carryOverExpanded(["/a/x", "/a/b/c", "/a/b/c/d"], "/a", "/a/b")).toEqual([
+      "/a/b/c",
+      "/a/b/c/d",
+    ]);
+  });
+
+  it("adds the missing intermediate folders, parents first", () => {
+    expect(carryOverExpanded(["/a/b/c/d"], "/a", "/a/b")).toEqual(["/a/b/c", "/a/b/c/d"]);
+  });
+
+  it("keeps nothing for an unrelated root", () => {
+    expect(carryOverExpanded(["/a/b"], "/a", "/z")).toEqual([]);
+  });
+
+  it("never lists the new root itself", () => {
+    expect(carryOverExpanded(["/a/b", "/a/b/c"], "/a", "/a/b")).toEqual(["/a/b/c"]);
+  });
+
+  it("returns an empty list for an empty set going down", () => {
+    expect(carryOverExpanded([], "/a/b", "/a/b/c")).toEqual([]);
+  });
+
+  it("opens only the old root for an empty set going up", () => {
+    expect(carryOverExpanded([], "/a/b", "/a")).toEqual(["/a/b"]);
+  });
+
+  it("works without a previous root", () => {
+    expect(carryOverExpanded(["/a/b"], null, "/a")).toEqual(["/a/b"]);
+  });
+
+  it("accepts roots with a trailing slash", () => {
+    expect(carryOverExpanded(["/a/b/c"], "/a/b/", "/a/")).toEqual(["/a/b", "/a/b/c"]);
+  });
+
+  it("returns no duplicates", () => {
+    const out = carryOverExpanded(new Set(["/a/b/c", "/a/b/d", "/a/b"]), "/a/b", "/a");
+    expect(new Set(out).size).toBe(out.length);
   });
 });

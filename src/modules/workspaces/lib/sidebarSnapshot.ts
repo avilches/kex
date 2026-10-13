@@ -80,6 +80,18 @@ export function restoreExplorerSnapshot(
   return { expanded: [...open], selectedPath: selected, scrollTop };
 }
 
+// The previous root is never in its own open set, so it is added here: going
+// up must leave the folder we came from open.
+export function carryOverExpanded(
+  expanded: Iterable<string>,
+  previousRoot: string | null,
+  root: string,
+): string[] {
+  const paths = previousRoot ? [previousRoot, ...expanded] : [...expanded];
+  return restoreExplorerSnapshot({ expanded: paths, selectedPath: null, scroll: null }, root)
+    .expanded;
+}
+
 export function applySidebarView(
   workspaces: Workspace[],
   id: string,
