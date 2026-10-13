@@ -182,7 +182,9 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 | `SessionEnd` | `kex:agent-signal` kind=`SessionEnd` | |
 | `UserPromptSubmit` | `kex:agent-signal` kind=`UserPromptSubmit` | Includes `prompt` |
 | `Notification` | `kex:agent-signal` kind=`Notification` | Includes `message` |
-| `Stop` | `kex:agent-signal` kind=`Stop` | Includes `last_assistant_message` as `message` |
+| `Stop` | `kex:agent-signal` kind=`Stop` | Includes `last_assistant_message` as `message`, and `backgroundSubagents` (`{ id, agentType, description }[]`): the `background_tasks` entries with `type == "subagent"` and `status == "running"` |
+| `SubagentStart` | `kex:agent-signal` kind=`SubagentStart` | Includes `agent_id` as `agentId` and `agent_type` as `agentType`; dropped without an `agent_id` |
+| `SubagentStop` | `kex:agent-signal` kind=`SubagentStop` | Same fields as `SubagentStart` |
 | `StopFailure` | `kex:agent-signal` kind=`StopFailure` | Includes `error_message` as `message` |
 | `PermissionRequest` | `kex:agent-signal` kind=`PermissionRequest` | Includes `tool_name` as `toolName` |
 | `MessageDisplay` | `kex:agent-signal` kind=`MessageDisplay` | Only on `final: true` chunks; `delta` as `message` |
