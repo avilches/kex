@@ -117,6 +117,17 @@ describe("WorkspaceDetailList tab notes", () => {
     expect(docked("t-b")).not.toBeNull();
   });
 
+  it("turning off an open note hides its docked preview", () => {
+    const tabs: Tab[] = [{ ...baseTabs[0], noteOpen: true }, baseTabs[1]];
+    const { noteButton, onUpdateTab } = mount("", tabs);
+    const btn = noteButton("t-a")!;
+    hover(btn, true);
+    expect(docked("t-a")).not.toBeNull();
+    act(() => btn.click());
+    expect(onUpdateTab).toHaveBeenCalledTimes(1);
+    expect(docked("t-a")).toBeNull();
+  });
+
   it("a docked preview of an open note has a close button that hides the note", () => {
     const tabs: Tab[] = [{ ...baseTabs[0], noteOpen: true }, baseTabs[1]];
     const { noteButton, onUpdateTab } = mount("", tabs);

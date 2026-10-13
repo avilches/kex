@@ -327,11 +327,15 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     },
     [visibleSet, setSidebarHover, notePreview.show, notePreview.leave],
   );
-  // A visible tab's pane resets its own preview when the note opens or closes; a docked preview
-  // stays under the pointer and just gains or loses its close button.
+  // A visible tab's pane resets its own preview when the note opens or closes. A docked preview
+  // stays under the pointer when the note is turned on (now with its close button) and goes away
+  // when it is turned off.
   const handleNoteToggle = useCallback(
-    (tabId: string) => onUpdateTab(tabId, toggleTabNote),
-    [onUpdateTab],
+    (tabId: string) => {
+      if (tabsById.get(tabId)?.noteOpen) notePreview.close();
+      onUpdateTab(tabId, toggleTabNote);
+    },
+    [tabsById, notePreview.close, onUpdateTab],
   );
   useEffect(() => () => setSidebarHover(null), [setSidebarHover]);
   const previewTab = notePreview.tabId ? tabsById.get(notePreview.tabId) : undefined;
