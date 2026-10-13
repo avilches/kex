@@ -3,7 +3,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { tabLocations } from "@/modules/workspaces/lib/tabLocations";
+import { tabLocations, userTabTitles } from "@/modules/workspaces/lib/tabLocations";
 import {
   blockedWhileHibernated,
   workspaceDialogPending,
@@ -3189,6 +3189,7 @@ export default function App() {
     useAgentStore.getState().setTabLocations(
       tabLocations(workspaces.filter((w) => !w.hibernated)),
     );
+    useAgentStore.getState().setUserTabTitles(userTabTitles(workspaces));
   }, [workspaces]);
 
   const onActivateAgent = useCallback(

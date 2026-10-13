@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { sameLocations } from "@/modules/workspaces/lib/tabLocations";
+import { sameLocations, sameTitles } from "@/modules/workspaces/lib/tabLocations";
 import type {
   AgentNotification,
   AgentSession,
@@ -20,6 +20,9 @@ type AgentStoreState = {
   /** tabId -> workspaceId of every live tab; null until the app reports it. */
   tabLocations: Record<string, string> | null;
   setTabLocations: (locations: Record<string, string>) => void;
+  /** Names the user gave to tabs, keyed by tab id (tabs without one are absent). */
+  userTabTitles: Record<string, string>;
+  setUserTabTitles: (titles: Record<string, string>) => void;
   /** Sessions of closed tabs that were waiting on the user, by their old tab id. */
   closedSessions: Record<string, AgentSession>;
   stashClosedSession: (tabId: string) => void;
@@ -57,6 +60,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
   localAgent: null,
   notifications: [],
   tabLocations: null,
+  userTabTitles: {},
   closedSessions: {},
 
   start: (tabId, workspaceId, agent) =>
@@ -284,6 +288,9 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
     set((s) =>
       sameLocations(s.tabLocations, locations) ? s : { tabLocations: locations },
     ),
+
+  setUserTabTitles: (titles) =>
+    set((s) => (sameTitles(s.userTabTitles, titles) ? s : { userTabTitles: titles })),
 
   // Closing the tab kills the agent and drops its session, so an attention state
   // would be lost for good. Keep it aside in case the tab is reopened.

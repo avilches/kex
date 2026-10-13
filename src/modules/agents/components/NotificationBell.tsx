@@ -95,6 +95,7 @@ export function NotificationBell({ onActivate }: Props) {
   const sessions = useAgentStore((s) => s.sessions);
   const notifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
+  const userTabTitles = useAgentStore((s) => s.userTabTitles);
   const markAllRead = useAgentStore((s) => s.markAllRead);
   const clearAll = useAgentStore((s) => s.clearAll);
   const oscTitles = useSyncExternalStore(
@@ -210,7 +211,11 @@ export function NotificationBell({ onActivate }: Props) {
               <AgentEntryRow
                 key={entry.tabId}
                 entry={entry}
-                name={oscTitles.get(entry.tabId) ?? entry.agent}
+                name={
+                  userTabTitles[entry.tabId] ??
+                  oscTitles.get(entry.tabId) ??
+                  entry.agent
+                }
                 onClick={() => activate(entry.workspaceId, entry.tabId)}
               />
             ))}
