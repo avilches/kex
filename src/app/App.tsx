@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLaunchDir } from "@/lib/launchDir";
 import { native } from "@/lib/native";
+import { focusWhenReady } from "@/lib/focusWhenReady";
 import { newGroupId, newTabId } from "@/lib/ids";
 import { useZoom } from "@/lib/useZoom";
 import { useUiFont } from "@/lib/useUiFont";
@@ -1400,6 +1401,23 @@ export default function App() {
       return tabId;
     },
     [activeWorkspace, activateTab, openTab, replaceTab],
+  );
+
+  const openFileAndFocus = useCallback(
+    (path: string, pin?: boolean) => {
+      const id = openFileInTab(path, pin);
+      if (id == null) return;
+      const markdown = isMarkdownPath(path);
+      focusWhenReady(() => {
+        if (markdown) {
+          const h = markdownHandles.current.get(id);
+          h?.focus();
+          return h != null;
+        }
+        return editorHandles.current.get(id)?.focus() ?? false;
+      });
+    },
+    [openFileInTab],
   );
 
   const openNoteToSide = useCallback(
@@ -3535,7 +3553,7 @@ export default function App() {
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
                         revealRequest={revealRequest}
-                        onOpenFile={(path, pin) => openFileInTab(path, pin)}
+                        onOpenFile={openFileAndFocus}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={openFolderInTerminal}
@@ -3644,7 +3662,7 @@ export default function App() {
                         workspaceRootPath={workspaceRootPath}
                         workspaceRootExists={workspaceRootExists}
                         revealRequest={revealRequest}
-                        onOpenFile={(path, pin) => openFileInTab(path, pin)}
+                        onOpenFile={openFileAndFocus}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={openFolderInTerminal}
