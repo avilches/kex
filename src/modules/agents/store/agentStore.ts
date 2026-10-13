@@ -39,6 +39,7 @@ type AgentStoreState = {
   subagentStarted: (tabId: string, agentId: string, agentType: string) => void;
   subagentStopped: (tabId: string, agentId: string) => void;
   reconcileSubagents: (tabId: string, list: BackgroundSubagent[]) => void;
+  forgetSubagents: (tabId: string) => void;
   finish: (tabId: string) => void;
   startRestored: (tabId: string, workspaceId: string, agent: string) => void;
   setRestoreError: (
@@ -169,6 +170,22 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
       if (subagents === prev.subagents) return s;
       return {
         sessions: { ...s.sessions, [tabId]: { ...prev, subagents } },
+      };
+    }),
+
+  forgetSubagents: (tabId) =>
+    set((s) => {
+      const prev = s.sessions[tabId];
+      if (!prev || Object.keys(prev.subagents).length === 0) return s;
+      return {
+        sessions: {
+          ...s.sessions,
+          [tabId]: {
+            ...prev,
+            subagents: {},
+            status: prev.status === "working" ? "idle" : prev.status,
+          },
+        },
       };
     }),
 

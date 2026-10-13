@@ -43,7 +43,7 @@ function handleAgentCwd(tabId: string, cwd: string) {
     });
 }
 
-type Ctx = {
+export type Ctx = {
   workspaces: Workspace[];
   activeWorkspaceId: string;
   focused: boolean;
@@ -149,7 +149,7 @@ function ensureSessionIdle(tabId: string, ctx: Ctx, agent: string): boolean {
   return true;
 }
 
-function handleSignal(sig: AgentSignal, ctx: Ctx): void {
+export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const tabId = leafIdForPty(sig.id);
   if (tabId === null) return;
   const store = useAgentStore.getState();
@@ -225,6 +225,9 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       return;
     }
     case "SessionEnd":
+      // /clear and /resume end the Claude session while the process lives on;
+      // its background subagents are assumed gone with it.
+      store.forgetSubagents(tabId);
       return;
     case "MessageDisplay":
       // Fields TBD after log inspection - for now just ensure session exists.
