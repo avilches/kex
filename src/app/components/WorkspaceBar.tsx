@@ -100,6 +100,8 @@ type WorkspaceItem = {
   groupId?: string;
   tabs: Tab[];
   focusedTabId: string | null;
+  // Comma-joined active tab of every pane: the tabs whose note a pane can draw.
+  visibleTabIds?: string;
   detailExpanded?: boolean;
   hibernated?: boolean;
   hibernatedAt?: number;
@@ -470,6 +472,7 @@ function SortableWorkspaceItem({
           entries={agentEntries}
           filter={detailFilter}
           focusedTabId={active ? ws.focusedTabId : null}
+          visibleTabIds={active ? ws.visibleTabIds : ""}
           onActivate={activateDetailTab}
         />
       </SlideReveal>

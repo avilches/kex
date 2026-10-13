@@ -11,7 +11,7 @@ import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentEntry } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { FloatingTabNote } from "@/modules/workspaces/FloatingTabNote";
-import { toggleTabNote } from "@/modules/workspaces/lib/tabNote";
+import { hideTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { useNotePreview } from "@/modules/workspaces/lib/useNotePreview";
 import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
@@ -242,6 +242,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   entries,
   filter,
   focusedTabId,
+  visibleTabIds = "",
   onActivate,
 }: {
   workspaceId: string;
@@ -249,6 +250,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   entries: AgentEntry[] | undefined;
   filter: DetailFilter;
   focusedTabId: string | null;
+  visibleTabIds?: string;
   onActivate: (tabId: string) => void;
 }) {
   const sessions = useAgentStore((s) => s.sessions);
@@ -291,11 +293,12 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     ),
     focusedTabId ?? "",
   );
-  // The focused tab's note lives in its pane, at its own position: the pane previews it.
-  // Any other tab's note is docked next to its row.
+  // A tab that is the active one of a pane has its note drawn by that pane, at its own position
+  // and sticky once opened. Any other tab's note is docked next to its row.
+  const visibleSet = useMemo(() => new Set(visibleTabIds.split(",")), [visibleTabIds]);
   const handleNoteHover = useCallback(
     (tabId: string, hovering: boolean) => {
-      if (tabId === focusedTabId) {
+      if (visibleSet.has(tabId)) {
         setSidebarHover(hovering ? tabId : null);
       } else if (hovering) {
         notePreview.show(tabId);
@@ -303,16 +306,13 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
         notePreview.leave(tabId);
       }
     },
-    [focusedTabId, setSidebarHover, notePreview.show, notePreview.leave],
+    [visibleSet, setSidebarHover, notePreview.show, notePreview.leave],
   );
-  // Toggling drops the hover preview, as in the pane: the pointer is still on the icon, so the
-  // preview would otherwise keep showing a note the click just hid.
+  // A visible tab's pane resets its own preview when the note opens or closes; a docked preview
+  // stays under the pointer and just gains or loses its close button.
   const handleNoteToggle = useCallback(
-    (tabId: string) => {
-      notePreview.close();
-      onUpdateTab(tabId, toggleTabNote);
-    },
-    [notePreview.close, onUpdateTab],
+    (tabId: string) => onUpdateTab(tabId, toggleTabNote),
+    [onUpdateTab],
   );
   useEffect(() => () => setSidebarHover(null), [setSidebarHover]);
   const previewTab = notePreview.tabId ? tabsById.get(notePreview.tabId) : undefined;
@@ -338,7 +338,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
           />
         ) : null;
       })}
-      {previewTab && previewTab.note !== undefined && previewTab.id !== focusedTabId &&
+      {previewTab && previewTab.note !== undefined && !visibleSet.has(previewTab.id) &&
         createPortal(
           <div className="pointer-events-none fixed inset-0 z-50">
             <FloatingTabNote
@@ -351,6 +351,10 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               tabBarRef={noBarRef}
               layoutKey=""
               onUpdateTab={onUpdateTab}
+              onClose={() => {
+                notePreview.close();
+                onUpdateTab(previewTab.id, hideTabNote);
+              }}
               onDismiss={notePreview.close}
               onPointerEnter={() => notePreview.show(previewTab.id)}
               onPointerLeave={() => notePreview.leave(previewTab.id)}

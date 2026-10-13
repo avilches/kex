@@ -60,6 +60,8 @@ function sameMeasure(a: Measure, b: Measure) {
 export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab, preview, dockTo, onClose, onDismiss, onPointerEnter, onPointerLeave }: Props) {
   const visible = tab.note !== undefined && (!!preview || (active && !!tab.noteOpen));
   const sticky = active && !!tab.noteOpen;
+  // A note docked to a WorkspaceBar row shows its open state with the close button too.
+  const closable = sticky || (!!dockTo && !!tab.noteOpen);
   const docked = !active;
   const draggable = sticky || active;
   const noteRef = useRef<HTMLDivElement>(null);
@@ -258,7 +260,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
           if (!sticky) onDismiss?.();
         }}
       >
-        {sticky && (
+        {closable && (
           <button
             type="button"
             aria-label="Close note"

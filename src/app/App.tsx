@@ -3397,6 +3397,10 @@ export default function App() {
           ? allPanes(w.paneTree).flatMap((p) => p.tabs)
           : NO_TABS,
         focusedTabId: focusedTabId(w.paneTree, w.activePaneId),
+        visibleTabIds: allPanes(w.paneTree)
+          .map((p) => p.activeTabId)
+          .filter(Boolean)
+          .join(","),
         detailExpanded: w.detailExpanded,
         hibernated: w.hibernated,
         hibernatedAt: w.hibernatedAt,
