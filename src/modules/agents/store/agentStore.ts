@@ -312,7 +312,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
                 ...s.sessions,
                 [tabId]: {
                   ...prev,
-                  status: "idle",
+                  status: Object.keys(prev.subagents).length > 0 ? "working" : "idle",
                   attentionSince: null,
                   lastActivityAt: now,
                 },

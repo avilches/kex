@@ -307,6 +307,23 @@ describe("agentStore subagents", () => {
     expect(Object.keys(subagents())).toEqual(["a2"]);
   });
 
+  test("markTabSeen keeps the session working while subagents still run", () => {
+    const s = useAgentStore.getState();
+    s.subagentStarted("tab-1", "a1", "Explore");
+    s.setStatus("tab-1", "attention");
+    s.markTabSeen("tab-1");
+    const session = useAgentStore.getState().sessions["tab-1"];
+    expect(session.status).toBe("working");
+    expect(session.attentionSince).toBeNull();
+  });
+
+  test("markTabSeen still goes idle when no subagent runs", () => {
+    const s = useAgentStore.getState();
+    s.setStatus("tab-1", "attention");
+    s.markTabSeen("tab-1");
+    expect(useAgentStore.getState().sessions["tab-1"].status).toBe("idle");
+  });
+
   test("finish drops the session and its subagents", () => {
     useAgentStore.getState().subagentStarted("tab-1", "a1", "Explore");
     useAgentStore.getState().finish("tab-1");
