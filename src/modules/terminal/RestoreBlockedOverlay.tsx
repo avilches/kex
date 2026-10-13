@@ -58,7 +58,7 @@ export function RestoreBlockedOverlay({ leafId, block }: Props) {
             </Button>
           )}
           <Button autoFocus disabled={busy} onClick={() => run(retryRestore)} className="gap-2">
-            {retrying && <Spinner size={16} />}
+            {retrying && <Spinner size={16} className="text-current" />}
             Try again
           </Button>
         </div>
