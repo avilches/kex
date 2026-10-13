@@ -296,8 +296,9 @@ The `Run on Start` submenu (`RunOnStartMenu`) reacts to it:
 
 - The submenu trigger turns red (`text-destructive`).
 - The `Enabled` checkbox is not rendered (`runOnStartSections`): it makes no sense while a plan waits.
-- A red "Restore pending" block shows the reason and the command as it will be typed, two selectable mono lines:
-  `cd <dir>` and the command. It replaces the old red error text of the agent preview.
+- A "Restore pending" block (only its title is red) shows the reason and the command as it will be typed in the
+  normal text colour, two selectable mono lines: `cd <dir>` and the command. It replaces the old red error text of
+  the agent preview.
 - **Retry restore** (`retryPendingRestore`): works in the live shell. It rechecks the directory (a fresh plan with
   `previewResumeCmd` for an agent, `check_launch_dir` for a saved command). If the problem persists the block stays
   pending with the new reason; if the plan is gone it just clears; otherwise it types
