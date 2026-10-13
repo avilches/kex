@@ -14,9 +14,9 @@ export type Script = {
   tabId?: string;
 };
 
-// What the sleeping overlay shows for a terminal tab: its live title, agent and restore
-// command are gone with the PTY, so they are captured when the workspace goes to sleep.
-export type TabHibernation = { title: string; agent?: string; command?: string };
+// What the sleeping overlay shows for a terminal tab besides its title: the agent and the
+// restore command are gone with the PTY, so they are captured when the workspace goes to sleep.
+export type TabHibernation = { agent?: string; command?: string };
 
 // Common to every tab. `locked` (prevent close) applies to all kinds with no
 // exception. `autofocus` lives here too so any new path-bearing kind opts in
@@ -38,7 +38,7 @@ type TabCommon = {
 };
 
 export type Tab =
-  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; persistentCommandManual?: boolean; scratchpadEnabled?: boolean; hibernation?: TabHibernation })
+  | (TabCommon & { kind: "terminal"; cwd?: string; blocks?: boolean; restoreOnRestart?: boolean; persistentCommand?: string; persistentCommandManual?: boolean; scratchpadEnabled?: boolean; hibernation?: TabHibernation; agentTitle?: string })
   | (TabCommon & {
       kind: "editor";
       path: string;

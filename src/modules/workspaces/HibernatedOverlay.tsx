@@ -5,13 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
-import { formatHibernatedFor } from "./lib/hibernate";
+import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
+import { formatHibernatedFor, restoreCommandFor } from "./lib/hibernate";
 import { markHibernateFxPlayed, shouldPlayHibernateFx } from "./lib/hibernateFx";
 import { allPanes } from "./lib/splitNode";
 import { tabIcon } from "./lib/tabTitle";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 import { HIBERNATED_DROP_PREFIX } from "./lib/tabDrop";
-import type { Tab, Workspace } from "./lib/types";
+import type { Tab, TabHibernation, Workspace } from "./lib/types";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
 import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { WorkspaceMark } from "./WorkspaceMark";
@@ -31,12 +32,31 @@ function useNow(enabled: boolean): number {
   return now;
 }
 
+// A workspace hibernated at startup has no snapshot: the agent and resume command come from
+// the same plan the wake uses.
+function useSleepingSnapshot(tab: Tab): TabHibernation | undefined {
+  const saved = tab.kind === "terminal" ? tab.hibernation : undefined;
+  const [fetched, setFetched] = useState<TabHibernation>();
+  const terminal = tab.kind === "terminal" ? tab : null;
+  useEffect(() => {
+    if (!terminal || saved) return;
+    let cancelled = false;
+    void previewResumeCmd(terminal.id).then((plan) => {
+      if (!cancelled) setFetched({ agent: plan?.agent, command: restoreCommandFor(terminal, plan) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [terminal, saved]);
+  return saved ?? fetched;
+}
+
 function SleepingTabRow({ tab }: { tab: Tab }) {
   const info = useAgentTabTitle(tab);
-  const saved = tab.kind === "terminal" ? tab.hibernation : undefined;
-  const title = saved?.title ?? info?.displayTitle ?? tab.id;
-  const agent = saved ? saved.agent : info?.hasAgent ? info.agentSession?.agent : undefined;
-  const command = saved?.command;
+  const snapshot = useSleepingSnapshot(tab);
+  const title = tab.title || (tab.kind === "terminal" ? tab.agentTitle : undefined) || info?.displayTitle || tab.id;
+  const agent = snapshot?.agent;
+  const command = snapshot?.command;
   return (
     <li title={command ? `${title}: ${command}` : title} className="flex h-6 items-center gap-1.5 px-2 text-[12px]">
       <span className="flex size-3.5 shrink-0 items-center justify-center">

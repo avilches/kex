@@ -104,7 +104,7 @@ describe("applyHibernate timestamp", () => {
 });
 
 describe("tab snapshots", () => {
-  const snap = { title: "Fix login", agent: "claude", command: "claude --resume abc" };
+  const snap = { agent: "claude", command: "claude --resume abc" };
   const firstTab = (w: Workspace) => (w.paneTree as Extract<SplitNode, { kind: "split" }>).first as Extract<SplitNode, { kind: "pane" }>;
 
   it("stores the snapshot on the terminal tab it belongs to and on no other", () => {

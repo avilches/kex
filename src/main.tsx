@@ -10,6 +10,7 @@ import { flushEditors } from "./app/lib/editorFlush";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 import { loadPreferences } from "./modules/settings/store";
+import { flushAgentTitles } from "./modules/workspaces/lib/agentTitleSync";
 import { claimClose, flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
 import { retryMissingWebgl } from "./modules/terminal/lib/rendererPool";
 
@@ -83,6 +84,7 @@ getCurrentWindow().onCloseRequested(async (event) => {
   if (!claimClose()) return;
   event.preventDefault();
   try {
+    await flushAgentTitles();
     await flushEditors();
     await flushWorkspaceState();
     await getCurrentWindow().destroy();
@@ -94,6 +96,7 @@ getCurrentWindow().onCloseRequested(async (event) => {
 listen("kex:before-quit", async () => {
   try {
     if (claimClose()) {
+      await flushAgentTitles();
       await flushEditors();
       await flushWorkspaceState();
     }

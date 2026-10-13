@@ -120,6 +120,11 @@ export function editorTabIds(ws: Workspace): string[] {
     .map((t) => t.id);
 }
 
+// What the restore will type into the tab: the agent resume command, else the run-on-start command.
+export function restoreCommandFor(tab: TerminalTab, plan: { resumeCmd: string } | null | undefined): string | undefined {
+  return plan?.resumeCmd.trim() || (tab.restoreOnRestart ? tab.persistentCommand : undefined) || undefined;
+}
+
 export function enableRunOnStart(tab: Tab, runningCommand?: string): Tab {
   if (tab.kind !== "terminal") return tab;
   return {

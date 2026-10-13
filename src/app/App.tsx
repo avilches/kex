@@ -147,6 +147,7 @@ import { WorkspaceSettingsDialog } from "./components/WorkspaceSettingsDialog";
 import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceBar } from "./components/WorkspaceBar";
+import { startAgentTitleSync } from "@/modules/workspaces/lib/agentTitleSync";
 import { setEditorFlush } from "./lib/editorFlush";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
@@ -263,6 +264,7 @@ export default function App() {
     splitPaneAndOpenTab,
     openTab,
     hibernateWorkspace,
+    setAgentTitles,
     wakeWorkspace,
     activateTab,
     revealTab,
@@ -2038,6 +2040,8 @@ export default function App() {
     },
     [saveTab],
   );
+
+  useEffect(() => startAgentTitleSync(setAgentTitles), [setAgentTitles]);
 
   const hibernateFlow = useHibernateFlow({
     workspacesRef,

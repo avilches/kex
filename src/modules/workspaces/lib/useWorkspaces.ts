@@ -7,6 +7,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
+import { applyAgentTitles } from "./agentTitles";
 import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { discardUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
@@ -956,6 +957,10 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     [],
   );
 
+  const setAgentTitles = useCallback((titles: ReadonlyMap<string, string>) => {
+    setWorkspaces((prev) => applyAgentTitles(prev, titles));
+  }, []);
+
   const hibernateWorkspace = useCallback((workspaceId: string, snapshots?: Record<string, TabHibernation>) => {
     setWorkspaces((prev) => applyHibernate(prev, workspaceId, Date.now(), snapshots));
   }, []);
@@ -1041,6 +1046,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
     splitPaneAndOpenTab,
     openTab,
     hibernateWorkspace,
+    setAgentTitles,
     wakeWorkspace,
     activateTab,
     revealTab,

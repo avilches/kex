@@ -42,7 +42,7 @@ describe("createHibernateFlow", () => {
   });
 
   it("hands the tab snapshots taken before the hibernation to the hibernate step", async () => {
-    const snap = { title: "Fix login", command: "claude --resume abc" };
+    const snap = { command: "claude --resume abc" };
     let received: unknown;
     const { flow } = setup(ws([term("t1")]), {
       snapshotTabs: async () => ({ t1: snap }),

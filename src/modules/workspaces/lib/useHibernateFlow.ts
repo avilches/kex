@@ -2,11 +2,10 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { markHibernating, unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
-import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
-import { terminalTabs } from "./hibernate";
+import { restoreCommandFor, terminalTabs } from "./hibernate";
+import { flushAgentTitles } from "./agentTitleSync";
 import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
-import { getRunningCommand, getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
-import { resolveAgentTabTitle } from "./useAgentTabTitle";
+import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
 import type { TabHibernation, Workspace } from "./types";
 
 export type HibernateFlowDeps = {
@@ -99,17 +98,14 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   return { request, requestAuto, perform };
 }
 
-// A tab that was added or retitled during the await keeps no snapshot or a slightly old one,
-// which the overlay tolerates by falling back to the live title.
 async function snapshotTerminalTabs(ws: Workspace): Promise<Record<string, TabHibernation>> {
+  await flushAgentTitles();
   const sessions = useAgentStore.getState().sessions;
   const entries = await Promise.all(
     terminalTabs(ws).map(async (tab): Promise<[string, TabHibernation]> => {
       const session = sessions[tab.id];
-      const info = resolveAgentTabTitle(tab, getRunningCommand(tab.id), getOscTitle(tab.id), session);
       const plan = session ? await previewResumeCmd(tab.id) : null;
-      const command = plan?.resumeCmd.trim() || (tab.restoreOnRestart ? tab.persistentCommand : undefined);
-      return [tab.id, { title: info.displayTitle, agent: session?.agent, command }];
+      return [tab.id, { agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan) }];
     }),
   );
   return Object.fromEntries(entries);
