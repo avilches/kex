@@ -279,7 +279,7 @@ set. For an agent plan the tab also gets the `restoreError` placeholder (the `âš
   directory lives on a volume that was not mounted yet. The modal stays up while it works: `startLeaf` clears it on
   success or replaces it with the new block on failure.
 - **Retry feedback** (`restoreBusy.ts`): `retryRestore` and `retryPendingRestore` run inside `withRestoreBusy`, a
-  per-leaf counter that stays on for at least 1500ms (`MIN_BUSY_MS`) so a fast retry does not just flicker. While it is
+  per-leaf counter that stays on for at least 800ms (`MIN_BUSY_MS`) so a fast retry does not just flicker. While it is
   on, the tab swaps its indicator for a spinner (any terminal tab, with or without an agent; larger than the
   working-agent one so it is noticed) and the modal disables both buttons and shows a spinner inside Try again. When
   the retry ends they come back; if the plan is still pending the tab goes back to the red dot. The indicator choice is
