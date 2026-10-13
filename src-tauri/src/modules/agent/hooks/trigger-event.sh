@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kex-session-v5
+# kex-session-v6
 [ -n "$KEX_TERMINAL" ] || exit 0
 [ -n "$KEX_TAB_ID" ] || exit 0
 
@@ -88,8 +88,16 @@ handle_MessageDisplay() {
     send_ipc
 }
 
+handle_SubagentStart() {
+    send_ipc
+}
+
+handle_SubagentStop() {
+    send_ipc
+}
+
 case "$EVENT" in
-    SessionStart|UserPromptSubmit|Notification|Stop|StopFailure|SessionEnd|PermissionRequest|MessageDisplay)
+    SessionStart|UserPromptSubmit|Notification|Stop|StopFailure|SessionEnd|PermissionRequest|MessageDisplay|SubagentStart|SubagentStop)
         "handle_${EVENT}" ;;
     *) exit 0 ;;
 esac
