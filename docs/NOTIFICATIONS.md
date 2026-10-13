@@ -160,7 +160,7 @@ El dot naranja (status=attention) y el spinner (status=working) se limpian por m
 | ESC (`\x1b` solo, 1 byte) | Spinner | `writeToPty` → `setStatus("idle")` |
 | CTRL+C (`\x03`) | Spinner | `writeToPty` → `setStatus("idle")` |
 
-El dot naranja es una señal de "atención no vista": se limpia al **mirar** el panel (panel activo + ventana enfocada), no al teclear. Por eso un `Notification`/`PermissionRequest`/`Stop` que llega mientras el panel ya está enfocado no llega a poner el dot (`isPanelSeen` lo descarta en `handleSignal`); cuando es un `Stop`, el spinner pasa directo a `idle`. Al mirar el panel con subagentes en segundo plano todavía vivos, el dot se limpia pero la sesión vuelve a `working` y no a `idle` (`markTabSeen`).
+El dot naranja es una señal de "atención no vista": se limpia al **mirar** el panel (panel activo + ventana enfocada), no al teclear. Por eso un `Notification`/`PermissionRequest`/`Stop` que llega mientras el panel ya está enfocado no llega a poner el dot (`isPanelSeen` lo descarta en `handleSignal`); cuando es un `Stop`, el spinner pasa directo a `idle`. Al mirar el panel con subagentes en segundo plano todavía vivos, el dot se limpia pero la sesión vuelve a `working` y no a `idle` (`markTabSeen`). Un `SessionEnd` (por ejemplo `/clear`) olvida los subagentes de la sesión y, si seguía en `working`, la pasa a `idle` (`forgetSubagents`).
 
 El spinner refleja estado real del agente, así que solo lo limpian las interrupciones explícitas (`\x03`, `\x1b` solo). Las respuestas automáticas de xterm a queries de terminal (`\x1b[?1;2c`, etc.) son secuencias multi-byte que no coinciden y no limpian el spinner accidentalmente.
 
