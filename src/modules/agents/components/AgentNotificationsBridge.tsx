@@ -52,7 +52,7 @@ type Ctx = {
 function tabInfo(
   workspaces: Workspace[],
   tabId: string,
-): { workspaceId: string; title: string } | null {
+): { workspaceId: string; title: string; userTitle?: string } | null {
   for (const ws of workspaces) {
     const result = findTabPane(ws.paneTree, tabId);
     if (result) {
@@ -60,7 +60,7 @@ function tabInfo(
         result.tab.kind === "terminal" ? result.tab.cwd : undefined;
       const cwdParts = cwd ? cwd.split(/[\\/]/).filter(Boolean) : [];
       const title = cwd ? (cwdParts[cwdParts.length - 1] ?? cwd) : ws.title;
-      return { workspaceId: ws.id, title };
+      return { workspaceId: ws.id, title, userTitle: result.tab.title || undefined };
     }
   }
   return null;
@@ -86,9 +86,9 @@ function route(
   extraBody?: string,
 ): void {
   const info = tabInfo(ctx.workspaces, session.tabId);
-  // Prefer the tab's OSC title (what the agent emits) so multiple agents are
-  // distinguishable in the toast / OS notification; fall back to the agent name.
-  const name = getOscTitle(session.tabId) ?? session.agent;
+  // The user's own tab name wins, then the OSC title (what the agent emits) so
+  // multiple agents are distinguishable; fall back to the agent name.
+  const name = info?.userTitle ?? getOscTitle(session.tabId) ?? session.agent;
   const heading =
     kind === "attention"
       ? `${name} needs your input`
