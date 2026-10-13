@@ -65,6 +65,7 @@ import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { dirname, useFileTree } from "./lib/useFileTree";
 import { ancestorListingPending, shouldClearSelection } from "./lib/staleSelection";
+import { listingsSettled, resolvePendingScroll } from "./lib/pendingScroll";
 import {
   restoreExplorerSnapshot,
   type ExplorerSnapshot,
@@ -440,7 +441,12 @@ export const FileExplorer = memo(
     const pendingScrollRef = useRef(0);
     useEffect(() => {
       const snap = initialExplorerRef.current;
-      if (!rootPath || !snap) return;
+      // A later root change must not inherit an offset meant for the restored root.
+      if (!snap) {
+        pendingScrollRef.current = 0;
+        return;
+      }
+      if (!rootPath) return;
       initialExplorerRef.current = null;
       const r = restoreExplorerSnapshot(snap, rootPath);
       setSelectedPath(r.selectedPath);
@@ -609,16 +615,6 @@ export const FileExplorer = memo(
       if (clear) setSelectedPath(null);
     }, [entryIndexByPath, selectedPath, tree.nodes, rootPath]);
 
-    useEffect(() => {
-      const top = pendingScrollRef.current;
-      const el = scrollRef.current;
-      if (!top || !el) return;
-      if (el.scrollHeight - el.clientHeight >= top) {
-        el.scrollTop = top;
-        pendingScrollRef.current = 0;
-      }
-    }, [rows]);
-
     const reportRef = useRef(onExplorerSnapshot);
     reportRef.current = onExplorerSnapshot;
     const report = useCallback(() => {
@@ -638,6 +634,26 @@ export const FileExplorer = memo(
     useEffect(() => {
       report();
     }, [report]);
+
+    useEffect(() => {
+      const top = pendingScrollRef.current;
+      const el = scrollRef.current;
+      if (!top || !el) return;
+      const next = resolvePendingScroll(
+        top,
+        el.scrollHeight,
+        el.clientHeight,
+        listingsSettled(rootPath, tree.nodes),
+      );
+      if (!next.done) return;
+      pendingScrollRef.current = 0;
+      if (next.scrollTo !== null) el.scrollTop = next.scrollTo;
+      report();
+    }, [rows, rootPath, tree.nodes, report]);
+
+    const dropPendingScroll = useCallback(() => {
+      pendingScrollRef.current = 0;
+    }, []);
 
     const virtualizer = useVirtualizer({
       count: rows.length,
@@ -798,6 +814,7 @@ export const FileExplorer = memo(
         // from the sidebar selects it on click, and the autofocus tab would
         // otherwise re-reveal that same file in a circular flash.
         const alreadySelected = selectedPath === file;
+        pendingScrollRef.current = 0;
         setSelectedPath(file);
         requestAnimationFrame(() => {
           scrollEntryIntoView(file, { topRatio: 0.2 });
@@ -950,6 +967,7 @@ export const FileExplorer = memo(
         target.isContentEditable
       )
         return;
+      dropPendingScroll();
       if (matchesShortcut(e.nativeEvent, "file.paste", userShortcuts)) {
         e.preventDefault();
         if (selectedPath) {
@@ -1389,9 +1407,8 @@ export const FileExplorer = memo(
                     }}
                     data-explorer-drop=""
                     onScroll={report}
-                    onWheel={() => {
-                      pendingScrollRef.current = 0;
-                    }}
+                    onWheel={dropPendingScroll}
+                    onPointerDown={dropPendingScroll}
                     className={cn(
                       "thin-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]",
                       rootIsDropTarget &&
