@@ -1,3 +1,4 @@
+import { chipColorOnWhite } from "@/modules/workspaces/lib/workspaceColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -78,6 +79,7 @@ function DetailTabRow({
   workspaceId,
   visual,
   focused,
+  color,
   prevTabId,
   insertSide,
   onActivate,
@@ -88,6 +90,7 @@ function DetailTabRow({
   workspaceId: string;
   visual: DetailRow["visual"];
   focused: boolean;
+  color: string | null;
   prevTabId: string | null;
   insertSide: "before" | "after" | null;
   onActivate: (tabId: string) => void;
@@ -162,9 +165,23 @@ function DetailTabRow({
                 "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
                 isDragging && "opacity-40",
                 focused
-                  ? "bg-foreground/[0.16] font-medium text-foreground"
+                  ? "font-medium text-foreground"
                   : "text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground",
               )}
+              style={
+                focused
+                  ? color !== null
+                    ? {
+                        backgroundColor: chipColorOnWhite(color),
+                        color: "#ffffff",
+                        boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
+                      }
+                    : {
+                        backgroundColor: "var(--muted)",
+                        boxShadow: "inset 0 0 0 1px var(--ring)",
+                      }
+                  : undefined
+              }
             >
               <span className="flex size-3.5 shrink-0 items-center justify-center">
                 {agent && !tab.icon ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab, info?.isRunning)}
@@ -242,6 +259,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   entries,
   filter,
   focusedTabId,
+  color = null,
   visibleTabIds = "",
   onActivate,
 }: {
@@ -250,6 +268,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   entries: AgentEntry[] | undefined;
   filter: DetailFilter;
   focusedTabId: string | null;
+  color?: string | null;
   visibleTabIds?: string;
   onActivate: (tabId: string) => void;
 }) {
@@ -330,6 +349,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
             workspaceId={workspaceId}
             visual={row.visual}
             focused={row.tabId === focusedTabId}
+            color={color}
             prevTabId={rows[i - 1]?.tabId ?? null}
             insertSide={insert?.tabId === row.tabId ? insert.side : null}
             onActivate={onActivate}
