@@ -1,6 +1,7 @@
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
 export type { ExplorerRootMode };
 import type { AutofocusMode } from "@/modules/settings/store";
+import type { WorkspaceSidebar } from "./sidebarSnapshot";
 
 export type ScriptCwdMode = "workspace" | "context" | "fixed";
 
@@ -100,6 +101,8 @@ export type Workspace = {
   activePaneId: string;
   explorerRootMode?: ExplorerRootMode;
   showHidden?: boolean;
+  // Sidebar view state of this workspace: active view and the explorer snapshot.
+  sidebar?: WorkspaceSidebar;
   workspaceRoot?: string;
   fsRoot?: string;
   git?: WorkspaceGitConfig;

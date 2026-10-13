@@ -32,7 +32,7 @@ function clampWidth(v: unknown): number {
   return DEFAULT_SIDEBAR_STATE.width;
 }
 
-function parseView(value: unknown): SidebarView {
+export function parseView(value: unknown): SidebarView {
   return value === "git" || value === "history" || value === "notes"
     ? value
     : "explorer";

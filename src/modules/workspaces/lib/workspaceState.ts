@@ -4,6 +4,7 @@ import { debouncedInvoke } from "./debouncedInvoke";
 import { seedActivity, withActivity } from "./autoHibernate";
 import { applyStartupHibernation } from "./hibernate";
 import type { Tab, SplitNode, Workspace } from "./types";
+import { sanitizeWorkspaceSidebar } from "./sidebarSnapshot";
 import {
   setSavedSidebarState,
   type SidebarUiState,
@@ -47,6 +48,7 @@ export function sanitizeWorkspace(w: Workspace): Workspace {
   return {
     ...w,
     showHidden: w.showHidden,
+    sidebar: sanitizeWorkspaceSidebar(w.sidebar),
     paneTree: sanitizeTree(w.paneTree),
   };
 }
