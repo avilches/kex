@@ -302,15 +302,11 @@ auto-hibernate (`AutoHibernateCountdown`, in the title row right before the agen
 `autoHibernateRemainingMs` and formatted by `formatCountdown`. Only that child ticks (every second); it is absent when the mode is
 Never, the bar is compact, or the workspace is active or hibernated. It reads 0:00 until the next minutely check fires.
 
-#### Startup hibernation
+#### Startup
 
-With `restoreAllWorkspacesOnStartup` off (the default), `initWorkspaceState` applies
-`applyStartupHibernation` to the saved workspaces of each window: all but the active one are hibernated
-before the first render (this also clears `dirty` and `floating`, which matters because the floating
-browser restore runs right after startup). A workspace that was already hibernated stays so, even the
-active one. Consequently "Run on start" commands and agent sessions of the other workspaces are not
-launched at startup: they relaunch when each workspace is restored. With the setting on, nothing is
-hibernated at startup.
+There is no startup hibernation: `initWorkspaceState` restores the saved workspaces untouched. A workspace that
+was hibernated stays so; every other one mounts, including its "Run on start" commands and agent sessions. Their
+`lastActiveAt` is seeded into `activityStamps`, so auto-hibernate resumes the countdown where it was.
 
 ---
 

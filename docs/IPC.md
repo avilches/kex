@@ -182,12 +182,14 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 | `SessionEnd` | `kex:agent-signal` kind=`SessionEnd` | |
 | `UserPromptSubmit` | `kex:agent-signal` kind=`UserPromptSubmit` | Includes `prompt` |
 | `Notification` | `kex:agent-signal` kind=`Notification` | Includes `message` |
-| `Stop` | `kex:agent-signal` kind=`Stop` | Includes `last_assistant_message` as `message` |
+| `Stop` | `kex:agent-signal` kind=`Stop` | Includes `last_assistant_message` as `message`, and `backgroundSubagents` (`{ id, agentType, description }[]`): the `background_tasks` entries with `type == "subagent"` and `status == "running"` |
+| `SubagentStart` | `kex:agent-signal` kind=`SubagentStart` | Includes `agent_id` as `agentId` and `agent_type` as `agentType`; dropped without an `agent_id` |
+| `SubagentStop` | `kex:agent-signal` kind=`SubagentStop` | Same fields as `SubagentStart` |
 | `StopFailure` | `kex:agent-signal` kind=`StopFailure` | Includes `error_message` as `message` |
 | `PermissionRequest` | `kex:agent-signal` kind=`PermissionRequest` | Includes `tool_name` as `toolName` |
 | `MessageDisplay` | `kex:agent-signal` kind=`MessageDisplay` | Only on `final: true` chunks; `delta` as `message` |
 
-Every hook event that carries a non-empty `cwd` (all but `SessionEnd`) also emits `kex:agent-cwd` (`{ tabId, cwd }`). `AgentNotificationsBridge` resolves it with `git_resolve_repo`; when it is a linked worktree the root is stored in the session as `meta.worktreeCwd`. F4 and autofocus on that terminal tab then target the worktree instead of the shell cwd (which does not change when the agent enters a worktree), and fall back to the shell cwd when the agent leaves it or its session ends.
+Every hook event that carries a non-empty `cwd` (all but `SessionEnd`, `SubagentStart` and `SubagentStop`, whose `cwd` is not the main agent's) also emits `kex:agent-cwd` (`{ tabId, cwd }`). `AgentNotificationsBridge` resolves it with `git_resolve_repo`; when it is a linked worktree the root is stored in the session as `meta.worktreeCwd`. F4 and autofocus on that terminal tab then target the worktree instead of the shell cwd (which does not change when the agent enters a worktree), and fall back to the shell cwd when the agent leaves it or its session ends.
 
 Independent of agents, the PTY reader emits `kex:shell-ready` (`{ id }`, the PTY id) once per PTY, on the first `OSC 133;B` (`AgentDetector` -> `Transition::ShellReady`, handled in `session.rs` before the agent-signal plumbing). The frontend (`shellReadyWaiter.ts`) uses it to know when it is safe to inject a "Run on start" command.
 

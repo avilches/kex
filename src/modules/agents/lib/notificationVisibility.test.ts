@@ -20,6 +20,7 @@ const session = (
   attentionSince: status === "attention" ? 1 : null,
   restored: false,
   restoreError: false,
+  subagents: {},
 });
 
 const errorNotif = (tabId: string, workspaceId: string): AgentNotification => ({

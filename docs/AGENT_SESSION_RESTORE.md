@@ -41,7 +41,7 @@ Triggered by Claude Code at session start. The hook command:
 [ -n "$KEX_TAB_ID" ] && "$HOME/.config/kex/hooks/trigger-event.sh" || true  # kex-session-hook
 ```
 
-The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v5`) handles all 8 registered Claude Code
+The script (`~/.config/kex/hooks/trigger-event.sh`, marker: `kex-session-v6`) handles all 10 registered Claude Code
 hook events the same way:
 
 1. Reads `KEX_TERMINAL` and `KEX_TAB_ID` from the environment. If either is unset, exits silently (tab is not
@@ -57,7 +57,7 @@ hook events the same way:
 4. `pty/ipc.rs::run_listener`, one thread per PTY listening on `kex-ipc-<pid>-<pty_id>.sock`, reads the JSON
    directly with `serde_json`. For `SessionStart` it calls `session_store::record_session(...)` and emits
    `kex:agent-session-meta`; for every other event (`UserPromptSubmit`, `Notification`, `Stop`, `StopFailure`,
-   `SessionEnd`, `PermissionRequest`, `MessageDisplay`) it emits `kex:agent-signal` directly with a `kind` matching
+   `SessionEnd`, `PermissionRequest`, `MessageDisplay`, `SubagentStart`, `SubagentStop`) it emits `kex:agent-signal` directly with a `kind` matching
    the event name. None of this goes through `agent_detect.rs` or its OSC byte-level state machine.
 
 Only `SessionStart` calls `session_store::record_session` today. The payload carries a `source` field
@@ -274,9 +274,17 @@ A start that cannot happen (unusable directory, or `openPty` rejecting) leaves t
 or its tab bar, showing the reason, the directory and the command. `attachSession` does not retry while the block is
 set. For an agent plan the tab also gets the `restoreError` placeholder (the `⚠` icon).
 
-- **Try again** (`retryRestore`): clears the block and the placeholder, fetches a fresh plan with `previewResumeCmd`
+- **Try again** (`retryRestore`): clears the placeholder, fetches a fresh plan with `previewResumeCmd`
   (read-only, so the store entry survives a second failure), seeds it, and runs `startLeaf` again. Useful when the
-  directory lives on a volume that was not mounted yet.
+  directory lives on a volume that was not mounted yet. The modal stays up while it works: `startLeaf` clears it on
+  success or replaces it with the new block on failure.
+- **Retry feedback** (`restoreBusy.ts`): `retryRestore` and `retryPendingRestore` run inside `withRestoreBusy`, a
+  per-leaf counter that stays on for at least 1500ms (`MIN_BUSY_MS`) so a fast retry does not just flicker. While it is
+  on, the tab swaps its indicator for a spinner (any terminal tab, with or without an agent; larger than the
+  working-agent one so it is noticed) and the modal disables both buttons and shows a spinner inside Try again. When
+  the retry ends they come back; if the plan is still pending the tab goes back to the red dot. The indicator choice is
+  the pure `tabStatusIndicator` (`workspaces/lib`): a tab with a pending restore shows the red dot even without an
+  agent session.
 - **Open terminal without restoring** (`openWithoutRestoring`): opens a plain shell, in `initialCwd` when that is
   usable and in the shell's default directory otherwise. It deletes nothing: the plan stays in `agent-sessions.json`
   (or in the tab's `persistentCommand`), so it survives the plain shell and a Kex restart (the in-memory pending state does
@@ -301,9 +309,11 @@ The `Run on Start` submenu (`RunOnStartMenu`) reacts to it:
   the agent preview.
 - **Retry restore** (`retryPendingRestore`): works in the live shell. It rechecks the directory (a fresh plan with
   `previewResumeCmd` for an agent, `check_launch_dir` for a saved command). If the problem persists the block stays
-  pending with the new reason; if the plan is gone it just clears; otherwise it types
+  pending with the new reason and a `Restore still failing` toast shows it (the menu is already closed); if the plan is
+  gone it just clears; otherwise it types
   ` cd <dir> && <command>` (joined with `; ` on Windows, where PowerShell 5.1 has no `&&`) once the shell is ready.
-  A rejection is logged with `console.error`.
+  A rejection is logged with `console.error`. If the menu is opened while the modal is still up (no shell yet), the
+  action runs the modal's Try again instead of doing nothing.
 - **Discard restore plan** (`discardPendingRestore`): the only place besides agent exit and tab close that deletes the
   agent entry from the store. For a saved command (no agent) it only forgets this start; `persistentCommand` is kept,
   so the next launch tries it again.

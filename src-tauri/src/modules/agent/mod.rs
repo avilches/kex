@@ -18,7 +18,7 @@ const SESSION_HOOK_MARKER: &str = "kex-session-hook";
 // Bump this when the script behaviour changes in a way that requires reinstall.
 // agent_claude_hooks_status checks the installed file for this marker so that
 // users with an older script see the "Set up Claude Code" button again.
-const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v5";
+const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v6";
 
 // Script lives in hooks/trigger-event.sh; embedded at compile time.
 //
@@ -26,15 +26,17 @@ const SESSION_HOOK_SCRIPT_VERSION: &str = "kex-session-v5";
 //   SessionStart:       [5]=source (startup|resume|clear|compact), [6]=sessionTitle
 //   UserPromptSubmit:   [5]=prompt
 //   Notification:       [5]=notification_type, [6]=message
-//   Stop:               [5]=stop_reason
+//   Stop:               [5]=stop_reason, also background_tasks (running subagents)
 //   StopFailure:        [5]=error_type, [6]=error_message
 //   SessionEnd:         [5]=end_reason
 //   PermissionRequest:  [5]=tool_name
 //   MessageDisplay:     TBD
+//   SubagentStart:      agent_id, agent_type
+//   SubagentStop:       agent_id, agent_type
 const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 
-// All 8 events handled by trigger-event.sh in v5.
-const SESSION_HOOK_EVENTS: [&str; 8] = [
+// All 10 events handled by trigger-event.sh in v6.
+const SESSION_HOOK_EVENTS: [&str; 10] = [
     "SessionStart",
     "UserPromptSubmit",
     "Notification",
@@ -43,6 +45,8 @@ const SESSION_HOOK_EVENTS: [&str; 8] = [
     "SessionEnd",
     "PermissionRequest",
     "MessageDisplay",
+    "SubagentStart",
+    "SubagentStop",
 ];
 
 fn session_hook_script_path() -> Result<std::path::PathBuf, String> {
@@ -268,7 +272,7 @@ pub fn agent_claude_hooks_status() -> bool {
     let Ok(root) = serde_json::from_str::<Value>(&content) else {
         return false;
     };
-    // All 8 events must have the session hook (v5 unified protocol).
+    // Every subscribed event must have the session hook.
     let all_hooks_present = SESSION_HOOK_EVENTS.iter().all(|event| {
         root["hooks"][event]
             .as_array()
@@ -277,7 +281,7 @@ pub fn agent_claude_hooks_status() -> bool {
     if !all_hooks_present {
         return false;
     }
-    // Check that the session hook script is up-to-date (v4).
+    // Check that the session hook script is up-to-date.
     session_hook_script_path()
         .ok()
         .and_then(|p| std::fs::read_to_string(p).ok())
@@ -347,7 +351,7 @@ mod tests {
     #[test]
     fn adds_session_hooks_to_empty_config() {
         let out = merge_hooks(json!({}));
-        // All 8 events must have the session hook in v5.
+        // Every subscribed event must have the session hook.
         for event in SESSION_HOOK_EVENTS {
             let arr = out["hooks"][event].as_array().unwrap();
             assert!(!arr.is_empty(), "{event} missing");
@@ -357,6 +361,12 @@ mod tests {
             let timeout = arr[0]["hooks"][0]["timeout"].as_u64().unwrap();
             assert_eq!(timeout, 10, "{event} timeout should be 10");
         }
+    }
+
+    #[test]
+    fn subscribes_to_subagent_events() {
+        assert!(SESSION_HOOK_EVENTS.contains(&"SubagentStart"));
+        assert!(SESSION_HOOK_EVENTS.contains(&"SubagentStop"));
     }
 
     #[test]

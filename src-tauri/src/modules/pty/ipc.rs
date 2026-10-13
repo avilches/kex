@@ -141,6 +141,30 @@ impl Drop for IpcGuard {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct BackgroundSubagent {
+    id: String,
+    agent_type: String,
+    description: String,
+}
+
+fn parse_background_subagents(v: &serde_json::Value) -> Vec<BackgroundSubagent> {
+    let Some(tasks) = v["background_tasks"].as_array() else {
+        return Vec::new();
+    };
+    tasks
+        .iter()
+        .filter(|t| t["type"].as_str() == Some("subagent") && t["status"].as_str() == Some("running"))
+        .filter_map(|t| {
+            Some(BackgroundSubagent {
+                id: t["id"].as_str()?.to_string(),
+                agent_type: t["agent_type"].as_str().unwrap_or("").to_string(),
+                description: t["description"].as_str().unwrap_or("").to_string(),
+            })
+        })
+        .collect()
+}
+
 struct Payload {
     event: String,
     session_id: String,
@@ -160,6 +184,10 @@ struct Payload {
     // Stop
     stop_reason: Option<String>,
     last_message: Option<String>,
+    background_subagents: Vec<BackgroundSubagent>,
+    // SubagentStart / SubagentStop
+    agent_id: Option<String>,
+    agent_type: Option<String>,
     // StopFailure
     error_message: Option<String>,
     // PermissionRequest
@@ -187,6 +215,9 @@ fn parse_payload(json: &str) -> Option<Payload> {
         notif_type:      v["notification_type"].as_str().map(str::to_string),
         stop_reason:     v["stop_reason"].as_str().map(str::to_string),
         last_message:    v["last_assistant_message"].as_str().map(str::to_string),
+        background_subagents: parse_background_subagents(&v),
+        agent_id:        v["agent_id"].as_str().map(str::to_string),
+        agent_type:      v["agent_type"].as_str().map(str::to_string),
         error_message:   v["error_message"].as_str().map(str::to_string),
         tool_name:       v["tool_name"].as_str().map(str::to_string),
         is_final:        v["final"].as_bool().unwrap_or(false),
@@ -378,12 +409,18 @@ fn truncate_for_log(s: &str, max: usize) -> String {
     format!("{truncated}...({} more)", char_count - max)
 }
 
+/// A subagent's `cwd` says where the subagent runs, not where the main agent
+/// is, so only the main agent's own events may move the tab's worktree.
+fn reports_agent_cwd(event: &str, cwd: &str) -> bool {
+    !cwd.is_empty() && !matches!(event, "SessionEnd" | "SubagentStart" | "SubagentStop")
+}
+
 fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
     let Some(p) = parse_payload(json) else {
         log::debug!("[ipc] invalid JSON: {}", truncate_for_log(json, MAX_LOG_FIELD_LEN));
         return;
     };
-    if !p.cwd.is_empty() && p.event != "SessionEnd" {
+    if reports_agent_cwd(&p.event, &p.cwd) {
         log::debug!("[ipc] cwd tab={tab_id} event={} cwd={:?}", p.event, p.cwd);
         let _ = app.emit(AGENT_CWD_EVENT, serde_json::json!({ "tabId": tab_id, "cwd": p.cwd }));
     }
@@ -468,6 +505,15 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 "[ipc] Stop tab={tab_id} reason={reason} last={:?}",
                 truncate_for_log(last, MAX_LOG_FIELD_LEN)
             );
+            let subagents: Vec<serde_json::Value> = p
+                .background_subagents
+                .iter()
+                .map(|s| serde_json::json!({
+                    "id":          s.id,
+                    "agentType":   s.agent_type,
+                    "description": s.description,
+                }))
+                .collect();
             let _ = app.emit(AGENT_EVENT, serde_json::json!({
                 "id":       pty_id,
                 "kind":     "Stop",
@@ -475,6 +521,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 "message":  last,
                 "toolName": null,
                 "prompt":   null,
+                "backgroundSubagents": subagents,
             }));
         }
         "StopFailure" => {
@@ -502,6 +549,23 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 "message":  null,
                 "toolName": tool,
                 "prompt":   null,
+            }));
+        }
+        "SubagentStart" | "SubagentStop" => {
+            let Some(agent_id) = p.agent_id.as_deref() else {
+                return;
+            };
+            let agent_type = p.agent_type.as_deref().unwrap_or("");
+            log::debug!("[ipc] {} tab={tab_id} agent={agent_id} type={agent_type}", p.event);
+            let _ = app.emit(AGENT_EVENT, serde_json::json!({
+                "id":        pty_id,
+                "kind":      p.event,
+                "agent":     null,
+                "message":   null,
+                "toolName":  null,
+                "prompt":    null,
+                "agentId":   agent_id,
+                "agentType": agent_type,
             }));
         }
         "MessageDisplay" => {
@@ -769,6 +833,49 @@ mod tests {
         let p = parse_payload(json).unwrap();
         assert_eq!(p.stop_reason.as_deref(), Some("end_turn"));
         assert_eq!(p.last_message.as_deref(), Some("done"));
+    }
+
+    #[test]
+    fn parse_subagent_start() {
+        let json = r#"{"hook_event_name":"SubagentStart","session_id":"s","transcript_path":"","cwd":"","agent_id":"a1","agent_type":"general-purpose"}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(p.event, "SubagentStart");
+        assert_eq!(p.agent_id.as_deref(), Some("a1"));
+        assert_eq!(p.agent_type.as_deref(), Some("general-purpose"));
+    }
+
+    #[test]
+    fn parse_stop_keeps_only_running_subagents() {
+        let json = r#"{"hook_event_name":"Stop","session_id":"s","transcript_path":"","cwd":"","background_tasks":[
+            {"id":"a1","type":"subagent","status":"running","description":"do it","agent_type":"Explore"},
+            {"id":"a2","type":"subagent","status":"completed","description":"old","agent_type":"Explore"},
+            {"id":"b1","type":"shell","status":"running","description":"npm run dev"}
+        ]}"#;
+        let p = parse_payload(json).unwrap();
+        assert_eq!(
+            p.background_subagents,
+            vec![BackgroundSubagent {
+                id: "a1".into(),
+                agent_type: "Explore".into(),
+                description: "do it".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn parse_stop_without_background_tasks_has_no_subagents() {
+        let json = r#"{"hook_event_name":"Stop","session_id":"s","transcript_path":"","cwd":""}"#;
+        assert!(parse_payload(json).unwrap().background_subagents.is_empty());
+    }
+
+    #[test]
+    fn only_main_agent_events_report_the_agent_cwd() {
+        assert!(reports_agent_cwd("Stop", "/p"));
+        assert!(reports_agent_cwd("UserPromptSubmit", "/p"));
+        assert!(!reports_agent_cwd("Stop", ""));
+        assert!(!reports_agent_cwd("SessionEnd", "/p"));
+        assert!(!reports_agent_cwd("SubagentStart", "/p"));
+        assert!(!reports_agent_cwd("SubagentStop", "/p"));
     }
 
     #[test]

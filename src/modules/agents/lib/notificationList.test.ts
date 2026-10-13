@@ -14,6 +14,7 @@ function session(p: Partial<AgentSession> & { tabId: string }): AgentSession {
     restored: p.restored ?? false,
     restoreError: p.restoreError ?? false,
     restoreErrorReason: p.restoreErrorReason,
+    subagents: p.subagents ?? {},
     meta: p.meta,
   };
 }

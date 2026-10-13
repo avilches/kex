@@ -11,6 +11,7 @@ import { startAgentSnapshotSync } from "../lib/agentSnapshotSync";
 import { routeAgentNotification } from "../lib/route";
 import { isHibernating } from "../lib/hibernatingTabs";
 import { detachesRecord, endsAgentSession, isRunningAgentSession } from "../lib/sessionEndPolicy";
+import { stopOutcome } from "../lib/subagentGate";
 import type { AgentSession, AgentSignal } from "../lib/types";
 import { useWindowFocus } from "../lib/useWindowFocus";
 import { useAgentStore } from "../store/agentStore";
@@ -42,7 +43,7 @@ function handleAgentCwd(tabId: string, cwd: string) {
     });
 }
 
-type Ctx = {
+export type Ctx = {
   workspaces: Workspace[];
   activeWorkspaceId: string;
   focused: boolean;
@@ -148,7 +149,7 @@ function ensureSessionIdle(tabId: string, ctx: Ctx, agent: string): boolean {
   return true;
 }
 
-function handleSignal(sig: AgentSignal, ctx: Ctx): void {
+export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const tabId = leafIdForPty(sig.id);
   if (tabId === null) return;
   const store = useAgentStore.getState();
@@ -180,15 +181,30 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     case "Stop": {
       // Claude finished its turn: it is now your move. This is the reliable,
       // single end-of-turn signal (idle_prompt is filtered out upstream), so it
-      // is what raises the attention dot.
+      // is what raises the attention dot. A background subagent keeps the agent
+      // busy; its completion opens a new turn whose own Stop raises the dot.
+      // Read the state fresh: ensureSession and the reconcile below changed it.
       ensureSession(tabId, ctx, sig.agent ?? "claude");
-      const session = store.sessions[tabId];
-      if (session && !isTabSeen(ctx, session.workspaceId, tabId)) {
-        store.setStatus(tabId, "attention");
-        route(session, "attention", ctx);
-      } else {
-        store.setStatus(tabId, "idle");
-      }
+      useAgentStore.getState().reconcileSubagents(tabId, sig.backgroundSubagents ?? []);
+      const session = useAgentStore.getState().sessions[tabId];
+      if (!session) return;
+      const outcome = stopOutcome(
+        Object.keys(session.subagents).length,
+        isTabSeen(ctx, session.workspaceId, tabId),
+      );
+      store.setStatus(tabId, outcome);
+      if (outcome === "attention") route(session, "attention", ctx);
+      return;
+    }
+    case "SubagentStart": {
+      if (!sig.agentId) return;
+      ensureSession(tabId, ctx, sig.agent ?? "claude");
+      store.subagentStarted(tabId, sig.agentId, sig.agentType ?? "");
+      return;
+    }
+    case "SubagentStop": {
+      if (!sig.agentId) return;
+      store.subagentStopped(tabId, sig.agentId);
       return;
     }
     case "PermissionRequest": {
@@ -209,6 +225,9 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
       return;
     }
     case "SessionEnd":
+      // /clear and /resume end the Claude session while the process lives on;
+      // its background subagents are assumed gone with it.
+      store.forgetSubagents(tabId);
       return;
     case "MessageDisplay":
       // Fields TBD after log inspection - for now just ensure session exists.

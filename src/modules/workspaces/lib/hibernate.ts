@@ -75,16 +75,6 @@ export function formatHibernatedFor(ms: number): string {
   return unit(Math.floor(hours / 24), "d", hours % 24, "h");
 }
 
-export function applyStartupHibernation(
-  workspaces: Workspace[],
-  activeIndex: number,
-  restoreAll: boolean,
-): Workspace[] {
-  if (restoreAll || workspaces.length === 0) return workspaces;
-  const active = workspaces[Math.max(0, Math.min(activeIndex, workspaces.length - 1))]!;
-  return workspaces.reduce((acc, w) => (w.id === active.id ? acc : applyHibernate(acc, w.id)), workspaces);
-}
-
 function clearTabSnapshots(node: SplitNode): SplitNode {
   if (node.kind === "pane") {
     return {

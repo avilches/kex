@@ -10,7 +10,6 @@ import {
 import {
   setAutoHibernate,
   setRandomWorkspaceColor,
-  setRestoreAllWorkspacesOnStartup,
   setWorkspaceDetailBrowsers,
   setWorkspaceDetailEditors,
   setWorkspaceDetailGit,
@@ -26,7 +25,6 @@ import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
 export function WorkspacesSection() {
-  const restoreAll = usePreferencesStore((s) => s.restoreAllWorkspacesOnStartup);
   const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
   const randomWorkspaceColor = usePreferencesStore((s) => s.randomWorkspaceColor);
   const terminalsEnabled = usePreferencesStore((s) => s.workspaceDetailTerminalsEnabled);
@@ -51,28 +49,6 @@ export function WorkspacesSection() {
       <SectionHeader title="Workspaces" />
 
       <div className="flex flex-col gap-2">
-        <SettingRow
-          title="Restore on startup"
-          description="Which workspaces reopen their terminals, agents and editors when Kex starts. Restoring all of them uses more memory and CPU, especially with many workspaces. With only the active one, the others start hibernated: nothing is lost, and you can restore each one manually later. Workspaces that were already hibernated stay hibernated until you restore them. Applies the next time Kex starts."
-        >
-          <RadioGroup
-            value={restoreAll ? "all" : "active"}
-            onValueChange={(v) => void setRestoreAllWorkspacesOnStartup(v === "all")}
-          >
-            <div className="flex items-center gap-2">
-              <RadioGroupItem value="active" id="restore-startup-active" />
-              <label htmlFor="restore-startup-active" className="cursor-pointer text-[12px]">
-                Only the active workspace
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <RadioGroupItem value="all" id="restore-startup-all" />
-              <label htmlFor="restore-startup-all" className="cursor-pointer text-[12px]">
-                All workspaces (uses more memory)
-              </label>
-            </div>
-          </RadioGroup>
-        </SettingRow>
         <SettingRow
           title="Auto-hibernate"
           description="Hibernate a workspace after it has been inactive for this long. Only workspaces without activity are hibernated: not the one you are in, none with an agent working or a script running, and only when every command in them has Run on start enabled, so nothing is lost. Unsaved documents are saved first; if saving fails, the workspace is not hibernated."

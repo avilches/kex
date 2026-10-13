@@ -4,12 +4,13 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { retryRestore, openWithoutRestoring } = vi.hoisted(() => ({
-  retryRestore: vi.fn(() => Promise.resolve()),
+  retryRestore: vi.fn((_id: string) => Promise.resolve()),
   openWithoutRestoring: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("./lib/useTerminalSession", () => ({ retryRestore, openWithoutRestoring }));
 
 import { RestoreBlockedOverlay } from "./RestoreBlockedOverlay";
+import { withRestoreBusy } from "./lib/restoreBusy";
 import type { RestoreBlock } from "./lib/restoreStart";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -62,6 +63,28 @@ describe("RestoreBlockedOverlay", () => {
     await act(async () => button(container, "Try again").click());
     expect(retryRestore).toHaveBeenCalledWith("tab-1");
     expect(openWithoutRestoring).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("disables both buttons and shows a spinner on Try again while the retry runs, then restores them", async () => {
+    let finish!: () => void;
+    const work = new Promise<void>((r) => (finish = r));
+    retryRestore.mockImplementationOnce((id: string) => withRestoreBusy(id, () => work, 0));
+    const { container, unmount } = mount();
+    expect(container.querySelector('[role="status"]')).toBeNull();
+
+    await act(async () => button(container, "Try again").click());
+    expect(button(container, "Try again").disabled).toBe(true);
+    expect(button(container, "Open terminal without restoring").disabled).toBe(true);
+    expect(button(container, "Try again").querySelector('[role="status"]')).not.toBeNull();
+
+    await act(async () => {
+      finish();
+      await work;
+    });
+    expect(button(container, "Try again").disabled).toBe(false);
+    expect(button(container, "Open terminal without restoring").disabled).toBe(false);
+    expect(container.querySelector('[role="status"]')).toBeNull();
     unmount();
   });
 

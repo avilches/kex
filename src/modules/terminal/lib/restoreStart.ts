@@ -95,13 +95,14 @@ async function leaveBlock(
   const block = s.restoreBlock;
   if (s.disposed || !block || s.ptyOpening) return;
   s.ptyOpening = true;
-  d.setBlock(null);
+  // A retry keeps the modal up so its button can show the spinner; the start clears or replaces it.
+  if (plain) d.setBlock(null);
   try {
     await prepare(block);
   } catch (e) {
     console.error("[kex] restore action failed:", e);
     s.ptyOpening = false;
-    if (!s.disposed) d.setBlock(block);
+    if (plain && !s.disposed) d.setBlock(block);
     return;
   }
   await d.start(plain);
@@ -179,6 +180,8 @@ export type RetryPendingDeps = PendingActionDeps & {
   // True once the tab was closed or its PTY replaced while a check was awaiting.
   isStale: () => boolean;
   markBlocked: (block: RestoreBlock) => void;
+  // The retry found the problem still there: the menu closed already, so tell the user why.
+  stillBlocked: (block: RestoreBlock) => void;
   adopt: (plan: RestorePlan) => void;
   write: (line: string) => Promise<void>;
 };
@@ -210,6 +213,7 @@ export async function retryPendingFlow(d: RetryPendingDeps): Promise<void> {
     if (outcome.kind === "blocked") {
       d.setPending(outcome.block);
       if (block.agent) d.markBlocked(outcome.block);
+      d.stillBlocked(outcome.block);
       return;
     }
     d.setPending(null);

@@ -157,7 +157,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
   flaps). Session status (`UserPromptSubmit`/`Notification`/`Stop`/`StopFailure`/`SessionEnd`/`PermissionRequest`)
   arrives out of band: Claude Code hooks (installed by `agent_enable_claude_hooks`, atomic write, never clobbers
   invalid JSON, prunes empty groups, gated on `KEX_TERMINAL`) run the script `agent/hooks/trigger-event.sh` (marker
-  `kex-session-v5`), which forwards the hook's JSON payload as-is over a Unix domain socket, one per PTY
+  `kex-session-v6`), which forwards the hook's JSON payload as-is over a Unix domain socket, one per PTY
   (`pty/ipc.rs`, `kex-ipc-<pid>-<pty_id>.sock` under `XDG_RUNTIME_DIR` or an owner-only (0700) per-uid subdirectory of
   `$TMPDIR` otherwise, socket file itself forced to 0600, env `KEX_IPC`, `nc -U` with a `python3` fallback). The listener
   (`ipc.rs::run_listener`, `#![cfg(unix)]`) parses the JSON directly and emits `kex:agent-signal` (or, for

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 import { listen } from "@tauri-apps/api/event";
 import {
   consumeRestorePlan,
@@ -37,6 +38,7 @@ import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { openPty, type PtySession } from "./pty-bridge";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
+import { withRestoreBusy } from "./restoreBusy";
 import {
   decideStart,
   needsDirCheck,
@@ -991,6 +993,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     return;
   }
   if (!plain) setPendingRestore(leafId, null);
+  if (s.restoreBlock) setRestoreBlock(leafId, s, null);
   s.pty = pty;
   if (s.pendingInput) {
     void pty.write(s.pendingInput);
@@ -1019,7 +1022,7 @@ function restoreActionDeps(leafId: string, s: Session): RestoreActionDeps {
 
 export async function retryRestore(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
-  if (s) await retryRestoreFlow(s, restoreActionDeps(leafId, s));
+  if (s) await withRestoreBusy(leafId, () => retryRestoreFlow(s, restoreActionDeps(leafId, s)));
 }
 
 // Plain shell; the plan stays pending so the user can still run or discard it later.
@@ -1051,14 +1054,20 @@ useAgentStore.subscribe((state) => {
 // Runs a pending restore inside the live shell. No-op while there is no PTY.
 export async function retryPendingRestore(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
-  const pty = s?.pty;
-  if (!s || !pty) return;
-  await retryPendingFlow({
+  if (!s) return;
+  const pty = s.pty;
+  if (!pty) {
+    // The modal is still up (no shell yet): the menu action is its Try again.
+    if (s.restoreBlock) await retryRestore(leafId);
+    return;
+  }
+  await withRestoreBusy(leafId, () => retryPendingFlow({
     ...pendingActionDeps(leafId),
     isWindows: IS_WINDOWS,
     previewPlan: () => previewResumeCmd(leafId),
     checkDir: (path) => invoke<string | null>("check_launch_dir", { path }).catch(() => null),
     isStale: () => s.disposed || s.pty !== pty,
+    stillBlocked: (block) => toast.error("Restore still failing", { description: block.reason }),
     markBlocked: (block) =>
       useAgentStore.getState().setRestoreError(leafId, leafId, block.agent ?? "", block.reason),
     adopt: (plan) => {
@@ -1066,7 +1075,7 @@ export async function retryPendingRestore(leafId: string): Promise<void> {
       watchResume(plan);
     },
     write: (line) => writeWhenShellReady(s, leafId, pty, line),
-  });
+  }));
 }
 
 // The only place besides agent exit and tab close that deletes the agent session from the store.

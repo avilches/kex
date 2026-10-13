@@ -102,6 +102,7 @@ function DetailTabRow({
   const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
   const { onRenameTab, onClose, onUpdateTab } = useSidebarTabMenu();
   const isLocked = tab.locked ?? false;
+  const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
   const hasNote = tab.note !== undefined;
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -166,7 +167,7 @@ function DetailTabRow({
                 isDragging && "opacity-40",
                 focused
                   ? "font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground",
+                  : "text-muted-foreground group-hover/tab:bg-foreground/[0.08] group-hover/tab:text-foreground",
               )}
               style={
                 focused
@@ -226,7 +227,7 @@ function DetailTabRow({
           type="button"
           title="Unlock tab"
           aria-label="Unlock tab"
-          className="absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
+          className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring", hoverBg)}
           onClick={() => onUpdateTab(tab.id, (p) => ({ ...p, locked: false }))}
         >
           <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
@@ -242,7 +243,7 @@ function DetailTabRow({
             type="button"
             title="Close tab"
             aria-label="Close tab"
-            className="absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:bg-muted group-focus-within/tab:opacity-60 group-hover/tab:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+            className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity group-focus-within/tab:opacity-60 group-hover/tab:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", hoverBg)}
             onClick={() => onClose(tab.id)}
           >
             <span className="text-[13px] leading-none">×</span>
@@ -327,11 +328,17 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     },
     [visibleSet, setSidebarHover, notePreview.show, notePreview.leave],
   );
-  // A visible tab's pane resets its own preview when the note opens or closes; a docked preview
-  // stays under the pointer and just gains or loses its close button.
+  // A visible tab's pane resets its own preview when the note opens or closes. A docked preview
+  // stays under the pointer when the note is turned on (now with its close button) and goes away
+  // when it is turned off.
   const handleNoteToggle = useCallback(
-    (tabId: string) => onUpdateTab(tabId, toggleTabNote),
-    [onUpdateTab],
+    (tabId: string) => {
+      // The pointer is still on the icon, so no new enter event will reopen the preview.
+      if (tabsById.get(tabId)?.noteOpen) notePreview.close();
+      else if (!visibleSet.has(tabId)) notePreview.show(tabId);
+      onUpdateTab(tabId, toggleTabNote);
+    },
+    [tabsById, visibleSet, notePreview.close, notePreview.show, onUpdateTab],
   );
   useEffect(() => () => setSidebarHover(null), [setSidebarHover]);
   const previewTab = notePreview.tabId ? tabsById.get(notePreview.tabId) : undefined;

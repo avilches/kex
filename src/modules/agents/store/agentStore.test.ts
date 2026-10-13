@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
+import { stopOutcome } from "../lib/subagentGate";
 import { useAgentStore } from "./agentStore";
 
 describe("agentStore.clearRestoreError", () => {
@@ -265,5 +266,78 @@ describe("agentStore.reassignTabWorkspace", () => {
     useAgentStore.getState().reassignTabWorkspace("tab-1", "ws-2");
     expect(useAgentStore.getState().notifications[0]?.workspaceId).toBe("ws-2");
     expect(useAgentStore.getState().sessions).toEqual({});
+  });
+});
+
+describe("agentStore subagents", () => {
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {} });
+    useAgentStore.getState().start("tab-1", "ws-1", "claude");
+  });
+
+  const subagents = () => useAgentStore.getState().sessions["tab-1"].subagents;
+
+  test("a new session has no subagents", () => {
+    expect(subagents()).toEqual({});
+  });
+
+  test("subagentStarted registers once and keeps the first startedAt", () => {
+    const s = useAgentStore.getState();
+    s.subagentStarted("tab-1", "a1", "Explore");
+    const first = subagents().a1.startedAt;
+    s.subagentStarted("tab-1", "a1", "Explore");
+    expect(Object.keys(subagents())).toEqual(["a1"]);
+    expect(subagents().a1.startedAt).toBe(first);
+  });
+
+  test("subagentStopped removes it, and unknown ids or tabs are no-ops", () => {
+    const s = useAgentStore.getState();
+    s.subagentStarted("tab-1", "a1", "Explore");
+    s.subagentStopped("tab-1", "nope");
+    s.subagentStopped("no-tab", "a1");
+    expect(Object.keys(subagents())).toEqual(["a1"]);
+    s.subagentStopped("tab-1", "a1");
+    expect(subagents()).toEqual({});
+  });
+
+  test("reconcileSubagents replaces the set", () => {
+    const s = useAgentStore.getState();
+    s.subagentStarted("tab-1", "stale", "Explore");
+    s.reconcileSubagents("tab-1", [{ id: "a2", agentType: "Plan", description: "x" }]);
+    expect(Object.keys(subagents())).toEqual(["a2"]);
+  });
+
+  test("markTabSeen keeps the session working while subagents still run", () => {
+    const s = useAgentStore.getState();
+    s.subagentStarted("tab-1", "a1", "Explore");
+    s.setStatus("tab-1", "attention");
+    s.markTabSeen("tab-1");
+    const session = useAgentStore.getState().sessions["tab-1"];
+    expect(session.status).toBe("working");
+    expect(session.attentionSince).toBeNull();
+  });
+
+  test("markTabSeen still goes idle when no subagent runs", () => {
+    const s = useAgentStore.getState();
+    s.setStatus("tab-1", "attention");
+    s.markTabSeen("tab-1");
+    expect(useAgentStore.getState().sessions["tab-1"].status).toBe("idle");
+  });
+
+  test("finish drops the session and its subagents", () => {
+    useAgentStore.getState().subagentStarted("tab-1", "a1", "Explore");
+    useAgentStore.getState().finish("tab-1");
+    expect(useAgentStore.getState().sessions["tab-1"]).toBeUndefined();
+  });
+
+  test("a Stop with a running subagent stays working until the final Stop", () => {
+    const s = useAgentStore.getState();
+    s.subagentStarted("tab-1", "a1", "Explore");
+    s.reconcileSubagents("tab-1", [{ id: "a1", agentType: "Explore", description: "" }]);
+    const count = () => Object.keys(subagents()).length;
+    expect(stopOutcome(count(), false)).toBe("working");
+    s.subagentStopped("tab-1", "a1");
+    s.reconcileSubagents("tab-1", []);
+    expect(stopOutcome(count(), false)).toBe("attention");
   });
 });
