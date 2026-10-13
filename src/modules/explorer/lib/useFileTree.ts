@@ -14,6 +14,10 @@ import {
   resolveDestDir,
 } from "@/modules/explorer/lib/clipboardPaste";
 import { isUnder } from "@/modules/workspaces/lib/explorerRoot";
+import {
+  restoreExplorerSnapshot,
+  type ExplorerSnapshot,
+} from "@/modules/workspaces/lib/sidebarSnapshot";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
 export type DirEntry = {
@@ -89,6 +93,7 @@ type Options = {
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   showHidden?: boolean;
+  initialSnapshot?: ExplorerSnapshot | null;
 };
 
 export function useFileTree(rootPath: string | null, options?: Options) {
@@ -102,6 +107,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   const keepLayoutRef = useRef(keepLayout);
   const [nodes, setNodes] = useState<TreeState>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [restoredRoot, setRestoredRoot] = useState<string | null>(null);
+  const initialSnapshotRef = useRef(options?.initialSnapshot ?? null);
+  const initialRootRef = useRef<string | null>(null);
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
     null,
   );
@@ -223,6 +231,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     if (!rootPath) {
       setNodes({});
       setExpanded(new Set());
+      setRestoredRoot(null);
       setPendingCreate(null);
       setPendingDuplicate(null);
       setRenaming(null);
@@ -232,7 +241,16 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     setPendingDuplicate(null);
     setRenaming(null);
 
-    const restored = keepLayoutRef.current ? recallExpansion(rootPath) : [];
+    let restored: string[];
+    const initial = initialSnapshotRef.current;
+    if (initial && (initialRootRef.current ?? rootPath) === rootPath) {
+      initialRootRef.current = rootPath;
+      restored = restoreExplorerSnapshot(initial, rootPath).expanded;
+    } else {
+      initialSnapshotRef.current = null;
+      restored = keepLayoutRef.current ? recallExpansion(rootPath) : [];
+    }
+    setRestoredRoot(rootPath);
     setExpanded(new Set(restored));
     setNodes({});
 
@@ -636,6 +654,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   return {
     nodes,
     expanded,
+    restoredRoot,
     pendingCreate,
     pendingDuplicate,
     renaming,

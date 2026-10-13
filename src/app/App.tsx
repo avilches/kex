@@ -3523,6 +3523,7 @@ export default function App() {
                     >
                                             <Sidebar
                         ref={sidebarRef}
+                        workspaceId={activeWorkspaceId}
                         view={sidebarView}
                         onChangeView={setSidebarView}
                         notesRoot={workspaceRootPath}
@@ -3632,6 +3633,7 @@ export default function App() {
                     >
                                             <Sidebar
                         ref={sidebarRef}
+                        workspaceId={activeWorkspaceId}
                         view={sidebarView}
                         onChangeView={setSidebarView}
                         notesRoot={workspaceRootPath}

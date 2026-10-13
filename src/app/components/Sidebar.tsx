@@ -15,6 +15,7 @@ import type {
   SourceControlSummary,
 } from "@/modules/source-control";
 import type { ExplorerRootMode } from "@/modules/workspaces/lib/explorerRoot";
+import type { ExplorerSnapshot } from "@/modules/workspaces/lib/sidebarSnapshot";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
 import { GitCommitIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -48,6 +49,9 @@ export type SidebarProps = {
   notesRoot: string | null;
   onOpenNoteToSide: (path: string) => void;
   onRevealNoteInExplorer: (path: string) => void;
+  workspaceId: string | null;
+  initialExplorer?: ExplorerSnapshot | null;
+  onExplorerSnapshot?: (snapshot: ExplorerSnapshot) => void;
   // FileExplorer props
   rootPath: string | null;
   rootMode: ExplorerRootMode;
@@ -154,7 +158,10 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(
             )}
           >
             <FileExplorer
+              key={props.workspaceId ?? "none"}
               ref={explorerRef}
+              initialExplorer={props.initialExplorer}
+              onExplorerSnapshot={props.onExplorerSnapshot}
               active={view === "explorer"}
               rootPath={props.rootPath}
               rootMode={props.rootMode}
