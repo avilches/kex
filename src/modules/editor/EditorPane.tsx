@@ -60,7 +60,8 @@ export type EditorPaneHandle = {
   findNext: () => void;
   findPrevious: () => void;
   clearQuery: () => void;
-  focus: () => void;
+  /** True when the view existed and took focus. */
+  focus: () => boolean;
   /** Persist the buffer to disk. No-op if the document is not dirty. */
   save: () => Promise<void>;
   getSelection: () => string | null;
@@ -383,7 +384,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           });
         },
         focus: () => {
-          cmRef.current?.view?.focus();
+          const view = cmRef.current?.view;
+          view?.focus();
+          return view != null;
         },
         save: async () => {
           await saveRef.current();
