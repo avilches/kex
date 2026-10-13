@@ -34,7 +34,7 @@ export function RestoreBlockedOverlay({ leafId, block }: Props) {
       role="alertdialog"
       aria-modal="true"
       aria-label="Terminal restore failed"
-      className="absolute inset-0 z-30 flex items-center justify-center bg-[var(--terminal-background)] p-6"
+      className="absolute inset-0 z-30 flex items-center justify-center bg-background p-6"
     >
       <div className="flex w-full max-w-lg flex-col gap-4 text-foreground">
         <div className="flex items-start gap-2.5">
