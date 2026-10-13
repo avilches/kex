@@ -27,20 +27,24 @@ export type RestoredExplorer = {
 
 const MAX_EXPANDED = 500;
 
+// The explorer only works with absolute paths; a relative or `..` path read
+// from disk could point outside every root it would be compared against.
+function isSafeAbsolutePath(p: unknown): p is string {
+  if (typeof p !== "string") return false;
+  if (!p.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(p)) return false;
+  return !p.split(/[\\/]/).includes("..");
+}
+
 export function sanitizeWorkspaceSidebar(raw: unknown): WorkspaceSidebar | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
   const expanded = Array.isArray(r.expanded)
-    ? [
-        ...new Set(
-          r.expanded.filter((p): p is string => typeof p === "string" && p.length > 0),
-        ),
-      ].slice(0, MAX_EXPANDED)
+    ? [...new Set(r.expanded.filter(isSafeAbsolutePath))].slice(0, MAX_EXPANDED)
     : [];
   const sc = r.scroll as Record<string, unknown> | null | undefined;
   const scroll =
     sc &&
-    typeof sc.root === "string" &&
+    isSafeAbsolutePath(sc.root) &&
     typeof sc.top === "number" &&
     Number.isFinite(sc.top) &&
     sc.top >= 0
@@ -49,7 +53,7 @@ export function sanitizeWorkspaceSidebar(raw: unknown): WorkspaceSidebar | undef
   return {
     view: parseView(r.view),
     expanded,
-    selectedPath: typeof r.selectedPath === "string" && r.selectedPath ? r.selectedPath : null,
+    selectedPath: isSafeAbsolutePath(r.selectedPath) ? r.selectedPath : null,
     scroll,
   };
 }

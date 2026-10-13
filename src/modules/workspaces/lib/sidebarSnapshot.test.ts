@@ -109,6 +109,30 @@ describe("sanitizeWorkspaceSidebar", () => {
     ).toEqual({ root: "/p", top: 40 });
   });
 
+  it("drops relative paths and paths with a .. segment", () => {
+    const s = sanitizeWorkspaceSidebar({
+      expanded: ["src", "./src", "/p/../etc", "C:\\p\\..\\x", "/p/ok", "/p/..hidden"],
+      selectedPath: "a/b.ts",
+      scroll: { root: "/p/..", top: 10 },
+    });
+    expect(s?.expanded).toEqual(["/p/ok", "/p/..hidden"]);
+    expect(s?.selectedPath).toBeNull();
+    expect(s?.scroll).toBeNull();
+    expect(sanitizeWorkspaceSidebar({ selectedPath: "/p/../x.ts" })?.selectedPath).toBeNull();
+  });
+
+  it("keeps valid Windows drive paths", () => {
+    const s = sanitizeWorkspaceSidebar({
+      expanded: ["C:/Users/me/src", "D:\\work\\app"],
+      selectedPath: "C:/Users/me/src/a.ts",
+      scroll: { root: "C:/Users/me", top: 5 },
+    });
+    expect(s?.expanded).toEqual(["C:/Users/me/src", "D:\\work\\app"]);
+    expect(s?.selectedPath).toBe("C:/Users/me/src/a.ts");
+    expect(s?.scroll).toEqual({ root: "C:/Users/me", top: 5 });
+    expect(sanitizeWorkspaceSidebar({ expanded: ["C:relative"] })?.expanded).toEqual([]);
+  });
+
   it("caps the number of open folders", () => {
     const many = Array.from({ length: 2000 }, (_, i) => `/p/d${i}`);
     expect(sanitizeWorkspaceSidebar({ expanded: many })?.expanded.length).toBe(500);
