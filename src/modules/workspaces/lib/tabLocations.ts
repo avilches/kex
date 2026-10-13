@@ -22,3 +22,24 @@ export function sameLocations(
   if (ak.length !== Object.keys(b).length) return false;
   return ak.every((k) => a[k] === b[k]);
 }
+
+export function userTabTitles(
+  workspaces: Pick<Workspace, "paneTree">[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const ws of workspaces) {
+    for (const pane of allPanes(ws.paneTree)) {
+      for (const tab of pane.tabs) if (tab.title) out[tab.id] = tab.title;
+    }
+  }
+  return out;
+}
+
+export function sameTitles(
+  a: Record<string, string>,
+  b: Record<string, string>,
+): boolean {
+  const ak = Object.keys(a);
+  if (ak.length !== Object.keys(b).length) return false;
+  return ak.every((k) => a[k] === b[k]);
+}
