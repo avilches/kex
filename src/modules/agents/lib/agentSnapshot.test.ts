@@ -13,6 +13,7 @@ function session(overrides: Partial<AgentSession> = {}): AgentSession {
     attentionSince: null,
     restored: false,
     restoreError: false,
+    subagents: {},
     meta: { sessionId: "s1" },
     ...overrides,
   };

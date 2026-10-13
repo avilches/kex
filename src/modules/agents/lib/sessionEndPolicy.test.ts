@@ -47,6 +47,7 @@ describe("isRunningAgentSession", () => {
     attentionSince: null,
     restored: false,
     restoreError: false,
+    subagents: {},
   };
 
   it("is false when the tab has no session", () => {

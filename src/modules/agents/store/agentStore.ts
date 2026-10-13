@@ -1,10 +1,12 @@
 import { create } from "zustand";
 import { sameLocations, sameTitles } from "@/modules/workspaces/lib/tabLocations";
+import { reconcileSubagents } from "../lib/subagentGate";
 import type {
   AgentNotification,
   AgentSession,
   AgentSessionMeta,
   AgentStatus,
+  BackgroundSubagent,
   LocalAgentState,
 } from "../lib/types";
 
@@ -34,6 +36,9 @@ type AgentStoreState = {
   start: (tabId: string, workspaceId: string, agent: string) => void;
   startIdle: (tabId: string, workspaceId: string, agent: string) => void;
   setStatus: (tabId: string, status: AgentStatus) => void;
+  subagentStarted: (tabId: string, agentId: string, agentType: string) => void;
+  subagentStopped: (tabId: string, agentId: string) => void;
+  reconcileSubagents: (tabId: string, list: BackgroundSubagent[]) => void;
   finish: (tabId: string) => void;
   startRestored: (tabId: string, workspaceId: string, agent: string) => void;
   setRestoreError: (
@@ -79,6 +84,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             attentionSince: null,
             restored: false,
             restoreError: false,
+            subagents: {},
           },
         },
       };
@@ -100,6 +106,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             attentionSince: null,
             restored: false,
             restoreError: false,
+            subagents: {},
           },
         },
       };
@@ -121,6 +128,47 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             restored: false,
           },
         },
+      };
+    }),
+
+  subagentStarted: (tabId, agentId, agentType) =>
+    set((s) => {
+      const prev = s.sessions[tabId];
+      if (!prev || agentId in prev.subagents) return s;
+      return {
+        sessions: {
+          ...s.sessions,
+          [tabId]: {
+            ...prev,
+            subagents: {
+              ...prev.subagents,
+              [agentId]: { agentType, startedAt: Date.now() },
+            },
+          },
+        },
+      };
+    }),
+
+  subagentStopped: (tabId, agentId) =>
+    set((s) => {
+      const prev = s.sessions[tabId];
+      if (!prev || !(agentId in prev.subagents)) return s;
+      const subagents = Object.fromEntries(
+        Object.entries(prev.subagents).filter(([id]) => id !== agentId),
+      );
+      return {
+        sessions: { ...s.sessions, [tabId]: { ...prev, subagents } },
+      };
+    }),
+
+  reconcileSubagents: (tabId, list) =>
+    set((s) => {
+      const prev = s.sessions[tabId];
+      if (!prev) return s;
+      const subagents = reconcileSubagents(prev.subagents, list, Date.now());
+      if (subagents === prev.subagents) return s;
+      return {
+        sessions: { ...s.sessions, [tabId]: { ...prev, subagents } },
       };
     }),
 
@@ -148,6 +196,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             attentionSince: null,
             restored: true,
             restoreError: false,
+            subagents: {},
           },
         },
       };
@@ -169,6 +218,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             attentionSince: null,
             restored: false,
             restoreError: true,
+            subagents: {},
             restoreErrorReason: reason,
           },
         },

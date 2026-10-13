@@ -11,7 +11,21 @@ type AgentSignalKind =
   | "SessionEnd"
   | "PermissionRequest"
   | "MessageDisplay"
+  | "SubagentStart"
+  | "SubagentStop"
   | "exited";
+
+export type SubagentRecord = {
+  agentType: string;
+  description?: string;
+  startedAt: number;
+};
+
+export type BackgroundSubagent = {
+  id: string;
+  agentType: string;
+  description: string;
+};
 
 export type AgentSignal = {
   id: number;
@@ -20,6 +34,9 @@ export type AgentSignal = {
   message?: string;
   toolName?: string;
   prompt?: string;
+  agentId?: string;
+  agentType?: string;
+  backgroundSubagents?: BackgroundSubagent[];
 };
 
 export type AgentSessionMeta = {
@@ -43,6 +60,7 @@ export type AgentSession = {
   restored: boolean;
   restoreError: boolean;
   restoreErrorReason?: string;
+  subagents: Record<string, SubagentRecord>;
   meta?: AgentSessionMeta;
 };
 
