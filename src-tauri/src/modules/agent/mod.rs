@@ -272,7 +272,7 @@ pub fn agent_claude_hooks_status() -> bool {
     let Ok(root) = serde_json::from_str::<Value>(&content) else {
         return false;
     };
-    // All 8 events must have the session hook (v5 unified protocol).
+    // Every subscribed event must have the session hook.
     let all_hooks_present = SESSION_HOOK_EVENTS.iter().all(|event| {
         root["hooks"][event]
             .as_array()
@@ -281,7 +281,7 @@ pub fn agent_claude_hooks_status() -> bool {
     if !all_hooks_present {
         return false;
     }
-    // Check that the session hook script is up-to-date (v4).
+    // Check that the session hook script is up-to-date.
     session_hook_script_path()
         .ok()
         .and_then(|p| std::fs::read_to_string(p).ok())

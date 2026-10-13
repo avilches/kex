@@ -46,7 +46,8 @@ directamente, sin pasar por `agent_detect.rs`:
 | `SessionStart` | Claude Code inicia una nueva sesión, incluida una reanudada con `--resume` (payload `source`) | `session_store::record_session(...)`, emit `kex:agent-session-meta` (no llega a `kex:agent-signal`) | (ninguno; solo alimenta la restauración de sesión) |
 | `UserPromptSubmit` | El usuario envió un prompt | emit `kex:agent-signal` `kind: "UserPromptSubmit"` | `ensureSession` + `setStatus("working")` (spinner en el tab) |
 | `Notification` | Claude Code necesita input del usuario (permiso, pregunta, etc.) | Si `notification_type == idle_prompt`: **ignorado** (ya lo cubre `Stop`). Resto: emit `kex:agent-signal` `kind: "Notification"` | `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
-| `Stop` | Claude Code terminó de responder y vuelve a esperar input | emit `kex:agent-signal` `kind: "Stop"` | Si panel enfocado: `setStatus("idle")`. Si no: `setStatus("attention")` (dot naranja) + route "attention" |
+| `Stop` | Claude Code terminó de responder y vuelve a esperar input | emit `kex:agent-signal` `kind: "Stop"`, con `backgroundSubagents` (los subagentes en segundo plano que siguen vivos) | `reconcileSubagents` y luego `stopOutcome` (`lib/subagentGate.ts`): con algún subagente vivo, `setStatus("working")` y nada más. Sin ninguno: si panel enfocado, `setStatus("idle")`; si no, `setStatus("attention")` (dot naranja) + route "attention" |
+| `SubagentStart` / `SubagentStop` | Claude Code lanza o termina un subagente | emit `kex:agent-signal` con `agentId` y `agentType` | `subagentStarted` / `subagentStopped` (registro `subagents` de la sesión); no cambian el estado. Al acabar el último, Claude abre un turno nuevo y su `Stop` es el que pone el dot |
 | `StopFailure` | Claude Code falló con error | emit `kex:agent-signal` `kind: "StopFailure"` | route error + `store.finish()` + detach |
 | `SessionEnd` | Sesión terminó limpiamente | emit `kex:agent-signal` `kind: "SessionEnd"` | `store.finish()` + detach |
 | `PermissionRequest` | Claude Code pide permiso para usar una herramienta | emit `kex:agent-signal` `kind: "PermissionRequest"` | `setStatus("attention")` + route |
@@ -159,7 +160,7 @@ El dot naranja (status=attention) y el spinner (status=working) se limpian por m
 | ESC (`\x1b` solo, 1 byte) | Spinner | `writeToPty` → `setStatus("idle")` |
 | CTRL+C (`\x03`) | Spinner | `writeToPty` → `setStatus("idle")` |
 
-El dot naranja es una señal de "atención no vista": se limpia al **mirar** el panel (panel activo + ventana enfocada), no al teclear. Por eso un `Notification`/`PermissionRequest`/`Stop` que llega mientras el panel ya está enfocado no llega a poner el dot (`isPanelSeen` lo descarta en `handleSignal`); cuando es un `Stop`, el spinner pasa directo a `idle`.
+El dot naranja es una señal de "atención no vista": se limpia al **mirar** el panel (panel activo + ventana enfocada), no al teclear. Por eso un `Notification`/`PermissionRequest`/`Stop` que llega mientras el panel ya está enfocado no llega a poner el dot (`isPanelSeen` lo descarta en `handleSignal`); cuando es un `Stop`, el spinner pasa directo a `idle`. Al mirar el panel con subagentes en segundo plano todavía vivos, el dot se limpia pero la sesión vuelve a `working` y no a `idle` (`markTabSeen`).
 
 El spinner refleja estado real del agente, así que solo lo limpian las interrupciones explícitas (`\x03`, `\x1b` solo). Las respuestas automáticas de xterm a queries de terminal (`\x1b[?1;2c`, etc.) son secuencias multi-byte que no coinciden y no limpian el spinner accidentalmente.
 
@@ -183,9 +184,9 @@ ni peticiones en background cuando no hay ningún agente corriendo.
 
 Hooks can be installed from the notification bell popover. `agent_enable_claude_hooks`:
 - Reads `~/.claude/settings.json` atomically
-- Injects hook entries for all 8 events handled by `trigger-event.sh` (`SessionStart`, `UserPromptSubmit`,
-  `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`) without touching
-  unrelated settings
+- Injects hook entries for all 10 events handled by `trigger-event.sh` (`SessionStart`, `UserPromptSubmit`,
+  `Notification`, `Stop`, `StopFailure`, `SessionEnd`, `PermissionRequest`, `MessageDisplay`, `SubagentStart`,
+  `SubagentStop`) without touching unrelated settings
 - Is idempotent, safe to run on an already-configured installation
 - On every startup, if `agentNotifications` is true, runs silently to repair missing or outdated hooks
 
