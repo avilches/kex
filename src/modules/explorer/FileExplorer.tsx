@@ -1020,7 +1020,10 @@ export const FileExplorer = memo(
               gitColorScheme={gitColorScheme}
               gitignored={row.gitignored}
               onOpenFile={onOpenFile}
-              onSelectPath={setSelectedPath}
+              onSelectPath={(path) => {
+                setSelectedPath(path);
+                containerRef.current?.focus({ preventScroll: true });
+              }}
               onRevealInTerminal={onRevealInTerminal}
               onNewWorkspaceFromFolder={onNewWorkspaceFromFolder}
               onSetAsRoot={onSetAsRoot}
