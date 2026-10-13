@@ -3,6 +3,8 @@ import {
   autoHibernateCandidates,
   autoHibernateTick,
   autoHibernateDelayMs,
+  autoHibernateRemainingMs,
+  formatCountdown,
   hibernatedIds,
   parseAutoHibernate,
   seedActivity,
@@ -191,5 +193,38 @@ describe("autoHibernateTick", () => {
     const second = withActivity(list, stamps)[1];
     expect(second).toEqual(first);
     expect(withActivity(list, stamps)[0]!.lastActiveAt).toBe(61_000);
+  });
+});
+
+describe("formatCountdown", () => {
+  it("uses m:ss under an hour", () => {
+    expect(formatCountdown(0)).toBe("0:00");
+    expect(formatCountdown(-5)).toBe("0:00");
+    expect(formatCountdown(29 * 60_000 + 5_000)).toBe("29:05");
+    expect(formatCountdown(59 * 60_000 + 59_999)).toBe("59:59");
+  });
+
+  it("uses XhYYm from one hour up to 48 hours", () => {
+    expect(formatCountdown(60 * 60_000)).toBe("1h00m");
+    expect(formatCountdown((3 * 60 + 12) * 60_000)).toBe("3h12m");
+    expect(formatCountdown((47 * 60 + 59) * 60_000)).toBe("47h59m");
+  });
+
+  it("uses Xd Yh from 48 hours", () => {
+    expect(formatCountdown(48 * 3_600_000)).toBe("2d 0h");
+    expect(formatCountdown(52 * 3_600_000)).toBe("2d 4h");
+    expect(formatCountdown(100 * 3_600_000)).toBe("4d 4h");
+  });
+});
+
+describe("autoHibernateRemainingMs", () => {
+  it("is null when off or without a stamp", () => {
+    expect(autoHibernateRemainingMs(1000, "off", 2000)).toBeNull();
+    expect(autoHibernateRemainingMs(undefined, "30m", 2000)).toBeNull();
+  });
+
+  it("is stamp plus delay minus now, clamped at zero", () => {
+    expect(autoHibernateRemainingMs(1000, "30m", 61_000)).toBe(29 * 60_000);
+    expect(autoHibernateRemainingMs(0, "30m", 99 * 60_000)).toBe(0);
   });
 });
