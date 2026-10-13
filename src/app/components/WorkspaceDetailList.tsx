@@ -102,6 +102,7 @@ function DetailTabRow({
   const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
   const { onRenameTab, onClose, onUpdateTab } = useSidebarTabMenu();
   const isLocked = tab.locked ?? false;
+  const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
   const hasNote = tab.note !== undefined;
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -226,7 +227,7 @@ function DetailTabRow({
           type="button"
           title="Unlock tab"
           aria-label="Unlock tab"
-          className="absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
+          className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded text-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring", hoverBg)}
           onClick={() => onUpdateTab(tab.id, (p) => ({ ...p, locked: false }))}
         >
           <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
@@ -242,7 +243,7 @@ function DetailTabRow({
             type="button"
             title="Close tab"
             aria-label="Close tab"
-            className="absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity hover:bg-muted group-focus-within/tab:opacity-60 group-hover/tab:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring"
+            className={cn("absolute right-1.5 top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center rounded opacity-0 outline-none transition-opacity group-focus-within/tab:opacity-60 group-hover/tab:opacity-60 hover:!opacity-100 focus-visible:!opacity-100 focus-visible:ring-1 focus-visible:ring-ring", hoverBg)}
             onClick={() => onClose(tab.id)}
           >
             <span className="text-[13px] leading-none">×</span>
