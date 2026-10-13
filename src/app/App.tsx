@@ -148,6 +148,15 @@ import { Sidebar, type SidebarHandle } from "./components/Sidebar";
 import { WorkspaceInputBar } from "./components/WorkspaceInputBar";
 import { WorkspaceBar } from "./components/WorkspaceBar";
 import { startAgentTitleSync } from "@/modules/workspaces/lib/agentTitleSync";
+import {
+  autofocusDecision,
+  type AutofocusKey,
+} from "@/modules/workspaces/lib/autofocusDecision";
+import {
+  flushSidebarSnapshotsNow,
+  pushSidebarSnapshot,
+  startSidebarSnapshotSync,
+} from "@/modules/workspaces/lib/sidebarSnapshotSync";
 import { setEditorFlush } from "./lib/editorFlush";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
@@ -266,6 +275,7 @@ export default function App() {
     openTab,
     hibernateWorkspace,
     setAgentTitles,
+    applyExplorerSnapshotBatch,
     wakeWorkspace,
     activateTab,
     revealTab,
@@ -1235,18 +1245,22 @@ export default function App() {
   }, [activeTabFocusTarget, focusSidebar]);
 
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
-  const prevAutofocusSignalRef = useRef<string | null | undefined>(undefined);
+  const prevAutofocusRef = useRef<AutofocusKey | undefined>(undefined);
   useEffect(() => {
     const ap = activeTab;
     const target = ap && isAutofocusActive(ap, autofocusMode) ? activeTabFocusTarget : null;
-    const signal = target ? `${activeTabId}|${agentWorktree ?? ""}` : null;
-    const prev = prevAutofocusSignalRef.current;
-    prevAutofocusSignalRef.current = signal;
-    if (prev === undefined) return; // skip initial mount
-    if (signal && signal !== prev && target) {
-      focusSidebar(target, { fromShortcut: false });
-    }
-  }, [activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar, autofocusMode]);
+    const next: AutofocusKey = {
+      workspaceId: activeWorkspaceId,
+      signal: target ? `${activeTabId}|${agentWorktree ?? ""}` : null,
+    };
+    const fire = autofocusDecision(prevAutofocusRef.current, next);
+    prevAutofocusRef.current = next;
+    if (fire && target) focusSidebar(target, { fromShortcut: false });
+  }, [activeWorkspaceId, activeTabId, activeTab, agentWorktree, activeTabFocusTarget, focusSidebar, autofocusMode]);
+
+  useEffect(() => {
+    lastFocusFolderRef.current = null;
+  }, [activeWorkspaceId]);
 
   // Whether the saved workspace root still exists on disk, so the selector can
   // disable the option when it is unset or missing.
@@ -2052,6 +2066,17 @@ export default function App() {
   );
 
   useEffect(() => startAgentTitleSync(setAgentTitles), [setAgentTitles]);
+  useEffect(
+    () => startSidebarSnapshotSync(applyExplorerSnapshotBatch),
+    [applyExplorerSnapshotBatch],
+  );
+  // Flush on cleanup so a restore after a switch or a Sidebar reopen never reads a stale snapshot.
+  useEffect(
+    () => () => {
+      flushSidebarSnapshotsNow();
+    },
+    [activeWorkspaceId, sidebarOpen],
+  );
 
   const hibernateFlow = useHibernateFlow({
     workspacesRef,
@@ -3524,6 +3549,10 @@ export default function App() {
                                             <Sidebar
                         ref={sidebarRef}
                         workspaceId={activeWorkspaceId}
+                        initialExplorer={activeWorkspace?.sidebar ?? null}
+                        onExplorerSnapshot={(s) => {
+                          if (activeWorkspaceId) pushSidebarSnapshot(activeWorkspaceId, s);
+                        }}
                         view={sidebarView}
                         onChangeView={setSidebarView}
                         notesRoot={workspaceRootPath}
@@ -3634,6 +3663,10 @@ export default function App() {
                                             <Sidebar
                         ref={sidebarRef}
                         workspaceId={activeWorkspaceId}
+                        initialExplorer={activeWorkspace?.sidebar ?? null}
+                        onExplorerSnapshot={(s) => {
+                          if (activeWorkspaceId) pushSidebarSnapshot(activeWorkspaceId, s);
+                        }}
                         view={sidebarView}
                         onChangeView={setSidebarView}
                         notesRoot={workspaceRootPath}

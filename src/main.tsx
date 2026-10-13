@@ -11,6 +11,7 @@ import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 import { loadPreferences } from "./modules/settings/store";
 import { flushAgentTitles } from "./modules/workspaces/lib/agentTitleSync";
+import { flushSidebarSnapshots } from "./modules/workspaces/lib/sidebarSnapshotSync";
 import { claimClose, flushWorkspaceState, initWorkspaceState } from "./modules/workspaces/lib/workspaceState";
 import { retryMissingWebgl } from "./modules/terminal/lib/rendererPool";
 
@@ -85,6 +86,7 @@ getCurrentWindow().onCloseRequested(async (event) => {
   event.preventDefault();
   try {
     await flushAgentTitles();
+    await flushSidebarSnapshots();
     await flushEditors();
     await flushWorkspaceState();
     await getCurrentWindow().destroy();
@@ -97,6 +99,7 @@ listen("kex:before-quit", async () => {
   try {
     if (claimClose()) {
       await flushAgentTitles();
+      await flushSidebarSnapshots();
       await flushEditors();
       await flushWorkspaceState();
     }

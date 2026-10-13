@@ -4,6 +4,7 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
 import { restoreCommandFor, terminalTabs } from "./hibernate";
 import { flushAgentTitles } from "./agentTitleSync";
+import { flushSidebarSnapshots } from "./sidebarSnapshotSync";
 import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
 import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
 import type { TabHibernation, Workspace } from "./types";
@@ -100,6 +101,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
 
 async function snapshotTerminalTabs(ws: Workspace): Promise<Record<string, TabHibernation>> {
   await flushAgentTitles();
+  await flushSidebarSnapshots();
   const sessions = useAgentStore.getState().sessions;
   const entries = await Promise.all(
     terminalTabs(ws).map(async (tab): Promise<[string, TabHibernation]> => {
