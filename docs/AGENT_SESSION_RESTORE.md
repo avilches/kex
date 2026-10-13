@@ -274,9 +274,14 @@ A start that cannot happen (unusable directory, or `openPty` rejecting) leaves t
 or its tab bar, showing the reason, the directory and the command. `attachSession` does not retry while the block is
 set. For an agent plan the tab also gets the `restoreError` placeholder (the `⚠` icon).
 
-- **Try again** (`retryRestore`): clears the block and the placeholder, fetches a fresh plan with `previewResumeCmd`
+- **Try again** (`retryRestore`): clears the placeholder, fetches a fresh plan with `previewResumeCmd`
   (read-only, so the store entry survives a second failure), seeds it, and runs `startLeaf` again. Useful when the
-  directory lives on a volume that was not mounted yet.
+  directory lives on a volume that was not mounted yet. The modal stays up while it works: `startLeaf` clears it on
+  success or replaces it with the new block on failure.
+- **Retry feedback** (`restoreBusy.ts`): `retryRestore` and `retryPendingRestore` run inside `withRestoreBusy`, a
+  per-leaf counter that stays on for at least 400ms so a fast retry does not just flicker. While it is on, the tab shows
+  the same small spinner as a working agent (any terminal tab, with or without an agent) and the modal disables both
+  buttons and shows a spinner inside Try again; they come back when the retry ends.
 - **Open terminal without restoring** (`openWithoutRestoring`): opens a plain shell, in `initialCwd` when that is
   usable and in the shell's default directory otherwise. It deletes nothing: the plan stays in `agent-sessions.json`
   (or in the tab's `persistentCommand`), so it survives the plain shell and a Kex restart (the in-memory pending state does

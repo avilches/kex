@@ -37,6 +37,7 @@ import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { openPty, type PtySession } from "./pty-bridge";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
+import { withRestoreBusy } from "./restoreBusy";
 import {
   decideStart,
   needsDirCheck,
@@ -991,6 +992,7 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
     return;
   }
   if (!plain) setPendingRestore(leafId, null);
+  if (s.restoreBlock) setRestoreBlock(leafId, s, null);
   s.pty = pty;
   if (s.pendingInput) {
     void pty.write(s.pendingInput);
@@ -1019,7 +1021,7 @@ function restoreActionDeps(leafId: string, s: Session): RestoreActionDeps {
 
 export async function retryRestore(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
-  if (s) await retryRestoreFlow(s, restoreActionDeps(leafId, s));
+  if (s) await withRestoreBusy(leafId, () => retryRestoreFlow(s, restoreActionDeps(leafId, s)));
 }
 
 // Plain shell; the plan stays pending so the user can still run or discard it later.
@@ -1053,7 +1055,7 @@ export async function retryPendingRestore(leafId: string): Promise<void> {
   const s = sessions.get(leafId);
   const pty = s?.pty;
   if (!s || !pty) return;
-  await retryPendingFlow({
+  await withRestoreBusy(leafId, () => retryPendingFlow({
     ...pendingActionDeps(leafId),
     isWindows: IS_WINDOWS,
     previewPlan: () => previewResumeCmd(leafId),
@@ -1066,7 +1068,7 @@ export async function retryPendingRestore(leafId: string): Promise<void> {
       watchResume(plan);
     },
     write: (line) => writeWhenShellReady(s, leafId, pty, line),
-  });
+  }));
 }
 
 // The only place besides agent exit and tab close that deletes the agent session from the store.
