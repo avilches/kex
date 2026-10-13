@@ -16,7 +16,7 @@ describe("endsAgentSession", () => {
   });
 
   it("keeps the session for every other signal", () => {
-    for (const kind of ["started", "UserPromptSubmit", "Notification", "Stop", "PermissionRequest", "MessageDisplay"] as const) {
+    for (const kind of ["started", "UserPromptSubmit", "Notification", "Stop", "PermissionRequest", "MessageDisplay", "SubagentStart", "SubagentStop"] as const) {
       expect(endsAgentSession(kind)).toBe(false);
     }
   });
