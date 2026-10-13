@@ -39,7 +39,6 @@ pub struct WorkspaceGroupEntry {
 #[serde(rename_all = "camelCase")]
 pub struct SidebarState {
     pub open: bool,
-    pub view: String,
     pub side: String,
     pub width: u32,
 }
@@ -424,16 +423,12 @@ impl WindowStateManager {
     }
 
     pub fn update_sidebar(&self, label: &str, state: SidebarState) {
-        let view = match state.view.as_str() {
-            "explorer" | "git" | "history" => state.view,
-            _ => "explorer".to_string(),
-        };
         let side = match state.side.as_str() {
             "left" | "right" => state.side,
             _ => "left".to_string(),
         };
         let width = state.width.clamp(12, 70);
-        let sanitized = SidebarState { open: state.open, view, side, width };
+        let sanitized = SidebarState { open: state.open, side, width };
         let mut guard = self.inner.write().expect("window state lock poisoned");
         if let Some(entry) = guard.windows.get_mut(label) {
             entry.sidebar = Some(sanitized);
@@ -696,7 +691,6 @@ mod tests {
         let with = WindowEntry {
             sidebar: Some(SidebarState {
                 open: false,
-                view: "git".to_string(),
                 side: "right".to_string(),
                 width: 25,
             }),
@@ -704,11 +698,9 @@ mod tests {
         };
         let json = serde_json::to_string(&with).unwrap();
         assert!(json.contains("sidebar"));
-        assert!(json.contains("\"view\""));
         let back: WindowEntry = serde_json::from_str(&json).unwrap();
         let sb = back.sidebar.unwrap();
         assert!(!sb.open);
-        assert_eq!(sb.view, "git");
         assert_eq!(sb.side, "right");
         assert_eq!(sb.width, 25);
 
@@ -716,6 +708,15 @@ mod tests {
         let json = serde_json::to_string(&without).unwrap();
         let back: WindowEntry = serde_json::from_str(&json).unwrap();
         assert!(back.sidebar.is_none());
+    }
+
+    #[test]
+    fn sidebar_with_legacy_view_key_still_deserializes() {
+        let sb: SidebarState =
+            serde_json::from_str(r#"{"open":true,"view":"git","side":"left","width":20}"#)
+                .unwrap();
+        assert!(sb.open);
+        assert_eq!(sb.width, 20);
     }
 
     #[test]
@@ -747,7 +748,6 @@ mod tests {
             "w-1",
             SidebarState {
                 open: false,
-                view: "history".to_string(),
                 side: "right".to_string(),
                 width: 30,
             },
@@ -758,7 +758,6 @@ mod tests {
         assert!(mgr2.load());
         let sb = mgr2.get_entry("w-1").unwrap().sidebar.unwrap();
         assert!(!sb.open);
-        assert_eq!(sb.view, "history");
         assert_eq!(sb.side, "right");
         assert_eq!(sb.width, 30);
     }
@@ -772,13 +771,11 @@ mod tests {
             "w-1",
             SidebarState {
                 open: true,
-                view: "bogus".to_string(),
                 side: "up".to_string(),
                 width: 5,
             },
         );
         let sb = mgr.get_entry("w-1").unwrap().sidebar.unwrap();
-        assert_eq!(sb.view, "explorer");
         assert_eq!(sb.side, "left");
         assert_eq!(sb.width, 12);
     }
@@ -791,7 +788,6 @@ mod tests {
             "w-ghost",
             SidebarState {
                 open: true,
-                view: "explorer".to_string(),
                 side: "left".to_string(),
                 width: 20,
             },

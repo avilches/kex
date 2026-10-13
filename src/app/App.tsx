@@ -169,6 +169,7 @@ import {
   saveGroups,
 } from "@/modules/workspaces/lib/workspaceGroupsState";
 import type { SidebarView } from "@/modules/workspaces/lib/sidebarState";
+import { DEFAULT_WORKSPACE_SIDEBAR } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { isTabNoteOpen, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
@@ -276,6 +277,7 @@ export default function App() {
     setWorkspaceCwd,
     setExplorerRootMode,
     setShowHidden,
+    setWorkspaceSidebarView,
     setWorkspaceRoot,
     clearWorkspaceRoot,
     setFsRoot,
@@ -670,15 +672,23 @@ export default function App() {
   );
   const {
     open: sidebarOpen,
-    view: sidebarView,
     side: sidebarSide,
     width: sidebarWidth,
     stateRef: sidebarStateRef,
     setOpen: setSidebarOpen,
-    setView: setSidebarView,
     setSide: setSidebarSide,
     setWidth: setSidebarWidth,
   } = useSidebarState(windowLabel);
+  const sidebarView: SidebarView =
+    activeWorkspace?.sidebar?.view ?? DEFAULT_WORKSPACE_SIDEBAR.view;
+  const sidebarViewRef = useRef(sidebarView);
+  sidebarViewRef.current = sidebarView;
+  const setSidebarView = useCallback(
+    (view: SidebarView) => {
+      if (activeWorkspaceId) setWorkspaceSidebarView(activeWorkspaceId, view);
+    },
+    [activeWorkspaceId, setWorkspaceSidebarView],
+  );
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const gitColorScheme = usePreferencesStore((s) => s.explorerGitColorScheme);
   const pendingExplorerSearch = useRef(false);
@@ -1184,7 +1194,7 @@ export default function App() {
         const shouldSwitchToExplorer = opts.pendingAction
           ? true
           : lastFocusFolderRef.current === folder;
-        if (shouldSwitchToExplorer && sidebar.view !== "explorer") {
+        if (shouldSwitchToExplorer && sidebarViewRef.current !== "explorer") {
           setSidebarView("explorer");
         }
       }
@@ -2251,7 +2261,7 @@ export default function App() {
       if (!sidebar.open) {
         setSidebarOpen(true);
         setSidebarView(tab);
-      } else if (sidebar.view === tab) {
+      } else if (sidebarViewRef.current === tab) {
         setSidebarOpen(false);
       } else {
         setSidebarView(tab);
@@ -2286,7 +2296,7 @@ export default function App() {
   // System (idempotent). It never closes the sidebar (use sidebar.toggle).
   const rotateExplorerRoot = useCallback(() => {
     const sidebar = sidebarStateRef.current;
-    const inExplorer = sidebar.open && sidebar.view === "explorer";
+    const inExplorer = sidebar.open && sidebarViewRef.current === "explorer";
     if (!inExplorer) {
       showSidebarView("explorer");
       return;
@@ -2801,7 +2811,7 @@ export default function App() {
 
   const handleExplorerSearch = useCallback(() => {
     const sidebar = sidebarStateRef.current;
-    if (sidebar.open && sidebar.view === "explorer") {
+    if (sidebar.open && sidebarViewRef.current === "explorer") {
       sidebarRef.current?.toggleExplorerSearch?.();
     } else {
       pendingExplorerSearch.current = true;
