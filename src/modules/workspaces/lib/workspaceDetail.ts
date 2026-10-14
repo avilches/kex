@@ -98,7 +98,7 @@ export function subagentRows(
   if (!subagents) return [];
   return Object.entries(subagents)
     .sort(([ia, a], [ib, b]) => a.startedAt - b.startedAt || (ia < ib ? -1 : ia > ib ? 1 : 0))
-    .map(([id, r]) => ({ id, label: r.description || r.agentType }));
+    .map(([id, r]) => ({ id, label: r.description || r.agentType || "subagent" }));
 }
 
 export function activeAgentCount(entries: AgentEntry[] | undefined): number {

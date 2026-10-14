@@ -53,6 +53,7 @@ function SubagentRow({
       type="button"
       data-subagent-row=""
       title={row.label}
+      aria-label={`Subagent: ${row.label}`}
       onClick={() => onActivate(tabId)}
       className="flex h-6 w-full items-center gap-1.5 rounded-md pl-7 pr-1.5 text-left text-[11.5px] text-muted-foreground transition-colors select-none hover:bg-foreground/[0.08] hover:text-foreground"
     >

@@ -170,4 +170,10 @@ describe("subagentRows", () => {
     });
     expect(rows.map((r) => r.label)).toEqual(["Explore", "Plan"]);
   });
+
+  test("uses a generic label when neither description nor agent type is known", () => {
+    expect(subagentRows({ a: { agentType: "", startedAt: 1 } }).map((r) => r.label)).toEqual([
+      "subagent",
+    ]);
+  });
 });
