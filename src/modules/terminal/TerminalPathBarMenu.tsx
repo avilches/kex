@@ -14,6 +14,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { warn as logWarn } from "@tauri-apps/plugin-log";
 import { native } from "@/lib/native";
 import { revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
 import type { AgentSession } from "@/modules/agents/lib/types";
@@ -46,8 +47,11 @@ async function writeClipboard(value: string): Promise<boolean> {
     await navigator.clipboard.writeText(value);
     return true;
   } catch (err) {
-    console.warn("clipboard.writeText failed, using execCommand fallback", err);
-    return legacyCopy(value);
+    const ok = legacyCopy(value);
+    void logWarn(
+      `[clipboard] writeText failed: ${String(err)} | hasFocus=${document.hasFocus()} | active=${document.activeElement?.tagName} | execCommand=${ok}`,
+    );
+    return ok;
   }
 }
 
