@@ -2,7 +2,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
-import { agentRestoreDisabled } from "./lib/agentRestore";
+import { agentIconMark, type AgentIconMark } from "./lib/agentRestore";
 import { tabIcon, tabTitle } from "./lib/tabTitle";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -23,7 +23,7 @@ import {
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
 import { PopoverAnchor } from "@/components/ui/popover";
 import { useTabRenameStore } from "./lib/tabRenameStore";
-import { AgentIcon } from "@/modules/agents/lib/agentIcon";
+import { AgentIcon, StruckAgentIcon } from "@/modules/agents/lib/agentIcon";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon, CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
@@ -57,6 +57,11 @@ type Props = {
   onNoteHover?: (tabId: string, hovering: boolean) => void;
   gitStatus?: GitStatusSnapshot | null;
   gitColorScheme?: GitColorScheme;
+};
+
+const ICON_MARK_TITLES: Record<NonNullable<AgentIconMark>, string> = {
+  "restore-off": "Won't be restored on restart (Run on start is off)",
+  "launch-unknown": "Launch command unknown: restore will use plain claude --resume",
 };
 
 function TabNoteButton({ open, onToggle, onHover }: { open: boolean; onToggle: () => void; onHover?: (hovering: boolean) => void }) {
@@ -152,6 +157,7 @@ function DraggableTab({
   const agentSession = agentTabTitle?.agentSession;
   const hasAgent = agentTabTitle?.hasAgent ?? false;
   const isRestoreError = agentSession?.restoreError ?? false;
+  const iconMark = agentIconMark(tab, agentSession);
 
   const { resolvedMode } = useTheme();
   const tabColor = useMemo(
@@ -257,14 +263,8 @@ function DraggableTab({
             ? <span className="text-amber-500" title={`Session restore failed: ${agentSession!.restoreErrorReason ?? "unknown error"}`}>
                 <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.5} />
               </span>
-            : agentRestoreDisabled(tab)
-              ? <span
-                  className="relative inline-flex"
-                  title="Won't be restored on restart (Run on start is off)"
-                >
-                  <AgentIcon agent={agentSession!.agent} size={12} />
-                  <span className="pointer-events-none absolute left-1/2 top-1/2 h-px w-[15px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-muted-foreground" />
-                </span>
+            : iconMark
+              ? <StruckAgentIcon agent={agentSession!.agent} size={12} title={ICON_MARK_TITLES[iconMark]} />
               : <AgentIcon agent={agentSession!.agent} size={12} />
           : tab.kind === "browser" && tab.floating
             ? <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />

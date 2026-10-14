@@ -26,6 +26,7 @@ type AgentSessionMetaPayload = {
   sessionTitle: string;
   model: string;
   transcriptPath: string;
+  launchKnown: boolean;
 };
 const latestAgentCwd = new Map<string, string>();
 
@@ -153,6 +154,20 @@ function ensureSessionIdle(tabId: string, ctx: Ctx, agent: string): boolean {
   return true;
 }
 
+// SessionStart reaches the tab even when the shell line named no known agent (a launcher
+// script of the user's), so the session is created here instead of waiting for the first prompt.
+export function handleSessionMeta(p: AgentSessionMetaPayload, ctx: Ctx): void {
+  ensureSessionIdle(p.tabId, ctx, "claude");
+  useAgentStore.getState().setMeta(p.tabId, {
+    sessionId: p.sessionId,
+    cwdLaunch: p.cwdLaunch,
+    sessionTitle: p.sessionTitle,
+    model: p.model,
+    transcriptPath: p.transcriptPath || undefined,
+    launchKnown: p.launchKnown,
+  });
+}
+
 export function handleSignal(sig: AgentSignal, ctx: Ctx): void {
   const tabId = leafIdForPty(sig.id);
   if (tabId === null) return;
@@ -275,12 +290,9 @@ export function AgentNotificationsBridge({
     handleSignal(e.payload, ctxRef.current),
   );
 
-  useTauriListen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) => {
-    const { tabId, sessionId, cwdLaunch, sessionTitle, model, transcriptPath } = e.payload;
-    useAgentStore
-      .getState()
-      .setMeta(tabId, { sessionId, cwdLaunch, sessionTitle, model, transcriptPath: transcriptPath || undefined });
-  });
+  useTauriListen<AgentSessionMetaPayload>("kex:agent-session-meta", (e) =>
+    handleSessionMeta(e.payload, ctxRef.current),
+  );
 
   useTauriListen<{ tabId: string; cwd: string }>("kex:agent-cwd", (e) =>
     handleAgentCwd(e.payload.tabId, e.payload.cwd),

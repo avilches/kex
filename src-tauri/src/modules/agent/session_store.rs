@@ -37,6 +37,11 @@ fn take_stashed_cmd(tab_id: &str) -> Option<String> {
     pending_cmds().lock().ok()?.remove(tab_id)
 }
 
+/// Forgets the command stashed for a tab without recording anything.
+pub fn drop_stashed_cmd(tab_id: &str) {
+    let _ = take_stashed_cmd(tab_id);
+}
+
 /// Must be called once in setup() before any session store operation.
 /// Accepts the app data dir (e.g. ~/Library/Application Support/app.betauer.kex/).
 pub fn init(data_dir: PathBuf) {
@@ -385,19 +390,46 @@ fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
 ///
 /// Consumes the pending launch command stashed by `stash_cmd`. If the stashed command
 /// is print-mode (`-p` / `--print`), the session is not persisted.
-pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd_launch: &str) {
+///
+/// `same_process` is true for a SessionStart that continues the agent process already running
+/// in the tab (`/clear`, `/compact`, `/resume`): no new command line went through the shell, so the
+/// launch command of the previous record still describes it.
+///
+/// Returns whether the stored record has a launch command. False means the launcher was not
+/// recognised (a script of the user's) and a restore can only use the agent's plain command.
+pub fn record_session(
+    tab_id: &str,
+    agent: &str,
+    session_id: &str,
+    transcript_path: &str,
+    cwd_launch: &str,
+    same_process: bool,
+) -> bool {
     let path = match store_path() {
         Some(p) => p,
-        None => return,
+        None => return false,
     };
-    record_session_at_path(&path, tab_id, agent, session_id, transcript_path, cwd_launch);
+    record_session_at_path_with(&path, tab_id, agent, session_id, transcript_path, cwd_launch, same_process)
 }
 
+#[cfg(test)]
 fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd_launch: &str) {
+    record_session_at_path_with(path, tab_id, agent, session_id, transcript_path, cwd_launch, false);
+}
+
+fn record_session_at_path_with(
+    path: &PathBuf,
+    tab_id: &str,
+    agent: &str,
+    session_id: &str,
+    transcript_path: &str,
+    cwd_launch: &str,
+    same_process: bool,
+) -> bool {
     let launch_cmd = take_stashed_cmd(tab_id);
     if launch_cmd.as_deref().is_some_and(|c| is_print_mode_cmd(c, agent)) {
         log::info!("[agent-session] skip record: print-mode session tab={tab_id}");
-        return;
+        return false;
     }
     log::info!(
         "[agent-session] record tab={tab_id} agent={agent} session={session_id} cwd_launch={cwd_launch} \
@@ -446,6 +478,10 @@ fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id:
         record.title = previous.title.clone();
         record.notification = previous.notification.clone();
     }
+    if record.launch_cmd.is_none() && same_process {
+        record.launch_cmd = store.tabs.get(tab_id).and_then(|p| p.launch_cmd.clone());
+    }
+    let launch_known = record.launch_cmd.is_some();
     store.tabs.insert(tab_id.to_string(), record);
     if let Ok(out) = serde_json::to_string_pretty(&store) {
         let tmp = path.with_extension("json.kex-tmp");
@@ -456,6 +492,7 @@ fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id:
             let _ = std::fs::rename(&tmp, path);
         }
     }
+    launch_known
 }
 
 const MAX_TITLE_CHARS: usize = 200;
@@ -783,6 +820,50 @@ mod tests {
     fn strip_keeps_process_substitution_values() {
         let base = strip_for_resume_base("claude --mcp-config <(echo '{}') --verbose", "claude");
         assert_eq!(base.as_deref(), Some("claude --mcp-config <(echo '{}') --verbose"));
+    }
+
+    #[test]
+    fn record_reports_whether_the_launch_command_is_known() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-known", "claude-max --safe-mode".to_string());
+        assert!(record_session_at_path_with(&path, "tab-known", "claude", "s1", "/tmp/s.jsonl", "/tmp/p", false));
+        assert!(!record_session_at_path_with(&path, "tab-unknown", "claude", "s2", "/tmp/s.jsonl", "/tmp/p", false));
+    }
+
+    #[test]
+    fn a_clear_or_compact_keeps_the_launch_command_of_the_running_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-clear-keeps", "claude-max".to_string());
+        assert!(record_session_at_path_with(&path, "tab-clear-keeps", "claude", "old", "/tmp/s.jsonl", "/tmp/p", false));
+        assert!(record_session_at_path_with(&path, "tab-clear-keeps", "claude", "new", "/tmp/s.jsonl", "/tmp/p", true));
+        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(store.tabs["tab-clear-keeps"].launch_cmd.as_deref(), Some("claude-max"));
+    }
+
+    #[test]
+    fn a_dropped_stash_is_not_read_by_the_next_session_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-stash-dropped", "claude-max".to_string());
+        drop_stashed_cmd("tab-stash-dropped");
+        assert!(!record_session_at_path_with(&path, "tab-stash-dropped", "claude", "s1", "/tmp/s.jsonl", "/tmp/p", false));
+    }
+
+    #[test]
+    fn a_new_launch_without_a_recognised_command_does_not_inherit_the_old_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-new-unrecognised", "claude-max".to_string());
+        record_session_at_path_with(&path, "tab-new-unrecognised", "claude", "old", "/tmp/s.jsonl", "/tmp/p", false);
+        assert!(!record_session_at_path_with(&path, "tab-new-unrecognised", "claude", "new", "/tmp/s.jsonl", "/tmp/p", false));
+        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(store.tabs["tab-new-unrecognised"].launch_cmd, None);
     }
 
     #[test]
