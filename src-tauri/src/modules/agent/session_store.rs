@@ -212,6 +212,9 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
     // A record written before the launch line was reduced to the agent segment can still
     // carry `cd dir && claude ...`; reducing it again here heals it on read.
     let inv = find_agent_invocation(cmd, &known_agents(agent))?;
+    if !inv.complete {
+        return None;
+    }
     let tokens: Vec<&str> = inv.args.iter().map(String::as_str).collect();
     let mut result: Vec<&str> = inv.head.iter().map(String::as_str).collect();
     let mut i = 0;
@@ -768,6 +771,18 @@ mod tests {
         let stored_again = find_agent_invocation(&retyped, &known_agents("claude")).unwrap().command();
         assert_eq!(stored_again, resume);
         assert_eq!(strip_for_resume_base(&stored_again, "claude").unwrap(), base);
+    }
+
+    #[test]
+    fn strip_refuses_a_stored_command_that_was_cut() {
+        assert_eq!(strip_for_resume_base("claude --append-system-prompt 'abc def", "claude"), None);
+        assert_eq!(strip_for_resume_base("claude --add-dir /a\\", "claude"), None);
+    }
+
+    #[test]
+    fn strip_keeps_process_substitution_values() {
+        let base = strip_for_resume_base("claude --mcp-config <(echo '{}') --verbose", "claude");
+        assert_eq!(base.as_deref(), Some("claude --mcp-config <(echo '{}') --verbose"));
     }
 
     #[test]

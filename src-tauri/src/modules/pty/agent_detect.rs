@@ -388,11 +388,12 @@ impl AgentDetector {
             Some(b'C') => {
                 let line = String::from_utf8_lossy(pt.strip_prefix(b"C;").unwrap_or(b""));
                 let Some(inv) = find_agent_invocation(&line, &self.agents) else { return };
-                if inv.args.iter().any(|t| t == "-p" || t == "--print") {
+                if inv.is_print_mode() {
                     log::debug!("[shell] osc133 C: skip arm (print mode) cmd={line}");
                     return;
                 }
-                let cmd_string = inv.command();
+                // A cut line still names the agent, but replaying its text would be wrong.
+                let cmd_string = if inv.complete { inv.command() } else { String::new() };
                 let agent = inv.agent;
                 log::debug!("[shell] osc133 C: armed agent={agent} cmd={cmd_string}");
                 self.armed = true;
@@ -527,6 +528,21 @@ mod tests {
             run(&mut d, &osc("133;C;(cd /tmp && FOO=1 claude --safe-mode)")),
             vec![started_cmd("claude", "FOO=1 claude --safe-mode")]
         );
+    }
+
+    #[test]
+    fn arms_but_stashes_nothing_when_the_line_was_cut() {
+        let mut d = AgentDetector::new();
+        let cut = format!("133;C;claude --append-system-prompt '{}", "x".repeat(300));
+        assert_eq!(run(&mut d, &osc(&cut)), vec![started("claude")]);
+        let mut d2 = AgentDetector::new();
+        assert_eq!(run(&mut d2, &osc("133;C;claude --add-dir /a\\")), vec![started("claude")]);
+    }
+
+    #[test]
+    fn does_not_arm_on_shell_dependent_quoting() {
+        let mut d = AgentDetector::new();
+        assert!(run(&mut d, &osc("133;C;claude --name 'it\\'s' ; rm -rf y")).is_empty());
     }
 
     #[test]

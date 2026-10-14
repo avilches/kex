@@ -1,17 +1,22 @@
 //! Finds the command that launched an agent inside a shell line.
 //!
-//! The line reaches us from OSC 133;C exactly as typed (aliases unexpanded, control chars
-//! flattened to spaces, cut at 256 chars), so it can be `cd dir && claude-max --resume x`,
-//! `(cd dir; FOO=1 claude)` or `cd ~/claude-docs`. The launcher name and its prefix of
-//! assignments and wrappers are what has to be repeated on restore; everything before the
-//! agent segment (`cd`, the grouping, the other commands) must not be.
+//! The line reaches us from OSC 133;C as typed (aliases unexpanded, control chars including
+//! newlines flattened to spaces, cut at 256 chars by zsh, fish and PowerShell; bash sends no
+//! text), so it can be `cd dir && claude-max --resume x`, `(cd dir; FOO=1 claude)` or
+//! `cd ~/claude-docs`. The launcher name and its prefix of assignments and wrappers are what
+//! has to be repeated on restore; everything before the agent segment (`cd`, the grouping, the
+//! other commands) must not be.
 //!
-//! Anything this module cannot resolve with certainty yields `None`, never a guess: the caller
-//! then falls back to the plain agent command. Unterminated quotes (a truncated line) are
-//! tolerated: the rest of the line becomes part of the last token. Command substitutions are
-//! consumed whole, quotes inside them included, but never analysed.
+//! Anything this module cannot resolve with certainty is not guessed. A wrapper option it does
+//! not know, or a quoting style whose meaning depends on the shell (`'it\'s'` is two things in
+//! zsh and fish), yields `None`. A line that was cut mid-construct still names the agent but
+//! is flagged `complete: false`, so that its text is never replayed. Command substitutions and
+//! `${...}` are consumed whole, quotes inside them included, but never analysed.
 
 pub const DEFAULT_AGENTS: &[&str] = &["claude", "codex"];
+
+/// Longest line the shell scripts send; a line this long may have been cut.
+pub const MAX_LINE_CHARS: usize = 256;
 
 struct Wrapper {
     name: &'static str,
@@ -45,6 +50,12 @@ const WRAPPERS: &[Wrapper] = &[
     wrapper("caffeinate", &["-t", "-w"], 0),
 ];
 
+/// Wrapper options known to take no value. Any other option makes the command word
+/// unresolvable (`sudo -Eu claude ls`, `command -v claude`).
+const FLAG_OPTIONS: &[&str] = &[
+    "-i", "-p", "-y", "--yes", "-E", "-H", "-c", "-l", "--foreground", "--preserve-status",
+];
+
 /// Reserved words that may open a segment before the command (`if x; then claude; fi`).
 const LEADING: &[&str] = &["{", "!", "then", "do", "else"];
 
@@ -55,19 +66,32 @@ pub struct Invocation {
     pub head: Vec<String>,
     /// Raw tokens after the command word.
     pub args: Vec<String>,
+    /// False when the line ended inside a quote, a substitution or after a lone backslash, or
+    /// was long enough to have been cut: the agent is known, the text must not be replayed.
+    pub complete: bool,
 }
 
 impl Invocation {
     pub fn command(&self) -> String {
         self.head.iter().chain(self.args.iter()).map(String::as_str).collect::<Vec<_>>().join(" ")
     }
+
+    /// `-p` / `--print` among the agent's own options (not after `--`).
+    pub fn is_print_mode(&self) -> bool {
+        self.args.iter().take_while(|t| t.as_str() != "--").any(|t| t == "-p" || t == "--print")
+    }
 }
 
 /// The last segment of `line` whose command word is one of `agents`.
 pub fn find_agent_invocation(line: &str, agents: &[String]) -> Option<Invocation> {
+    let split = split_segments(line);
+    if split.ambiguous {
+        return None;
+    }
+    let complete = !split.unterminated && line.chars().count() < MAX_LINE_CHARS;
     let mut found = None;
-    for segment in split_segments(line) {
-        if let Some(inv) = match_segment(segment, agents) {
+    for segment in split.segments {
+        if let Some(inv) = match_segment(segment, agents, complete) {
             found = Some(inv);
         }
     }
@@ -75,29 +99,33 @@ pub fn find_agent_invocation(line: &str, agents: &[String]) -> Option<Invocation
 }
 
 pub fn is_print_mode(line: &str, agents: &[String]) -> bool {
-    find_agent_invocation(line, agents)
-        .is_some_and(|inv| inv.args.iter().any(|t| t == "-p" || t == "--print"))
+    find_agent_invocation(line, agents).is_some_and(|inv| inv.is_print_mode())
 }
 
 /// How many tokens a redirection occupies: 1 when its target is attached (`2>/dev/null`),
 /// 2 when it is a bare operator followed by the target (`>`, `2>>`, `<<<`), None otherwise.
+/// Process substitutions (`<(cmd)`, `>(cmd)`) are values, not redirections.
 pub fn redirection_tokens(token: &str) -> Option<usize> {
     let rest = token.trim_start_matches(|c: char| c.is_ascii_digit());
     if !(rest.starts_with(['<', '>']) || rest.starts_with("&>")) {
         return None;
     }
+    if rest.starts_with(['<', '>']) && rest[1..].starts_with('(') {
+        return None;
+    }
     Some(if rest.trim_start_matches(['<', '>', '&', '|']).is_empty() { 2 } else { 1 })
 }
 
-fn match_segment(tokens: Vec<String>, agents: &[String]) -> Option<Invocation> {
+fn match_segment(tokens: Vec<String>, agents: &[String], complete: bool) -> Option<Invocation> {
     let mut i = 0;
     while i < tokens.len() && LEADING.contains(&tokens[i].as_str()) {
         i += 1;
     }
-    let start = i;
+    let mut head: Vec<String> = Vec::new();
     while i < tokens.len() {
         let tok = tokens[i].as_str();
         if is_assignment(tok) {
+            head.push(tokens[i].clone());
             i += 1;
             continue;
         }
@@ -107,16 +135,20 @@ fn match_segment(tokens: Vec<String>, agents: &[String]) -> Option<Invocation> {
         }
         let word = base_name(tok);
         if let Some(w) = WRAPPERS.iter().find(|w| w.name == word) {
-            i = skip_wrapper_args(&tokens, i + 1, w)?;
+            let next = skip_wrapper_args(&tokens, i + 1, w)?;
+            head.extend(tokens[i..next.min(tokens.len())].iter().cloned());
+            i = next;
             continue;
         }
         let agent = agents.iter().find(|a| {
             word.strip_prefix(a.as_str()).is_some_and(|rest| rest.is_empty() || rest.starts_with('-'))
         })?;
+        head.push(tokens[i].clone());
         return Some(Invocation {
             agent: agent.clone(),
-            head: tokens[start..=i].to_vec(),
+            head,
             args: tokens[i + 1..].to_vec(),
+            complete,
         });
     }
     None
@@ -131,19 +163,18 @@ fn skip_wrapper_args(tokens: &[String], mut i: usize, w: &Wrapper) -> Option<usi
         if opt == "--" {
             break;
         }
-        // `command -v claude` only looks the name up.
-        if w.name == "command" && opt != "-p" {
-            return None;
-        }
         if w.value_opts.contains(&opt) {
             i += 1;
+            continue;
         }
+        let numeric = opt.len() > 1 && opt[1..].bytes().all(|b| b.is_ascii_digit());
+        let long_with_value = opt.starts_with("--") && opt.contains('=');
+        if FLAG_OPTIONS.contains(&opt) || numeric || long_with_value {
+            continue;
+        }
+        return None;
     }
-    let mut left = w.positionals;
-    while left > 0 && i < tokens.len() {
-        i += 1;
-        left -= 1;
-    }
+    i += w.positionals;
     Some(i)
 }
 
@@ -179,6 +210,8 @@ struct Splitter {
     tokens: Vec<String>,
     tok: String,
     in_token: bool,
+    unterminated: bool,
+    ambiguous: bool,
 }
 
 impl Splitter {
@@ -203,104 +236,119 @@ impl Splitter {
 }
 
 // The scanners below start at the opening character, copy everything through the matching
-// close into `out` and return the index after it (or the end of input if it never closes).
+// close into the current token and return the index after it. Reaching the end of input
+// without a close marks the line unterminated.
 
-fn scan_single(chars: &[char], mut i: usize, out: &mut String, ansi_c: bool) -> usize {
-    out.push(chars[i]);
+fn copy_escaped(chars: &[char], mut i: usize, sp: &mut Splitter) -> usize {
+    sp.push(chars[i]);
+    i += 1;
+    match chars.get(i) {
+        Some(&next) => {
+            sp.push(next);
+            i + 1
+        }
+        None => {
+            sp.unterminated = true;
+            i
+        }
+    }
+}
+
+fn scan_single(chars: &[char], mut i: usize, sp: &mut Splitter, ansi_c: bool) -> usize {
+    sp.push(chars[i]);
     i += 1;
     while i < chars.len() {
         let c = chars[i];
-        out.push(c);
-        i += 1;
         if ansi_c && c == '\\' {
-            if let Some(&next) = chars.get(i) {
-                out.push(next);
-                i += 1;
-            }
-        } else if c == '\'' {
-            break;
+            i = copy_escaped(chars, i, sp);
+            continue;
+        }
+        // Whether `\'` closes the string depends on the shell (zsh yes, fish no).
+        if c == '\'' && !ansi_c && sp.tok.ends_with('\\') {
+            sp.ambiguous = true;
+        }
+        sp.push(c);
+        i += 1;
+        if c == '\'' {
+            return i;
         }
     }
+    sp.unterminated = true;
     i
 }
 
-fn scan_backtick(chars: &[char], mut i: usize, out: &mut String) -> usize {
-    out.push(chars[i]);
+fn scan_backtick(chars: &[char], mut i: usize, sp: &mut Splitter) -> usize {
+    sp.push(chars[i]);
     i += 1;
     while i < chars.len() {
         let c = chars[i];
-        out.push(c);
-        i += 1;
         if c == '\\' {
-            if let Some(&next) = chars.get(i) {
-                out.push(next);
-                i += 1;
-            }
-        } else if c == '`' {
-            break;
+            i = copy_escaped(chars, i, sp);
+            continue;
+        }
+        sp.push(c);
+        i += 1;
+        if c == '`' {
+            return i;
         }
     }
+    sp.unterminated = true;
     i
 }
 
-fn scan_double(chars: &[char], mut i: usize, out: &mut String) -> usize {
-    out.push(chars[i]);
+fn scan_double(chars: &[char], mut i: usize, sp: &mut Splitter) -> usize {
+    sp.push(chars[i]);
     i += 1;
     while i < chars.len() {
         let c = chars[i];
         match c {
-            '\\' => {
-                out.push(c);
-                i += 1;
-                if let Some(&next) = chars.get(i) {
-                    out.push(next);
-                    i += 1;
-                }
-            }
+            '\\' => i = copy_escaped(chars, i, sp),
             '"' => {
-                out.push(c);
+                sp.push(c);
                 return i + 1;
             }
             '$' if chars.get(i + 1) == Some(&'(') => {
-                out.push(c);
-                i = scan_paren(chars, i + 1, out);
+                sp.push(c);
+                i = scan_group(chars, i + 1, sp, '(', ')');
             }
-            '`' => i = scan_backtick(chars, i, out),
+            '$' if chars.get(i + 1) == Some(&'{') => {
+                sp.push(c);
+                i = scan_group(chars, i + 1, sp, '{', '}');
+            }
+            // A backtick is a substitution in POSIX shells and the escape character in PowerShell.
+            '`' => {
+                sp.ambiguous = true;
+                i = scan_backtick(chars, i, sp);
+            }
             _ => {
-                out.push(c);
+                sp.push(c);
                 i += 1;
             }
         }
     }
+    sp.unterminated = true;
     i
 }
 
-fn scan_paren(chars: &[char], mut i: usize, out: &mut String) -> usize {
+fn scan_group(chars: &[char], mut i: usize, sp: &mut Splitter, open: char, close: char) -> usize {
     let mut depth = 0;
     while i < chars.len() {
         let c = chars[i];
         match c {
-            '\'' => i = scan_single(chars, i, out, false),
-            '"' => i = scan_double(chars, i, out),
-            '`' => i = scan_backtick(chars, i, out),
+            '\'' => i = scan_single(chars, i, sp, false),
+            '"' => i = scan_double(chars, i, sp),
+            '`' => i = scan_backtick(chars, i, sp),
             '$' if chars.get(i + 1) == Some(&'\'') => {
-                out.push(c);
-                i = scan_single(chars, i + 1, out, true);
+                sp.push(c);
+                i = scan_single(chars, i + 1, sp, true);
             }
-            '\\' => {
-                out.push(c);
-                i += 1;
-                if let Some(&next) = chars.get(i) {
-                    out.push(next);
-                    i += 1;
-                }
-            }
+            '\\' => i = copy_escaped(chars, i, sp),
             _ => {
-                out.push(c);
+                sp.push(c);
                 i += 1;
-                if c == '(' {
+                if c == open {
                     depth += 1;
-                } else if c == ')' {
+                } else if c == close {
                     depth -= 1;
                     if depth == 0 {
                         return i;
@@ -309,12 +357,13 @@ fn scan_paren(chars: &[char], mut i: usize, out: &mut String) -> usize {
             }
         }
     }
+    sp.unterminated = true;
     i
 }
 
 /// Splits on `&&`, `||`, `;`, `|`, `&`, newlines and parentheses outside quotes. Redirections
 /// that contain `&` or `|` (`2>&1`, `&>`, `>|`) stay inside their token.
-fn split_segments(line: &str) -> Vec<Vec<String>> {
+fn split_segments(line: &str) -> Splitter {
     let chars: Vec<char> = line.chars().collect();
     let mut sp = Splitter::default();
     let mut i = 0;
@@ -323,44 +372,47 @@ fn split_segments(line: &str) -> Vec<Vec<String>> {
         let c = chars[i];
         let next = chars.get(i + 1).copied();
         match c {
-            '\\' => {
-                sp.push(c);
-                if let Some(n) = next {
-                    sp.push(n);
-                    i += 1;
-                }
-            }
-            '\'' => { i = scan_single(&chars, i, &mut sp.tok, false) - 1; sp.in_token = true; }
-            '"' => { i = scan_double(&chars, i, &mut sp.tok) - 1; sp.in_token = true; }
-            '`' => { i = scan_backtick(&chars, i, &mut sp.tok) - 1; sp.in_token = true; }
+            '\\' => i = copy_escaped(&chars, i, &mut sp),
+            '\'' => i = scan_single(&chars, i, &mut sp, false),
+            '"' => i = scan_double(&chars, i, &mut sp),
+            '`' => i = scan_backtick(&chars, i, &mut sp),
             '$' if next == Some('(') => {
                 sp.push(c);
-                i = scan_paren(&chars, i + 1, &mut sp.tok) - 1;
+                i = scan_group(&chars, i + 1, &mut sp, '(', ')');
+            }
+            '$' if next == Some('{') => {
+                sp.push(c);
+                i = scan_group(&chars, i + 1, &mut sp, '{', '}');
             }
             '$' if next == Some('\'') => {
                 sp.push(c);
-                i = scan_single(&chars, i + 1, &mut sp.tok, true) - 1;
+                i = scan_single(&chars, i + 1, &mut sp, true);
             }
             '<' | '>' if next == Some('(') => {
                 sp.push(c);
-                i = scan_paren(&chars, i + 1, &mut sp.tok) - 1;
+                i = scan_group(&chars, i + 1, &mut sp, '(', ')');
             }
             '=' if next == Some('(') && !sp.in_token => {
                 sp.push(c);
-                i = scan_paren(&chars, i + 1, &mut sp.tok) - 1;
+                i = scan_group(&chars, i + 1, &mut sp, '(', ')');
             }
             // Glob qualifier or array value glued to a word: `./*(/)`, `FOO=(a b)`.
-            '(' if sp.in_token => {
-                i = scan_paren(&chars, i, &mut sp.tok) - 1;
+            '(' if sp.in_token => i = scan_group(&chars, i, &mut sp, '(', ')'),
+            '\n' | '\r' | ';' | '(' | ')' => {
+                sp.end_segment();
+                i += 1;
             }
-            '\n' | '\r' | ';' | '(' | ')' => sp.end_segment(),
-            c if c.is_whitespace() => sp.end_token(),
+            c if c.is_whitespace() => {
+                sp.end_token();
+                i += 1;
+            }
             '|' => {
                 if sp.in_token && sp.tok.ends_with('>') {
                     sp.push(c);
                 } else {
                     sp.end_segment();
                 }
+                i += 1;
             }
             '&' => {
                 let after_redirect = sp.in_token && sp.tok.ends_with(['>', '<']);
@@ -369,13 +421,16 @@ fn split_segments(line: &str) -> Vec<Vec<String>> {
                 } else {
                     sp.end_segment();
                 }
+                i += 1;
             }
-            _ => sp.push(c),
+            _ => {
+                sp.push(c);
+                i += 1;
+            }
         }
-        i += 1;
     }
     sp.end_segment();
-    sp.segments
+    sp
 }
 
 #[cfg(test)]
@@ -394,9 +449,14 @@ mod tests {
         assert_eq!(cmd(line).as_deref(), Some(line), "line: {line}");
     }
 
+    fn complete(line: &str) -> Option<bool> {
+        find_agent_invocation(line, &agents()).map(|i| i.complete)
+    }
+
     #[test]
     fn plain_command_is_kept_whole() {
         same("claude --resume 'abc'");
+        assert_eq!(complete("claude --resume 'abc'"), Some(true));
     }
 
     #[test]
@@ -460,12 +520,22 @@ mod tests {
         same("env -u FOO claude --x");
         same("timeout 5 claude --x");
         same("timeout -s KILL 5s claude --x");
+        same("timeout --foreground 5 claude --x");
         same("caffeinate -i claude --x");
         same("sudo -- claude --x");
         assert_eq!(cmd("sudo -u claude whoami"), None);
         assert_eq!(cmd("command -v claude"), None);
         assert_eq!(cmd("exec -a claude zsh"), None);
         assert_eq!(cmd("timeout 5 sleep 1"), None);
+    }
+
+    #[test]
+    fn unknown_wrapper_options_are_not_guessed() {
+        assert_eq!(cmd("sudo -Eu claude ls"), None);
+        assert_eq!(cmd("sudo --user claude ls"), None);
+        assert_eq!(cmd("nice -x claude ls"), None);
+        assert_eq!(cmd("env -P claude ls"), None);
+        assert_eq!(cmd("npx -w claude ls"), None);
     }
 
     #[test]
@@ -499,11 +569,22 @@ mod tests {
     }
 
     #[test]
-    fn a_redirection_before_the_command_word_is_skipped() {
-        same(">/tmp/o claude --x");
-        same("2>/dev/null claude --x");
+    fn a_redirection_before_the_command_word_is_skipped_and_not_kept() {
+        assert_eq!(cmd(">/tmp/o claude --x").as_deref(), Some("claude --x"));
+        assert_eq!(cmd("> out.log claude --x").as_deref(), Some("claude --x"));
+        assert_eq!(cmd("2>&1 claude --x").as_deref(), Some("claude --x"));
+        assert_eq!(cmd("FOO=1 >/tmp/o claude --x").as_deref(), Some("FOO=1 claude --x"));
         assert_eq!(cmd("</tmp/claude ls"), None);
         assert_eq!(cmd(">/tmp/claude echo hi"), None);
+    }
+
+    #[test]
+    fn process_substitutions_are_values_not_redirections() {
+        same("claude --mcp-config <(echo '{}') --verbose");
+        same("claude --settings <(echo '{}')");
+        assert_eq!(redirection_tokens("<(echo x)"), None);
+        assert_eq!(redirection_tokens(">(tee x)"), None);
+        assert_eq!(redirection_tokens("2>(tee x)"), None);
     }
 
     #[test]
@@ -516,6 +597,10 @@ mod tests {
         same("claude --add-dir `echo a; echo b` --x");
         same("claude =(echo a; echo b) --x");
         same("claude --add-dir ./*(/) --verbose");
+        same("claude --add-dir ${y:-a;b} --verbose");
+        same("claude --add-dir ${y:-a&&b} --verbose");
+        same("claude --add-dir ${y:-a|b} --verbose");
+        same("claude --add-dir ${y:-)} --verbose");
         assert_eq!(
             cmd("cd a && claude --append-system-prompt $(echo ')') ; rm -rf y").as_deref(),
             Some("claude --append-system-prompt $(echo ')')")
@@ -526,6 +611,13 @@ mod tests {
     fn ansi_c_quoting_honours_escaped_quotes() {
         same("claude --name $'it\\'s' --x");
         assert_eq!(cmd("claude --name $'it\\'s' && rm -rf /tmp/y").as_deref(), Some("claude --name $'it\\'s'"));
+    }
+
+    #[test]
+    fn quoting_whose_meaning_depends_on_the_shell_is_not_guessed() {
+        assert_eq!(cmd("claude --name 'it\\'s' ; rm -rf y"), None);
+        assert_eq!(cmd("claude --append-system-prompt \"a`\"b\" ; rm -rf y"), None);
+        assert_eq!(cmd("claude --name \"it`s\" ; rm -rf y"), None);
     }
 
     #[test]
@@ -545,16 +637,41 @@ mod tests {
     }
 
     #[test]
-    fn truncated_lines_do_not_panic() {
-        same("claude --append-system-prompt 'abc def");
-        same("claude --append-system-prompt \"abc $(echo def");
-        same("claude \\");
-        same("claude $(echo");
-        same("claude --x $'abc");
-        same("claude --x `abc");
+    fn a_line_cut_mid_construct_names_the_agent_but_is_not_complete() {
+        for line in [
+            "claude --append-system-prompt 'abc def",
+            "claude --append-system-prompt \"abc $(echo def",
+            "claude --add-dir /a\\",
+            "claude $(echo",
+            "claude --x $'abc",
+            "claude --x `abc",
+            "claude --x ${y:-a",
+        ] {
+            assert_eq!(complete(line), Some(false), "line: {line}");
+        }
+        assert_eq!(complete("claude --x 'ok' $(echo ok)"), Some(true));
+    }
+
+    #[test]
+    fn a_line_as_long_as_the_shell_cut_is_not_complete() {
+        let long = format!("claude --append-system-prompt '{}' --x", "x".repeat(300));
+        assert_eq!(complete(&long), Some(false));
+        let max = format!("claude {}", "a".repeat(MAX_LINE_CHARS - "claude ".len()));
+        assert_eq!(max.chars().count(), MAX_LINE_CHARS);
+        assert_eq!(complete(&max), Some(false));
+        let below = format!("claude {}", "a".repeat(MAX_LINE_CHARS - 8));
+        assert_eq!(complete(&below), Some(true));
+    }
+
+    #[test]
+    fn degenerate_input_does_not_panic() {
         assert_eq!(cmd("cd 'abc").as_deref(), None);
         assert_eq!(cmd(""), None);
         assert_eq!(cmd("   "), None);
+        assert_eq!(cmd("\\"), None);
+        assert_eq!(cmd("$("), None);
+        assert_eq!(cmd("'"), None);
+        assert_eq!(cmd("claude \u{1F600} \u{e9} \u{4e2d}").as_deref(), Some("claude \u{1F600} \u{e9} \u{4e2d}"));
     }
 
     #[test]
@@ -577,11 +694,12 @@ mod tests {
     }
 
     #[test]
-    fn print_mode_looks_only_at_the_agent_args() {
+    fn print_mode_looks_only_at_the_agent_options() {
         assert!(is_print_mode("cd x && claude -p hi", &agents()));
         assert!(is_print_mode("claude --print", &agents()));
         assert!(!is_print_mode("time -p claude --x", &agents()));
         assert!(!is_print_mode("claude --model opus", &agents()));
         assert!(!is_print_mode("ls -p", &agents()));
+        assert!(!is_print_mode("claude -- -p", &agents()));
     }
 }
