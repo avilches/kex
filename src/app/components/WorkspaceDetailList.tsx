@@ -203,7 +203,7 @@ function DetailTabRow({
                     ? {
                         backgroundColor: chipColorOnWhite(color),
                         color: "#ffffff",
-                        boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
+                        boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--foreground) 40%, transparent)",
                       }
                     : {
                         backgroundColor: "var(--muted)",

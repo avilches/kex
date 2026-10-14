@@ -393,7 +393,7 @@ function SortableWorkspaceItem({
                 ? {
                     backgroundColor: chipColorOnWhite(displayColor),
                     color: "#ffffff",
-                    boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.4)",
+                    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--foreground) 40%, transparent)",
                   }
                 : {
                     backgroundColor: "var(--muted)",
@@ -469,7 +469,7 @@ function SortableWorkspaceItem({
           </button>
         )}
         {agentIndicator}
-        {!active && displayColor && (
+        {displayColor && (
           <span
             className="absolute inset-y-2 left-1.5 w-[3px] rounded-full"
             style={{ backgroundColor: displayColor }}
