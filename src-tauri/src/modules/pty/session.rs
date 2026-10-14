@@ -251,7 +251,7 @@ pub fn spawn(
                                 _ => None,
                             };
                             if let Some((tab_id, agent, session_id, transcript_path, cwd, session_title, model)) = session_data {
-                                let launch_known = session_store::record_session(&tab_id, &agent, &session_id, &transcript_path, &cwd, false);
+                                let launch_known = session_store::record_session(&tab_id, &agent, &session_id, &transcript_path, &cwd, true);
                                 let _ = app_reader.emit(AGENT_SESSION_META_EVENT, AgentSessionMetaPayload {
                                     tab_id: &tab_id,
                                     session_id: &session_id,
@@ -271,6 +271,11 @@ pub fn spawn(
                                 if !cmd_string.is_empty() {
                                     session_store::stash_cmd(&tab_id_for_reader, cmd_string.clone());
                                 }
+                            }
+                            // The agent is gone: a command stashed for a launch that never reached
+                            // SessionStart must not be read by the next, unrelated one.
+                            if matches!(t, Transition::Exited) {
+                                session_store::drop_stashed_cmd(&tab_id_for_reader);
                             }
                             let _ = app_reader.emit(AGENT_EVENT, t.into_signal(id));
                         });

@@ -37,6 +37,11 @@ fn take_stashed_cmd(tab_id: &str) -> Option<String> {
     pending_cmds().lock().ok()?.remove(tab_id)
 }
 
+/// Forgets the command stashed for a tab without recording anything.
+pub fn drop_stashed_cmd(tab_id: &str) {
+    let _ = take_stashed_cmd(tab_id);
+}
+
 /// Must be called once in setup() before any session store operation.
 /// Accepts the app data dir (e.g. ~/Library/Application Support/app.betauer.kex/).
 pub fn init(data_dir: PathBuf) {
@@ -387,7 +392,7 @@ fn remove_panel_from_store(tab_id: &str, path: &PathBuf) {
 /// is print-mode (`-p` / `--print`), the session is not persisted.
 ///
 /// `same_process` is true for a SessionStart that continues the agent process already running
-/// in the tab (`/clear`, `/compact`): no new command line went through the shell, so the
+/// in the tab (`/clear`, `/compact`, `/resume`): no new command line went through the shell, so the
 /// launch command of the previous record still describes it.
 ///
 /// Returns whether the stored record has a launch command. False means the launcher was not
@@ -837,6 +842,16 @@ mod tests {
         assert!(record_session_at_path_with(&path, "tab-clear-keeps", "claude", "new", "/tmp/s.jsonl", "/tmp/p", true));
         let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(store.tabs["tab-clear-keeps"].launch_cmd.as_deref(), Some("claude-max"));
+    }
+
+    #[test]
+    fn a_dropped_stash_is_not_read_by_the_next_session_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent-sessions.json");
+
+        stash_cmd("tab-stash-dropped", "claude-max".to_string());
+        drop_stashed_cmd("tab-stash-dropped");
+        assert!(!record_session_at_path_with(&path, "tab-stash-dropped", "claude", "s1", "/tmp/s.jsonl", "/tmp/p", false));
     }
 
     #[test]

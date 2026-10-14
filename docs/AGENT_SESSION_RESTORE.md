@@ -66,10 +66,11 @@ Only `SessionStart` calls `session_store::record_session` today. The payload car
 `UserPromptSubmit`-based recording in the live mechanism.
 
 `record_session` returns whether the stored record has a `launch_cmd`, and the `kex:agent-session-meta` payload carries
-it as `launchKnown`. A `SessionStart` with `source` `clear` or `compact` continues the process already running in the
-tab, so no new line went through the shell and the previous record's `launch_cmd` is kept; `startup` and `resume`
-do not inherit it, because they can come from a new launch whose launcher was not recognised (a script of the user's).
-`launchKnown: false` therefore means that a restore can only use the agent's plain command.
+it as `launchKnown`. A `SessionStart` with `source` `clear`, `compact` or `resume` may continue the process already running in the
+tab (`/clear`, `/compact` and `/resume` inside it), so no new line went through the shell and the previous record's
+`launch_cmd` is kept when nothing was stashed; `startup` never inherits it. The stash itself is dropped when the
+agent exits, so a launch that never reached `SessionStart` cannot leak its command into the next one.
+`launchKnown: false` means that a restore can only use the agent's plain command.
 
 In the frontend, `AgentNotificationsBridge.handleSessionMeta` creates the tab's agent session (idle) if none exists yet
 and stores `launchKnown` in `session.meta`. Without this the icon of an agent launched by an unrecognised script
@@ -78,6 +79,11 @@ would only appear with the first prompt, because the hooks other than `SessionSt
 use plain claude --resume" when `meta.launchKnown === false` (`agentIconMark` in `workspaces/lib/agentRestore.ts`).
 The strike of "Run on start is off" wins when both apply. The restore itself is unchanged: it still relaunches with
 `claude --resume '<id>'`. After that restore the line Kex types is recognised, so the strike goes away.
+
+Known limits of a launcher that was not recognised: the detector was never armed, so no `OSC 133;D` ends the session
+and the icon stays on the tab after the agent quits, until the tab closes (the same as it already did after the first
+prompt). A `claude -p` run is also not filtered, because the print-mode check needs the shell line; it shows the
+struck icon until the tab closes.
 
 Sessions are cleared from the store only when the agent process exits (the `exited` signal, from `OSC 133;D`, which
 `AgentNotificationsBridge.tsx` turns into `agent_detach_session`; the rule lives in `lib/sessionEndPolicy.ts`).
