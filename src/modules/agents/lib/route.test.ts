@@ -5,11 +5,6 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: vi.fn(() => ({ label: "w-1" })),
 }));
-vi.mock("@tauri-apps/plugin-notification", () => ({
-  isPermissionGranted: vi.fn(async () => true),
-  requestPermission: vi.fn(async () => "granted"),
-  sendNotification: vi.fn(),
-}));
 vi.mock("@/modules/agents/store/agentStore", () => ({
   useAgentStore: { getState: vi.fn(() => ({ pushNotification: vi.fn() })) },
 }));
@@ -22,7 +17,6 @@ vi.mock("@/modules/agents/components/AgentToast", () => ({
 
 import { routeAgentNotification } from "@/modules/agents/lib/route";
 import { invoke } from "@tauri-apps/api/core";
-import { sendNotification } from "@tauri-apps/plugin-notification";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 
 /** Drain the microtask queue including nested awaits inside async functions. */
@@ -55,12 +49,10 @@ describe("routeAgentNotification", () => {
 
     await flushPromises();
 
-    expect(invoke).toHaveBeenCalledWith("agent_queue_nav", {
+    expect(invoke).toHaveBeenCalledWith("agent_os_notify", {
       windowLabel: "w-1",
       workspaceId: "ws-abc",
       tabId: "tab-xyz",
-    });
-    expect(sendNotification).toHaveBeenCalledWith({
       title: "claude finished",
       body: "my-project",
     });
@@ -84,7 +76,6 @@ describe("routeAgentNotification", () => {
     await flushPromises();
 
     expect(invoke).not.toHaveBeenCalled();
-    expect(sendNotification).not.toHaveBeenCalled();
   });
 
   it("does not notify when agentNotifications preference is false", async () => {
@@ -105,6 +96,5 @@ describe("routeAgentNotification", () => {
     await flushPromises();
 
     expect(invoke).not.toHaveBeenCalled();
-    expect(sendNotification).not.toHaveBeenCalled();
   });
 });

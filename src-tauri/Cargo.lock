@@ -2265,6 +2265,7 @@ dependencies = [
  "ignore",
  "libc",
  "log",
+ "mac-notification-sys",
  "notify",
  "nucleo-matcher",
  "objc2",
