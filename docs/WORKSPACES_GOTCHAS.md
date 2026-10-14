@@ -994,7 +994,7 @@ El mismo defecto hacia que `cd ~/claude-docs` armara el detector, porque el nomb
 
 ### Fix
 
-`agent/launch_cmd.rs` (modulo puro con tests) trocea la linea en segmentos respetando comillas, `$(...)`, `&&`, `||`, `;`, `|`, `&`, saltos de linea y parentesis, y se queda con el ultimo segmento cuya palabra de orden es el agente, conservando asignaciones y envoltorios (`env`, `time`, `sudo -u x`, `timeout 5`...). El detector guarda solo ese segmento y `strip_for_resume_base(cmd, agent)` lo vuelve a extraer al leer, de modo que los registros ya contaminados se curan sin migracion. Lo que no se puede resolver con certeza (opcion de envoltorio desconocida, `pnpm dlx claude`) no se adivina: no hay match y el restore usa el comando por defecto del agente.
+`agent/launch_cmd.rs` (modulo puro con tests) trocea la linea en segmentos respetando comillas, `$(...)`, `&&`, `||`, `;`, `|`, `&`, saltos de linea y parentesis, y se queda con el ultimo segmento cuya palabra de orden es el agente, conservando asignaciones y envoltorios (`env`, `time`, `sudo -u x`, `timeout 5`...). El detector guarda solo ese segmento y `strip_for_resume_base(cmd, agent)` lo vuelve a extraer al leer, y como siempre vuelve a extraer el segmento al leer, un registro que ya se guardo con el prefijo `cd` se corrige solo; no hay codigo de migracion aparte. Lo que no se puede resolver con certeza no se adivina: una opcion de envoltorio desconocida, `pnpm dlx claude` o un entrecomillado que depende de la shell (`'it\'s'`) no dan match y el restore usa el comando por defecto del agente; una linea cortada (256 caracteres o una comilla sin cerrar) sigue armando el detector pero no guarda el texto.
 
 ### Leccion
 

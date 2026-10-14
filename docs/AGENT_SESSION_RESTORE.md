@@ -95,27 +95,36 @@ The stash is keyed by `tab_id`; entries are consumed exactly once and are not vi
 #### Which part of the line is kept
 
 The `OSC 133;C` text is the line as typed: aliases are not expanded, control characters (newlines included) are
-flattened to spaces and zsh cuts it at 256 characters. bash sends no text at all (its `PS0` marker is empty), so
-bash tabs never get a `launch_cmd`. The line can therefore be `cd dir && claude-max --resume x`, `(cd dir; FOO=1
-claude)` or `cd ~/claude-docs`, and only the invocation of the agent must be stored and replayed.
+flattened to spaces, and the zsh, fish and PowerShell scripts cut it at 256 characters. bash sends no text at all (its
+`PS0` marker is empty), so bash tabs never get a `launch_cmd`. The line can therefore be `cd dir && claude-max --resume
+x`, `(cd dir; FOO=1 claude)` or `cd ~/claude-docs`, and only the invocation of the agent must be stored and replayed.
 
 `agent/launch_cmd.rs::find_agent_invocation` (pure, no IO) splits the line into segments at `&&`, `||`, `;`, `|`,
-`&`, newlines and parentheses outside quotes, and keeps the **last segment whose command word is an agent**
-(`claude`, `codex`; `claude-max`, `/opt/bin/claude` and `\claude` count). The command word is the first token that
-is not a leading reserved word (`{`, `!`, `then`, `do`, `else`), a `VAR=value` assignment, a redirection or a wrapper
-(`env`, `time`, `command`, `nohup`, `nice`, `sudo`, `exec`, `timeout`, `npx`, `caffeinate`... with their options). What is
-stored is that segment from its first assignment or wrapper to its end, so `cd x && FOO=1 claude-max --resume 'a'`
-stores `FOO=1 claude-max --resume 'a'`.
+`&` and parentheses outside quotes, and keeps the **last segment whose command word is an agent** (`claude`, `codex`;
+`claude-max`, `/opt/bin/claude` and `\claude` count). The command word is the first token that is not a leading
+reserved word (`{`, `!`, `then`, `do`, `else`), a `VAR=value` assignment, a redirection or a wrapper (`env`, `time`,
+`command`, `nohup`, `nice`, `sudo`, `exec`, `timeout`, `npx`, `caffeinate`, with the options listed in the code). What
+is stored is that segment from its first assignment or wrapper to its end, without any redirection that came before
+the command word, so `cd x && FOO=1 claude-max --resume 'a'` stores `FOO=1 claude-max --resume 'a'`.
 
-Anything it cannot resolve with certainty is not guessed:
+Anything it cannot resolve with certainty is not guessed, and what happens depends on the case:
 
-- A wrapper option it does not know, or a subcommand-style launcher (`pnpm dlx claude`, `bun x claude`,
-  `direnv exec . claude`, `ssh host claude`), gives no match. No `Started` is emitted, nothing is stashed and the
-  restore falls back to a plain `claude --resume '<id>'`, which silently drops the launcher name and its environment.
-  This is deliberate: the alternative is storing a wrong command.
-- An alias or function typed by its own name (`cm`, `cf`) is not an agent name either, so it is not detected.
-- Command substitutions (`$(...)`, backticks, `<(...)`) are consumed whole, quotes inside them included, but never
-  analysed. `#` comments are not parsed (zsh does not treat them as comments interactively).
+- **No match.** A wrapper option it does not know (`sudo -Eu bob claude`), a subcommand-style launcher (`pnpm dlx
+  claude`, `bun x claude`, `direnv exec . claude`, `ssh host claude`) or an alias or function typed by its own name
+  (`cm`, `cf`) is not detected. No `Started` is emitted, nothing is stashed and the restore falls back to a plain
+  `claude --resume '<id>'`, which silently drops the launcher name and its environment. This is deliberate: the
+  alternative is storing a wrong command.
+- **Shell-dependent quoting.** `'it\'s'` closes at the second quote in zsh and not in fish, and a backtick inside
+  double quotes is a substitution in POSIX shells and the escape character in PowerShell. The OSC does not say which
+  shell sent the line, so the whole line gives no match.
+- **Cut line.** If the line ended inside a quote, a substitution, `${...}` or after a lone backslash, or is 256
+  characters or longer (it may have been cut), the agent is still detected but `Started.cmd_string` is empty: the text
+  is never replayed, because retyping it would leave the shell at a continuation prompt. `strip_for_resume_base`
+  applies the same rule to stored values.
+- **Known blind spots.** A `\` + newline continuation arrives as `\ ` plus a space and becomes a stray argument.
+  Command substitutions, backticks, `<(...)` and `${...}` are consumed whole, quotes inside them included, but never
+  analysed, so fish's `(cmd)` substitution splits the segment. `#` comments are not parsed: zsh does not treat them as
+  comments interactively, while fish and PowerShell do, so `ls # ; claude` is detected there.
 
 The process the shell runs is not a source for the command: a wrapper such as `claude-max` ends with `exec claude`,
 so the process shows a plain `claude` and its cleaned environment is gone.
@@ -209,7 +218,7 @@ It returns `None` when no agent is launched in the text, and the planner then us
 launcher part (assignments, wrappers and the command word) is kept as typed; the arguments go through a
 whitelist-based filter. It keeps flags that remain meaningful for an
 interactive resume and drops one-time flags (e.g. `--worktree`, `--from-pr`, `--tmux`, `--model`, `--effort`).
-Redirections (`2>/dev/null`, `> out.log`) are dropped and never consumed as a flag's value.
+Redirections after the launcher (`2>/dev/null`, `> out.log`) are dropped and never consumed as a flag's value; `<(cmd)` and `>(cmd)` are values, not redirections, and are kept.
 
 Flags kept as boolean (no value):
 `--allow-dangerously-skip-permissions`, `--dangerously-skip-permissions`, `--safe-mode`, `--bare`, `--verbose`,
@@ -225,13 +234,12 @@ Flags kept with their value(s):
 to be replayed on resume. Any flag not in either list is dropped along with any immediately-following non-flag value
 tokens.
 
-Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. A zsh
-line cut at 256 characters can end inside a value; the flags that were lost with the cut are not recovered.
+Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. A positional prompt that follows a whitelisted value flag is still read as one more value of that flag. A stored command that was cut is refused (see above).
 
 ### Print-mode filtering
 
 Sessions started with `-p` / `--print` are non-interactive and transient. `agent_detect.rs` looks for the flag in
-the arguments of the agent segment only (`ls -p; claude` and `time -p claude` are not print mode) and returns before
+the arguments of the agent segment only, and not after `--` (`ls -p; claude` and `time -p claude` are not print mode) and returns before
 arming the detector, so nothing is stashed. `record_session` checks the stashed `launch_cmd` once more via
 `is_print_mode_cmd` and skips recording if the flag is present.
 
