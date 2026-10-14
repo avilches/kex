@@ -187,7 +187,7 @@ describe("WorkspaceDetailList kind icons", () => {
 
 describe("WorkspaceDetailList subagents", () => {
   const subagentButtons = (c: Element) =>
-    Array.from(c.querySelectorAll<HTMLButtonElement>("button[data-subagent-row]"));
+    Array.from(c.querySelectorAll<HTMLElement>("[data-subagent-row]"));
 
   it("lists the subagents of an agent tab under its row, labelled and in start order", () => {
     const { container, rows, unmount } = mount({ terminals: "all" });
@@ -233,16 +233,22 @@ describe("WorkspaceDetailList subagents", () => {
     unmount();
   });
 
-  it("activates the parent tab on click and has no close control of its own", () => {
-    const { container, onActivate, unmount } = mount({ terminals: "all" });
+  it("is not interactive: no button, no hover surface, and the block hover belongs to the wrapper", () => {
+    const { container, rows, onActivate, unmount } = mount({ terminals: "all" });
     act(() =>
       useAgentStore
         .getState()
         .reconcileSubagents("t-work", [{ id: "a1", agentType: "Explore", description: "" }]),
     );
+    const sub = subagentButtons(container)[0];
+    expect(sub.tagName).toBe("DIV");
+    expect(sub.className).not.toContain("hover:bg");
+    act(() => sub.click());
+    expect(onActivate).not.toHaveBeenCalled();
+    const block = wrap(rows()[0]).parentElement as HTMLElement;
+    expect(block.className).toContain("hover:bg-foreground");
+    expect(block.contains(sub)).toBe(true);
     expect(container.querySelectorAll('button[aria-label="Close tab"]')).toHaveLength(4);
-    act(() => subagentButtons(container)[0].click());
-    expect(onActivate).toHaveBeenCalledWith("t-work");
     unmount();
   });
 });

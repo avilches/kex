@@ -39,25 +39,31 @@ import {
   workspaceDetailRows,
 } from "@/modules/workspaces/lib/workspaceDetail";
 
+type SubagentTone = "plain" | "chip" | "chip-color";
+
+const SUBAGENT_TONE: Record<SubagentTone, string> = {
+  plain: "text-muted-foreground group-hover/block:text-foreground",
+  chip: "text-foreground/70",
+  "chip-color": "text-white/80",
+};
+
 function SubagentRow({
-  tabId,
   agent,
   row,
-  onActivate,
+  tone,
 }: {
-  tabId: string;
   agent: string | undefined;
   row: SubagentRowData;
-  onActivate: (tabId: string) => void;
+  tone: SubagentTone;
 }) {
   return (
-    <button
-      type="button"
+    <div
       data-subagent-row=""
       title={row.label}
-      aria-label={`Subagent: ${row.label}`}
-      onClick={() => onActivate(tabId)}
-      className="flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] text-muted-foreground transition-colors select-none hover:bg-foreground/[0.08] hover:text-foreground"
+      className={cn(
+        "flex h-6 w-full cursor-default items-center gap-1.5 pl-2 pr-1.5 text-[11.5px] select-none",
+        SUBAGENT_TONE[tone],
+      )}
     >
       {agent && (
         <span className="flex size-3.5 shrink-0 items-center justify-center">
@@ -67,7 +73,7 @@ function SubagentRow({
       <span className="min-w-0 truncate">{row.label}</span>
       <span aria-hidden className="flex-1" />
       <Spinner size={11} />
-    </button>
+    </div>
   );
 }
 
@@ -85,20 +91,18 @@ function focusChipStyle(color: string | null): React.CSSProperties {
 }
 
 function SubagentGroup({
-  tabId,
   agent,
   rows,
-  onActivate,
+  tone,
 }: {
-  tabId: string;
   agent: string | undefined;
   rows: SubagentRowData[];
-  onActivate: (tabId: string) => void;
+  tone: SubagentTone;
 }) {
   return (
     <div className="ml-[15px] flex flex-col gap-px border-l border-border/60 pl-0.5">
       {rows.map((sub) => (
-        <SubagentRow key={sub.id} tabId={tabId} agent={agent} row={sub} onActivate={onActivate} />
+        <SubagentRow key={sub.id} agent={agent} row={sub} tone={tone} />
       ))}
     </div>
   );
@@ -153,6 +157,7 @@ function DetailTabRow({
   visual,
   focused,
   grouped,
+  hasSubagents,
   color,
   prevTabId,
   insertSide,
@@ -165,6 +170,7 @@ function DetailTabRow({
   visual: DetailRow["visual"];
   focused: boolean;
   grouped: boolean;
+  hasSubagents: boolean;
   color: string | null;
   prevTabId: string | null;
   insertSide: "before" | "after" | null;
@@ -264,7 +270,9 @@ function DetailTabRow({
                 isDragging && "opacity-40",
                 focused
                   ? "font-medium text-foreground"
-                  : "text-muted-foreground group-hover/tab:bg-foreground/[0.08] group-hover/tab:text-foreground",
+                  : hasSubagents
+                    ? "text-muted-foreground group-hover/block:text-foreground"
+                    : "text-muted-foreground group-hover/tab:bg-foreground/[0.08] group-hover/tab:text-foreground",
               )}
               style={
                 focused
@@ -473,7 +481,11 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
         return (
           <div
             key={row.tabId}
-            className={grouped ? "rounded-md" : undefined}
+            className={cn(
+              "group/block",
+              subs.length > 0 && "rounded-md",
+              subs.length > 0 && !focused && "hover:bg-foreground/[0.08]",
+            )}
             style={grouped ? focusChipStyle(color) : undefined}
           >
             <DetailTabRow
@@ -482,6 +494,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               visual={row.visual}
               focused={focused}
               grouped={grouped}
+              hasSubagents={subs.length > 0}
               color={color}
               prevTabId={rows[i - 1]?.tabId ?? null}
               insertSide={insert?.tabId === row.tabId ? insert.side : null}
@@ -491,10 +504,9 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
             />
             {subs.length > 0 && (
               <SubagentGroup
-                tabId={row.tabId}
                 agent={sessions[row.tabId]?.agent}
                 rows={subs}
-                onActivate={onActivate}
+                tone={!grouped ? "plain" : color !== null ? "chip-color" : "chip"}
               />
             )}
           </div>
