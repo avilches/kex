@@ -185,6 +185,74 @@ describe("WorkspaceDetailList kind icons", () => {
   });
 });
 
+describe("WorkspaceDetailList subagents", () => {
+  const subagentButtons = (c: Element) =>
+    Array.from(c.querySelectorAll<HTMLElement>("[data-subagent-row]"));
+
+  it("lists the subagents of an agent tab under its row, labelled and in start order", () => {
+    const { container, rows, unmount } = mount({ terminals: "all" });
+    act(() =>
+      useAgentStore.getState().reconcileSubagents("t-work", [
+        { id: "a1", agentType: "Explore", description: "Scan the repo" },
+        { id: "a2", agentType: "general-purpose", description: "" },
+      ]),
+    );
+    expect(rows().map((b) => rowName(b))).toEqual(["api", "web", "docs", "shell"]);
+    const subs = subagentButtons(container);
+    expect(subs.map((b) => b.textContent)).toEqual(["Scan the repo", "general-purpose"]);
+    expect(wrap(rows()[0]).nextElementSibling).toBe(subs[0].parentElement);
+    expect(subs[0].parentElement).toBe(subs[1].parentElement);
+    expect(subs[0].querySelector(".animate-spin")).not.toBeNull();
+    unmount();
+  });
+
+  it("draws the focus chip around the focused tab and its subagents together", () => {
+    const { container, rows, unmount } = mount({ terminals: "all" }, "t-work");
+    act(() =>
+      useAgentStore
+        .getState()
+        .reconcileSubagents("t-work", [{ id: "a1", agentType: "Explore", description: "" }]),
+    );
+    const chip = wrap(rows()[0]).parentElement as HTMLElement;
+    expect(chip.style.boxShadow).not.toBe("");
+    expect(chip.contains(subagentButtons(container)[0])).toBe(true);
+    expect(rows()[0].style.boxShadow).toBe("");
+    unmount();
+  });
+
+  it("removes a row when its subagent stops", () => {
+    const { container, unmount } = mount({ terminals: "all" });
+    act(() =>
+      useAgentStore
+        .getState()
+        .reconcileSubagents("t-work", [{ id: "a1", agentType: "Explore", description: "" }]),
+    );
+    expect(subagentButtons(container)).toHaveLength(1);
+    act(() => useAgentStore.getState().subagentStopped("t-work", "a1"));
+    expect(subagentButtons(container)).toHaveLength(0);
+    unmount();
+  });
+
+  it("is not interactive: no button, no hover surface, and the block hover belongs to the wrapper", () => {
+    const { container, rows, onActivate, unmount } = mount({ terminals: "all" });
+    act(() =>
+      useAgentStore
+        .getState()
+        .reconcileSubagents("t-work", [{ id: "a1", agentType: "Explore", description: "" }]),
+    );
+    const sub = subagentButtons(container)[0];
+    expect(sub.tagName).toBe("DIV");
+    expect(sub.className).not.toContain("hover:bg");
+    act(() => sub.click());
+    expect(onActivate).not.toHaveBeenCalled();
+    const block = wrap(rows()[0]).parentElement as HTMLElement;
+    expect(block.className).toContain("hover:bg-foreground");
+    expect(block.contains(sub)).toBe(true);
+    expect(container.querySelectorAll('button[aria-label="Close tab"]')).toHaveLength(4);
+    unmount();
+  });
+});
+
 describe("WorkspaceDetailList context menu", () => {
   const actions = {
     paneTabCount: () => 3,

@@ -34,8 +34,79 @@ import { TabRenamePopover } from "@/modules/workspaces/TabRenamePopover";
 import {
   type DetailFilter,
   type DetailRow,
+  type SubagentRow as SubagentRowData,
+  subagentRows,
   workspaceDetailRows,
 } from "@/modules/workspaces/lib/workspaceDetail";
+
+type SubagentTone = "plain" | "chip" | "chip-color";
+
+const SUBAGENT_TONE: Record<SubagentTone, string> = {
+  plain: "text-muted-foreground group-hover/block:text-foreground",
+  chip: "text-foreground/70",
+  "chip-color": "text-white/80",
+};
+
+function SubagentRow({
+  agent,
+  row,
+  tone,
+}: {
+  agent: string | undefined;
+  row: SubagentRowData;
+  tone: SubagentTone;
+}) {
+  return (
+    <div
+      data-subagent-row=""
+      title={row.label}
+      className={cn(
+        "flex h-6 w-full cursor-default items-center gap-1.5 pl-2 pr-1.5 text-[11.5px] select-none",
+        SUBAGENT_TONE[tone],
+      )}
+    >
+      {agent && (
+        <span className="flex size-3.5 shrink-0 items-center justify-center">
+          <AgentIcon agent={agent} size={12} />
+        </span>
+      )}
+      <span className="min-w-0 truncate">{row.label}</span>
+      <span aria-hidden className="flex-1" />
+      <Spinner size={11} />
+    </div>
+  );
+}
+
+function focusChipStyle(color: string | null): React.CSSProperties {
+  return color !== null
+    ? {
+        backgroundColor: chipColorOnWhite(color),
+        color: "#ffffff",
+        boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--foreground) 40%, transparent)",
+      }
+    : {
+        backgroundColor: "var(--muted)",
+        boxShadow: "inset 0 0 0 1px var(--ring)",
+      };
+}
+
+function SubagentGroup({
+  agent,
+  rows,
+  tone,
+}: {
+  agent: string | undefined;
+  rows: SubagentRowData[];
+  tone: SubagentTone;
+}) {
+  return (
+    <div className="ml-[15px] flex flex-col gap-px border-l border-border/60 pl-0.5">
+      {rows.map((sub) => (
+        <SubagentRow key={sub.id} agent={agent} row={sub} tone={tone} />
+      ))}
+    </div>
+  );
+}
 
 function StatusMark({ visual }: { visual: DetailRow["visual"] }) {
   if (visual === "working") {
@@ -85,6 +156,8 @@ function DetailTabRow({
   workspaceId,
   visual,
   focused,
+  grouped,
+  hasSubagents,
   color,
   prevTabId,
   insertSide,
@@ -96,6 +169,8 @@ function DetailTabRow({
   workspaceId: string;
   visual: DetailRow["visual"];
   focused: boolean;
+  grouped: boolean;
+  hasSubagents: boolean;
   color: string | null;
   prevTabId: string | null;
   insertSide: "before" | "after" | null;
@@ -195,20 +270,17 @@ function DetailTabRow({
                 isDragging && "opacity-40",
                 focused
                   ? "font-medium text-foreground"
-                  : "text-muted-foreground group-hover/tab:bg-foreground/[0.08] group-hover/tab:text-foreground",
+                  : hasSubagents
+                    ? "text-muted-foreground group-hover/block:text-foreground"
+                    : "text-muted-foreground group-hover/tab:bg-foreground/[0.08] group-hover/tab:text-foreground",
               )}
               style={
                 focused
-                  ? color !== null
-                    ? {
-                        backgroundColor: chipColorOnWhite(color),
-                        color: "#ffffff",
-                        boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--foreground) 40%, transparent)",
-                      }
-                    : {
-                        backgroundColor: "var(--muted)",
-                        boxShadow: "inset 0 0 0 1px var(--ring)",
-                      }
+                  ? grouped
+                    ? color !== null
+                      ? { color: "#ffffff" }
+                      : undefined
+                    : focusChipStyle(color)
                   : undefined
               }
             >
@@ -402,21 +474,43 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     <div className="ml-3 mt-0.5 flex flex-col gap-px border-l border-border/60 pl-0.5">
       {rows.map((row, i) => {
         const tab = tabsById.get(row.tabId);
-        return tab ? (
-          <DetailTabRow
+        if (!tab) return null;
+        const subs = subagentRows(sessions[row.tabId]?.subagents);
+        const focused = row.tabId === focusedTabId;
+        const grouped = focused && subs.length > 0;
+        return (
+          <div
             key={row.tabId}
-            tab={tab}
-            workspaceId={workspaceId}
-            visual={row.visual}
-            focused={row.tabId === focusedTabId}
-            color={color}
-            prevTabId={rows[i - 1]?.tabId ?? null}
-            insertSide={insert?.tabId === row.tabId ? insert.side : null}
-            onActivate={onActivate}
-            onNoteHover={handleNoteHover}
-            onNoteToggle={handleNoteToggle}
-          />
-        ) : null;
+            className={cn(
+              "group/block",
+              subs.length > 0 && "rounded-md",
+              subs.length > 0 && !focused && "hover:bg-foreground/[0.08]",
+            )}
+            style={grouped ? focusChipStyle(color) : undefined}
+          >
+            <DetailTabRow
+              tab={tab}
+              workspaceId={workspaceId}
+              visual={row.visual}
+              focused={focused}
+              grouped={grouped}
+              hasSubagents={subs.length > 0}
+              color={color}
+              prevTabId={rows[i - 1]?.tabId ?? null}
+              insertSide={insert?.tabId === row.tabId ? insert.side : null}
+              onActivate={onActivate}
+              onNoteHover={handleNoteHover}
+              onNoteToggle={handleNoteToggle}
+            />
+            {subs.length > 0 && (
+              <SubagentGroup
+                agent={sessions[row.tabId]?.agent}
+                rows={subs}
+                tone={!grouped ? "plain" : color !== null ? "chip-color" : "chip"}
+              />
+            )}
+          </div>
+        );
       })}
       {previewTab && previewTab.note !== undefined && !visibleSet.has(previewTab.id) &&
         createPortal(
