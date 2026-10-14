@@ -28,8 +28,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Alert02Icon, CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import type { GitStatusSnapshot } from "@/lib/native";
 import type { GitColorScheme } from "@/modules/settings/store";
-import { buildGitStatusMap, lookupGitStatus, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
-import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
+import { buildGitStatusMap, type GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
+import { tabGitColor } from "./lib/tabGitColor";
+import { useTabTooltip } from "./lib/useTabTooltip";
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { NewTabMenuButton } from "./NewTabMenuButton";
 import { TabContextMenuItems } from "./TabContextMenuItems";
@@ -153,11 +154,10 @@ function DraggableTab({
   const isRestoreError = agentSession?.restoreError ?? false;
 
   const { resolvedMode } = useTheme();
-  const tabColor = useMemo(() => {
-    if (tab.kind !== "editor" || !gitStatusMap || !gitStatus) return null;
-    const code = lookupGitStatus(gitStatusMap, gitStatus.repoRoot, tab.path);
-    return code ? gitStatusHexColor(code, gitColorScheme ?? "vscode", resolvedMode) : null;
-  }, [tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode]);
+  const tabColor = useMemo(
+    () => tabGitColor(tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode),
+    [tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode],
+  );
 
   // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
   // Paths (cwd segments): truncate from the left so the deepest directory stays visible.
@@ -174,18 +174,7 @@ function DraggableTab({
   const lockFlashToken =
     lockFlashSnap.tabId === tab.id ? lockFlashSnap.seq : 0;
 
-  const nativeTooltip = (() => {
-    const cwd = tab.kind === "terminal" ? tab.cwd : undefined;
-    const parts: string[] = [];
-    if (cwd) parts.push(cwd);
-    if (agentSession) {
-      const model = agentSession.meta?.model ?? agentSession.agent;
-      const sessionId = agentSession.meta?.sessionId;
-      const agentPart = [model, sessionId].filter(Boolean).join(" ");
-      if (agentPart) parts.push(agentPart);
-    }
-    return parts.join(" - ") || undefined;
-  })();
+  const tooltip = useTabTooltip(tab, agentSession);
 
   const restoreBusy = useRestoreBusy(tab.id);
   const restorePending = usePendingRestore(tab.id) !== null;
@@ -212,7 +201,8 @@ function DraggableTab({
       ref={setNodeRef}
       {...attributes}
       data-tab-id={tab.id}
-      title={nativeTooltip}
+      title={tooltip.title}
+      onPointerEnter={tooltip.onPointerEnter}
       onClick={() => onActivate(tab.id)}
       onMouseDown={(e) => {
         if (e.button === 1) e.preventDefault();
