@@ -204,6 +204,7 @@ import {
 import { clearMetricsEntry } from "@/modules/workspaces/lib/terminalMetricsStore";
 import {
   resolveExplorerRoot,
+  nearestExistingDir,
   resolveSidebarTarget,
   isFilesystemRoot,
   parentRoot,
@@ -1068,15 +1069,41 @@ export default function App() {
   // repo nested under the workspace should re-root the explorer (see focusSidebar).
   const [workspaceGitRoot, setWorkspaceGitRoot] = useState<string | null>(null);
 
+  // The pinned root may have been deleted or moved: the explorer falls back to
+  // its nearest existing ancestor instead of rendering nothing.
+  const [liveWorkspaceRoot, setLiveWorkspaceRoot] = useState<{
+    for: string;
+    path: string;
+  } | null>(null);
+  useEffect(() => {
+    if (!workspaceRootPath) return;
+    let cancelled = false;
+    void nearestExistingDir(workspaceRootPath, (p) =>
+      native.fsStat(p).then(
+        () => true,
+        () => false,
+      ),
+    ).then((path) => {
+      if (!cancelled) setLiveWorkspaceRoot({ for: workspaceRootPath, path });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceRootPath]);
+  const effectiveWorkspaceRoot =
+    liveWorkspaceRoot && liveWorkspaceRoot.for === workspaceRootPath
+      ? liveWorkspaceRoot.path
+      : workspaceRootPath;
+
   const explorerRoot = useMemo<string | null>(
     () =>
       resolveExplorerRoot({
         mode: activeRootMode,
-        workspaceRoot: workspaceRootPath,
+        workspaceRoot: effectiveWorkspaceRoot,
         fsRoot: fsFolderRoot,
         home,
       }),
-    [activeRootMode, workspaceRootPath, fsFolderRoot, home],
+    [activeRootMode, effectiveWorkspaceRoot, fsFolderRoot, home],
   );
 
   const editorChrome = useMemo(

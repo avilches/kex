@@ -6,6 +6,7 @@ import {
   isUnder,
   parentRoot,
   resolveExplorerRoot,
+  nearestExistingDir,
   resolveSidebarTarget,
 } from "./explorerRoot";
 
@@ -235,5 +236,22 @@ describe("resolveSidebarTarget", () => {
       home: null,
     });
     expect(t).toEqual({ mode: "filesystem", fsRoot: "/x/y" });
+  });
+});
+
+describe("nearestExistingDir", () => {
+  const existing = new Set(["/a", "/a/b"]);
+  const exists = async (p: string) => existing.has(p);
+
+  it("returns the path itself when it exists", async () => {
+    expect(await nearestExistingDir("/a/b", exists)).toBe("/a/b");
+  });
+
+  it("walks up to the nearest existing ancestor", async () => {
+    expect(await nearestExistingDir("/a/b/c/d", exists)).toBe("/a/b");
+  });
+
+  it("stops at the filesystem root", async () => {
+    expect(await nearestExistingDir("/x/y", exists)).toBe("/");
   });
 });
