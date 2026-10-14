@@ -26,6 +26,7 @@ import {
 } from "@/modules/terminal/lib/oscTitleStore";
 import { setAgentNotifications } from "@/modules/settings/store";
 import { type AgentEntry, buildAgentEntries } from "../lib/notificationList";
+import { AgentIcon } from "../lib/agentIcon";
 import { useAgentStore } from "../store/agentStore";
 import { useBellStore } from "../store/bellStore";
 
@@ -73,14 +74,17 @@ function AgentEntryRow({
       onClick={onClick}
       className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-accent"
     >
-      <span className="flex w-4 shrink-0 items-center justify-center">
-        <EntryDot visual={entry.visual} />
+      <span className="shrink-0">
+        <AgentIcon agent={entry.agent} size={12} />
       </span>
       <span className="min-w-0 flex-1 truncate text-sm text-foreground">
         {name}
       </span>
       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
         {relativeTime(entry.at)}
+      </span>
+      <span className="flex w-4 shrink-0 items-center justify-center">
+        <EntryDot visual={entry.visual} />
       </span>
     </button>
   );
