@@ -81,15 +81,41 @@ export function restoreExplorerSnapshot(
 }
 
 // The previous root is never in its own open set, so it is added here: going
-// up must leave the folder we came from open.
+// up must leave the folder we came from open. If it no longer exists on disk
+// (the root was deleted and we climbed to an ancestor), it and everything
+// under it is dropped instead.
 export function carryOverExpanded(
   expanded: Iterable<string>,
   previousRoot: string | null,
   root: string,
+  previousRootGone = false,
 ): string[] {
-  const paths = previousRoot ? [previousRoot, ...expanded] : [...expanded];
+  const kept = previousRoot && previousRootGone
+    ? [...expanded].filter((p) => !isUnder(p, previousRoot))
+    : [...expanded];
+  const paths = previousRoot && !previousRootGone ? [previousRoot, ...kept] : kept;
   return restoreExplorerSnapshot({ expanded: paths, selectedPath: null, scroll: null }, root)
     .expanded;
+}
+
+export type InitialRestore = { snapshot: ExplorerSnapshot | null; root: string | null };
+
+// The mount snapshot applies to the first root the explorer shows and never again:
+// a root that goes through "none" (A, none, A) or changes is a mid-session change.
+export function stepInitialRestore(
+  state: InitialRestore,
+  rootPath: string | null,
+): { state: InitialRestore; useInitial: boolean } {
+  if (!rootPath) {
+    return {
+      state: state.root !== null ? { snapshot: null, root: null } : state,
+      useInitial: false,
+    };
+  }
+  if (state.snapshot && (state.root ?? rootPath) === rootPath) {
+    return { state: { snapshot: state.snapshot, root: rootPath }, useInitial: true };
+  }
+  return { state: { snapshot: null, root: null }, useInitial: false };
 }
 
 export function applySidebarView(

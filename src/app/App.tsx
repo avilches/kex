@@ -185,7 +185,10 @@ import {
   effectiveSidebarView,
   type SidebarView,
 } from "@/modules/workspaces/lib/sidebarState";
-import { DEFAULT_WORKSPACE_SIDEBAR } from "@/modules/workspaces/lib/sidebarSnapshot";
+import {
+  DEFAULT_WORKSPACE_SIDEBAR,
+  type ExplorerSnapshot,
+} from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { isTabNoteOpen, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
@@ -2144,6 +2147,13 @@ export default function App() {
     [activeWorkspaceId, sidebarOpen],
   );
 
+  const handleExplorerSnapshot = useCallback(
+    (s: ExplorerSnapshot) => {
+      if (activeWorkspaceId) pushSidebarSnapshot(activeWorkspaceId, s);
+    },
+    [activeWorkspaceId],
+  );
+
   const hibernateFlow = useHibernateFlow({
     workspacesRef,
     saveWorkspaceDocs,
@@ -3632,9 +3642,7 @@ export default function App() {
                         ref={sidebarRef}
                         workspaceId={activeWorkspaceId}
                         initialExplorer={activeWorkspace?.sidebar ?? null}
-                        onExplorerSnapshot={(s) => {
-                          if (activeWorkspaceId) pushSidebarSnapshot(activeWorkspaceId, s);
-                        }}
+                        onExplorerSnapshot={handleExplorerSnapshot}
                         view={sidebarView}
                         onChangeView={setSidebarView}
                         notesRoot={workspaceRootPath}
@@ -3746,9 +3754,7 @@ export default function App() {
                         ref={sidebarRef}
                         workspaceId={activeWorkspaceId}
                         initialExplorer={activeWorkspace?.sidebar ?? null}
-                        onExplorerSnapshot={(s) => {
-                          if (activeWorkspaceId) pushSidebarSnapshot(activeWorkspaceId, s);
-                        }}
+                        onExplorerSnapshot={handleExplorerSnapshot}
                         view={sidebarView}
                         onChangeView={setSidebarView}
                         notesRoot={workspaceRootPath}
