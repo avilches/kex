@@ -5,6 +5,7 @@ import {
   TERMINAL_DETAIL_MODES,
   activeAgentCount,
   hasDetail,
+  subagentRows,
   workspaceDetailRows,
 } from "./workspaceDetail";
 
@@ -140,5 +141,33 @@ describe("TERMINAL_DETAIL_MODES", () => {
     expect(hasDetail(off)).toBe(false);
     expect(hasDetail({ ...off, git: true })).toBe(true);
     expect(hasDetail({ ...off, terminals: "agents" })).toBe(true);
+  });
+});
+
+describe("subagentRows", () => {
+  test("no subagents gives no rows", () => {
+    expect(subagentRows(undefined)).toEqual([]);
+    expect(subagentRows({})).toEqual([]);
+  });
+
+  test("orders by start time, then id, and labels with the description", () => {
+    const rows = subagentRows({
+      b: { agentType: "Explore", description: "Scan the repo", startedAt: 20 },
+      a: { agentType: "general-purpose", description: "Run the tests", startedAt: 20 },
+      c: { agentType: "Plan", description: "Draft a plan", startedAt: 10 },
+    });
+    expect(rows.map((r) => [r.id, r.label])).toEqual([
+      ["c", "Draft a plan"],
+      ["a", "Run the tests"],
+      ["b", "Scan the repo"],
+    ]);
+  });
+
+  test("falls back to the agent type when the description is missing or empty", () => {
+    const rows = subagentRows({
+      a: { agentType: "Explore", startedAt: 1 },
+      b: { agentType: "Plan", description: "", startedAt: 2 },
+    });
+    expect(rows.map((r) => r.label)).toEqual(["Explore", "Plan"]);
   });
 });

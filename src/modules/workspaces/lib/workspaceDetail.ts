@@ -2,6 +2,7 @@ import type {
   AgentEntry,
   AgentEntryVisual,
 } from "@/modules/agents/lib/notificationList";
+import type { SubagentRecord } from "@/modules/agents/lib/types";
 
 export const TERMINAL_DETAIL_MODES = [
   "all",
@@ -87,6 +88,17 @@ export function workspaceDetailRows(
   const agents = entries.filter((e) => present.has(e.tabId)).map((e) => row(e.tabId));
   const others = tabs.filter((t) => !terminalOnly(t) && wanted(t)).map((t) => row(t.id));
   return [...agents, ...others];
+}
+
+export type SubagentRow = { id: string; label: string };
+
+export function subagentRows(
+  subagents: Record<string, SubagentRecord> | undefined,
+): SubagentRow[] {
+  if (!subagents) return [];
+  return Object.entries(subagents)
+    .sort(([ia, a], [ib, b]) => a.startedAt - b.startedAt || (ia < ib ? -1 : ia > ib ? 1 : 0))
+    .map(([id, r]) => ({ id, label: r.description || r.agentType }));
 }
 
 export function activeAgentCount(entries: AgentEntry[] | undefined): number {
