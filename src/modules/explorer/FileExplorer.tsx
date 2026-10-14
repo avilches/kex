@@ -439,14 +439,22 @@ export const FileExplorer = memo(
     const [selectedPath, setSelectedPath] = useState<string | null>(null);
     const initialExplorerRef = useRef(initialExplorer ?? null);
     const pendingScrollRef = useRef(0);
+    const lastRootRef = useRef<string | null>(null);
     useEffect(() => {
+      if (!rootPath) {
+        lastRootRef.current = null;
+        if (!initialExplorerRef.current) pendingScrollRef.current = 0;
+        return;
+      }
+      // Effect re-run for a root already handled (StrictMode): keep what it armed.
+      if (lastRootRef.current === rootPath) return;
+      lastRootRef.current = rootPath;
       const snap = initialExplorerRef.current;
       // A later root change must not inherit an offset meant for the restored root.
       if (!snap) {
         pendingScrollRef.current = 0;
         return;
       }
-      if (!rootPath) return;
       initialExplorerRef.current = null;
       const r = restoreExplorerSnapshot(snap, rootPath);
       setSelectedPath(r.selectedPath);
