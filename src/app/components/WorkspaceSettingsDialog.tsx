@@ -384,12 +384,12 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
             <input
               ref={nameInputRef}
               className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              placeholder="Name"
+              placeholder="Name (empty uses the default title)"
               spellCheck={false}
               value={titleValue}
               onChange={(e) => {
                 setTitleValue(e.target.value);
-                if (e.target.value.trim()) props.onSetTitle(ws.id, e.target.value.trim());
+                props.onSetTitle(ws.id, e.target.value.trim());
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { e.preventDefault(); cwdInputRef.current?.focus(); }

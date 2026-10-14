@@ -163,6 +163,9 @@ export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
   { name: "file", description: "File name of an editor tab", scope: "both" },
   { name: "agent", description: "Coding agent running in the terminal", scope: "both" },
   { name: "host", description: "This machine's name", scope: "both" },
+  { name: "osc", description: "Title the running program sets for the terminal", scope: "both" },
+  { name: "session", description: "Title of the coding agent's session", scope: "both" },
+  { name: "url", description: "Address of a browser tab", scope: "both" },
   { name: "tab", description: "Title of the focused tab", scope: "workspace" },
 ];
 
@@ -170,4 +173,7 @@ export function titleVariableDocs(scope: TitleScope) {
   return TITLE_VARIABLE_DOCS.filter((v) => v.scope === "both" || v.scope === scope);
 }
 
-export const TITLE_VARIABLES_HINT = `${TITLE_VARIABLE_DOCS.map((v) => `{${v.name}}`).join(" ")}. Use {{ and }} for literal braces.`;
+export const TITLE_SYNTAX_HINT =
+  "{a|b} uses the first value that is not empty. {?var text} shows the text only when var has a value. Use {{ and }} for literal braces.";
+
+export const TITLE_VARIABLES_HINT = `${TITLE_VARIABLE_DOCS.map((v) => `{${v.name}}`).join(" ")}. ${TITLE_SYNTAX_HINT}`;
