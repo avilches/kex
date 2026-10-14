@@ -25,7 +25,7 @@ import {
   updateDivider,
   updatePane,
 } from "./splitNode";
-import { attachTab, workspaceForTab, workspaceTitleFromCwd, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
+import { attachTab, workspaceForTab, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
 import { type ClosedEntry, type Tab, type PaneNode, type Script, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { applyExplorerSnapshots, applySidebarView, type ExplorerSnapshot } from "./sidebarSnapshot";
@@ -351,7 +351,7 @@ function newWorkspace(cwd?: string): Workspace {
   const randomColor = usePreferencesStore.getState().randomWorkspaceColor;
   return {
     id: newWorkspaceId(),
-    title: workspaceTitleFromCwd(cwd),
+    title: "",
     cwd,
     color: randomColor ? undefined : null,
     paneTree: pane,

@@ -1,6 +1,7 @@
 import { pathBasename, pathDirname } from "@/lib/pathUtils";
 import type { DirGit } from "./dirGitStore";
 import { tabFilePath } from "./tabPath";
+import type { TitleDefaults } from "./defaultTitles";
 import { expandTitle, type TitleVars } from "./titleTemplate";
 import type { Tab, Workspace } from "./types";
 
@@ -10,6 +11,11 @@ export type TitleSources = {
   runningCommand?: string | null;
   git?: DirGit;
   agent?: string;
+  // Title the running program set through OSC 0/2, and the agent's own session title.
+  osc?: string;
+  session?: string;
+  // Default templates in force; the factory ones when absent.
+  defaults?: TitleDefaults;
   home?: string | null;
   host?: string;
   // Directory used when the tab has none of its own (a workspace falls back to its root).
@@ -46,6 +52,9 @@ export function tabTitleVars(tab: Tab | null, src: TitleSources = {}): TitleVars
     file: file ? base(file) : "",
     agent: src.agent ?? "",
     host: src.host ?? "",
+    osc: (src.osc ?? "").trim(),
+    session: (src.session ?? "").trim(),
+    url: tab?.kind === "browser" ? tab.url : "",
   };
 }
 

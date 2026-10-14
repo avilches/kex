@@ -13,6 +13,7 @@ import {
   terminalTabs,
 } from "@/modules/workspaces/lib/hibernate";
 import { claimToggle } from "@/modules/workspaces/lib/hibernateFx";
+import { tabDisplayTitleNow } from "@/modules/workspaces/lib/tabTitleNow";
 import { abandonUnflushedBuffers } from "@/modules/editor/lib/unflushedBuffers";
 import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
@@ -98,7 +99,6 @@ import {
   focusedTab,
   focusedTabId,
   planDiffTabOpen,
-  tabTitle,
   siblingPane,
   type DiffIdentity,
   type Tab,
@@ -1399,7 +1399,7 @@ export default function App() {
     const label = activeTab
       ? activeCwd
         ? pathBasename(activeCwd, { tolerateTrailingSlash: true })
-        : tabTitle(activeTab)
+        : tabDisplayTitleNow(activeTab)
       : "";
     let title: string;
     if (project && label && label !== project) title = `${project} — ${label}`;

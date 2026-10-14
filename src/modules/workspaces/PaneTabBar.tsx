@@ -3,14 +3,13 @@ import { useDraggable, useDroppable, useDndMonitor } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import { agentIconMark, type AgentIconMark } from "./lib/agentRestore";
-import { tabIcon, tabTitle } from "./lib/tabTitle";
+import { tabIcon } from "./lib/tabTitle";
 import { type Tab, isAutofocusTab } from "./lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { isTabNoteOpen, toggleTabNote } from "./lib/tabNote";
 import { subscribeToRunningCommands, getRunningCommand } from "./lib/terminalEphemeralStore";
-import { subscribe as subscribeOscTitles, getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { usePendingRestore } from "@/modules/terminal/lib/pendingRestore";
 import { useRestoreBusy } from "@/modules/terminal/lib/restoreBusy";
 import { tabStatusIndicator } from "./lib/tabStatusIndicator";
@@ -145,11 +144,6 @@ function DraggableTab({
     subscribeToRunningCommands,
     () => (tab.kind === "terminal" ? getRunningCommand(tab.id) : null),
   );
-  const oscTitle = useSyncExternalStore(
-    subscribeOscTitles,
-    () => (tab.kind === "terminal" ? getOscTitle(tab.id) : undefined),
-  );
-  const title = tabTitle(tab, runningCommand, oscTitle);
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const tabBarStyle = usePreferencesStore((s) => s.tabBarStyle);
   const connected = tabBarStyle === "connected";
@@ -167,7 +161,7 @@ function DraggableTab({
 
   // Descriptions (ai-title, user rename): left-align, CSS ellipsis truncates on the right.
   // Paths (cwd segments): truncate from the left so the deepest directory stays visible.
-  const agentTitle = agentTabTitle?.displayTitle ?? title;
+  const agentTitle = agentTabTitle?.displayTitle ?? "";
   const isDescription = agentTabTitle?.isDescription ?? false;
   const displayTitle = isDescription
     ? agentTitle
@@ -346,7 +340,7 @@ function DraggableTab({
       tabId={tab.id}
       origin="pane"
       title={tab.title}
-      placeholder={title}
+      placeholder={agentTitle}
       onRenameTab={onRenameTab}
     >
       <ContextMenu>

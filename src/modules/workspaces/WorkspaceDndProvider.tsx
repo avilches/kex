@@ -42,7 +42,8 @@ import {
   SCRATCHPAD_DROP_PREFIX,
 } from "@/modules/terminal/lib/scratchpadPath";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { basename, tabIcon, tabTitle } from "./lib/tabTitle";
+import { basename, tabIcon } from "./lib/tabTitle";
+import { tabDisplayTitleNow } from "./lib/tabTitleNow";
 import type { Tab, Workspace } from "./lib/types";
 import type { UseWorkspacesReturn } from "./lib/useWorkspaces";
 
@@ -551,7 +552,7 @@ export function WorkspaceDndProvider({
         {draggingItem?.kind === "tab" && (
           <div className="pointer-events-none flex items-center gap-1 text-[11px] text-foreground">
             <span className="shrink-0 opacity-70">{tabIcon(draggingItem.tab)}</span>
-            <span className="max-w-[120px] truncate">{tabTitle(draggingItem.tab)}</span>
+            <span className="max-w-[120px] truncate">{tabDisplayTitleNow(draggingItem.tab)}</span>
           </div>
         )}
         {draggingItem?.kind === "file" && (

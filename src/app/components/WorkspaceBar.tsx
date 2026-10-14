@@ -265,7 +265,8 @@ function SortableWorkspaceItem({
     if (handledRef.current) return;
     handledRef.current = true;
     const value = inputRef.current?.value.trim() ?? "";
-    if (value) onRename(ws.id, value);
+    // An empty name returns the workspace to the default title template.
+    if (value !== ws.title) onRename(ws.id, value);
     clearRename();
   }
 
@@ -676,7 +677,7 @@ function SortableWorkspaceItem({
           ref={inputRef}
           type="text"
           defaultValue={ws.title}
-          placeholder={ws.kind}
+          placeholder={shownTitle || ws.kind}
           title={TITLE_VARIABLES_HINT}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {

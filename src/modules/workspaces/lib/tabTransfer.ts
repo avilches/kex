@@ -14,10 +14,6 @@ export type TabMoveRequest =
   | { kind: "auto"; workspaceId: string }
   | { kind: "new" };
 
-export function workspaceTitleFromCwd(cwd?: string): string {
-  return cwd ? (cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] ?? "shell") : "shell";
-}
-
 function insertIntoPane(ws: Workspace, paneId: string, tab: Tab, index?: number): Workspace | null {
   if (!findPane(ws.paneTree, paneId)) return null;
   const paneTree = updatePane(ws.paneTree, paneId, (p) => {
@@ -72,7 +68,7 @@ export function workspaceForTab(
   const cwd = tab.kind === "terminal" ? tab.cwd : undefined;
   return {
     id: ids.workspaceId,
-    title: workspaceTitleFromCwd(cwd),
+    title: "",
     cwd,
     color,
     paneTree: { kind: "pane", id: ids.paneId, tabs: [tab], activeTabId: tab.id },

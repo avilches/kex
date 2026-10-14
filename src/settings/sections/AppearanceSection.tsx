@@ -27,6 +27,7 @@ import { useEffect, useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
 import { INPUT_CLASS } from "../components/inputClass";
+import { TitleTemplatesBlock } from "../components/TitleTemplatesBlock";
 
 const UI_FONT_PRESETS: { label: string; value: string }[] = [
   { label: "Default (Inter)", value: "" },
@@ -197,6 +198,8 @@ export function AppearanceSection() {
           </div>
         </div>
       </div>
+
+      <TitleTemplatesBlock />
 
       <div className="flex flex-col gap-2">
         <FieldLabel>Explorer</FieldLabel>
