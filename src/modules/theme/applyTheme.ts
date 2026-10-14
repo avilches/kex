@@ -1,4 +1,5 @@
 import { withReadableText } from "./readableColors";
+import { noteSurface } from "./noteSurface";
 import { getBuiltinTheme } from "./themes";
 import type { EditorSurface, Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
 
@@ -56,6 +57,8 @@ const ALL_VARS: readonly string[] = [
   ...Object.values(COLOR_VAR),
   "--editor-background",
   "--editor-foreground",
+  "--note-background",
+  "--note-foreground",
   "--terminal-background",
   "--terminal-foreground",
   "--terminal-cursor",
@@ -88,6 +91,15 @@ export function applyTheme(
   if (terminal) writeTerminal(root, terminal);
   const editor = editorOverride ?? variant.editor;
   if (editor) writeEditor(root, editor);
+  const note = noteSurface(
+    editor?.background ?? colors?.background ?? "",
+    editor?.foreground ?? colors?.foreground ?? "",
+    variant.noteStrong,
+  );
+  if (note) {
+    root.style.setProperty("--note-background", note.background);
+    root.style.setProperty("--note-foreground", note.foreground);
+  }
   lastApplied = theme.id;
 }
 

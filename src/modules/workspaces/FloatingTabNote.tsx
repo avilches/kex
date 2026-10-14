@@ -232,7 +232,7 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         {...{ [TAB_NOTE_ATTR]: "" }}
         data-tab-note-id={tab.id}
         className={cn(
-          "pointer-events-auto absolute w-80 max-w-full overflow-hidden rounded-lg border border-border bg-[var(--editor-background)] shadow-xl",
+          "pointer-events-auto absolute w-80 max-w-full overflow-hidden rounded-lg border border-border bg-[var(--editor-background)] [--editor-background:var(--note-background)] [--editor-foreground:var(--note-foreground)] shadow-xl",
           size && "flex flex-col",
           !pos && "invisible",
         )}
