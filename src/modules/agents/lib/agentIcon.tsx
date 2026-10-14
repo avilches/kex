@@ -57,3 +57,20 @@ export function AgentIcon({
     />
   );
 }
+
+export function StruckAgentIcon({
+  agent,
+  size,
+  title,
+}: {
+  agent: string;
+  size?: number;
+  title: string;
+}) {
+  return (
+    <span className="relative inline-flex" title={title}>
+      <AgentIcon agent={agent} size={size} />
+      <span className="pointer-events-none absolute left-1/2 top-1/2 h-px w-[15px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-muted-foreground" />
+    </span>
+  );
+}

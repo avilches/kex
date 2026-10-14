@@ -47,6 +47,8 @@ export type AgentSessionMeta = {
   transcriptPath?: string;
   agentCwd?: string;
   worktreeCwd?: string;
+  /** False when the launcher was not recognised, so a restore can only use the agent's plain command. */
+  launchKnown?: boolean;
 };
 
 export type AgentSession = {

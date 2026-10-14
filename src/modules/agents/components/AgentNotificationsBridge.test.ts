@@ -4,7 +4,7 @@ import { focusedTabId } from "@/modules/workspaces";
 import { routeAgentNotification } from "../lib/route";
 import type { AgentSignal } from "../lib/types";
 import { useAgentStore } from "../store/agentStore";
-import { handleSignal, type Ctx } from "./AgentNotificationsBridge";
+import { handleSessionMeta, handleSignal, type Ctx } from "./AgentNotificationsBridge";
 
 vi.mock("@/modules/workspaces", () => ({
   findTabPane: () => ({ tab: { kind: "terminal", cwd: "/p/proj", title: "" } }),
@@ -135,5 +135,45 @@ describe("handleSignal with background subagents", () => {
     handleSignal(sig("SessionEnd"), ctx());
     expect(session().subagents).toEqual({});
     expect(session().status).toBe("idle");
+  });
+});
+
+describe("handleSessionMeta", () => {
+  const meta = (launchKnown: boolean) => ({
+    tabId: "tab-1",
+    sessionId: "s-1",
+    cwdLaunch: "/p/proj",
+    sessionTitle: "",
+    model: "opus",
+    transcriptPath: "/p/t.jsonl",
+    launchKnown,
+  });
+
+  beforeEach(() => {
+    useAgentStore.setState({ sessions: {}, notifications: [] });
+  });
+
+  test("creates an idle session at SessionStart when no shell line named the agent", () => {
+    handleSessionMeta(meta(false), ctx());
+    expect(session().status).toBe("idle");
+    expect(session().meta?.launchKnown).toBe(false);
+    expect(session().meta?.sessionId).toBe("s-1");
+  });
+
+  test("a recognised launcher keeps its session and only records the metadata", () => {
+    handleSignal(sig("started", { agent: "claude" }), ctx());
+    const startedAt = session().startedAt;
+    handleSessionMeta(meta(true), ctx());
+    expect(session().startedAt).toBe(startedAt);
+    expect(Object.keys(useAgentStore.getState().sessions)).toEqual(["tab-1"]);
+    expect(session().meta?.launchKnown).toBe(true);
+  });
+
+  test("a later prompt on the session created by SessionStart does not duplicate it", () => {
+    handleSessionMeta(meta(false), ctx());
+    handleSignal(sig("UserPromptSubmit"), ctx());
+    expect(Object.keys(useAgentStore.getState().sessions)).toEqual(["tab-1"]);
+    expect(session().status).toBe("working");
+    expect(session().meta?.launchKnown).toBe(false);
   });
 });
