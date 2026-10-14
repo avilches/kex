@@ -19,6 +19,20 @@ export function resolveExplorerRoot(r: ResolveExplorerRootInput): string | null 
   }
 }
 
+export async function nearestExistingDir(
+  path: string,
+  exists: (p: string) => Promise<boolean>,
+): Promise<string> {
+  let current = path;
+  while (!isFilesystemRoot(current)) {
+    if (await exists(current)) return current;
+    const parent = parentRoot(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return current;
+}
+
 const DRIVE_ROOT = /^[A-Za-z]:\/?$/;
 const BARE_DRIVE = /^[A-Za-z]:$/;
 
