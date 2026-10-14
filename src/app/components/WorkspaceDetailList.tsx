@@ -197,6 +197,7 @@ function DetailTabRow({
     [sidebarGit, workspaceId, tab, resolvedMode],
   );
   const solidChip = focused && color !== null;
+  const showAutofocus = isAutofocusTab(tab) && tab.autofocus === true && autofocusMode !== "always";
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: sidebarTabDragId(tab.id),
@@ -307,14 +308,10 @@ function DetailTabRow({
               {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
                 <span className="shrink-0 text-[8px] text-primary">●</span>
               )}
-              {isAutofocusTab(tab) && tab.autofocus && autofocusMode !== "always" && (
-                <span className="shrink-0" title="Autofocus: this tab drives the sidebar">
-                  <HugeiconsIcon icon={CrosshairIcon} size={12} strokeWidth={2} />
-                </span>
-              )}
               <span aria-hidden className="flex-1" />
               <span aria-hidden className="size-[16px] shrink-0" />
               {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
+              {showAutofocus && <span aria-hidden className="size-[16px] shrink-0" />}
             </button>
           </PopoverAnchor>
         </ContextMenuTrigger>
@@ -346,6 +343,17 @@ function DetailTabRow({
         >
           <HugeiconsIcon icon={StickyNote03Icon} size={12} strokeWidth={2} />
         </button>
+      )}
+      {showAutofocus && (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute top-1/2 z-10 flex size-[16px] -translate-y-1/2 items-center justify-center",
+            hasNote ? "right-[46px]" : "right-[26px]",
+          )}
+        >
+          <HugeiconsIcon icon={CrosshairIcon} size={12} strokeWidth={2} />
+        </span>
       )}
       {isLocked ? (
         <button
