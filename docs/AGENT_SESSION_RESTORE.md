@@ -92,6 +92,34 @@ the command is bridged through a thread-safe stash:
 
 The stash is keyed by `tab_id`; entries are consumed exactly once and are not visible across tabs.
 
+#### Which part of the line is kept
+
+The `OSC 133;C` text is the line as typed: aliases are not expanded, control characters (newlines included) are
+flattened to spaces and zsh cuts it at 256 characters. bash sends no text at all (its `PS0` marker is empty), so
+bash tabs never get a `launch_cmd`. The line can therefore be `cd dir && claude-max --resume x`, `(cd dir; FOO=1
+claude)` or `cd ~/claude-docs`, and only the invocation of the agent must be stored and replayed.
+
+`agent/launch_cmd.rs::find_agent_invocation` (pure, no IO) splits the line into segments at `&&`, `||`, `;`, `|`,
+`&`, newlines and parentheses outside quotes, and keeps the **last segment whose command word is an agent**
+(`claude`, `codex`; `claude-max`, `/opt/bin/claude` and `\claude` count). The command word is the first token that
+is not a leading reserved word (`{`, `!`, `then`, `do`, `else`), a `VAR=value` assignment, a redirection or a wrapper
+(`env`, `time`, `command`, `nohup`, `nice`, `sudo`, `exec`, `timeout`, `npx`, `caffeinate`... with their options). What is
+stored is that segment from its first assignment or wrapper to its end, so `cd x && FOO=1 claude-max --resume 'a'`
+stores `FOO=1 claude-max --resume 'a'`.
+
+Anything it cannot resolve with certainty is not guessed:
+
+- A wrapper option it does not know, or a subcommand-style launcher (`pnpm dlx claude`, `bun x claude`,
+  `direnv exec . claude`, `ssh host claude`), gives no match. No `Started` is emitted, nothing is stashed and the
+  restore falls back to a plain `claude --resume '<id>'`, which silently drops the launcher name and its environment.
+  This is deliberate: the alternative is storing a wrong command.
+- An alias or function typed by its own name (`cm`, `cf`) is not an agent name either, so it is not detected.
+- Command substitutions (`$(...)`, backticks, `<(...)`) are consumed whole, quotes inside them included, but never
+  analysed. `#` comments are not parsed (zsh does not treat them as comments interactively).
+
+The process the shell runs is not a source for the command: a wrapper such as `claude-max` ends with `exec claude`,
+so the process shows a plain `claude` and its cleaned environment is gone.
+
 ### CLAUDE_CONFIG_DIR support
 
 If `CLAUDE_CONFIG_DIR` is set, `load_restore_plan()` searches for JSONL transcripts under that directory instead of
@@ -165,9 +193,9 @@ For each session in the store:
    directory check passes), so "Try again" can still find the session; it goes away when the agent exits, the tab is
    closed, or the user cancels the restore.
 5. **Build the command.**
-   - JSONL found: if `launch_cmd` is present, `strip_for_resume_base(launch_cmd) + --resume <id>`;
+   - JSONL found: if `launch_cmd` yields a base, `strip_for_resume_base(launch_cmd, agent) + --resume <id>`;
      otherwise `claude --resume '<id>'` / `codex resume --last` / `gemini --resume '<id>'`
-   - JSONL missing (claude only): if `launch_cmd` is present, `strip_for_resume_base(launch_cmd) + --session-id <id>`;
+   - JSONL missing (claude only): if `launch_cmd` yields a base, `strip_for_resume_base(launch_cmd, agent) + --session-id <id>`;
      otherwise `claude --session-id '<id>'`
    - others/unknown: empty string (tab shows restore error)
 
@@ -175,8 +203,13 @@ The PTY is spawned with `plan.cwdLaunch` as the initial working directory, so no
 
 ### Command stripping
 
-`strip_for_resume_base(cmd)` is a whitelist-based arg filter. It keeps flags that remain meaningful for an
+`strip_for_resume_base(cmd, agent)` first runs `find_agent_invocation` again on the stored text, so a record written
+with a `cd dir && claude ...` prefix (the bug of TASK-826) is healed on read instead of restoring as `cd --resume`.
+It returns `None` when no agent is launched in the text, and the planner then uses the plain per-agent command. The
+launcher part (assignments, wrappers and the command word) is kept as typed; the arguments go through a
+whitelist-based filter. It keeps flags that remain meaningful for an
 interactive resume and drops one-time flags (e.g. `--worktree`, `--from-pr`, `--tmux`, `--model`, `--effort`).
+Redirections (`2>/dev/null`, `> out.log`) are dropped and never consumed as a flag's value.
 
 Flags kept as boolean (no value):
 `--allow-dangerously-skip-permissions`, `--dangerously-skip-permissions`, `--safe-mode`, `--bare`, `--verbose`,
@@ -192,14 +225,15 @@ Flags kept with their value(s):
 to be replayed on resume. Any flag not in either list is dropped along with any immediately-following non-flag value
 tokens.
 
-Limitation: multi-word values containing spaces (e.g. `--system-prompt "hello world"`) split into separate tokens.
-This edge case is not handled; the overwhelming majority of real invocations use single-token values.
+Tokens keep their quotes, so a quoted value with spaces (`--system-prompt "hello world"`) stays one value. A zsh
+line cut at 256 characters can end inside a value; the flags that were lost with the cut are not recovered.
 
 ### Print-mode filtering
 
-Sessions started with `-p` / `--print` are non-interactive and transient. `record_session` checks the stashed
-`launch_cmd` via `is_print_mode_cmd` and silently skips recording if the flag is present. The stash is also cleared
-in `agent_detect.rs` at the `OSC 133;C` stage — `is_print_mode` returns early before arming the detector.
+Sessions started with `-p` / `--print` are non-interactive and transient. `agent_detect.rs` looks for the flag in
+the arguments of the agent segment only (`ls -p; claude` and `time -p claude` are not print mode) and returns before
+arming the detector, so nothing is stashed. `record_session` checks the stashed `launch_cmd` once more via
+`is_print_mode_cmd` and skips recording if the flag is present.
 
 ### RestorePlan type
 

@@ -172,7 +172,7 @@ Events emitted by `float_browser.rs` to the **origin window** (not broadcast):
 
 Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via two complementary channels:
 
-**OSC 133 C (shell integration)** — the PTY reader detects the sequence `OSC 133;C;<cmd> ST` emitted by the shell init scripts at each prompt. This arms the `AgentDetector` and produces the `started` signal. This path is always active once shell integration is loaded.
+**OSC 133 C (shell integration)** — the PTY reader detects the sequence `OSC 133;C;<cmd> ST` emitted by the shell init scripts at each prompt. This arms the `AgentDetector` and produces the `started` signal, but only when a segment of the line has an agent as its command word (`cd ~/claude-docs` or `echo claude` do not arm); `Started.cmd_string` carries that segment, not the whole line (see `AGENT_SESSION_RESTORE.md`, *Which part of the line is kept*). This path is always active once shell integration is loaded.
 
 **Unix socket IPC (hook events)**: Claude Code hooks call `trigger-event.sh` on each hook event. The script sends the raw JSON payload to a per-session Unix domain socket at `kex-ipc-{pid}-{pty_id}.sock`, where `pid` is the Kex process id so concurrent instances never share a path (path exposed via `KEX_IPC` env var). The socket lives under `XDG_RUNTIME_DIR` when available, otherwise under an owner-only (0700) `kex-ipc-{uid}` subdirectory of the system temp dir that Kex creates itself, and the socket file itself is forced to 0600; this keeps another local user on a shared machine from pre-creating the path (denial of service) or connecting to inject forged agent events. The Rust listener (`pty/ipc.rs`) reads the JSON and emits Tauri events:
 

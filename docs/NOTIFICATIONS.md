@@ -27,7 +27,7 @@ legacy/dead, not a live path (see TASK-733 for the decision on deleting it).
 | `OSC 7;file://<host><path>` | Shell (Kex init scripts) | Segunda instrucción de `_kex_precmd`: justo después de `D`, antes del prompt | | Updates `panel.cwd`. Ignorado si `state.inCommand` | |
 | `OSC 133;A` | Shell (Kex init scripts) | Última instrucción de `_kex_precmd`: el prompt está a punto de renderizarse | | `state.inCommand=false`, crea marker de posición del prompt | |
 | `OSC 133;B` | Shell (Kex init scripts) | Incrustado en `PS1`: el shell renderizó el prompt | | `state.inCommand=true` | |
-| `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse | Si `match_agent(cmd)`: `armed=true`, `status=Idle`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → noop |
+| `OSC 133;C;<cmd>` | Shell (Kex init scripts) | `_kex_preexec` (zsh) / `PS0` (bash ≥4.4): el usuario pulsó Enter, el comando va a ejecutarse | Si `find_agent_invocation(cmd)` encuentra un segmento cuya palabra de orden es un agente: `armed=true`, `status=Idle`, emit `Started` → `kex:agent-signal` | `state.inCommand=true`, `onRunningCommand(cmd)` | `started` → noop |
 | `OSC 9;<msg>` (sin `9;4`) | Cualquier proceso | Claude Code lo usa para notificaciones cuando no hay hooks instalados | Si `armed`: `status=Waiting`, emit `Notification` → `kex:agent-signal` | | `Notification` → `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
 
 `OSC 133` lo emite el shell (zsh/bash via los scripts de init de Kex), no Claude Code. Cuando el usuario lanza `claude`, el shell emite `C;claude` y deja de emitir OSC 133 porque Claude Code toma el PTY: a partir de ahí, `armed`/`status` en `agent_detect.rs` ya no avanzan (solo `OSC 9` y `OSC 133;D` los tocan); el estado working/attention real durante la sesión se conoce a través del canal 2, más abajo.
@@ -73,7 +73,7 @@ El único estado que mantiene hoy `agent_detect.rs` es el de armado/desarmado de
 working/waiting completo:
 
 ```
-OSC 133;C (match_agent)
+OSC 133;C (find_agent_invocation)
 Ground ──────────────────► Armed
                               │
        OSC 133;D / PTY close │

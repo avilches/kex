@@ -969,3 +969,33 @@ El alias de rutas del Bug 17 parecia cubrirlo, pero fallaba tambien el nodo `/pr
 ### Leccion
 
 Un watcher que falla en silencio parece un evento perdido. Si una carpeta se lista pero no se refresca, comprobar primero que `fs_watch_add` la acepta.
+
+## Bug 19: el restore de un agente reintentado desde el menu restauraba como `cd --resume` (RESUELTO)
+
+### Sintoma
+
+Un tab con el directorio de lanzamiento borrado quedo bloqueado en el restore. Tras recrear la carpeta y reintentar desde el menu contextual, `claude --resume` funciono. Pero al hibernar y restaurar de nuevo, el tab ejecutaba `cd --resume '<id>'`.
+
+### Pistas falsas descartadas
+
+- Que el restore de arranque estuviera mal montando el comando: no, esa ruta lanza el agente con el cwd ya fijado y sin `cd` delante, y funciona.
+- Leer el argv del proceso en memoria en vez de la linea de la shell. Se midio con 22 formas de lanzar en una zsh real: el proceso final NO conserva el nombre del lanzador. `claude-max` termina en `exec claude`, asi que el proceso es un `claude` normal, y su entorno ya viene limpio de `ANTHROPIC_BASE_URL`. Repetir ese argv restauraria contra la pasarela en vez de contra el plan Max, sin avisar.
+- Que bash pudiera aportar el texto: su marcador `PS0` emite `OSC 133;C` vacio, asi que en bash no hay `launch_cmd`.
+
+### Causa raiz
+
+Cadena de tres fallos:
+
+1. El reintento escribe en la shell ` cd '<dir>' && claude --resume '<id>'` (`restoreCommandLine`).
+2. `match_agent` buscaba el agente en CUALQUIER token de la linea, y `OSC 133;C` llega con la linea tal como se tecleo. La armaba entera y `session_store` guardaba la linea completa como `launch_cmd`.
+3. `strip_for_resume_base` daba por hecho que el primer token era el binario. Se quedaba con `cd`, descartaba el resto (no estaba en la lista blanca) y anadia ` --resume '<id>'`.
+
+El mismo defecto hacia que `cd ~/claude-docs` armara el detector, porque el nombre base `claude-docs` empieza por `claude-`.
+
+### Fix
+
+`agent/launch_cmd.rs` (modulo puro con tests) trocea la linea en segmentos respetando comillas, `$(...)`, `&&`, `||`, `;`, `|`, `&`, saltos de linea y parentesis, y se queda con el ultimo segmento cuya palabra de orden es el agente, conservando asignaciones y envoltorios (`env`, `time`, `sudo -u x`, `timeout 5`...). El detector guarda solo ese segmento y `strip_for_resume_base(cmd, agent)` lo vuelve a extraer al leer, de modo que los registros ya contaminados se curan sin migracion. Lo que no se puede resolver con certeza (opcion de envoltorio desconocida, `pnpm dlx claude`) no se adivina: no hay match y el restore usa el comando por defecto del agente.
+
+### Leccion
+
+Un texto que llega de la shell es la linea que escribio el usuario, no un comando. Antes de interpretarlo hay que localizar el comando dentro de ella. Y cuando no se puede localizar con certeza, es mejor no detectar que guardar algo que luego se ejecutara tal cual.
