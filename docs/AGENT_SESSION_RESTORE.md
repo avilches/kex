@@ -65,6 +65,20 @@ Only `SessionStart` calls `session_store::record_session` today. The payload car
 `claude --resume` also fires `SessionStart` and gets recorded through the same path; there is no separate
 `UserPromptSubmit`-based recording in the live mechanism.
 
+`record_session` returns whether the stored record has a `launch_cmd`, and the `kex:agent-session-meta` payload carries
+it as `launchKnown`. A `SessionStart` with `source` `clear` or `compact` continues the process already running in the
+tab, so no new line went through the shell and the previous record's `launch_cmd` is kept; `startup` and `resume`
+do not inherit it, because they can come from a new launch whose launcher was not recognised (a script of the user's).
+`launchKnown: false` therefore means that a restore can only use the agent's plain command.
+
+In the frontend, `AgentNotificationsBridge.handleSessionMeta` creates the tab's agent session (idle) if none exists yet
+and stores `launchKnown` in `session.meta`. Without this the icon of an agent launched by an unrecognised script
+would only appear with the first prompt, because the hooks other than `SessionStart` are the only ones that emit
+`kex:agent-signal`. `PaneTabBar` draws the icon struck through with the tooltip "Launch command unknown: restore will
+use plain claude --resume" when `meta.launchKnown === false` (`agentIconMark` in `workspaces/lib/agentRestore.ts`).
+The strike of "Run on start is off" wins when both apply. The restore itself is unchanged: it still relaunches with
+`claude --resume '<id>'`. After that restore the line Kex types is recognised, so the strike goes away.
+
 Sessions are cleared from the store only when the agent process exits (the `exited` signal, from `OSC 133;D`, which
 `AgentNotificationsBridge.tsx` turns into `agent_detach_session`; the rule lives in `lib/sessionEndPolicy.ts`).
 The same signal removes the session shown in the panel and the agent icon of the tab (`agentStore.finish`); the one

@@ -178,7 +178,7 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 
 | Hook event | Tauri event | Notes |
 |---|---|---|
-| `SessionStart` | `kex:agent-session-meta` + arms detector | Includes `source`, `sessionTitle`, `model` |
+| `SessionStart` | `kex:agent-session-meta` (does not arm the detector; the frontend creates the tab's session if missing) | Includes `source`, `sessionTitle`, `model`, `launchKnown` |
 | `SessionEnd` | `kex:agent-signal` kind=`SessionEnd` | |
 | `UserPromptSubmit` | `kex:agent-signal` kind=`UserPromptSubmit` | Includes `prompt` |
 | `Notification` | `kex:agent-signal` kind=`Notification` | Includes `message` |

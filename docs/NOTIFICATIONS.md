@@ -43,7 +43,7 @@ directamente, sin pasar por `agent_detect.rs`:
 
 | `hook_event_name` | Cuando | `ipc.rs::dispatch` (Rust) | `AgentNotificationsBridge` (TS) |
 |---|---|---|---|
-| `SessionStart` | Claude Code inicia una nueva sesión, incluida una reanudada con `--resume` (payload `source`) | `session_store::record_session(...)`, emit `kex:agent-session-meta` (no llega a `kex:agent-signal`) | (ninguno; solo alimenta la restauración de sesión) |
+| `SessionStart` | Claude Code inicia una nueva sesión, incluida una reanudada con `--resume` (payload `source`) | `session_store::record_session(...)`, emit `kex:agent-session-meta` (no llega a `kex:agent-signal`; el payload lleva `launchKnown`) | `handleSessionMeta`: crea la sesión idle del tab si no existía (icono desde el arranque, aunque ningún OSC 133;C reconociera el lanzador) y guarda `launchKnown`; con `false` el icono sale tachado |
 | `UserPromptSubmit` | El usuario envió un prompt | emit `kex:agent-signal` `kind: "UserPromptSubmit"` | `ensureSession` + `setStatus("working")` (spinner en el tab) |
 | `Notification` | Claude Code necesita input del usuario (permiso, pregunta, etc.) | Si `notification_type == idle_prompt`: **ignorado** (ya lo cubre `Stop`). Resto: emit `kex:agent-signal` `kind: "Notification"` | `setStatus("attention")` + route (salvo si el panel ya está enfocado) |
 | `Stop` | Claude Code terminó de responder y vuelve a esperar input | emit `kex:agent-signal` `kind: "Stop"`, con `backgroundSubagents` (los subagentes en segundo plano que siguen vivos) | `reconcileSubagents` y luego `stopOutcome` (`lib/subagentGate.ts`): con algún subagente vivo, `setStatus("working")` y nada más. Sin ninguno: si panel enfocado, `setStatus("idle")`; si no, `setStatus("attention")` (dot naranja) + route "attention" |
