@@ -93,6 +93,7 @@ import {
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
 import { TITLE_VARIABLES_HINT } from "@/modules/workspaces/lib/titleTemplate";
+import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
 import { useWorkspaceTitle, workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 
 type WorkspaceItem = {
@@ -673,7 +674,7 @@ function SortableWorkspaceItem({
       <PopoverContent
         side="right"
         align="center"
-        className="w-48 p-1.5"
+        className="flex w-60 flex-col gap-1.5 p-1.5"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={handleSave}
         onEscapeKeyDown={handleCancel}
@@ -695,6 +696,7 @@ function SortableWorkspaceItem({
             }
           }}
         />
+        <TitleVariablesHelp scope="workspace" />
       </PopoverContent>
     </Popover>
   );

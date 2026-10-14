@@ -40,5 +40,26 @@ export function expandTitle(template: string, vars: TitleVars): string {
   return out.replace(/\s+/g, " ").trim();
 }
 
-export const TITLE_VARIABLES_HINT =
-  "Variables: {cwd} {dir} {branch} {repo} {cmd} {file} {agent} {host}; workspaces also {tab}. Use {{ and }} for literal braces.";
+export type TitleScope = "tab" | "workspace";
+
+export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
+  name: TitleVariable;
+  description: string;
+  scope: TitleScope | "both";
+}> = [
+  { name: "cwd", description: "Full working directory, home shown as ~", scope: "both" },
+  { name: "dir", description: "Name of the working directory", scope: "both" },
+  { name: "branch", description: "Git branch (empty outside a repo)", scope: "both" },
+  { name: "repo", description: "Name of the git repository folder", scope: "both" },
+  { name: "cmd", description: "Command running in the terminal", scope: "both" },
+  { name: "file", description: "File name of an editor tab", scope: "both" },
+  { name: "agent", description: "Coding agent running in the terminal", scope: "both" },
+  { name: "host", description: "This machine's name", scope: "both" },
+  { name: "tab", description: "Title of the focused tab", scope: "workspace" },
+];
+
+export function titleVariableDocs(scope: TitleScope) {
+  return TITLE_VARIABLE_DOCS.filter((v) => v.scope === "both" || v.scope === scope);
+}
+
+export const TITLE_VARIABLES_HINT = `${TITLE_VARIABLE_DOCS.map((v) => `{${v.name}}`).join(" ")}. Use {{ and }} for literal braces.`;

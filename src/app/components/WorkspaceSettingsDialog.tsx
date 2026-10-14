@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { native } from "@/lib/native";
+import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
 import { useWorkspaceSettingsStore } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import type { WorkspaceSettingsFocus, WorkspaceSettingsSection } from "@/modules/workspaces/lib/workspaceSettingsStore";
 import {
@@ -394,6 +395,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                 if (e.key === "Enter") { e.preventDefault(); cwdInputRef.current?.focus(); }
               }}
             />
+            <TitleVariablesHelp scope="workspace" layout="list" />
           </div>
 
           {/* Working Directory */}
