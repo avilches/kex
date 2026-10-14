@@ -16,7 +16,9 @@ import { isUnder } from "@/modules/workspaces/lib/explorerRoot";
 import {
   carryOverExpanded,
   restoreExplorerSnapshot,
+  stepInitialRestore,
   type ExplorerSnapshot,
+  type InitialRestore,
 } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 
@@ -83,8 +85,10 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   const [nodes, setNodes] = useState<TreeState>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [restoredRoot, setRestoredRoot] = useState<string | null>(null);
-  const initialSnapshotRef = useRef(options?.initialSnapshot ?? null);
-  const initialRootRef = useRef<string | null>(null);
+  const initialRestoreRef = useRef<InitialRestore>({
+    snapshot: options?.initialSnapshot ?? null,
+    root: null,
+  });
   const previousRootRef = useRef<string | null>(null);
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
     null,
@@ -201,6 +205,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   useEffect(() => {
     if (!rootPath) {
       previousRootRef.current = null;
+      initialRestoreRef.current = stepInitialRestore(initialRestoreRef.current, null).state;
       setNodes({});
       setExpanded(new Set());
       setRestoredRoot(null);
@@ -214,16 +219,17 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     setRenaming(null);
 
     let restored: string[];
-    const initial = initialSnapshotRef.current;
-    if (initial && (initialRootRef.current ?? rootPath) === rootPath) {
-      initialRootRef.current = rootPath;
-      restored = restoreExplorerSnapshot(initial, rootPath).expanded;
+    const step = stepInitialRestore(initialRestoreRef.current, rootPath);
+    initialRestoreRef.current = step.state;
+    if (step.useInitial && step.state.snapshot) {
+      restored = restoreExplorerSnapshot(step.state.snapshot, rootPath).expanded;
     } else {
-      initialSnapshotRef.current = null;
       restored = carryOverExpanded(
         expandedRef.current,
         previousRootRef.current,
         rootPath,
+        previousRootRef.current !== null &&
+          nodesRef.current[previousRootRef.current]?.status === "error",
       );
     }
     previousRootRef.current = rootPath;

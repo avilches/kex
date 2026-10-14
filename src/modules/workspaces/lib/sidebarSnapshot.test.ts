@@ -6,7 +6,9 @@ import {
   DEFAULT_WORKSPACE_SIDEBAR,
   restoreExplorerSnapshot,
   sanitizeWorkspaceSidebar,
+  stepInitialRestore,
   type ExplorerSnapshot,
+  type InitialRestore,
 } from "./sidebarSnapshot";
 import type { Workspace } from "./types";
 
@@ -259,5 +261,89 @@ describe("carryOverExpanded", () => {
   it("returns no duplicates", () => {
     const out = carryOverExpanded(new Set(["/a/b/c", "/a/b/d", "/a/b"]), "/a/b", "/a");
     expect(new Set(out).size).toBe(out.length);
+  });
+});
+
+describe("carryOverExpanded when the previous root is gone", () => {
+  it("does not open the deleted root nor what was under it", () => {
+    expect(carryOverExpanded(["/a/b/c", "/a/x"], "/a/b", "/a", true)).toEqual(["/a/x"]);
+  });
+
+  it("still opens the previous root when it exists", () => {
+    expect(carryOverExpanded(["/a/x"], "/a/b", "/a", false)).toEqual(["/a/b", "/a/x"]);
+  });
+});
+
+describe("filesystem and drive roots", () => {
+  it("restores under the root \"/\"", () => {
+    const r = restoreExplorerSnapshot(
+      snap({
+        expanded: ["/a/b", "/"],
+        selectedPath: "/c/f.ts",
+        scroll: { root: "/", top: 40 },
+      }),
+      "/",
+    );
+    expect(r.expanded).toEqual(["/a", "/a/b", "/c"]);
+    expect(r.selectedPath).toBe("/c/f.ts");
+    expect(r.scrollTop).toBe(40);
+  });
+
+  it("restores under a drive root", () => {
+    const r = restoreExplorerSnapshot(
+      snap({
+        expanded: ["C:/a/b", "C:/"],
+        selectedPath: "C:/c/f.ts",
+        scroll: { root: "C:/", top: 7 },
+      }),
+      "C:/",
+    );
+    expect(r.expanded).toEqual(["C:/a", "C:/a/b", "C:/c"]);
+    expect(r.selectedPath).toBe("C:/c/f.ts");
+    expect(r.scrollTop).toBe(7);
+  });
+
+  it("carries folders over when going up to \"/\" and down from it", () => {
+    expect(carryOverExpanded(["/a/b"], "/a", "/")).toEqual(["/a", "/a/b"]);
+    expect(carryOverExpanded(["/a/b"], "/", "/a")).toEqual(["/a/b"]);
+  });
+
+  it("carries folders over when going up to a drive root and down from it", () => {
+    expect(carryOverExpanded(["C:/a/b"], "C:/a", "C:/")).toEqual(["C:/a", "C:/a/b"]);
+    expect(carryOverExpanded(["C:/a/b"], "C:/", "C:/a")).toEqual(["C:/a/b"]);
+  });
+});
+
+describe("stepInitialRestore", () => {
+  const start = (): InitialRestore => ({ snapshot: snap({ expanded: ["/a/x"] }), root: null });
+
+  it("uses the snapshot for the first root", () => {
+    const step = stepInitialRestore(start(), "/a");
+    expect(step.useInitial).toBe(true);
+    expect(step.state.root).toBe("/a");
+  });
+
+  it("waits through a null root before the first one", () => {
+    const first = stepInitialRestore(start(), null);
+    expect(first.useInitial).toBe(false);
+    expect(stepInitialRestore(first.state, "/a").useInitial).toBe(true);
+  });
+
+  it("does not reapply it after the root goes through none (A, none, A)", () => {
+    const a = stepInitialRestore(start(), "/a");
+    const none = stepInitialRestore(a.state, null);
+    expect(stepInitialRestore(none.state, "/a").useInitial).toBe(false);
+  });
+
+  it("does not reapply it after a different root", () => {
+    const a = stepInitialRestore(start(), "/a");
+    const b = stepInitialRestore(a.state, "/b");
+    expect(b.useInitial).toBe(false);
+    expect(stepInitialRestore(b.state, "/a").useInitial).toBe(false);
+  });
+
+  it("applies it again if the same root is reported twice (StrictMode)", () => {
+    const a = stepInitialRestore(start(), "/a");
+    expect(stepInitialRestore(a.state, "/a").useInitial).toBe(true);
   });
 });
