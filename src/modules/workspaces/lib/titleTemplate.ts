@@ -35,7 +35,11 @@ const COND = /^\?([a-z]+)([\s\S]*)$/;
 
 // `{{` and `}}` are literal braces at the top level only: inside a group every brace
 // opens or closes, so `{?a {b}}` ends with two closers, not an escape.
-function parse(src: string, nested: boolean): Node[] {
+const MAX_DEPTH = 16;
+
+// A brace that does not open a readable group stays text and scanning resumes right after
+// it, so what follows still expands. Groups nested deeper than MAX_DEPTH are plain text.
+function parse(src: string, nested: boolean, level = 0): Node[] {
   const nodes: Node[] = [];
   let text = "";
   const flush = () => {
@@ -49,7 +53,7 @@ function parse(src: string, nested: boolean): Node[] {
       i++;
       continue;
     }
-    if (ch !== "{") {
+    if (ch !== "{" || level >= MAX_DEPTH) {
       text += ch;
       continue;
     }
@@ -60,22 +64,25 @@ function parse(src: string, nested: boolean): Node[] {
       else if (src[j] === "}") depth--;
     }
     if (depth > 0) {
-      text += src.slice(i);
-      break;
+      text += ch;
+      continue;
     }
     const raw = src.slice(i, j);
     const inner = raw.slice(1, -1);
     const cond = COND.exec(inner);
+    const parts = cond ? [] : splitAlternatives(inner);
+    if (!cond && parts.length === 1 && !BARE.test(inner)) {
+      text += ch;
+      continue;
+    }
     flush();
-    if (cond) nodes.push({ kind: "cond", name: cond[1], body: parse(cond[2], true), raw });
-    else {
-      const parts = splitAlternatives(inner);
-      const single = parts.length === 1;
-      if (single && !BARE.test(inner.trim())) nodes.push({ kind: "text", text: raw });
-      else {
-        const v = parts.map((a): Alt => (BARE.test(a.trim()) ? { name: a.trim() } : { nodes: parse(a, true) }));
-        nodes.push({ kind: "vars", v, raw });
-      }
+    if (cond) {
+      nodes.push({ kind: "cond", name: cond[1], body: parse(cond[2], true, level + 1), raw });
+    } else {
+      const v = parts.map(
+        (a): Alt => (BARE.test(a.trim()) ? { name: a.trim() } : { nodes: parse(a, true, level + 1) }),
+      );
+      nodes.push({ kind: "vars", v, raw });
     }
     i = j - 1;
   }
@@ -123,21 +130,26 @@ export function hasTitleVariables(template: string): boolean {
   return /[{}]/.test(template);
 }
 
+// Own properties only: `constructor` and the like must not resolve to Object.prototype.
+function lookup(vars: TitleVars, name: string): string | undefined {
+  return Object.prototype.hasOwnProperty.call(vars, name) ? vars[name as TitleVariable] : undefined;
+}
+
 function render(nodes: Node[], vars: TitleVars): string {
   return nodes
     .map((n) => {
       if (n.kind === "text") return n.text;
       if (n.kind === "vars") {
-        if (n.v.some((a) => "name" in a && vars[a.name as TitleVariable] === undefined)) return n.raw;
+        if (n.v.some((a) => "name" in a && lookup(vars, a.name) === undefined)) return n.raw;
         for (const a of n.v) {
-          const value = "name" in a ? (vars[a.name as TitleVariable] as string) : render(a.nodes, vars);
+          const value = "name" in a ? (lookup(vars, a.name) as string) : render(a.nodes, vars);
           if (value.trim()) return value;
         }
         return "";
       }
-      const value = vars[n.name as TitleVariable];
+      const value = lookup(vars, n.name);
       if (value === undefined) return n.raw;
-      return value ? render(n.body, vars) : "";
+      return value.trim() ? render(n.body, vars) : "";
     })
     .join("");
 }

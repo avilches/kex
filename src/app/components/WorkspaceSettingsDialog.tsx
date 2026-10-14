@@ -48,6 +48,18 @@ import {
 } from "@/modules/workspaces/lib/workspaceColor";
 import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
 import type { Workspace, Script, ScriptCwdMode } from "@/modules/workspaces/lib/types";
+import { focusedTab } from "@/modules/workspaces/lib/splitNode";
+import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
+
+function WorkspaceHeading({ ws }: { ws: Workspace | undefined }) {
+  const shown = useWorkspaceTitle({
+    title: ws?.title ?? "",
+    cwd: ws?.cwd,
+    workspaceRoot: ws?.workspaceRoot,
+    focusedTab: ws ? focusedTab(ws.paneTree, ws.activePaneId) : null,
+  });
+  return <>Workspace {ws ? shown : ""}</>;
+}
 
 type Props = {
   workspaces: Workspace[];
@@ -87,7 +99,7 @@ export function WorkspaceSettingsDialog(props: Props) {
         }}
       >
         <DialogHeader>
-          <DialogTitle>Workspace {ws?.title}</DialogTitle>
+          <DialogTitle><WorkspaceHeading ws={ws} /></DialogTitle>
         </DialogHeader>
         {ws && (
           <WorkspaceSettingsForm
@@ -389,8 +401,10 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
               value={titleValue}
               onChange={(e) => {
                 setTitleValue(e.target.value);
-                props.onSetTitle(ws.id, e.target.value.trim());
+                // An empty name (back to the default title) is saved on blur, not mid-typing.
+                if (e.target.value.trim()) props.onSetTitle(ws.id, e.target.value.trim());
               }}
+              onBlur={(e) => props.onSetTitle(ws.id, e.target.value.trim())}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { e.preventDefault(); cwdInputRef.current?.focus(); }
               }}

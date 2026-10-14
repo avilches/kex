@@ -35,7 +35,9 @@ function TemplateRow({ kind, pref, label, scope }: (typeof ROWS)[number]) {
   }, [hydrated, stored]);
 
   const commit = (next: string) => {
-    if (next.trim() !== stored) void setTitleTemplate(pref, next);
+    const trimmed = next.trim();
+    setValue(trimmed);
+    if (trimmed !== stored) void setTitleTemplate(pref, trimmed);
   };
 
   return (
@@ -47,7 +49,7 @@ function TemplateRow({ kind, pref, label, scope }: (typeof ROWS)[number]) {
         <button
           type="button"
           title="Reset to default"
-          disabled={!stored}
+          disabled={!stored && !value}
           onClick={() => {
             setValue("");
             void setTitleTemplate(pref, "");

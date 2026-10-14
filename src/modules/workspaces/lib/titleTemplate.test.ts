@@ -93,6 +93,40 @@ describe("conditional {?var text}", () => {
   });
 });
 
+describe("hostile and malformed templates", () => {
+  it("does not resolve inherited object properties as variables", () => {
+    expect(expandTitle("{constructor}", { dir: "d" })).toBe("{constructor}");
+    expect(expandTitle("{constructor|dir}", { dir: "d" })).toBe("{constructor|dir}");
+    expect(expandTitle("{?constructor x}", { dir: "d" })).toBe("{?constructor x}");
+  });
+
+  it("survives absurd nesting without throwing", () => {
+    const deep = `${"{osc|".repeat(20000)}x${"}".repeat(20000)}`;
+    expect(() => expandTitle(deep, { osc: "", dir: "d" })).not.toThrow();
+    const deepCond = `${"{?dir ".repeat(20000)}x${"}".repeat(20000)}`;
+    expect(() => expandTitle(deepCond, { dir: "d" })).not.toThrow();
+  });
+
+  it("expands what follows an unbalanced brace", () => {
+    expect(expandTitle("x { {dir}", { dir: "D" })).toBe("x { D");
+    expect(expandTitle("{a {dir}", { dir: "D" })).toBe("{a D");
+  });
+
+  it("expands variables inside text that merely looks like a group", () => {
+    expect(expandTitle('{"a": {dir}}', { dir: "D" })).toBe('{"a": D}');
+    expect(expandTitle("{foo bar}", { dir: "D" })).toBe("{foo bar}");
+  });
+
+  it("keeps a variable with spaces inside the braces literal, as before", () => {
+    expect(expandTitle("{ dir }", { dir: "D" })).toBe("{ dir }");
+  });
+
+  it("treats a blank value as empty for conditionals and fallbacks alike", () => {
+    expect(expandTitle("{?dir x}", { dir: "  " })).toBe("");
+    expect(expandTitle("{dir|file}", { dir: "  ", file: "f" })).toBe("f");
+  });
+});
+
 describe("titleVariablesUsed / hasTitleVariables", () => {
   it("lists variable names and ignores escaped braces", () => {
     expect([...titleVariablesUsed("{branch} {{cwd}} {dir}")].sort()).toEqual(["branch", "dir"]);

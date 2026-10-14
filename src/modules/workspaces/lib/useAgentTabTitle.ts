@@ -45,7 +45,7 @@ export function useAgentTabTitle(tab: Tab | null): AgentTabTitleInfo | null {
 }
 
 // The template that titles a tab right now: its own, else the default of its kind.
-export function effectiveTabTemplate(tab: Tab, hasAgent: boolean, defaults: TitleDefaults): string {
+function effectiveTabTemplate(tab: Tab, hasAgent: boolean, defaults: TitleDefaults): string {
   return tab.title || defaults[defaultKindFor(tab, hasAgent)];
 }
 
