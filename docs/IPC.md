@@ -150,6 +150,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_session_preview_cmd(tabId)` | Return `Option<RestorePlan>` for a single tab, computed live and read-only (never mutates `agent-sessions.json`). Used by the "Run on start" menu to preview the resume command that will actually run next launch, and by the blocked-start modal's "Try again" |
 | `check_launch_dir(path)` | Async (the filesystem checks run on `spawn_blocking`, so a slow mount does not stall the runtime). Return `Option<String>`: why `path` cannot be the working directory of a restored terminal (`Directory not found`, `Not a directory`, `Cannot access directory`), or `None` when it is fine |
 | `agent_session_set_snapshot(tabId, sessionId, title, notification)` | Store the tab name and the kind of its unread notification (`attention`, `finished`, `error`; empty or unknown clears it) in the tab's `agent-sessions.json` record. An empty `title` keeps the stored one. Scoped to the session the caller captured: returns `false` and writes nothing when the tab's record belongs to another `sessionId` (an in-flight flush of the previous session after `/clear` cannot land on the new one). Also returns `false` (and writes nothing) if the tab has no record yet, the file cannot be read or parsed, or the write fails, so the caller sends the tab again on its next change; skipped without writing when nothing changed. `RestorePlan` carries both back as `title` / `notification` |
+| `agent_queue_nav` | Store a pending OS-notification navigation target `{ window_label, workspace_id, tab_id }` with a 5-second TTL. Called by the frontend before sending an OS notification so that when the user clicks the notification and any main window gains focus, Rust can redirect to the correct window and emit `kex:activate-tab` to it. |
 | `float_browser_open(tabId, url, originWindowLabel, workspaceId)` | Open a floating `WebviewUrl::External` window for the given browser tab. If the window already exists, focuses it instead of opening a second one. State is inserted only after successful window build. |
 | `float_browser_close(tabId)` | Destroy the floating window without docking (no `kex:float-dock` event emitted). Removes from state unconditionally. |
 | `float_browser_focus(tabId)` | Bring the floating window to front via `set_focus`. |
@@ -195,3 +196,17 @@ Independent of agents, the PTY reader emits `kex:shell-ready` (`{ id }`, the PTY
 The socket is created in `session::spawn()` before the child process starts, so `KEX_IPC` is always set when the shell reads its environment. The socket file is removed when the `IpcGuard` drops (PTY session closed). The first time a socket path is built, `kex-ipc-<pid>-*.sock` files whose pid no longer exists (`kill(pid, 0)` returns ESRCH) are deleted; sockets of live pids are never touched.
 
 Hooks must be installed via "Set up Claude Code" (notification bell popover). See `docs/NOTIFICATIONS.md` for the detector state machine and `docs/AGENT_SESSION_RESTORE.md` for session persistence.
+
+### OS notification deep-link
+
+When the app is not focused and an agent event requires an OS notification, the frontend calls `agent_queue_nav` to register a navigation target before calling `sendNotification`. Rust stores it in `PendingNavState` (a `Mutex<Option<PendingNav>>`) with a 5-second TTL.
+
+On every `WindowEvent::Focused(true)` for a main window (`w-*` label), Rust checks for a fresh pending nav. If found, it:
+
+1. Focuses the target window via `WebviewWindow::set_focus()`.
+2. Emits `kex:activate-tab` to that window with payload `{ workspaceId, tabId }`.
+3. Clears the pending nav.
+
+Each main window's `App.tsx` listens for `kex:activate-tab` on startup (via `getCurrentWindow().listen(...)`) and calls `onActivateAgent(workspaceId, tabId)`, which switches the active workspace, activates the tab, and focuses the terminal with a 50 ms delay.
+
+**Limitation:** only the most recent navigation target is kept. If two agents finish while the app is unfocused, clicking either OS notification navigates to the panel of whichever agent finished last.

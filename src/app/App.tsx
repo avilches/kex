@@ -3340,6 +3340,24 @@ export default function App() {
     [setActiveWorkspaceId, onActivateTabStable, focusTab],
   );
 
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .listen<{ workspaceId: string; tabId: string }>(
+        "kex:activate-tab",
+        (e) => {
+          onActivateAgent(e.payload.workspaceId, e.payload.tabId);
+        },
+      )
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch((e) => console.error("[kex] kex:activate-tab listen failed:", e));
+    return () => {
+      unlisten?.();
+    };
+  }, [onActivateAgent]);
+
   // ── Native macOS menu wiring ──────────────────────────────────────────────
   // The menu (built in Rust) emits `kex:menu` with the item id; dispatch to the
   // same handlers the shortcuts use. Kept in a ref so the listener stays stable.

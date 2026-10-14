@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock Tauri APIs before importing the module under test
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: vi.fn(() => ({ label: "w-1" })),
+}));
 vi.mock("@tauri-apps/plugin-notification", () => ({
   isPermissionGranted: vi.fn(async () => true),
   requestPermission: vi.fn(async () => "granted"),
@@ -17,6 +21,7 @@ vi.mock("@/modules/agents/components/AgentToast", () => ({
 }));
 
 import { routeAgentNotification } from "@/modules/agents/lib/route";
+import { invoke } from "@tauri-apps/api/core";
 import { sendNotification } from "@tauri-apps/plugin-notification";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 
@@ -30,7 +35,7 @@ async function flushPromises(): Promise<void> {
 describe("routeAgentNotification", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("sends OS notification when app is not focused", async () => {
+  it("queues nav and sends OS notification when app is not focused", async () => {
     const pushNotification = vi.fn();
     vi.mocked(useAgentStore.getState).mockReturnValue({ pushNotification } as never);
 
@@ -50,6 +55,11 @@ describe("routeAgentNotification", () => {
 
     await flushPromises();
 
+    expect(invoke).toHaveBeenCalledWith("agent_queue_nav", {
+      windowLabel: "w-1",
+      workspaceId: "ws-abc",
+      tabId: "tab-xyz",
+    });
     expect(sendNotification).toHaveBeenCalledWith({
       title: "claude finished",
       body: "my-project",
@@ -59,7 +69,7 @@ describe("routeAgentNotification", () => {
     );
   });
 
-  it("does not send OS notification when focused and visible", async () => {
+  it("does not queue nav or send OS notification when focused and visible", async () => {
     routeAgentNotification({
       source: "terminal",
       agent: "claude",
@@ -73,6 +83,7 @@ describe("routeAgentNotification", () => {
 
     await flushPromises();
 
+    expect(invoke).not.toHaveBeenCalled();
     expect(sendNotification).not.toHaveBeenCalled();
   });
 
@@ -93,6 +104,7 @@ describe("routeAgentNotification", () => {
 
     await flushPromises();
 
+    expect(invoke).not.toHaveBeenCalled();
     expect(sendNotification).not.toHaveBeenCalled();
   });
 });

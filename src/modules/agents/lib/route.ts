@@ -1,7 +1,7 @@
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { showAgentToast } from "../components/AgentToast";
 import { useAgentStore } from "../store/agentStore";
-import { sendOsNotification } from "./notify";
+import { queueNavAndNotify } from "./notify";
 import type { AgentSource, NotificationKind } from "./types";
 
 type RouteArgs = {
@@ -39,7 +39,7 @@ export function routeAgentNotification({
   useAgentStore.getState().pushNotification({ source, agent, kind, workspaceId, tabId });
 
   if (!focused) {
-    void sendOsNotification({ title, body: body ?? agent });
+    void queueNavAndNotify({ workspaceId, tabId, title, body: body ?? agent });
     return;
   }
   if (allowToast) {

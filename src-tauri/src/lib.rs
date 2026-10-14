@@ -244,6 +244,20 @@ fn create_app_window(
             let mgr = app_handle.state::<window_state::WindowStateManager>();
             if matches!(event, WindowEvent::Focused(true)) {
                 mgr.set_focused_window(&win_label);
+                // Consume any pending OS-notification navigation and route to the target window.
+                // Only main windows (label starts with "w-") trigger this; settings window is ignored.
+                if win_label.starts_with("w-") {
+                    let nav_state = app_handle.state::<agent::PendingNavState>();
+                    if let Some(nav) = nav_state.take_if_fresh() {
+                        if let Some(target) = app_handle.get_webview_window(&nav.window_label) {
+                            let _ = target.set_focus();
+                            let _ = target.emit("kex:activate-tab", serde_json::json!({
+                                "workspaceId": nav.workspace_id,
+                                "tabId": nav.tab_id,
+                            }));
+                        }
+                    }
+                }
             }
             if let Some(w) = app_handle.get_webview_window(&win_label) {
                 let maximized = w.is_maximized().unwrap_or(false);
@@ -811,6 +825,7 @@ pub fn run() {
             }
             registry
         })
+        .manage(agent::PendingNavState::default())
         .manage(QuitGuard::default())
         .manage(LaunchDir(Mutex::new(cli_dir)))
         .manage(float_browser::FloatBrowserState::new())
@@ -909,6 +924,7 @@ pub fn run() {
             agent::agent_claude_hooks_status,
             agent::agent_detach_session,
             agent::agent_session_set_snapshot,
+            agent::pending_nav::agent_queue_nav,
             agent_session_restore_plan,
             agent_session_preview_cmd,
             check_launch_dir,
