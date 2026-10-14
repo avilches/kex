@@ -200,7 +200,8 @@ describe("WorkspaceDetailList subagents", () => {
     expect(rows().map((b) => rowName(b))).toEqual(["api", "web", "docs", "shell"]);
     const subs = subagentButtons(container);
     expect(subs.map((b) => b.textContent)).toEqual(["Scan the repo", "general-purpose"]);
-    expect(wrap(rows()[0]).nextElementSibling).toBe(subs[0]);
+    expect(wrap(rows()[0]).nextElementSibling).toBe(subs[0].parentElement);
+    expect(subs[0].parentElement).toBe(subs[1].parentElement);
     expect(subs[0].querySelector(".animate-spin")).not.toBeNull();
     unmount();
   });

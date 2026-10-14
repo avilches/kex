@@ -41,10 +41,12 @@ import {
 
 function SubagentRow({
   tabId,
+  agent,
   row,
   onActivate,
 }: {
   tabId: string;
+  agent: string | undefined;
   row: SubagentRowData;
   onActivate: (tabId: string) => void;
 }) {
@@ -55,12 +57,39 @@ function SubagentRow({
       title={row.label}
       aria-label={`Subagent: ${row.label}`}
       onClick={() => onActivate(tabId)}
-      className="flex h-6 w-full items-center gap-1.5 rounded-md pl-7 pr-1.5 text-left text-[11.5px] text-muted-foreground transition-colors select-none hover:bg-foreground/[0.08] hover:text-foreground"
+      className="flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] text-muted-foreground transition-colors select-none hover:bg-foreground/[0.08] hover:text-foreground"
     >
+      {agent && (
+        <span className="flex size-3.5 shrink-0 items-center justify-center">
+          <AgentIcon agent={agent} size={12} />
+        </span>
+      )}
       <span className="min-w-0 truncate">{row.label}</span>
       <span aria-hidden className="flex-1" />
       <Spinner size={11} />
     </button>
+  );
+}
+
+function SubagentGroup({
+  tabId,
+  agent,
+  subagents,
+  onActivate,
+}: {
+  tabId: string;
+  agent: string | undefined;
+  subagents: Parameters<typeof subagentRows>[0];
+  onActivate: (tabId: string) => void;
+}) {
+  const rows = subagentRows(subagents);
+  if (rows.length === 0) return null;
+  return (
+    <div className="ml-[15px] flex flex-col gap-px border-l border-border/60 pl-0.5">
+      {rows.map((sub) => (
+        <SubagentRow key={sub.id} tabId={tabId} agent={agent} row={sub} onActivate={onActivate} />
+      ))}
+    </div>
   );
 }
 
@@ -443,9 +472,12 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               onNoteHover={handleNoteHover}
               onNoteToggle={handleNoteToggle}
             />
-            {subagentRows(sessions[row.tabId]?.subagents).map((sub) => (
-              <SubagentRow key={sub.id} tabId={row.tabId} row={sub} onActivate={onActivate} />
-            ))}
+            <SubagentGroup
+              tabId={row.tabId}
+              agent={sessions[row.tabId]?.agent}
+              subagents={sessions[row.tabId]?.subagents}
+              onActivate={onActivate}
+            />
           </Fragment>
         ) : null;
       })}
