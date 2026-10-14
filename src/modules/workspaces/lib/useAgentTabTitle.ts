@@ -6,10 +6,12 @@ import {
   getOscTitle,
 } from "@/modules/terminal/lib/oscTitleStore";
 import { useDirGit } from "./dirGitStore";
-import { agentAwareTabTitle, tabTitle } from "./tabTitle";
+import { defaultKindFor, type TitleDefaults } from "./defaultTitles";
+import { tabTitle } from "./tabTitle";
 import { useSystemInfo } from "./systemInfoStore";
+import { useTitleDefaults } from "./titleDefaultsPrefs";
 import { titleVariablesUsed } from "./titleTemplate";
-import { expandTabTitle, tabDir, type TitleSources } from "./titleVars";
+import { tabDir, type TitleSources } from "./titleVars";
 import {
   getRunningCommand,
   subscribeToRunningCommands,
@@ -42,16 +44,27 @@ export function useAgentTabTitle(tab: Tab | null): AgentTabTitleInfo | null {
   return resolveAgentTabTitle(tab, runningCommand, oscTitle, agentSession, sources);
 }
 
-// Git is queried only for a tab whose own title asks for the branch or repo.
+// The template that titles a tab right now: its own, else the default of its kind.
+export function effectiveTabTemplate(tab: Tab, hasAgent: boolean, defaults: TitleDefaults): string {
+  return tab.title || defaults[defaultKindFor(tab, hasAgent)];
+}
+
+export function templateNeedsGit(template: string): boolean {
+  const used = titleVariablesUsed(template);
+  return used.has("branch") || used.has("repo");
+}
+
+// Git is queried only for a tab whose effective title asks for the branch or repo.
 export function useTitleSources(
   tab: Tab | null,
   agentSession: AgentSession | undefined,
 ): TitleSources {
   const sys = useSystemInfo();
-  const used = tab?.title ? titleVariablesUsed(tab.title) : null;
-  const needsGit = !!used && (used.has("branch") || used.has("repo"));
+  const defaults = useTitleDefaults();
+  const hasAgent = !!agentSession && tab?.kind === "terminal";
+  const needsGit = !!tab && templateNeedsGit(effectiveTabTemplate(tab, hasAgent, defaults));
   const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined);
-  return { git, agent: agentSession?.agent, home: sys.home, host: sys.host };
+  return { git, agent: agentSession?.agent, home: sys.home, host: sys.host, defaults };
 }
 
 export function resolveAgentTabTitle(
@@ -63,18 +76,13 @@ export function resolveAgentTabTitle(
 ): AgentTabTitleInfo {
   const hasAgent = !!agentSession && tab.kind === "terminal";
   const sessionTitle = agentSession?.meta?.sessionTitle;
-  const src = { ...sources, agent: sources?.agent ?? agentSession?.agent };
-  const baseTitle = tabTitle(tab, runningCommand, oscTitle, src);
-  const customTitle = expandTabTitle(tab, { ...src, runningCommand });
-  const displayTitle = agentAwareTabTitle(
-    tab,
-    hasAgent,
-    agentSession?.agent,
-    oscTitle,
-    sessionTitle,
-    baseTitle,
-    customTitle,
-  );
+  // The agent name only reaches the sources of an agent tab, which is what selects its default.
+  const src = {
+    ...sources,
+    agent: hasAgent ? (sources?.agent ?? agentSession?.agent) : undefined,
+    session: sessionTitle,
+  };
+  const displayTitle = tabTitle(tab, runningCommand, oscTitle, src);
   const isDescription = !!(tab.title || oscTitle || sessionTitle);
 
   return { displayTitle, isDescription, hasAgent, isRunning: !!runningCommand, agentSession };

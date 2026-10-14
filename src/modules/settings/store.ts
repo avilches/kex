@@ -214,6 +214,18 @@ export type Preferences = {
   workspaceDetailBrowsers: boolean;
   workspaceDetailGit: boolean;
   uiFont: string;
+  // Default title template for terminal; "" means the factory default.
+  titleTemplateTerminal: string;
+  // Default title template for agent; "" means the factory default.
+  titleTemplateAgent: string;
+  // Default title template for file; "" means the factory default.
+  titleTemplateFile: string;
+  // Default title template for browser; "" means the factory default.
+  titleTemplateBrowser: string;
+  // Default title template for gitHistory; "" means the factory default.
+  titleTemplateGitHistory: string;
+  // Default title template for workspace; "" means the factory default.
+  titleTemplateWorkspace: string;
 };
 
 const STORE_PATH = "settings-general.json";
@@ -236,6 +248,12 @@ const KEY_SPINNER_STYLE = "spinnerStyle";
 const KEY_AUTO_HIBERNATE = "autoHibernate";
 const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_UI_FONT = "uiFont";
+const KEY_TITLE_TEMPLATE_TERMINAL = "titleTemplateTerminal";
+const KEY_TITLE_TEMPLATE_AGENT = "titleTemplateAgent";
+const KEY_TITLE_TEMPLATE_FILE = "titleTemplateFile";
+const KEY_TITLE_TEMPLATE_BROWSER = "titleTemplateBrowser";
+const KEY_TITLE_TEMPLATE_GIT_HISTORY = "titleTemplateGitHistory";
+const KEY_TITLE_TEMPLATE_WORKSPACE = "titleTemplateWorkspace";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
@@ -462,6 +480,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   workspaceDetailBrowsers: true,
   workspaceDetailGit: true,
   uiFont: "",
+  titleTemplateTerminal: "",
+  titleTemplateAgent: "",
+  titleTemplateFile: "",
+  titleTemplateBrowser: "",
+  titleTemplateGitHistory: "",
+  titleTemplateWorkspace: "",
 };
 
 const PROSE_SEED_EXTS = ["md", "markdown", "mdx", "txt", "text"] as const;
@@ -777,6 +801,24 @@ export async function loadPreferences(): Promise<Preferences> {
       getGeneral<boolean>(KEY_WORKSPACE_DETAIL_GIT) ??
       DEFAULT_PREFERENCES.workspaceDetailGit,
     uiFont: getGeneral<string>(KEY_UI_FONT) ?? DEFAULT_PREFERENCES.uiFont,
+    titleTemplateTerminal:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_TERMINAL) ??
+      DEFAULT_PREFERENCES.titleTemplateTerminal,
+    titleTemplateAgent:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_AGENT) ??
+      DEFAULT_PREFERENCES.titleTemplateAgent,
+    titleTemplateFile:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_FILE) ??
+      DEFAULT_PREFERENCES.titleTemplateFile,
+    titleTemplateBrowser:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_BROWSER) ??
+      DEFAULT_PREFERENCES.titleTemplateBrowser,
+    titleTemplateGitHistory:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_GIT_HISTORY) ??
+      DEFAULT_PREFERENCES.titleTemplateGitHistory,
+    titleTemplateWorkspace:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_WORKSPACE) ??
+      DEFAULT_PREFERENCES.titleTemplateWorkspace,
   };
 
   // Persist JSON-only general keys so they're discoverable in settings-general.json.
@@ -1134,6 +1176,27 @@ export async function setUiFont(value: string): Promise<void> {
   await writePref(KEY_UI_FONT, value.trim());
 }
 
+export type TitleTemplatePref =
+  | "titleTemplateTerminal"
+  | "titleTemplateAgent"
+  | "titleTemplateFile"
+  | "titleTemplateBrowser"
+  | "titleTemplateGitHistory"
+  | "titleTemplateWorkspace";
+
+const TITLE_TEMPLATE_KEYS: Record<TitleTemplatePref, string> = {
+  titleTemplateTerminal: KEY_TITLE_TEMPLATE_TERMINAL,
+  titleTemplateAgent: KEY_TITLE_TEMPLATE_AGENT,
+  titleTemplateFile: KEY_TITLE_TEMPLATE_FILE,
+  titleTemplateBrowser: KEY_TITLE_TEMPLATE_BROWSER,
+  titleTemplateGitHistory: KEY_TITLE_TEMPLATE_GIT_HISTORY,
+  titleTemplateWorkspace: KEY_TITLE_TEMPLATE_WORKSPACE,
+};
+
+export async function setTitleTemplate(pref: TitleTemplatePref, value: string): Promise<void> {
+  await writePref(TITLE_TEMPLATE_KEYS[pref], value.trim());
+}
+
 function clampAutoSaveDelay(v: number): number {
   if (!Number.isFinite(v)) return 15000;
   return Math.min(60000, Math.max(100, Math.round(v)));
@@ -1267,6 +1330,12 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_WORKSPACE_DETAIL_BROWSERS]: "workspaceDetailBrowsers",
   [KEY_WORKSPACE_DETAIL_GIT]: "workspaceDetailGit",
   [KEY_UI_FONT]: "uiFont",
+  [KEY_TITLE_TEMPLATE_TERMINAL]: "titleTemplateTerminal",
+  [KEY_TITLE_TEMPLATE_AGENT]: "titleTemplateAgent",
+  [KEY_TITLE_TEMPLATE_FILE]: "titleTemplateFile",
+  [KEY_TITLE_TEMPLATE_BROWSER]: "titleTemplateBrowser",
+  [KEY_TITLE_TEMPLATE_GIT_HISTORY]: "titleTemplateGitHistory",
+  [KEY_TITLE_TEMPLATE_WORKSPACE]: "titleTemplateWorkspace",
 };
 
 export const TERMINAL_PREF_KEY_MAP: Record<string, PrefKey> = {

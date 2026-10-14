@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attachTab, workspaceForTab, workspaceTitleFromCwd } from "./tabTransfer";
+import { attachTab, workspaceForTab } from "./tabTransfer";
 import type { PaneNode, SplitNode, Tab, Workspace } from "./types";
 
 const tab = (id: string, extra: Partial<Extract<Tab, { kind: "terminal" }>> = {}): Tab => ({
@@ -24,18 +24,6 @@ const wsWith = (over: Partial<Workspace> = {}): Workspace => ({
 });
 
 const moved = tab("moved");
-
-describe("workspaceTitleFromCwd", () => {
-  it("uses the last path segment", () => {
-    expect(workspaceTitleFromCwd("/Users/me/Hub/Kex")).toBe("Kex");
-    expect(workspaceTitleFromCwd("C:\\Users\\me\\proj")).toBe("proj");
-  });
-
-  it("falls back to shell without a cwd", () => {
-    expect(workspaceTitleFromCwd(undefined)).toBe("shell");
-    expect(workspaceTitleFromCwd("/")).toBe("shell");
-  });
-});
 
 describe("attachTab with a pane placement", () => {
   it("appends to the end and activates the tab and its pane", () => {
@@ -146,19 +134,19 @@ describe("attachTab with the auto placement", () => {
 });
 
 describe("workspaceForTab", () => {
-  it("builds a workspace with the tab as its only tab, titled after the terminal cwd", () => {
+  it("builds a workspace with the tab as its only tab and an empty title", () => {
     const ws = workspaceForTab(tab("t", { cwd: "/Users/me/proj" }), { workspaceId: "w9", paneId: "p9" }, null);
-    expect(ws).toMatchObject({ id: "w9", title: "proj", cwd: "/Users/me/proj", color: null, activePaneId: "p9" });
+    expect(ws).toMatchObject({ id: "w9", title: "", cwd: "/Users/me/proj", color: null, activePaneId: "p9" });
     expect(ws.paneTree).toEqual(pane("p9", [tab("t", { cwd: "/Users/me/proj" })], "t"));
   });
 
-  it("uses shell and no cwd for a tab without a terminal cwd", () => {
+  it("has an empty title and no cwd for a tab without a terminal cwd", () => {
     const ws = workspaceForTab(
       { id: "e", kind: "editor", path: "/x/y.ts", dirty: false, preview: false },
       { workspaceId: "w9", paneId: "p9" },
       undefined,
     );
-    expect(ws.title).toBe("shell");
+    expect(ws.title).toBe("");
     expect(ws.cwd).toBeUndefined();
     expect(ws.color).toBeUndefined();
   });

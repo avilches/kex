@@ -1,7 +1,11 @@
+import { useAgentStore } from "@/modules/agents/store/agentStore";
+import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { getDirGit } from "./dirGitStore";
 import { getSystemInfo } from "./systemInfoStore";
 import { getRunningCommand } from "./terminalEphemeralStore";
+import { titleDefaultsNow } from "./titleDefaultsPrefs";
 import { expandTabTitle, tabDir } from "./titleVars";
+import { resolveAgentTabTitle } from "./useAgentTabTitle";
 import type { Tab } from "./types";
 
 // The user's own title for a tab, expanded from the stores at this instant. For callers
@@ -15,4 +19,17 @@ export function tabTitleNow(tab: Tab): string {
     home: sys.home,
     host: sys.host,
   });
+}
+
+// The title the tab shows, defaults included, read at this instant (drag ghost).
+export function tabDisplayTitleNow(tab: Tab): string {
+  const sys = getSystemInfo();
+  const terminal = tab.kind === "terminal";
+  return resolveAgentTabTitle(
+    tab,
+    terminal ? getRunningCommand(tab.id) : null,
+    terminal ? getOscTitle(tab.id) : undefined,
+    useAgentStore.getState().sessions[tab.id],
+    { git: getDirGit(tabDir(tab)), home: sys.home, host: sys.host, defaults: titleDefaultsNow() },
+  ).displayTitle;
 }

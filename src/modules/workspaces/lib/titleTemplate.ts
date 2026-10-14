@@ -20,14 +20,17 @@ export type TitleVariable = (typeof TITLE_VARIABLES)[number];
 export type TitleVars = Partial<Record<TitleVariable, string>>;
 
 // A template is parsed into text, variable groups ({a|b|c}) and conditionals
-// ({?var text}). `raw` is the source slice, re-emitted verbatim when the group names
-// something that is not a variable of the scope.
+// ({?var text}). An alternative of a group is a bare variable name or, when it has
+// anything else in it, a template of its own ({osc|{agent} - {dir}}). `raw` is the
+// source slice, re-emitted verbatim when the group names something that is not a
+// variable of the scope.
+type Alt = { name: string } | { nodes: Node[] };
 type Node =
   | { kind: "text"; text: string }
-  | { kind: "vars"; names: string[]; raw: string }
+  | { kind: "vars"; v: Alt[]; raw: string }
   | { kind: "cond"; name: string; body: Node[]; raw: string };
 
-const VARS = /^[a-z]+(\s*\|\s*[a-z]+)*$/;
+const BARE = /^[a-z]+$/;
 const COND = /^\?([a-z]+)([\s\S]*)$/;
 
 // `{{` and `}}` are literal braces at the top level only: inside a group every brace
@@ -65,19 +68,45 @@ function parse(src: string, nested: boolean): Node[] {
     const cond = COND.exec(inner);
     flush();
     if (cond) nodes.push({ kind: "cond", name: cond[1], body: parse(cond[2], true), raw });
-    else if (VARS.test(inner)) {
-      nodes.push({ kind: "vars", names: inner.split("|").map((n) => n.trim()), raw });
-    } else nodes.push({ kind: "text", text: raw });
+    else {
+      const parts = splitAlternatives(inner);
+      const single = parts.length === 1;
+      if (single && !BARE.test(inner.trim())) nodes.push({ kind: "text", text: raw });
+      else {
+        const v = parts.map((a): Alt => (BARE.test(a.trim()) ? { name: a.trim() } : { nodes: parse(a, true) }));
+        nodes.push({ kind: "vars", v, raw });
+      }
+    }
     i = j - 1;
   }
   flush();
   return nodes;
 }
 
+function splitAlternatives(inner: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i < inner.length; i++) {
+    if (inner[i] === "{") depth++;
+    else if (inner[i] === "}") depth--;
+    else if (inner[i] === "|" && depth === 0) {
+      parts.push(inner.slice(from, i));
+      from = i + 1;
+    }
+  }
+  parts.push(inner.slice(from));
+  return parts;
+}
+
 function collect(nodes: Node[], into: Set<string>) {
   for (const n of nodes) {
-    if (n.kind === "vars") for (const name of n.names) into.add(name);
-    else if (n.kind === "cond") {
+    if (n.kind === "vars") {
+      for (const a of n.v) {
+        if ("name" in a) into.add(a.name);
+        else collect(a.nodes, into);
+      }
+    } else if (n.kind === "cond") {
       into.add(n.name);
       collect(n.body, into);
     }
@@ -99,8 +128,12 @@ function render(nodes: Node[], vars: TitleVars): string {
     .map((n) => {
       if (n.kind === "text") return n.text;
       if (n.kind === "vars") {
-        if (n.names.some((name) => vars[name as TitleVariable] === undefined)) return n.raw;
-        return n.names.map((name) => vars[name as TitleVariable] as string).find(Boolean) ?? "";
+        if (n.v.some((a) => "name" in a && vars[a.name as TitleVariable] === undefined)) return n.raw;
+        for (const a of n.v) {
+          const value = "name" in a ? (vars[a.name as TitleVariable] as string) : render(a.nodes, vars);
+          if (value.trim()) return value;
+        }
+        return "";
       }
       const value = vars[n.name as TitleVariable];
       if (value === undefined) return n.raw;

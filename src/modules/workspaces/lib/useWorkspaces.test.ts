@@ -585,7 +585,7 @@ describe("applyMoveTabToWorkspace", () => {
     );
     expect(out.map((w) => w.id)).toEqual(["src", "wn", "dst"]);
     const created = out[1]!;
-    expect(created).toMatchObject({ title: "proj", cwd: "/Users/me/proj", groupId: "g1", color: null, activePaneId: "pn" });
+    expect(created).toMatchObject({ title: "", cwd: "/Users/me/proj", groupId: "g1", color: null, activePaneId: "pn" });
     expect(created.paneTree).toMatchObject({ kind: "pane", id: "pn", activeTabId: "t1" });
   });
 });

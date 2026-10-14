@@ -51,6 +51,22 @@ describe("fallback {a|b|c}", () => {
   });
 });
 
+describe("template alternatives", () => {
+  it("uses a template alternative when the variables before it are empty", () => {
+    const t = "{osc|session|{agent} · {dir}}";
+    expect(expandTitle(t, { osc: "", session: "", agent: "claude", dir: "kex" })).toBe("claude · kex");
+    expect(expandTitle(t, { osc: "work", session: "", agent: "claude", dir: "kex" })).toBe("work");
+  });
+
+  it("leaves a group with one non-variable alternative literal", () => {
+    expect(expandTitle("{foo bar}", { dir: "d" })).toBe("{foo bar}");
+  });
+
+  it("does not split on a bar inside a nested group", () => {
+    expect(expandTitle("{cmd|{osc|dir}}", { cmd: "", osc: "", dir: "d" })).toBe("d");
+  });
+});
+
 describe("conditional {?var text}", () => {
   it("renders the text only when the variable is not empty", () => {
     const t = "{dir}{?branch · {branch}}";
