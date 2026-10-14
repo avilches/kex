@@ -223,7 +223,7 @@ function DetailTabRow({
               </span>
               <span
                 className={cn(
-                  "min-w-0 flex-1 truncate",
+                  "min-w-0 truncate",
                   (tab.kind === "editor" || tab.kind === "git-diff" || tab.kind === "git-commit-file") &&
                     tab.preview &&
                     "italic",
@@ -240,6 +240,7 @@ function DetailTabRow({
                   <HugeiconsIcon icon={CrosshairIcon} size={12} strokeWidth={2} />
                 </span>
               )}
+              <span aria-hidden className="flex-1" />
               <span aria-hidden className="size-[16px] shrink-0" />
               {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
             </button>
