@@ -185,6 +185,53 @@ describe("WorkspaceDetailList kind icons", () => {
   });
 });
 
+describe("WorkspaceDetailList subagents", () => {
+  const subagentButtons = (c: Element) =>
+    Array.from(c.querySelectorAll<HTMLButtonElement>("button[data-subagent-row]"));
+
+  it("lists the subagents of an agent tab under its row, labelled and in start order", () => {
+    const { container, rows, unmount } = mount({ terminals: "all" });
+    act(() =>
+      useAgentStore.getState().reconcileSubagents("t-work", [
+        { id: "a1", agentType: "Explore", description: "Scan the repo" },
+        { id: "a2", agentType: "general-purpose", description: "" },
+      ]),
+    );
+    expect(rows().map((b) => rowName(b))).toEqual(["api", "web", "docs", "shell"]);
+    const subs = subagentButtons(container);
+    expect(subs.map((b) => b.textContent)).toEqual(["Scan the repo", "general-purpose"]);
+    expect(wrap(rows()[0]).nextElementSibling).toBe(subs[0]);
+    expect(subs[0].querySelector(".animate-spin")).not.toBeNull();
+    unmount();
+  });
+
+  it("removes a row when its subagent stops", () => {
+    const { container, unmount } = mount({ terminals: "all" });
+    act(() =>
+      useAgentStore
+        .getState()
+        .reconcileSubagents("t-work", [{ id: "a1", agentType: "Explore", description: "" }]),
+    );
+    expect(subagentButtons(container)).toHaveLength(1);
+    act(() => useAgentStore.getState().subagentStopped("t-work", "a1"));
+    expect(subagentButtons(container)).toHaveLength(0);
+    unmount();
+  });
+
+  it("activates the parent tab on click and has no close control of its own", () => {
+    const { container, onActivate, unmount } = mount({ terminals: "all" });
+    act(() =>
+      useAgentStore
+        .getState()
+        .reconcileSubagents("t-work", [{ id: "a1", agentType: "Explore", description: "" }]),
+    );
+    expect(container.querySelectorAll('button[aria-label="Close tab"]')).toHaveLength(4);
+    act(() => subagentButtons(container)[0].click());
+    expect(onActivate).toHaveBeenCalledWith("t-work");
+    unmount();
+  });
+});
+
 describe("WorkspaceDetailList context menu", () => {
   const actions = {
     paneTabCount: () => 3,

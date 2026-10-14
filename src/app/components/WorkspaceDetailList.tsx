@@ -4,7 +4,7 @@ import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { PopoverAnchor } from "@/components/ui/popover";
@@ -34,8 +34,34 @@ import { TabRenamePopover } from "@/modules/workspaces/TabRenamePopover";
 import {
   type DetailFilter,
   type DetailRow,
+  type SubagentRow as SubagentRowData,
+  subagentRows,
   workspaceDetailRows,
 } from "@/modules/workspaces/lib/workspaceDetail";
+
+function SubagentRow({
+  tabId,
+  row,
+  onActivate,
+}: {
+  tabId: string;
+  row: SubagentRowData;
+  onActivate: (tabId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-subagent-row=""
+      title={row.label}
+      onClick={() => onActivate(tabId)}
+      className="flex h-6 w-full items-center gap-1.5 rounded-md pl-7 pr-1.5 text-left text-[11.5px] text-muted-foreground transition-colors select-none hover:bg-foreground/[0.08] hover:text-foreground"
+    >
+      <span className="min-w-0 truncate">{row.label}</span>
+      <span aria-hidden className="flex-1" />
+      <Spinner size={11} />
+    </button>
+  );
+}
 
 function StatusMark({ visual }: { visual: DetailRow["visual"] }) {
   if (visual === "working") {
@@ -403,19 +429,23 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
       {rows.map((row, i) => {
         const tab = tabsById.get(row.tabId);
         return tab ? (
-          <DetailTabRow
-            key={row.tabId}
-            tab={tab}
-            workspaceId={workspaceId}
-            visual={row.visual}
-            focused={row.tabId === focusedTabId}
-            color={color}
-            prevTabId={rows[i - 1]?.tabId ?? null}
-            insertSide={insert?.tabId === row.tabId ? insert.side : null}
-            onActivate={onActivate}
-            onNoteHover={handleNoteHover}
-            onNoteToggle={handleNoteToggle}
-          />
+          <Fragment key={row.tabId}>
+            <DetailTabRow
+              tab={tab}
+              workspaceId={workspaceId}
+              visual={row.visual}
+              focused={row.tabId === focusedTabId}
+              color={color}
+              prevTabId={rows[i - 1]?.tabId ?? null}
+              insertSide={insert?.tabId === row.tabId ? insert.side : null}
+              onActivate={onActivate}
+              onNoteHover={handleNoteHover}
+              onNoteToggle={handleNoteToggle}
+            />
+            {subagentRows(sessions[row.tabId]?.subagents).map((sub) => (
+              <SubagentRow key={sub.id} tabId={row.tabId} row={sub} onActivate={onActivate} />
+            ))}
+          </Fragment>
         ) : null;
       })}
       {previewTab && previewTab.note !== undefined && !visibleSet.has(previewTab.id) &&
