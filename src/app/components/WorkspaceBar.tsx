@@ -439,7 +439,7 @@ function SortableWorkspaceItem({
                 />
               )}
               <span className="truncate">{shownTitle || ws.kind}</span>
-              {ws.hibernated && <span aria-hidden className={cn("size-[13px] shrink-0", agentCount === 0 && "ml-auto")} />}
+              {ws.hibernated && <span aria-hidden className="ml-auto size-[13px] shrink-0" />}
               {agentCount > 0 && (
                 <span
                   title={`${agentCount} active ${agentCount === 1 ? "agent" : "agents"}`}
