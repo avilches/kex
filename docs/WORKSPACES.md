@@ -104,7 +104,7 @@ moved up keeps everything, one that moved down keeps what is still under it and 
 keeps nothing. A root change inside a session carries the open
 folders over through the same rule (`carryOverExpanded`, which also opens the previous root), with no
 per-root memory: what a move down dropped does not come back on the way up. Saving goes through a
-10 s coalescer, flushed before anything that remounts the explorer. The details (selection and
+10 s coalescer, flushed before opening, closing or moving the Sidebar and, on a workspace switch, right after the switch has rendered (an effect cleanup, so it runs after the explorer remounted, not before). The details (selection and
 scroll while folders load, reveal requests, flush points) are in the paragraph "Sidebar view state
 per workspace" of [ARCHITECTURE.md](ARCHITECTURE.md).
 
