@@ -35,7 +35,7 @@ Todo el calculo vive en funciones puras testeables; los componentes quedan finos
 
 | Pieza | Que es | Donde |
 |---|---|---|
-| `tabUse` | Mapa `tabId -> epoch ms` del ultimo uso, en `localStorage` como `mru.ts`. API: `recordTabUse(tabId)`, `tabUseSnapshot()`, `pruneTabUse(liveIds)`. Tope de 300 entradas. | `command-palette/lib/tabUse.ts` |
+| `tabUse` | Mapa `tabId -> epoch ms` del ultimo uso, en `localStorage` como `mru.ts`. API: `recordTabUse(tabId)`, `tabUseSnapshot()`, `pruneTabUse(liveIds)`. Tope de 300 entradas. Vive en el modulo de workspaces, no en la paleta, porque quien sella es `activateTab`; la paleta solo lo lee. | `workspaces/lib/tabUse.ts` |
 | `buildTabEntries` | Dado workspaces, fuentes de titulo (rama, comando, agente), estados de agente y el snapshot de uso, devuelve una lista plana de `TabEntry`. Funcion pura. | `command-palette/lib/tabEntries.ts` |
 | `rankTabEntries` | Dado entradas, termino y snapshot, devuelve las entradas ordenadas. Sin termino devuelve los 8 recientes. Funcion pura. | `command-palette/lib/tabRank.ts` |
 | `buildActionCatalog` | Sustituye a la lista a mano de `commands.ts`: genera las acciones a partir de `SHORTCUTS` mas las que no tienen atajo, y las filas de Settings a partir de la lista de secciones. | `command-palette/commands.ts` |
