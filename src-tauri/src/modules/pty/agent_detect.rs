@@ -1,11 +1,11 @@
+use crate::modules::agent::launch_cmd::{find_agent_invocation, DEFAULT_AGENTS};
+
 const ESC: u8 = 0x1b;
 const BEL: u8 = 0x07;
 const OSC_INTRO: u8 = b']';
 const ST_FINAL: u8 = b'\\';
 
 const OSC_MAX: usize = 4096;
-
-const DEFAULT_AGENTS: &[&str] = &["claude", "codex"];
 
 // OSC 777;kex;<event>;<tab_id>;<session_id>;<transcript_path>;<cwd>[;<extra...>]
 const KEX_UNIFIED_MARKER: &[u8] = b"kex;";
@@ -118,16 +118,6 @@ impl Transition {
                 unreachable!("ShellReady is handled before into_signal"),
         }
     }
-}
-
-fn is_print_mode(cmd: &[u8]) -> bool {
-    let s = match std::str::from_utf8(cmd) {
-        Ok(s) => s,
-        Err(_) => return false,
-    };
-    s.split_whitespace()
-        .skip(1) // skip binary name
-        .any(|t| t == "-p" || t == "--print")
 }
 
 pub struct AgentDetector {
@@ -396,19 +386,20 @@ impl AgentDetector {
                 }
             }
             Some(b'C') => {
-                let cmd = pt.strip_prefix(b"C;").unwrap_or(b"");
-                if is_print_mode(cmd) {
-                    log::debug!("[shell] osc133 C: skip arm (print mode) cmd={}", String::from_utf8_lossy(cmd));
+                let line = String::from_utf8_lossy(pt.strip_prefix(b"C;").unwrap_or(b""));
+                let Some(inv) = find_agent_invocation(&line, &self.agents) else { return };
+                if inv.is_print_mode() {
+                    log::debug!("[shell] osc133 C: skip arm (print mode) cmd={line}");
                     return;
                 }
-                if let Some(agent) = self.match_agent(cmd) {
-                    let cmd_string = String::from_utf8_lossy(cmd).into_owned();
-                    log::debug!("[shell] osc133 C: armed agent={agent} cmd={cmd_string}");
-                    self.armed = true;
-                    self.status = Status::Idle;
-                    self.current_agent = agent.clone();
-                    emit(Transition::Started { agent, cmd_string });
-                }
+                // A cut line still names the agent, but replaying its text would be wrong.
+                let cmd_string = if inv.complete { inv.command() } else { String::new() };
+                let agent = inv.agent;
+                log::debug!("[shell] osc133 C: armed agent={agent} cmd={cmd_string}");
+                self.armed = true;
+                self.status = Status::Idle;
+                self.current_agent = agent.clone();
+                emit(Transition::Started { agent, cmd_string });
             }
             Some(b'D') if self.armed => {
                 log::debug!("[shell] osc133 D: exited");
@@ -434,23 +425,6 @@ impl AgentDetector {
             self.status = Status::Waiting;
             emit(Transition::Notification { message: String::new() });
         }
-    }
-
-    fn match_agent(&self, cmd: &[u8]) -> Option<String> {
-        let cmd = std::str::from_utf8(cmd).ok()?;
-        for token in cmd.split_whitespace() {
-            if token.starts_with('-') {
-                continue;
-            }
-            let base = token.rsplit(['/', '\\']).next().unwrap_or(token);
-            if let Some(agent) = self.agents.iter().find(|a| {
-                base.strip_prefix(a.as_str())
-                    .is_some_and(|rest| rest.is_empty() || rest.starts_with('-'))
-            }) {
-                return Some(agent.clone());
-            }
-        }
-        None
     }
 }
 
@@ -535,6 +509,57 @@ mod tests {
         assert_eq!(
             run(&mut d2, &osc("133;C;npx claude")),
             vec![started_cmd("claude", "npx claude")]
+        );
+    }
+
+    #[test]
+    fn stashes_only_the_agent_segment_of_a_retry_line() {
+        let mut d = AgentDetector::new();
+        assert_eq!(
+            run(&mut d, &osc("133;C; cd '/a b' && claude-max --resume 'x'")),
+            vec![started_cmd("claude", "claude-max --resume 'x'")]
+        );
+    }
+
+    #[test]
+    fn stashes_assignments_and_drops_grouping() {
+        let mut d = AgentDetector::new();
+        assert_eq!(
+            run(&mut d, &osc("133;C;(cd /tmp && FOO=1 claude --safe-mode)")),
+            vec![started_cmd("claude", "FOO=1 claude --safe-mode")]
+        );
+    }
+
+    #[test]
+    fn arms_but_stashes_nothing_when_the_line_was_cut() {
+        let mut d = AgentDetector::new();
+        let cut = format!("133;C;claude --append-system-prompt '{}", "x".repeat(300));
+        assert_eq!(run(&mut d, &osc(&cut)), vec![started("claude")]);
+        let mut d2 = AgentDetector::new();
+        assert_eq!(run(&mut d2, &osc("133;C;claude --add-dir /a\\")), vec![started("claude")]);
+    }
+
+    #[test]
+    fn does_not_arm_on_shell_dependent_quoting() {
+        let mut d = AgentDetector::new();
+        assert!(run(&mut d, &osc("133;C;claude --name 'it\\'s' ; rm -rf y")).is_empty());
+    }
+
+    #[test]
+    fn does_not_arm_when_the_agent_is_only_an_argument() {
+        let mut d = AgentDetector::new();
+        assert!(run(&mut d, &osc("133;C;cd ~/claude-docs")).is_empty());
+        assert!(run(&mut d, &osc("133;C;cd ~/Projects/claude")).is_empty());
+        assert!(run(&mut d, &osc("133;C;echo claude")).is_empty());
+    }
+
+    #[test]
+    fn print_mode_is_checked_on_the_agent_segment_only() {
+        let mut d = AgentDetector::new();
+        assert!(run(&mut d, &osc("133;C;cd x && claude -p hi")).is_empty());
+        assert_eq!(
+            run(&mut d, &osc("133;C;ls -p; claude --safe-mode")),
+            vec![started_cmd("claude", "claude --safe-mode")]
         );
     }
 
