@@ -4,6 +4,8 @@ use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
+use super::launch_cmd::{self, find_agent_invocation};
+
 static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 // Per-tab pending launch command, stashed by the PTY reader when OSC 133;C fires
@@ -150,10 +152,8 @@ fn read_launch_cwd_from_jsonl(jsonl: &PathBuf) -> Option<String> {
 
 /// True when the original invocation was non-interactive (`-p` / `--print`).
 /// Such sessions are never persisted.
-pub fn is_print_mode_cmd(cmd: &str) -> bool {
-    cmd.split_whitespace()
-        .skip(1) // skip binary name
-        .any(|t| t == "-p" || t == "--print")
+pub fn is_print_mode_cmd(cmd: &str, agent: &str) -> bool {
+    launch_cmd::is_print_mode(cmd, agent)
 }
 
 /// Whitelist-based arg stripper for session restore.
@@ -162,10 +162,9 @@ pub fn is_print_mode_cmd(cmd: &str) -> bool {
 /// auth/permission settings, model/effort, tool allow-lists, add-dirs, MCP config, etc.
 /// One-time flags (--worktree, --from-pr, --tmux) and print-mode flags are dropped.
 ///
-/// Limitation: does not handle shell-quoted values with internal whitespace
-/// (e.g. --system-prompt "hello world" splits into two tokens). This covers the
-/// overwhelming majority of real invocations.
-fn strip_for_resume_base(cmd: &str) -> String {
+/// Tokens keep their quotes, so a quoted value with spaces stays one value. Assignments and
+/// wrappers before the launcher (`FOO=1 claude`, `env X=1 claude-max`) are kept as written.
+fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
     // Boolean flags — keep as-is, no following value token.
     const KEEP_FLAGS: &[&str] = &[
         "--allow-dangerously-skip-permissions",
@@ -202,14 +201,19 @@ fn strip_for_resume_base(cmd: &str) -> String {
         "--betas",
     ];
 
-    let tokens: Vec<&str> = cmd.split_whitespace().collect();
-    if tokens.is_empty() {
-        return String::new();
-    }
-    let mut result = vec![tokens[0]]; // always keep binary name
-    let mut i = 1;
+    // A record written before the launch line was reduced to the agent segment can still
+    // carry `cd dir && claude ...`; reducing it again here heals it on read.
+    let inv = find_agent_invocation(cmd, &[agent.to_string()])?;
+    let tokens: Vec<&str> = inv.args.iter().map(String::as_str).collect();
+    let mut result: Vec<&str> = inv.head.iter().map(String::as_str).collect();
+    let mut i = 0;
     while i < tokens.len() {
         let token = tokens[i];
+        if is_redirection(token) {
+            // A bare operator (`>`, `2>>`) takes the next token as its target.
+            i += if token.trim_start_matches(|c: char| c.is_ascii_digit()).trim_start_matches(['<', '>', '&']).is_empty() { 2 } else { 1 };
+            continue;
+        }
         let (flag, has_eq) = match token.find('=') {
             Some(pos) => (&token[..pos], true),
             None => (token, false),
@@ -224,7 +228,7 @@ fn strip_for_resume_base(cmd: &str) -> String {
             i += 1;
             if !has_eq {
                 // Consume all immediately-following non-flag tokens as values.
-                while i < tokens.len() && !tokens[i].starts_with('-') {
+                while i < tokens.len() && !tokens[i].starts_with('-') && !is_redirection(tokens[i]) {
                     result.push(tokens[i]);
                     i += 1;
                 }
@@ -233,11 +237,16 @@ fn strip_for_resume_base(cmd: &str) -> String {
         }
         // Not in whitelist: skip this token (and any orphaned non-flag value that follows).
         i += 1;
-        while i < tokens.len() && !tokens[i].starts_with('-') {
+        while i < tokens.len() && !tokens[i].starts_with('-') && !is_redirection(tokens[i]) {
             i += 1;
         }
     }
-    result.join(" ")
+    Some(result.join(" "))
+}
+
+fn is_redirection(token: &str) -> bool {
+    let rest = token.trim_start_matches(|c: char| c.is_ascii_digit());
+    rest.starts_with(['<', '>']) || rest.starts_with("&>")
 }
 
 // Returns only the agent command. The frontend spawns the PTY with plan.cwdLaunch as the
@@ -291,11 +300,8 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
         // new session produces messages.
         let (cwd_launch, cmd) = if let Some(ref j) = jsonl {
             let cwd_launch = read_launch_cwd_from_jsonl(j).unwrap_or_else(|| record.cwd_launch.clone());
-            let cmd = match record.launch_cmd.as_deref() {
-                Some(lc) => {
-                    let base = strip_for_resume_base(lc);
-                    format!("{base} --resume {}", shell_quote(&record.session_id))
-                }
+            let cmd = match record.launch_cmd.as_deref().and_then(|lc| strip_for_resume_base(lc, &agent)) {
+                Some(base) => format!("{base} --resume {}", shell_quote(&record.session_id)),
                 None => resume_cmd_for_agent(&agent, &record.session_id),
             };
             (cwd_launch, cmd)
@@ -306,11 +312,8 @@ fn build_plans_from(tabs: HashMap<String, SessionRecord>, store_path: Option<&Pa
                 record.session_id
             );
             let cwd_launch = record.cwd_launch.clone();
-            let cmd = match record.launch_cmd.as_deref() {
-                Some(lc) => {
-                    let base = strip_for_resume_base(lc);
-                    format!("{base} --session-id {}", shell_quote(&record.session_id))
-                }
+            let cmd = match record.launch_cmd.as_deref().and_then(|lc| strip_for_resume_base(lc, &agent)) {
+                Some(base) => format!("{base} --session-id {}", shell_quote(&record.session_id)),
                 None => reattach_cmd_for_agent(&agent, &record.session_id),
             };
             (cwd_launch, cmd)
@@ -387,7 +390,7 @@ pub fn record_session(tab_id: &str, agent: &str, session_id: &str, transcript_pa
 
 fn record_session_at_path(path: &PathBuf, tab_id: &str, agent: &str, session_id: &str, transcript_path: &str, cwd_launch: &str) {
     let launch_cmd = take_stashed_cmd(tab_id);
-    if launch_cmd.as_deref().is_some_and(is_print_mode_cmd) {
+    if launch_cmd.as_deref().is_some_and(|c| is_print_mode_cmd(c, agent)) {
         log::info!("[agent-session] skip record: print-mode session tab={tab_id}");
         return;
     }
@@ -626,50 +629,50 @@ mod tests {
 
     #[test]
     fn is_print_mode_detects_p_flag() {
-        assert!(is_print_mode_cmd("claude -p hello"));
-        assert!(is_print_mode_cmd("claude --print"));
-        assert!(is_print_mode_cmd("claude --model opus -p"));
-        assert!(!is_print_mode_cmd("claude --model opus"));
-        assert!(!is_print_mode_cmd("claude"));
+        assert!(is_print_mode_cmd("claude -p hello", "claude"));
+        assert!(is_print_mode_cmd("claude --print", "claude"));
+        assert!(is_print_mode_cmd("claude --model opus -p", "claude"));
+        assert!(!is_print_mode_cmd("claude --model opus", "claude"));
+        assert!(!is_print_mode_cmd("claude", "claude"));
     }
 
     #[test]
     fn strip_keeps_whitelisted_flags() {
         // --model and --effort are NOT kept (configurable in-session via /model)
-        let base = strip_for_resume_base("claude --model opus --effort high --safe-mode");
+        let base = strip_for_resume_base("claude --model opus --effort high --safe-mode", "claude").unwrap();
         assert_eq!(base, "claude --safe-mode");
     }
 
     #[test]
     fn strip_removes_non_whitelisted_flags() {
-        let base = strip_for_resume_base("claude --model opus --worktree my-branch --effort high");
+        let base = strip_for_resume_base("claude --model opus --worktree my-branch --effort high", "claude").unwrap();
         assert_eq!(base, "claude");
     }
 
     #[test]
     fn strip_removes_flag_with_value() {
         // --debug-file has a value; both flag and value should be dropped
-        let base = strip_for_resume_base("claude --model opus --debug-file /tmp/out.log --effort high");
+        let base = strip_for_resume_base("claude --model opus --debug-file /tmp/out.log --effort high", "claude").unwrap();
         assert_eq!(base, "claude");
     }
 
     #[test]
     fn strip_keeps_add_dir_multiple_values() {
-        let base = strip_for_resume_base("claude --add-dir /a /b --model opus");
+        let base = strip_for_resume_base("claude --add-dir /a /b --model opus", "claude").unwrap();
         assert_eq!(base, "claude --add-dir /a /b");
     }
 
     #[test]
     fn strip_handles_eq_form() {
         // --model=opus and --effort=high are dropped (in-session configurable)
-        let base = strip_for_resume_base("claude --model=opus --effort=high");
+        let base = strip_for_resume_base("claude --model=opus --effort=high", "claude").unwrap();
         assert_eq!(base, "claude");
     }
 
     #[test]
     fn resume_cmd_from_launch_cmd_strips_and_adds_resume() {
         let lc = "claude --model opus --worktree feat -p";
-        let base = strip_for_resume_base(lc);
+        let base = strip_for_resume_base(lc, "claude").unwrap();
         let cmd = format!("{base} --resume {}", shell_quote("abc-123"));
         // --worktree, -p, --model all removed; --resume added
         assert_eq!(cmd, "claude --resume 'abc-123'");
@@ -678,7 +681,7 @@ mod tests {
     #[test]
     fn reattach_from_launch_cmd_uses_session_id() {
         let lc = "claude --model opus --safe-mode";
-        let base = strip_for_resume_base(lc);
+        let base = strip_for_resume_base(lc, "claude").unwrap();
         let cmd = format!("{base} --session-id {}", shell_quote("abc-123"));
         // --model dropped; --safe-mode kept
         assert_eq!(cmd, "claude --safe-mode --session-id 'abc-123'");
@@ -715,6 +718,72 @@ mod tests {
         assert_eq!(plan.tab_id, "tab-1");
         assert_eq!(plan.resume_cmd, "claude --safe-mode --resume 'abc-123'");
         assert_eq!(plan.error_reason, "");
+    }
+
+    #[test]
+    fn strip_heals_a_launch_cmd_stored_with_the_cd_prefix() {
+        let lc = " cd '/Users/x/Application Support/Taxes' && claude --resume 'old-id'";
+        assert_eq!(strip_for_resume_base(lc, "claude").as_deref(), Some("claude"));
+        let lc = " cd '/x' && claude-max --resume 'old-id'";
+        assert_eq!(strip_for_resume_base(lc, "claude").as_deref(), Some("claude-max"));
+    }
+
+    #[test]
+    fn strip_keeps_assignments_and_wrappers_before_the_launcher() {
+        let base = strip_for_resume_base("FOO=1 env BAR=2 claude-max --model opus --safe-mode", "claude");
+        assert_eq!(base.as_deref(), Some("FOO=1 env BAR=2 claude-max --safe-mode"));
+    }
+
+    #[test]
+    fn strip_keeps_a_quoted_value_with_spaces_whole() {
+        let base = strip_for_resume_base("claude --append-system-prompt 'hello world' --model opus", "claude");
+        assert_eq!(base.as_deref(), Some("claude --append-system-prompt 'hello world'"));
+    }
+
+    #[test]
+    fn strip_drops_redirections_and_does_not_eat_them_as_values() {
+        let base = strip_for_resume_base("claude --add-dir /a 2>/dev/null", "claude");
+        assert_eq!(base.as_deref(), Some("claude --add-dir /a"));
+        let base = strip_for_resume_base("claude --safe-mode > out.log --add-dir /a", "claude");
+        assert_eq!(base.as_deref(), Some("claude --safe-mode --add-dir /a"));
+    }
+
+    #[test]
+    fn strip_returns_none_when_no_agent_is_launched() {
+        assert_eq!(strip_for_resume_base("cd ~/claude-docs", "claude"), None);
+        assert_eq!(strip_for_resume_base("", "claude"), None);
+    }
+
+    #[test]
+    fn preview_resume_cmd_from_path_heals_a_contaminated_launch_cmd() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd_launch = dir.path().join("project");
+        std::fs::create_dir_all(&cwd_launch).unwrap();
+        let jsonl = dir.path().join("session.jsonl");
+        std::fs::write(&jsonl, format!("{{\"cwd\":\"{}\"}}\n", cwd_launch.display())).unwrap();
+
+        let mut tabs = HashMap::new();
+        tabs.insert("tab-1".to_string(), SessionRecord {
+            agent: Some("claude".to_string()),
+            session_id: "abc-123".to_string(),
+            cwd_launch: cwd_launch.display().to_string(),
+            transcript_path: jsonl.display().to_string(),
+            launch_cmd: Some(" cd '/somewhere' && claude-max --resume 'abc-123'".to_string()),
+            title: None,
+            notification: None,
+            updated_at: 0,
+        });
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, tabs);
+
+        let plan = preview_resume_cmd_from_path("tab-1", &store_path).expect("plan for known tab");
+        assert_eq!(plan.resume_cmd, "claude-max --resume 'abc-123'");
+    }
+
+    #[test]
+    fn print_mode_is_decided_on_the_agent_segment() {
+        assert!(is_print_mode_cmd("cd x && claude -p hi", "claude"));
+        assert!(!is_print_mode_cmd("time -p claude", "claude"));
     }
 
     #[test]
