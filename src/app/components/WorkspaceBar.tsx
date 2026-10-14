@@ -75,8 +75,6 @@ import { useGroupRenameStore } from "@/modules/workspaces/lib/groupRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
 import { getShortcutLabel } from "@/modules/shortcuts/shortcuts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { AutoHibernateCountdown } from "./AutoHibernateCountdown";
-import { autoHibernateDelayMs } from "@/modules/workspaces/lib/autoHibernate";
 import {
   groupDropId,
   groupIdFromGroupId,
@@ -279,10 +277,6 @@ function SortableWorkspaceItem({
   const expanded = showDetail && !!ws.detailExpanded && !ws.hibernated;
   const agentCount = activeAgentCount(agentEntries);
 
-  const autoHibernate = usePreferencesStore((s) => s.autoHibernate);
-  const showCountdown =
-    !active && !ws.hibernated && !compact && autoHibernateDelayMs(autoHibernate) !== null;
-
   const sideControl =
     "absolute top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
@@ -447,7 +441,6 @@ function SortableWorkspaceItem({
                   {agentCount}
                 </span>
               )}
-              {showCountdown && <AutoHibernateCountdown workspaceId={ws.id} mode={autoHibernate} />}
               {agentSpacer}
             </>
           )}

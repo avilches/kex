@@ -297,16 +297,11 @@ fails. The same guard applies to every save path (manual save reports it as a to
 unmount flush skip the write and the unmount carries the buffer in memory instead). `requestAuto` never opens `HibernateDialog`; anything else leaves the workspace
 awake until the next check.
 
-Each non-active, awake chip in the expanded WorkspaceBar shows a muted countdown to its
-auto-hibernate (`AutoHibernateCountdown`, in the title row right before the agent indicator's reserved space, so it never overlaps it), computed from `activityStamps` by
-`autoHibernateRemainingMs` and formatted by `formatCountdown`. Only that child ticks (every second); it is absent when the mode is
-Never, the bar is compact, or the workspace is active or hibernated. It reads 0:00 until the next minutely check fires.
-
 #### Startup
 
 There is no startup hibernation: `initWorkspaceState` restores the saved workspaces untouched. A workspace that
 was hibernated stays so; every other one mounts, including its "Run on start" commands and agent sessions. Their
-`lastActiveAt` is seeded into `activityStamps`, so auto-hibernate resumes the countdown where it was.
+`lastActiveAt` is seeded into `activityStamps`, so auto-hibernate resumes the idle timer where it was.
 
 ---
 

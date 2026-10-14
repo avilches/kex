@@ -25,25 +25,6 @@ export function autoHibernateDelayMs(mode: AutoHibernate): number | null {
   return mode === "off" ? null : DELAY_MS[mode];
 }
 
-export function autoHibernateRemainingMs(
-  stamp: number | undefined,
-  mode: AutoHibernate,
-  now: number,
-): number | null {
-  const delay = autoHibernateDelayMs(mode);
-  if (delay === null || stamp === undefined) return null;
-  return Math.max(0, stamp + delay - now);
-}
-
-export function formatCountdown(ms: number): string {
-  const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
-  const totalMinutes = Math.floor(totalSeconds / 60);
-  if (totalMinutes < 60) return `${totalMinutes}:${String(totalSeconds % 60).padStart(2, "0")}`;
-  const hours = Math.floor(totalMinutes / 60);
-  if (hours < 48) return `${hours}h${String(totalMinutes % 60).padStart(2, "0")}m`;
-  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-}
-
 function validStamp(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
