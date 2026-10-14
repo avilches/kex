@@ -10,6 +10,8 @@ import type { DetailFilter } from "@/modules/workspaces/lib/workspaceDetail";
 import { SidebarTabMenuProvider } from "@/modules/workspaces/SidebarTabMenuContext";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
 
+vi.mock("@/modules/theme/ThemeProvider", () => ({ useTheme: () => ({ resolvedMode: "dark" }) }));
+
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const baseTabs: Tab[] = [

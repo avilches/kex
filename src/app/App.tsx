@@ -110,6 +110,8 @@ import {
 import type { Script, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import type { WelcomeActions } from "@/modules/workspaces/EmptyPaneWelcome";
 import { WorkspaceMoveProvider } from "@/modules/workspaces/WorkspaceMoveContext";
+import { buildGitStatusMap } from "@/modules/explorer/lib/gitStatusUtils";
+import { SidebarGitProvider, type SidebarGit } from "@/modules/workspaces/SidebarGitContext";
 import {
   SidebarTabMenuProvider,
   useSidebarTabMenuActions,
@@ -2842,6 +2844,15 @@ export default function App() {
   const saveTabRef = useRef(saveTabReportingErrors);
   saveTabRef.current = saveTabReportingErrors;
   const sidebarTabMenu = useSidebarTabMenuActions({ workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef });
+  const sidebarGit = useMemo<SidebarGit>(
+    () => ({
+      workspaceId: activeWorkspaceId,
+      status: sourceControl.status,
+      statusMap: sourceControl.status ? buildGitStatusMap(sourceControl.status) : null,
+      scheme: gitColorScheme,
+    }),
+    [activeWorkspaceId, sourceControl.status, gitColorScheme],
+  );
 
   const cycleWorkspace = useCallback(
     (delta: 1 | -1) => {
@@ -3558,6 +3569,7 @@ export default function App() {
           <div className="flex min-h-0 flex-1">
             <WorkspaceMoveProvider workspaces={workspaces} onMoveTab={handleMoveTabFromMenu}>
             <SidebarTabMenuProvider value={sidebarTabMenu}>
+            <SidebarGitProvider value={sidebarGit}>
             <WorkspaceDndProvider
               workspaces={workspaces}
               activeWorkspaceId={activeWorkspaceId}
@@ -3794,6 +3806,7 @@ export default function App() {
                 )}
               </ResizablePanelGroup>
             </WorkspaceDndProvider>
+            </SidebarGitProvider>
             </SidebarTabMenuProvider>
             </WorkspaceMoveProvider>
           </div>

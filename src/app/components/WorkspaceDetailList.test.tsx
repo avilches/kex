@@ -11,6 +11,8 @@ import { SidebarTabMenuProvider } from "@/modules/workspaces/SidebarTabMenuConte
 import type { DetailFilter } from "@/modules/workspaces/lib/workspaceDetail";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
 
+vi.mock("@/modules/theme/ThemeProvider", () => ({ useTheme: () => ({ resolvedMode: "dark" }) }));
+
 // The rows register with dnd-kit, so they always render inside a DndContext in the app.
 function createRoot(container: Element) {
   const root = createDomRoot(container);

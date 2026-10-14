@@ -3,7 +3,7 @@ import { chipColorOnWhite } from "@/modules/workspaces/lib/workspaceColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -20,7 +20,12 @@ import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import { useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCloseStore";
-import type { Tab } from "@/modules/workspaces/lib/types";
+import { type Tab, isAutofocusTab } from "@/modules/workspaces/lib/types";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTheme } from "@/modules/theme/ThemeProvider";
+import { tabGitColor } from "@/modules/workspaces/lib/tabGitColor";
+import { useTabTooltip } from "@/modules/workspaces/lib/useTabTooltip";
+import { useSidebarGit } from "@/modules/workspaces/SidebarGitContext";
 import { useSidebarTabMenu } from "@/modules/workspaces/SidebarTabMenuContext";
 import { TabContextMenuItems } from "@/modules/workspaces/TabContextMenuItems";
 import { sidebarTabDragId, useWorkspaceDnd } from "@/modules/workspaces/WorkspaceDndProvider";
@@ -105,6 +110,18 @@ function DetailTabRow({
   const isLocked = tab.locked ?? false;
   const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
   const hasNote = tab.note !== undefined;
+  const tooltip = useTabTooltip(tab, info?.agentSession);
+  const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
+  const sidebarGit = useSidebarGit();
+  const { resolvedMode } = useTheme();
+  const gitColor = useMemo(
+    () =>
+      sidebarGit?.workspaceId === workspaceId
+        ? tabGitColor(tab, sidebarGit.statusMap, sidebarGit.status, sidebarGit.scheme, resolvedMode)
+        : null,
+    [sidebarGit, workspaceId, tab, resolvedMode],
+  );
+  const solidChip = focused && color !== null;
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: sidebarTabDragId(tab.id),
@@ -160,9 +177,19 @@ function DetailTabRow({
               type="button"
               data-detail-row=""
               data-detail-row-id={tab.id}
-              title={title}
+              title={tooltip.title ?? title}
+              onPointerEnter={tooltip.onPointerEnter}
               aria-current={focused || undefined}
               onClick={() => onActivate(tab.id)}
+              onMouseDown={(e) => {
+                if (e.button === 1) e.preventDefault();
+              }}
+              onAuxClick={(e) => {
+                if (e.button === 1) {
+                  e.stopPropagation();
+                  onClose(tab.id);
+                }
+              }}
               className={cn(
                 "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
                 isDragging && "opacity-40",
@@ -186,9 +213,33 @@ function DetailTabRow({
               }
             >
               <span className="flex size-3.5 shrink-0 items-center justify-center">
-                {agent && !tab.icon ? <AgentIcon agent={agent} size={12} /> : tabIcon(tab, info?.isRunning)}
+                {agent && !tab.icon ? (
+                  <AgentIcon agent={agent} size={12} />
+                ) : tab.kind === "browser" && tab.floating ? (
+                  <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
+                ) : (
+                  tabIcon(tab, info?.isRunning)
+                )}
               </span>
-              <span className="min-w-0 flex-1 truncate">{title}</span>
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate",
+                  (tab.kind === "editor" || tab.kind === "git-diff" || tab.kind === "git-commit-file") &&
+                    tab.preview &&
+                    "italic",
+                )}
+                style={gitColor && !solidChip ? { color: gitColor } : undefined}
+              >
+                {title}
+              </span>
+              {(tab.kind === "editor" || tab.kind === "markdown") && tab.dirty && (
+                <span className="shrink-0 text-[8px] text-primary">●</span>
+              )}
+              {isAutofocusTab(tab) && tab.autofocus && autofocusMode !== "always" && (
+                <span className="shrink-0" title="Autofocus: this tab drives the sidebar">
+                  <HugeiconsIcon icon={CrosshairIcon} size={12} strokeWidth={2} />
+                </span>
+              )}
               <span aria-hidden className="size-[16px] shrink-0" />
               {hasNote && <span aria-hidden className="size-[16px] shrink-0" />}
             </button>
