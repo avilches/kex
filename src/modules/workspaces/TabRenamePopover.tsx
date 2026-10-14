@@ -85,7 +85,7 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
         side="bottom"
         align="start"
         sideOffset={4}
-        className="flex w-52 flex-col gap-1 rounded-lg p-2"
+        className="flex w-64 flex-col gap-1 rounded-lg p-2"
         onEscapeKeyDown={(e) => {
           e.preventDefault();
           handleCancel();

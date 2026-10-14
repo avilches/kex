@@ -395,7 +395,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
                 if (e.key === "Enter") { e.preventDefault(); cwdInputRef.current?.focus(); }
               }}
             />
-            <TitleVariablesHelp scope="workspace" layout="list" />
+            <TitleVariablesHelp scope="workspace" />
           </div>
 
           {/* Working Directory */}

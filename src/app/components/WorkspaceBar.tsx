@@ -674,7 +674,7 @@ function SortableWorkspaceItem({
       <PopoverContent
         side="right"
         align="center"
-        className="flex w-60 flex-col gap-1.5 p-1.5"
+        className="flex w-64 flex-col gap-1.5 p-1.5"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={handleSave}
         onEscapeKeyDown={handleCancel}
