@@ -55,7 +55,7 @@ const TOKENS = [
   "accent-foreground", "destructive", "border", "input", "ring", "sidebar",
   "sidebar-foreground", "sidebar-primary", "sidebar-primary-foreground",
   "sidebar-accent", "sidebar-accent-foreground", "sidebar-border",
-  "sidebar-ring", "tab-focus-indicator", "editor-background", "editor-foreground", "terminal-background",
+  "sidebar-ring", "tab-focus-indicator", "editor-background", "editor-foreground", "note-background", "note-foreground", "terminal-background",
   "terminal-foreground", "terminal-cursor", "terminal-cursor-accent",
   "terminal-selection", ...ANSI_NAMES.map((n) => `terminal-ansi-${n}`),
 ];
