@@ -436,7 +436,10 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
             );
             // Agent name is not available in the SessionStart payload. "claude" is the default;
             // TODO: infer agent from the transcript path or a future payload field.
-            session_store::record_session(tab_id, "claude", &p.session_id, &p.transcript_path, &p.cwd);
+            let same_process = matches!(source, "clear" | "compact");
+            let launch_known = session_store::record_session(
+                tab_id, "claude", &p.session_id, &p.transcript_path, &p.cwd, same_process,
+            );
             let _ = app.emit(AGENT_SESSION_META_EVENT, serde_json::json!({
                 "tabId":          tab_id,
                 "sessionId":      p.session_id,
@@ -444,6 +447,7 @@ fn dispatch(json: &str, tab_id: &str, pty_id: u32, app: &AppHandle) {
                 "sessionTitle":   session_title,
                 "model":          model,
                 "transcriptPath": p.transcript_path,
+                "launchKnown":    launch_known,
             }));
         }
         "SessionEnd" => {

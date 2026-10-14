@@ -26,6 +26,7 @@ struct AgentSessionMetaPayload<'a> {
     cwd_launch: &'a str,
     session_title: &'a str,
     model: &'a str,
+    launch_known: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -250,13 +251,14 @@ pub fn spawn(
                                 _ => None,
                             };
                             if let Some((tab_id, agent, session_id, transcript_path, cwd, session_title, model)) = session_data {
-                                session_store::record_session(&tab_id, &agent, &session_id, &transcript_path, &cwd);
+                                let launch_known = session_store::record_session(&tab_id, &agent, &session_id, &transcript_path, &cwd, false);
                                 let _ = app_reader.emit(AGENT_SESSION_META_EVENT, AgentSessionMetaPayload {
                                     tab_id: &tab_id,
                                     session_id: &session_id,
                                     cwd_launch: &cwd,
                                     session_title: &session_title,
                                     model: &model,
+                                    launch_known,
                                 });
                                 // SessionStart has no frontend handler - skip emitting to kex:agent-signal
                                 if matches!(t, Transition::SessionStart { .. }) {
