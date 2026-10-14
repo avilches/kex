@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { markHibernating, unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
-import { restoreCommandFor, terminalTabs } from "./hibernate";
+import { hasTabs, restoreCommandFor, terminalTabs } from "./hibernate";
 import { flushAgentTitles } from "./agentTitleSync";
 import { flushSidebarSnapshots } from "./sidebarSnapshotSync";
 import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
@@ -34,7 +34,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   // not hibernated afterwards. Mark, finish and hibernate run with no await between them.
   async function perform(workspaceId: string, stillValid?: (ws: Workspace) => boolean): Promise<boolean> {
     const ws = d.getWorkspace(workspaceId);
-    if (!ws || ws.hibernated || inFlight.has(workspaceId)) return false;
+    if (!ws || ws.hibernated || !hasTabs(ws) || inFlight.has(workspaceId)) return false;
     inFlight.add(workspaceId);
     try {
       // First, so the dialog stops watching the stores this call is about to change.
@@ -44,7 +44,7 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
         ws.hibernated ? {} : d.snapshotTabs(ws),
       ]);
       const current = d.getWorkspace(workspaceId);
-      if (!current || current.hibernated || (stillValid && !stillValid(current))) return false;
+      if (!current || current.hibernated || !hasTabs(current) || (stillValid && !stillValid(current))) return false;
       const ids = terminalTabs(current).map((t) => t.id);
       markHibernating(ids);
       try {
@@ -65,13 +65,14 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   const stillEmpty = (ws: Workspace) => isReviewEmpty(hibernateReview(ws, d.live()));
 
   async function request(workspaceId: string): Promise<void> {
-    if (d.getWorkspace(workspaceId)?.hibernated) return;
+    const first = d.getWorkspace(workspaceId);
+    if (!first || first.hibernated || !hasTabs(first)) return;
     // Whatever the autosave preference says: unsaved text outlives a hibernation only in memory.
     // A document that fails to save stays dirty and shows up in the dialog.
     await d.saveWorkspaceDocs(workspaceId);
     await d.settle();
     const ws = d.getWorkspace(workspaceId);
-    if (!ws || ws.hibernated) return;
+    if (!ws || ws.hibernated || !hasTabs(ws)) return;
     if (isReviewEmpty(hibernateReview(ws, d.live()))) {
       await perform(workspaceId, stillEmpty);
       return;
@@ -83,13 +84,14 @@ export function createHibernateFlow(d: HibernateFlowDeps) {
   // is left to ask about (no busy tab, no unsaved document, no command that
   // would be lost). It never opens the dialog.
   async function requestAuto(workspaceId: string): Promise<boolean> {
-    if (d.getWorkspace(workspaceId)?.hibernated || inFlight.has(workspaceId) || d.isActive(workspaceId)) {
+    const first = d.getWorkspace(workspaceId);
+    if (!first || first.hibernated || !hasTabs(first) || inFlight.has(workspaceId) || d.isActive(workspaceId)) {
       return false;
     }
     if (!(await d.saveWorkspaceDocs(workspaceId))) return false;
     await d.settle();
     const ws = d.getWorkspace(workspaceId);
-    if (!ws || ws.hibernated || d.isActive(workspaceId)) return false;
+    if (!ws || ws.hibernated || !hasTabs(ws) || d.isActive(workspaceId)) return false;
     const live = d.live();
     if (!isReviewEmpty(hibernateReview(ws, live))) return false;
     if (terminalTabs(ws).some((t) => live.agentOf(t.id)?.status === "attention")) return false;

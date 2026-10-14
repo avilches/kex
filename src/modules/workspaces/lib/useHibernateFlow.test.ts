@@ -41,6 +41,15 @@ describe("createHibernateFlow", () => {
     expect(calls).not.toContain("pending:w1");
   });
 
+  it("never hibernates a workspace without tabs, whichever way it is asked", async () => {
+    const { flow, calls } = setup(ws([]));
+    await flow.request("w1");
+    expect(await flow.requestAuto("w1")).toBe(false);
+    expect(await flow.perform("w1")).toBe(false);
+    expect(calls).not.toContain("hibernate");
+    expect(calls).not.toContain("pending:w1");
+  });
+
   it("hands the tab snapshots taken before the hibernation to the hibernate step", async () => {
     const snap = { command: "claude --resume abc" };
     let received: unknown;

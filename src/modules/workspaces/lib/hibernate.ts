@@ -97,6 +97,11 @@ export function applyWake(workspaces: Workspace[], workspaceId: string): Workspa
   });
 }
 
+// A workspace with no tabs has nothing to put to sleep.
+export function hasTabs(ws: Workspace): boolean {
+  return allPanes(ws.paneTree).some((p) => p.tabs.length > 0);
+}
+
 export function terminalTabs(ws: Workspace): TerminalTab[] {
   return allPanes(ws.paneTree)
     .flatMap((p) => p.tabs)

@@ -230,6 +230,7 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
 - `wakeWorkspace` seeds the agent resume plans (`seedWakePlans`, same "Run on start" gate as the
   reopen flow), discards the carried unsaved editor buffers (`unflushedBuffers.ts`) and then clears
   `hibernated`; the terminals mount again and resume through the normal restore path. `runOnce` keeps a map of in-flight wakes by workspace id: a second wake (double click, or `moveTabToWorkspace`) awaits the first one's promise, so it never proceeds before the resume plans are seeded. In the WorkspaceBar a hibernated item cannot be expanded (the nested tab list is empty): its chevron, its sleeping icon (which turns into the undo icon on hover) and a double click on it all wake the workspace, instead of opening its properties. The workspace keeps its `detailExpanded` flag while asleep, so waking by any gesture brings the chevron back as it was; only the chevron itself also expands it.
+- A workspace with no tabs is never hibernated: `createHibernateFlow` (`request`, `requestAuto` and `perform`) checks `hasTabs` and the WorkspaceBar hides the Hibernate menu item.
 - Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
   `applyMoveTabToWorkspace` refuses it as a destination, so `moveTabToWorkspace` wakes it first (the menu lists it with a Zzz mark; drag and drop accepts its bar row and its overlay),
   `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`

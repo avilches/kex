@@ -534,7 +534,7 @@ function SortableWorkspaceItem({
                   )}
                 </ContextMenuItem>
               )
-            : onHibernate && (
+            : onHibernate && ws.tabs.length > 0 && (
                 <ContextMenuItem onSelect={() => onHibernate(ws.id)}>
                   <HugeiconsIcon icon={SleepingIcon} size={14} strokeWidth={2} />
                   Hibernate
