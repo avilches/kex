@@ -41,3 +41,14 @@ export function planCommandEvent(
   if (seen && marked) return { seen: false, clearMark: true };
   return { seen, clearMark: false };
 }
+
+/**
+ * The command a tab reports as running. A script is typed wrapped in a `cd`,
+ * so the shell reports that wrapper; the tab should show the user's command.
+ */
+export function displayedRunningCommand(
+  cmd: string | null,
+  scriptCommand: string | null,
+): string | null {
+  return cmd !== null && scriptCommand ? scriptCommand : cmd;
+}

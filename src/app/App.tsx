@@ -226,6 +226,7 @@ import {
   planCommandEvent,
   planDelayedWrite,
   planScriptStop,
+  displayedRunningCommand,
 } from "@/modules/workspaces/lib/scriptRunState";
 import { followableCommand } from "@/modules/terminal/lib/runOnStartCommand";
 import { IS_WINDOWS } from "@/lib/platform";
@@ -2505,7 +2506,13 @@ export default function App() {
       },
       onRunningCommand: (tabId, cmd, started) => {
         const found = findTabGlobal(tabId);
-        if (found) setTerminalRunningCommand(found.workspace.id, tabId, cmd);
+        if (found) {
+          setTerminalRunningCommand(
+            found.workspace.id,
+            tabId,
+            displayedRunningCommand(cmd, getRunningScriptCommand(tabId)),
+          );
+        }
         const next = planCommandEvent(
           { cmd, started },
           scriptCommandSeen.current.has(tabId),

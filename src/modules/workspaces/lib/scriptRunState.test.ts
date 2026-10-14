@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { planCommandEvent, planDelayedWrite, planScriptStop } from "./scriptRunState";
+import {
+  displayedRunningCommand,
+  planCommandEvent,
+  planDelayedWrite,
+  planScriptStop,
+} from "./scriptRunState";
 import type { ScriptState } from "./terminalEphemeralStore";
 
 describe("planDelayedWrite", () => {
@@ -68,5 +73,19 @@ describe("planCommandEvent", () => {
 
   it("ignores a prompt boundary before the command started", () => {
     expect(planCommandEvent({ cmd: null }, false, true)).toEqual({ seen: false, clearMark: false });
+  });
+});
+
+describe("displayedRunningCommand", () => {
+  it("shows the script command instead of the typed cd wrapper", () => {
+    expect(displayedRunningCommand("cd -- '/x' && { npm run dev }", "npm run dev")).toBe("npm run dev");
+  });
+
+  it("keeps the reported command when the tab is not running a script", () => {
+    expect(displayedRunningCommand("ls -la", null)).toBe("ls -la");
+  });
+
+  it("keeps null when the command ended", () => {
+    expect(displayedRunningCommand(null, "npm run dev")).toBeNull();
   });
 });
