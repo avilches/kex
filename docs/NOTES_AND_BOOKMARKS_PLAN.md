@@ -15,7 +15,7 @@ Cada fase es autocontenida, enviable de forma aislada, y deja todas las comproba
 2. Ejecuta las fases en orden. No saltes la Fase 0: es el refactor habilitador del que dependen las demas.
 3. Antes de dar una fase por terminada, ejecuta el bloque "Verificacion" de esa fase.
 4. Donde el documento muestra rutas o firmas de funciones, verificalas contra el codigo real antes de editar. El codigo es la fuente de verdad; este plan puede haber quedado desfasado.
-5. Respeta sin excepcion las convenciones de `AGENTS.md` (sin em-dash, sin emojis, imports con `@/...`, pnpm, functional core / imperative shell, tests para invariantes de subsistemas core).
+5. Respeta sin excepcion las convenciones de `CLAUDE.md` (sin em-dash, sin emojis, imports con `@/...`, pnpm, functional core / imperative shell, tests para invariantes de subsistemas core).
 
 ## Principios de diseno (no negociables)
 
@@ -445,7 +445,7 @@ Objetivo: rematar UX y mantener la documentacion viva en sync (obligatorio en el
 ## 6.1 Pulido
 
 - Estados vacios (sin vault designado, sin favoritos, sin marcadores) con call-to-action claro.
-- Iconografia consistente (hugeicons), botones de accion segun la convencion de `AGENTS.md` (`size-[22px]`, icono 11-12px, `title` nativo para tooltip).
+- Iconografia consistente (hugeicons), botones de accion segun la convencion de `CLAUDE.md` (`size-[22px]`, icono 11-12px, `title` nativo para tooltip).
 - Atajos: alternar vista Notas, nueva nota, quick-open, alternar Marcadores. Registrar en `shortcuts.ts` con `metaKey || ctrlKey`.
 - Menus contextuales coherentes entre explorer, notas y marcadores.
 
@@ -455,7 +455,7 @@ Objetivo: rematar UX y mantener la documentacion viva en sync (obligatorio en el
 - `docs/IPC.md`: nuevo comando `notes_list` (firma, params, retorno) y, si se anaden, otros comandos fs.
 - `docs/FORK.md`: divergencia respecto al upstream (notas WYSIWYG y marcadores como features anadidas; fases completadas).
 - `docs/BUILD.md`: solo si cambia el build (por ejemplo, el chunk lazy de Milkdown o una dep nueva).
-- `AGENTS.md`: actualizar el mapa de modulos en la seccion "Module layout".
+- `CLAUDE.md`: actualizar el mapa de modulos en la seccion "Module layout".
 
 ## Verificacion Fase 6
 

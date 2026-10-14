@@ -708,7 +708,7 @@ desaparecer nunca, se hiciera lo que se hiciera despues.
 ### Pistas falsas descartadas
 
 - Vite HMR mostrando un render antiguo de una pestana ya montada antes del cambio (patron ya
-  documentado en `AGENTS.md`): descartado porque el usuario reprodujo el fallo tras matar el proceso
+  documentado en `CLAUDE.md`): descartado porque el usuario reprodujo el fallo tras matar el proceso
   y arrancar `pnpm tauri dev` en frio.
 - Un problema de timing en el primer render (settings aun no hidratados, viewToggles llegando
   `undefined` un instante): descartado con una traza (`console.log` temporal en `EditorPathBar`) que

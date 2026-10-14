@@ -538,7 +538,7 @@ path above: hook payloads arriving over the Unix socket (`pty::ipc::dispatch`), 
 `OSC 133;C` launch-command stash.
 
 The log file is reachable without hunting for the OS-specific path: `user-data/logs/Kex.log` (a symlink to
-`~/Library/Logs/app.betauer.kex/Kex.log` on macOS, see the root `AGENTS.md`/`CLAUDE.md` for the other platforms).
+`~/Library/Logs/app.betauer.kex/Kex.log` on macOS, see the root `CLAUDE.md` for the other platforms).
 `user-data/logs-dev` is the equivalent for a `pnpm tauri dev` build.
 
 Two things to check if the log looks unhelpful right after a restore failure:

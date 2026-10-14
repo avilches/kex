@@ -2,7 +2,7 @@
 
 This document is the single reference for the scratchpad's state model and every focus/close path
 that touches it. If you change anything about the scratchpad, read this first, and update it in the
-same commit as your change (see `AGENTS.md`, Living documentation).
+same commit as your change (see `CLAUDE.md`, Living documentation).
 
 For the high-level user-facing overview, see [ARCHITECTURE.md](ARCHITECTURE.md) section 3.1. For the
 full war-story history of how this model was arrived at (three separate redesigns), see

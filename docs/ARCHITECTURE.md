@@ -336,7 +336,7 @@ A workspace is created with an empty `title`, which means "use the workspace def
 
 ### 4.6 Forward-slash canonical paths
 
-The frontend stores all paths in forward-slash form. OSC 7 on Windows emits `/C:/Users/foo`; Kex normalizes it to `C:/Users/foo` at parse time. `homeDir()` on Windows returns backslashes; `App.tsx` converts at the boundary. Any code consuming a path that might originate from the OS must normalize separators with `.split(/[\\/]/)`. This is documented in `AGENTS.md` and enforced in code review.
+The frontend stores all paths in forward-slash form. OSC 7 on Windows emits `/C:/Users/foo`; Kex normalizes it to `C:/Users/foo` at parse time. `homeDir()` on Windows returns backslashes; `App.tsx` converts at the boundary. Any code consuming a path that might originate from the OS must normalize separators with `.split(/[\\/]/)`. This is documented in `CLAUDE.md` and enforced in code review.
 
 The reason: consistent string equality for path comparison (e.g., preventing the file explorer from flashing when `tab.cwd` arrives). Using two representations and forgetting to normalize in one place causes subtle bugs.
 

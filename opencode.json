@@ -10,7 +10,6 @@
   // `bash ~/Hub/dotfiles/scripts/link-agent-instructions.sh --check`
   "instructions": [
     "~/Hub/CLAUDE.md",
-    "AGENTS.md",
     ".memory/MEMORY.md"
   ]
 }
