@@ -206,6 +206,20 @@ describe("WorkspaceDetailList subagents", () => {
     unmount();
   });
 
+  it("draws the focus chip around the focused tab and its subagents together", () => {
+    const { container, rows, unmount } = mount({ terminals: "all" }, "t-work");
+    act(() =>
+      useAgentStore
+        .getState()
+        .reconcileSubagents("t-work", [{ id: "a1", agentType: "Explore", description: "" }]),
+    );
+    const chip = wrap(rows()[0]).parentElement as HTMLElement;
+    expect(chip.style.boxShadow).not.toBe("");
+    expect(chip.contains(subagentButtons(container)[0])).toBe(true);
+    expect(rows()[0].style.boxShadow).toBe("");
+    unmount();
+  });
+
   it("removes a row when its subagent stops", () => {
     const { container, unmount } = mount({ terminals: "all" });
     act(() =>

@@ -4,7 +4,7 @@ import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { PopoverAnchor } from "@/components/ui/popover";
@@ -71,19 +71,30 @@ function SubagentRow({
   );
 }
 
+function focusChipStyle(color: string | null): React.CSSProperties {
+  return color !== null
+    ? {
+        backgroundColor: chipColorOnWhite(color),
+        color: "#ffffff",
+        boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--foreground) 40%, transparent)",
+      }
+    : {
+        backgroundColor: "var(--muted)",
+        boxShadow: "inset 0 0 0 1px var(--ring)",
+      };
+}
+
 function SubagentGroup({
   tabId,
   agent,
-  subagents,
+  rows,
   onActivate,
 }: {
   tabId: string;
   agent: string | undefined;
-  subagents: Parameters<typeof subagentRows>[0];
+  rows: SubagentRowData[];
   onActivate: (tabId: string) => void;
 }) {
-  const rows = subagentRows(subagents);
-  if (rows.length === 0) return null;
   return (
     <div className="ml-[15px] flex flex-col gap-px border-l border-border/60 pl-0.5">
       {rows.map((sub) => (
@@ -141,6 +152,7 @@ function DetailTabRow({
   workspaceId,
   visual,
   focused,
+  grouped,
   color,
   prevTabId,
   insertSide,
@@ -152,6 +164,7 @@ function DetailTabRow({
   workspaceId: string;
   visual: DetailRow["visual"];
   focused: boolean;
+  grouped: boolean;
   color: string | null;
   prevTabId: string | null;
   insertSide: "before" | "after" | null;
@@ -255,16 +268,11 @@ function DetailTabRow({
               )}
               style={
                 focused
-                  ? color !== null
-                    ? {
-                        backgroundColor: chipColorOnWhite(color),
-                        color: "#ffffff",
-                        boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--foreground) 40%, transparent)",
-                      }
-                    : {
-                        backgroundColor: "var(--muted)",
-                        boxShadow: "inset 0 0 0 1px var(--ring)",
-                      }
+                  ? grouped
+                    ? color !== null
+                      ? { color: "#ffffff" }
+                      : undefined
+                    : focusChipStyle(color)
                   : undefined
               }
             >
@@ -458,13 +466,22 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
     <div className="ml-3 mt-0.5 flex flex-col gap-px border-l border-border/60 pl-0.5">
       {rows.map((row, i) => {
         const tab = tabsById.get(row.tabId);
-        return tab ? (
-          <Fragment key={row.tabId}>
+        if (!tab) return null;
+        const subs = subagentRows(sessions[row.tabId]?.subagents);
+        const focused = row.tabId === focusedTabId;
+        const grouped = focused && subs.length > 0;
+        return (
+          <div
+            key={row.tabId}
+            className={grouped ? "rounded-md" : undefined}
+            style={grouped ? focusChipStyle(color) : undefined}
+          >
             <DetailTabRow
               tab={tab}
               workspaceId={workspaceId}
               visual={row.visual}
-              focused={row.tabId === focusedTabId}
+              focused={focused}
+              grouped={grouped}
               color={color}
               prevTabId={rows[i - 1]?.tabId ?? null}
               insertSide={insert?.tabId === row.tabId ? insert.side : null}
@@ -472,14 +489,16 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               onNoteHover={handleNoteHover}
               onNoteToggle={handleNoteToggle}
             />
-            <SubagentGroup
-              tabId={row.tabId}
-              agent={sessions[row.tabId]?.agent}
-              subagents={sessions[row.tabId]?.subagents}
-              onActivate={onActivate}
-            />
-          </Fragment>
-        ) : null;
+            {subs.length > 0 && (
+              <SubagentGroup
+                tabId={row.tabId}
+                agent={sessions[row.tabId]?.agent}
+                rows={subs}
+                onActivate={onActivate}
+              />
+            )}
+          </div>
+        );
       })}
       {previewTab && previewTab.note !== undefined && !visibleSet.has(previewTab.id) &&
         createPortal(
