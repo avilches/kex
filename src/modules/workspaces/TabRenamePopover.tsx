@@ -1,6 +1,8 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import type React from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { TITLE_VARIABLES_HINT } from "./lib/titleTemplate";
+import { TitleVariablesHelp } from "./TitleVariablesHelp";
 import { type RenameOrigin, isRenamingAt, useTabRenameStore } from "./lib/tabRenameStore";
 
 type Props = {
@@ -83,7 +85,7 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
         side="bottom"
         align="start"
         sideOffset={4}
-        className="flex w-52 flex-col gap-1 rounded-lg p-2"
+        className="flex w-64 flex-col gap-1 rounded-lg p-2"
         onEscapeKeyDown={(e) => {
           e.preventDefault();
           handleCancel();
@@ -102,6 +104,7 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
           onBlur={handleBlur}
           defaultValue={title ?? ""}
           placeholder={placeholder}
+          title={TITLE_VARIABLES_HINT}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -111,6 +114,7 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
           onPointerDown={(e) => e.stopPropagation()}
           className="w-full rounded border border-input bg-transparent px-1.5 py-1 text-[12px] text-foreground outline-none focus:border-ring placeholder:text-muted-foreground/60"
         />
+        <TitleVariablesHelp scope="tab" />
       </PopoverContent>
     </Popover>
   );

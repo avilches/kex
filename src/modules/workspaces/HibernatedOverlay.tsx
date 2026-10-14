@@ -10,7 +10,9 @@ import { formatHibernatedFor, restoreCommandFor } from "./lib/hibernate";
 import { markHibernateFxPlayed, shouldPlayHibernateFx } from "./lib/hibernateFx";
 import { allPanes } from "./lib/splitNode";
 import { tabIcon } from "./lib/tabTitle";
+import { focusedTab } from "./lib/splitNode";
 import { useAgentTabTitle } from "./lib/useAgentTabTitle";
+import { useWorkspaceTitle } from "./lib/workspaceTitle";
 import { HIBERNATED_DROP_PREFIX } from "./lib/tabDrop";
 import type { Tab, TabHibernation, Workspace } from "./lib/types";
 import { useWorkspaceDnd } from "./WorkspaceDndProvider";
@@ -54,7 +56,7 @@ function useSleepingSnapshot(tab: Tab): TabHibernation | undefined {
 function SleepingTabRow({ tab }: { tab: Tab }) {
   const info = useAgentTabTitle(tab);
   const snapshot = useSleepingSnapshot(tab);
-  const title = tab.title || (tab.kind === "terminal" ? tab.agentTitle : undefined) || info?.displayTitle || tab.id;
+  const title = (tab.title && info?.displayTitle) || (tab.kind === "terminal" ? tab.agentTitle : undefined) || info?.displayTitle || tab.id;
   const agent = snapshot?.agent;
   const command = snapshot?.command;
   return (
@@ -70,6 +72,12 @@ function SleepingTabRow({ tab }: { tab: Tab }) {
 
 export function HibernatedOverlay({ workspace, onWake, active }: Props) {
   const workspaceId = workspace.id;
+  const shownTitle = useWorkspaceTitle({
+    title: workspace.title,
+    cwd: workspace.cwd,
+    workspaceRoot: workspace.workspaceRoot,
+    focusedTab: focusedTab(workspace.paneTree, workspace.activePaneId),
+  });
   const dragging = useWorkspaceDnd().draggingItem;
   const acceptsDrop = active && dragging?.kind === "tab" && dragging.workspaceId !== workspaceId;
   const { setNodeRef, isOver } = useDroppable({
@@ -94,7 +102,7 @@ export function HibernatedOverlay({ workspace, onWake, active }: Props) {
       <div className={cn("flex max-w-[80%] flex-col items-center gap-1.5", fx && "hib-item [animation-delay:350ms]")}>
         <span className="flex items-center gap-2 text-[15px] text-foreground">
           <WorkspaceMark id={workspaceId} color={workspace.color} icon={workspace.icon} size={22} />
-          <span className="truncate">{workspace.title || "Workspace"}</span>
+          <span className="truncate">{shownTitle || "Workspace"}</span>
         </span>
         {workspace.hibernatedAt !== undefined && (
           <span className="text-[12px]">

@@ -90,17 +90,23 @@ import {
 } from "@/modules/workspaces/lib/workspaceDetail";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
+import { TITLE_VARIABLES_HINT } from "@/modules/workspaces/lib/titleTemplate";
+import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
+import { useWorkspaceTitle, workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 
 type WorkspaceItem = {
   id: string;
   title: string;
   kind: string;
   cwd?: string;
+  workspaceRoot?: string;
   color?: string | null;
   icon?: string;
   groupId?: string;
   tabs: Tab[];
   focusedTabId: string | null;
+  // The tab a templated title ({cwd}, {branch}...) is resolved against.
+  focusedTab: Tab | null;
   // Comma-joined active tab of every pane: the tabs whose note a pane can draw.
   visibleTabIds?: string;
   detailExpanded?: boolean;
@@ -189,6 +195,7 @@ function SortableWorkspaceItem({
   onRestoreFocus: () => void;
   hoverSwitch: HoverSwitch | null;
 }) {
+  const shownTitle = useWorkspaceTitle(ws);
   const {
     attributes,
     listeners,
@@ -359,7 +366,7 @@ function SortableWorkspaceItem({
         <button
           type="button"
           title={
-            ws.cwd ? `${ws.title || ws.kind}: ${ws.cwd}` : ws.title || ws.kind
+            ws.cwd ? `${shownTitle || ws.kind}: ${ws.cwd}` : shownTitle || ws.kind
           }
           onClick={() => {
             if (active) onRestoreFocus();
@@ -418,7 +425,7 @@ function SortableWorkspaceItem({
                 strokeWidth={1.5}
               />
             ) : (
-              <span className="text-[12px]">{abbrev(ws.title, ws.kind)}</span>
+              <span className="text-[12px]">{abbrev(shownTitle, ws.kind)}</span>
             )
           ) : (
             <>
@@ -431,7 +438,7 @@ function SortableWorkspaceItem({
                   className="shrink-0"
                 />
               )}
-              <span className="truncate">{ws.title || ws.kind}</span>
+              <span className="truncate">{shownTitle || ws.kind}</span>
               {ws.hibernated && <span aria-hidden className="ml-auto size-[13px] shrink-0" />}
               {agentCount > 0 && (
                 <span
@@ -660,7 +667,7 @@ function SortableWorkspaceItem({
       <PopoverContent
         side="right"
         align="center"
-        className="w-48 p-1.5"
+        className="flex w-64 flex-col gap-1.5 p-1.5"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={handleSave}
         onEscapeKeyDown={handleCancel}
@@ -670,6 +677,7 @@ function SortableWorkspaceItem({
           type="text"
           defaultValue={ws.title}
           placeholder={ws.kind}
+          title={TITLE_VARIABLES_HINT}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -681,6 +689,7 @@ function SortableWorkspaceItem({
             }
           }}
         />
+        <TitleVariablesHelp scope="workspace" />
       </PopoverContent>
     </Popover>
   );
@@ -1187,10 +1196,10 @@ export function WorkspaceBar({
                     }
                   >
                     {compact ? (
-                      abbrev(dragActiveWs.title, dragActiveWs.kind)
+                      abbrev(workspaceTitleNow(dragActiveWs), dragActiveWs.kind)
                     ) : (
                       <span className="max-w-full truncate text-center">
-                        {dragActiveWs.title || dragActiveWs.kind}
+                        {workspaceTitleNow(dragActiveWs) || dragActiveWs.kind}
                       </span>
                     )}
                   </div>

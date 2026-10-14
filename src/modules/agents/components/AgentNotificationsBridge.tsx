@@ -3,6 +3,8 @@ import { findTabPane, focusedTabId } from "@/modules/workspaces";
 import { leafIdForPty } from "@/modules/terminal";
 import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { native } from "@/lib/native";
+import { tabTitleNow } from "@/modules/workspaces/lib/tabTitleNow";
+import { workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useTauriListen } from "@/lib/useTauriListen";
@@ -60,8 +62,10 @@ function tabInfo(
       const cwd =
         result.tab.kind === "terminal" ? result.tab.cwd : undefined;
       const cwdParts = cwd ? cwd.split(/[\\/]/).filter(Boolean) : [];
-      const title = cwd ? (cwdParts[cwdParts.length - 1] ?? cwd) : ws.title;
-      return { workspaceId: ws.id, title, userTitle: result.tab.title || undefined };
+      const title = cwd
+        ? (cwdParts[cwdParts.length - 1] ?? cwd)
+        : workspaceTitleNow({ ...ws, focusedTab: result.tab });
+      return { workspaceId: ws.id, title, userTitle: tabTitleNow(result.tab) || undefined };
     }
   }
   return null;

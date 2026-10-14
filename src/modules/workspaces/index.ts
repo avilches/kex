@@ -14,6 +14,7 @@ export {
   findPane,
   findPaneInDirection,
   findTabPane,
+  focusedTab,
   focusedTabId,
   firstPaneId,
   siblingPane,

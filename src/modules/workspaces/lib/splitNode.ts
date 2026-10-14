@@ -22,6 +22,11 @@ export function focusedTabId(
   return findPane(tree, activePaneId)?.activeTabId ?? null;
 }
 
+export function focusedTab(tree: SplitNode, activePaneId: string): Tab | null {
+  const pane = findPane(tree, activePaneId);
+  return pane?.tabs.find((t) => t.id === pane.activeTabId) ?? null;
+}
+
 export function findTabPane(
   tree: SplitNode,
   tabId: string,
