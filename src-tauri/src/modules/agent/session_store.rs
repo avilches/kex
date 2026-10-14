@@ -4,7 +4,7 @@ use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
-use super::launch_cmd::{self, find_agent_invocation};
+use super::launch_cmd::{self, find_agent_invocation, DEFAULT_AGENTS};
 
 static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
@@ -153,7 +153,15 @@ fn read_launch_cwd_from_jsonl(jsonl: &PathBuf) -> Option<String> {
 /// True when the original invocation was non-interactive (`-p` / `--print`).
 /// Such sessions are never persisted.
 pub fn is_print_mode_cmd(cmd: &str, agent: &str) -> bool {
-    launch_cmd::is_print_mode(cmd, agent)
+    launch_cmd::is_print_mode(cmd, &known_agents(agent))
+}
+
+// The record's agent comes from the hooks and is always "claude" today, while the launch line
+// may name another known agent; match both so the launcher is never silently swapped.
+fn known_agents(agent: &str) -> Vec<String> {
+    let mut agents = vec![agent.to_string()];
+    agents.extend(DEFAULT_AGENTS.iter().filter(|a| **a != agent).map(|a| a.to_string()));
+    agents
 }
 
 /// Whitelist-based arg stripper for session restore.
@@ -203,15 +211,14 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
 
     // A record written before the launch line was reduced to the agent segment can still
     // carry `cd dir && claude ...`; reducing it again here heals it on read.
-    let inv = find_agent_invocation(cmd, &[agent.to_string()])?;
+    let inv = find_agent_invocation(cmd, &known_agents(agent))?;
     let tokens: Vec<&str> = inv.args.iter().map(String::as_str).collect();
     let mut result: Vec<&str> = inv.head.iter().map(String::as_str).collect();
     let mut i = 0;
     while i < tokens.len() {
         let token = tokens[i];
-        if is_redirection(token) {
-            // A bare operator (`>`, `2>>`) takes the next token as its target.
-            i += if token.trim_start_matches(|c: char| c.is_ascii_digit()).trim_start_matches(['<', '>', '&']).is_empty() { 2 } else { 1 };
+        if let Some(n) = launch_cmd::redirection_tokens(token) {
+            i += n;
             continue;
         }
         let (flag, has_eq) = match token.find('=') {
@@ -228,7 +235,7 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
             i += 1;
             if !has_eq {
                 // Consume all immediately-following non-flag tokens as values.
-                while i < tokens.len() && !tokens[i].starts_with('-') && !is_redirection(tokens[i]) {
+                while i < tokens.len() && !tokens[i].starts_with('-') && launch_cmd::redirection_tokens(tokens[i]).is_none() {
                     result.push(tokens[i]);
                     i += 1;
                 }
@@ -237,16 +244,11 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
         }
         // Not in whitelist: skip this token (and any orphaned non-flag value that follows).
         i += 1;
-        while i < tokens.len() && !tokens[i].starts_with('-') && !is_redirection(tokens[i]) {
+        while i < tokens.len() && !tokens[i].starts_with('-') && launch_cmd::redirection_tokens(tokens[i]).is_none() {
             i += 1;
         }
     }
     Some(result.join(" "))
-}
-
-fn is_redirection(token: &str) -> bool {
-    let rest = token.trim_start_matches(|c: char| c.is_ascii_digit());
-    rest.starts_with(['<', '>']) || rest.starts_with("&>")
 }
 
 // Returns only the agent command. The frontend spawns the PTY with plan.cwdLaunch as the
@@ -746,6 +748,26 @@ mod tests {
         assert_eq!(base.as_deref(), Some("claude --add-dir /a"));
         let base = strip_for_resume_base("claude --safe-mode > out.log --add-dir /a", "claude");
         assert_eq!(base.as_deref(), Some("claude --safe-mode --add-dir /a"));
+    }
+
+    #[test]
+    fn strip_keeps_another_known_agent_launcher_like_before() {
+        let base = strip_for_resume_base("codex resume --last", "claude");
+        assert_eq!(base.as_deref(), Some("codex"));
+    }
+
+    #[test]
+    fn healed_command_round_trips_through_the_retry_line() {
+        let line = " cd '/Users/x/Application Support/Taxes' && FOO=1 claude-max --model opus --safe-mode --resume 'id-1'";
+        let stored = find_agent_invocation(line, &known_agents("claude")).unwrap().command();
+        let base = strip_for_resume_base(&stored, "claude").unwrap();
+        let resume = format!("{base} --resume {}", shell_quote("id-2"));
+        assert_eq!(resume, "FOO=1 claude-max --safe-mode --resume 'id-2'");
+
+        let retyped = format!(" cd '/Users/x/Application Support/Taxes' && {resume}");
+        let stored_again = find_agent_invocation(&retyped, &known_agents("claude")).unwrap().command();
+        assert_eq!(stored_again, resume);
+        assert_eq!(strip_for_resume_base(&stored_again, "claude").unwrap(), base);
     }
 
     #[test]

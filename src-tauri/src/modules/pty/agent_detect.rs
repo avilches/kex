@@ -1,4 +1,4 @@
-use crate::modules::agent::launch_cmd::find_agent_invocation;
+use crate::modules::agent::launch_cmd::{find_agent_invocation, DEFAULT_AGENTS};
 
 const ESC: u8 = 0x1b;
 const BEL: u8 = 0x07;
@@ -6,8 +6,6 @@ const OSC_INTRO: u8 = b']';
 const ST_FINAL: u8 = b'\\';
 
 const OSC_MAX: usize = 4096;
-
-const DEFAULT_AGENTS: &[&str] = &["claude", "codex"];
 
 // OSC 777;kex;<event>;<tab_id>;<session_id>;<transcript_path>;<cwd>[;<extra...>]
 const KEX_UNIFIED_MARKER: &[u8] = b"kex;";
