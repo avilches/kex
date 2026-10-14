@@ -2,7 +2,7 @@
 
 ## Problema
 
-La paleta de comandos (`src/modules/command-palette/`) solo encuentra acciones. Para saltar a un tab o a un workspace hay que usar la WorkspaceBar o los atajos, y con muchos workspaces (varios hibernados) eso es lento. Ademas el catalogo de acciones se escribio a mano y se ha quedado atras: tiene 24 entradas frente a 65 atajos y 10 secciones de Settings.
+La paleta de comandos (`src/modules/command-palette/`) solo encuentra acciones. Para saltar a un tab o a un workspace hay que usar la WorkspaceBar o los atajos, y con muchos workspaces (varios hibernados) eso es lento. Ademas el catalogo de acciones se escribio a mano y se ha quedado atras: tiene 23 entradas frente a 62 atajos y 10 secciones de Settings (medido el 2026-10-14).
 
 ## Objetivo
 
@@ -106,9 +106,10 @@ La nota se renderiza con la pieza de `MarkdownPreviewPane` (misma que el preview
 ### Catalogo de acciones y settings
 
 - Cada entrada de `SHORTCUTS` se convierte en accion, con su `group`, `label` y `shortcutId`. Las que ya existen en `commands.ts` con `run` propio mantienen su implementacion; las demas necesitan un `run` en `CommandPaletteActionContext`.
-- Se anaden las acciones sin atajo que hoy faltan: hibernar y despertar el workspace, anadir o quitar nota del tab, bloquear tab, mover tab a otro workspace, renombrar tab y workspace. El inventario exacto lo fija la implementacion, comparando la lista de `ShortcutId` y los menus contextuales de WorkspaceBar y PaneTabBar con el catalogo.
-- Settings: una fila por seccion (General, Workspaces, Terminal, Tools, Editor, File Types, Appearance, Themes, Shortcuts, About) que llama a `openSettingsWindow(seccion)`. Las secciones se leen de la misma constante que usa `SettingsApp.tsx` para que no puedan divergir.
-- Test de cobertura: recorre `SHORTCUTS` y las secciones de Settings y falla si alguno no tiene fila en el catalogo. Una lista corta de excepciones explicita (atajos que no tienen sentido en la paleta, por ejemplo los de navegacion dentro de un widget) se escribe en el propio test con el motivo.
+- Acciones sin atajo que reciben fila: hibernar/despertar el workspace activo (una sola fila toggle que dice "Restore" cuando esta hibernado), quitar la nota del tab (complemento de `tab.note`), devolver el tab a su titulo por defecto cuando tiene titulo propio, cerrar los otros tabs del pane, cerrar todos los tabs del pane, mover el tab activo a otro workspace (subpagina de workspaces, como la de temas) y split de browser a la derecha y abajo. Lo parametrico no recibe fila: renombrar grupos, mover un workspace a otro grupo, ejecutar un script concreto por nombre y los pickers de color e icono (el dialogo Properties ya los expone).
+- Settings: una fila por seccion. La lista sale de un modulo nuevo compartido y sin componentes, `src/modules/settings/sections.ts`, que exporta `{ id: SettingsSection; label: string; icon }[]` y lo consumen `SettingsApp.tsx` (que solo le anade su `component`) y la paleta. No se puede importar `SECTIONS` desde `SettingsApp.tsx` directamente: esa entrada es el webview `settings.html` y arrastraria el arbol completo de Settings al bundle de la ventana principal. `openSettingsWindow(section)` acepta el id. Ojo: `external-editors` se etiqueta "Tools" (el id no es el label) y `filetypes` admite el deep-link `filetypes:<ext>`.
+- Test de cobertura: recorre `SHORTCUTS` y `sections.ts` y falla si alguno no tiene fila en el catalogo. Excepciones explicitas con su motivo (inventario medido el 2026-10-14): `commandPalette.open` (ya se esta dentro de la paleta), `commandPalette.content` (lo cubre la fila existente `search.content` anadiendole su `shortcutId`), `file.copy`, `file.cut`, `file.paste`, `file.delete` (edicion in-situ sobre la seleccion local del explorer: la fila perderia el objetivo al cerrarse la paleta), `editor.undo`, `editor.redo` (transaccion del buffer del editor enfocado), `tab.next`, `tab.prev`, `pane.focusUp`, `pane.focusDown`, `pane.focusLeft`, `pane.focusRight`, `workspace.prev`, `workspace.next` (navegacion relativa sin objetivo seleccionable en una lista), `tab.selectByIndex`, `workspace.selectByIndex` (handler parametrizado por la tecla digito).
+- Grupos del catalogo: los 8 de `SHORTCUTS` (General, Sidebar, Explorer, Tabs, Panes, Terminal, View, Editor), los dos propios de la paleta (Git y Search) y uno nuevo, Settings. `COMMAND_GROUPS` pasa a ser esa lista, en el orden de pintado.
 
 ### Flujo al elegir una fila
 
