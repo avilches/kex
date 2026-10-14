@@ -209,6 +209,7 @@ import {
 import { clearMetricsEntry } from "@/modules/workspaces/lib/terminalMetricsStore";
 import {
   resolveExplorerRoot,
+  logicalRepoRoot,
   nearestExistingDir,
   resolveSidebarTarget,
   isFilesystemRoot,
@@ -1221,11 +1222,14 @@ export default function App() {
     ) => {
       const ws = activeWorkspace;
       if (!ws) return;
-      void native
-        .gitResolveRepo(folder)
-        .catch(() => null)
-        .then((info) => {
-          const resolvedGitRoot = info?.repoRoot ?? null;
+      void Promise.all([
+        native.gitResolveRepo(folder).catch(() => null),
+        native.canonicalize(folder).catch(() => folder),
+      ])
+        .then(([info, canonicalFolder]) => {
+          const resolvedGitRoot = info?.repoRoot
+            ? logicalRepoRoot(folder, canonicalFolder, info.repoRoot)
+            : null;
           const target = resolveSidebarTarget({
             folder,
             workspaceRoot: workspaceRootPath,
@@ -1342,10 +1346,17 @@ export default function App() {
       return;
     }
     let cancelled = false;
-    void native
-      .gitResolveRepo(workspaceRootPath)
-      .then((info) => {
-        if (!cancelled) setWorkspaceGitRoot(info?.repoRoot ?? null);
+    void Promise.all([
+      native.gitResolveRepo(workspaceRootPath),
+      native.canonicalize(workspaceRootPath).catch(() => workspaceRootPath),
+    ])
+      .then(([info, canonical]) => {
+        if (cancelled) return;
+        setWorkspaceGitRoot(
+          info?.repoRoot
+            ? logicalRepoRoot(workspaceRootPath, canonical, info.repoRoot)
+            : null,
+        );
       })
       .catch(() => {
         if (!cancelled) setWorkspaceGitRoot(null);

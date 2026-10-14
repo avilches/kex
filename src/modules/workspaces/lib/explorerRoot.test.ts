@@ -7,6 +7,7 @@ import {
   parentRoot,
   resolveExplorerRoot,
   nearestExistingDir,
+  logicalRepoRoot,
   resolveSidebarTarget,
 } from "./explorerRoot";
 
@@ -253,5 +254,31 @@ describe("nearestExistingDir", () => {
 
   it("stops at the filesystem root", async () => {
     expect(await nearestExistingDir("/x/y", exists)).toBe("/");
+  });
+});
+
+describe("logicalRepoRoot", () => {
+  it("keeps the symlinked spelling of the repo root", () => {
+    expect(
+      logicalRepoRoot("/link/repo/src", "/real/repo/src", "/real/repo"),
+    ).toBe("/link/repo");
+  });
+
+  it("maps a folder that is the repo root itself", () => {
+    expect(logicalRepoRoot("/link/repo", "/real/repo", "/real/repo")).toBe(
+      "/link/repo",
+    );
+  });
+
+  it("returns the repo root unchanged when there is no symlink", () => {
+    expect(logicalRepoRoot("/a/repo/src", "/a/repo/src", "/a/repo")).toBe(
+      "/a/repo",
+    );
+  });
+
+  it("falls back to the repo root when the spellings do not line up", () => {
+    expect(logicalRepoRoot("/x/y", "/real/repo/src", "/real/repo")).toBe(
+      "/real/repo",
+    );
   });
 });

@@ -19,6 +19,25 @@ export function resolveExplorerRoot(r: ResolveExplorerRootInput): string | null 
   }
 }
 
+// git reports the repo root already canonicalized (symlinks resolved). Map it back
+// onto the path the user is actually in, so the explorer does not jump to the
+// physical location: drop from `folder` the same trailing segments that separate
+// the canonical folder from the canonical repo root.
+export function logicalRepoRoot(
+  folder: string,
+  canonicalFolder: string,
+  repoRoot: string,
+): string {
+  const f = normalizeSep(folder).replace(/\/+$/, "");
+  const cf = normalizeSep(canonicalFolder).replace(/\/+$/, "");
+  const rr = normalizeSep(repoRoot).replace(/\/+$/, "");
+  if (!isUnder(cf, rr)) return repoRoot;
+  const suffix = cf.slice(rr.length);
+  if (suffix === "") return f || "/";
+  if (!f.endsWith(suffix)) return repoRoot;
+  return f.slice(0, f.length - suffix.length) || "/";
+}
+
 export async function nearestExistingDir(
   path: string,
   exists: (p: string) => Promise<boolean>,
