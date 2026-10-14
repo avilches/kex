@@ -62,7 +62,11 @@ export function useTitleSources(
   const sys = useSystemInfo();
   const defaults = useTitleDefaults();
   const hasAgent = !!agentSession && tab?.kind === "terminal";
-  const needsGit = !!tab && templateNeedsGit(effectiveTabTemplate(tab, hasAgent, defaults));
+  // A custom title that expands to nothing falls back to the default, so both count.
+  const needsGit =
+    !!tab &&
+    (templateNeedsGit(effectiveTabTemplate(tab, hasAgent, defaults)) ||
+      templateNeedsGit(defaults[defaultKindFor(tab, hasAgent)]));
   const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined);
   return { git, agent: agentSession?.agent, home: sys.home, host: sys.host, defaults };
 }

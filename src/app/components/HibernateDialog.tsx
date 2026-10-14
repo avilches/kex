@@ -22,7 +22,8 @@ import {
 import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
 import { scriptsToDelete, type RunningProcess } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
-import { allPanes } from "@/modules/workspaces/lib/splitNode";
+import { allPanes, focusedTab } from "@/modules/workspaces/lib/splitNode";
+import { workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
 import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
@@ -104,6 +105,9 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
   const shown = useRef<{ workspace: Workspace; groupLabel?: string } | null>(null);
   if (workspace) shown.current = { workspace, groupLabel };
   const titleWs = shown.current?.workspace;
+  const titleWsName = titleWs
+    ? workspaceTitleNow({ ...titleWs, focusedTab: focusedTab(titleWs.paneTree, titleWs.activePaneId) })
+    : "";
   const tabs = useMemo(
     () => new Map(titleWs ? allPanes(titleWs.paneTree).flatMap((p) => p.tabs).map((t) => [t.id, t] as const) : []),
     [titleWs],
@@ -125,7 +129,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
               <WorkspaceMark id={titleWs.id} color={titleWs.color} icon={titleWs.icon} size={18} />
             )}
             <span className="truncate">
-              {`${closing ? "Close" : "Hibernate"} ${titleWs?.title ? `"${titleWs.title}"` : "this workspace"}?`}
+              {`${closing ? "Close" : "Hibernate"} ${titleWsName ? `"${titleWsName}"` : "this workspace"}?`}
             </span>
             {titleGroup && (
               <span className="max-w-[40%] shrink-0 truncate text-[12px] font-normal text-muted-foreground">
