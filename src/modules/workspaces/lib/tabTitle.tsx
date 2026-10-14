@@ -23,7 +23,7 @@ export function tabTitle(tab: Tab, runningCommand?: string | null, oscTitle?: st
   switch (tab.kind) {
     case "terminal": {
       if (tab.title) return tab.title;
-      if (runningCommand) return basename(runningCommand.trim().split(/\s+/)[0] ?? "");
+      if (runningCommand) return runningCommand.trim().replace(/\s+/g, " ");
       if (oscTitle) return oscTitle;
       if (!tab.cwd) return "shell";
       const cwd = tab.cwd.replace(/\/$/, "");

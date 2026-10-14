@@ -14,7 +14,11 @@ describe("tabTitle - terminal oscTitle precedence", () => {
   });
 
   it("runningCommand overrides oscTitle", () => {
-    expect(tabTitle(terminal({ cwd: "/home/me" }), "cargo build", "vim")).toBe("cargo");
+    expect(tabTitle(terminal({ cwd: "/home/me" }), "cargo build", "vim")).toBe("cargo build");
+  });
+
+  it("shows the whole running command with whitespace collapsed", () => {
+    expect(tabTitle(terminal({ cwd: "/home/me" }), "  npm run\n  dev ", undefined)).toBe("npm run dev");
   });
 
   it("falls back to cwd when oscTitle is empty string", () => {
