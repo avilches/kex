@@ -95,6 +95,7 @@ import {
   findPane,
   findPaneInDirection,
   findTabPane,
+  focusedTab,
   focusedTabId,
   planDiffTabOpen,
   tabTitle,
@@ -3532,9 +3533,11 @@ export default function App() {
         title: w.title,
         kind: "terminal",
         cwd: w.cwd,
+        workspaceRoot: w.workspaceRoot,
         color: w.color,
         icon: w.icon,
         groupId: w.groupId,
+        focusedTab: focusedTab(w.paneTree, w.activePaneId),
         tabs: w.detailExpanded && !w.hibernated
           ? allPanes(w.paneTree).flatMap((p) => p.tabs)
           : NO_TABS,

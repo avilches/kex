@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import type React from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { TITLE_VARIABLES_HINT } from "./lib/titleTemplate";
 import { type RenameOrigin, isRenamingAt, useTabRenameStore } from "./lib/tabRenameStore";
 
 type Props = {
@@ -102,6 +103,7 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
           onBlur={handleBlur}
           defaultValue={title ?? ""}
           placeholder={placeholder}
+          title={TITLE_VARIABLES_HINT}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();

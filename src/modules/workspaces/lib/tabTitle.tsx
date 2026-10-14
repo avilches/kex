@@ -11,6 +11,7 @@ import type { IconSvgElement } from "@hugeicons/react";
 import type { ReactNode } from "react";
 import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
+import { expandTabTitle, type TitleSources } from "./titleVars";
 import type { Tab } from "./types";
 import { getWorkspaceIcon } from "./workspaceIcon";
 
@@ -18,11 +19,17 @@ export function basename(path: string): string {
   return pathBasename(path, { tolerateTrailingSlash: true });
 }
 
-export function tabTitle(tab: Tab, runningCommand?: string | null, oscTitle?: string): string {
-  if (tab.kind !== "terminal" && tab.title) return tab.title;
+export function tabTitle(
+  tab: Tab,
+  runningCommand?: string | null,
+  oscTitle?: string,
+  sources?: TitleSources,
+): string {
+  const custom = expandTabTitle(tab, { ...sources, runningCommand });
+  if (tab.kind !== "terminal" && custom) return custom;
   switch (tab.kind) {
     case "terminal": {
-      if (tab.title) return tab.title;
+      if (custom) return custom;
       if (runningCommand) return runningCommand.trim().replace(/\s+/g, " ");
       if (oscTitle) return oscTitle;
       if (!tab.cwd) return "shell";
@@ -50,9 +57,11 @@ export function agentAwareTabTitle(
   oscTitle: string | undefined,
   sessionTitle: string | undefined,
   fallbackTitle: string,
+  customTitle?: string,
 ): string {
   if (!hasAgent || tab.kind !== "terminal") return fallbackTitle;
-  if (tab.title) return tab.title;
+  const custom = customTitle ?? tab.title;
+  if (custom) return custom;
   if (oscTitle) return oscTitle;
   if (sessionTitle) return sessionTitle;
   const cwd = tab.cwd ?? "";

@@ -1,7 +1,9 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { focusedTab } from "./lib/splitNode";
 import type { TabMoveRequest } from "./lib/tabTransfer";
 import type { Workspace } from "./lib/types";
 import { resolveWorkspaceColor } from "./lib/workspaceColor";
+import { workspaceTitleNow } from "./lib/workspaceTitle";
 
 export type WorkspaceMoveTarget = { id: string; title: string; color: string | null; icon?: string; hibernated: boolean };
 
@@ -29,15 +31,18 @@ type Props = {
 // recolored, so it is memoized on a key instead of on the workspaces array
 // (which changes on every cwd update and would re-render every tab).
 export function WorkspaceMoveProvider({ workspaces, onMoveTab, children }: Props) {
+  const titles = workspaces.map((w) =>
+    workspaceTitleNow({ ...w, focusedTab: focusedTab(w.paneTree, w.activePaneId) }),
+  );
   const key = workspaces
-    .map((w) => `${w.id}\u0000${w.title}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}\u0000${w.icon ?? ""}\u0000${w.hibernated ? 1 : 0}`)
+    .map((w, i) => `${w.id}\u0000${titles[i]}\u0000${resolveWorkspaceColor(w.color, w.id) ?? ""}\u0000${w.icon ?? ""}\u0000${w.hibernated ? 1 : 0}`)
     .join("\u0001");
   // biome-ignore lint/correctness/useExhaustiveDependencies: key captures every field read from workspaces
   const targets = useMemo(
     () =>
-      workspaces.map((w) => ({
+      workspaces.map((w, i) => ({
         id: w.id,
-        title: w.title || "shell",
+        title: titles[i] || "shell",
         color: resolveWorkspaceColor(w.color, w.id),
         icon: w.icon,
         hibernated: w.hibernated === true,

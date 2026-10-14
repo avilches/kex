@@ -2,17 +2,24 @@ import { SleepingIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
+import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
 import type { Tab, Workspace, WorkspaceGroup } from "@/modules/workspaces/lib/types";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 
 type Props = {
-  workspace: Pick<Workspace, "id" | "title" | "icon" | "color" | "groupId" | "hibernated"> | null;
+  workspace: Pick<Workspace, "id" | "title" | "icon" | "color" | "groupId" | "hibernated" | "cwd" | "workspaceRoot"> | null;
   tab: Tab | null;
   groups: WorkspaceGroup[];
 };
 
 export function WorkspaceTitle({ workspace, tab, groups }: Props) {
   const agentTabTitle = useAgentTabTitle(tab);
+  const shownTitle = useWorkspaceTitle({
+    title: workspace?.title ?? "",
+    cwd: workspace?.cwd,
+    workspaceRoot: workspace?.workspaceRoot,
+    focusedTab: tab,
+  });
 
   if (!workspace) return null;
 
@@ -35,7 +42,7 @@ export function WorkspaceTitle({ workspace, tab, groups }: Props) {
       <div className="flex min-w-0 flex-col justify-center gap-0.5">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-[13.5px] font-semibold leading-none text-foreground">
-            {workspace.title || "Workspace"}
+            {shownTitle || "Workspace"}
           </span>
           {workspace.hibernated && (
             <HugeiconsIcon
