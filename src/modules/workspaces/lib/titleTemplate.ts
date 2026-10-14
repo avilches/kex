@@ -7,6 +7,9 @@ export const TITLE_VARIABLES = [
   "file",
   "agent",
   "host",
+  "osc",
+  "session",
+  "url",
   "tab",
 ] as const;
 
@@ -16,11 +19,74 @@ export type TitleVariable = (typeof TITLE_VARIABLES)[number];
 // stays literal in the output, so `{tab}` in a tab title is visibly not a variable there.
 export type TitleVars = Partial<Record<TitleVariable, string>>;
 
-const TOKEN = /\{\{|\}\}|\{([a-z]+)\}/g;
+// A template is parsed into text, variable groups ({a|b|c}) and conditionals
+// ({?var text}). `raw` is the source slice, re-emitted verbatim when the group names
+// something that is not a variable of the scope.
+type Node =
+  | { kind: "text"; text: string }
+  | { kind: "vars"; names: string[]; raw: string }
+  | { kind: "cond"; name: string; body: Node[]; raw: string };
+
+const VARS = /^[a-z]+(\s*\|\s*[a-z]+)*$/;
+const COND = /^\?([a-z]+)([\s\S]*)$/;
+
+// `{{` and `}}` are literal braces at the top level only: inside a group every brace
+// opens or closes, so `{?a {b}}` ends with two closers, not an escape.
+function parse(src: string, nested: boolean): Node[] {
+  const nodes: Node[] = [];
+  let text = "";
+  const flush = () => {
+    if (text) nodes.push({ kind: "text", text });
+    text = "";
+  };
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (!nested && (ch === "{" || ch === "}") && src[i + 1] === ch) {
+      text += ch;
+      i++;
+      continue;
+    }
+    if (ch !== "{") {
+      text += ch;
+      continue;
+    }
+    let depth = 1;
+    let j = i + 1;
+    for (; j < src.length && depth > 0; j++) {
+      if (src[j] === "{") depth++;
+      else if (src[j] === "}") depth--;
+    }
+    if (depth > 0) {
+      text += src.slice(i);
+      break;
+    }
+    const raw = src.slice(i, j);
+    const inner = raw.slice(1, -1);
+    const cond = COND.exec(inner);
+    flush();
+    if (cond) nodes.push({ kind: "cond", name: cond[1], body: parse(cond[2], true), raw });
+    else if (VARS.test(inner)) {
+      nodes.push({ kind: "vars", names: inner.split("|").map((n) => n.trim()), raw });
+    } else nodes.push({ kind: "text", text: raw });
+    i = j - 1;
+  }
+  flush();
+  return nodes;
+}
+
+function collect(nodes: Node[], into: Set<string>) {
+  for (const n of nodes) {
+    if (n.kind === "vars") for (const name of n.names) into.add(name);
+    else if (n.kind === "cond") {
+      into.add(n.name);
+      collect(n.body, into);
+    }
+  }
+}
 
 export function titleVariablesUsed(template: string): Set<string> {
   const used = new Set<string>();
-  for (const m of template.matchAll(TOKEN)) if (m[1]) used.add(m[1]);
+  collect(parse(template, false), used);
   return used;
 }
 
@@ -28,16 +94,25 @@ export function hasTitleVariables(template: string): boolean {
   return /[{}]/.test(template);
 }
 
+function render(nodes: Node[], vars: TitleVars): string {
+  return nodes
+    .map((n) => {
+      if (n.kind === "text") return n.text;
+      if (n.kind === "vars") {
+        if (n.names.some((name) => vars[name as TitleVariable] === undefined)) return n.raw;
+        return n.names.map((name) => vars[name as TitleVariable] as string).find(Boolean) ?? "";
+      }
+      const value = vars[n.name as TitleVariable];
+      if (value === undefined) return n.raw;
+      return value ? render(n.body, vars) : "";
+    })
+    .join("");
+}
+
 // Returns "" when nothing readable is left so callers fall back to the default title.
 export function expandTitle(template: string, vars: TitleVars): string {
   if (!hasTitleVariables(template)) return template;
-  const out = template.replace(TOKEN, (match, name: string | undefined) => {
-    if (match === "{{") return "{";
-    if (match === "}}") return "}";
-    const value = name ? vars[name as TitleVariable] : undefined;
-    return value === undefined ? match : value;
-  });
-  return out.replace(/\s+/g, " ").trim();
+  return render(parse(template, false), vars).replace(/\s+/g, " ").trim();
 }
 
 export type TitleScope = "tab" | "workspace";

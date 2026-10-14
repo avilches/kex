@@ -31,9 +31,65 @@ describe("expandTitle", () => {
   });
 });
 
+describe("fallback {a|b|c}", () => {
+  it("uses the first non-empty value", () => {
+    expect(expandTitle("{cmd|osc|cwd}", { cmd: "", osc: "vim", cwd: "/x" })).toBe("vim");
+    expect(expandTitle("{cmd|osc|cwd}", { cmd: "ls", osc: "vim", cwd: "/x" })).toBe("ls");
+    expect(expandTitle("{cmd|osc|cwd}", { cmd: "", osc: "", cwd: "/x" })).toBe("/x");
+  });
+
+  it("is empty when every alternative is empty", () => {
+    expect(expandTitle("{cmd|osc}", { cmd: "", osc: "" })).toBe("");
+  });
+
+  it("stays literal when any alternative is not a variable of the scope", () => {
+    expect(expandTitle("{cmd|tab}", { cmd: "" })).toBe("{cmd|tab}");
+  });
+
+  it("tolerates spaces around the bars", () => {
+    expect(expandTitle("{cmd | osc}", { cmd: "", osc: "vim" })).toBe("vim");
+  });
+});
+
+describe("conditional {?var text}", () => {
+  it("renders the text only when the variable is not empty", () => {
+    const t = "{dir}{?branch · {branch}}";
+    expect(expandTitle(t, { dir: "kex", branch: "main" })).toBe("kex · main");
+    expect(expandTitle(t, { dir: "kex", branch: "" })).toBe("kex");
+  });
+
+  it("drops the leading space of the text once the title is trimmed", () => {
+    expect(expandTitle("{?agent [{agent}]}", { agent: "claude" })).toBe("[claude]");
+  });
+
+  it("supports a fallback inside the text", () => {
+    expect(expandTitle("{?repo {repo|dir}}", { repo: "r", dir: "d" })).toBe("r");
+  });
+
+  it("stays literal when the variable is unknown or the group is not closed", () => {
+    expect(expandTitle("{?nope x}", { dir: "d" })).toBe("{?nope x}");
+    expect(expandTitle("{?dir x", { dir: "d" })).toBe("{?dir x");
+  });
+
+  it("nests", () => {
+    expect(expandTitle("{?cwd x{?dir y}}", { cwd: "c", dir: "d" })).toBe("x y");
+    expect(expandTitle("{?cwd x{?dir y}}", { cwd: "c", dir: "" })).toBe("x");
+  });
+});
+
 describe("titleVariablesUsed / hasTitleVariables", () => {
   it("lists variable names and ignores escaped braces", () => {
     expect([...titleVariablesUsed("{branch} {{cwd}} {dir}")].sort()).toEqual(["branch", "dir"]);
+  });
+
+  it("lists names inside fallbacks and conditionals", () => {
+    expect([...titleVariablesUsed("{cmd|osc}{?branch · {repo|dir}}")].sort()).toEqual([
+      "branch",
+      "cmd",
+      "dir",
+      "osc",
+      "repo",
+    ]);
   });
 
   it("detects braces", () => {
