@@ -6,7 +6,7 @@ const busy = new Map<string, number>();
 const listeners = new Map<string, Set<() => void>>();
 
 // A retry usually answers in a few milliseconds; below this the spinner would just flicker.
-export const MIN_BUSY_MS = 800;
+export const MIN_BUSY_MS = 650;
 
 export function isRestoreBusy(leafId: string): boolean {
   return (busy.get(leafId) ?? 0) > 0;
