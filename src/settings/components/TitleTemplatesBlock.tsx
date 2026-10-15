@@ -1,27 +1,34 @@
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setTitleTemplate, type TitleTemplatePref } from "@/modules/settings/store";
 import { FACTORY_TITLE_DEFAULTS, type TitleDefaultKind } from "@/modules/workspaces/lib/defaultTitles";
-import { TITLE_VARIABLE_DOCS } from "@/modules/workspaces/lib/titleTemplate";
+import {
+  TITLE_GROUP_LABELS,
+  TITLE_VARIABLE_DOCS,
+  type TitleVariableGroup,
+} from "@/modules/workspaces/lib/titleTemplate";
 import { FieldLabel } from "./FieldLabel";
 import { INPUT_CLASS } from "./inputClass";
 
 const ROWS: { kind: TitleDefaultKind; pref: TitleTemplatePref; label: string }[] = [
   { kind: "terminal", pref: "titleTemplateTerminal", label: "Terminal" },
   { kind: "agent", pref: "titleTemplateAgent", label: "Terminal with an agent" },
-  { kind: "file", pref: "titleTemplateFile", label: "Editor, markdown, diffs" },
-  { kind: "browser", pref: "titleTemplateBrowser", label: "Browser" },
   { kind: "gitHistory", pref: "titleTemplateGitHistory", label: "Git History" },
+  { kind: "browser", pref: "titleTemplateBrowser", label: "Browser" },
+  { kind: "diff", pref: "titleTemplateDiff", label: "Diff" },
+  { kind: "editor", pref: "titleTemplateEditor", label: "Editor" },
   { kind: "workspace", pref: "titleTemplateWorkspace", label: "Workspace" },
 ];
 
-const SYNTAX_DOCS: { syntax: string; description: string }[] = [
-  { syntax: "{a|b|c}", description: "The first value that is not empty" },
-  { syntax: "{?var text}", description: "The text, only when var has a value (text may hold more {variables})" },
-  { syntax: "{{ }}", description: "A literal { or }" },
+const SYNTAX_DOCS: { syntax: string; description: string; example: string }[] = [
+  { syntax: "{a|b|c}", description: "The first value that is not empty", example: "{cmd|cwd}: npm run dev, or ~/code/kex when idle" },
+  { syntax: "{?var text}", description: "The text, only when var has a value", example: "{dir}{?branch · {branch}}: kex · main, or kex outside a repo" },
+  { syntax: "{{ }}", description: "A literal { or }", example: "{{dir}}: {dir}" },
 ];
+
+const GROUP_ORDER: TitleVariableGroup[] = ["common", "terminal", "file", "browser", "workspace"];
 
 function TemplateRow({ kind, pref, label }: (typeof ROWS)[number]) {
   const stored = usePreferencesStore((s) => s[pref]);
@@ -75,26 +82,42 @@ function TemplateRow({ kind, pref, label }: (typeof ROWS)[number]) {
 }
 
 function HelpTable() {
-  const rows = [
-    ...TITLE_VARIABLE_DOCS.map((v) => ({
-      syntax: `{${v.name}}`,
-      description: v.scope === "workspace" ? `${v.description} (workspaces only)` : v.description,
-    })),
-    ...SYNTAX_DOCS,
-  ];
   return (
     <table className="w-full border-collapse text-[11px] leading-snug">
       <thead>
         <tr className="text-left text-muted-foreground">
-          <th className="w-32 border-b border-border/60 py-1 pr-2 font-medium">Syntax</th>
-          <th className="border-b border-border/60 py-1 font-medium">What it shows</th>
+          <th className="w-24 border-b border-border/60 py-1 pr-2 font-medium">Variable</th>
+          <th className="border-b border-border/60 py-1 pr-2 font-medium">What it shows</th>
+          <th className="border-b border-border/60 py-1 font-medium">Example</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((r) => (
+        {GROUP_ORDER.map((group) => (
+          <Fragment key={group}>
+            <tr>
+              <th colSpan={3} className="pb-0.5 pt-2 text-left font-medium text-foreground">
+                {TITLE_GROUP_LABELS[group]}
+              </th>
+            </tr>
+            {TITLE_VARIABLE_DOCS.filter((v) => v.group === group).map((v) => (
+              <tr key={v.name}>
+                <td className="border-b border-border/30 py-0.5 pr-2 font-mono text-foreground">{`{${v.name}}`}</td>
+                <td className="border-b border-border/30 py-0.5 pr-2 text-muted-foreground">{v.description}</td>
+                <td className="border-b border-border/30 py-0.5 font-mono text-muted-foreground">{v.example}</td>
+              </tr>
+            ))}
+          </Fragment>
+        ))}
+        <tr>
+          <th colSpan={3} className="pb-0.5 pt-2 text-left font-medium text-foreground">
+            Combining them
+          </th>
+        </tr>
+        {SYNTAX_DOCS.map((r) => (
           <tr key={r.syntax}>
             <td className="border-b border-border/30 py-0.5 pr-2 font-mono text-foreground">{r.syntax}</td>
-            <td className="border-b border-border/30 py-0.5 text-muted-foreground">{r.description}</td>
+            <td className="border-b border-border/30 py-0.5 pr-2 text-muted-foreground">{r.description}</td>
+            <td className="border-b border-border/30 py-0.5 font-mono text-muted-foreground">{r.example}</td>
           </tr>
         ))}
       </tbody>
@@ -109,6 +132,7 @@ export function TitleTemplatesBlock() {
       <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
         <p className="text-[11px] leading-snug text-muted-foreground">
           What a tab or workspace shows until you rename it. An empty field uses the default shown in it.
+          A workspace takes the values of the tab you are on.
         </p>
         {ROWS.map((row) => (
           <TemplateRow key={row.kind} {...row} />

@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { FACTORY_TITLE_DEFAULTS } from "@/modules/workspaces/lib/defaultTitles";
+import { TITLE_VARIABLE_DOCS } from "@/modules/workspaces/lib/titleTemplate";
 import { TitleTemplatesBlock } from "./TitleTemplatesBlock";
 
 const setTitleTemplate = vi.hoisted(() => vi.fn(async () => {}));
@@ -52,7 +53,8 @@ describe("TitleTemplatesBlock", () => {
     usePreferencesStore.setState({
       titleTemplateTerminal: "",
       titleTemplateAgent: "",
-      titleTemplateFile: "",
+      titleTemplateEditor: "",
+      titleTemplateDiff: "",
       titleTemplateBrowser: "",
       titleTemplateGitHistory: "",
       titleTemplateWorkspace: "",
@@ -65,11 +67,35 @@ describe("TitleTemplatesBlock", () => {
     expect(inputs.map((i) => i.placeholder)).toEqual([
       FACTORY_TITLE_DEFAULTS.terminal,
       FACTORY_TITLE_DEFAULTS.agent,
-      FACTORY_TITLE_DEFAULTS.file,
-      FACTORY_TITLE_DEFAULTS.browser,
       FACTORY_TITLE_DEFAULTS.gitHistory,
+      FACTORY_TITLE_DEFAULTS.browser,
+      FACTORY_TITLE_DEFAULTS.diff,
+      FACTORY_TITLE_DEFAULTS.editor,
       FACTORY_TITLE_DEFAULTS.workspace,
     ]);
+    unmount();
+  });
+
+  it("lists the variables common to every tab before the specific ones", () => {
+    const { container, unmount } = mount();
+    const text = container.querySelector("table")?.textContent ?? "";
+    const at = (s: string) => text.indexOf(s);
+    expect(at("Any tab or workspace")).toBeGreaterThan(-1);
+    expect(at("{cwd}")).toBeLessThan(at("Terminals"));
+    expect(at("{cmd}")).toBeGreaterThan(at("Terminals"));
+    expect(at("{file}")).toBeGreaterThan(at("Editors and diffs"));
+    expect(at("{url}")).toBeGreaterThan(at("Browsers"));
+    expect(at("{tab}")).toBeGreaterThan(at("Workspaces only"));
+    unmount();
+  });
+
+  it("gives an example for every variable", () => {
+    const { container, unmount } = mount();
+    const text = container.textContent ?? "";
+    for (const v of TITLE_VARIABLE_DOCS) {
+      expect(v.example).not.toBe("");
+      expect(text).toContain(v.example);
+    }
     unmount();
   });
 
@@ -103,7 +129,7 @@ describe("TitleTemplatesBlock", () => {
 
   it("does not write when nothing changed", () => {
     const { container, unmount } = mount();
-    blur(field(container, "file"));
+    blur(field(container, "editor"));
     expect(setTitleTemplate).not.toHaveBeenCalled();
     unmount();
   });

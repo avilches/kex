@@ -52,13 +52,29 @@ describe("tabTitle - other kinds", () => {
     expect(tabTitle({ id: "b", kind: "browser", url: "" })).toBe("Browser");
   });
 
-  it("git history has a fixed name", () => {
-    expect(tabTitle({ id: "h", kind: "git-history", repoRoot: "/r" } as Tab)).toBe("Git History");
+  it("git history names the repository folder it shows", () => {
+    expect(tabTitle({ id: "h", kind: "git-history", repoRoot: "/code/kex" } as Tab)).toBe("Git History · kex");
   });
 
-  it("falls back to the file name when a custom file default expands to nothing", () => {
-    const defaults = resolveTitleDefaults({ file: "{branch}" });
+  it("git history falls back to a fixed name when the template expands to nothing", () => {
+    const defaults = resolveTitleDefaults({ gitHistory: "{branch}" });
+    expect(tabTitle({ id: "h", kind: "git-history", repoRoot: "/code/kex" } as Tab, null, undefined, { defaults })).toBe(
+      "Git History",
+    );
+  });
+
+  it("falls back to the file name when a custom editor default expands to nothing", () => {
+    const defaults = resolveTitleDefaults({ editor: "{branch}" });
     expect(tabTitle(editor, null, undefined, { defaults })).toBe("foo.ts");
+  });
+
+  it("editors and diffs have their own default", () => {
+    const defaults = resolveTitleDefaults({ editor: "{file}{?dir · {dir}}", diff: "diff {file}" });
+    const diff: Tab = { id: "d", kind: "git-diff", path: "a/b.ts", repoRoot: "/r" } as Tab;
+    expect(tabTitle(editor, null, undefined, { defaults })).toBe("foo.ts · src");
+    expect(tabTitle(diff, null, undefined, { defaults })).toBe("diff b.ts");
+    const markdown: Tab = { id: "m", kind: "markdown", path: "/docs/readme.md" } as Tab;
+    expect(tabTitle(markdown, null, undefined, { defaults })).toBe("readme.md · docs");
   });
 });
 
@@ -109,6 +125,6 @@ describe("tabTitle - configurable defaults", () => {
   });
 
   it("an empty pref keeps the factory default", () => {
-    expect(resolveTitleDefaults({ terminal: "  ", file: "" })).toEqual(FACTORY_TITLE_DEFAULTS);
+    expect(resolveTitleDefaults({ terminal: "  ", editor: "" })).toEqual(FACTORY_TITLE_DEFAULTS);
   });
 });

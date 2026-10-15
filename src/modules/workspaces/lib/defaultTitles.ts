@@ -3,20 +3,23 @@ import type { Tab } from "./types";
 export type TitleDefaultKind =
   | "terminal"
   | "agent"
-  | "file"
+  | "editor"
+  | "diff"
   | "browser"
   | "gitHistory"
   | "workspace";
 
 export type TitleDefaults = Record<TitleDefaultKind, string>;
 
-// Reproduces what Kex showed before the defaults became configurable.
+// What a tab or workspace shows until the user renames it. Everything but the git history
+// reproduces what Kex showed before the defaults became configurable.
 export const FACTORY_TITLE_DEFAULTS: TitleDefaults = {
   terminal: "{cmd|osc|cwd}",
   agent: "{osc|session|{agent}{?dir · {dir}}}",
-  file: "{file}",
+  editor: "{file}",
+  diff: "{file}",
   browser: "{url}",
-  gitHistory: "Git History",
+  gitHistory: "Git History{?dir · {dir}}",
   workspace: "{dir}",
 };
 
@@ -48,7 +51,10 @@ export function defaultKindFor(tab: Tab, hasAgent: boolean): TitleDefaultKind {
       return "browser";
     case "git-history":
       return "gitHistory";
+    case "git-diff":
+    case "git-commit-file":
+      return "diff";
     default:
-      return "file";
+      return "editor";
   }
 }

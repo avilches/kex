@@ -162,23 +162,43 @@ export function expandTitle(template: string, vars: TitleVars): string {
 
 export type TitleScope = "tab" | "workspace";
 
+// Where a variable has a value: every tab, or only one kind. A workspace takes the values
+// of its focused tab, so the same groups apply to it.
+export type TitleVariableGroup = "common" | "terminal" | "file" | "browser" | "workspace";
+
+export const TITLE_GROUP_LABELS: Record<TitleVariableGroup, string> = {
+  common: "Any tab or workspace",
+  terminal: "Terminals",
+  file: "Editors and diffs",
+  browser: "Browsers",
+  workspace: "Workspaces only",
+};
+
 export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
   name: TitleVariable;
   description: string;
+  example: string;
+  group: TitleVariableGroup;
   scope: TitleScope | "both";
 }> = [
-  { name: "cwd", description: "Full working directory, home shown as ~", scope: "both" },
-  { name: "dir", description: "Name of the working directory", scope: "both" },
-  { name: "branch", description: "Git branch (empty outside a repo)", scope: "both" },
-  { name: "repo", description: "Name of the git repository folder", scope: "both" },
-  { name: "cmd", description: "Command running in the terminal", scope: "both" },
-  { name: "file", description: "File name of an editor tab", scope: "both" },
-  { name: "agent", description: "Coding agent running in the terminal", scope: "both" },
-  { name: "host", description: "This machine's name", scope: "both" },
-  { name: "osc", description: "Title the running program sets for the terminal", scope: "both" },
-  { name: "session", description: "Title of the coding agent's session", scope: "both" },
-  { name: "url", description: "Address of a browser tab", scope: "both" },
-  { name: "tab", description: "Title of the focused tab", scope: "workspace" },
+  {
+    name: "cwd",
+    description: "Full path of the folder the tab is in (for a file, the folder that holds it)",
+    example: "~/code/kex/src",
+    group: "common",
+    scope: "both",
+  },
+  { name: "dir", description: "Only the name of that folder", example: "src", group: "common", scope: "both" },
+  { name: "branch", description: "Git branch of that folder, empty outside a repository", example: "main", group: "common", scope: "both" },
+  { name: "repo", description: "Name of the git repository", example: "kex", group: "common", scope: "both" },
+  { name: "host", description: "Name of this computer", example: "MacBook", group: "common", scope: "both" },
+  { name: "cmd", description: "Command running right now", example: "npm run dev", group: "terminal", scope: "both" },
+  { name: "osc", description: "Title the program in the terminal sets for itself", example: "vim notes.md", group: "terminal", scope: "both" },
+  { name: "agent", description: "Coding agent running in the terminal", example: "claude", group: "terminal", scope: "both" },
+  { name: "session", description: "Title of that agent's session", example: "Fix login bug", group: "terminal", scope: "both" },
+  { name: "file", description: "Name of the file", example: "index.ts", group: "file", scope: "both" },
+  { name: "url", description: "Address of the page", example: "https://example.com/docs", group: "browser", scope: "both" },
+  { name: "tab", description: "Title of the focused tab", example: "npm run dev", group: "workspace", scope: "workspace" },
 ];
 
 export function titleVariableDocs(scope: TitleScope) {
