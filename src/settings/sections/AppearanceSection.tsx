@@ -173,26 +173,23 @@ export function AppearanceSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <FieldLabel>Spinner</FieldLabel>
-        <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2">
           <span className="text-[12.5px] font-medium">Loading indicator</span>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="flex items-center gap-1.5">
             {SPINNER_STYLES.map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => void setSpinnerStyle(s)}
                 className={cn(
-                  "flex flex-col items-center gap-2 rounded-lg border p-2.5 transition-all",
+                  "flex items-center gap-1.5 rounded border px-2 py-1 transition-colors",
                   spinnerStyle === s
                     ? "border-foreground/60 ring-1 ring-foreground/20"
                     : "border-border/60 hover:border-border",
                 )}
               >
-                <span className="flex h-6 items-center">
-                  <Spinner size={20} style={s} />
-                </span>
-                <span className="text-[12px] font-medium">{SPINNER_STYLE_LABELS[s]}</span>
+                <Spinner size={12} style={s} />
+                <span className="text-[11.5px] font-medium">{SPINNER_STYLE_LABELS[s]}</span>
               </button>
             ))}
           </div>
