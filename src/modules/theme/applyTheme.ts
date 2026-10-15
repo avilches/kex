@@ -91,15 +91,13 @@ export function applyTheme(
   if (terminal) writeTerminal(root, terminal);
   const editor = editorOverride ?? variant.editor;
   if (editor) writeEditor(root, editor);
-  const note = noteSurface(
-    editor?.background ?? colors?.background ?? "",
-    editor?.foreground ?? colors?.foreground ?? "",
-    variant.noteStrong,
-  );
-  if (note) {
-    root.style.setProperty("--note-background", note.background);
-    root.style.setProperty("--note-foreground", note.foreground);
-  }
+  const noteBg = editor?.background ?? colors?.background;
+  const noteFg = editor?.foreground ?? colors?.foreground;
+  const note = noteSurface(noteBg ?? "", noteFg ?? "", variant.noteStrong);
+  const background = note?.background ?? noteBg;
+  const foreground = note?.foreground ?? noteFg;
+  if (background) root.style.setProperty("--note-background", background);
+  if (foreground) root.style.setProperty("--note-foreground", foreground);
   lastApplied = theme.id;
 }
 

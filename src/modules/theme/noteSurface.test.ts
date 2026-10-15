@@ -20,8 +20,13 @@ describe("noteSurface", () => {
     expect(b[0] - b[2]).toBeGreaterThan(a[0] - a[2]);
   });
 
-  test("returns null for non-hex input", () => {
-    expect(noteSurface("rgb(0,0,0)", "#ffffff")).toBeNull();
+  test("accepts the rgb() form that getComputedStyle returns", () => {
+    const n = noteSurface("rgb(26, 27, 38)", "rgb(192, 202, 245)")!;
+    expect(n.background).toBe(noteSurface("#1a1b26", "#c0caf5")!.background);
+  });
+
+  test("returns null for a color it cannot parse", () => {
+    expect(noteSurface("transparent", "#ffffff")).toBeNull();
   });
 
   test("text stays readable on every built-in theme and mode", () => {

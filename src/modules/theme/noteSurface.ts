@@ -11,8 +11,16 @@ const MIX = {
 
 type Rgb = [number, number, number];
 
-function toRgb(hex: string): Rgb {
-  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as Rgb;
+const FUNC = /^rgba?\(\s*(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)/i;
+
+// Theme files use #rrggbb, but colors read back from CodeMirror via
+// getComputedStyle arrive as rgb(...).
+function parseColor(value: string): Rgb | null {
+  if (HEX.test(value)) {
+    return [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16)) as Rgb;
+  }
+  const m = FUNC.exec(value.trim());
+  return m ? ([Number(m[1]), Number(m[2]), Number(m[3])] as Rgb) : null;
 }
 
 function toHex(c: Rgb): string {
@@ -37,14 +45,15 @@ export function noteSurface(
   foreground: string,
   strong = false,
 ): NoteSurface | null {
-  if (!HEX.test(background) || !HEX.test(foreground)) return null;
-  const bg = toRgb(background);
+  const bg = parseColor(background);
+  const text = parseColor(foreground);
+  if (!bg || !text) return null;
   const amount = MIX[isLight(bg) ? "light" : "dark"][strong ? "strong" : "normal"];
   const tinted = mix(bg, YELLOW, amount);
   const target: Rgb = isLight(tinted) ? [0, 0, 0] : [255, 255, 255];
-  let fg = toRgb(foreground);
+  let fg = text;
   for (let t = 0.05; contrastRatio(fg, tinted) < MIN_CONTRAST && t <= 1; t += 0.05) {
-    fg = mix(toRgb(foreground), target, t);
+    fg = mix(text, target, t);
   }
   return { background: toHex(tinted), foreground: toHex(fg) };
 }
