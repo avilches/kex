@@ -103,7 +103,7 @@ export function useWorkspaceTitle(saved: WorkspaceTitleSubject): string {
   const agentSession = useAgentStore((s) => (tab ? s.sessions[tab.id] : undefined));
   const sys = useSystemInfo();
   const defaults = useTitleDefaults();
-  const git = useDirGit(gitDirFor(ws, defaults));
+  const git = useDirGit(gitDirFor(ws, defaults), tab?.id);
   return resolveWorkspaceTitle(ws, { runningCommand, oscTitle, agentSession, sys, git, defaults });
 }
 

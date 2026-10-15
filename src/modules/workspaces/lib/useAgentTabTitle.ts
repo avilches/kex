@@ -71,7 +71,7 @@ export function useTitleSources(
     !!tab &&
     (templateNeedsGit(effectiveTabTemplate(tab, hasAgent, defaults)) ||
       templateNeedsGit(defaults[defaultKindFor(tab, hasAgent)]));
-  const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined);
+  const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined, tab?.id);
   return { git, agent: agentSession?.agent, home: sys.home, host: sys.host, defaults };
 }
 
