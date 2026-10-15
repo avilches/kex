@@ -6,7 +6,7 @@ const MIN_CONTRAST = 4.5;
 // A warm yellow darkened over a dark surface turns brown, so dark uses a
 // greener yellow that stays mustard-olive.
 const TINT = {
-  dark: { color: [235, 225, 80] as Rgb, normal: 0.12, strong: 0.22 },
+  dark: { color: [235, 225, 80] as Rgb, normal: 0.3, strong: 0.42 },
   light: { color: [250, 204, 21] as Rgb, normal: 0.2, strong: 0.4 },
 };
 
