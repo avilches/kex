@@ -30,6 +30,13 @@ describe("parseAutoHibernate", () => {
 });
 
 describe("touchActivity", () => {
+  it("renews a workspace with a busy agent even when it is not the active one", () => {
+    const seen = new Map([["a", 1], ["b", 1]]);
+    touchActivity(seen, [ws("a"), ws("b")], null, 100, new Set(), new Set(["b"]));
+    expect(seen.get("a")).toBe(1);
+    expect(seen.get("b")).toBe(100);
+  });
+
   it("stamps the active workspace and first sightings, and forgets removed ones", () => {
     const seen = new Map([["a", 1], ["gone", 2]]);
     touchActivity(seen, [ws("a"), ws("b"), ws("c")], "b", 100, new Set());
