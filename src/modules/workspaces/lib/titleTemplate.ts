@@ -30,10 +30,10 @@ type Alt = { name: string } | { nodes: Node[] };
 type Node =
   | { kind: "text"; text: string }
   | { kind: "vars"; v: Alt[]; raw: string }
-  | { kind: "cond"; name: string; body: Node[]; raw: string };
+  | { kind: "cond"; names: string[]; negate: boolean; body: Node[]; raw: string };
 
 const BARE = /^[a-z]+$/;
-const COND = /^\?([a-z]+)([\s\S]*)$/;
+const COND = /^([?!])([a-z]+(?:\|[a-z]+)*)([\s\S]*)$/;
 
 // `{{` and `}}` are literal braces at the top level only: inside a group every brace
 // opens or closes, so `{?a {b}}` ends with two closers, not an escape.
@@ -79,7 +79,13 @@ function parse(src: string, nested: boolean, level = 0): Node[] {
     }
     flush();
     if (cond) {
-      nodes.push({ kind: "cond", name: cond[1], body: parse(cond[2], true, level + 1), raw });
+      nodes.push({
+        kind: "cond",
+        names: cond[2].split("|"),
+        negate: cond[1] === "!",
+        body: parse(cond[3], true, level + 1),
+        raw,
+      });
     } else {
       const v = parts.map(
         (a): Alt => (BARE.test(a.trim()) ? { name: a.trim() } : { nodes: parse(a, true, level + 1) }),
@@ -116,7 +122,7 @@ function collect(nodes: Node[], into: Set<string>) {
         else collect(a.nodes, into);
       }
     } else if (n.kind === "cond") {
-      into.add(n.name);
+      for (const name of n.names) into.add(name);
       collect(n.body, into);
     }
   }
@@ -150,9 +156,10 @@ function render(nodes: Node[], vars: TitleVars): string {
         }
         return "";
       }
-      const value = lookup(vars, n.name);
-      if (value === undefined) return n.raw;
-      return value.trim() ? render(n.body, vars) : "";
+      const values = n.names.map((name) => lookup(vars, name));
+      if (values.some((v) => v === undefined)) return n.raw;
+      const any = values.some((v) => (v as string).trim() !== "");
+      return any !== n.negate ? render(n.body, vars) : "";
     })
     .join("");
 }
