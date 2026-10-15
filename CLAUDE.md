@@ -67,7 +67,7 @@ Cada concepto tiene UN solo nombre canonico. Si el usuario se refiere a algo con
 | **Script** | Comando guardado y ejecutable de un workspace. Campos: `id`, `name`, `command`, `cwdMode?` (`workspace` por defecto, `context` o `fixed`), `cwd?` (solo en `fixed`), `tabId?`. Se configuran en `WorkspaceSettingsDialog` (pestana "Scripts"). Se persisten en `{app_data_dir}/workspaces/<id>.json` como campos `scripts: Script[]` y `activeScript: string` del objeto Workspace. | `src/modules/workspaces/lib/types.ts` (tipo `Script`); dialog en `src/app/components/WorkspaceSettingsDialog.tsx` | "comando", "script", "run config", "configuracion de run", "script del workspace" |
 | **RunButton** | Split-button en el Header para ejecutar el script activo. Parte izquierda: ejecuta/detiene el script seleccionado. Parte derecha (chevron): dropdown para seleccionar entre los scripts configurados en el workspace y acceder a "Configure Scripts". | `src/app/components/RunButton.tsx` | "selector de scripts", "combo de scripts", "menu de run", "el run", "dropdown de scripts", "boton run con flecha", "selector combo de scripts" |
 | **OpenInEditorButton** | Split-button en el Header para abrir el archivo o directorio activo en un editor externo. Parte izquierda: abre con el editor preferido. Parte derecha (chevron): dropdown para elegir editor entre los detectados automaticamente y los personalizados. Se configura en Settings > External Editors (`ExternalEditorsSection`). Preferencias persistidas en `settings-general.json` (`customEditors`, `detectedEditors`, `preferredFileEditorId`, `preferredWorkspaceEditorId`, `textEditorMode`). | `src/modules/external-editors/OpenInEditorButton.tsx`; config en `src/settings/sections/ExternalEditorsSection.tsx`; store en `src/modules/settings/store.ts` | "selector de tools", "combo de tools", "Open in", "abrir en", "el editor externo", "dropdown de tools", "selector combo de tools", "menu de herramientas externas" |
-| **Workspace status** | Categoria/etiqueta de usuario para un workspace; agrupa y colapsa en el WorkspaceBar                                        | `settings/store.ts` (`WorkspaceStatus`), `statusId` | "estado", "grupo", "grupo de workspace"                                                               |
+| **Workspace status** | Categoria/etiqueta de usuario para un workspace; agrupa y colapsa en el WorkspaceBar                                        | `groupId` en `Workspace` (`modules/workspaces/lib/types.ts`); colapso en `collapsedGroupsState.ts` | "estado", "grupo", "grupo de workspace"                                                               |
 | **Header** | Barra superior: identidad del workspace activo + titulo del tab, busqueda inline, run button, campana, controles de ventana | `modules/header/Header.tsx`, `WorkspaceTitle.tsx`, `SearchInline.tsx`, `WindowControls.tsx` | "barra de arriba", "barra superior", "topbar", "cabecera"                                             |
 | **Shortcuts / hotkeys** | Atajos de teclado, todos reasignables desde Settings. Registry unico `SHORTCUTS` (fuente de verdad) + overrides del usuario | `modules/shortcuts/shortcuts.ts`, `useGlobalShortcuts`, `matchesShortcut`; overrides en `usePreferencesStore((s) => s.shortcuts)` | "atajos", "teclas", "hotkeys", "keybindings"                                                          |
 | **Settings** | Ventana de ajustes (webview aparte, label `settings`) + su persistencia JSON. Secciones en `src/settings/sections/`         | UI: `src/settings/SettingsApp.tsx`; store: `modules/settings/store.ts` + `preferences.ts` (`tauri-plugin-store`); JSON `settings-general.json` | "user settings", "config general", "ajustes", "preferencias", "configuracion", "el panel de settings" |
@@ -80,13 +80,12 @@ Cada concepto tiene UN solo nombre canonico. Si el usuario se refiere a algo con
 | **Pane divider** | `<ResizableHandle />` de `react-resizable-panels` dentro del arbol de splits de panes. Se instancia recursivamente en `SplitNodeView`. | `src/modules/workspaces/SplitNodeView.tsx` | "resizer", "divisor de panes", "separador de panes", "linea entre paneles", "lineas divisorias de los panes" |
 | **NotesView** | Vista de notas del Sidebar (pestana "Notes" tras Git, solo con workspaceRoot definido): Quick Access + arbol de carpetas + lista de notas ordenable | `src/modules/notes/NotesView.tsx`; estado en `modules/notes/lib/` | "vista de notas", "las notas", "panel de notas", "pestana notes" |
 | **Quick Access** | Lista de notas fijadas (pinned) del workspace, reordenable por drag, primera seccion de NotesView | `kex.json` campo `notes.quickAccess`; UI en `modules/notes/CollectionsColumn.tsx` | "accesos directos", "notas fijadas", "pinned", "favoritos" |
-| **Workspace hibernado** | Workspace con `hibernated: true`: sus terminales y editores estan cerrados (sin PTY), los tabs siguen en el `paneTree` persistido y se muestra un overlay "Zzzzz" con boton Restore. Se hiberna con Cmd+Alt+Z (`workspace.hibernate`); un modal revisa agentes trabajando, documentos sin guardar y comandos que no volverian | `modules/workspaces/lib/hibernate.ts`, `hibernateReview.ts`, `useHibernateFlow.ts`; `src/app/components/HibernateDialog.tsx`; `docs/WORKSPACES.md` | "dormido", "suspendido", "zzz", "hibernar" |
+| **Workspace hibernado** | Workspace con `hibernated: true`: sus terminales y editores estan cerrados (sin PTY), los tabs siguen en el `paneTree` persistido y se muestra `HibernatedOverlay` ("Hibernated for ...") con un boton para despertarlo. Se hiberna con Cmd+Alt+Z (`workspace.hibernate`); un modal revisa agentes trabajando, documentos sin guardar y comandos que no volverian | `modules/workspaces/HibernatedOverlay.tsx`, `lib/hibernate.ts`, `hibernateReview.ts`, `useHibernateFlow.ts`; `src/app/components/HibernateDialog.tsx`; `docs/WORKSPACES.md` | "dormido", "suspendido", "zzz", "hibernar" |
 | **kex.json** | Fichero JSON en la raiz del workspace con estado de features por-workspace, namespaced (hoy solo `notes`) | raiz del `workspaceRoot`; parse en `modules/notes/lib/notesConfig.ts` | "el kex.json", "config del workspace en el repo" |
 
 **Falsos amigos** (cosas del codigo que se confunden):
 
 - `leaf` (en el slot pool del terminal) no es una entidad: es el slot keyed por tab id.
-- El primitivo shadcn `Tabs` (`components/ui/tabs.tsx`) y `TAB_KEY` son genericos, no la entidad **Tab**.
 - `ScriptState = "running" | "waiting"` (estado de ejecucion de un script) no tiene que ver con **Agent attention**.
 - El token de tema `bg-sidebar` / `--sidebar*` lo consume el **Sidebar** (derecho), no el WorkspaceBar.
 
@@ -246,7 +245,7 @@ Al anadir una accion con atajo: nueva entrada en `SHORTCUTS` (con `id`, `label`,
 Al anadir un ajuste al editor hay que ubicarlo segun su alcance:
 
 - **Ajuste por extension de archivo** (vive en `editorViewByExt`, resuelto con `resolveEditorView`): SIEMPRE va en el menu contextual del editor (el dropdown `[...]` de `EditorPathBar`), en su seccion "por extension". No va en la ventana de Settings (esa es global).
-- **Ajuste global del editor** (preferencia top-level del store): va en DOS sitios: en su grupo "Global" del menu contextual `[...]` y tambien en la ventana de Settings, en la seccion `Editor` (`EditorSection`). Los ajustes globales del terminal van en `TerminalSection`, y los de apariencia/tema en `ThemesSection` (etiquetada "Appearance").
+- **Ajuste global del editor** (preferencia top-level del store): va en DOS sitios: en su grupo "Global" del menu contextual `[...]` y tambien en la ventana de Settings, en la seccion `Editor` (`EditorSection`). Los ajustes globales del terminal van en `TerminalSection`, los de apariencia (fuente de la interfaz) en `AppearanceSection` y los de temas en `ThemesSection`.
 - **Ajuste solo-JSON**: algunas preferencias no tienen UI y se editan a mano en `settings-general.json` o `settings-editor.json`. Marcalas con un comentario `// JSON-only` en el tipo `Preferences` de `store.ts` y listalas en `docs/ARCHITECTURE.md`. Hoy son `editorHighlightActiveLine`, `editorAutoSaveDelay`, `workspacePaneLimit`, `paneSplitLimit`.
 
 Asi el usuario puede tocar lo visual rapido desde el editor y la configuracion global queda accesible tanto en contexto como en la pantalla de ajustes.
@@ -280,7 +279,7 @@ Todos los `<input>` nativos en pantallas de settings deben usar este patron exac
 Diferencias importantes respecto a inputs generales:
 - **`focus:outline-none focus:ring-1 focus:ring-ring`** (NO `focus-visible:ring-1`): evitar el borde azul del SO en navegacion con Tab.
 - `bg-transparent` (no `bg-background`): hereda el fondo del panel de settings.
-- Referencia viva: `ExternalEditorsSection.tsx` constante `INPUT_CLASS`.
+- Referencia viva: la constante `INPUT_CLASS` de `src/settings/components/inputClass.ts`.
 
 Para botones de tab dentro de dialogs/modals (como `WorkspaceSettingsDialog`):
 - Anadir `outline-none focus-visible:outline-none` para eliminar el borde de foco del sistema operativo.
@@ -299,18 +298,19 @@ Cuando Vite HMR recarga un modulo con estado mutable a nivel de modulo, crea una
 ### Two-process model
 
 **Rust (`src-tauri/`)** owns all OS access. The webview never touches the FS, processes, or shells directly - everything
-goes through `invoke()` calls to commands registered in `src-tauri/src/lib.rs`:
+goes through `invoke()` calls to commands registered in `src-tauri/src/lib.rs`. The list below is representative, not
+exhaustive; the full surface is in `docs/IPC.md`:
 
 - `pty::pty_*` - long-lived interactive PTY sessions (xterm ↔ portable-pty), managed by `PtyState` (
   `RwLock<HashMap<id, Session>>`). Output streams via a Tauri `Channel<PtyEvent>`.
 - `fs::tree::*` (`fs_read_dir`, `list_subdirs`), `fs::file::*` (`fs_read_file`, `fs_write_file`, `fs_stat`,
-  `fs_canonicalize`), `fs::mutate::*` (`fs_create_file`, `fs_create_dir`, `fs_rename`, `fs_delete`): file explorer +
+  `fs_canonicalize`), `fs::mutate::*` (`fs_create_file`, `fs_create_dir`, `fs_rename`, `fs_copy`, `fs_trash`, `fs_delete`), `fs::duplicate::*`, `fs::watch::*` (`fs_watch_add`, `fs_watch_remove`): file explorer +
   editor IO.
-- `fs::search::*` (`fs_search`, `fs_list_files`), `fs::grep::*` (`fs_grep`, `fs_glob`): fuzzy file finder + content
+- `fs::search::*` (`fs_search`, `fs_list_files`), `fs::grep::*` (`fs_grep`, `fs_grep_interactive`, `fs_glob`): fuzzy file finder + content
   search (powered by `ignore` + `grep-*` crates).
 - `git::commands::*`: full source-control surface (`git_status`, `git_diff`, `git_diff_content`, `git_stage`,
   `git_unstage`, `git_discard`, `git_commit`, `git_fetch`, `git_pull_ff_only`, `git_push`, `git_log`, `git_show_commit`,
-  `git_commit_files`, `git_commit_file_diff`, `git_panel_snapshot`, `git_resolve_repo`, `git_remote_url`). All gated
+  `git_commit_files`, `git_commit_file_diff`, `git_panel_snapshot`, `git_resolve_repo`, `git_remote_url`, plus branches, remotes, worktrees and `git_mv`). All gated
   through the workspace authorization registry.
 - `shell::shell_run_command`: one-shot subshell exec. On Windows via PowerShell (`-NoProfile -Command`), on Unix via
   `$SHELL -lc`. Shared helper `build_oneshot_command`.
@@ -318,8 +318,10 @@ goes through `invoke()` calls to commands registered in `src-tauri/src/lib.rs`:
   `kill`, `list`): long-running background processes (dev servers etc.) with bounded ring-buffer log capture.
 - `workspace::*`: `workspace_authorize` / `workspace_current_dir` (the spawn/git cwd authorization registry) plus the
   WSL bridge (`wsl_list_distros`, `wsl_default_distro`, `wsl_home`).
+- `fs::notes::*` (`notes_read_dirs`, `notes_read_heads`, `notes_paths_exist`), `history::*`, `editors::*` (external editors),
+  `float_browser::*` (floating browser) and the `window_*` commands that persist per-window state.
 - `open_settings_window`: separate webview window for Settings (optional `section` arg deep-links a section).
-- `agent::agent_enable_claude_hooks` / `agent_claude_hooks_status`: atomically install Claude Code terminal hooks; gated
+- `agent::agent_enable_claude_hooks` / `agent_disable_claude_hooks` / `agent_claude_hooks_status` (plus `agent_session_*` and `agent_os_notify`): atomically install Claude Code terminal hooks; gated
   on `KEX_TERMINAL`.
 
 ### PTY shell integration
@@ -337,9 +339,9 @@ PTY shells are bootstrapped via injected init scripts in `src-tauri/src/modules/
 `pty/shell_init.rs` is split into `#[cfg(unix)]` / `#[cfg(windows)]` modules - keep new platform-specific code in the
 right cfg arm.
 
-ConPTY on Windows requires `SPAWN_LOCK` (Mutex) around `openpty + spawn_command` in `session.rs`. Concurrent spawns
-leave one of the resulting PTYs with a stalled output pipe. Don't remove the lock without verifying first-tab stability
-under fast tab spam.
+ConPTY on Windows requires `CONPTY_LIFECYCLE_LOCK` (Mutex) around both create (`openpty + spawn_command`) and close
+(`drop_session`) in `session.rs`. Overlapping pseudoconsole lifecycle calls corrupt the new console so its shell never
+pumps output (issue #356). Don't remove the lock without verifying first-tab stability under fast tab spam.
 
 Each ConPTY child is also assigned to a per-session **Job Object** with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` (
 `pty/job.rs`). When the Job HANDLE drops - clean shutdown, panic, or even SIGKILL'd Kex process - the kernel kills
@@ -385,7 +387,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **workspaces/** - source of truth for the Workspace/Pane/Tab model. `useWorkspaces` owns state; `splitNode.ts` is
   the pure tree-operation library (split, remove, find, flatten). Rendering: `WorkspaceView` → `SplitNodeView` (
   recursive binary tree) → `PaneView` → `TabContent` (switches on `tab.kind`). State persisted to
-  `{app_data_dir}/workspaces.json` plus `workspaces/<id>.json` by Rust (see above), debounced 300ms on every change.
+  `{app_data_dir}/workspaces.json` plus `workspaces/<id>.json` by Rust (see above), debounced 800ms on every change.
 - **source-control/** - git status / stage / commit panel and diff workflow.
 - **git-history/** - commit graph rail, refs, per-commit file diffs.
 - **markdown/**: Live Preview, the only markdown engine (`codemirror/`, lazy chunk `MarkdownTab`), built directly on
@@ -402,8 +404,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **workspace/** - workspace environment switching (Local + WSL distros).
 - **theme/** - custom theme engine (no `next-themes`). `ThemeProvider` + `applyTheme` write CSS variables; built-in
   presets in `themes/` (registered in `themes/index.ts`),
-  user themes via `customThemes.ts` + `validateTheme.ts`, optional background image via `bgImageStore.ts` +
-  `SurfaceLayer`.
+  user themes via `customThemes.ts` + `validateTheme.ts`.
 - **command-palette/**: fuzzy command/file/search palette.
 - **external-editors/**: detection and launch of external editors (`OpenInEditorButton`).
 - **html-preview/**: `HtmlPreviewPane`, preview of HTML files.
@@ -574,7 +575,7 @@ exist."
 ### Known gotchas
 
 - **React 19 strict mode** double-mounts `useEffect` in dev → terminals spawn twice on first render. The first PTY is
-  cleaned up almost immediately. The `SPAWN_LOCK` mutex serializes this; don't be alarmed by `pty opened id=1` followed
+  cleaned up almost immediately. Don't be alarmed by `pty opened id=1` followed
   by `pty closed id=1` in dev logs.
 - **Windows PowerShell process lifecycle**: `killer.kill()` from `portable-pty` only kills the immediate child.
   Descendants (e.g. `npm run dev` started inside pwsh) survive unless something else takes them down. The Job Object in
