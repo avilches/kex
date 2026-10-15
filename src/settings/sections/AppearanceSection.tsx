@@ -5,9 +5,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { ZOOM_LEVELS } from "@/lib/zoomLevels";
 import { gitStatusHexColor } from "@/modules/explorer/lib/gitStatusColor";
 import type { GitStatusCode } from "@/modules/explorer/lib/gitStatusUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
@@ -21,8 +21,6 @@ import {
   setZoomLevel,
 } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme/ThemeProvider";
-import { Refresh01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { FieldLabel } from "../components/FieldLabel";
 import { SectionHeader } from "../components/SectionHeader";
@@ -60,10 +58,6 @@ const SPINNER_STYLE_LABELS: Record<SpinnerStyle, string> = {
   braille: "Braille",
   cursor: "Cursor",
 };
-
-const ZOOM_MIN = 0.5;
-const ZOOM_MAX = 2.0;
-const ZOOM_STEP = 0.05;
 
 export function AppearanceSection() {
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
@@ -108,23 +102,48 @@ export function AppearanceSection() {
       <SectionHeader title="Appearance" />
 
       <div className="flex flex-col gap-2">
-        <FieldLabel>UI Font</FieldLabel>
+        <FieldLabel>UI</FieldLabel>
         <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <Select
-            value={toSelectValue(selectedPreset)}
-            onValueChange={(v) => handlePresetChange(fromSelectValue(v))}
-          >
-            <SelectTrigger size="sm" className="h-8 w-full text-[12.5px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {UI_FONT_PRESETS.map((p) => (
-                <SelectItem key={p.value} value={toSelectValue(p.value)} className="text-[12.5px]">
-                  {p.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-4">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="shrink-0 text-[12.5px] font-medium">Font</span>
+              <Select
+                value={toSelectValue(selectedPreset)}
+                onValueChange={(v) => handlePresetChange(fromSelectValue(v))}
+              >
+                <SelectTrigger size="sm" className="h-8 w-full min-w-0 text-[12.5px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UI_FONT_PRESETS.map((p) => (
+                    <SelectItem key={p.value} value={toSelectValue(p.value)} className="text-[12.5px]">
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-[12.5px] font-medium">Zoom</span>
+              <div className="flex items-center gap-1.5">
+                {ZOOM_LEVELS.map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => void setZoomLevel(z)}
+                    className={cn(
+                      "rounded border px-2 py-1 tabular-nums text-[11.5px] font-medium transition-colors",
+                      zoomLevel === z
+                        ? "border-foreground/60 ring-1 ring-foreground/20"
+                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground",
+                    )}
+                  >
+                    {Math.round(z * 100)}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
           {showCustomInput && (
             <input
               type="text"
@@ -141,34 +160,6 @@ export function AppearanceSection() {
               className={INPUT_CLASS}
             />
           )}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
-          <span className="text-[12.5px] font-medium">Zoom UI</span>
-          <div className="flex items-center gap-2">
-            <Slider
-              value={[zoomLevel]}
-              min={ZOOM_MIN}
-              max={ZOOM_MAX}
-              step={ZOOM_STEP}
-              onValueChange={(v) => void setZoomLevel(v[0] ?? 1)}
-              className="w-32"
-            />
-            <span className="w-9 shrink-0 text-right tabular-nums text-[11px] text-muted-foreground">
-              {Math.round(zoomLevel * 100)}%
-            </span>
-            <button
-              type="button"
-              title="Reset to default"
-              disabled={zoomLevel === 1.0}
-              onClick={() => void setZoomLevel(1.0)}
-              className="flex size-[22px] items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
-            >
-              <HugeiconsIcon icon={Refresh01Icon} size={11} />
-            </button>
-          </div>
         </div>
       </div>
 

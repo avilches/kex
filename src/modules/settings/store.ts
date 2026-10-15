@@ -1,3 +1,4 @@
+import { DEFAULT_ZOOM, snapZoom } from "@/lib/zoomLevels";
 import type { KeyBinding, ShortcutId } from "@/modules/shortcuts/shortcuts";
 import {
   type EditorViewMap,
@@ -453,7 +454,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalScrollSensitivity: SCROLL_SENSITIVITY_DEFAULT,
   terminalNewFolderMode: "context",
   lastWslDistro: null,
-  zoomLevel: 1.0,
+  zoomLevel: DEFAULT_ZOOM,
   agentNotifications: true,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
@@ -698,7 +699,7 @@ export async function loadPreferences(): Promise<Preferences> {
     lastWslDistro:
       getGeneral<string | null>(KEY_LAST_WSL_DISTRO) ??
       DEFAULT_PREFERENCES.lastWslDistro,
-    zoomLevel: getGeneral<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel,
+    zoomLevel: snapZoom(getGeneral<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel),
     agentNotifications:
       getGeneral<boolean>(KEY_AGENT_NOTIFICATIONS) ??
       DEFAULT_PREFERENCES.agentNotifications,
@@ -1175,7 +1176,7 @@ export async function setWorkspaceDetailGit(value: boolean): Promise<void> {
 }
 
 export async function setZoomLevel(value: number): Promise<void> {
-  await writePref(KEY_ZOOM_LEVEL, value);
+  await writePref(KEY_ZOOM_LEVEL, snapZoom(value));
 }
 
 export async function setUiFont(value: string): Promise<void> {
