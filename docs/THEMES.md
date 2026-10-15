@@ -113,4 +113,5 @@ ahí antes de tocar el código.
 cálido en claro y uno verdoso en oscuro (uno cálido sobre oscuro vira a marrón). Una variante puede fijar su
 propio tinte con `noteTint: { color, amount }` (`amount` de 0 a 1), o intensificar el de por defecto con
 `noteStrong: true`; hoy `noteTint` está en el modo oscuro de varios temas y `noteStrong` en Kanagawa claro.
-La vista `app` de `theme-preview.html` pinta una nota de muestra en el Sidebar.
+La vista `app` de `theme-preview.html` pinta una nota de muestra en el Sidebar, y la mini preview de temas
+de Settings pinta una mininota con la misma superficie (ambas via `variantNoteSurface`).

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { noteSurface } from "./noteSurface";
+import { noteSurface, variantNoteSurface } from "./noteSurface";
 import { contrastRatio } from "./readableColors";
 import { listBuiltinThemes } from "./themes";
 
@@ -51,6 +51,41 @@ describe("noteSurface", () => {
         if (!bg || !fg) continue;
         const n = noteSurface(bg, fg, v?.noteStrong, v?.noteTint)!;
         expect(contrastRatio(rgb(n.foreground), rgb(n.background)), `${theme.id} ${mode}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+});
+
+describe("variantNoteSurface", () => {
+  test("uses the variant's editor surface, falling back to the UI colors", () => {
+    const withEditor = variantNoteSurface({ editor: { background: "#2b2b2b", foreground: "#a9b7c6" } })!;
+    const withColors = variantNoteSurface({ colors: { background: "#2b2b2b", foreground: "#a9b7c6" } })!;
+    expect(withEditor.background).toBe(withColors.background);
+    expect(withColors.background).toBe(noteSurface("#2b2b2b", "#a9b7c6")!.background);
+  });
+
+  test("an explicit editor surface wins over the variant's own", () => {
+    const over = variantNoteSurface({ editor: { background: "#1a1b26" } }, { background: "#ffffff" })!;
+    expect(over.background).toBe(noteSurface("#ffffff", undefined)!.background);
+  });
+
+  test("returns null when neither editor nor colors define a background", () => {
+    expect(variantNoteSurface({})).toBeNull();
+  });
+
+  test("matches what applyTheme publishes on every built-in theme and mode", () => {
+    for (const theme of listBuiltinThemes()) {
+      for (const mode of ["light", "dark"] as const) {
+        const v = theme.variants[mode];
+        if (!v) continue;
+        expect(variantNoteSurface(v), `${theme.id} ${mode}`).toEqual(
+          noteSurface(
+            v.editor?.background ?? v.colors?.background ?? "",
+            v.editor?.foreground ?? v.colors?.foreground,
+            v.noteStrong,
+            v.noteTint,
+          ),
+        );
       }
     }
   });

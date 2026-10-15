@@ -11,6 +11,7 @@ import {
 } from "@/modules/settings/store";
 import type { EditorThemeId } from "@/modules/settings/store";
 import { resolveEditorSurface } from "@/modules/theme/resolveEditorSurface";
+import { variantNoteSurface } from "@/modules/theme/noteSurface";
 import {
   formatEditorRowPref,
   parseEditorRowPref,
@@ -122,7 +123,9 @@ function Swatch({ theme, mode }: { theme: Theme; mode: ThemeMode }) {
 }
 
 function ShellPreview({ theme, mode }: { theme: Theme; mode: ThemeMode }) {
-  const c = (theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light)?.colors;
+  const variant = theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light;
+  const c = variant?.colors;
+  const note = variant ? variantNoteSurface(variant) : null;
   return (
     <div
       className={cn(PREVIEW_BOX, "border border-border/60 p-2 text-[10.5px] leading-[1.5]")}
@@ -130,7 +133,17 @@ function ShellPreview({ theme, mode }: { theme: Theme; mode: ThemeMode }) {
     >
       <div style={{ color: c?.primary ?? c?.accent }}>■ Explorer</div>
       <div>■ Source Control</div>
-      <div>■ Notes</div>
+      {note ? (
+        <div
+          className="mt-1 rounded-[4px] border px-1.5 py-1 leading-[1.35]"
+          style={{ background: note.background, color: note.foreground, borderColor: `${note.foreground}30` }}
+        >
+          <div className="font-semibold">Note:</div>
+          <div>Rebase before the release</div>
+        </div>
+      ) : (
+        <div>■ Notes</div>
+      )}
     </div>
   );
 }

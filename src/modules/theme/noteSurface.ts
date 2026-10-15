@@ -1,4 +1,5 @@
 import { contrastRatio } from "./readableColors";
+import type { EditorSurface, ThemeVariant } from "./types";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const MIN_CONTRAST = 4.5;
@@ -65,4 +66,19 @@ export function noteSurface(
     fg = round(mix(text, target, t));
   }
   return { background: toHex(bgRounded), foreground: toHex(fg) };
+}
+
+// The note surface of a theme variant: its editor surface (or the UI colors
+// when the variant defines no editor) pushed toward yellow, with an optional
+// explicit editor surface winning over the variant's own. This is exactly what
+// applyTheme publishes as --note-background/--note-foreground, so every
+// consumer (the app, the Settings mini preview) shows the same colors.
+export function variantNoteSurface(variant: ThemeVariant, editorOverride?: EditorSurface): NoteSurface | null {
+  const editor = editorOverride ?? variant.editor;
+  return noteSurface(
+    editor?.background ?? variant.colors?.background ?? "",
+    editor?.foreground ?? variant.colors?.foreground,
+    variant.noteStrong,
+    variant.noteTint,
+  );
 }
