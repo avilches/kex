@@ -1,12 +1,13 @@
 import { contrastRatio } from "./readableColors";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const YELLOW: Rgb = [250, 204, 21];
 const MIN_CONTRAST = 4.5;
 
-const MIX = {
-  dark: { normal: 0.14, strong: 0.28 },
-  light: { normal: 0.2, strong: 0.4 },
+// A warm yellow darkened over a dark surface turns brown, so dark uses a
+// greener yellow that stays mustard-olive.
+const TINT = {
+  dark: { color: [235, 225, 80] as Rgb, normal: 0.12, strong: 0.22 },
+  light: { color: [250, 204, 21] as Rgb, normal: 0.2, strong: 0.4 },
 };
 
 type Rgb = [number, number, number];
@@ -47,8 +48,8 @@ export function noteSurface(
 ): NoteSurface | null {
   const bg = parseColor(background);
   if (!bg) return null;
-  const amount = MIX[isLight(bg) ? "light" : "dark"][strong ? "strong" : "normal"];
-  const tinted = mix(bg, YELLOW, amount);
+  const tint = TINT[isLight(bg) ? "light" : "dark"];
+  const tinted = mix(bg, tint.color, strong ? tint.strong : tint.normal);
   const target: Rgb = isLight(tinted) ? [0, 0, 0] : [255, 255, 255];
   // Some themes (Kex Default) leave the text color to the stylesheet.
   const text = (foreground ? parseColor(foreground) : null) ?? target;
