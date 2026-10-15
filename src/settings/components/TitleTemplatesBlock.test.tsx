@@ -73,6 +73,24 @@ describe("TitleTemplatesBlock", () => {
     unmount();
   });
 
+  it("explains the variables and the syntax once, in a single table", () => {
+    const { container, unmount } = mount();
+    expect(container.querySelectorAll("table")).toHaveLength(1);
+    const cells = [...container.querySelectorAll("td:first-child")].map((c) => c.textContent);
+    expect(cells).toContain("{branch}");
+    expect(cells).toContain("{a|b|c}");
+    expect(cells).toContain("{?var text}");
+    expect(new Set(cells).size).toBe(cells.length);
+    unmount();
+  });
+
+  it("puts each label and its input on the same row", () => {
+    const { container, unmount } = mount();
+    const input = field(container, "workspace");
+    expect(input.parentElement?.querySelector("label")?.textContent).toBe("Workspace:");
+    unmount();
+  });
+
   it("saves a trimmed template on blur and shows it trimmed", () => {
     const { container, unmount } = mount();
     const input = field(container, "terminal");

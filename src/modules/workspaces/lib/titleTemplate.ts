@@ -185,7 +185,7 @@ export function titleVariableDocs(scope: TitleScope) {
   return TITLE_VARIABLE_DOCS.filter((v) => v.scope === "both" || v.scope === scope);
 }
 
-export const TITLE_SYNTAX_HINT =
+const TITLE_SYNTAX_HINT =
   "{a|b} uses the first value that is not empty. {?var text} shows the text only when var has a value. Use {{ and }} for literal braces.";
 
 export const TITLE_VARIABLES_HINT = `${TITLE_VARIABLE_DOCS.map((v) => `{${v.name}}`).join(" ")}. ${TITLE_SYNTAX_HINT}`;
