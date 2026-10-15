@@ -28,7 +28,7 @@ const SYNTAX_DOCS: { syntax: string; description: string; example: string }[] = 
   { syntax: "{{ }}", description: "A literal { or }", example: "{{dir}}: {dir}" },
 ];
 
-const GROUP_ORDER: TitleVariableGroup[] = ["common", "terminal", "file", "browser", "workspace"];
+const GROUP_ORDER: TitleVariableGroup[] = ["common", "place", "terminal", "file", "browser", "workspace"];
 
 // Every save writes the file and notifies all windows, so typing is saved in bursts.
 const SAVE_DELAY_MS = 250;
@@ -43,10 +43,16 @@ function TemplateRow({ kind, pref, label }: (typeof ROWS)[number]) {
   const editing = useRef(false);
   const pending = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // The store only echoes a save back after a round trip through disk and the event bus, so
+  // what was last written is tracked here, and echoes of older writes are ignored.
+  const sent = useRef(stored);
+  const inFlight = useRef(0);
 
   // The saved value arrives after the window loads and other windows can change it; a field
-  // being typed in is never overwritten.
+  // being typed in, or one with a write on its way, is never overwritten.
   useEffect(() => {
+    if (inFlight.current > 0) return;
+    sent.current = stored;
     if (!editing.current) setValue(stored || factory);
   }, [stored, factory]);
 
@@ -54,7 +60,12 @@ function TemplateRow({ kind, pref, label }: (typeof ROWS)[number]) {
   const save = (next: string) => {
     const trimmed = next.trim();
     const toStore = trimmed === factory ? "" : trimmed;
-    if (toStore !== storedRef.current) void setTitleTemplate(pref, toStore);
+    if (toStore === sent.current) return;
+    sent.current = toStore;
+    inFlight.current += 1;
+    void setTitleTemplate(pref, toStore).finally(() => {
+      inFlight.current -= 1;
+    });
   };
 
   const flush = () => {
@@ -88,15 +99,19 @@ function TemplateRow({ kind, pref, label }: (typeof ROWS)[number]) {
           clearTimeout(timer.current);
           timer.current = setTimeout(flush, SAVE_DELAY_MS);
         }}
-        onBlur={(e) => {
+        onBlur={() => {
           editing.current = false;
+          const typed = pending.current;
           flush();
-          setValue(e.target.value.trim() || factory);
+          // Nothing typed since the last save: show what is saved, which may have changed
+          // elsewhere while the field had focus.
+          setValue((typed ?? storedRef.current).trim() || factory);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
         }}
         spellCheck={false}
+        maxLength={500}
         className={INPUT_CLASS}
       />
       <button

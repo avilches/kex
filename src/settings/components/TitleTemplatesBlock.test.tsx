@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { FACTORY_TITLE_DEFAULTS } from "@/modules/workspaces/lib/defaultTitles";
 import { TITLE_VARIABLE_DOCS } from "@/modules/workspaces/lib/titleTemplate";
@@ -49,7 +49,8 @@ function blur(input: HTMLInputElement) {
 
 describe("TitleTemplatesBlock", () => {
   beforeEach(() => {
-    setTitleTemplate.mockClear();
+    setTitleTemplate.mockReset();
+    setTitleTemplate.mockImplementation(async () => {});
     usePreferencesStore.setState({
       titleTemplateTerminal: "",
       titleTemplateAgent: "",
@@ -81,6 +82,8 @@ describe("TitleTemplatesBlock", () => {
     const text = container.querySelector("table")?.textContent ?? "";
     const at = (s: string) => text.indexOf(s);
     expect(at("Any tab or workspace")).toBeGreaterThan(-1);
+    expect(at("{host}")).toBeLessThan(at("Tabs that live in a folder"));
+    expect(at("{cwd}")).toBeGreaterThan(at("Tabs that live in a folder"));
     expect(at("{cwd}")).toBeLessThan(at("Terminals"));
     expect(at("{cmd}")).toBeGreaterThan(at("Terminals"));
     expect(at("{file}")).toBeGreaterThan(at("Editors and diffs"));
@@ -213,6 +216,53 @@ describe("TitleTemplatesBlock", () => {
     const input = field(container, "terminal");
     act(() => usePreferencesStore.setState({ titleTemplateTerminal: "{host}" }));
     expect(input.value).toBe("{host}");
+    unmount();
+  });
+
+  describe("while a save is still on its way back from the store", () => {
+    beforeEach(() => {
+      setTitleTemplate.mockImplementation(() => new Promise<void>(() => {}));
+      vi.useFakeTimers();
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("still saves a revert to the default made before the first save came back", () => {
+      const { container, unmount } = mount();
+      const input = field(container, "terminal");
+      act(() => input.focus());
+      type(input, "x");
+      act(() => vi.advanceTimersByTime(250));
+      type(input, FACTORY_TITLE_DEFAULTS.terminal);
+      act(() => vi.advanceTimersByTime(250));
+      expect(setTitleTemplate.mock.calls).toEqual([
+        ["titleTemplateTerminal", "x"],
+        ["titleTemplateTerminal", ""],
+      ]);
+      unmount();
+    });
+
+    it("does not flash an older value when the echo of an earlier save arrives after blur", () => {
+      const { container, unmount } = mount();
+      const input = field(container, "terminal");
+      act(() => input.focus());
+      type(input, "ab");
+      act(() => vi.advanceTimersByTime(250));
+      type(input, "abc");
+      blur(input);
+      act(() => usePreferencesStore.setState({ titleTemplateTerminal: "ab" }));
+      expect(input.value).toBe("abc");
+      unmount();
+    });
+  });
+
+  it("shows a value changed elsewhere while the field had focus, once it loses it", () => {
+    const { container, unmount } = mount();
+    const input = field(container, "terminal");
+    act(() => input.focus());
+    act(() => usePreferencesStore.setState({ titleTemplateTerminal: "other" }));
+    expect(input.value).toBe(FACTORY_TITLE_DEFAULTS.terminal);
+    act(() => input.blur());
+    expect(input.value).toBe("other");
     unmount();
   });
 
