@@ -40,9 +40,10 @@ describe("tabTitle - terminal factory default: what is running, then the branch 
     expect(tabTitle(terminal({ cwd: "/home/me", title: "custom" }), "ls", "vim")).toBe("custom");
   });
 
-  it("leaves no dangling separator when there is neither a branch nor a folder", () => {
-    expect(tabTitle(terminal(), "ls", undefined)).toBe("ls");
-    expect(tabTitle(terminal(), null, "vim")).toBe("vim");
+  it("a terminal at the root of the disk still has a folder to show", () => {
+    const root = terminal({ cwd: "/" });
+    expect(tabTitle(root, null, undefined)).toBe("/");
+    expect(tabTitle(root, "ls", undefined)).toBe("ls · /");
   });
 
   it("falls back to shell when there is nothing at all", () => {
@@ -116,9 +117,8 @@ describe("tabTitle - agent terminals", () => {
     expect(tabTitle(t, null, undefined, { ...agent, ...inRepo })).toBe("claude · main");
   });
 
-  it("drops the branch or folder part when there is neither", () => {
-    expect(tabTitle(terminal(), null, undefined, agent)).toBe("claude");
-    expect(tabTitle(terminal(), null, "live status", agent)).toBe("live status");
+  it("shows the folder at the root of the disk too", () => {
+    expect(tabTitle(terminal({ cwd: "/" }), null, "live status", agent)).toBe("live status · /");
   });
 
   it("ignores the running command, which is literally the agent binary", () => {

@@ -315,15 +315,15 @@ Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command bo
 
 | Kind | Factory default | Meaning |
 |---|---|---|
-| terminal | `{?cmd\|osc {cmd\|osc}{?branch\|dir · }}{branch\|dir}` | what is running (foreground command from OSC 133 C, else the title the program set with OSC 0/2) followed by where, which is the branch if there is one and else the folder: `npm run dev · main`; an idle shell shows just `main` or `kex` |
-| terminal with an agent | `{osc\|session\|{agent}}{?branch\|dir · {branch\|dir}}` | OSC title, else the agent session title, else the agent name, followed by the branch or else the folder: `✳ Fix login · main`, `claude · kex` |
+| terminal | `{?cmd\|osc {cmd\|osc} · }{branch\|dir}` | what is running (foreground command from OSC 133 C, else the title the program set with OSC 0/2) followed by where, which is the branch if there is one and else the folder: `npm run dev · main`; an idle shell shows just `main` or `kex` |
+| terminal with an agent | `{osc\|session\|{agent}} · {branch\|dir}` | OSC title, else the agent session title, else the agent name, followed by the branch or else the folder: `✳ Fix login · main`, `claude · kex` |
 | editor, markdown | `{file}` | file name |
 | git diff, commit file | `{file}` | file name |
 | browser | `{url}` | address |
 | git history | `Git History{?dir · {dir}}` | `Git History · kex`; the folder is the repository root |
 | workspace | `{dir}` | name of the focused tab's directory |
 
-A terminal is an agent tab when `TitleSources.agent` is set (an agent session exists for it). The foreground command is deliberately not in the agent default: the shell reports it as literally `claude ...`, which would mask the live OSC title. Claude Code uses OSC 0/2 to propagate its AI-generated conversation title (`ai-title` field in the session JSONL); it emits `✳ Claude Code` on startup and `✳ <ai-title>` once generated, and spinner frames (`⠂ Claude Code`) are transient. `agentSession.meta.sessionTitle` is set once by the `SessionStart` hook payload, often empty and never updated, so it only fills the gap before the first OSC title.
+A terminal tab knows its folder from the moment it is created, not from the first OSC 7: every place that opens one passes `cwd`, and `resolveNewTerminalCwd` ends its fallback chain at the launch folder and then home, which is what the shell picks on its own; OSC 7 only follows later `cd`s. That is why the defaults above can assume "where" exists and carry no guard for an empty folder. A terminal is an agent tab when `TitleSources.agent` is set (an agent session exists for it). The foreground command is deliberately not in the agent default: the shell reports it as literally `claude ...`, which would mask the live OSC title. Claude Code uses OSC 0/2 to propagate its AI-generated conversation title (`ai-title` field in the session JSONL); it emits `✳ Claude Code` on startup and `✳ <ai-title>` once generated, and spinner frames (`⠂ Claude Code`) are transient. `agentSession.meta.sessionTitle` is set once by the `SessionStart` hook payload, often empty and never updated, so it only fills the gap before the first OSC title.
 
 Both the tab bar (`PaneTabBar`) and the header (`WorkspaceTitle`) render this same value through the shared hook `useAgentTabTitle()` (`src/modules/workspaces/lib/useAgentTabTitle.ts`), so they cannot diverge. See `docs/WORKSPACES_GOTCHAS.md` Bug 9 for the investigation that led here (the header used to show only the agent name because it called the non-agent `tabTitle()` directly).
 
