@@ -227,9 +227,9 @@ Hooks must be installed via "Set up Claude Code" (notification bell popover) for
 
 Settings open in a separate window (not a panel in the main window). Deep-linking is supported — `openSettingsWindow("shortcuts")` opens directly to the Shortcuts section. The settings window is `always_on_top` relative to the main window.
 
-Navigation is a left vertical sidebar. Sections: General, Workspaces, Editor, Terminal, Appearance, Themes, Shortcuts, About. General holds tabs, explorer, agents, and startup; Workspaces holds the global workspace status list (see below); Editor and Terminal each own their font, behavior, and cursor settings; Appearance holds zoom, the default tab and workspace title templates, and Git file colors; Themes holds the color mode, theme picker, and editor (syntax) theme. The sidebar dock side is no longer a global setting: it is per-window state (see below) flipped from each window's header toggle, since the standalone Settings window cannot target a specific main window.
+Navigation is a left vertical sidebar. Sections: General, Workspaces, Editor, Terminal, Appearance, Themes, Shortcuts, About. General holds tabs, explorer, agents, and startup; Workspaces holds workspace behavior such as auto-hibernate; Editor and Terminal each own their font, behavior, and cursor settings; Appearance holds zoom, the default tab and workspace title templates, and Git file colors; Themes holds the color mode, theme picker, and editor (syntax) theme. The sidebar dock side is no longer a global setting: it is per-window state (see below) flipped from each window's header toggle, since the standalone Settings window cannot target a specific main window.
 
-**Workspace statuses.** A global ordered list of named statuses (`WorkspaceStatus[]`, persisted in `settings-general.json` as `workspaceStatuses`). Each status has an immutable `id` (prefix `st-`, generated with `newStatusId()`) and a user-editable `label`. Defaults: Archived, Work in progress, On hold, Canceled, Completed. Managed in Settings > Workspaces via a drag-to-reorder, inline-rename, delete list. Each workspace can be assigned one status via a pill selector in its Properties dialog (Workspace Settings > Properties). The sidebar groups workspaces by status: workspaces with no status appear at the top; each status group with at least one member appears below, separated by a text label (expanded sidebar) or a thin divider (compact mode). Drag-and-drop in the sidebar is multi-container: dragging a workspace into a different group reassigns its status and repositions it. Groups that already have workspaces are not whole-group drop targets; only their items are, so a drag into such a group is just a drop between two workspaces. Statuses with no workspaces (and the no-status group when it is empty) are unreachable that way, so while a drag is active they appear as thin header drop targets rendered at the very end of the list (a "No status" header clears the status). Appending them at the end of the scrollable list keeps the existing items from shifting, so the drag overlay stays aligned with the pointer; these zones assign their status only on drop (reassigning mid-drag would fill the group and yank its header out from under the pointer). A custom collision strategy (`pointerWithin`, items first, group zones second) keeps in-group reordering precise while still letting the empty-group zones catch drops. The group list itself is a vertical scroll container (`flex-1 overflow-y-auto`, `thin-scrollbar`) with the "new workspace" button pinned below it, so many workspaces or many status groups scroll instead of overflowing the window (dnd-kit auto-scrolls the container while dragging). Workspaces whose `statusId` no longer matches a valid status are normalized to no-status on preferences hydration. Both the sidebar grouping and keyboard navigation derive their order from the pure helpers in `modules/workspaces/lib/workspaceOrder.ts` (`groupWorkspaces`, `groupWorkspacesForDrag`, `visibleWorkspaceOrder`), the single source of truth for visual order. A new workspace (`addWorkspace`, via `insertWorkspaceAfterActive`) is inserted right after the active one in the state array and inherits its `statusId`, so it lands immediately below the active workspace within the same status group (filtering preserves array order, so array adjacency equals in-group adjacency).
+**Workspace groups.** Workspaces can be organized into named groups in the WorkspaceBar. A group is `WorkspaceGroup { id, label }` (`modules/workspaces/lib/types.ts`, ids `grp-...` from `newGroupId()`) and a workspace joins one through its optional `groupId`. Groups belong to each window, not to the global preferences: `App.tsx` holds them in state and persists them through `window_save_groups` (`workspaceGroupsState.ts`, Rust `window_state`), and the collapsed ones through `window_save_collapsed_groups`. A group is created from a workspace (born with the label "Group"), can be renamed and reordered, and a group left with no members is pruned (`pruneEmptyGroups`). The sidebar order comes from the pure helpers in `modules/workspaces/lib/workspaceOrder.ts` (`groupWorkspaces`, `groupWorkspacesForDrag`, `visibleWorkspaceOrder`), the single source of truth for visual order, so navigation and rendering agree: workspaces with no valid group come first, then each non-empty group; while a drag is active every group is listed, even empty ones, so each is a drop target. A `groupId` that matches no group counts as no group. A new workspace (`addWorkspace`, via `insertWorkspaceAfterActive`) is inserted right after the active one in the state array and inherits its `groupId`.
 
 **State granularity (global vs per-window vs per-workspace).** Three tiers:
 
@@ -299,7 +299,7 @@ The practical effect: if you try a git operation in a directory you haven't navi
 
 ### 4.3 Windows: ConPTY spawn serialization
 
-On Windows, opening a new terminal tab serializes through a `SPAWN_LOCK` mutex. Concurrent ConPTY open calls leave one of the resulting PTYs with a stalled output pipe. This means: if you open several tabs very quickly on Windows, the tabs open in sequence rather than in parallel. The delay is typically under 200ms per tab and is only perceptible during rapid tab creation.
+On Windows, creating and closing a ConPTY session serializes through a `CONPTY_LIFECYCLE_LOCK` mutex (`pty/session.rs`). Overlapping pseudoconsole lifecycle calls corrupt the new console so its shell never pumps output. This means: if you open several tabs very quickly on Windows, the tabs open in sequence rather than in parallel. The delay is typically under 200ms per tab and is only perceptible during rapid tab creation.
 
 ### 4.4 Windows: Job Objects for process cleanup
 
@@ -360,7 +360,7 @@ The tab has three modes, chosen in the path bar and rotated by `editor.cycleView
 
 ### 4.10 Buffer ownership: `useDocument`
 
-The tab reads and writes its file through the same `useDocument` hook (`modules/editor/lib/useDocument.ts`) as a plain `editor` tab, so the CodeMirror document is the single source of truth for the text. `MarkdownTab` keeps only the text typed since the last load, tied to the `doc` it was typed against (a reload swaps `doc` and the stale edit is ignored), so Preview and Outline can read it and a remounted editor starts from it.
+The tab reads and writes its file through the same `useDocument` hook (`modules/editor/lib/useDocument.ts`) as a plain `editor` tab, so the CodeMirror document is the single source of truth for the text. `MarkdownTab` keeps only the text typed since the last load, tied to the `doc` it was typed against (a reload swaps `doc` and the stale edit is ignored), so Preview and Outline can read it and a remounted editor starts from it. The buffer a tab carries across an unmount (`unflushedBuffers` in `useDocument.ts`, for example when the tab is dragged to another pane) is keyed by tab id, not by path: the same file open in two tabs would otherwise let one tab's unmount overwrite or adopt the other's cache. `EditorPane` and `useDocument` therefore receive `tabId` as well as `path`. The conflict flag (`conflict` + `keepLocalChanges`) and the auto-save timer live in `useConflictFlag` / `useAutoSaveTimer` under `src/modules/editor/lib/`.
 
 ### 4.11 Save round-trip policy
 
@@ -545,8 +545,8 @@ src/
     │                                gets PowerShell syntax and the cd fails), and the frontend does not know
     │                                the user's shell, so fish before 4.1 (no `{ }` group) gets a syntax error
     │                                and the script does not run in a reused tab with a folder),
-    │                                activeScript (selected script id), and statusId (optional foreign key
-    │                                to a WorkspaceStatus id in the preferences store). See WORKSPACES.md for render
+    │                                activeScript (selected script id), and groupId (optional id of a
+    │                                window-level WorkspaceGroup). See WORKSPACES.md for render
     │                                tree details.
     │                                `terminalEphemeralStore` has a second section, `scriptRunning` (Map<tabId,
     │                                ScriptState>), tracking which terminal tabs are running a script command.
@@ -559,10 +559,6 @@ src/
     │                                (`lib/viewCycle.ts`). `markdown.toggleOutline` and `editor.save` use the same handle. `editor.preview.toggleSplit` has no default binding.
     ├── theme/                     — CSS variable engine, presets, custom themes, bg image
     ├── settings/                  — Settings store, preferences, window opener.
-    │                                The `Preferences` type includes `workspaceStatuses: WorkspaceStatus[]`
-    │                                (the global ordered status list, key `workspaceStatuses` in
-    │                                `settings-general.json`, synced cross-window via `GENERAL_PREF_KEY_MAP`).
-    │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
     ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  : Live Preview, the only markdown engine. Used by the `markdown` tab kind
     │   │                            and, through `MarkdownPreviewPane.tsx` (read-only Live Preview), by the
@@ -596,6 +592,8 @@ src/
     │                                Kex never writes metadata into user `.md` files. Opening a note creates a `markdown`
     │                                tab, so it opens in Live Preview.
     ├── workspace/                 — Local + WSL environment switching
+    ├── external-editors/          — Detection and launch of external editors (`OpenInEditorButton`)
+    ├── html-preview/              — `HtmlPreviewPane`, preview of HTML files
     ├── updater/                   — Auto-updater dialog
     └── command-palette/           — Fuzzy command/file/search palette
 ```

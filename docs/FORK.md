@@ -112,7 +112,7 @@ previous workspaces or pane layout.
 
 **What was built:**
 
-- Full `Workspace[]` serialized to `workspace-state.json` via `tauri-plugin-store` on every state change (debounced
+- Full `Workspace[]` serialized to `workspaces/<id>.json` by Rust on every state change (debounced
   300ms).
 - Pane tree, panel list, divider positions, active pane, and active panel all restored on restart.
 - Terminal panels restart with a fresh PTY in the saved `cwd`.
@@ -162,7 +162,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   behavior is replaced by the explicit per-terminal autofocus mechanism (see below). The Workspace Root option is
   disabled when unset or missing. The mode is the single source of truth for the root, so focusing an editor no
   longer reroots the explorer (the upstream per-editor root override was removed). Pure logic in
-  `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspace-state.json` (`explorerRootMode`,
+  `modules/workspaces/lib/explorerRoot.ts`; state persisted in `workspaces/<id>.json` (`explorerRootMode`,
   `workspaceRoot`).
 - **Per-terminal autofocus (sidebar-driving terminal)** -- replaces the removed "Follow Terminal" / "Follow Git Root"
   modes. A terminal with its autofocus flag enabled (crosshair indicator on the tab, toggle in the tab right-click
@@ -173,7 +173,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   root; else File System at the common ancestor / dirname. The git repo for Source Control / Git History is resolved
   from the same folder (`git_resolve_repo`), stored per workspace as `gitRootByWs`, and is `null` when no repo is
   found. Unlike the old reactive Follow modes, autofocus never fires on app boot and never switches sidebar tabs or
-  opens the panel automatically. The `autofocus` flag is persisted in `workspace-state.json`.
+  opens the panel automatically. The `autofocus` flag is persisted in `workspaces/<id>.json`.
 - **Root path header (all modes)** — the tree is prefixed by a non-collapsible header row showing the current root's
   full path, left-truncated when long so the tail stays visible (a leading LRM keeps the leading `/` from being
   reordered by the rtl-based truncation). The selector trigger shows the active mode's label and icon rather than the
@@ -185,7 +185,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   drive root) whose double-click climbs to the parent directory; the selector uses the hierarchy icon and its subtitle
   shows the current root path. If the current root is deleted while shown, the explorer silently relocates to the
   nearest existing ancestor instead of showing a recovery state. The current root is stored as `fsRoot` in
-  `workspace-state.json` (default home). A root change carries the open folders over through the same rule used to
+  `workspaces/<id>.json` (default home). A root change carries the open folders over through the same rule used to
   restore a workspace snapshot (`carryOverExpanded`): folders under the new root stay open, going up also opens the old
   root, and an unrelated root keeps nothing. The `..`
   row appears only in File System mode; Workspace Root mode is unaffected.
@@ -227,7 +227,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   installed will see the "Enable Claude Code alerts" button again (status check detects the outdated script via the
   version marker) and reinstalling updates both the script and the OSC signal.
 - **Agent session restore** — when Claude Code hooks are installed, the app writes the active session id and cwd to
-  `~/.config/kex/agent-sessions.json` (via `SessionStart` hook; `SessionEnd` is intentionally ignored to avoid a
+  `~/Library/Application Support/app.betauer.kex/agent-sessions.json` (via `SessionStart` hook; `SessionEnd` is intentionally ignored to avoid a
   race with PTY death). On relaunch, `agent_session_restore_plan` (Rust) reads the store (preferring
   `restore-candidates.json` written just before the last close), locates the Claude Code JSONL transcript to verify
   the cwd, and returns a resume command per recoverable session. The frontend types the command
@@ -354,15 +354,14 @@ The git diff and commit-file panes were brought in line with the editor: their o
 
 The diff can now render two ways. Unified is the existing inline `unifiedMergeView` extension inside the `<CodeMirror>` wrapper; split is a new side-by-side view (`GitDiffSplitView`) that mounts `@codemirror/merge`'s `MergeView` class directly on a host div, outside the React-CodeMirror wrapper, because `MergeView` is a class with its own DOM rather than an extension. Both editors are read-only and share the diff theme; the split view resolves its language asynchronously and reconfigures both panes via a compartment, so an uncached language pack still highlights without a remount. The mode is driven by a new global `diffViewMode` preference (`"unified" | "split"`, default `"unified"`), shown in Settings -> Editor and toggled from the bar. Word wrap and line numbers in diffs reuse the per-extension `editorViewByExt` config (the same store the editor `[...]` menu writes), so they are not new global settings. The upstream has only the inline unified diff and no diff options bar.
 
-### Workspace statuses
+### Workspace groups
 
-A global ordered list of named statuses that can be assigned to workspaces. Not present in upstream Terax.
+Workspaces can be organized into named groups in the WorkspaceBar. Not present in upstream Terax.
 
-- **Status model**: `WorkspaceStatus { id: string; label: string }` stored as `workspaceStatuses` in `settings-general.json`. IDs are immutable (`st-` prefix, generated by `newStatusId()`); labels are editable. Defaults: Archived, Work in progress, On hold, Canceled, Completed.
-- **Settings > Workspaces section**: new section in the Settings window (between General and Editor) with a drag-to-reorder, inline-rename, delete list. Empty-label entries are removed on navigation away.
-- **Workspace Properties**: status pill selector in the Properties tab of the Workspace Settings dialog. Clicking a pill assigns that status; a cancel button clears it.
-- **Sidebar grouping**: the workspace sidebar groups workspaces by status. Unassigned workspaces appear at the top; each non-empty status group appears below with a text label (expanded mode) or a thin divider (compact mode). Drag-and-drop is multi-container: dropping a workspace into a different group both reassigns its status and repositions it in the new group.
-- **Orphan normalization**: on preferences hydration, any workspace whose `statusId` no longer matches a valid status is silently cleared to no-status.
+- **Group model**: `WorkspaceGroup { id: string; label: string }`, ids `grp-` from `newGroupId()`. A workspace joins a group through its optional `groupId`. Groups are per window state (`window_save_groups`), not a global preference, and the collapsed ones are saved with `window_save_collapsed_groups`.
+- **Lifecycle**: a group is created from a workspace (label "Group"), can be renamed and reordered, and is pruned when it has no members.
+- **Sidebar grouping**: workspaces with no valid group appear at the top; each non-empty group appears below with a text label (expanded mode) or a thin divider (compact mode). Drag-and-drop is multi-container: dropping a workspace into a different group reassigns its group and repositions it there.
+- **Orphans**: a `groupId` that matches no group counts as no group (`groupWorkspaces`).
 
 ### Scripts and Run button (F12)
 

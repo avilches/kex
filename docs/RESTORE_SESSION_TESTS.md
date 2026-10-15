@@ -50,7 +50,7 @@ Lanzar `claude` dentro de Kex y esperar a que muestre el prompt (puede tardar ~5
 Luego en otro terminal:
 
 ```bash
-cat ~/.config/kex/agent-sessions.json | python3 -m json.tool
+cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json | python3 -m json.tool
 ```
 
 Esperado: objeto con `tabs` que tiene una clave igual al UUID de D1, con `state: "idle"`.
@@ -70,7 +70,7 @@ Nota: el script tiene un fallback sin jq pero es menos robusto.
 Cerrar Kex (sin salir de claude), luego:
 
 ```bash
-cat ~/.config/kex/agent-sessions.json | python3 -m json.tool
+cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json | python3 -m json.tool
 ```
 
 El `state` debe seguir siendo `"idle"` (no `"exited"`).
@@ -122,14 +122,14 @@ o `CLAUDE_CONFIG_DIR` esta configurado a otra ruta.
 ### D8 — El tabId del store coincide con el del tab nuevo
 
 El problema mas sutil: al reabrir Kex, los tabs obtienen IDs nuevos (UUIDs frescos) porque
-el estado de workspace se restaura desde `workspace-state.json`. Ese archivo persiste el `tab.id`.
+el estado de workspace se restaura desde `workspaces/<id>.json`. Ese archivo persiste el `tab.id`.
 
 El store guarda el `KEX_PANEL_ID` de la sesion anterior. Si ese ID coincide con el ID que
-tiene el tab al restaurarse (que viene de `workspace-state.json`), funciona. Si no coincide,
+tiene el tab al restaurarse (que viene de `workspaces/<id>.json`), funciona. Si no coincide,
 `consumeRestorePlan` no encuentra el plan.
 
-Verificar: el `tabId` en `~/.config/kex/agent-sessions.json` debe ser el mismo que el
-`id` del tab en `workspace-state.json` (via `tauri-plugin-store`, ver comando abajo).
+Verificar: el `tabId` en `~/Library/Application Support/app.betauer.kex/agent-sessions.json` debe ser el mismo que el
+`id` del tab en `workspaces/<id>.json` (ver comando abajo).
 
 ```bash
 # panel IDs en el workspace guardado
@@ -137,7 +137,7 @@ cat ~/Library/Application\ Support/app.betauer.kex/workspaces.json \
   | python3 -m json.tool | grep '"id"' | head -20
 
 # panel IDs en el session store
-cat ~/.config/kex/agent-sessions.json | python3 -m json.tool | grep -E '"tabs"|{' | head -10
+cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json | python3 -m json.tool | grep -E '"tabs"|{' | head -10
 ```
 
 Si los IDs no coinciden: este es el bug raiz. El UUID del panel cambia entre sesiones.
@@ -182,7 +182,7 @@ rm -f ~/.config/kex/hooks/session.sh
 - [ ] Abrir terminal en Kex, anotar el UUID de `$KEX_PANEL_ID`
 - [ ] Ejecutar `claude`
 - [ ] Esperar el prompt de claude (5-10s)
-- [ ] En otro terminal: `cat ~/.config/kex/agent-sessions.json | python3 -m json.tool`
+- [ ] En otro terminal: `cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json | python3 -m json.tool`
 - [ ] Esperado: entrada para el UUID anotado con `state: "idle"`, `session_id` relleno
 - [ ] Verificar UI: icono `✦` en el tab, dot verde pulsando, titulo `claude · dirname`
 
@@ -196,7 +196,7 @@ rm -f ~/.config/kex/hooks/session.sh
 
 - [ ] Abrir Terminal.app u otro emulador externo
 - [ ] Ejecutar `claude` ahi
-- [ ] Verificar: `~/.config/kex/agent-sessions.json` NO se actualiza (el script hace `exit 0` si `KEX_PANEL_ID` esta vacio)
+- [ ] Verificar: `~/Library/Application Support/app.betauer.kex/agent-sessions.json` NO se actualiza (el script hace `exit 0` si `KEX_PANEL_ID` esta vacio)
 
 ---
 
@@ -208,7 +208,7 @@ rm -f ~/.config/kex/hooks/session.sh
 - [ ] `cd ~/algun-proyecto-real` (el directorio debe existir)
 - [ ] Ejecutar `claude`, esperar el prompt
 - [ ] **Sin salir de claude**, cerrar Kex con Cmd+Q
-- [ ] Verificar: `cat ~/.config/kex/agent-sessions.json` tiene `state: "idle"` (NO "exited")
+- [ ] Verificar: `cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json` tiene `state: "idle"` (NO "exited")
 - [ ] Reabrir Kex
 - [ ] Esperado (primeros 200ms): el terminal recibe automaticamente `cd '/ruta' && claude --resume '<session_id>'`
 - [ ] Verificar: tab muestra `✦ claude · dirname`, dot verde pulsando
@@ -233,7 +233,7 @@ Partiendo del estado de C1 (sesion restaurada, dot verde):
 
 ### C4 Error de restore — JSONL no encontrado
 
-- [ ] Abrir `~/.config/kex/agent-sessions.json` y cambiar `session_id` por un valor inventado
+- [ ] Abrir `~/Library/Application Support/app.betauer.kex/agent-sessions.json` y cambiar `session_id` por un valor inventado
 - [ ] Asegurarse de que `state: "idle"` (no exited)
 - [ ] Reabrir Kex
 - [ ] Esperado: tab muestra `⚠` (warning), dot **rojo estatico**, titulo en color rojo apagado
@@ -335,13 +335,13 @@ Este es un bug pendiente de corregir (ver `PaneTabBar.tsx:105-112` y `165-174`).
 
 ### E2 Store JSON corrupto
 
-- [ ] Escribir JSON invalido en el store: `echo "{ corrupto" > ~/.config/kex/agent-sessions.json`
+- [ ] Escribir JSON invalido en el store: `echo "{ corrupto" > ~/Library/Application Support/app.betauer.kex/agent-sessions.json`
 - [ ] Reabrir Kex
 - [ ] Esperado: no hay crash, `load_restore_plan` devuelve `[]` silenciosamente
 
 ### E3 Store vacio
 
-- [ ] Borrar el store: `rm ~/.config/kex/agent-sessions.json`
+- [ ] Borrar el store: `rm ~/Library/Application Support/app.betauer.kex/agent-sessions.json`
 - [ ] Reabrir Kex
 - [ ] Esperado: arranque normal sin ningun intento de restore
 
@@ -360,9 +360,9 @@ Este es un bug pendiente de corregir (ver `PaneTabBar.tsx:105-112` y `165-174`).
 [ ] echo $KEX_PANEL_ID  →  UUID no vacio
 [ ] ls -la ~/.config/kex/hooks/session.sh  →  existe, permisos 755
 [ ] cat ~/.claude/settings.json | grep kex-session-hook  →  aparece
-[ ] cat ~/.config/kex/agent-sessions.json  →  existe, state: "idle", session_id relleno
+[ ] cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json  →  existe, state: "idle", session_id relleno
 [ ] find ~/.claude/projects -name "<session_id>.jsonl"  →  archivo encontrado
-[ ] tabId en agent-sessions.json == id del tab en workspace-state.json
+[ ] tabId en agent-sessions.json == id del tab en workspaces/<id>.json
 ```
 
 El ultimo punto (tabId == tab.id) es el mas critico. Si los IDs no coinciden,
