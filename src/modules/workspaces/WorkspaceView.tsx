@@ -49,7 +49,7 @@ export function WorkspaceView({
   const { draggingItem } = useWorkspaceDnd();
 
   // After workspace switch the CSS visibility:hidden is removed. The WebGL
-  // canvas doesn't repaint on its own after that — force a refresh once the
+  // canvas doesn't repaint on its own after that - force a refresh once the
   // DOM change has been painted.
   useEffect(() => {
     const ws = workspaces.find((w) => w.id === activeWorkspaceId);

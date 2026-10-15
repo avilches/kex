@@ -267,7 +267,7 @@ const KEY_WORKSPACE_DETAIL_EDITORS = "workspaceDetailEditors";
 const KEY_WORKSPACE_DETAIL_BROWSERS = "workspaceDetailBrowsers";
 const KEY_WORKSPACE_DETAIL_GIT = "workspaceDetailGit";
 
-// Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
+// Terminal store keys - no "terminal" prefix since the file is already settings-terminal.json
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
 const KEY_TERMINAL_WEBGL_ENABLED = "webglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "cursorBlink";
@@ -286,7 +286,7 @@ const KEY_TERMINAL_SCROLL_SENSITIVITY = "scrollSensitivity";
 const KEY_TERMINAL_NEW_FOLDER_MODE = "newFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 
-// Editor store keys — no "editor" prefix since the file is already settings-editor.json
+// Editor store keys - no "editor" prefix since the file is already settings-editor.json
 const KEY_EDITOR_THEME = "theme";
 const KEY_EDITOR_FONT_FAMILY = "fontFamily";
 const KEY_EDITOR_FONT_SIZE = "fontSize";
@@ -561,7 +561,7 @@ async function writeShortcutsPref(
 }
 
 export async function loadPreferences(): Promise<Preferences> {
-  // Fetch all stores in parallel — one IPC roundtrip per store.
+  // Fetch all stores in parallel - one IPC roundtrip per store.
   const [entries, terminalEntries, editorEntries, toolsEntries, shortcutsValue] = await Promise.all([
     store.entries(),
     terminalStore.entries(),
@@ -1390,7 +1390,7 @@ const SHORTCUTS_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SHORTCUTS]: "shortcuts",
 };
 
-// Backwards-compat export used by tests — maps store keys from all stores
+// Backwards-compat export used by tests - maps store keys from all stores
 // except where terminal/editor keys collide. Non-colliding entries are correct.
 // Do NOT use this map inside onPreferencesChange; use the per-store maps instead.
 export const PREF_KEY_MAP: Record<string, PrefKey> = {

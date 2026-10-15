@@ -178,7 +178,7 @@ fn known_agents(agent: &str) -> Vec<String> {
 /// Tokens keep their quotes, so a quoted value with spaces stays one value. Assignments and
 /// wrappers before the launcher (`FOO=1 claude`, `env X=1 claude-max`) are kept as written.
 fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
-    // Boolean flags — keep as-is, no following value token.
+    // Boolean flags - keep as-is, no following value token.
     const KEEP_FLAGS: &[&str] = &[
         "--allow-dangerously-skip-permissions",
         "--dangerously-skip-permissions",
@@ -193,7 +193,7 @@ fn strip_for_resume_base(cmd: &str, agent: &str) -> Option<String> {
         "--disable-slash-commands",
         "--brief",
     ];
-    // Value flags — keep flag + consume all immediately-following non-flag tokens.
+    // Value flags - keep flag + consume all immediately-following non-flag tokens.
     // Handles both "--flag value" and "--flag=value" forms.
     const KEEP_WITH_VALUE: &[&str] = &[
         "--add-dir",

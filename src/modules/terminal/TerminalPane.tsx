@@ -40,7 +40,7 @@ type Props = {
   tabId: string;
   /** Tab containing this pane is on screen. */
   visible: boolean;
-  /** This tab is the active one within its pane — receives auto-focus. */
+  /** This tab is the active one within its pane - receives auto-focus. */
   focused?: boolean;
   initialCwd?: string;
   /** Enable command-block decorations (OSC 133) for this terminal. */

@@ -528,7 +528,7 @@ export function setLeafScratchpadDraft(leafId: string, text: string): void {
 
 /**
  * Clear the scrollback and screen of the currently focused terminal, keeping
- * the active prompt line — macOS Terminal's ⌘K behaviour. Returns false when no
+ * the active prompt line - macOS Terminal's ⌘K behaviour. Returns false when no
  * focused terminal slot is bound (e.g. focus is in the editor or AI panel).
  */
 export function clearFocusedTerminal(): boolean {
@@ -633,7 +633,7 @@ configureRendererPool({
     if (!s) return null;
     return {
       writeToPty: (data) => {
-        // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) clear it —
+        // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) clear it -
         // these are explicit user interrupts. Multi-byte ESC sequences (xterm protocol
         // auto-responses like "\x1b[?1;2c") must NOT clear the spinner.
         // The attention dot ("attention") is cleared by focusing the tab, not by typing.
@@ -844,7 +844,7 @@ function bindLeafToSlot(leafId: string, s: Session): void {
           },
         ];
       }
-      // Shared in-command flag — see osc-handlers.ts. The prompt tracker
+      // Shared in-command flag - see osc-handlers.ts. The prompt tracker
       // flips it on OSC 133 B/C/D/A; the cwd handler reads it to ignore OSC
       // 7 emitted by untrusted command output (remote SSH, `cat` of an
       // attacker file, etc.).

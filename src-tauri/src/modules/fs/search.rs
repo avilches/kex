@@ -35,7 +35,7 @@ const MAX_SCANNED: usize = 50_000;
 const DEFAULT_DEPTH: usize = 8;
 const HARD_DEPTH: usize = 16;
 
-/// Directory names pruned unconditionally — they're rarely useful in a
+/// Directory names pruned unconditionally - they're rarely useful in a
 /// file-explorer search and they dominate scan time when present.
 pub(crate) const PRUNE_DIRS: &[&str] = &[
     "node_modules",
@@ -176,7 +176,7 @@ fn rank_fuzzy(cands: Vec<SearchHit>, query: &str, cap: usize) -> Vec<SearchHit> 
     // Strip glob wildcards so "*.pdf" degrades gracefully to ".pdf" fuzzy matching.
     let stripped: String = query.chars().filter(|&c| c != '*' && c != '?').collect();
     let effective = if stripped.is_empty() {
-        // Pure wildcard query — return all candidates up to cap sorted by path length.
+        // Pure wildcard query - return all candidates up to cap sorted by path length.
         let mut out = cands;
         out.sort_by_key(|h| h.rel.len());
         out.truncate(cap);

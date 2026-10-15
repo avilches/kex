@@ -233,7 +233,7 @@ function buildRows(
     rows.push({ kind: "fs-up", key: "fs-up", path: pathDirname(rootPath) });
   }
   // A create-at-root pending sits below the synthetic header/".." rows, before
-  // the real entries — only when there is no afterPath (afterPath means the
+  // the real entries - only when there is no afterPath (afterPath means the
   // pending is inserted inline during walk(), right after the target sibling).
   if (
     tree.pendingCreate?.parentPath === rootPath &&

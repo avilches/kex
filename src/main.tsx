@@ -40,7 +40,7 @@ const startupPrefs = await loadPreferences().catch((err) => {
 // Load saved workspace layout for session restore.
 await initWorkspaceState();
 
-// Sync Claude Code hooks on startup — idempotent in both directions:
+// Sync Claude Code hooks on startup - idempotent in both directions:
 // - integration ON:  install/update script and settings.json entries (no-op if up to date)
 // - integration OFF: remove any leftover entries from settings.json (no-op if already absent)
 if (startupPrefs) {
@@ -61,7 +61,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 await invoke("restore_window_geometry").catch(() => {});
 
 // Window starts hidden (per tauri.conf.json) so users never see a transparent
-// shadow-only frame before React paints. Use setTimeout — rAF is throttled
+// shadow-only frame before React paints. Use setTimeout - rAF is throttled
 // while the window is hidden and would never fire.
 const showWindow = () => {
   getCurrentWindow()
@@ -88,7 +88,7 @@ getCurrentWindow().onCloseRequested(async (event) => {
     await flushEditors();
     await flushWorkspaceState();
     await getCurrentWindow().destroy();
-  } catch { /* nothing — window stays open; user can retry */ }
+  } catch { /* nothing - window stays open; user can retry */ }
 });
 
 // Cmd+Q fires the custom Quit menu item in Rust (the predefined macOS quit can't

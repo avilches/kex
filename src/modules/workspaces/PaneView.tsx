@@ -80,7 +80,7 @@ function DropZone({
 }
 
 // Reads tabInsertPaneId from context so PaneView (memoized) is not re-rendered
-// on every dragover — only this sub-component is.
+// on every dragover - only this sub-component is.
 function PaneDropOverlay({ paneId, tooNarrow, tooShort }: {
   paneId: string;
   tooNarrow: boolean;
@@ -404,7 +404,7 @@ export const PaneView = memo(function PaneView({
           />
         )}
 
-        {/* drop overlay — only register/show for the active workspace */}
+        {/* drop overlay - only register/show for the active workspace */}
         {isDragging && isWorkspaceActive && !isDraggingOwnOnlyTab && (
           <PaneDropOverlay paneId={pane.id} tooNarrow={tooNarrow} tooShort={tooShort} />
         )}

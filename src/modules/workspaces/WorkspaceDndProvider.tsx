@@ -210,7 +210,7 @@ export function WorkspaceDndProvider({
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
 
-  // tabId → { paneId, wsId } — built once at dragStart, used by handleDragOver (hot path).
+  // tabId → { paneId, wsId } - built once at dragStart, used by handleDragOver (hot path).
   const dragIndexRef = useRef<Map<string, TabLocation>>(new Map());
   const originWorkspaceIdRef = useRef<string | null>(null);
 

@@ -258,7 +258,7 @@ function createSlot(): Slot {
   term.attachCustomKeyEventHandler((event) => {
     // During IME composition the browser is assembling a multi-keystroke
     // character (Chinese pinyin → hanzi, Korean jamo → syllable, etc.).
-    // Raw keydown events — including the Enter that commits a candidate —
+    // Raw keydown events - including the Enter that commits a candidate -
     // must NOT be forwarded to the PTY; xterm will receive the final
     // composed string through its own compositionend handler instead.
     // keyCode 229 ("Process") is what Chromium reports for every key
@@ -432,7 +432,7 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
   if (p.altScreen) {
     // Discard the dormant ring. TUI output is incremental cursor-positioned
     // updates that can't be replayed coherently on top of a stale snapshot
-    // — see the SIGWINCH kick below, which makes the TUI redraw from scratch.
+    // - see the SIGWINCH kick below, which makes the TUI redraw from scratch.
     p.drainRing(() => {});
   } else {
     p.drainRing((bytes) => slot.term.write(bytes));

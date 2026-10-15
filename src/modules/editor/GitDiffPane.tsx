@@ -386,7 +386,7 @@ export function GitDiffPane({ source, chipLabel, active, onNavigateDiff }: Props
   // isn't cached yet. This must wait until the editor is actually mounted
   // (state === "loaded"): the pane renders a spinner while the diff loads, so if
   // the language import resolved first the view would be null and the reconfigure
-  // would be silently dropped — leaving the diff unhighlighted until a remount.
+  // would be silently dropped - leaving the diff unhighlighted until a remount.
   // Keying on `state.kind` re-runs this once the view exists.
   useEffect(() => {
     if (useFallback || initialLang) return;

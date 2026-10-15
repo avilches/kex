@@ -95,7 +95,7 @@ export function UpdaterDialog() {
               ? "Restart Kex to finish installing."
               : downloading
                 ? progress !== null
-                  ? `${progress.toFixed(0)}% — ${formatBytes(status.downloaded)}`
+                  ? `${progress.toFixed(0)}% - ${formatBytes(status.downloaded)}`
                   : formatBytes(status.downloaded)
                 : manual
                   ? `You're on v${manual.currentVersion}. Pick your distro and run the command, or grab the package from GitHub.`

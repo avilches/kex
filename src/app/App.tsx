@@ -1402,7 +1402,7 @@ export default function App() {
         : tabDisplayTitleNow(activeTab)
       : "";
     let title: string;
-    if (project && label && label !== project) title = `${project} — ${label}`;
+    if (project && label && label !== project) title = `${project} - ${label}`;
     else title = project || label || "Kex";
     document.title = title;
     void getCurrentWindow()

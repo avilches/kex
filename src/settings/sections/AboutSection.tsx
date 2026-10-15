@@ -38,7 +38,7 @@ export function AboutSection() {
     status.kind === "uptodate"
       ? "You're up to date"
       : status.kind === "error"
-        ? "Check failed — retry"
+        ? "Check failed - retry"
         : checking
           ? "Checking…"
           : downloading
@@ -88,7 +88,7 @@ export function AboutSection() {
             Open-source AI-native terminal emulator
           </span>
           <span className="mt-1 font-mono text-[11px] text-muted-foreground">
-            v{version || "—"}
+            v{version || "-"}
           </span>
         </div>
       </div>

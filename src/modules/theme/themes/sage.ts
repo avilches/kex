@@ -3,7 +3,7 @@ import type { Theme } from "../types";
 export const sage: Theme = {
   id: "sage",
   name: "Sage",
-  description: "Muted forest green — calm and soft.",
+  description: "Muted forest green - calm and soft.",
   editorTheme: { dark: "atomone", light: "github-light" },
   variants: {
     dark: {
