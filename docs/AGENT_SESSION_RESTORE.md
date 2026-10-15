@@ -10,10 +10,10 @@ store format, restore algorithm, frontend integration, and error handling.
 
 The feature has three cooperating parts:
 
-1. **Hook layer (bash + Claude Code)** — writes session records to disk when a session starts.
-2. **Rust restore planner** (`agent_session_restore_plan`) — reads the store at launch, resolves cwd from the JSONL
+1. **Hook layer (bash + Claude Code)** - writes session records to disk when a session starts.
+2. **Rust restore planner** (`agent_session_restore_plan`) - reads the store at launch, resolves cwd from the JSONL
    transcript, and returns a list of `RestorePlan` entries.
-3. **Frontend consumer** (`agentSessionRestore.ts` + `useTerminalSession`) — loads the plan once at app start,
+3. **Frontend consumer** (`agentSessionRestore.ts` + `useTerminalSession`) - loads the plan once at app start,
    injects the resume command into the terminal after the PTY opens, and updates the tab UI.
 
 ---
@@ -196,7 +196,7 @@ Supported agent values: `"claude"`, `"codex"`, `"gemini"`. Unknown values produc
 
 ## Rust restore planner
 
-`src-tauri/src/modules/agent/session_store.rs` — `load_restore_plan() -> Vec<RestorePlan>`
+`src-tauri/src/modules/agent/session_store.rs` - `load_restore_plan() -> Vec<RestorePlan>`
 
 ### Algorithm
 
@@ -204,10 +204,10 @@ For each session in the store:
 
 1. **Find the JSONL transcript.** Checks the stored `transcript_path` first, then globs
    `~/.claude/projects/**/<sessionId>.jsonl` (or `CLAUDE_CONFIG_DIR`).
-2. **JSONL missing — reattach with `--session-id`.** If the transcript does not exist, the session was opened but
+2. **JSONL missing - reattach with `--session-id`.** If the transcript does not exist, the session was opened but
    no message was ever sent (the JSONL is only created on the first exchange). Rather than silently discarding the
    session, the plan is generated using `claude --session-id <id>`, which starts a *new* session that reuses the
-   same UUID — equivalent to what Claude would have done had the user run it again without `--resume`. The stale
+   same UUID - equivalent to what Claude would have done had the user run it again without `--resume`. The stale
    store entry is removed now; if the session produces messages, hooks will re-record it with the new
    `transcript_path`.
 3. **Read the launch cwd.** Opens the JSONL with `BufReader` and reads only as many lines as needed. If a
@@ -279,14 +279,14 @@ pub struct RestorePlan {
 }
 ```
 
-`rename_all = "camelCase"` is required — the frontend Map is keyed by `tabId` and would silently miss all sessions
+`rename_all = "camelCase"` is required - the frontend Map is keyed by `tabId` and would silently miss all sessions
 if it received `tab_id` instead.
 
 ### Single-tab preview
 
 `preview_resume_cmd(tab_id) -> Option<RestorePlan>` computes the same `RestorePlan` for one tab on demand, backing the
 `agent_session_preview_cmd` command. It shares `build_plans_from` with `load_restore_plan`, but calls it with
-`store_path: None`, which skips every `remove_panel_from_store` call in that function — so, unlike
+`store_path: None`, which skips every `remove_panel_from_store` call in that function - so, unlike
 `load_restore_plan`, it never mutates `agent-sessions.json` and can be called repeatedly while a session is live (e.g.
 each time the "Command" submenu opens) without racing the real startup restore.
 
@@ -300,7 +300,7 @@ each time the "Command" submenu opens) without racing the real startup restore.
 
 Loaded once at app start (`App.tsx`) via `loadRestorePlans()`, which calls `agent_session_restore_plan` and stores the
 result in a module-level `Map<tabId, RestorePlan>`. `consumeRestorePlan(tabId)` returns and deletes the plan for a
-given tab — consume-once semantics prevent double injection.
+given tab - consume-once semantics prevent double injection.
 
 `previewResumeCmd(tabId)` is a separate, non-consuming call to `agent_session_preview_cmd`, used on demand by
 `RunOnStartMenu` to show what will actually run on the *next* launch (see "Terminal path bar UI" below), and by
@@ -447,12 +447,12 @@ an agent is alive the agent icon of the tab (struck through when it is off) says
 dot either, only the model name, because the tab icon already carries the working and attention states.
 
 - **Enabled** checkbox: toggles `restoreOnRestart` on the panel. For agent sessions it defaults to checked
-  and enabling it captures the current running command as the `persistentCommand` if none is already set — this is only
+  and enabling it captures the current running command as the `persistentCommand` if none is already set - this is only
   a fallback default now (see below), not what normally gets shown or run.
 - **Command preview**: for a tab with a live agent session, this is a *live, read-only* preview of the resume command
   that will actually run on the next Kex launch, fetched from `agent_session_preview_cmd` (via `previewResumeCmd`) when
   the menu opens and whenever the session id changes (e.g. after `/clear`). It is computed the same way as the startup
-  restore plan — `claude --resume <id>` once the JSONL transcript exists, `claude --session-id <id>` before that — so it
+  restore plan - `claude --resume <id>` once the JSONL transcript exists, `claude --session-id <id>` before that - so it
   always matches what will actually be injected; it is not the `persistentCommand` field and cannot be edited. If the
   tab has no agent session (a plain "Run on start" command like `lazygit`), or an agent session with no matching entry
   in `agent-sessions.json` (e.g. `agentNotifications` was disabled), the inline field is an editable input instead (disabled while `Enabled` is off). Without a manual edit it follows the
@@ -464,8 +464,8 @@ dot either, only the model name, because the tab icon already carries the workin
 
   **Exiting and restarting the agent in the same tab** also refreshes the preview, through the existing session
   lifecycle rather than anything preview-specific: when the agent process exits, `kex:agent-signal` fires `"exited"`
-  (`AgentNotificationsBridge.tsx`), which calls `store.finish(tabId)` — deleting the session from `agentStore`
-  entirely, not just clearing it — and `agent_detach_session`, which removes the tab's entry from
+  (`AgentNotificationsBridge.tsx`), which calls `store.finish(tabId)` - deleting the session from `agentStore`
+  entirely, not just clearing it - and `agent_detach_session`, which removes the tab's entry from
   `agent-sessions.json`. If the menu happens to be open at that exact moment, `agentSession` becomes `null` and the
   preview falls back to the plain editable input, per the case above. When a new agent starts in the same tab, its
   `SessionStart` hook writes a fresh entry (new `session_id`) and emits `kex:agent-session-meta`, which updates
@@ -494,14 +494,14 @@ Tabs carry only a native `title` tooltip (cwd, agent model and sessionId when an
 
 `AgentSession` has two restore-specific fields:
 
-- `restored: boolean` — true while the session was opened via restore (cleared on the first real OSC event).
-- `restoreError: boolean` / `restoreErrorReason?: string` — set if the plan had an empty `resumeCmd`.
+- `restored: boolean` - true while the session was opened via restore (cleared on the first real OSC event).
+- `restoreError: boolean` / `restoreErrorReason?: string` - set if the plan had an empty `resumeCmd`.
 
 Actions:
 
-- `startRestored(tabId, workspaceId, agent)` — creates a session record with `restored: true`, `status: "working"`. No production code calls it today (TASK-666); the session of a restored tab is created by the first agent signal.
-- `setRestoreError(tabId, workspaceId, agent, reason?)` — sets `restoreError: true`.
-- `setStatus` (existing) — clears `restored` on the first real state transition.
+- `startRestored(tabId, workspaceId, agent)` - creates a session record with `restored: true`, `status: "working"`. No production code calls it today (TASK-666); the session of a restored tab is created by the first agent signal.
+- `setRestoreError(tabId, workspaceId, agent, reason?)` - sets `restoreError: true`.
+- `setStatus` (existing) - clears `restored` on the first real state transition.
 
 ---
 
@@ -545,7 +545,7 @@ Two things to check if the log looks unhelpful right after a restore failure:
 
 - **The file is empty or was just created.** Until TASK-769, the rotation policy was `RotationStrategy::KeepOne`,
   which deletes the previous log with no backup, and does so as soon as the app starts (the size check runs before
-  the new session writes anything) — so a log that had already grown past `max_file_size` in the *previous* session,
+  the new session writes anything) - so a log that had already grown past `max_file_size` in the *previous* session,
   the one that actually failed to restore, was gone before you could open it. Kex now rotates with
   `RotationStrategy::KeepSome(4)`, which renames the oversized file instead of deleting it: look for
   `Kex_<date>.log` siblings next to the active `Kex.log` in the same directory and check those too, not just
@@ -565,7 +565,7 @@ Two things to check if the log looks unhelpful right after a restore failure:
 | Agent process exited | `agent_detach_session` removes panel from store; not in plan |
 | Turn failed (`StopFailure`) or session ended (`SessionEnd`, incl. `/clear`, `/resume`) while the process lives | Store entry kept; the tab stays restorable |
 | Session started with `-p`/`--print` | `record_session` skips; session never written to store |
-| JSONL transcript missing (no messages sent) | Entry removed from store (unless the launch directory is unusable); `claude --session-id <id>` injected — new session reuses same UUID |
+| JSONL transcript missing (no messages sent) | Entry removed from store (unless the launch directory is unusable); `claude --session-id <id>` injected - new session reuses same UUID |
 | launch cwd deleted, not a folder, or unreadable | `resumeCmd` empty, `errorReason` and `attemptedCmd` set; no PTY, the tab is held on the Try again / Open terminal without restoring modal and shows `⚠`; store entry kept |
 | saved command (no agent) whose directory is unusable | Same modal, built on the frontend from `check_launch_dir` |
 | `openPty` rejects at start | Modal with the reason `Could not start the terminal: ...` and only Try again; nothing is left pending |

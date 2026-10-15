@@ -16,9 +16,9 @@ But this project has a similar, but different goal:
 
 ### AI subsystem (frontend)
 
-- `src/modules/ai/` — entire module: composer, multi-session agent runner, slash commands, voice input, AI autocomplete
+- `src/modules/ai/` - entire module: composer, multi-session agent runner, slash commands, voice input, AI autocomplete
   CodeMirror extension, session hydration, tool execution, plan mode
-- `src/modules/agents/store/managedAgentsStore.ts` — managed agents launched via `/claude-code`
+- `src/modules/agents/store/managedAgentsStore.ts` - managed agents launched via `/claude-code`
 - AI and Agents sections in the Settings window
 - AI controls in `StatusBar` (provider selector, model picker)
 - `AiInputBar` / `WorkspaceInputBar` AI composer surface
@@ -29,14 +29,14 @@ notifications, Sonner toasts). Zero cost when no agent runs.
 
 ### AI subsystem (Rust)
 
-- `src-tauri/src/modules/net.rs` — HTTP proxy used exclusively for AI API calls (`reqwest`)
-- `src-tauri/src/modules/secrets.rs` — OS keychain access used exclusively for API key storage (`keyring`)
+- `src-tauri/src/modules/net.rs` - HTTP proxy used exclusively for AI API calls (`reqwest`)
+- `src-tauri/src/modules/secrets.rs` - OS keychain access used exclusively for API key storage (`keyring`)
 - All related `tauri::generate_handler![]` entries and capability entries
 
 ### npm dependencies
 
 `ai` (Vercel AI SDK v6), `@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/cerebras`, `@ai-sdk/groq`,
-`@ai-sdk/xai`, `@ai-sdk/react`, `streamdown` — all removed. Reduces the frontend bundle by roughly half.
+`@ai-sdk/xai`, `@ai-sdk/react`, `streamdown` - all removed. Reduces the frontend bundle by roughly half.
 
 ### Features de upstream evaluadas y omitidas
 
@@ -55,7 +55,7 @@ notifications, Sonner toasts). Zero cost when no agent runs.
 
 ## What has been added or changed
 
-### Phase 1 — 3-column layout
+### Phase 1 - 3-column layout
 
 **Problem in the original:** a horizontal tab bar at the top and a collapsible left sidebar holding Explorer, Source
 Control, and Git History. This layout does not scale to many workspaces and leaves no room for a workspace-level pane
@@ -63,21 +63,21 @@ model.
 
 **What was built:**
 
-- `WorkspaceSidebar` (52px vertical strip, left) — replaces the horizontal `TabBar`. Lists workspaces as icon avatars
+- `WorkspaceSidebar` (52px vertical strip, left) - replaces the horizontal `TabBar`. Lists workspaces as icon avatars
   with stable colors derived from their ID. Keyboard-navigable.
-- `Sidebar` (collapsible, default 240px, right) — holds Explorer, Source Control, and Git History as tabs. Width,
+- `Sidebar` (collapsible, default 240px, right) - holds Explorer, Source Control, and Git History as tabs. Width,
   open/closed state, and dock side persist via `window_save_sidebar` per OS window; the active tab is per workspace
   (see "Per-window sidebar state" below).
-- `sidebarSide` per-window state — moves the tool panel to the left of the center content for users who prefer that layout.
+- `sidebarSide` per-window state - moves the tool panel to the left of the center content for users who prefer that layout.
 - `SidebarRail` and `useSidebarPanel` deleted (replaced by Sidebar).
 - `Header` no longer owns the tab bar.
-- `open_main_window` Tauri command — mirrors the settings window pattern, enables multiple independent main windows (
+- `open_main_window` Tauri command - mirrors the settings window pattern, enables multiple independent main windows (
   `Cmd+Shift+N`).
-- `Tab.id` migrated from `number` to `string` UUID — stable IDs required for cross-window entity transfer in later
+- `Tab.id` migrated from `number` to `string` UUID - stable IDs required for cross-window entity transfer in later
   phases.
 - `@dnd-kit/core` and `@dnd-kit/sortable` installed (no UI in Phase 1, needed for Phase 4).
 
-### Phase 2 — Workspace/Pane/Panel model
+### Phase 2 - Workspace/Pane/Panel model
 
 **Problem in the original:** a flat `Tab` model where each tab was the unit of content. Split panes existed but were
 scoped inside a terminal tab, not composable with editor or preview tabs. No per-pane tab strips.
@@ -94,11 +94,11 @@ Workspace  (UUID, title, cwd, binary pane tree)
 
 - `useWorkspaces` replaces `useTabs` entirely. Owns workspace list, active workspace, and all pane/panel operations (
   split, close, move, activate).
-- `splitNode.ts` — pure tree-operation library (split, remove, find, flatten, sibling lookup, directional neighbor lookup via `findPaneInDirection`). Fully unit-tested.
-- `WorkspaceView` → `SplitNodeView` (recursive) → `PaneView` → `PanelContent` — new rendering path. All content kinds (
+- `splitNode.ts` - pure tree-operation library (split, remove, find, flatten, sibling lookup, directional neighbor lookup via `findPaneInDirection`). Fully unit-tested.
+- `WorkspaceView` → `SplitNodeView` (recursive) → `PaneView` → `PanelContent` - new rendering path. All content kinds (
   terminal, editor, preview, git-*) now live as panels inside panes.
-- `PaneTabBar` — per-pane tab strip with close buttons and a `+` button, pinned to the right edge outside the scrolling strip, to open a new terminal panel in that pane. Hovering the `+` (or right-clicking it) opens a menu with the terminal and browser New / Split actions.
-- `dividerPosition` stored explicitly on split nodes (0.0–1.0) — layout persists without relying on
+- `PaneTabBar` - per-pane tab strip with close buttons and a `+` button, pinned to the right edge outside the scrolling strip, to open a new terminal panel in that pane. Hovering the `+` (or right-clicking it) opens a menu with the terminal and browser New / Split actions.
+- `dividerPosition` stored explicitly on split nodes (0.0–1.0) - layout persists without relying on
   `react-resizable-panels` internal state.
 - PTY session key migrated from `leafId: number` to `panelId: string` (UUID) throughout: `useTerminalSession`,
   `rendererPool`, `pty-bridge`, all call sites.
@@ -138,25 +138,25 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 
 ### UX improvements
 
-- **Focus restore on workspace switch** — when switching workspaces (via sidebar click or keyboard shortcut), the active
+- **Focus restore on workspace switch** - when switching workspaces (via sidebar click or keyboard shortcut), the active
   terminal panel of the new workspace receives focus automatically via `requestAnimationFrame`. No manual click needed.
-- **Active-pane tab indicator** — a 2px blue line (`bg-primary`) at the top of the tab that currently holds keyboard
+- **Active-pane tab indicator** - a 2px blue line (`bg-primary`) at the top of the tab that currently holds keyboard
   focus. Distinguishes "active in its pane" from "has global focus" when multiple panes are visible.
-- **`workspace.new` shortcut (`Cmd+N`)** — creates a new workspace directly from the keyboard or command palette. In the
+- **`workspace.new` shortcut (`Cmd+N`)** - creates a new workspace directly from the keyboard or command palette. In the
   original, the equivalent was `Cmd+T` for a new tab.
-- **MRU focus on tab close** — closing the active tab of a pane returns focus to the most-recently-used surviving tab,
+- **MRU focus on tab close** - closing the active tab of a pane returns focus to the most-recently-used surviving tab,
   not the positional neighbour, so closing a chain of tabs walks back through the order you used them. Each pane keeps an
   in-memory MRU list of tab ids (`paneActivationHistoryRef` in `useWorkspaces`, never persisted, cap 50) updated on every
   activation; `applyClosePanel` consumes it and falls back to the adjacent tab (right, then left) when the history is
   empty. A reconciliation effect prunes dead panes/tabs so a stale id is never selected. Independent from reopen-closed
   (undo). Upstream always activated the last panel; the fork previously activated the positional neighbour. See
   `docs/WORKSPACES.md` for the full lifecycle.
-- **Workspaces without tabs** — closing the last tab no longer closes the workspace. Instead, the sole pane of the workspace becomes empty and renders a welcome screen with quick actions (new terminal, open file). A workspace is closed only by an explicit action (the close shortcut or the sidebar close button). The close action shows the shared hibernate dialog only when something would be lost (scripts to delete, unsaved documents, running agents, scripts or processes) and closes directly otherwise. Closing the last workspace quits the app. Not present in upstream Terax.
-- **Directional pane focus shortcuts** — `Cmd+Ctrl+Arrow` (Mac) / `Ctrl+Alt+Arrow` (non-Mac) moves focus to the
+- **Workspaces without tabs** - closing the last tab no longer closes the workspace. Instead, the sole pane of the workspace becomes empty and renders a welcome screen with quick actions (new terminal, open file). A workspace is closed only by an explicit action (the close shortcut or the sidebar close button). The close action shows the shared hibernate dialog only when something would be lost (scripts to delete, unsaved documents, running agents, scripts or processes) and closes directly otherwise. Closing the last workspace quits the app. Not present in upstream Terax.
+- **Directional pane focus shortcuts** - `Cmd+Ctrl+Arrow` (Mac) / `Ctrl+Alt+Arrow` (non-Mac) moves focus to the
   geometrically adjacent pane in the given direction. Uses `findPaneInDirection` (spatial scoring on DOM rects: closest
   pane wins, tie-broken by perpendicular overlap). Hard stop at borders; no wrap-around. Replaces the old cyclic
   `Cmd+[` / `Cmd+]` shortcuts.
-- **Explorer root modes** — the explorer root is no longer hardwired to the active terminal cwd. A per-workspace mode
+- **Explorer root modes** - the explorer root is no longer hardwired to the active terminal cwd. A per-workspace mode
   (selector above the tree) picks between File System (home, navigable) and Workspace Root (set via "Set as workspace
   root" on any folder). The upstream "Follow Terminal" and "Follow Git Root" modes are removed; their reactive
   behavior is replaced by the explicit per-terminal autofocus mechanism (see below). The Workspace Root option is
@@ -174,13 +174,13 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   from the same folder (`git_resolve_repo`), stored per workspace as `gitRootByWs`, and is `null` when no repo is
   found. Unlike the old reactive Follow modes, autofocus never fires on app boot and never switches sidebar tabs or
   opens the panel automatically. The `autofocus` flag is persisted in `workspaces/<id>.json`.
-- **Root path header (all modes)** — the tree is prefixed by a non-collapsible header row showing the current root's
+- **Root path header (all modes)** - the tree is prefixed by a non-collapsible header row showing the current root's
   full path, left-truncated when long so the tail stays visible (a leading LRM keeps the leading `/` from being
   reordered by the rtl-based truncation). The selector trigger shows the active mode's label and icon rather than the
   folder name. The header has its own context menu (Set as Workspace Root, New Workspace from folder, Open in Terminal,
   Reveal in Finder, New File/Folder, Copy Path, Refresh); in Workspace Root mode the "Set as Workspace Root" entry is
   disabled and reads "This is the Workspace Root".
-- **Navigable File System root** — in File System mode the root is navigable per workspace: double-clicking a folder
+- **Navigable File System root** - in File System mode the root is navigable per workspace: double-clicking a folder
   enters it. On top of the shared path header, File System adds a `..` folder-style row (hidden at the filesystem or
   drive root) whose double-click climbs to the parent directory; the selector uses the hierarchy icon and its subtitle
   shows the current root path. If the current root is deleted while shown, the explorer silently relocates to the
@@ -189,7 +189,7 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   restore a workspace snapshot (`carryOverExpanded`): folders under the new root stay open, going up also opens the old
   root, and an unrelated root keeps nothing. The `..`
   row appears only in File System mode; Workspace Root mode is unaffected.
-- **Folder context actions** — a folder's context menu offers "Open in Terminal" (opens a new terminal tab in the
+- **Folder context actions** - a folder's context menu offers "Open in Terminal" (opens a new terminal tab in the
   current workspace's active pane, spawned directly with the folder as cwd, leaving the explorer view untouched) and
   "New Workspace from folder" (creates a new workspace with that folder pinned as its Workspace Root). Neither injects a
   `cd` command into a shell. A file's context menu also offers "Open in Terminal", spawning the terminal in the file's
@@ -203,48 +203,48 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 
 ### Technical fixes and refactors
 
-- **WebGL canvas refresh** — after a workspace switch, the `opacity-0` CSS change does not trigger a WebGL repaint. A
+- **WebGL canvas refresh** - after a workspace switch, the `opacity-0` CSS change does not trigger a WebGL repaint. A
   `useEffect` with `requestAnimationFrame` calls `refreshTerminalLeaf` on each visible panel to force the canvas to
   repaint.
-- **DnD zone isolation** — drop targets from inactive workspaces share screen coordinates with the active workspace (all
+- **DnD zone isolation** - drop targets from inactive workspaces share screen coordinates with the active workspace (all
   positioned absolute inset-0). Drop events now validate that the target pane belongs to the same workspace as the
   dragged panel.
-- **Renderer pool simplified** — the original eviction logic (score-based LRU with `POOL_MAX_SIZE = 5`) removed. With
+- **Renderer pool simplified** - the original eviction logic (score-based LRU with `POOL_MAX_SIZE = 5`) removed. With
   the Workspace/Panel model each panel gets and keeps its own slot; eviction no longer applies.
-- **`TERMINAL_ID` env var** — injected into the shell environment at PTY spawn (both Unix and Windows). Available to
+- **`TERMINAL_ID` env var** - injected into the shell environment at PTY spawn (both Unix and Windows). Available to
   shell scripts and tools running inside the terminal.
-- **`KEX_PANEL_ID` env var** (formerly `TERAX_PANEL_ID`) — UUID injected into each PTY shell at spawn. Used by session
+- **`KEX_PANEL_ID` env var** (formerly `TERAX_PANEL_ID`) - UUID injected into each PTY shell at spawn. Used by session
   persistence hooks to associate an agent session with a specific terminal panel across restarts.
-- **App env var prefix renamed to `KEX_`** — all shell integration env vars (`TERAX_TERMINAL`, `TERAX_BLOCKS`,
+- **App env var prefix renamed to `KEX_`** - all shell integration env vars (`TERAX_TERMINAL`, `TERAX_BLOCKS`,
   `TERAX_PANEL_ID`, `TERAX_USER_ZDOTDIR`) have been renamed to `KEX_TERMINAL`, `KEX_BLOCKS`, `KEX_PANEL_ID`,
   `KEX_USER_ZDOTDIR`. Shell integration cache moved from `~/.cache/terax/` to `~/.cache/kex/`. Fish integration file
   is now `kex.fish`. **Sync impact**: any upstream commit that references `TERAX_` env vars or `terax` paths will
   need manual adaptation. The old Terax hook markers are still in `OWNED_MARKERS` as migration targets (they get
   replaced when the user reinstalls hooks).
-- **Claude Code hooks config path renamed to `~/.config/kex/`** (formerly `~/.config/terax/`) — `agent-sessions.json`,
+- **Claude Code hooks config path renamed to `~/.config/kex/`** (formerly `~/.config/terax/`) - `agent-sessions.json`,
   `restore-candidates.json`, and `hooks/session.sh` are now under `~/.config/kex/`. Hook OSC signal changed from
   `notify;Terax;` to `notify;Kex;`. Script version marker is now `kex-session-v1`. Users with the old Terax hooks
   installed will see the "Enable Claude Code alerts" button again (status check detects the outdated script via the
   version marker) and reinstalling updates both the script and the OSC signal.
-- **Agent session restore** — when Claude Code hooks are installed, the app writes the active session id and cwd to
+- **Agent session restore** - when Claude Code hooks are installed, the app writes the active session id and cwd to
   `~/Library/Application Support/app.betauer.kex/agent-sessions.json` (via `SessionStart` hook; `SessionEnd` is intentionally ignored to avoid a
   race with PTY death). On relaunch, `agent_session_restore_plan` (Rust) reads the store (preferring
   `restore-candidates.json` written just before the last close), locates the Claude Code JSONL transcript to verify
   the cwd, and returns a resume command per recoverable session. The frontend types the command
   (`claude --resume '<id>'`) into the terminal 200ms after the PTY opens. Tab UI: `agentname · dirname` title, `✦`
   icon, colored status dot; `⚠` on error. See `docs/AGENT_SESSION_RESTORE.md`.
-- **`agentNotifications` setting** (formerly `claudeHooksEnabled`) — boolean persisted in the app settings store.
+- **`agentNotifications` setting** (formerly `claudeHooksEnabled`) - boolean persisted in the app settings store.
   Controls both notification routing and hook lifecycle. Enabling it calls `agent_enable_claude_hooks`; disabling it
   calls `agent_disable_claude_hooks` (removes Kex hooks from `~/.claude/settings.json`). On every startup, the app
   silently calls `agent_enable_claude_hooks` when this is true (idempotent). Controlled via Settings > General >
   Coding agent notifications; also accessible from the notification bell popup ("Enable Claude Code alerts").
-- **Minimal `~/.claude/settings.json` writes** — `agent_enable_claude_hooks` now uses `serde_json` with
+- **Minimal `~/.claude/settings.json` writes** - `agent_enable_claude_hooks` now uses `serde_json` with
   `preserve_order` (insertion-order key serialization via IndexMap) and detects the original indent style, so
   reformatting is kept to the minimum necessary. If our hooks are already present, settings.json is not touched at
   all. **Sync impact**: `Cargo.toml` now has `serde_json = { version = "1", features = ["preserve_order"] }` instead
   of `serde_json = "1"`. Upstream commits that add direct `serde_json` usage will still compile; only the object key
   order in serialized output changes from alphabetical to insertion order.
-- `native.ts` moved from `src/modules/terminal/` to `src/lib/native.ts` — shared across all modules.
+- `native.ts` moved from `src/modules/terminal/` to `src/lib/native.ts` - shared across all modules.
 
 ### Native macOS menu
 
@@ -436,12 +436,12 @@ the same Live Preview extensions in a read-only view (Streamdown and its depende
 
 HelixNotes-style notes browsing as a Sidebar tab, treating the workspace root as the vault. Three Tauri commands read the vault one level at a time (`notes_read_dirs`, `notes_read_heads`, `notes_paths_exist`); per-workspace UI state in `kex.json` at the workspace root. Not present upstream.
 
-- **Notes tab** — appears after Git in the Sidebar only when the workspace defines a `workspaceRoot`. Disappears (and persisted `view: "notes"` falls back to Explorer) when the root is unset.
-- **Two-column layout** — Quick Access (pinned notes, drag-reorder) and a folder tree on the left; a sortable note list on the right, scoped to exactly one folder at a time and holding notes only, since the tree is the sole way to navigate folders. Each tree row counts the notes directly inside that folder, and its first row is the vault root. Four sort modes: `modified`, `title`, `created`, `custom`, plus optional date grouping.
-- **Note metadata** — title from frontmatter `title:` field, first H1, or file stem (in that precedence); mtime and created date from frontmatter `created:` field, btime, or mtime (in that precedence). UI shows only the first 2 KB of each note (120-char snippet for previews).
-- **Config persistence** — all view state (`quickAccess`, `sortMode`, `folderOrder`, `expandedFolders`, `groupByDate`, `selectedFolder`) lives in `kex.json` at the workspace root under the `notes` namespace (vault-relative forward-slash paths). `folderOrder` maps a folder path to the ordered file names inside it, and the folder tree is collapsed unless a folder is listed in `expandedFolders`. There is no vault-wide scan and no scan cap: the view keeps a per-folder cache seeded from the vault root, the folders expanded in the tree and the selected folder, reads one directory level at a time through `notes_read_dirs`, and registers exactly those directories with the non-recursive filesystem watcher, which it did not do before this work (it only learned of an external change when the file explorer happened to have the same directory open). A change invalidates the changed folder plus its parent and grandparent, since a folder's note count and expand arrow live in its parent's payload. Dead folders and dead file names are pruned when the view activates, by asking the filesystem directly for each recorded path (`notes_paths_exist`), so a folder that is gitignored but still on disk is no longer indistinguishable from a deleted one. Read-modify-write strategy preserves foreign namespaces; invalid or missing `kex.json` falls back to defaults without overwriting until the first mutation.
-- **Immutable .md files** — Kex never writes frontmatter, metadata, or any other data into user `.md` files. State is stored exclusively in `kex.json`.
-- **Opens into the rich editor** — clicking a note creates a `markdown` tab, so notes render in Live Preview.
+- **Notes tab** - appears after Git in the Sidebar only when the workspace defines a `workspaceRoot`. Disappears (and persisted `view: "notes"` falls back to Explorer) when the root is unset.
+- **Two-column layout** - Quick Access (pinned notes, drag-reorder) and a folder tree on the left; a sortable note list on the right, scoped to exactly one folder at a time and holding notes only, since the tree is the sole way to navigate folders. Each tree row counts the notes directly inside that folder, and its first row is the vault root. Four sort modes: `modified`, `title`, `created`, `custom`, plus optional date grouping.
+- **Note metadata** - title from frontmatter `title:` field, first H1, or file stem (in that precedence); mtime and created date from frontmatter `created:` field, btime, or mtime (in that precedence). UI shows only the first 2 KB of each note (120-char snippet for previews).
+- **Config persistence** - all view state (`quickAccess`, `sortMode`, `folderOrder`, `expandedFolders`, `groupByDate`, `selectedFolder`) lives in `kex.json` at the workspace root under the `notes` namespace (vault-relative forward-slash paths). `folderOrder` maps a folder path to the ordered file names inside it, and the folder tree is collapsed unless a folder is listed in `expandedFolders`. There is no vault-wide scan and no scan cap: the view keeps a per-folder cache seeded from the vault root, the folders expanded in the tree and the selected folder, reads one directory level at a time through `notes_read_dirs`, and registers exactly those directories with the non-recursive filesystem watcher, which it did not do before this work (it only learned of an external change when the file explorer happened to have the same directory open). A change invalidates the changed folder plus its parent and grandparent, since a folder's note count and expand arrow live in its parent's payload. Dead folders and dead file names are pruned when the view activates, by asking the filesystem directly for each recorded path (`notes_paths_exist`), so a folder that is gitignored but still on disk is no longer indistinguishable from a deleted one. Read-modify-write strategy preserves foreign namespaces; invalid or missing `kex.json` falls back to defaults without overwriting until the first mutation.
+- **Immutable .md files** - Kex never writes frontmatter, metadata, or any other data into user `.md` files. State is stored exclusively in `kex.json`.
+- **Opens into the rich editor** - clicking a note creates a `markdown` tab, so notes render in Live Preview.
 
 - **Move a tab to another workspace** from its context menu ("Move to Workspace") or by dragging it (see `docs/WORKSPACES.md`). Not present upstream.
 
@@ -457,12 +457,12 @@ At startup every workspace except the active one starts hibernated, unless the s
 
 These phases are designed but not fully implemented:
 
-- **Phase 3 — Persistent terminal sessions** — a tmux daemon per workspace that keeps shell sessions alive across Kex
+- **Phase 3 - Persistent terminal sessions** - a tmux daemon per workspace that keeps shell sessions alive across Kex
   restarts. Panels restore with their full scrollback and running processes intact.
-- **Phase 4 — Drag-and-drop panel management** — drag panels between panes (5-zone drop: top / bottom / left / right /
+- **Phase 4 - Drag-and-drop panel management** - drag panels between panes (5-zone drop: top / bottom / left / right /
   center), drag workspaces to reorder the sidebar, drag panels to other workspaces. Infrastructure (dnd-kit, stable
   UUIDs, `movePanel` / `splitPaneAndPlace` operations) is already in place; the full drop UX is in progress.
-- **Multi-window workspace migration** — workspaces can be dragged from one window's sidebar to another window's
+- **Multi-window workspace migration** - workspaces can be dragged from one window's sidebar to another window's
   sidebar. Requires a Tauri event protocol (`terax:workspace-transfer`) that transfers the workspace entity by ID across
   WebView instances.
 

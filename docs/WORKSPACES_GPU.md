@@ -1,4 +1,4 @@
-# WebGL GPU en terminales — investigación y fix
+# WebGL GPU en terminales - investigación y fix
 
 Documentación completa del bug de WebGL al arrancar. Para contexto general del sistema ver
 [WORKSPACES.md](WORKSPACES.md).
@@ -88,7 +88,7 @@ ya es historia.
 
 ## Bug secundario: badge GPU en PaneView no se actualizaba
 
-El badge de debug (`{/* DEBUG — remove before ship */}`) en `PaneView.tsx` usaba
+El badge de debug (`{/* DEBUG - remove before ship */}`) en `PaneView.tsx` usaba
 `setInterval(500ms)` para releer `poolSlotStats()`. El `setTick` del interval nunca causaba
 re-renders (el state setter quedaba stale tras el primer render cycle). El badge solo
 actualizaba cuando un workspace state change (como un split) forzaba un re-render.

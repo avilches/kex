@@ -1,4 +1,4 @@
-# Workspaces — bugs encontrados y cómo se resolvieron
+# Workspaces - bugs encontrados y cómo se resolvieron
 
 Este documento registra los problemas de la capa workspace/terminal que resultaron no obvios de
 diagnosticar. El objetivo es que no haya que re-descubrirlos.
@@ -145,13 +145,13 @@ Ver documentación completa en [`docs/WORKSPACES_GPU.md`](WORKSPACES_GPU.md).
 **Fix**: `retryMissingWebgl()` llamada desde `main.tsx` a t=350ms (300ms tras `showWindow`).
 A ese tiempo la GPU surface de WKWebView ya está lista. El badge de debug usa
 `useSyncExternalStore` para reflejar el estado reactivamente.
-## Bug 4b: geometría de ventana — tamaño se restaura, posición descartada (RESUELTO PARCIALMENTE)
+## Bug 4b: geometría de ventana - tamaño se restaura, posición descartada (RESUELTO PARCIALMENTE)
 
 ### Estado final
 
 **Tamaño**: se guarda en pixels físicos (`inner_size()`) y se restaura con `set_size(PhysicalSize)`
 llamado desde un comando IPC (`restore_window_geometry`) invocado en `main.tsx` antes del `show()`
-— equivalente al `on_window_ready` del plugin oficial. Funciona de forma fiable.
+- equivalente al `on_window_ready` del plugin oficial. Funciona de forma fiable.
 
 **Posición**: descartada intencionalmente. Restaurar posición en macOS resultó demasiado frágil
 para el riesgo que supone (ventana fuera de pantalla al cambiar de monitor). macOS coloca la
@@ -349,7 +349,7 @@ Secuencia del click cruzado de panes:
 
 Por que SI funciona en los otros dos casos: en el mismo Pane, `handleFocus` en el mousedown es un
 no-op (el Pane ya estaba enfocado), asi que el unico cambio real de `visible`/`focused` ocurre en el
-`click` — ahi es donde se enfoca el scratchpad, como ULTIMA accion del gesto completo (despues del
+`click` - ahi es donde se enfoca el scratchpad, como ULTIMA accion del gesto completo (despues del
 robo nativo del mousedown, que ya paso antes sin nada que robar). Con teclado no hay eventos de raton,
 asi que nunca hay robo nativo de foco con el que competir.
 
@@ -374,7 +374,7 @@ vez, sobrevive al cambio de tab") se ponia a `false` de forma silenciosa y perma
 click dentro del area del terminal mientras la tab ya tenia el foco (`TerminalPane.tsx`, dos
 `onMouseDown`/`onMouseDownCapture`, llamaban a `setLeafScratchpadActive(tabId, false)`). Nada volvia
 a ponerlo a `true` salvo clicar directamente el textarea del scratchpad o el shortcut de ciclar
-(`Cmd+U`/`cycleScratchpad`) — cambiar de Tab NUNCA lo reactivaba, por diseño ("survives tab blur").
+(`Cmd+U`/`cycleScratchpad`) - cambiar de Tab NUNCA lo reactivaba, por diseño ("survives tab blur").
 Una vez en `false`, quedaba persistido asi para siempre: cada restore heredaba el mismo valor roto.
 
 Ningun fix de foco (pendingFocus, requestLeafFocus, preventDefault) estaba mal: todos respetaban
@@ -411,7 +411,7 @@ correctamente en el textarea del scratchpad (confirmado sincronamente, `document
 apunta al textarea justo despues de `el.focus()`), pero **uno o dos frames despues**, xterm.js llama
 a su propio `.focus()` interno sobre su `textarea` oculta (`xterm-helper-textarea`), robando el foco
 de vuelta. El stack trace mostraba la llamada originandose dentro del propio bundle de `@xterm/xterm`
-(`CoreBrowserTerminal`), sin ninguna llamada nuestra en medio — no es un bug en nuestro codigo de
+(`CoreBrowserTerminal`), sin ninguna llamada nuestra en medio - no es un bug en nuestro codigo de
 foco, es xterm.js reaccionando a algo (muy probablemente su propio `ResizeObserver`: el contenedor
 del terminal encoge de alto cuando el `ScratchpadBar` hermano se monta en el mismo flex column,
 disparando el recalculo de filas/columnas de xterm).
@@ -661,7 +661,7 @@ llama incondicionalmente a `renderService.setRenderer(core._createRenderer())` +
 `renderService.handleResize(...)`: reconstruye un `DomRenderer` completo (el renderer DOM de
 reserva de xterm, documentado en su propio codigo como "not meant to be particularly fast"). Su
 constructor crea un elemento DOM por cada fila *visible* del terminal, un `WidthCache` con sus
-propios elementos auxiliares, e inyecta una hoja de estilos nueva — coste fijo proporcional a
+propios elementos auxiliares, e inyecta una hoja de estilos nueva - coste fijo proporcional a
 `term.rows`, no al historial, medido en 50-65ms consistentes. Ese `DomRenderer` nunca llega a
 pintar nada: en cuanto la pestana vuelve a ser visible, `attachWebgl` crea un contexto nuevo y lo
 descarta sin usarlo. Confirmado leyendo el codigo fuente instalado de `@xterm/addon-webgl@0.19.0`
@@ -767,12 +767,12 @@ workspace suelto en la seccion "sin grupo", y ningun intento posterior de "New" 
 
 ### Causa raiz
 
-`handleSetGroup` (en `App.tsx`) leia `workspaces` — el array de React, capturado por el closure del
-`useCallback` — para decidir si el grupo de origen del workspace se habia quedado vacio y debia
+`handleSetGroup` (en `App.tsx`) leia `workspaces` - el array de React, capturado por el closure del
+`useCallback` - para decidir si el grupo de origen del workspace se habia quedado vacio y debia
 podarse. Pero `setWorkspaceGroup(workspaceId, groupId)` solo *programa* la actualizacion: el array
 `workspaces` que ve el resto de la misma funcion, en el mismo evento sincrono, sigue siendo el de
 ANTES del cambio (React no aplica el nuevo estado hasta el siguiente render). Para un workspace que
-aun no tenia grupo, `prevGroupId` era `null` y una guarda evitaba podar nada — de ahi que la
+aun no tenia grupo, `prevGroupId` era `null` y una guarda evitaba podar nada - de ahi que la
 PRIMERA creacion funcionara siempre. Pero al mover un workspace YA agrupado a un grupo nuevo,
 `pruneEmptyGroups` se ejecutaba sobre ese array desactualizado: el grupo de origen seguia
 "pareciendo usado" (el workspace aun no habia salido de el, segun ese snapshot) asi que NO se
@@ -789,7 +789,7 @@ en `workspaceOrder.ts`: en vez de que el llamador intente adivinar o esperar a q
 refleje el movimiento, la propia funcion aplica el movimiento sobre la copia que recibe (`.map` puro,
 sin depender de ningun estado de React) y solo despues llama a `pruneEmptyGroups` sobre ese
 resultado. `handleSetGroup` le pasa el `workspaces` capturado tal cual, ANTES de aplicar nada, y la
-funcion se encarga de calcular el "despues" ella misma — asi ya no importa en que momento del ciclo
+funcion se encarga de calcular el "despues" ella misma - asi ya no importa en que momento del ciclo
 de React se lea el closure, porque nunca se confia en que ya se haya actualizado. `handleCommitGroupMove`
 (el que se dispara al soltar un drag) no necesito este mismo tratamiento: para cuando el drag
 termina, los cambios de grupo en vivo (`handlePreviewGroup`, durante el `dragOver`) ya se aplicaron

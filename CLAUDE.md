@@ -213,6 +213,10 @@ Se actualiza en el mismo commit que el cambio de codigo, nunca despues.
 - `docs/AGENT_SESSION_RESTORE.md`, `docs/RESTORE_SESSION_TESTS.md`, `docs/NOTIFICATIONS.md`: hooks, restore de sesiones y notificaciones de agentes, y su plan de pruebas manuales.
 - `docs/FORK.md`: divergencias y roadmap respecto al upstream (funcionalidades quitadas, anadidas, decisiones de arquitectura). Actualizar cuando cambie cualquiera de ellas.
 
+<!-- BACKLOG.MD GUIDELINES START -->
+<!-- backlog.md-instructions-version: 1.50.1 -->
+<CRITICAL_INSTRUCTION>
+
 ## Backlog.md Workflow
 
 This project uses Backlog.md for task and project management.

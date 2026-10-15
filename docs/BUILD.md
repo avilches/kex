@@ -1,4 +1,4 @@
-# Kex — Build and packaging
+# Kex - Build and packaging
 
 ## Development
 
@@ -81,7 +81,7 @@ pnpm tauri build
 
 The build requires `TAURI_SIGNING_PRIVATE_KEY` because `tauri.conf.json` has an updater public key configured. Without it, Tauri aborts with "A public key has been found, but no private key." This key only signs the updater artifact (the auto-updater's signature check), it has nothing to do with Gatekeeper or Apple code signing.
 
-**First time:** generate a local key pair with a password (needs a TTY — run in your terminal), then back up both the key file and the password in your secret manager, since losing either makes the key unusable:
+**First time:** generate a local key pair with a password (needs a TTY - run in your terminal), then back up both the key file and the password in your secret manager, since losing either makes the key unusable:
 
 ```bash
 pnpm tauri signer generate -w ~/.tauri/kex-local.key -p "<a strong password>"
@@ -98,7 +98,7 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 
 ### Fast local install (no signing key, no dmg)
 
-`pnpm build:local` (runs `scripts/build-local-app.sh`, macOS only) builds just the `.app` bundle and installs it straight into `/Applications`, replacing whatever is there. It skips the signing key entirely by disabling updater artifacts for that one build (`tauri build -b app -c '{"bundle":{"createUpdaterArtifacts":false}}'`), and skips the dmg step, so it's a much faster loop for trying a local change than the full production build. It does not quit or relaunch Kex: this script may itself be running inside a Kex terminal tab, so killing the app would kill the shell running it. Quit and reopen Kex yourself once it prints that the copy is done.
+`pnpm buildlocal` (runs `scripts/build-local-app.sh`, macOS only) builds just the `.app` bundle and installs it straight into `/Applications`, replacing whatever is there. It skips the signing key entirely by disabling updater artifacts for that one build (`tauri build -b app -c '{"bundle":{"createUpdaterArtifacts":false}}'`), and skips the dmg step, so it's a much faster loop for trying a local change than the full production build. It does not quit or relaunch Kex: this script may itself be running inside a Kex terminal tab, so killing the app would kill the shell running it. Quit and reopen Kex yourself once it prints that the copy is done.
 
 ### Version mismatch gotcha
 
@@ -126,12 +126,12 @@ Pushing the tag triggers `.github/workflows/release.yml` (matches `v*`), which b
 ## Bundle chunk strategy (vite.config.ts)
 
 Manual `manualChunks` splits the bundle to keep the initial load fast:
-- `react` — React, ReactDOM, scheduler, clsx, tailwind-merge, cva, Vite preload helper
-- `radix` — all Radix UI primitives
-- `xterm` — xterm.js and addons
-- `codemirror` — CodeMirror core, themes, vim
-- `cm-lang-<name>` — each CodeMirror language pack (loaded on demand by `languageResolver.ts`)
-- `cm-legacy-<name>` — each legacy mode
+- `react` - React, ReactDOM, scheduler, clsx, tailwind-merge, cva, Vite preload helper
+- `radix` - all Radix UI primitives
+- `xterm` - xterm.js and addons
+- `codemirror` - CodeMirror core, themes, vim
+- `cm-lang-<name>` - each CodeMirror language pack (loaded on demand by `languageResolver.ts`)
+- `cm-legacy-<name>` - each legacy mode
 
 ### Markdown editor chunks
 

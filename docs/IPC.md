@@ -1,12 +1,12 @@
-# Kex — Backend IPC surface
+# Kex - Backend IPC surface
 
-All Tauri commands registered in `src-tauri/src/lib.rs` via `tauri::generate_handler![]`. The WebView calls them via `invoke()` from `src/lib/native.ts` — never use `invoke()` directly in components or hooks.
+All Tauri commands registered in `src-tauri/src/lib.rs` via `tauri::generate_handler![]`. The WebView calls them via `invoke()` from `src/lib/native.ts` - never use `invoke()` directly in components or hooks.
 
 Adding a new command requires three steps: `Cargo.toml` dependency (if a new plugin), `.plugin(...)` call in `lib.rs` `run()`, and a capability entry in `src-tauri/capabilities/default.json`.
 
 ---
 
-## `pty::*` — PTY sessions
+## `pty::*` - PTY sessions
 
 State: `PtyState = RwLock<HashMap<id, Session>>`
 
@@ -19,13 +19,14 @@ State: `PtyState = RwLock<HashMap<id, Session>>`
 | `pty_close_all` | Close all PTYs (used on app exit) |
 | `pty_has_foreground_process` | Whether a process other than the shell itself is in the foreground |
 | `pty_shell_name` | Detected shell name for the PTY session |
+| `pty_list_shells` | Shells found on this machine: `name`, `path` and `integrated` (whether Kex injects OSC 7/133 integration for it). Feeds the shell selector in Terminal settings |
 | `pty_metrics(pty_ids)` | Sample CPU% and resident memory of each terminal's shell process tree (shell PID + all descendants). Returns `{ pty_id, pid, cpu_percent, mem_bytes, shell_name }[]`. CPU is normalized 0..=100 (per-core sum divided by logical CPU count) via a persistent `sysinfo::System` kept in `ProcessMonitor` managed state, so the value is a real delta between calls, not an instantaneous snapshot. Sessions with an unknown shell PID or no active session are skipped. `shell_name` is the shell process name, used when no foreground command is running. |
 
 Shell integration scripts (`scripts/`) are injected at spawn time. Platform detection happens in `pty/shell_init.rs` with `#[cfg(unix)]` / `#[cfg(windows)]` split.
 
 ---
 
-## `fs::*` — Filesystem
+## `fs::*` - Filesystem
 
 | Command | Description |
 |---|---|
@@ -67,7 +68,7 @@ Events emitted globally (all windows) by `fs::duplicate`:
 
 ---
 
-## `git::*` — Source control
+## `git::*` - Source control
 
 All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subprocess (not via `git2`).
 
@@ -90,10 +91,18 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `git_commit_file_diff` | Diff of a specific file in a specific commit |
 | `git_remote_url` | Remote URL for the repo (used for remote links) |
 | `git_mv` | Move or rename a tracked file/dir; automatically stages the rename |
+| `git_list_branches` | Local and remote branches (`name`, `isCurrent`, `isRemote`, `remote`, `upstream`, `worktree`, `ahead`, `behind`) |
+| `git_checkout_branch` | Check out an existing branch |
+| `git_create_branch` | Create a branch |
+| `git_list_remotes` | Configured remotes |
+| `git_add_remote(name, url)` | Add a remote |
+| `git_fetch_remote` | Fetch a single named remote |
+| `git_list_worktrees` | Worktrees of the repo (path and metadata) |
+| `git_worktree_status` | `{ worktreeName, worktreeCount }` for the repo |
 
 ---
 
-## `shell::*` — Command execution
+## `shell::*` - Command execution
 
 | Command | Description |
 |---|---|
@@ -120,7 +129,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 
 ---
 
-## `history::*` — Shell history
+## `history::*` - Shell history
 
 | Command | Description |
 |---|---|
@@ -146,10 +155,19 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
-| `agent_session_restore_plan` | Return `Vec<RestorePlan>` — one entry per tab that had a running agent session at last close |
+| `agent_session_restore_plan` | Return `Vec<RestorePlan>` - one entry per tab that had a running agent session at last close |
 | `agent_session_preview_cmd(tabId)` | Return `Option<RestorePlan>` for a single tab, computed live and read-only (never mutates `agent-sessions.json`). Used by the "Run on start" menu to preview the resume command that will actually run next launch, and by the blocked-start modal's "Try again" |
 | `check_launch_dir(path)` | Async (the filesystem checks run on `spawn_blocking`, so a slow mount does not stall the runtime). Return `Option<String>`: why `path` cannot be the working directory of a restored terminal (`Directory not found`, `Not a directory`, `Cannot access directory`), or `None` when it is fine |
 | `agent_session_set_snapshot(tabId, sessionId, title, notification)` | Store the tab name and the kind of its unread notification (`attention`, `finished`, `error`; empty or unknown clears it) in the tab's `agent-sessions.json` record. An empty `title` keeps the stored one. Scoped to the session the caller captured: returns `false` and writes nothing when the tab's record belongs to another `sessionId` (an in-flight flush of the previous session after `/clear` cannot land on the new one). Also returns `false` (and writes nothing) if the tab has no record yet, the file cannot be read or parsed, or the write fails, so the caller sends the tab again on its next change; skipped without writing when nothing changed. `RestorePlan` carries both back as `title` / `notification` |
+| `agent_detach_session(tabId)` | Detach the stored agent session from a tab (`session_store::detach_session`) |
+| `editor_scan` | Detect installed external editors (runs on a blocking thread) |
+| `editor_open(binary, argsBeforePath, path)` | Launch an external editor on a file or folder |
+| `window_save_groups(label, groups)` | Persist the workspace groups (`WorkspaceGroup[]`) of a window |
+| `window_save_collapsed_groups(label, ids)` | Persist which workspace groups are collapsed in a window |
+| `restore_window_geometry` | Restore the window size on startup (physical pixels; position is not restored) |
+| `sync_menu(state)` | Sync the native menu with the frontend (`autosave`, `sidebarOpen`, `activeView`, `sidebarSide`, `showHidden`) |
+| `confirm_quit` | Called once the frontend has flushed editors and workspace state after `kex:before-quit`, so the deferred quit proceeds |
+| `enter_windowless_mode` | Called before destroying the last window so the app stays alive in the Dock without windows (macOS) |
 | `agent_os_notify` | Send an OS notification `{ window_label, workspace_id, tab_id, title, body }`. On macOS a click on the notification (and only that) focuses the window and emits `kex:activate-tab` to it. |
 | `float_browser_open(tabId, url, originWindowLabel, workspaceId)` | Open a floating `WebviewUrl::External` window for the given browser tab. If the window already exists, focuses it instead of opening a second one. State is inserted only after successful window build. |
 | `float_browser_close(tabId)` | Destroy the floating window without docking (no `kex:float-dock` event emitted). Removes from state unconditionally. |
@@ -172,7 +190,7 @@ Events emitted by `float_browser.rs` to the **origin window** (not broadcast):
 
 Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via two complementary channels:
 
-**OSC 133 C (shell integration)** — the PTY reader detects the sequence `OSC 133;C;<cmd> ST` emitted by the shell init scripts at each prompt. This arms the `AgentDetector` and produces the `started` signal, but only when a segment of the line has an agent as its command word (`cd ~/claude-docs` or `echo claude` do not arm); `Started.cmd_string` carries that segment, not the whole line (see `AGENT_SESSION_RESTORE.md`, *Which part of the line is kept*). This path is always active once shell integration is loaded.
+**OSC 133 C (shell integration)** - the PTY reader detects the sequence `OSC 133;C;<cmd> ST` emitted by the shell init scripts at each prompt. This arms the `AgentDetector` and produces the `started` signal, but only when a segment of the line has an agent as its command word (`cd ~/claude-docs` or `echo claude` do not arm); `Started.cmd_string` carries that segment, not the whole line (see `AGENT_SESSION_RESTORE.md`, *Which part of the line is kept*). This path is always active once shell integration is loaded.
 
 **Unix socket IPC (hook events)**: Claude Code hooks call `trigger-event.sh` on each hook event. The script sends the raw JSON payload to a per-session Unix domain socket at `kex-ipc-{pid}-{pty_id}.sock`, where `pid` is the Kex process id so concurrent instances never share a path (path exposed via `KEX_IPC` env var). The socket lives under `XDG_RUNTIME_DIR` when available, otherwise under an owner-only (0700) `kex-ipc-{uid}` subdirectory of the system temp dir that Kex creates itself, and the socket file itself is forced to 0600; this keeps another local user on a shared machine from pre-creating the path (denial of service) or connecting to inject forged agent events. The Rust listener (`pty/ipc.rs`) reads the JSON and emits Tauri events:
 

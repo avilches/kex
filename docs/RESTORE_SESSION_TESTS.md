@@ -1,4 +1,4 @@
-# Agent session restore — tests manuales
+# Agent session restore - tests manuales
 
 Plan de pruebas para la feature de restauracion de sesiones de agente.
 Ver diseño completo en `docs/AGENT_SESSION_RESTORE.md`.
@@ -9,7 +9,7 @@ Ver diseño completo en `docs/AGENT_SESSION_RESTORE.md`.
 
 Ejecutar en orden. Cada check desbloquea el siguiente.
 
-### D1 — Entorno de la shell
+### D1 - Entorno de la shell
 
 Abrir un terminal dentro de Kex y ejecutar:
 
@@ -25,7 +25,7 @@ Esperado:
 Si `PANEL_ID` esta vacio, los hooks de sesion no funcionaran. El problema esta en
 `pty/shell_init.rs` o en que no se recargo la app tras compilar.
 
-### D2 — Hooks instalados en settings.json
+### D2 - Hooks instalados en settings.json
 
 ```bash
 cat ~/.claude/settings.json | python3 -m json.tool | grep -A3 "Session"
@@ -35,7 +35,7 @@ Esperado: entradas `SessionStart` y `SessionEnd` con `kex-session-hook` en el co
 
 Si no aparecen, los hooks no estan instalados. Clicar el campanazo > "Set up Claude Code".
 
-### D3 — Script de sesion existe y es ejecutable
+### D3 - Script de sesion existe y es ejecutable
 
 ```bash
 ls -la ~/.config/kex/hooks/session.sh
@@ -44,7 +44,7 @@ head -5 ~/.config/kex/hooks/session.sh
 
 Esperado: `-rwxr-xr-x` y `#!/usr/bin/env bash` en la primera linea.
 
-### D4 — El store se escribe al lanzar claude
+### D4 - El store se escribe al lanzar claude
 
 Lanzar `claude` dentro de Kex y esperar a que muestre el prompt (puede tardar ~5s).
 Luego en otro terminal:
@@ -65,7 +65,7 @@ which jq || echo "jq NO encontrado"
 Si falta `jq`: instalar con `brew install jq` (macOS) o `apt install jq` (Linux).
 Nota: el script tiene un fallback sin jq pero es menos robusto.
 
-### D5 — El store sobrevive al cerrar Kex
+### D5 - El store sobrevive al cerrar Kex
 
 Cerrar Kex (sin salir de claude), luego:
 
@@ -77,7 +77,7 @@ El `state` debe seguir siendo `"idle"` (no `"exited"`).
 Si es `"exited"`: el hook `SessionEnd` se disparo antes del cierre, lo que ocurre si claude
 sale solo antes de que Kex se cierre. Confirmar que claude seguia corriendo al cerrar.
 
-### D6 — El restore plan se construye al reabrir
+### D6 - El restore plan se construye al reabrir
 
 Abrir Kex con la consola de DevTools activa (menu > View > Toggle DevTools o en dev mode).
 En la consola buscar logs de `agent_session_restore_plan`. Añadir un log temporal si es necesario:
@@ -105,7 +105,7 @@ Si `plans` es `[]`: el Rust planner no construyo ningun plan. Causas posibles:
 
 Si hay error IPC: problema con el comando Rust `agent_session_restore_plan`.
 
-### D7 — El JSONL de la sesion existe
+### D7 - El JSONL de la sesion existe
 
 Con el `session_id` del store (campo `session_id`):
 
@@ -119,7 +119,7 @@ Esperado: una ruta como `~/.claude/projects/somethinghashed/SESSION_ID.jsonl`.
 Si no aparece: claude no escribio el transcript todavia (puede pasar si la sesion era muy corta)
 o `CLAUDE_CONFIG_DIR` esta configurado a otra ruta.
 
-### D8 — El tabId del store coincide con el del tab nuevo
+### D8 - El tabId del store coincide con el del tab nuevo
 
 El problema mas sutil: al reabrir Kex, los tabs obtienen IDs nuevos (UUIDs frescos) porque
 el estado de workspace se restaura desde `workspaces/<id>.json`. Ese archivo persiste el `tab.id`.
@@ -144,7 +144,7 @@ Si los IDs no coinciden: este es el bug raiz. El UUID del panel cambia entre ses
 
 ---
 
-## Bloque A — Instalacion de hooks
+## Bloque A - Instalacion de hooks
 
 ### A1 Estado sin hooks
 
@@ -175,7 +175,7 @@ rm -f ~/.config/kex/hooks/session.sh
 
 ---
 
-## Bloque B — Escritura del store durante una sesion
+## Bloque B - Escritura del store durante una sesion
 
 ### B1 SessionStart escribe la entrada
 
@@ -200,7 +200,7 @@ rm -f ~/.config/kex/hooks/session.sh
 
 ---
 
-## Bloque C — Restauracion al reabrir
+## Bloque C - Restauracion al reabrir
 
 ### C1 Happy path
 
@@ -231,14 +231,14 @@ Partiendo del estado de C1 (sesion restaurada, dot verde):
 - [ ] Verificar: NO se inyecta ningun comando en ese terminal
 - [ ] Verificar: tab no muestra `✦` ni dot
 
-### C4 Error de restore — JSONL no encontrado
+### C4 Error de restore - JSONL no encontrado
 
 - [ ] Abrir `~/Library/Application Support/app.betauer.kex/agent-sessions.json` y cambiar `session_id` por un valor inventado
 - [ ] Asegurarse de que `state: "idle"` (no exited)
 - [ ] Reabrir Kex
 - [ ] Esperado: tab muestra `⚠` (warning), dot **rojo estatico**, titulo en color rojo apagado
 
-### C5 Error de restore — cwd borrado
+### C5 Error de restore - cwd borrado
 
 - [ ] Crear directorio temporal: `mkdir /tmp/test-kex-restore`
 - [ ] En Kex: `cd /tmp/test-kex-restore && claude`, esperar prompt
@@ -266,7 +266,7 @@ Partiendo de C4 o C5 (tab en estado `⚠`):
 
 ---
 
-## Bloque D — UI del tab
+## Bloque D - UI del tab
 
 ### D1 Titulo
 
@@ -297,10 +297,10 @@ Partiendo de C4 o C5 (tab en estado `⚠`):
 | Esperando input / tarea terminada (OSC "attention"/"finished") | amarillo `bg-amber-400` | pulsando |
 | Sesion restaurada (antes del primer OSC) | verde `bg-green-500` | pulsando |
 | Error de restore | rojo `bg-destructive` | estatico |
-| Sin agente | sin dot | — |
+| Sin agente | sin dot | - |
 
 - [ ] Verificar cada color
-- [ ] El dot tiene 6px de tamaño — confirmar que es visible
+- [ ] El dot tiene 6px de tamaño - confirmar que es visible
 
 ### D4 Tooltip (bug conocido)
 
@@ -324,7 +324,7 @@ Este es un bug pendiente de corregir (ver `PaneTabBar.tsx:105-112` y `165-174`).
 
 ---
 
-## Bloque E — Edge cases
+## Bloque E - Edge cases
 
 ### E1 jq no instalado
 
