@@ -53,9 +53,11 @@ export function noteSurface(
   const target: Rgb = isLight(tinted) ? [0, 0, 0] : [255, 255, 255];
   // Some themes (Kex Default) leave the text color to the stylesheet.
   const text = (foreground ? parseColor(foreground) : null) ?? target;
-  let fg = text;
-  for (let t = 0.05; contrastRatio(fg, tinted) < MIN_CONTRAST && t <= 1; t += 0.05) {
-    fg = mix(text, target, t);
+  const round = (c: Rgb): Rgb => c.map(Math.round) as Rgb;
+  const bgRounded = round(tinted);
+  let fg = round(text);
+  for (let t = 0.05; contrastRatio(fg, bgRounded) < MIN_CONTRAST && t <= 1; t += 0.05) {
+    fg = round(mix(text, target, t));
   }
-  return { background: toHex(tinted), foreground: toHex(fg) };
+  return { background: toHex(bgRounded), foreground: toHex(fg) };
 }
