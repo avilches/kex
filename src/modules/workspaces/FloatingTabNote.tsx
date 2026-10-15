@@ -126,28 +126,36 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
   }, [paneRef, tabBarRef, tab.id, dockTo]);
 
   useLayoutEffect(() => {
-    if (visible) measure();
-  }, [visible, measure, layoutKey]);
-
-  useLayoutEffect(() => {
     if (!visible) return;
-    const paneEl = paneRef.current;
-    const noteEl = noteRef.current;
-    const barEl = tabBarRef.current;
-    if (!paneEl || !noteEl) return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(paneEl);
-    ro.observe(noteEl);
-    // A tab before the active one changing width (title, badges) shifts the docked x.
-    for (const el of barEl?.querySelectorAll("[data-tab-id]") ?? []) ro.observe(el);
-    if (dockTo) {
-      const rowEl = document.querySelector(`[data-detail-row-id="${CSS.escape(tabId)}"]`);
-      if (rowEl) ro.observe(rowEl);
-    }
-    // scroll does not bubble; capture catches the tab strip's own scroll container.
-    barEl?.addEventListener("scroll", measure, true);
+    let raf = 0;
+    let ro: ResizeObserver | null = null;
+    let barEl: HTMLElement | null = null;
+    const attach = () => {
+      const paneEl = paneRef.current;
+      const noteEl = noteRef.current;
+      if (!paneEl || !noteEl) return false;
+      barEl = tabBarRef.current;
+      ro = new ResizeObserver(measure);
+      ro.observe(paneEl);
+      ro.observe(noteEl);
+      // A tab before the active one changing width (title, badges) shifts the docked x.
+      for (const el of barEl?.querySelectorAll("[data-tab-id]") ?? []) ro.observe(el);
+      if (dockTo) {
+        const rowEl = document.querySelector(`[data-detail-row-id="${CSS.escape(tabId)}"]`);
+        if (rowEl) ro.observe(rowEl);
+      }
+      // scroll does not bubble; capture catches the tab strip's own scroll container.
+      barEl?.addEventListener("scroll", measure, true);
+      measure();
+      return true;
+    };
+    // On a pane's first mount (app startup) this effect runs before React
+    // attaches the pane container's ref, so the note would never be measured
+    // and stay invisible. Retry on the next frame, once the commit finished.
+    if (!attach()) raf = requestAnimationFrame(attach);
     return () => {
-      ro.disconnect();
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
       barEl?.removeEventListener("scroll", measure, true);
     };
   }, [visible, measure, paneRef, tabBarRef, layoutKey, dockTo, tabId]);

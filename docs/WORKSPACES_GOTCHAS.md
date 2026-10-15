@@ -1023,3 +1023,31 @@ El camino de titulo de un tab despierto (`resolveAgentTabTitle` en `useAgentTabT
 ### Leccion
 
 Un dato que ya vive persistido en el tab no hace falta inventarlo ni esperar a la fuente en vivo: si un componente (el overlay) lo muestra bien y otro (la barra despierta) no, comparar las cadenas de prioridad de los dos antes de tocar el plumbing. El bug era de prioridad de fuentes en el camino de lectura, no de falta de persistencia.
+
+---
+
+## Bug 21: la sticky note del tab activo nunca aparecia al arrancar la app (RESUELTO)
+
+### Sintoma
+
+Al arrancar la app, la nota flotante de un tab que quedo abierta (`noteOpen: true` persistido, icono de nota encendido en el tab) no se muestra. Ocultarla y volver a abrirla (dos veces el atajo o el icono del tab) la hace aparecer. El texto nunca se pierde.
+
+### Pistas falsas descartadas
+
+- Persistencia: Rust guarda el workspace como JSON opaco y el estado en disco llevaba `noteOpen: true` en el tab activo; el restore, el sanitize y la hibernacion no tocan los campos de nota.
+- Render condicional: `PaneView` monta la nota (la condicion de `noteOpen` se cumple) y los tests de montaje del componente pasan.
+- Perdida de `noteOpen` al cerrar la app (Cmd+Q, flush del debounce, blur de la nota): el flujo de cierre preserva el estado.
+
+### Causa raiz
+
+En el primer montaje de un pane (el arranque), el `useLayoutEffect` de `FloatingTabNote` corre antes de que React asigne el ref del contenedor del pane: los refs de los ancestros se adjuntan despues de los layout effects de los hijos. `measure()` sale por su early return silencioso, y el efecto del ResizeObserver tampoco se registra (mismo early return). Como las dependencias de ambos efectos no cambian despues, nadie vuelve a medir: `m` y `pos` quedan null y la nota lleva la clase `invisible` indefinidamente. Al remontar la nota (toggle) el pane ya tiene su ref asignado y todo funciona, por eso el remedio manual la revive.
+
+Evidencia: instrumentacion temporal que enviaba `{m, pos, refs}` por fetch a un servidor HTTP local durante el arranque real de la app.
+
+### Fix
+
+`FloatingTabNote` fusiona los dos efectos en uno: `attach()` registra el ResizeObserver y mide, y si `paneRef.current` o `noteRef.current` aun son null reintenta en `requestAnimationFrame`, cuando el commit ya termino. Test de regresion en `FloatingTabNote.test.tsx` montando la nota con el ref del pane sin asignar y asignandolo despues.
+
+### Leccion
+
+Un early return silencioso en un camino de medicion puede dejar un componente montado pero invisible para siempre si nada re-dispara la medicion. El orden real de attach de refs frente a los layout effects solo se manifiesta en el primer montaje del padre, asi que los tests con refs pre-asignados no lo cubren: hay que montar con el ref vacio. Y para observar valores del webview en un arranque real, un fetch a un servidor local resulta mas fiable que cualquier intento de leer la consola.

@@ -83,6 +83,39 @@ describe("FloatingTabNote", () => {
     expect(screen.queryByTestId("tab-note-handle")).toBeNull();
   });
 
+  it("measures the note once the pane ref attaches, even if it was null at mount", async () => {
+    // A pane's first mount (app startup) runs this component's layout effects
+    // before React attaches the pane container's ref, so paneRef.current is
+    // still null while the note is already committed.
+    const pane = document.createElement("div");
+    const bar = document.createElement("div");
+    const tabEl = document.createElement("div");
+    tabEl.setAttribute("data-tab-id", open.id);
+    pane.append(bar, tabEl);
+    document.body.append(pane);
+    pane.getBoundingClientRect = () => rect(0, 0, 800, 600);
+    tabEl.getBoundingClientRect = () => rect(100, 0, 80, 20);
+    Object.defineProperty(bar, "offsetHeight", { value: 32, configurable: true });
+    const paneRef = { current: null as HTMLElement | null };
+    render(
+      <FloatingTabNote
+        tab={open}
+        active
+        paneRef={paneRef}
+        tabBarRef={{ current: bar }}
+        layoutKey={open.id}
+      />,
+    );
+    const note = document.querySelector("[data-tab-note]") as HTMLElement;
+    expect(note.className).toContain("invisible");
+    queueMicrotask(() => {
+      paneRef.current = pane;
+    });
+    await waitFor(() => expect(note.className).not.toContain("invisible"));
+    expect(note.style.left).toBe("100px");
+    expect(note.style.top).toBe("32px");
+  });
+
   it("edits the note in the Live Preview editor and stores each change on the tab", async () => {
     const { getTab, onUpdateTab } = setup(open);
     const content = await waitFor(() => {
