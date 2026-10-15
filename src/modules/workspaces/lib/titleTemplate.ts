@@ -132,9 +132,10 @@ export function hasTitleVariables(template: string): boolean {
   return /[{}]/.test(template);
 }
 
-// Own properties only: `constructor` and the like must not resolve to Object.prototype.
+// Only strings count, so `constructor` and the like never resolve through Object.prototype.
 function lookup(vars: TitleVars, name: string): string | undefined {
-  return Object.prototype.hasOwnProperty.call(vars, name) ? vars[name as TitleVariable] : undefined;
+  const value: unknown = (vars as Record<string, unknown>)[name];
+  return typeof value === "string" ? value : undefined;
 }
 
 function render(nodes: Node[], vars: TitleVars): string {
@@ -167,10 +168,11 @@ export type TitleSubject = Tab["kind"] | "workspace";
 
 // Where a variable has a value: every tab, or only one kind. A workspace takes the values
 // of its focused tab, so it can use all of them.
-export type TitleVariableGroup = "common" | "terminal" | "file" | "browser" | "workspace";
+export type TitleVariableGroup = "common" | "place" | "terminal" | "file" | "browser" | "workspace";
 
 export const TITLE_GROUP_LABELS: Record<TitleVariableGroup, string> = {
   common: "Any tab or workspace",
+  place: "Tabs that live in a folder (not browsers)",
   terminal: "Terminals",
   file: "Editors and diffs",
   browser: "Browsers",
@@ -187,11 +189,11 @@ export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
     name: "cwd",
     description: "Full path of the folder the tab is in (for a file, the folder that holds it)",
     example: "~/code/kex/src",
-    group: "common",
+    group: "place",
   },
-  { name: "dir", description: "Only the name of that folder", example: "src", group: "common" },
-  { name: "branch", description: "Git branch of that folder, empty outside a repository", example: "main", group: "common" },
-  { name: "repo", description: "Name of the git repository", example: "kex", group: "common" },
+  { name: "dir", description: "Only the name of that folder", example: "src", group: "place" },
+  { name: "branch", description: "Git branch of that folder, empty outside a repository", example: "main", group: "place" },
+  { name: "repo", description: "Name of the git repository", example: "kex", group: "place" },
   { name: "host", description: "Name of this computer", example: "MacBook", group: "common" },
   { name: "cmd", description: "Command running right now", example: "npm run dev", group: "terminal" },
   { name: "osc", description: "Title the program in the terminal sets for itself", example: "vim notes.md", group: "terminal" },
@@ -203,14 +205,14 @@ export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
 ];
 
 const GROUPS_FOR: Record<TitleSubject, TitleVariableGroup[]> = {
-  terminal: ["common", "terminal"],
-  editor: ["common", "file"],
-  markdown: ["common", "file"],
-  "git-diff": ["common", "file"],
-  "git-commit-file": ["common", "file"],
+  terminal: ["common", "place", "terminal"],
+  editor: ["common", "place", "file"],
+  markdown: ["common", "place", "file"],
+  "git-diff": ["common", "place", "file"],
+  "git-commit-file": ["common", "place", "file"],
   browser: ["common", "browser"],
-  "git-history": ["common"],
-  workspace: ["common", "terminal", "file", "browser", "workspace"],
+  "git-history": ["common", "place"],
+  workspace: ["common", "place", "terminal", "file", "browser", "workspace"],
 };
 
 // Only the variables the subject can have a value for.

@@ -58,7 +58,7 @@ describe("TabRenamePopover", () => {
 
   it.each([
     ["terminal", ["{cmd}", "{osc}", "{cwd}"], ["{url}", "{file}", "{tab}"]],
-    ["browser", ["{url}", "{cwd}"], ["{cmd}", "{file}", "{tab}"]],
+    ["browser", ["{url}", "{host}"], ["{cwd}", "{dir}", "{branch}", "{repo}", "{cmd}", "{file}", "{tab}"]],
     ["editor", ["{file}", "{dir}"], ["{cmd}", "{url}", "{tab}"]],
     ["git-history", ["{dir}", "{repo}"], ["{cmd}", "{file}", "{url}", "{tab}"]],
   ] as const)("offers only the variables a %s tab has", (kind, offered, hidden) => {
