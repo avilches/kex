@@ -84,14 +84,18 @@ export function resolveAgentTabTitle(
 ): AgentTabTitleInfo {
   const hasAgent = !!agentSession && tab.kind === "terminal";
   const sessionTitle = agentSession?.meta?.sessionTitle;
+  // After a wake or an app-restart restore the live OSC title is gone (the PTY was
+  // disposed) until the agent boots and sends a new one; the title it last sent is
+  // persisted on the tab, so the tab keeps its name through that window.
+  const osc = oscTitle ?? (tab.kind === "terminal" ? tab.agentTitle : undefined);
   // The agent name only reaches the sources of an agent tab, which is what selects its default.
   const src = {
     ...sources,
     agent: hasAgent ? (sources?.agent ?? agentSession?.agent) : undefined,
     session: sessionTitle,
   };
-  const displayTitle = tabTitle(tab, runningCommand, oscTitle, src);
-  const isDescription = !!(tab.title || oscTitle || sessionTitle);
+  const displayTitle = tabTitle(tab, runningCommand, osc, src);
+  const isDescription = !!(tab.title || osc || sessionTitle);
 
   return { displayTitle, isDescription, hasAgent, isRunning: !!runningCommand, agentSession };
 }
