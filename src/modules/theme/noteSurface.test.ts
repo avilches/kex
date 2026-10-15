@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { noteSurface } from "./noteSurface";
+import { noteSurface, parseNoteTintMap } from "./noteSurface";
 import { contrastRatio } from "./readableColors";
 import { listBuiltinThemes } from "./themes";
 
@@ -31,6 +31,21 @@ describe("noteSurface", () => {
     expect(contrastRatio(rgb(dark.foreground), rgb(dark.background))).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio(rgb(light.foreground), rgb(light.background))).toBeGreaterThanOrEqual(4.5);
     expect(dark.foreground).not.toBe(light.foreground);
+  });
+
+  test("an override replaces the built-in color and amount", () => {
+    const over = noteSurface("#2b2b2b", "#fafafa", false, { color: "#ff0000", amount: 1 })!;
+    expect(over.background).toBe("#ff0000");
+  });
+
+  test("parseNoteTintMap keeps valid entries and clamps the amount", () => {
+    const map = parseNoteTintMap({
+      "a:dark": { color: "#AABBCC", amount: 2 },
+      "b:dark": { color: "red", amount: 0.5 },
+      "c:dark": null,
+    });
+    expect(map).toEqual({ "a:dark": { color: "#aabbcc", amount: 1 } });
+    expect(parseNoteTintMap("nope")).toEqual({});
   });
 
   test("returns null for a color it cannot parse", () => {

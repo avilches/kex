@@ -17,6 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
+import { NoteTintTuner } from "../components/NoteTintTuner";
 import { ThemeTable } from "../components/ThemeTable";
 
 const APPEARANCE_MODES: { id: ThemePref; label: string; icon: typeof ComputerIcon }[] = [
@@ -107,6 +108,8 @@ export function ThemesSection() {
           ))}
         </div>
       </div>
+
+      <NoteTintTuner />
 
       <div
         role="presentation"

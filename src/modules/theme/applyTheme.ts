@@ -1,5 +1,5 @@
 import { withReadableText } from "./readableColors";
-import { noteSurface } from "./noteSurface";
+import { noteSurface, type NoteTint } from "./noteSurface";
 import { getBuiltinTheme } from "./themes";
 import type { EditorSurface, Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
 
@@ -74,6 +74,7 @@ export function applyTheme(
   mode: ThemeMode,
   terminalOverride?: TerminalPalette,
   editorOverride?: EditorSurface,
+  noteTint?: NoteTint,
 ): void {
   const root = document.documentElement;
   const variant = theme.variants[mode] ?? theme.variants.dark ?? theme.variants.light;
@@ -93,7 +94,7 @@ export function applyTheme(
   if (editor) writeEditor(root, editor);
   const noteBg = editor?.background ?? colors?.background;
   const noteFg = editor?.foreground ?? colors?.foreground;
-  const note = noteSurface(noteBg ?? "", noteFg, variant.noteStrong);
+  const note = noteSurface(noteBg ?? "", noteFg, variant.noteStrong, noteTint);
   const background = note?.background ?? noteBg;
   const foreground = note?.foreground ?? noteFg;
   if (background) root.style.setProperty("--note-background", background);

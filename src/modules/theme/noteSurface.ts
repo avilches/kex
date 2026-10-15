@@ -10,6 +10,30 @@ const TINT = {
   light: { color: [250, 204, 21] as Rgb, normal: 0.2, strong: 0.4 },
 };
 
+export type NoteTint = { color: string; amount: number };
+export type NoteTintMap = Record<string, NoteTint>;
+
+export const noteTintKey = (themeId: string, mode: "dark" | "light"): string => `${themeId}:${mode}`;
+
+export function parseNoteTintMap(raw: unknown): NoteTintMap {
+  const out: NoteTintMap = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw)) {
+    const t = v as Partial<NoteTint> | null;
+    if (t && typeof t.color === "string" && HEX.test(t.color) && Number.isFinite(t.amount)) {
+      out[k] = { color: t.color.toLowerCase(), amount: Math.min(1, Math.max(0, t.amount!)) };
+    }
+  }
+  return out;
+}
+
+export function defaultNoteTint(background: string, strong: boolean): NoteTint | null {
+  const bg = parseColor(background);
+  if (!bg) return null;
+  const tint = TINT[isLight(bg) ? "light" : "dark"];
+  return { color: toHex(tint.color), amount: strong ? tint.strong : tint.normal };
+}
+
 type Rgb = [number, number, number];
 
 const FUNC = /^rgba?\(\s*(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)/i;
@@ -45,11 +69,14 @@ export function noteSurface(
   background: string,
   foreground: string | undefined,
   strong = false,
+  override?: NoteTint,
 ): NoteSurface | null {
   const bg = parseColor(background);
   if (!bg) return null;
   const tint = TINT[isLight(bg) ? "light" : "dark"];
-  const tinted = mix(bg, tint.color, strong ? tint.strong : tint.normal);
+  const tinted = override
+    ? mix(bg, parseColor(override.color) ?? tint.color, override.amount)
+    : mix(bg, tint.color, strong ? tint.strong : tint.normal);
   const target: Rgb = isLight(tinted) ? [0, 0, 0] : [255, 255, 255];
   // Some themes (Kex Default) leave the text color to the stylesheet.
   const text = (foreground ? parseColor(foreground) : null) ?? target;
