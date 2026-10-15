@@ -1,4 +1,5 @@
 pub mod commands;
+mod direct;
 pub mod errors;
 pub mod operations;
 pub mod parser;

@@ -37,6 +37,7 @@ import { IS_WINDOWS } from "@/lib/platform";
 import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { openPty, type PtySession } from "./pty-bridge";
+import { spawnCwdUpdate } from "./spawnCwd";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
 import { withRestoreBusy } from "./restoreBusy";
 import {
@@ -995,6 +996,9 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   if (!plain) setPendingRestore(leafId, null);
   if (s.restoreBlock) setRestoreBlock(leafId, s, null);
   s.pty = pty;
+  // The folder the shell actually started in, known before the first OSC 7;
+  // a stale saved folder gives way to it the moment the PTY opens.
+  applySpawnCwdReport(s, pty.cwd);
   if (s.pendingInput) {
     void pty.write(s.pendingInput);
     s.pendingInput = "";
@@ -1134,11 +1138,23 @@ export async function respawnSession(
     return;
   }
   s.pty = pty;
+  applySpawnCwdReport(s, pty.cwd);
   if (s.pendingInput) {
     void pty.write(s.pendingInput);
     s.pendingInput = "";
   }
   if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
+}
+
+// The folder reported by pty_open seeds lastCwd and reaches the tab (and the
+// workspace cwd through it) without waiting for the shell's first OSC 7.
+// Unchanged folders and PTYs that had no folder to report leave the tab as it
+// was; the rebind path replays lastCwd as usual.
+function applySpawnCwdReport(s: Session, reported: string | null): void {
+  const next = spawnCwdUpdate(s.lastCwd, reported);
+  if (!next) return;
+  s.lastCwd = next;
+  s.callbacks.onCwd?.(next);
 }
 
 export async function leafHasForegroundProcess(leafId: string): Promise<string | null> {

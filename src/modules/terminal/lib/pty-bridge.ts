@@ -8,8 +8,15 @@ export type PtyHandlers = {
   onExit?: (code: number) => void;
 };
 
+export type PtySpawnedResponse = {
+  id: number;
+  cwd: string | null;
+};
+
 export type PtySession = {
   id: number;
+  /** The folder the shell actually started in, before the first OSC 7. */
+  cwd: string | null;
   write: (data: string) => Promise<void>;
   resize: (cols: number, rows: number) => Promise<void>;
   close: () => Promise<void>;
@@ -43,7 +50,7 @@ export async function openPty(
     releaseHandlers();
   };
 
-  const id = await invoke<number>("pty_open", {
+  const { id, cwd: spawnedCwd } = await invoke<PtySpawnedResponse>("pty_open", {
     cols,
     rows,
     cwd: cwd ?? null,
@@ -61,6 +68,7 @@ export async function openPty(
 
   return {
     id,
+    cwd: spawnedCwd ?? null,
     // Raw bytes + id header: no JSON round-trip on the per-keystroke path.
     write: (data) => invoke("pty_write", textEncoder.encode(data), { headers }),
     resize: (c, r) => invoke("pty_resize", { id, cols: c, rows: r }),

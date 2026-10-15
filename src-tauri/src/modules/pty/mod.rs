@@ -71,7 +71,7 @@ pub async fn pty_open(
     shell: Option<String>,
     on_data: Channel<Response>,
     on_exit: Channel<i32>,
-) -> Result<u32, String> {
+) -> Result<PtySpawned, String> {
     let window_label = webview_window.label().to_string();
     let workspace = WorkspaceEnv::from_option(workspace);
     let blocks = blocks.unwrap_or(false);
@@ -80,9 +80,13 @@ pub async fn pty_open(
     // cwd falls back to home rather than failing the open.
     let (cwd, canonical_cwd) = spawn_cwd_or_home(cwd, &workspace);
     let id = state.next_id.fetch_add(1, Ordering::Relaxed);
-    let session = tauri::async_runtime::spawn_blocking(move || {
+    let report_workspace = workspace.clone();
+    let (session, spawned_dir) = tauri::async_runtime::spawn_blocking(move || {
+        // Same thread that stats the cwd for the spawn also answers the
+        // report: an is_dir on a slow mount stays off the async runtime.
+        let dir = shell_init::spawn_dir_report(cwd.clone(), &report_workspace);
         session::spawn(id, app, cols, rows, cwd, workspace, blocks, tab_id, shell, on_data, on_exit)
-            .map(|(s, _)| s)
+            .map(|(s, _)| (s, dir))
     })
     .await
     .map_err(|e| {
@@ -123,7 +127,19 @@ pub async fn pty_open(
         }
     }
     log::info!("pty opened id={id} cols={cols} rows={rows} window={window_label}");
-    Ok(id)
+    Ok(PtySpawned {
+        id,
+        cwd: spawned_dir,
+    })
+}
+
+/// What `pty_open` hands the tab: the session id plus the folder the shell
+/// actually started in, so the tab can show it before the first OSC 7.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PtySpawned {
+    pub id: u32,
+    pub cwd: Option<String>,
 }
 
 // Input is the latency-critical path: raw body + id header skips JSON

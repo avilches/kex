@@ -12,7 +12,7 @@ State: `PtyState = RwLock<HashMap<id, Session>>`
 
 | Command | Description |
 |---|---|
-| `pty_open` | Spawn a new PTY session, returns a Tauri `Channel<PtyEvent>` for streaming output |
+| `pty_open` | Spawn a new PTY session, returns a Tauri `Channel<PtyEvent>` for streaming output plus `{ id, cwd }`: the session id and the folder the shell actually started in (the given cwd when usable, else the launch folder, else home; `cwd` is null for a WSL spawn without a folder, where the shell lands in the distro home). The tab takes the folder from `cwd` when the PTY opens, before the first OSC 7 |
 | `pty_write` | Write bytes to a PTY (keyboard input) |
 | `pty_resize` | Resize PTY (columns / rows) |
 | `pty_close` | Close PTY and kill the shell process |
