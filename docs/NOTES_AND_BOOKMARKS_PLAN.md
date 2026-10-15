@@ -455,7 +455,7 @@ Objetivo: rematar UX y mantener la documentacion viva en sync (obligatorio en el
 - `docs/IPC.md`: nuevo comando `notes_list` (firma, params, retorno) y, si se anaden, otros comandos fs.
 - `docs/FORK.md`: divergencia respecto al upstream (notas WYSIWYG y marcadores como features anadidas; fases completadas).
 - `docs/BUILD.md`: solo si cambia el build (por ejemplo, el chunk lazy de Milkdown o una dep nueva).
-- `CLAUDE.md`: actualizar el mapa de modulos en la seccion "Module layout".
+- `docs/ARCHITECTURE.md`: actualizar el mapa de modulos (seccion 7).
 
 ## Verificacion Fase 6
 
