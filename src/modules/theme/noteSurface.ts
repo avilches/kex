@@ -42,15 +42,16 @@ export type NoteSurface = { background: string; foreground: string };
 // yellowish, where the normal amount would barely show.
 export function noteSurface(
   background: string,
-  foreground: string,
+  foreground: string | undefined,
   strong = false,
 ): NoteSurface | null {
   const bg = parseColor(background);
-  const text = parseColor(foreground);
-  if (!bg || !text) return null;
+  if (!bg) return null;
   const amount = MIX[isLight(bg) ? "light" : "dark"][strong ? "strong" : "normal"];
   const tinted = mix(bg, YELLOW, amount);
   const target: Rgb = isLight(tinted) ? [0, 0, 0] : [255, 255, 255];
+  // Some themes (Kex Default) leave the text color to the stylesheet.
+  const text = (foreground ? parseColor(foreground) : null) ?? target;
   let fg = text;
   for (let t = 0.05; contrastRatio(fg, tinted) < MIN_CONTRAST && t <= 1; t += 0.05) {
     fg = mix(text, target, t);

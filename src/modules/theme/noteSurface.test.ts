@@ -25,6 +25,14 @@ describe("noteSurface", () => {
     expect(n.background).toBe(noteSurface("#1a1b26", "#c0caf5")!.background);
   });
 
+  test("picks a readable text color when the theme defines none", () => {
+    const dark = noteSurface("#2b2b2b", undefined)!;
+    const light = noteSurface("#ffffff", undefined)!;
+    expect(contrastRatio(rgb(dark.foreground), rgb(dark.background))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(rgb(light.foreground), rgb(light.background))).toBeGreaterThanOrEqual(4.5);
+    expect(dark.foreground).not.toBe(light.foreground);
+  });
+
   test("returns null for a color it cannot parse", () => {
     expect(noteSurface("transparent", "#ffffff")).toBeNull();
   });

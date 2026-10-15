@@ -93,7 +93,7 @@ export function applyTheme(
   if (editor) writeEditor(root, editor);
   const noteBg = editor?.background ?? colors?.background;
   const noteFg = editor?.foreground ?? colors?.foreground;
-  const note = noteSurface(noteBg ?? "", noteFg ?? "", variant.noteStrong);
+  const note = noteSurface(noteBg ?? "", noteFg, variant.noteStrong);
   const background = note?.background ?? noteBg;
   const foreground = note?.foreground ?? noteFg;
   if (background) root.style.setProperty("--note-background", background);
