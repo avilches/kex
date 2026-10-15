@@ -999,3 +999,27 @@ El mismo defecto hacia que `cd ~/claude-docs` armara el detector, porque el nomb
 ### Leccion
 
 Un texto que llega de la shell es la linea que escribio el usuario, no un comando. Antes de interpretarlo hay que localizar el comando dentro de ella. Y cuando no se puede localizar con certeza, es mejor no detectar que guardar algo que luego se ejecutara tal cual.
+
+## Bug 20: al despertar un workspace, el tab del agente perdia su nombre hasta que el agente arrancaba (RESUELTO)
+
+### Sintoma
+
+Hibernado, el overlay de `HibernatedOverlay` muestra bien el nombre que el agente envio por OSC. Al pulsar Restore, la barra de tabs vuelve a mostrar el titulo generico (la carpeta, o `claude --resume ...` en cuanto se teclea el comando) durante los segundos que tarda Claude Code en arrancar, y solo entonces aparece el nombre bueno.
+
+### Pistas falsas descartadas
+
+- Que el nombre no estuviera persistido: si lo esta, como `Tab.agentTitle` en el JSON del workspace, actualizado en memoria por `agentTitleSync` (ventana compartida de 10 s, flush al hibernar y al cerrar). El overlay lo lee y por eso hibernado se ve bien.
+- Que hiciera falta que el evento de OSC escribiese el dato del tab en memoria: ya lo hace ese sync. El problema no era de escritura sino de lectura.
+- Que la sesion del agente rellenara el hueco: se cerro con `finishAgent` al hibernar y no vuelve hasta que el agente restaurado registra su SessionStart.
+
+### Causa raiz
+
+El camino de titulo de un tab despierto (`resolveAgentTabTitle` en `useAgentTabTitle.ts` -> `tabTitle`) solo consulta fuentes en vivo: `oscTitleStore`, `terminalEphemeralStore` y `agentStore`. Al hibernar, el dispose del PTY llama `clearOscTitle`, asi que en la ventana entre el wake y el primer OSC del agente restaurado las tres estan vacias, y `Tab.agentTitle` no participaba en ese camino: solo lo usaba el overlay dormido.
+
+### Fix
+
+`resolveAgentTabTitle` usa como OSC `oscTitle ?? tab.agentTitle` (solo tabs de terminal), y lo cuenta tambien para `isDescription`. El OSC en vivo siempre gana; el dato persistido solo rellena el hueco. El mismo hueco existe en el restore de arranque de la app, y el fix lo cubre tambien.
+
+### Leccion
+
+Un dato que ya vive persistido en el tab no hace falta inventarlo ni esperar a la fuente en vivo: si un componente (el overlay) lo muestra bien y otro (la barra despierta) no, comparar las cadenas de prioridad de los dos antes de tocar el plumbing. El bug era de prioridad de fuentes en el camino de lectura, no de falta de persistencia.
