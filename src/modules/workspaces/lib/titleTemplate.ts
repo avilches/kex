@@ -1,3 +1,5 @@
+import type { Tab } from "./types";
+
 export const TITLE_VARIABLES = [
   "cwd",
   "dir",
@@ -160,10 +162,11 @@ export function expandTitle(template: string, vars: TitleVars): string {
   return render(parse(template, false), vars).replace(/\s+/g, " ").trim();
 }
 
-export type TitleScope = "tab" | "workspace";
+// What is being titled; decides which variables are worth offering.
+export type TitleSubject = Tab["kind"] | "workspace";
 
 // Where a variable has a value: every tab, or only one kind. A workspace takes the values
-// of its focused tab, so the same groups apply to it.
+// of its focused tab, so it can use all of them.
 export type TitleVariableGroup = "common" | "terminal" | "file" | "browser" | "workspace";
 
 export const TITLE_GROUP_LABELS: Record<TitleVariableGroup, string> = {
@@ -179,33 +182,46 @@ export const TITLE_VARIABLE_DOCS: ReadonlyArray<{
   description: string;
   example: string;
   group: TitleVariableGroup;
-  scope: TitleScope | "both";
 }> = [
   {
     name: "cwd",
     description: "Full path of the folder the tab is in (for a file, the folder that holds it)",
     example: "~/code/kex/src",
     group: "common",
-    scope: "both",
   },
-  { name: "dir", description: "Only the name of that folder", example: "src", group: "common", scope: "both" },
-  { name: "branch", description: "Git branch of that folder, empty outside a repository", example: "main", group: "common", scope: "both" },
-  { name: "repo", description: "Name of the git repository", example: "kex", group: "common", scope: "both" },
-  { name: "host", description: "Name of this computer", example: "MacBook", group: "common", scope: "both" },
-  { name: "cmd", description: "Command running right now", example: "npm run dev", group: "terminal", scope: "both" },
-  { name: "osc", description: "Title the program in the terminal sets for itself", example: "vim notes.md", group: "terminal", scope: "both" },
-  { name: "agent", description: "Coding agent running in the terminal", example: "claude", group: "terminal", scope: "both" },
-  { name: "session", description: "Title of that agent's session", example: "Fix login bug", group: "terminal", scope: "both" },
-  { name: "file", description: "Name of the file", example: "index.ts", group: "file", scope: "both" },
-  { name: "url", description: "Address of the page", example: "https://example.com/docs", group: "browser", scope: "both" },
-  { name: "tab", description: "Title of the focused tab", example: "npm run dev", group: "workspace", scope: "workspace" },
+  { name: "dir", description: "Only the name of that folder", example: "src", group: "common" },
+  { name: "branch", description: "Git branch of that folder, empty outside a repository", example: "main", group: "common" },
+  { name: "repo", description: "Name of the git repository", example: "kex", group: "common" },
+  { name: "host", description: "Name of this computer", example: "MacBook", group: "common" },
+  { name: "cmd", description: "Command running right now", example: "npm run dev", group: "terminal" },
+  { name: "osc", description: "Title the program in the terminal sets for itself", example: "vim notes.md", group: "terminal" },
+  { name: "agent", description: "Coding agent running in the terminal", example: "claude", group: "terminal" },
+  { name: "session", description: "Title of that agent's session", example: "Fix login bug", group: "terminal" },
+  { name: "file", description: "Name of the file", example: "index.ts", group: "file" },
+  { name: "url", description: "Address of the page", example: "https://example.com/docs", group: "browser" },
+  { name: "tab", description: "Title of the focused tab", example: "npm run dev", group: "workspace" },
 ];
 
-export function titleVariableDocs(scope: TitleScope) {
-  return TITLE_VARIABLE_DOCS.filter((v) => v.scope === "both" || v.scope === scope);
+const GROUPS_FOR: Record<TitleSubject, TitleVariableGroup[]> = {
+  terminal: ["common", "terminal"],
+  editor: ["common", "file"],
+  markdown: ["common", "file"],
+  "git-diff": ["common", "file"],
+  "git-commit-file": ["common", "file"],
+  browser: ["common", "browser"],
+  "git-history": ["common"],
+  workspace: ["common", "terminal", "file", "browser", "workspace"],
+};
+
+// Only the variables the subject can have a value for.
+export function titleVariableDocs(subject: TitleSubject) {
+  const groups = GROUPS_FOR[subject];
+  return TITLE_VARIABLE_DOCS.filter((v) => groups.includes(v.group));
 }
 
 const TITLE_SYNTAX_HINT =
   "{a|b} uses the first value that is not empty. {?var text} shows the text only when var has a value. Use {{ and }} for literal braces.";
 
-export const TITLE_VARIABLES_HINT = `${TITLE_VARIABLE_DOCS.map((v) => `{${v.name}}`).join(" ")}. ${TITLE_SYNTAX_HINT}`;
+export function titleVariablesHint(subject: TitleSubject): string {
+  return `${titleVariableDocs(subject).map((v) => `{${v.name}}`).join(" ")}. ${TITLE_SYNTAX_HINT}`;
+}

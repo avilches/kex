@@ -90,7 +90,7 @@ import {
 } from "@/modules/workspaces/lib/workspaceDetail";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
-import { TITLE_VARIABLES_HINT } from "@/modules/workspaces/lib/titleTemplate";
+import { titleVariablesHint } from "@/modules/workspaces/lib/titleTemplate";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
 import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
 import { useWorkspaceTitle, workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
@@ -686,7 +686,7 @@ function SortableWorkspaceItem({
           defaultValue={ws.title}
           onChange={(e) => setTitleDraft(ws.id, e.target.value)}
           placeholder={shownTitle || ws.kind}
-          title={TITLE_VARIABLES_HINT}
+          title={titleVariablesHint("workspace")}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -698,7 +698,7 @@ function SortableWorkspaceItem({
             }
           }}
         />
-        <TitleVariablesHelp scope="workspace" />
+        <TitleVariablesHelp subject="workspace" />
       </PopoverContent>
     </Popover>
   );
