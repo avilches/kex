@@ -6,13 +6,14 @@ import { resolveTitleDefaults, type TitleDefaults } from "./defaultTitles";
 export function useTitleDefaults(): TitleDefaults {
   const terminal = usePreferencesStore((s) => s.titleTemplateTerminal);
   const agent = usePreferencesStore((s) => s.titleTemplateAgent);
-  const file = usePreferencesStore((s) => s.titleTemplateFile);
+  const editor = usePreferencesStore((s) => s.titleTemplateEditor);
+  const diff = usePreferencesStore((s) => s.titleTemplateDiff);
   const browser = usePreferencesStore((s) => s.titleTemplateBrowser);
   const gitHistory = usePreferencesStore((s) => s.titleTemplateGitHistory);
   const workspace = usePreferencesStore((s) => s.titleTemplateWorkspace);
   return useMemo(
-    () => resolveTitleDefaults({ terminal, agent, file, browser, gitHistory, workspace }),
-    [terminal, agent, file, browser, gitHistory, workspace],
+    () => resolveTitleDefaults({ terminal, agent, editor, diff, browser, gitHistory, workspace }),
+    [terminal, agent, editor, diff, browser, gitHistory, workspace],
   );
 }
 
@@ -22,7 +23,8 @@ export function titleDefaultsNow(): TitleDefaults {
   return resolveTitleDefaults({
     terminal: s.titleTemplateTerminal,
     agent: s.titleTemplateAgent,
-    file: s.titleTemplateFile,
+    editor: s.titleTemplateEditor,
+    diff: s.titleTemplateDiff,
     browser: s.titleTemplateBrowser,
     gitHistory: s.titleTemplateGitHistory,
     workspace: s.titleTemplateWorkspace,

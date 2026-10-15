@@ -11,6 +11,7 @@ import { tabTitle } from "./tabTitle";
 import { useSystemInfo } from "./systemInfoStore";
 import { useTitleDefaults } from "./titleDefaultsPrefs";
 import { titleVariablesUsed } from "./titleTemplate";
+import { useTitleDraft, withTitleDraft } from "./titleDraftStore";
 import { tabDir, type TitleSources } from "./titleVars";
 import {
   getRunningCommand,
@@ -26,7 +27,10 @@ export type AgentTabTitleInfo = {
   agentSession: AgentSession | undefined;
 };
 
-export function useAgentTabTitle(tab: Tab | null): AgentTabTitleInfo | null {
+export function useAgentTabTitle(savedTab: Tab | null): AgentTabTitleInfo | null {
+  // While its rename field is open the tab shows what is being typed.
+  const draft = useTitleDraft(savedTab?.id);
+  const tab = savedTab && withTitleDraft(savedTab, draft);
   // Per-tab selectors: only this tab's entry re-renders the component, not
   // every terminal's running command / OSC title change.
   const runningCommand = useSyncExternalStore(
@@ -67,7 +71,7 @@ export function useTitleSources(
     !!tab &&
     (templateNeedsGit(effectiveTabTemplate(tab, hasAgent, defaults)) ||
       templateNeedsGit(defaults[defaultKindFor(tab, hasAgent)]));
-  const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined);
+  const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined, tab?.id);
   return { git, agent: agentSession?.agent, home: sys.home, host: sys.host, defaults };
 }
 

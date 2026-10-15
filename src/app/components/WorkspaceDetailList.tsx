@@ -235,6 +235,7 @@ function DetailTabRow({
       )}
     <TabRenamePopover
       tabId={tab.id}
+      kind={tab.kind}
       origin="sidebar"
       title={tab.title}
       placeholder={title}

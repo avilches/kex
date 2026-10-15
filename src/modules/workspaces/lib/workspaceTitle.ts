@@ -7,6 +7,7 @@ import { getDirGit, useDirGit, type DirGit } from "./dirGitStore";
 import { getSystemInfo, useSystemInfo, type SystemInfo } from "./systemInfoStore";
 import { getRunningCommand, subscribeToRunningCommands } from "./terminalEphemeralStore";
 import { titleDefaultsNow, useTitleDefaults } from "./titleDefaultsPrefs";
+import { getTitleDraft, useTitleDraft, withTitleDraft } from "./titleDraftStore";
 import { hasTitleVariables, titleVariablesUsed } from "./titleTemplate";
 import { expandWorkspaceTitle, workspaceDir, type TitleSources } from "./titleVars";
 import { resolveAgentTabTitle, templateNeedsGit } from "./useAgentTabTitle";
@@ -16,6 +17,8 @@ import type { Tab } from "./types";
 // focused on (active pane's active tab) lends it one. An empty title means the
 // workspace default template.
 export type WorkspaceTitleSubject = {
+  // Lets the title being typed in the workspace's rename field show live.
+  id?: string;
   title: string;
   cwd?: string;
   workspaceRoot?: string;
@@ -75,8 +78,21 @@ function gitDirFor(ws: WorkspaceTitleSubject, defaults: TitleDefaults): string |
   return needsGit ? workspaceDir(ws, ws.focusedTab) : undefined;
 }
 
+function withDrafts(
+  ws: WorkspaceTitleSubject,
+  wsDraft: string | undefined,
+  tabDraft: string | undefined,
+): WorkspaceTitleSubject {
+  return {
+    ...ws,
+    title: wsDraft ?? ws.title,
+    focusedTab: ws.focusedTab && withTitleDraft(ws.focusedTab, tabDraft),
+  };
+}
+
 // Reactive: re-renders when the focused tab's command, OSC title, agent or branch change.
-export function useWorkspaceTitle(ws: WorkspaceTitleSubject): string {
+export function useWorkspaceTitle(saved: WorkspaceTitleSubject): string {
+  const ws = withDrafts(saved, useTitleDraft(saved.id), useTitleDraft(saved.focusedTab?.id));
   const tab = ws.focusedTab;
   const runningCommand = useSyncExternalStore(subscribeToRunningCommands, () =>
     tab?.kind === "terminal" ? getRunningCommand(tab.id) : null,
@@ -87,12 +103,13 @@ export function useWorkspaceTitle(ws: WorkspaceTitleSubject): string {
   const agentSession = useAgentStore((s) => (tab ? s.sessions[tab.id] : undefined));
   const sys = useSystemInfo();
   const defaults = useTitleDefaults();
-  const git = useDirGit(gitDirFor(ws, defaults));
+  const git = useDirGit(gitDirFor(ws, defaults), tab?.id);
   return resolveWorkspaceTitle(ws, { runningCommand, oscTitle, agentSession, sys, git, defaults });
 }
 
 // One-shot read of the same stores, for lists that rebuild on their own schedule.
-export function workspaceTitleNow(ws: WorkspaceTitleSubject): string {
+export function workspaceTitleNow(saved: WorkspaceTitleSubject): string {
+  const ws = withDrafts(saved, getTitleDraft(saved.id), getTitleDraft(saved.focusedTab?.id));
   const tab = ws.focusedTab;
   const defaults = titleDefaultsNow();
   return resolveWorkspaceTitle(ws, {

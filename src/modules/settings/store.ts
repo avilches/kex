@@ -219,7 +219,8 @@ export type Preferences = {
   // Default title template for agent; "" means the factory default.
   titleTemplateAgent: string;
   // Default title template for file; "" means the factory default.
-  titleTemplateFile: string;
+  titleTemplateEditor: string;
+  titleTemplateDiff: string;
   // Default title template for browser; "" means the factory default.
   titleTemplateBrowser: string;
   // Default title template for gitHistory; "" means the factory default.
@@ -250,7 +251,8 @@ const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_UI_FONT = "uiFont";
 const KEY_TITLE_TEMPLATE_TERMINAL = "titleTemplateTerminal";
 const KEY_TITLE_TEMPLATE_AGENT = "titleTemplateAgent";
-const KEY_TITLE_TEMPLATE_FILE = "titleTemplateFile";
+const KEY_TITLE_TEMPLATE_EDITOR = "titleTemplateEditor";
+const KEY_TITLE_TEMPLATE_DIFF = "titleTemplateDiff";
 const KEY_TITLE_TEMPLATE_BROWSER = "titleTemplateBrowser";
 const KEY_TITLE_TEMPLATE_GIT_HISTORY = "titleTemplateGitHistory";
 const KEY_TITLE_TEMPLATE_WORKSPACE = "titleTemplateWorkspace";
@@ -482,7 +484,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   uiFont: "",
   titleTemplateTerminal: "",
   titleTemplateAgent: "",
-  titleTemplateFile: "",
+  titleTemplateEditor: "",
+  titleTemplateDiff: "",
   titleTemplateBrowser: "",
   titleTemplateGitHistory: "",
   titleTemplateWorkspace: "",
@@ -807,9 +810,12 @@ export async function loadPreferences(): Promise<Preferences> {
     titleTemplateAgent:
       getGeneral<string>(KEY_TITLE_TEMPLATE_AGENT) ??
       DEFAULT_PREFERENCES.titleTemplateAgent,
-    titleTemplateFile:
-      getGeneral<string>(KEY_TITLE_TEMPLATE_FILE) ??
-      DEFAULT_PREFERENCES.titleTemplateFile,
+    titleTemplateEditor:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_EDITOR) ??
+      DEFAULT_PREFERENCES.titleTemplateEditor,
+    titleTemplateDiff:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_DIFF) ??
+      DEFAULT_PREFERENCES.titleTemplateDiff,
     titleTemplateBrowser:
       getGeneral<string>(KEY_TITLE_TEMPLATE_BROWSER) ??
       DEFAULT_PREFERENCES.titleTemplateBrowser,
@@ -1179,7 +1185,8 @@ export async function setUiFont(value: string): Promise<void> {
 export type TitleTemplatePref =
   | "titleTemplateTerminal"
   | "titleTemplateAgent"
-  | "titleTemplateFile"
+  | "titleTemplateEditor"
+  | "titleTemplateDiff"
   | "titleTemplateBrowser"
   | "titleTemplateGitHistory"
   | "titleTemplateWorkspace";
@@ -1187,7 +1194,8 @@ export type TitleTemplatePref =
 const TITLE_TEMPLATE_KEYS: Record<TitleTemplatePref, string> = {
   titleTemplateTerminal: KEY_TITLE_TEMPLATE_TERMINAL,
   titleTemplateAgent: KEY_TITLE_TEMPLATE_AGENT,
-  titleTemplateFile: KEY_TITLE_TEMPLATE_FILE,
+  titleTemplateEditor: KEY_TITLE_TEMPLATE_EDITOR,
+  titleTemplateDiff: KEY_TITLE_TEMPLATE_DIFF,
   titleTemplateBrowser: KEY_TITLE_TEMPLATE_BROWSER,
   titleTemplateGitHistory: KEY_TITLE_TEMPLATE_GIT_HISTORY,
   titleTemplateWorkspace: KEY_TITLE_TEMPLATE_WORKSPACE,
@@ -1332,7 +1340,8 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_UI_FONT]: "uiFont",
   [KEY_TITLE_TEMPLATE_TERMINAL]: "titleTemplateTerminal",
   [KEY_TITLE_TEMPLATE_AGENT]: "titleTemplateAgent",
-  [KEY_TITLE_TEMPLATE_FILE]: "titleTemplateFile",
+  [KEY_TITLE_TEMPLATE_EDITOR]: "titleTemplateEditor",
+  [KEY_TITLE_TEMPLATE_DIFF]: "titleTemplateDiff",
   [KEY_TITLE_TEMPLATE_BROWSER]: "titleTemplateBrowser",
   [KEY_TITLE_TEMPLATE_GIT_HISTORY]: "titleTemplateGitHistory",
   [KEY_TITLE_TEMPLATE_WORKSPACE]: "titleTemplateWorkspace",

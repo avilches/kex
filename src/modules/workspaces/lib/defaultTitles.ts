@@ -3,20 +3,25 @@ import type { Tab } from "./types";
 export type TitleDefaultKind =
   | "terminal"
   | "agent"
-  | "file"
+  | "editor"
+  | "diff"
   | "browser"
   | "gitHistory"
   | "workspace";
 
 export type TitleDefaults = Record<TitleDefaultKind, string>;
 
-// Reproduces what Kex showed before the defaults became configurable.
+// What a tab or workspace shows until the user renames it. Terminals and agents say what is
+// going on, then where: the branch if there is one, else the folder. A terminal tab always
+// has its folder (it is set when the tab is created, OSC 7 only follows later `cd`s), so
+// "where" is never empty and the separator needs no guard.
 export const FACTORY_TITLE_DEFAULTS: TitleDefaults = {
-  terminal: "{cmd|osc|cwd}",
-  agent: "{osc|session|{agent}{?dir · {dir}}}",
-  file: "{file}",
+  terminal: "{?cmd|osc {cmd|osc} · }{branch|dir}",
+  agent: "{osc|session|{agent}} · {branch|dir}",
+  editor: "{file}",
+  diff: "{file}",
   browser: "{url}",
-  gitHistory: "Git History",
+  gitHistory: "Git History{?dir · {dir}}",
   workspace: "{dir}",
 };
 
@@ -48,7 +53,10 @@ export function defaultKindFor(tab: Tab, hasAgent: boolean): TitleDefaultKind {
       return "browser";
     case "git-history":
       return "gitHistory";
+    case "git-diff":
+    case "git-commit-file":
+      return "diff";
     default:
-      return "file";
+      return "editor";
   }
 }

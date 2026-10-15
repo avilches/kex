@@ -18,6 +18,19 @@ export function subscribeToRunningCommands(listener: Listener): () => void {
   return () => { listeners.delete(listener); };
 }
 
+// Fired with the tab id each time a command ends, which is when what it did to the
+// repository (a checkout, a pull) can be read back.
+const finishListeners = new Set<(tabId: string) => void>();
+
+export function subscribeToCommandFinished(listener: (tabId: string) => void): () => void {
+  finishListeners.add(listener);
+  return () => { finishListeners.delete(listener); };
+}
+
+function notifyFinished(tabId: string): void {
+  for (const l of finishListeners) l(tabId);
+}
+
 export function getRunningCommandsSnapshot(): ReadonlyMap<string, string> {
   return snapshot;
 }
@@ -33,10 +46,12 @@ export function setRunningCommand(tabId: string, cmd: string | null): void {
   if (cmd === null) {
     if (!runningCommands.has(tabId)) return;
     runningCommands.delete(tabId);
-  } else {
-    if (runningCommands.get(tabId) === cmd) return;
-    runningCommands.set(tabId, cmd);
+    notify();
+    notifyFinished(tabId);
+    return;
   }
+  if (runningCommands.get(tabId) === cmd) return;
+  runningCommands.set(tabId, cmd);
   notify();
 }
 
@@ -44,6 +59,7 @@ export function clearRunningCommandEntry(tabId: string): void {
   if (!runningCommands.has(tabId)) return;
   runningCommands.delete(tabId);
   notify();
+  notifyFinished(tabId);
 }
 
 // ── Script running state ──────────────────────────────────────────────────

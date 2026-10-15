@@ -49,10 +49,12 @@ import {
 import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
 import type { Workspace, Script, ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { focusedTab } from "@/modules/workspaces/lib/splitNode";
+import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
 import { useWorkspaceTitle } from "@/modules/workspaces/lib/workspaceTitle";
 
 function WorkspaceHeading({ ws }: { ws: Workspace | undefined }) {
   const shown = useWorkspaceTitle({
+    id: ws?.id,
     title: ws?.title ?? "",
     cwd: ws?.cwd,
     workspaceRoot: ws?.workspaceRoot,
@@ -335,6 +337,7 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
   const [cwdValid, setCwdValid] = useState<boolean | null>(null);
   const [titleValue, setTitleValue] = useState(ws.title ?? "");
   const nameInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => () => clearTitleDraft(ws.id), [ws.id]);
   const cwdInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -401,15 +404,19 @@ function WorkspaceSettingsForm({ ws, initialSection, initialFocus, onRequestClos
               value={titleValue}
               onChange={(e) => {
                 setTitleValue(e.target.value);
+                setTitleDraft(ws.id, e.target.value);
                 // An empty name (back to the default title) is saved on blur, not mid-typing.
                 if (e.target.value.trim()) props.onSetTitle(ws.id, e.target.value.trim());
               }}
-              onBlur={(e) => props.onSetTitle(ws.id, e.target.value.trim())}
+              onBlur={(e) => {
+                props.onSetTitle(ws.id, e.target.value.trim());
+                clearTitleDraft(ws.id);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { e.preventDefault(); cwdInputRef.current?.focus(); }
               }}
             />
-            <TitleVariablesHelp scope="workspace" />
+            <TitleVariablesHelp subject="workspace" />
           </div>
 
           {/* Working Directory */}
