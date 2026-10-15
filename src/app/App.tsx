@@ -1384,6 +1384,7 @@ export default function App() {
           home: homeRef.current,
           lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          launchDir: getLaunchDir() ?? null,
         }),
       });
     },
@@ -1848,6 +1849,7 @@ export default function App() {
           home: homeRef.current,
           lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          launchDir: getLaunchDir() ?? null,
         }),
       });
     },
@@ -1882,6 +1884,7 @@ export default function App() {
           home: homeRef.current,
           lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          launchDir: getLaunchDir() ?? null,
         }),
       });
     },
