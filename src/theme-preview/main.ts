@@ -262,8 +262,16 @@ function sidebar(): HTMLElement {
     commit("Use saturated git colors", "#bb9af7"),
     commit("Darken foreground", "#9ece6a"),
     h("div", { class: "mb-1 mt-2 text-[10px] opacity-60" }, "Notes"),
-    h("div", { class: "rounded bg-sidebar-accent px-1.5 py-0.5 text-[11px] text-sidebar-accent-foreground" }, "Selected note"),
-    h("div", { class: "px-1.5 py-0.5 text-[11px]" }, "Other note"),
+    h(
+      "div",
+      {
+        class: "rounded-lg border border-border px-2 py-1.5 text-[11px] shadow-xl",
+        style: "background:var(--note-background);color:var(--note-foreground)",
+        "data-surface": "note",
+      },
+      h("div", { class: "font-semibold" }, "Floating note"),
+      h("div", {}, "Remember to rebase before the release."),
+    ),
   );
 }
 
