@@ -229,7 +229,7 @@ export function titleVariableDocs(subject: TitleSubject) {
 }
 
 const TITLE_SYNTAX_HINT =
-  "{a|b} uses the first value that is not empty. {?var text} shows the text only when var has a value. Use {{ and }} for literal braces.";
+  "{a|b} uses the first value that is not empty. {?a|b text} shows the text only when a or b has a value, {!a|b text} only when neither does. Use {{ and }} for literal braces.";
 
 export function titleVariablesHint(subject: TitleSubject): string {
   return `${titleVariableDocs(subject).map((v) => `{${v.name}}`).join(" ")}. ${TITLE_SYNTAX_HINT}`;

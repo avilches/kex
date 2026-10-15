@@ -11,11 +11,11 @@ export type TitleDefaultKind =
 
 export type TitleDefaults = Record<TitleDefaultKind, string>;
 
-// What a tab or workspace shows until the user renames it. Everything but the git history
-// reproduces what Kex showed before the defaults became configurable.
+// What a tab or workspace shows until the user renames it. Terminals and agents say what is
+// going on, then where: the branch if there is one, else the folder.
 export const FACTORY_TITLE_DEFAULTS: TitleDefaults = {
-  terminal: "{cmd|osc|cwd}",
-  agent: "{osc|session|{agent}{?dir · {dir}}}",
+  terminal: "{?cmd|osc {cmd|osc}{?branch|dir · }}{branch|dir}",
+  agent: "{osc|session|{agent}}{?branch|dir · {branch|dir}}",
   editor: "{file}",
   diff: "{file}",
   browser: "{url}",

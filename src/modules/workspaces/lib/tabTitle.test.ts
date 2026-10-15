@@ -9,34 +9,49 @@ const terminal = (overrides: Partial<{ cwd: string; title: string }> = {}): Tab 
   ...overrides,
 });
 
-describe("tabTitle - terminal factory default {cmd|osc|cwd}", () => {
-  it("shows oscTitle when no runningCommand and no tab.title", () => {
-    expect(tabTitle(terminal({ cwd: "/home/me" }), null, "vim")).toBe("vim");
+describe("tabTitle - terminal factory default: what is running, then the branch or the folder", () => {
+  const t = terminal({ cwd: "/home/me/kex" });
+  const inRepo = { git: { branch: "main", repoRoot: "/home/me/kex" } };
+
+  it("an idle shell shows the branch, or the folder outside a repository", () => {
+    expect(tabTitle(t, null, undefined, inRepo)).toBe("main");
+    expect(tabTitle(t, null, undefined)).toBe("kex");
   });
 
-  it("tab.title overrides oscTitle", () => {
-    expect(tabTitle(terminal({ cwd: "/home/me", title: "custom" }), null, "vim")).toBe("custom");
-  });
-
-  it("runningCommand overrides oscTitle", () => {
-    expect(tabTitle(terminal({ cwd: "/home/me" }), "cargo build", "vim")).toBe("cargo build");
+  it("a running command is followed by the branch, or by the folder outside a repository", () => {
+    expect(tabTitle(t, "cargo build", undefined, inRepo)).toBe("cargo build · main");
+    expect(tabTitle(t, "cargo build", undefined)).toBe("cargo build · kex");
   });
 
   it("shows the whole running command with whitespace collapsed", () => {
-    expect(tabTitle(terminal({ cwd: "/home/me" }), "  npm run\n  dev ", undefined)).toBe("npm run dev");
+    expect(tabTitle(t, "  npm run\n  dev ", undefined)).toBe("npm run dev · kex");
   });
 
-  it("falls back to the cwd when oscTitle is empty or undefined", () => {
-    expect(tabTitle(terminal({ cwd: "/home/me" }), null, "")).toBe("/home/me");
-    expect(tabTitle(terminal({ cwd: "/home/me" }), null, undefined)).toBe("/home/me");
+  it("the title the program sets is used when no command is running", () => {
+    expect(tabTitle(t, null, "vim notes.md", inRepo)).toBe("vim notes.md · main");
+    expect(tabTitle(t, null, "", inRepo)).toBe("main");
   });
 
-  it("shows the home as ~ when the sources know it", () => {
-    expect(tabTitle(terminal({ cwd: "/home/me/code" }), null, undefined, { home: "/home/me" })).toBe("~/code");
+  it("runningCommand overrides oscTitle", () => {
+    expect(tabTitle(t, "cargo build", "vim")).toBe("cargo build · kex");
+  });
+
+  it("tab.title overrides everything", () => {
+    expect(tabTitle(terminal({ cwd: "/home/me", title: "custom" }), "ls", "vim")).toBe("custom");
+  });
+
+  it("leaves no dangling separator when there is neither a branch nor a folder", () => {
+    expect(tabTitle(terminal(), "ls", undefined)).toBe("ls");
+    expect(tabTitle(terminal(), null, "vim")).toBe("vim");
   });
 
   it("falls back to shell when there is nothing at all", () => {
     expect(tabTitle(terminal(), null, undefined)).toBe("shell");
+  });
+
+  it("a custom default can still show the whole path with the home as ~", () => {
+    const defaults = resolveTitleDefaults({ terminal: "{cwd}" });
+    expect(tabTitle(terminal({ cwd: "/home/me/code" }), null, undefined, { home: "/home/me", defaults })).toBe("~/code");
   });
 });
 
@@ -82,20 +97,28 @@ describe("tabTitle - agent terminals", () => {
   const agent = { agent: "claude" };
   const t = terminal({ cwd: "/home/me" });
 
-  it("oscTitle wins over the session title", () => {
-    expect(tabTitle(t, null, "live status", { ...agent, session: "initial" })).toBe("live status");
+  const inRepo = { git: { branch: "main", repoRoot: "/home/me" } };
+
+  it("oscTitle wins over the session title, followed by the folder", () => {
+    expect(tabTitle(t, null, "live status", { ...agent, session: "initial" })).toBe("live status · me");
   });
 
   it("the session title wins when oscTitle is absent", () => {
-    expect(tabTitle(t, null, undefined, { ...agent, session: "initial" })).toBe("initial");
+    expect(tabTitle(t, null, undefined, { ...agent, session: "initial" })).toBe("initial · me");
   });
 
-  it("falls back to agent and dir when neither title is present", () => {
+  it("falls back to agent and folder when neither title is present", () => {
     expect(tabTitle(t, null, undefined, agent)).toBe("claude · me");
   });
 
-  it("drops the dir part when there is no cwd", () => {
+  it("shows the branch instead of the folder inside a repository", () => {
+    expect(tabTitle(t, null, "live status", { ...agent, ...inRepo })).toBe("live status · main");
+    expect(tabTitle(t, null, undefined, { ...agent, ...inRepo })).toBe("claude · main");
+  });
+
+  it("drops the branch or folder part when there is neither", () => {
     expect(tabTitle(terminal(), null, undefined, agent)).toBe("claude");
+    expect(tabTitle(terminal(), null, "live status", agent)).toBe("live status");
   });
 
   it("ignores the running command, which is literally the agent binary", () => {
@@ -121,7 +144,7 @@ describe("tabTitle - configurable defaults", () => {
     const defaults = resolveTitleDefaults({ agent: "[{agent}] {dir}" });
     const t = terminal({ cwd: "/home/me" });
     expect(tabTitle(t, null, "osc", { defaults, agent: "claude" })).toBe("[claude] me");
-    expect(tabTitle(t, null, "osc", { defaults })).toBe("osc");
+    expect(tabTitle(t, null, "osc", { defaults })).toBe("osc · me");
   });
 
   it("an empty pref keeps the factory default", () => {

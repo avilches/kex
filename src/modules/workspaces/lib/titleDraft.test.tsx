@@ -61,7 +61,7 @@ describe("a title follows what is being typed", () => {
   it("an emptied tab draft shows the default title of its kind", () => {
     const { container, unmount } = render(() => useAgentTabTitle(tab)?.displayTitle ?? "");
     act(() => setTitleDraft("tab-1", ""));
-    expect(container.textContent).toBe("/srv/code/kex");
+    expect(container.textContent).toBe("kex");
     unmount();
   });
 

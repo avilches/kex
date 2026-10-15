@@ -24,7 +24,8 @@ const ROWS: { kind: TitleDefaultKind; pref: TitleTemplatePref; label: string }[]
 
 const SYNTAX_DOCS: { syntax: string; description: string; example: string }[] = [
   { syntax: "{a|b|c}", description: "The first value that is not empty", example: "{cmd|cwd}: npm run dev, or ~/code/kex when idle" },
-  { syntax: "{?var text}", description: "The text, only when var has a value", example: "{dir}{?branch · {branch}}: kex · main, or kex outside a repo" },
+  { syntax: "{?a|b text}", description: "The text, only when a or b has a value", example: "{dir}{?branch · {branch}}: kex · main, or kex outside a repo" },
+  { syntax: "{!a|b text}", description: "The text, only when neither has a value (the else)", example: "{?branch on {branch}}{!branch in {dir}}: on main, or in kex" },
   { syntax: "{{ }}", description: "A literal { or }", example: "{{dir}}: {dir}" },
 ];
 
