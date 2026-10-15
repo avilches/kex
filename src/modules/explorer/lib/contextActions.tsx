@@ -1,3 +1,4 @@
+import { writeClipboardText } from "@/lib/clipboard";
 import { IS_MAC } from "@/lib/platform";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { ClipboardCopyIcon } from "@hugeicons/core-free-icons";
@@ -9,16 +10,15 @@ export const REVEAL_LABEL = IS_MAC
   : "Reveal in File Manager";
 
 export async function copyToClipboard(text: string, label?: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    if (label)
-      toast.success(label, {
-        description: text,
-        icon: <HugeiconsIcon icon={ClipboardCopyIcon} size={16} strokeWidth={1.5} />,
-      });
-  } catch {
-    // Best-effort; ignore in environments without clipboard permission.
+  if (!(await writeClipboardText(text))) {
+    toast.error("Copy failed");
+    return;
   }
+  if (label)
+    toast.success(label, {
+      description: text,
+      icon: <HugeiconsIcon icon={ClipboardCopyIcon} size={16} strokeWidth={1.5} />,
+    });
 }
 
 export function relativePath(rootPath: string, path: string): string {

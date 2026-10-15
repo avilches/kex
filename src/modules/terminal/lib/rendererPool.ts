@@ -1,3 +1,4 @@
+import { writeClipboardText } from "@/lib/clipboard";
 import { resolveMonoFontFamily } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type {
@@ -297,7 +298,7 @@ function createSlot(): Slot {
     if (isTerminalCopy(event)) {
       if (event.type === "keydown" && slot.term.hasSelection()) {
         const sel = slot.term.getSelection();
-        if (sel) void navigator.clipboard.writeText(sel).catch(() => {});
+        if (sel) void writeClipboardText(sel);
       }
       event.preventDefault();
       return false;
