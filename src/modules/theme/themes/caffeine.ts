@@ -7,6 +7,7 @@ export const caffeine: Theme = {
   editorTheme: { dark: "copilot", light: "github-light" },
   variants: {
     dark: {
+      noteTint: { color: "#942192", amount: 0.23 },
       colors: {
         background: "#111111",
         foreground: "#eeeeee",

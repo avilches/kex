@@ -7,6 +7,7 @@ export const sage: Theme = {
   editorTheme: { dark: "atomone", light: "github-light" },
   variants: {
     dark: {
+      noteTint: { color: "#ebe150", amount: 0.36 },
       colors: {
         background: "#1c211e",
         foreground: "#d8e0d2",

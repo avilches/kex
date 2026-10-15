@@ -7,6 +7,7 @@ export const tokyoNight: Theme = {
   editorTheme: { dark: "tokyo-night", light: "github-light" },
   variants: {
     dark: {
+      noteTint: { color: "#ebe150", amount: 0.16 },
       colors: {
         background: "#1a1b26",
         foreground: "#c0caf5",

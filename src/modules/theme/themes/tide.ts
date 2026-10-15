@@ -7,6 +7,7 @@ export const tide: Theme = {
   editorTheme: { dark: "nord", light: "github-light" },
   variants: {
     dark: {
+      noteTint: { color: "#ebe150", amount: 0.39 },
       colors: {
         background: "#14191c",
         foreground: "#cdd9da",

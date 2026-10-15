@@ -7,6 +7,7 @@ export const claude: Theme = {
   editorTheme: { dark: "copilot", light: "github-light" },
   variants: {
     dark: {
+      noteTint: { color: "#ffaa00", amount: 0.54 },
       colors: {
         background: "#1f1e1d",
         foreground: "#f5f4ee",

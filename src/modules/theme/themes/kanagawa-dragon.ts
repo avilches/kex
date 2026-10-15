@@ -9,7 +9,7 @@ export const kanagawaDragon: Theme = {
   variants: {
     light: kanagawa.variants.light,
     dark: {
-      noteStrong: true,
+      noteTint: { color: "#006d8f", amount: 0.42 },
       colors: {
         background: "#181616",
         foreground: "#c5c9c5",

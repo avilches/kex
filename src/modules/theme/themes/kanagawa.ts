@@ -7,7 +7,7 @@ export const kanagawa: Theme = {
   editorTheme: { dark: "kanagawa", light: "kanagawa-lotus" },
   variants: {
     dark: {
-      noteStrong: true,
+      noteTint: { color: "#006d8f", amount: 0.6 },
       colors: {
         background: "#1f1f28",
         foreground: "#dcd7ba",

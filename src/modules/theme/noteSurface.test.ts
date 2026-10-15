@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { noteSurface, parseNoteTintMap } from "./noteSurface";
+import { noteSurface } from "./noteSurface";
 import { contrastRatio } from "./readableColors";
 import { listBuiltinThemes } from "./themes";
 
@@ -38,16 +38,6 @@ describe("noteSurface", () => {
     expect(over.background).toBe("#ff0000");
   });
 
-  test("parseNoteTintMap keeps valid entries and clamps the amount", () => {
-    const map = parseNoteTintMap({
-      "a:dark": { color: "#AABBCC", amount: 2 },
-      "b:dark": { color: "red", amount: 0.5 },
-      "c:dark": null,
-    });
-    expect(map).toEqual({ "a:dark": { color: "#aabbcc", amount: 1 } });
-    expect(parseNoteTintMap("nope")).toEqual({});
-  });
-
   test("returns null for a color it cannot parse", () => {
     expect(noteSurface("transparent", "#ffffff")).toBeNull();
   });
@@ -59,7 +49,7 @@ describe("noteSurface", () => {
         const bg = v?.editor?.background ?? v?.colors?.background;
         const fg = v?.editor?.foreground ?? v?.colors?.foreground;
         if (!bg || !fg) continue;
-        const n = noteSurface(bg, fg, v?.noteStrong)!;
+        const n = noteSurface(bg, fg, v?.noteStrong, v?.noteTint)!;
         expect(contrastRatio(rgb(n.foreground), rgb(n.background)), `${theme.id} ${mode}`).toBeGreaterThanOrEqual(4.5);
       }
     }

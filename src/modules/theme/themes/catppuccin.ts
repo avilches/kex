@@ -7,6 +7,7 @@ export const catppuccin: Theme = {
   editorTheme: { dark: "catppuccin-mocha", light: "catppuccin-latte" },
   variants: {
     dark: {
+      noteTint: { color: "#ebe150", amount: 0.38 },
       colors: {
         background: "#1e1e2e",
         foreground: "#cdd6f4",

@@ -28,7 +28,6 @@ import {
   listTerminalOnlyThemes,
 } from "./themes";
 import { resolveEditorSurface } from "./resolveEditorSurface";
-import { noteTintKey } from "./noteSurface";
 import { resolveEditorThemeId } from "./resolveEditorTheme";
 import { resolveTerminalPalette } from "./resolveTerminalTheme";
 import type { EditorSurface, Theme } from "./types";
@@ -152,7 +151,6 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
   }, [resolvedMode]);
 
   const terminalThemePref = usePreferencesStore((s) => s.terminalTheme);
-  const noteTints = usePreferencesStore((s) => s.noteTint);
   const editorPref = usePreferencesStore((s) => s.editorTheme);
   const editorThemePref =
     editorPref === EDITOR_THEME_AUTO
@@ -185,8 +183,8 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
       editorThemePref === EDITOR_THEME_AUTO
         ? resolveEditorSurface(editorThemePref, appTheme, resolvedMode, () => undefined)
         : editorSurface;
-    applyTheme(appTheme, resolvedMode, terminal, editor, noteTints[noteTintKey(appTheme.id, resolvedMode)]);
-  }, [effectiveId, resolvedMode, customThemes, terminalThemePref, editorThemePref, editorSurface, noteTints]);
+    applyTheme(appTheme, resolvedMode, terminal, editor);
+  }, [effectiveId, resolvedMode, customThemes, terminalThemePref, editorThemePref, editorSurface]);
 
   const setMode = useCallback((next: ThemePref) => {
     setModeState(next);

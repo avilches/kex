@@ -34,6 +34,7 @@ export const kexDefault: Theme = {
       inactivePaneDim: { terminal: 0.015 },
     },
     dark: {
+      noteTint: { color: "#006d8f", amount: 0.5 },
       colors: {
         background: "#2B2B2B",
         card: "#363636",

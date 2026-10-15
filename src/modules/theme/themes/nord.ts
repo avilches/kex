@@ -14,6 +14,7 @@ export const nord: Theme = {
   editorTheme: { dark: "nord", light: "xcode-light" },
   variants: {
     dark: {
+      noteTint: { color: "#006d8f", amount: 0.3 },
       colors: {
         background: "#2e3440",
         foreground: "#d8dee9",

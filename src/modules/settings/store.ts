@@ -1,4 +1,3 @@
-import { parseNoteTintMap, type NoteTintMap } from "@/modules/theme/noteSurface";
 import type { KeyBinding, ShortcutId } from "@/modules/shortcuts/shortcuts";
 import {
   type EditorViewMap,
@@ -200,7 +199,6 @@ export type Preferences = {
   editorCloseBrackets: boolean;
   editorAutocompletion: boolean;
   tabBarStyle: TabBarStyle;
-  noteTint: NoteTintMap; // TEMPORARY tuning knob for note colors, remove once baked into themes
   workspacePaneLimit: number; // JSON-only: no settings UI, edit settings-general.json
   paneSplitLimit: PaneSplitLimit; // JSON-only: no settings UI, edit settings-general.json
   scratchpadEnterSends: boolean;
@@ -259,7 +257,6 @@ const KEY_TITLE_TEMPLATE_WORKSPACE = "titleTemplateWorkspace";
 const KEY_ZOOM_LEVEL = "zoomLevel";
 const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_TAB_BAR_STYLE = "tabBarStyle";
-const KEY_NOTE_TINT = "noteTint";
 const KEY_WORKSPACE_PANE_LIMIT = "workspacePaneLimit";
 const KEY_PANE_SPLIT_LIMIT = "paneSplitLimit";
 const KEY_PREVIEW_ON_CLICK = "previewOnClick";
@@ -468,7 +465,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorCloseBrackets: true,
   editorAutocompletion: true,
   tabBarStyle: "connected",
-  noteTint: {},
   workspacePaneLimit: 8,
   paneSplitLimit: { width: 250, height: 250 },
   scratchpadEnterSends: true,
@@ -756,7 +752,6 @@ export async function loadPreferences(): Promise<Preferences> {
       const v = getGeneral<string>(KEY_TAB_BAR_STYLE);
       return v === "connected" || v === "pill" ? v : DEFAULT_PREFERENCES.tabBarStyle;
     })(),
-    noteTint: parseNoteTintMap(getGeneral<unknown>(KEY_NOTE_TINT)),
     workspacePaneLimit: (() => {
       const v = getGeneral<number>(KEY_WORKSPACE_PANE_LIMIT);
       return Number.isFinite(v) && v! >= 1 ? Math.floor(v!) : DEFAULT_PREFERENCES.workspacePaneLimit;
@@ -1302,10 +1297,6 @@ export async function resetShortcuts(): Promise<void> {
   await writeShortcutsPref(DEFAULT_PREFERENCES.shortcuts);
 }
 
-export async function setNoteTint(value: NoteTintMap): Promise<void> {
-  await writePref(KEY_NOTE_TINT, value);
-}
-
 export async function setTabBarStyle(value: TabBarStyle): Promise<void> {
   await writePref(KEY_TAB_BAR_STYLE, value);
 }
@@ -1331,7 +1322,6 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_ZOOM_LEVEL]: "zoomLevel",
   [KEY_AGENT_NOTIFICATIONS]: "agentNotifications",
   [KEY_TAB_BAR_STYLE]: "tabBarStyle",
-  [KEY_NOTE_TINT]: "noteTint",
   [KEY_PREVIEW_ON_CLICK]: "previewOnClick",
   [KEY_RANDOM_WORKSPACE_COLOR]: "randomWorkspaceColor",
   [KEY_WORKSPACE_DETAIL_TERMINALS_ENABLED]: "workspaceDetailTerminalsEnabled",
