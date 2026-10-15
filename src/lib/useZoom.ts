@@ -1,16 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setZoomLevel } from "@/modules/settings/store";
+import { DEFAULT_ZOOM, stepZoom } from "@/lib/zoomLevels";
 
-const ZOOM_STEP = 0.1;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2.0;
 const CSS_VAR = "--app-zoom";
-
-function clampZoom(z: number): number {
-  const rounded = Math.round(z * 100) / 100;
-  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, rounded));
-}
 
 function applyToDom(z: number): void {
   document.documentElement.style.setProperty(CSS_VAR, String(z));
@@ -30,19 +23,19 @@ export function useZoom() {
 
   const zoomIn = useCallback(() => {
     const current = usePreferencesStore.getState().zoomLevel;
-    const next = clampZoom(current + ZOOM_STEP);
+    const next = stepZoom(current, 1);
     if (next !== current) void setZoomLevel(next);
   }, []);
 
   const zoomOut = useCallback(() => {
     const current = usePreferencesStore.getState().zoomLevel;
-    const next = clampZoom(current - ZOOM_STEP);
+    const next = stepZoom(current, -1);
     if (next !== current) void setZoomLevel(next);
   }, []);
 
   const zoomReset = useCallback(() => {
-    if (usePreferencesStore.getState().zoomLevel !== 1.0) {
-      void setZoomLevel(1.0);
+    if (usePreferencesStore.getState().zoomLevel !== DEFAULT_ZOOM) {
+      void setZoomLevel(DEFAULT_ZOOM);
     }
   }, []);
 
