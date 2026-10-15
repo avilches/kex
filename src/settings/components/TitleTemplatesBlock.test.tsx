@@ -82,10 +82,11 @@ describe("TitleTemplatesBlock", () => {
     const text = container.querySelector("table")?.textContent ?? "";
     const at = (s: string) => text.indexOf(s);
     expect(at("Any tab or workspace")).toBeGreaterThan(-1);
-    expect(at("{host}")).toBeLessThan(at("Tabs that live in a folder"));
-    expect(at("{cwd}")).toBeGreaterThan(at("Tabs that live in a folder"));
-    expect(at("{cwd}")).toBeLessThan(at("Terminals"));
-    expect(at("{cmd}")).toBeGreaterThan(at("Terminals"));
+    expect(at("{host}")).toBeLessThan(at("Terminals, editors and diff"));
+    expect(at("{cwd}")).toBeGreaterThan(at("Terminals, editors and diff"));
+    const terminals = text.indexOf("Terminals", at("Terminals, editors and diff") + 30);
+    expect(at("{cwd}")).toBeLessThan(terminals);
+    expect(at("{cmd}")).toBeGreaterThan(terminals);
     expect(at("{file}")).toBeGreaterThan(at("Editors and diffs"));
     expect(at("{url}")).toBeGreaterThan(at("Browsers"));
     expect(at("{tab}")).toBeGreaterThan(at("Workspaces only"));

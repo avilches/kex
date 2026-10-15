@@ -196,8 +196,6 @@ export function AppearanceSection() {
         </div>
       </div>
 
-      <TitleTemplatesBlock />
-
       <div className="flex flex-col gap-2">
         <FieldLabel>Explorer</FieldLabel>
         <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
@@ -224,6 +222,8 @@ export function AppearanceSection() {
           </div>
         </div>
       </div>
+
+      <TitleTemplatesBlock />
     </div>
   );
 }

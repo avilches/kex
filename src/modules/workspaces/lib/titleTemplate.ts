@@ -179,7 +179,7 @@ export type TitleVariableGroup = "common" | "place" | "terminal" | "file" | "bro
 
 export const TITLE_GROUP_LABELS: Record<TitleVariableGroup, string> = {
   common: "Any tab or workspace",
-  place: "Tabs that live in a folder (not browsers)",
+  place: "Terminals, editors and diff",
   terminal: "Terminals",
   file: "Editors and diffs",
   browser: "Browsers",
