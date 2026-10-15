@@ -1,10 +1,19 @@
 import { useEffect, useRef } from "react";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { autoHibernateTick, hibernatedIds, stampSwitch } from "./autoHibernate";
 import type { Workspace } from "./types";
 import { activityStamps, saveWorkspaceState } from "./workspaceState";
 
 const CHECK_EVERY_MS = 60_000;
+
+function busyWorkspaceIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const session of Object.values(useAgentStore.getState().sessions)) {
+    if (session.status === "working") ids.add(session.workspaceId);
+  }
+  return ids;
+}
 
 type Deps = {
   workspacesRef: { current: Workspace[] };
@@ -41,6 +50,7 @@ export function useAutoHibernate(deps: Deps) {
           activeId: activeWorkspaceIdRef.current,
           stamps: activityStamps,
           hibernatedSeen: hibernatedSeenRef.current!,
+          busyIds: busyWorkspaceIds(),
           mode,
           busy,
           now: Date.now(),

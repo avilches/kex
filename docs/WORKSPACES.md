@@ -277,7 +277,8 @@ The `autoHibernate` preference (Settings > Workspaces: Never, 30 minutes, 4 hour
 hibernates idle workspaces. `useAutoHibernate` checks every minute, and once right at startup. A workspace is idle
 for the time since it was last the active one. That moment is kept in `activityStamps` (`workspaceState.ts`), a
 module-level map outside React state so the minutely renewal does not re-render the tree. `touchActivity` renews the
-awake active workspace each tick and gives a workspace without a stamp "now". A hibernated workspace is stamped only
+awake active workspace each tick, and also every awake workspace with a "working" agent (the spinner in the
+WorkspaceBar), so its countdown only runs while no agent is busy in it; it gives a workspace without a stamp "now". A hibernated workspace is stamped only
 when it changes state (hibernated, or woken), tracked with a set of the previously hibernated ids, so its persisted body
 does not change every minute while waking it still restarts its clock. The switch effect (`stampSwitch`) stamps the
 workspace being left and the one entered. Every tick schedules the normal debounced `saveWorkspaceState`, whose

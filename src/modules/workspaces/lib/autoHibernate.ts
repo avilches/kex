@@ -46,13 +46,15 @@ export function hibernatedIds(workspaces: readonly Workspace[]): Set<string> {
 // renewed every tick. A hibernated workspace is stamped only when it changes state
 // (hibernated or woken, compared with `hibernatedSeen`, which this updates), so its
 // persisted body does not change every minute but waking it still restarts the clock.
-// One without a stamp (new, or saved before stamps existed) starts it now.
+// One without a stamp (new, or saved before stamps existed) starts it now. A workspace
+// with a busy agent is renewed too, so its countdown only runs while nothing works in it.
 export function touchActivity(
   stamps: Map<string, number>,
   workspaces: readonly Workspace[],
   activeId: string | null,
   now: number,
   hibernatedSeen: Set<string>,
+  busyIds: ReadonlySet<string> = new Set(),
 ): void {
   const ids = new Set(workspaces.map((w) => w.id));
   for (const id of stamps.keys()) if (!ids.has(id)) stamps.delete(id);
@@ -62,7 +64,7 @@ export function touchActivity(
     const changed = hibernatedSeen.has(w.id) !== asleep;
     if (asleep) hibernatedSeen.add(w.id);
     else hibernatedSeen.delete(w.id);
-    if ((w.id === activeId && !asleep) || changed || !stamps.has(w.id)) stamps.set(w.id, now);
+    if (((w.id === activeId || busyIds.has(w.id)) && !asleep) || changed || !stamps.has(w.id)) stamps.set(w.id, now);
   }
 }
 
@@ -96,6 +98,7 @@ export type AutoHibernateTick = {
   activeId: string | null;
   stamps: Map<string, number>;
   hibernatedSeen: Set<string>;
+  busyIds?: ReadonlySet<string>;
   mode: AutoHibernate;
   now: number;
   save: () => void;
@@ -105,7 +108,7 @@ export type AutoHibernateTick = {
 };
 
 export async function autoHibernateTick(t: AutoHibernateTick): Promise<void> {
-  touchActivity(t.stamps, t.workspaces, t.activeId, t.now, t.hibernatedSeen);
+  touchActivity(t.stamps, t.workspaces, t.activeId, t.now, t.hibernatedSeen, t.busyIds);
   t.save();
   if (t.busy) return;
   for (const id of autoHibernateCandidates(t.workspaces, t.activeId, t.stamps, t.mode, t.now)) {
