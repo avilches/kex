@@ -436,7 +436,7 @@ A file opened in the editor from a directory the user has not navigated to in a 
 | `dirs` | `6` | Cross-platform home/cache directories |
 | `tempfile` | `3` | Temporary files for shell init scripts |
 
-Tauri plugins used: `store`, `updater`, `window-state`, `autostart`, `os`, `notification`, `log`, `opener`, `process`, `clipboard-manager` (write-only: the capability grants `allow-write-text` and nothing that reads the pasteboard; `src/lib/clipboard.ts` is the single entry point, introduced because `navigator.clipboard.writeText` was rejected by WebKit with `NotAllowedError`, see TASK-828).
+Tauri plugins used: `store`, `updater`, `window-state`, `autostart`, `os`, `notification`, `log`, `opener`, `process`, `clipboard-manager` (write-only: the capability grants `allow-write-text` and nothing that reads the pasteboard; `src/lib/clipboard.ts` is the single entry point for every clipboard write in the webview (tab ids, explorer, git history, Live Preview code blocks, terminal copy and OSC 52, block overlay, updater); pasting still uses `navigator.clipboard.readText`. It exists because `navigator.clipboard.writeText` was rejected by WebKit with `NotAllowedError`, see TASK-828).
 
 ### TypeScript frontend
 | Library | Version | Role |

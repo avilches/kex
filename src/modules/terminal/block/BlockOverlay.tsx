@@ -4,6 +4,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { writeClipboardText } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown01Icon,
@@ -77,10 +78,10 @@ function relPath(p: string): string {
 }
 
 function copy(text: string, message: string) {
-  void navigator.clipboard
-    .writeText(text)
-    .then(() => toast.success(message))
-    .catch(() => {});
+  void writeClipboardText(text).then((ok) => {
+    if (ok) toast.success(message);
+    else toast.error("Copy failed");
+  });
 }
 
 function signature(v: VisibleBlocks): string {

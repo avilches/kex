@@ -1,4 +1,5 @@
 import type { IMarker, Terminal } from "@xterm/xterm";
+import { writeClipboardText } from "@/lib/clipboard";
 import { IS_WINDOWS } from "@/lib/platform";
 
 const MAX_OSC52_CLIPBOARD_BYTES = 1024 * 1024;
@@ -98,11 +99,11 @@ export function registerTitleHandler(
   };
 }
 
-export type ClipboardWriter = (text: string) => void | Promise<void>;
+export type ClipboardWriter = (text: string) => unknown;
 
 export function registerOsc52ClipboardHandler(
   term: Terminal,
-  writeClipboard: ClipboardWriter = writeSystemClipboard,
+  writeClipboard: ClipboardWriter = writeClipboardText,
 ): () => void {
   const d = term.parser.registerOscHandler(52, (data) => {
     const text = parseOsc52Clipboard(data);
@@ -155,8 +156,4 @@ function parseOsc52Clipboard(data: string): string | null {
   } catch {
     return null;
   }
-}
-
-async function writeSystemClipboard(text: string): Promise<void> {
-  await navigator.clipboard.writeText(text);
 }

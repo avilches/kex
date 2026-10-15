@@ -16,6 +16,9 @@ import {
 const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 
+const writeClipboardText = vi.hoisted(() => vi.fn((_text: string) => Promise.resolve(true)));
+vi.mock("@/lib/clipboard", () => ({ writeClipboardText }));
+
 // IS_MAC is read live at call time inside handleLinkMousedown, so mutating
 // this mocked module's property between tests is enough to flip branches;
 // no module reset or re-import is needed.
@@ -114,16 +117,27 @@ describe("livePreviewPlugin", () => {
   });
 
   it("puts a copy button in the block header that copies the code and then confirms it", async () => {
-    const writeText = vi.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    const doc = "```js\nconst x = 1;\nlet y;\n```\n\nafter\n";
+    writeClipboardText.mockClear();
+    const doc ="```js\nconst x = 1;\nlet y;\n```\n\nafter\n";
     const view = mount(doc, { anchor: doc.indexOf("after") });
     expect(view.dom.querySelector(".cm-lp-code-lang")?.textContent).toBe("js");
     const button = view.dom.querySelector(".cm-lp-code-copy") as HTMLButtonElement;
     button.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-    expect(writeText).toHaveBeenCalledWith("const x = 1;\nlet y;");
+    expect(writeClipboardText).toHaveBeenCalledWith("const x = 1;\nlet y;");
+    await vi.waitFor(() => expect(button.classList.contains("copied")).toBe(true));
+    view.destroy();
+  });
+
+  it("does not confirm the copy when the native write fails", async () => {
+    writeClipboardText.mockClear();
+    writeClipboardText.mockResolvedValueOnce(false);
+    const doc = "```js\nconst x = 1;\n```\n\nafter\n";
+    const view = mount(doc, { anchor: doc.indexOf("after") });
+    const button = view.dom.querySelector(".cm-lp-code-copy") as HTMLButtonElement;
+    button.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => expect(writeClipboardText).toHaveBeenCalledTimes(1));
     await Promise.resolve();
-    expect(button.classList.contains("copied")).toBe(true);
+    expect(button.classList.contains("copied")).toBe(false);
     view.destroy();
   });
 

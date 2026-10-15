@@ -19,6 +19,7 @@ import {
   type GitStatusCategory,
   normalizeGitStatusCode,
 } from "@/modules/explorer/lib/gitStatusUtils";
+import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   Copy01Icon,
@@ -481,14 +482,6 @@ export function GitHistoryPane({
     },
     [onOpenCommitFile, repoRoot],
   );
-
-  const copyToClipboard = useCallback(async (value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      /* noop */
-    }
-  }, []);
 
   return (
     <TooltipProvider delayDuration={500} skipDelayDuration={200}>
