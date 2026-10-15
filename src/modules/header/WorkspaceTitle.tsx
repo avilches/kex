@@ -15,6 +15,7 @@ type Props = {
 export function WorkspaceTitle({ workspace, tab, groups }: Props) {
   const agentTabTitle = useAgentTabTitle(tab);
   const shownTitle = useWorkspaceTitle({
+    id: workspace?.id,
     title: workspace?.title ?? "",
     cwd: workspace?.cwd,
     workspaceRoot: workspace?.workspaceRoot,

@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import type React from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { clearTitleDraft, setTitleDraft } from "./lib/titleDraftStore";
 import { TITLE_VARIABLES_HINT } from "./lib/titleTemplate";
 import { TitleVariablesHelp } from "./TitleVariablesHelp";
 import { type RenameOrigin, isRenamingAt, useTabRenameStore } from "./lib/tabRenameStore";
@@ -62,6 +63,13 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
     });
   }, [isRenaming]);
 
+  // What is being typed shows live in every title of this tab until the field closes;
+  // cancelling just drops it.
+  useEffect(() => {
+    if (!isRenaming) return;
+    return () => clearTitleDraft(tabId);
+  }, [isRenaming, tabId]);
+
   // A row can unmount with its field open (collapsed list, detail filter,
   // compact bar); without this the store keeps pointing at it forever.
   useEffect(
@@ -103,6 +111,7 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
           }}
           onBlur={handleBlur}
           defaultValue={title ?? ""}
+          onChange={(e) => setTitleDraft(tabId, e.target.value)}
           placeholder={placeholder}
           title={TITLE_VARIABLES_HINT}
           onKeyDown={(e) => {

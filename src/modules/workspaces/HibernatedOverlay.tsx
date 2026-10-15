@@ -73,6 +73,7 @@ function SleepingTabRow({ tab }: { tab: Tab }) {
 export function HibernatedOverlay({ workspace, onWake, active }: Props) {
   const workspaceId = workspace.id;
   const shownTitle = useWorkspaceTitle({
+    id: workspace.id,
     title: workspace.title,
     cwd: workspace.cwd,
     workspaceRoot: workspace.workspaceRoot,
