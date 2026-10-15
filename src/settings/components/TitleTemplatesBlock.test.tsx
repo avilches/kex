@@ -61,10 +61,10 @@ describe("TitleTemplatesBlock", () => {
     });
   });
 
-  it("shows one field per default, with the factory template as placeholder", () => {
+  it("shows one field per default, already holding the default template to edit", () => {
     const { container, unmount } = mount();
     const inputs = [...container.querySelectorAll("input")];
-    expect(inputs.map((i) => i.placeholder)).toEqual([
+    expect(inputs.map((i) => i.value)).toEqual([
       FACTORY_TITLE_DEFAULTS.terminal,
       FACTORY_TITLE_DEFAULTS.agent,
       FACTORY_TITLE_DEFAULTS.gitHistory,
@@ -134,16 +134,99 @@ describe("TitleTemplatesBlock", () => {
     unmount();
   });
 
-  it("shows a saved template, and the reset button clears it", () => {
+  it("does not save a template that equals the default, so the default keeps following Kex", () => {
+    const { container, unmount } = mount();
+    const input = field(container, "terminal");
+    type(input, "{cmd}");
+    type(input, ` ${FACTORY_TITLE_DEFAULTS.terminal} `);
+    blur(input);
+    expect(setTitleTemplate).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("typing the default over a saved template clears the saved one", () => {
+    act(() => usePreferencesStore.setState({ titleTemplateTerminal: "{dir}" }));
+    const { container, unmount } = mount();
+    const input = field(container, "terminal");
+    expect(input.value).toBe("{dir}");
+    type(input, FACTORY_TITLE_DEFAULTS.terminal);
+    blur(input);
+    expect(setTitleTemplate).toHaveBeenCalledWith("titleTemplateTerminal", "");
+    unmount();
+  });
+
+  it("clearing a field puts the default back on blur", () => {
     act(() => usePreferencesStore.setState({ titleTemplateBrowser: "{host} {url}" }));
     const { container, unmount } = mount();
     const input = field(container, "browser");
-    expect(input.value).toBe("{host} {url}");
+    type(input, "");
+    blur(input);
+    expect(setTitleTemplate).toHaveBeenCalledWith("titleTemplateBrowser", "");
+    expect(input.value).toBe(FACTORY_TITLE_DEFAULTS.browser);
+    unmount();
+  });
+
+  it("the reset button restores the default, and is off while the field already shows it", () => {
+    act(() => usePreferencesStore.setState({ titleTemplateBrowser: "{host} {url}" }));
+    const { container, unmount } = mount();
+    const input = field(container, "browser");
     const reset = input.parentElement?.querySelector<HTMLButtonElement>("button[title='Reset to default']");
     expect(reset?.disabled).toBe(false);
     act(() => reset?.click());
     expect(setTitleTemplate).toHaveBeenCalledWith("titleTemplateBrowser", "");
-    expect(input.value).toBe("");
+    expect(input.value).toBe(FACTORY_TITLE_DEFAULTS.browser);
+    expect(reset?.disabled).toBe(true);
     unmount();
+  });
+
+  it("saves while typing in bursts, not on every keystroke", () => {
+    vi.useFakeTimers();
+    try {
+      const { container, unmount } = mount();
+      const input = field(container, "workspace");
+      act(() => input.focus());
+      type(input, "{d");
+      type(input, "{di");
+      type(input, "{dir}!");
+      expect(setTitleTemplate).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(250));
+      expect(setTitleTemplate).toHaveBeenCalledTimes(1);
+      expect(setTitleTemplate).toHaveBeenCalledWith("titleTemplateWorkspace", "{dir}!");
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not overwrite what is being typed when the saved value changes underneath", () => {
+    const { container, unmount } = mount();
+    const input = field(container, "terminal");
+    act(() => input.focus());
+    type(input, "{dir} abc");
+    act(() => usePreferencesStore.setState({ titleTemplateTerminal: "{dir} ab" }));
+    expect(input.value).toBe("{dir} abc");
+    unmount();
+  });
+
+  it("follows a change made elsewhere while the field is not being edited", () => {
+    const { container, unmount } = mount();
+    const input = field(container, "terminal");
+    act(() => usePreferencesStore.setState({ titleTemplateTerminal: "{host}" }));
+    expect(input.value).toBe("{host}");
+    unmount();
+  });
+
+  it("saves a pending edit when the section is left", () => {
+    vi.useFakeTimers();
+    try {
+      const { container, unmount } = mount();
+      const input = field(container, "diff");
+      act(() => input.focus());
+      type(input, "diff {file}");
+      unmount();
+      expect(setTitleTemplate).toHaveBeenCalledWith("titleTemplateDiff", "diff {file}");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,6 +1,6 @@
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setTitleTemplate, type TitleTemplatePref } from "@/modules/settings/store";
 import { FACTORY_TITLE_DEFAULTS, type TitleDefaultKind } from "@/modules/workspaces/lib/defaultTitles";
@@ -30,22 +30,44 @@ const SYNTAX_DOCS: { syntax: string; description: string; example: string }[] = 
 
 const GROUP_ORDER: TitleVariableGroup[] = ["common", "terminal", "file", "browser", "workspace"];
 
+// Every save writes the file and notifies all windows, so typing is saved in bursts.
+const SAVE_DELAY_MS = 250;
+
 function TemplateRow({ kind, pref, label }: (typeof ROWS)[number]) {
+  const factory = FACTORY_TITLE_DEFAULTS[kind];
   const stored = usePreferencesStore((s) => s[pref]);
-  const hydrated = usePreferencesStore((s) => s.hydrated);
-  const [value, setValue] = useState(stored);
+  // The field always holds the template in force, so the default can be edited in place.
+  const [value, setValue] = useState(stored || factory);
+  const storedRef = useRef(stored);
+  storedRef.current = stored;
+  const editing = useRef(false);
+  const pending = useRef<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Preferences hydrate asynchronously; resync once the saved value is in.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only a hydration or an external change should overwrite the draft
+  // The saved value arrives after the window loads and other windows can change it; a field
+  // being typed in is never overwritten.
   useEffect(() => {
-    setValue(stored);
-  }, [hydrated, stored]);
+    if (!editing.current) setValue(stored || factory);
+  }, [stored, factory]);
 
-  const commit = (next: string) => {
+  // Empty, or the same as the default: nothing is saved, so the default keeps following Kex.
+  const save = (next: string) => {
     const trimmed = next.trim();
-    setValue(trimmed);
-    if (trimmed !== stored) void setTitleTemplate(pref, trimmed);
+    const toStore = trimmed === factory ? "" : trimmed;
+    if (toStore !== storedRef.current) void setTitleTemplate(pref, toStore);
   };
+
+  const flush = () => {
+    clearTimeout(timer.current);
+    timer.current = undefined;
+    if (pending.current === null) return;
+    const next = pending.current;
+    pending.current = null;
+    save(next);
+  };
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  useEffect(() => () => flushRef.current(), []);
 
   return (
     <div className="flex items-center gap-2">
@@ -56,9 +78,21 @@ function TemplateRow({ kind, pref, label }: (typeof ROWS)[number]) {
         id={`title-template-${kind}`}
         type="text"
         value={value}
-        placeholder={FACTORY_TITLE_DEFAULTS[kind]}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={(e) => commit(e.target.value)}
+        placeholder={factory}
+        onFocus={() => {
+          editing.current = true;
+        }}
+        onChange={(e) => {
+          setValue(e.target.value);
+          pending.current = e.target.value;
+          clearTimeout(timer.current);
+          timer.current = setTimeout(flush, SAVE_DELAY_MS);
+        }}
+        onBlur={(e) => {
+          editing.current = false;
+          flush();
+          setValue(e.target.value.trim() || factory);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
         }}
@@ -68,10 +102,11 @@ function TemplateRow({ kind, pref, label }: (typeof ROWS)[number]) {
       <button
         type="button"
         title="Reset to default"
-        disabled={!stored && !value}
+        disabled={value.trim() === factory}
         onClick={() => {
-          setValue("");
-          void setTitleTemplate(pref, "");
+          pending.current = factory;
+          setValue(factory);
+          flush();
         }}
         className="flex size-[22px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
       >
@@ -131,7 +166,8 @@ export function TitleTemplatesBlock() {
       <FieldLabel>Tab and workspace titles</FieldLabel>
       <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
         <p className="text-[11px] leading-snug text-muted-foreground">
-          What a tab or workspace shows until you rename it. An empty field uses the default shown in it.
+          What a tab or workspace shows until you rename it. Each field starts with Kex's default: edit it
+          and the tabs change as you type. Leave it as it was, or clear it, to keep following the default.
           A workspace takes the values of the tab you are on.
         </p>
         {ROWS.map((row) => (
