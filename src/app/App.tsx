@@ -19,6 +19,7 @@ import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
 import { useCloseWorkspaceFlow } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
+import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -3544,6 +3545,7 @@ export default function App() {
         tabs: w.detailExpanded && !w.hibernated
           ? allPanes(w.paneTree).flatMap((p) => p.tabs)
           : NO_TABS,
+        tabCount: workspaceTabCount(w),
         focusedTabId: focusedTabId(w.paneTree, w.activePaneId),
         visibleTabIds: allPanes(w.paneTree)
           .map((p) => p.activeTabId)

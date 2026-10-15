@@ -3,14 +3,10 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { hibernateReview, liveAgent, type HibernateLive } from "./hibernateReview";
 import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
-import type { Workspace } from "./types";
+import { scriptsToDelete, type Workspace } from "./types";
 
 export type RunningProcess = { tabId: string; label: string };
 export type PendingClose = { id: string; processes: RunningProcess[] };
-
-export function scriptsToDelete(ws: Workspace): number {
-  return ws.scripts?.filter((s) => s.command.trim()).length ?? 0;
-}
 
 // Scripts and agents already show up as busy rows, so a process listed for the
 // same tab would be a duplicate.

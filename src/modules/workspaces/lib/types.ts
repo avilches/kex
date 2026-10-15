@@ -125,6 +125,13 @@ export type Workspace = {
   lastActiveAt?: number;
 };
 
+// Scripts with a command: the ones a workspace close would delete. The
+// close-workspace dialog warns about them, and the fold-on-empty rule spares
+// a workspace that still has any.
+export function scriptsToDelete(ws: Workspace): number {
+  return ws.scripts?.filter((s) => s.command.trim()).length ?? 0;
+}
+
 export type ClosedEntry = {
   tab: Tab;
   paneId: string;

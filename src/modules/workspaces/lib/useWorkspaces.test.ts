@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
 import { applyWake } from "./hibernate";
-import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, findReopenTarget, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, emptyWorkspaceToClose, findReopenTarget, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -172,6 +172,97 @@ describe("applyCloseTab", () => {
   it("does not change the active tab when a non-active tab closes, even with history", () => {
     const out = applyCloseTab([threeTabPane("t2")], "w1", "t3", ["t3", "t2", "t1"]);
     expect(activeId(out)).toBe("t2");
+  });
+
+  it("resets detailExpanded when the last tab empties the sole pane", () => {
+    const w = ws({
+      paneTree: { kind: "pane", id: "p1", tabs: [term("t1")], activeTabId: "t1" },
+      activePaneId: "p1",
+      detailExpanded: undefined,
+    });
+    const out = applyCloseTab([w], "w1", "t1");
+    expect(out[0].detailExpanded).toBe(true);
+  });
+
+  it("does not touch detailExpanded while tabs remain", () => {
+    const collapsed = threeTabPane("t3");
+    collapsed.detailExpanded = undefined;
+    const out = applyCloseTab([collapsed], "w1", "t3", []);
+    expect(out[0].detailExpanded).toBeUndefined();
+  });
+});
+
+describe("workspaceTabCount", () => {
+  const term = (id: string): Tab => ({ id, kind: "terminal" });
+
+  it("sums the tabs of every pane across a split", () => {
+    const w = ws({
+      paneTree: {
+        kind: "split",
+        id: "s1",
+        orientation: "horizontal",
+        dividerPosition: 0.5,
+        first: { kind: "pane", id: "p1", tabs: [term("t1"), term("t2")], activeTabId: "t2" },
+        second: { kind: "pane", id: "p2", tabs: [term("t3")], activeTabId: "t3" },
+      },
+      activePaneId: "p2",
+    });
+    expect(workspaceTabCount(w)).toBe(3);
+  });
+
+  it("counts zero for the empty pane of a fresh workspace", () => {
+    expect(workspaceTabCount(ws())).toBe(0);
+  });
+});
+
+describe("emptyWorkspaceToClose", () => {
+  const term = (id: string): Tab => ({ id, kind: "terminal" });
+  const withScripts = (command: string): Script => ({ id: "sc1", name: "run", command });
+
+  const emptyWs = ws({
+    paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
+    activePaneId: "p1",
+  });
+  const fullWs = ws({
+    id: "w2",
+    paneTree: { kind: "pane", id: "p2", tabs: [term("t1")], activeTabId: "t1" },
+    activePaneId: "p2",
+  });
+
+  it("returns the empty workspace when others exist", () => {
+    expect(emptyWorkspaceToClose([fullWs, emptyWs])?.id).toBe("w1");
+  });
+
+  it("returns null for the window's only workspace, empty or not", () => {
+    expect(emptyWorkspaceToClose([emptyWs])).toBeNull();
+    expect(emptyWorkspaceToClose([fullWs])).toBeNull();
+  });
+
+  it("skips workspaces holding scripts with a command", () => {
+    const scripted = ws({
+      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
+      activePaneId: "p1",
+      scripts: [withScripts("pnpm test")],
+    });
+    expect(emptyWorkspaceToClose([fullWs, scripted])).toBeNull();
+  });
+
+  it("folds a workspace whose scripts are all blank commands", () => {
+    const blank = ws({
+      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
+      activePaneId: "p1",
+      scripts: [withScripts("   ")],
+    });
+    expect(emptyWorkspaceToClose([fullWs, blank])?.id).toBe("w1");
+  });
+
+  it("ignores hibernated workspaces, which keep their tabs in the tree", () => {
+    const hibernated = ws({
+      paneTree: { kind: "pane", id: "p1", tabs: [term("t1")], activeTabId: "t1" },
+      activePaneId: "p1",
+      hibernated: true,
+    });
+    expect(emptyWorkspaceToClose([fullWs, hibernated])).toBeNull();
   });
 });
 

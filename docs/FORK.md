@@ -363,6 +363,13 @@ Workspaces can be organized into named groups in the WorkspaceBar. Not present i
 - **Sidebar grouping**: workspaces with no valid group appear at the top; each non-empty group appears below with a text label (expanded mode) or a thin divider (compact mode). Drag-and-drop is multi-container: dropping a workspace into a different group reassigns its group and repositions it there.
 - **Orphans**: a `groupId` that matches no group counts as no group (`groupWorkspaces`).
 
+### Fold on empty
+
+Upstream Terax keeps a workspace whose last tab closed, as an empty chip in the bar with an empty pane. Kex folds such a workspace away instead.
+
+- **Rule**: a workspace that reaches zero tabs is closed by a reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`), whatever emptied it (tab close, shell exit, moving or dragging the last tab to another workspace, bulk closes such as Close All Tabs). Two exceptions keep it with its empty pane: the window's only workspace, and one holding scripts with a command, whose deletion the close confirmation dialog still protects.
+- **WorkspaceBar**: an empty workspace shows no chevron for its nested tab list but stays expanded: `applyCloseTab` resets `detailExpanded` to true when it empties the sole pane, so a tab opened into the workspace appears in the nested list without a toggle.
+
 ### Scripts and Run button (F12)
 
 Per-workspace scripts (`Script[]` on `Workspace`) let users save named shell commands (with a folder mode: workspace root by default, last folder from the focused terminal or editor, or a fixed folder) and execute them from the header bar with one click or F12. Not present in upstream Terax.

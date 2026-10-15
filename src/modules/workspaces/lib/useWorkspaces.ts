@@ -26,7 +26,7 @@ import {
   updatePane,
 } from "./splitNode";
 import { attachTab, workspaceForTab, type TabMoveRequest, type TabPlacement } from "./tabTransfer";
-import { type ClosedEntry, type Tab, type PaneNode, type Script, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab } from "./types";
+import { type ClosedEntry, type Tab, type PaneNode, type Script, type TabHibernation, type Workspace, type WorkspaceGitConfig, isAutofocusTab, scriptsToDelete } from "./types";
 import type { ExplorerRootMode } from "./explorerRoot";
 import { applyExplorerSnapshots, applySidebarView, type ExplorerSnapshot } from "./sidebarSnapshot";
 import type { SidebarView } from "./sidebarState";
@@ -246,6 +246,9 @@ export function applyCloseTab(
       if (!newTree) {
         return {
           ...w,
+          // Empty means expanded: the bar hides the chevron, and a tab opened
+          // into the workspace shows up in the nested list without a toggle.
+          detailExpanded: true,
           paneTree: updatePane(w.paneTree, pane.id, (p) => ({
             ...p,
             tabs: [],
@@ -279,6 +282,21 @@ export function applyCloseTab(
       })),
     };
   });
+}
+
+export function workspaceTabCount(ws: Workspace): number {
+  return allPanes(ws.paneTree).reduce((n, p) => n + p.tabs.length, 0);
+}
+
+// A workspace left with no tabs folds away with its last tab: an empty chip has
+// nothing to show. The window's only workspace survives (the window would close
+// with it), and so does one holding configured scripts, whose deletion the
+// close-workspace confirmation dialog still owns.
+export function emptyWorkspaceToClose(workspaces: Workspace[]): Workspace | null {
+  if (workspaces.length <= 1) return null;
+  return (
+    workspaces.find((w) => workspaceTabCount(w) === 0 && scriptsToDelete(w) === 0) ?? null
+  );
 }
 
 export type TabMoveDestination =
@@ -480,6 +498,16 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
       return (remaining[closedIdx] ?? remaining[closedIdx - 1])?.id ?? prev;
     });
   }, []);
+
+  // A workspace that reaches zero tabs closes with its last tab, whatever the
+  // path (tab close, shell exit, move to another workspace, bulk closes): the
+  // fold is decided on committed state, so batched closes in one tick see the
+  // updated workspace too. Never leaves the window empty; workspaces with
+  // scripts are exempt so the close confirmation dialog still protects them.
+  useEffect(() => {
+    const fold = emptyWorkspaceToClose(workspaces);
+    if (fold) closeWorkspace(fold.id);
+  }, [workspaces, closeWorkspace]);
 
   // ── Pane operations ───────────────────────────────────────────────────────
 

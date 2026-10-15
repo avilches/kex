@@ -105,6 +105,9 @@ type WorkspaceItem = {
   icon?: string;
   groupId?: string;
   tabs: Tab[];
+  // Tabs across all panes, independent of `tabs` (which is empty when the
+  // nested list is collapsed). Zero means the workspace has nothing to expand.
+  tabCount: number;
   focusedTabId: string | null;
   // The tab a templated title ({cwd}, {branch}...) is resolved against.
   focusedTab: Tab | null;
@@ -296,7 +299,9 @@ function SortableWorkspaceItem({
     "absolute top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
   const detailSpacer = showDetail ? <span aria-hidden className="size-[14px] shrink-0" /> : null;
-  const detailToggle = showDetail ? (
+  // An empty workspace keeps its spacer (so the title does not jump when a
+  // tab appears) but has no chevron: `applyCloseTab` resets it to expanded.
+  const detailToggle = showDetail && ws.tabCount > 0 ? (
     <button
       type="button"
       aria-expanded={ws.hibernated ? undefined : expanded}

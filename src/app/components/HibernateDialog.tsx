@@ -20,13 +20,13 @@ import {
   subscribeToScriptRunning,
 } from "@/modules/workspaces/lib/terminalEphemeralStore";
 import { hibernateReview, isBlockedByFailures, isReviewEmpty, liveAgent, type BusyRow } from "@/modules/workspaces/lib/hibernateReview";
-import { scriptsToDelete, type RunningProcess } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
+import type { RunningProcess } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
 import { WorkspaceMark } from "@/modules/workspaces/WorkspaceMark";
 import { allPanes, focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 import { tabIcon } from "@/modules/workspaces/lib/tabTitle";
 import { useAgentTabTitle } from "@/modules/workspaces/lib/useAgentTabTitle";
-import type { Tab, Workspace } from "@/modules/workspaces/lib/types";
+import { scriptsToDelete, type Tab, type Workspace } from "@/modules/workspaces/lib/types";
 
 // Same icon and title the tab bar shows: a custom tab icon wins over the agent's.
 function TabLabel({ tab, command }: { tab: Tab; command?: string }) {

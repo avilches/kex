@@ -48,6 +48,19 @@ the empty half and promotes the sibling - only the root pane of a single-pane wo
 empty, where it renders a welcome screen. This invariant is locked by a unit test in
 `workspaceState.test.ts`: `sanitizeWorkspace` must round-trip an empty pane without dropping it.
 
+**Fold on empty.** A workspace that reaches zero tabs closes with its last tab, through a
+reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`), whatever emptied it: the
+tab close button or `tab.close`, the shell exiting on its own, moving or dragging the last tab
+to another workspace, and bulk closes such as Close All Tabs (the fold decides on committed
+state, so batched closes inside one tick are covered too). Two exceptions keep the workspace
+with its empty pane: the window's only workspace (folding it would close the window), and one
+holding scripts with a command, whose deletion the close-workspace confirmation dialog still
+owns (`scriptsToDelete`). `applyCloseTab` also resets `detailExpanded` to true when it empties
+the sole pane, so an empty workspace shows no chevron in the WorkspaceBar while staying
+expanded: a tab opened into it appears in the nested list without touching anything. The
+nested list renders nothing with zero tabs, so the expanded state is invisible on the empty
+workspace itself.
+
 **Focus on close (per-pane MRU).** When the *active* tab of a pane with more than one tab closes,
 focus returns to the most-recently-used surviving tab, not the positional neighbour. Each pane
 keeps an MRU list of `tabId`s (most recent first) in `paneActivationHistoryRef`, an in-memory ref
@@ -574,7 +587,8 @@ placement: no pane is ever split, the tab goes into the rightmost pane (`rightmo
 side-by-side split, top half of a stacked one). The user stays in the current workspace, unless the
 moved tab was the current tab of its workspace (menu or drag): then the destination workspace is selected and the tab focused in it (`handleMoveTabFollowingFocus`, focus after 50 ms because the refs are only fresh after the commit). "New" creates a workspace right after the source (same group) whose
 only tab is the moved one, titled and rooted after the tab's cwd when it is a terminal. A source
-workspace that loses its last tab is not closed: it keeps an empty pane. `App.tsx` also calls
+workspace that loses its last tab folds away like any empty workspace (see Fold on empty).
+`App.tsx` also calls
 `useAgentStore.reassignTabWorkspace` so the agent session and its notifications point at the new
 workspace. Dragging uses the same operation, through `resolveTabDrop` (see Drag-and-drop).
 
