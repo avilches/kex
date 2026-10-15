@@ -14,7 +14,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { warn as logWarn } from "@tauri-apps/plugin-log";
+import { writeClipboardText } from "@/lib/clipboard";
 import { native } from "@/lib/native";
 import { revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
 import type { AgentSession } from "@/modules/agents/lib/types";
@@ -28,40 +28,13 @@ function formatElapsed(ms: number): string {
   return `${h}h ${m % 60}m`;
 }
 
-function legacyCopy(value: string): boolean {
-  const ta = document.createElement("textarea");
-  ta.value = value;
-  ta.style.position = "fixed";
-  ta.style.opacity = "0";
-  document.body.appendChild(ta);
-  ta.select();
-  try {
-    return document.execCommand("copy");
-  } finally {
-    ta.remove();
-  }
-}
-
-async function writeClipboard(value: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(value);
-    return true;
-  } catch (err) {
-    const ok = legacyCopy(value);
-    void logWarn(
-      `[clipboard] writeText failed: ${String(err)} | hasFocus=${document.hasFocus()} | active=${document.activeElement?.tagName} | execCommand=${ok}`,
-    );
-    return ok;
-  }
-}
-
 function CopyIdButton({ value, label }: { value: string; label: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const copy = async () => {
-    const ok = await writeClipboard(value);
+    const ok = await writeClipboardText(value);
     setState(ok ? "copied" : "failed");
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setState("idle"), 1500);
