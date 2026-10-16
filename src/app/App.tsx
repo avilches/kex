@@ -192,6 +192,7 @@ import {
 } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { isTabNoteOpen, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
+import { pruneTabUse, recordTabUse } from "@/modules/workspaces/lib/tabUse";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
@@ -355,6 +356,12 @@ export default function App() {
   const activeTab = activeTabId
     ? (activePane?.tabs.find((p) => p.id === activeTabId) ?? null)
     : null;
+
+  const activeWorkspaceHibernated = !!activeWorkspace?.hibernated;
+  // One place covers tab clicks, shortcuts, new tabs, workspace switches and startup.
+  useEffect(() => {
+    if (activeTabId && !activeWorkspaceHibernated) recordTabUse(activeTabId);
+  }, [activeTabId, activeWorkspaceHibernated]);
 
   // Returns focus to the active tab after a transient interruption -- a
   // dropdown, dialog, or context menu closing -- instead of leaving it on
@@ -3439,6 +3446,18 @@ export default function App() {
       },
     }).catch(() => {});
   }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden]);
+
+  useEffect(() => {
+    if (!commandPaletteOpen) return;
+    pruneTabUse(
+      new Set(
+        workspaces.flatMap((w) =>
+          allPanes(w.paneTree).flatMap((p) => p.tabs.map((t) => t.id)),
+        ),
+      ),
+    );
+    // Only on open: pruning on every workspace change would rewrite storage constantly.
+  }, [commandPaletteOpen]);
 
   // ── Command palette ───────────────────────────────────────────────────────
 
