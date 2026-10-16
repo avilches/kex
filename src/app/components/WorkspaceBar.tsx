@@ -308,10 +308,8 @@ function SortableWorkspaceItem({
       aria-label={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
       title={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
       onClick={() => {
-        if (ws.hibernated) {
-          onSetDetailExpanded(ws.id, true);
-          onWake?.(ws.id);
-        } else onSetDetailExpanded(ws.id, !expanded);
+        if (ws.hibernated) onWake?.(ws.id);
+        else onSetDetailExpanded(ws.id, !expanded);
       }}
       className={cn(sideControl, "left-4 size-[14px] opacity-60 hover:opacity-100 focus-visible:opacity-100")}
     >
