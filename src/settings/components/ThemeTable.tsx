@@ -135,11 +135,10 @@ function ShellPreview({ theme, mode }: { theme: Theme; mode: ThemeMode }) {
       <div>■ Source Control</div>
       {note ? (
         <div
-          className="mt-1 rounded-[4px] border px-1.5 py-1 leading-[1.35]"
+          className="mt-1 truncate rounded-[4px] border px-1.5 py-0.5"
           style={{ background: note.background, color: note.foreground, borderColor: `${note.foreground}30` }}
         >
-          <div className="font-semibold">Note:</div>
-          <div>Rebase before the release</div>
+          <span className="font-semibold">Note:</span> Rebase before the release
         </div>
       ) : (
         <div>■ Notes</div>
@@ -166,18 +165,24 @@ function Cell({
   onPick,
   preview,
   modeToggle,
+  onHover,
 }: {
   info: SurfaceInfo | undefined;
   onPick: () => void;
   preview: React.ReactNode;
   modeToggle?: ModeToggle;
+  onHover?: (on: boolean) => void;
 }) {
   if (!info) {
     return <div className={cn(CELL, "px-2 py-1.5 text-[11.5px] text-muted-foreground/60")}>-</div>;
   }
   const shared = info.sharedWith.length > 0;
   return (
-    <div className={cn(CELL, "group/cell flex min-w-0 items-center")}>
+    <div
+      className={cn(CELL, "group/cell flex min-w-0 items-center")}
+      onMouseEnter={onHover && (() => onHover(true))}
+      onMouseLeave={onHover && (() => onHover(false))}
+    >
       <button
         type="button"
         onClick={onPick}
@@ -253,6 +258,17 @@ export function ThemeTable({
   const editorRowPref = parseEditorRowPref(editorPref);
 
   const [pickedEditorRow, setPickedEditorRow] = useState<string | null>(null);
+  const [hoverTheme, setHoverTheme] = useState<Theme | null>(null);
+  const [hoverEditor, setHoverEditor] = useState<{
+    id: EditorThemeId;
+    app: Theme;
+    mode: ThemeMode;
+  } | null>(null);
+  const [hoverTerminal, setHoverTerminal] = useState<{
+    name: string;
+    mode: ThemeMode;
+    palette: ReturnType<typeof paletteOf>;
+  } | null>(null);
   const base = useMemo(
     () =>
       themes.map((t) => ({
@@ -368,35 +384,51 @@ export function ThemeTable({
 
       <div className={COLUMNS}>
         <div className="flex flex-col gap-1 px-1">
-          <span className="px-0.5 text-[11px] font-medium">{activeTheme.name}</span>
-          <ShellPreview theme={activeTheme} mode={mode} />
+          <span className="px-0.5 text-[11px] font-medium">
+            {(hoverTheme ?? activeTheme).name}
+          </span>
+          <ShellPreview theme={hoverTheme ?? activeTheme} mode={mode} />
         </div>
         <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">
-            {EDITOR_THEME_LABELS[activeEditorId]}
+            {EDITOR_THEME_LABELS[hoverEditor?.id ?? activeEditorId]}
           </span>
           <div className={cn(PREVIEW_BOX, "border border-border/60 text-[10.5px]")}>
             <Suspense fallback={null}>
               <EditorThemePreview
-                themeId={activeEditorId}
-                surface={resolveEditorSurface(
-                  editorRowPref ? activeEditorId : editorPref,
-                  activeTheme,
-                  mode,
-                  () => undefined,
-                )}
+                themeId={hoverEditor?.id ?? activeEditorId}
+                surface={
+                  hoverEditor
+                    ? resolveEditorSurface(hoverEditor.id, hoverEditor.app, hoverEditor.mode, () => undefined)
+                    : resolveEditorSurface(
+                        editorRowPref ? activeEditorId : editorPref,
+                        activeTheme,
+                        mode,
+                        () => undefined,
+                      )
+                }
               />
             </Suspense>
           </div>
         </div>
         <div className="flex flex-col gap-1 px-1">
           <span className="px-0.5 text-[11px] font-medium">
-            {terminalPreviewName ?? activeTheme.name}
-            {pinnedTerminal?.mode && pinnedTerminal.mode !== mode ? ` (${pinnedTerminal.mode})` : ""}
+            {hoverTerminal ? hoverTerminal.name : (terminalPreviewName ?? activeTheme.name)}
+            {hoverTerminal
+              ? hoverTerminal.mode !== mode
+                ? ` (${hoverTerminal.mode})`
+                : ""
+              : pinnedTerminal?.mode && pinnedTerminal.mode !== mode
+                ? ` (${pinnedTerminal.mode})`
+                : ""}
           </span>
           <div className={PREVIEW_BOX}>
             <TerminalThemePreview
-              palette={resolveTerminalPalette(terminalPref, activeTheme, terminalCatalog, mode)}
+              palette={
+                hoverTerminal
+                  ? hoverTerminal.palette
+                  : resolveTerminalPalette(terminalPref, activeTheme, terminalCatalog, mode)
+              }
             />
           </div>
         </div>
@@ -413,7 +445,11 @@ export function ThemeTable({
           return (
             <div key={t.id} className={cn(COLUMNS, "group relative items-stretch")}>
               <SelectionOutline selected={[themeSel, editorSel, terminalSel]} />
-              <div className={cn(CELL, "flex min-w-0 items-center gap-1")}>
+              <div
+                className={cn(CELL, "flex min-w-0 items-center gap-1")}
+                onMouseEnter={() => setHoverTheme(t)}
+                onMouseLeave={() => setHoverTheme(null)}
+              >
                 <button
                   type="button"
                   onClick={() => selectTheme(t.id)}
@@ -452,6 +488,9 @@ export function ThemeTable({
                   );
                 }}
                 preview={<EditorPeek id={r.editorId} app={t} mode={r.editorMode} />}
+                onHover={(on) =>
+                  setHoverEditor(on ? { id: r.editorId, app: t, mode: r.editorMode } : null)
+                }
                 modeToggle={
                   r.modes.editor && editorSel
                     ? {
@@ -476,6 +515,11 @@ export function ThemeTable({
                   );
                 }}
                 preview={<TerminalThemePreview palette={paletteOf(t, r.terminalMode)} />}
+                onHover={(on) =>
+                  setHoverTerminal(
+                    on ? { name: t.name, mode: r.terminalMode, palette: paletteOf(t, r.terminalMode) } : null,
+                  )
+                }
                 modeToggle={
                   r.modes.terminal && terminalSel
                     ? {
@@ -511,6 +555,7 @@ export function ThemeTable({
                   void setEditorTheme(id);
                 }}
                 preview={<EditorPeek id={id} app={activeTheme} mode={mode} />}
+                onHover={(on) => setHoverEditor(on ? { id, app: activeTheme, mode } : null)}
               />
               <span />
             </div>
@@ -535,6 +580,9 @@ export function ThemeTable({
                   void setTerminalTheme(formatTerminalPref(t.id, shown === mode ? undefined : shown));
                 }}
                 preview={<TerminalThemePreview palette={paletteOf(t, shown)} />}
+                onHover={(on) =>
+                  setHoverTerminal(on ? { name: t.name, mode: shown, palette: paletteOf(t, shown) } : null)
+                }
                 modeToggle={
                   sel
                     ? {
