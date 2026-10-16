@@ -8,6 +8,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { pathBasename } from "@/lib/pathUtils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -38,6 +39,7 @@ import { mruRank, mruSnapshot, recordUse } from "./lib/mru";
 import { duplicateTitleIds, type TabEntry, type WorkspaceEntry } from "./lib/tabEntries";
 import { rankTabEntries, rankWorkspaceEntries } from "./lib/tabRank";
 import { TabItem } from "./TabItem";
+import { hasPreview, TabPreview } from "./TabPreview";
 import type { PaletteItem } from "./types";
 import { WorkspaceItem } from "./WorkspaceItem";
 
@@ -110,6 +112,14 @@ export function CommandPalette({
     [inCommands, workspaceEntries, parsed.term],
   );
   const ambiguous = useMemo(() => duplicateTitleIds(rankedTabs), [rankedTabs]);
+  const selectedTab = useMemo(
+    () =>
+      value.startsWith("tab:")
+        ? rankedTabs.find((t) => t.tabId === value.slice("tab:".length))
+        : undefined,
+    [value, rankedTabs],
+  );
+  const showPreview = !!selectedTab && hasPreview(selectedTab);
 
   const themes = useMemo(() => {
     if (!inThemes) return [];
@@ -242,7 +252,12 @@ export function CommandPalette({
       onOpenChange={handleOpenChange}
       title="Command Palette"
       description="Run a command, switch theme, or search your workspace."
-      className="top-1/2 w-[min(680px,calc(100vw-32px))] -translate-y-1/2"
+      className={cn(
+        "top-1/2 -translate-y-1/2",
+        showPreview
+          ? "w-[min(940px,calc(100vw-32px))]"
+          : "w-[min(680px,calc(100vw-32px))]",
+      )}
     >
       <Command
         shouldFilter={false}
@@ -258,7 +273,8 @@ export function CommandPalette({
           placeholder={placeholder}
           autoFocus
         />
-        <ScrollArea className="max-h-[420px]">
+        <div className="flex min-h-0">
+        <ScrollArea className="max-h-[420px] min-w-0 flex-1">
           <CommandList className="max-h-none overflow-visible pr-3">
             {inThemes ? (
               <CommandGroup heading="Themes">
@@ -434,6 +450,8 @@ export function CommandPalette({
             )}
           </CommandList>
         </ScrollArea>
+        {showPreview && selectedTab ? <TabPreview entry={selectedTab} /> : null}
+        </div>
       </Command>
     </CommandDialog>
   );
