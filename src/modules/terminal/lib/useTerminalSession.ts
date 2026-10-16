@@ -12,6 +12,8 @@ import {
 } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
+import { applyZoomToDom } from "@/lib/useZoom";
+import { applyZoomThenRefit } from "@/lib/zoomSync";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -1212,7 +1214,11 @@ function startPoolPreferencesSync(): void {
   let prev = usePreferencesStore.getState();
   usePreferencesStore.subscribe((state) => {
     if (state.terminalFontSize !== prev.terminalFontSize || state.zoomLevel !== prev.zoomLevel) {
-      applyFontSize(renderFontSize(state.terminalFontSize, state.zoomLevel));
+      applyZoomThenRefit(state.zoomLevel, state.hydrated, {
+        applyZoomToDom,
+        refitTerminals: () =>
+          applyFontSize(renderFontSize(state.terminalFontSize, state.zoomLevel)),
+      });
     }
     if (state.terminalFontFamily !== prev.terminalFontFamily) {
       applyFontFamily(state.terminalFontFamily);

@@ -5,7 +5,7 @@ import { DEFAULT_ZOOM, stepZoom } from "@/lib/zoomLevels";
 
 const CSS_VAR = "--app-zoom";
 
-function applyToDom(z: number): void {
+export function applyZoomToDom(z: number): void {
   document.documentElement.style.setProperty(CSS_VAR, String(z));
 }
 
@@ -18,7 +18,7 @@ export function useZoom() {
     if (!hydrated) return;
     if (lastAppliedRef.current === zoomLevel) return;
     lastAppliedRef.current = zoomLevel;
-    applyToDom(zoomLevel);
+    applyZoomToDom(zoomLevel);
   }, [hydrated, zoomLevel]);
 
   const zoomIn = useCallback(() => {
