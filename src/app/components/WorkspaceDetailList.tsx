@@ -3,10 +3,11 @@ import { chipColorOnWhite } from "@/modules/workspaces/lib/workspaceColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon } from "@hugeicons/core-free-icons";
+import { CrosshairIcon, LinkSquare02Icon, LockKeyIcon, StickyNote03Icon, UploadCircle01Icon } from "@hugeicons/core-free-icons";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuShortcut, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { useShortcutLabel } from "@/modules/shortcuts/useShortcutLabel";
 import { PopoverAnchor } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
@@ -126,6 +127,17 @@ function StatusMark({ visual }: { visual: DetailRow["visual"] }) {
   );
 }
 
+function RestoreWorkspaceItem({ onWake }: { onWake: () => void }) {
+  const label = useShortcutLabel("workspace.hibernate");
+  return (
+    <ContextMenuItem onSelect={onWake}>
+      <HugeiconsIcon icon={UploadCircle01Icon} size={14} strokeWidth={2} />
+      Restore Workspace
+      {label && <ContextMenuShortcut>{label}</ContextMenuShortcut>}
+    </ContextMenuItem>
+  );
+}
+
 function DetailTabMenu({
   tab,
   workspaceId,
@@ -162,7 +174,9 @@ function DetailTabRow({
   color,
   prevTabId,
   insertSide,
+  hibernated,
   onActivate,
+  onWake,
   onNoteHover,
   onNoteToggle,
 }: {
@@ -175,7 +189,9 @@ function DetailTabRow({
   color: string | null;
   prevTabId: string | null;
   insertSide: "before" | "after" | null;
+  hibernated: boolean;
   onActivate: (tabId: string) => void;
+  onWake?: () => void;
   onNoteHover: (tabId: string, hovering: boolean) => void;
   onNoteToggle: (tabId: string) => void;
 }) {
@@ -183,9 +199,10 @@ function DetailTabRow({
   const title = info?.displayTitle ?? tab.id;
   const agent = info?.hasAgent ? info.agentSession?.agent : undefined;
   const { onRenameTab, onClose, onUpdateTab } = useSidebarTabMenu();
-  const isLocked = tab.locked ?? false;
+  // A sleeping tab can only be looked at: the workspace has to be restored before anything else.
+  const isLocked = !hibernated && (tab.locked ?? false);
   const hoverBg = focused && color !== null ? "hover:bg-white/25" : "hover:bg-muted";
-  const hasNote = tab.note !== undefined;
+  const hasNote = !hibernated && tab.note !== undefined;
   const tooltip = useTabTooltip(tab, info?.agentSession);
   const autofocusMode = usePreferencesStore((s) => s.autofocusMode);
   const sidebarGit = useSidebarGit();
@@ -198,11 +215,12 @@ function DetailTabRow({
     [sidebarGit, workspaceId, tab, resolvedMode],
   );
   const solidChip = focused && color !== null;
-  const showAutofocus = isAutofocusTab(tab) && tab.autofocus === true && autofocusMode !== "always";
+  const showAutofocus = !hibernated && isAutofocusTab(tab) && tab.autofocus === true && autofocusMode !== "always";
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: sidebarTabDragId(tab.id),
     data: { type: "tab" },
+    disabled: hibernated,
   });
 
   const tabDragActive = useWorkspaceDnd().draggingItem?.kind === "tab";
@@ -213,7 +231,7 @@ function DetailTabRow({
   const { setNodeRef: setDropRef } = useDroppable({
     id: `${SIDE_ROW_DROP_PREFIX}${tab.id}`,
     data: dropData,
-    disabled: !tabDragActive,
+    disabled: !tabDragActive || hibernated,
   });
 
   const rowRef = useRef<HTMLButtonElement | null>(null);
@@ -263,7 +281,7 @@ function DetailTabRow({
                 if (e.button === 1) e.preventDefault();
               }}
               onAuxClick={(e) => {
-                if (e.button === 1) {
+                if (e.button === 1 && !hibernated) {
                   e.stopPropagation();
                   onClose(tab.id);
                 }
@@ -325,7 +343,11 @@ function DetailTabRow({
             if (useTabRenameStore.getState().renamingTabId !== tab.id) rowRef.current?.focus();
           }}
         >
-          <DetailTabMenu tab={tab} workspaceId={workspaceId} onActivate={onActivate} />
+          {hibernated ? (
+            onWake && <RestoreWorkspaceItem onWake={onWake} />
+          ) : (
+            <DetailTabMenu tab={tab} workspaceId={workspaceId} onActivate={onActivate} />
+          )}
         </ContextMenuContent>
       </ContextMenu>
     </TabRenamePopover>
@@ -367,7 +389,7 @@ function DetailTabRow({
         >
           <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={2} />
         </button>
-      ) : (
+      ) : hibernated ? null : (
         <>
           {visual !== null && (
             <span className="pointer-events-none absolute right-1.5 top-1/2 flex size-[16px] -translate-y-1/2 items-center justify-center transition-opacity group-focus-within/tab:opacity-0 group-hover/tab:opacity-0">
@@ -399,6 +421,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   visibleTabIds = "",
   hibernated = false,
   onActivate,
+  onWake,
 }: {
   workspaceId: string;
   tabs: Tab[];
@@ -409,6 +432,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   visibleTabIds?: string;
   hibernated?: boolean;
   onActivate: (tabId: string) => void;
+  onWake?: () => void;
 }) {
   const sessions = useAgentStore((s) => s.sessions);
   const rows = useMemo(() => {
@@ -511,7 +535,9 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               color={color}
               prevTabId={rows[i - 1]?.tabId ?? null}
               insertSide={insert?.tabId === row.tabId ? insert.side : null}
+              hibernated={hibernated}
               onActivate={onActivate}
+              onWake={onWake}
               onNoteHover={handleNoteHover}
               onNoteToggle={handleNoteToggle}
             />

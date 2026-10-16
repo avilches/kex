@@ -495,6 +495,7 @@ function SortableWorkspaceItem({
           color={displayColor}
           visibleTabIds={active ? ws.visibleTabIds : ""}
           hibernated={ws.hibernated}
+          onWake={onWake ? () => onWake(ws.id) : undefined}
           onActivate={activateDetailTab}
         />
       </SlideReveal>

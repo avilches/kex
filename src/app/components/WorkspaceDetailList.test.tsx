@@ -334,3 +334,65 @@ describe("WorkspaceDetailList context menu", () => {
     unmount();
   });
 });
+
+describe("WorkspaceDetailList hibernated", () => {
+  function mountAsleep(onWake = vi.fn(), onActivate = vi.fn()) {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        createElement(
+          SidebarTabMenuProvider,
+          {
+            value: {
+              paneTabCount: () => 3,
+              onClose: vi.fn(),
+              onCloseOtherTabs: vi.fn(),
+              onCloseAllTabs: vi.fn(),
+              onRenameTab: vi.fn(),
+              onUpdateTab: vi.fn(),
+              onSaveTab: vi.fn(),
+            },
+          },
+          createElement(WorkspaceDetailList, {
+            workspaceId: "ws-1",
+            tabs: tabs.map((t) => (t.kind === "terminal" ? { ...t, locked: true, note: "n" } : t)),
+            entries: [],
+            filter: { ...base },
+            focusedTabId: null,
+            hibernated: true,
+            onActivate,
+            onWake,
+          }),
+        ),
+      );
+    });
+    const rows = () => Array.from(container.querySelectorAll<HTMLButtonElement>("button[data-detail-row]"));
+    return { container, rows, onWake, onActivate, unmount: track(root) };
+  }
+
+  it("has no close, unlock or note controls, but still activates on click", () => {
+    const { container, rows, onActivate, unmount } = mountAsleep();
+    expect(rows()).toHaveLength(4);
+    expect(
+      container.querySelector('button[aria-label="Close tab"], button[aria-label="Unlock tab"], button[aria-label="Tab note"]'),
+    ).toBeNull();
+    act(() => rows()[0].click());
+    expect(onActivate).toHaveBeenCalledWith("t-work");
+    unmount();
+  });
+
+  it("the context menu only offers Restore Workspace", () => {
+    const { rows, onWake, unmount } = mountAsleep();
+    act(() => {
+      rows()[0].dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 4, clientY: 4 }));
+    });
+    const items = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+    expect(items).toHaveLength(1);
+    expect(items[0].textContent).toMatch(/^Restore Workspace.+/);
+    act(() => items[0].click());
+    expect(onWake).toHaveBeenCalled();
+    unmount();
+  });
+});
