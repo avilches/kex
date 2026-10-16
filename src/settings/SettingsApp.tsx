@@ -4,19 +4,8 @@ import { cn } from "@/lib/utils";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsSection } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import {
-  Cancel01Icon,
-  ColorsIcon,
-  ComputerTerminal01Icon,
-  DocumentCodeIcon,
-  File02Icon,
-  InformationCircleIcon,
-  KeyboardIcon,
-  Layers01Icon,
-  PaintBoardIcon,
-  Settings01Icon,
-  SourceCodeIcon,
-} from "@hugeicons/core-free-icons";
+import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { type JSX, useEffect, useRef, useState } from "react";
@@ -33,23 +22,20 @@ import { TerminalSection } from "./sections/TerminalSection";
 import { ThemesSection } from "./sections/ThemesSection";
 import { WorkspacesSection } from "./sections/WorkspacesSection";
 
-const SECTIONS: {
-  id: SettingsSection;
-  label: string;
-  icon: typeof Settings01Icon;
-  component: () => JSX.Element;
-}[] = [
-  { id: "general", label: "General", icon: Settings01Icon, component: GeneralSection },
-  { id: "workspaces", label: "Workspaces", icon: Layers01Icon, component: WorkspacesSection },
-  { id: "terminal", label: "Terminal", icon: ComputerTerminal01Icon, component: TerminalSection },
-  { id: "external-editors", label: "Tools", icon: DocumentCodeIcon, component: ExternalEditorsSection },
-  { id: "editor", label: "Editor", icon: SourceCodeIcon, component: EditorSection },
-  { id: "filetypes", label: "File Types", icon: File02Icon, component: FileTypesSection },
-  { id: "appearance", label: "Appearance", icon: PaintBoardIcon, component: AppearanceSection },
-  { id: "themes", label: "Themes", icon: ColorsIcon, component: ThemesSection },
-  { id: "shortcuts", label: "Shortcuts", icon: KeyboardIcon, component: ShortcutsSection },
-  { id: "about", label: "About", icon: InformationCircleIcon, component: AboutSection },
-];
+const COMPONENTS: Record<SettingsSection, () => JSX.Element> = {
+  general: GeneralSection,
+  workspaces: WorkspacesSection,
+  terminal: TerminalSection,
+  "external-editors": ExternalEditorsSection,
+  editor: EditorSection,
+  filetypes: FileTypesSection,
+  appearance: AppearanceSection,
+  themes: ThemesSection,
+  shortcuts: ShortcutsSection,
+  about: AboutSection,
+};
+
+const SECTIONS = SETTINGS_SECTIONS.map((s) => ({ ...s, component: COMPONENTS[s.id] }));
 
 const VALID_SECTIONS: SettingsSection[] = SECTIONS.map((s) => s.id);
 
