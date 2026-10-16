@@ -1,5 +1,5 @@
 import { withReadableText } from "./readableColors";
-import { variantNoteSurface } from "./noteSurface";
+import { terminalNoteSurface, variantNoteSurface } from "./noteSurface";
 import { getBuiltinTheme } from "./themes";
 import type { EditorSurface, Theme, ThemeColors, ThemeMode, TerminalPalette } from "./types";
 
@@ -57,8 +57,10 @@ const ALL_VARS: readonly string[] = [
   ...Object.values(COLOR_VAR),
   "--editor-background",
   "--editor-foreground",
-  "--note-background",
-  "--note-foreground",
+  "--note-editor-background",
+  "--note-editor-foreground",
+  "--note-terminal-background",
+  "--note-terminal-foreground",
   "--terminal-background",
   "--terminal-foreground",
   "--terminal-cursor",
@@ -91,13 +93,16 @@ export function applyTheme(
   if (terminal) writeTerminal(root, terminal);
   const editor = editorOverride ?? variant.editor;
   if (editor) writeEditor(root, editor);
-  const noteBg = editor?.background ?? colors?.background;
-  const noteFg = editor?.foreground ?? colors?.foreground;
-  const note = variantNoteSurface(variant, editorOverride);
-  const background = note?.background ?? noteBg;
-  const foreground = note?.foreground ?? noteFg;
-  if (background) root.style.setProperty("--note-background", background);
-  if (foreground) root.style.setProperty("--note-foreground", foreground);
+  const editorNote = variantNoteSurface(variant, editorOverride);
+  const editorBg = editorNote?.background ?? editor?.background ?? colors?.background;
+  const editorFg = editorNote?.foreground ?? editor?.foreground ?? colors?.foreground;
+  if (editorBg) root.style.setProperty("--note-editor-background", editorBg);
+  if (editorFg) root.style.setProperty("--note-editor-foreground", editorFg);
+  const terminalNote = terminalNoteSurface(variant, terminalOverride);
+  const terminalBg = terminalNote?.background ?? terminal?.background ?? colors?.background;
+  const terminalFg = terminalNote?.foreground ?? terminal?.foreground ?? colors?.foreground;
+  if (terminalBg) root.style.setProperty("--note-terminal-background", terminalBg);
+  if (terminalFg) root.style.setProperty("--note-terminal-foreground", terminalFg);
   lastApplied = theme.id;
 }
 

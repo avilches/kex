@@ -3,6 +3,7 @@ import type React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
+import type { NoteSurfaceKind } from "@/modules/theme/noteSurface";
 import type { CodeMirrorEditorHandle } from "@/modules/markdown/codemirror/CodeMirrorEditor";
 import { isLeavingNote } from "./lib/noteBlur";
 import { dropBlankTabNote, moveTabNote, resizeTabNote, setTabNoteText } from "./lib/tabNote";
@@ -35,6 +36,8 @@ type Props = {
   onDismiss?: () => void;
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
+  // Surface of the tab the note is shown over, whose mode can differ from the note owner's.
+  surface?: NoteSurfaceKind;
 };
 
 type Measure = { pane: Rect; tab: Rect | null; note: Size; tabBarHeight: number };
@@ -57,7 +60,7 @@ function sameMeasure(a: Measure, b: Measure) {
   );
 }
 
-export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab, preview, dockTo, onClose, onDismiss, onPointerEnter, onPointerLeave }: Props) {
+export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, onUpdateTab, preview, dockTo, onClose, onDismiss, onPointerEnter, onPointerLeave, surface = "editor" }: Props) {
   const visible = tab.note !== undefined && (!!preview || (active && !!tab.noteOpen));
   const sticky = active && !!tab.noteOpen;
   // A note docked to a WorkspaceBar row shows its open state with the close button too.
@@ -240,7 +243,10 @@ export function FloatingTabNote({ tab, active, paneRef, tabBarRef, layoutKey, on
         {...{ [TAB_NOTE_ATTR]: "" }}
         data-tab-note-id={tab.id}
         className={cn(
-          "pointer-events-auto absolute w-80 max-w-full overflow-hidden rounded-lg border border-border bg-[var(--editor-background)] [--editor-background:var(--note-background)] [--editor-foreground:var(--note-foreground)] shadow-xl",
+          "pointer-events-auto absolute w-80 max-w-full overflow-hidden rounded-lg border border-border bg-[var(--editor-background)] shadow-xl",
+          surface === "terminal"
+            ? "[--editor-background:var(--note-terminal-background)] [--editor-foreground:var(--note-terminal-foreground)]"
+            : "[--editor-background:var(--note-editor-background)] [--editor-foreground:var(--note-editor-foreground)]",
           size && "flex flex-col",
           !pos && "invisible",
         )}

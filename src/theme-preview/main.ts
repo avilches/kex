@@ -55,7 +55,7 @@ const TOKENS = [
   "accent-foreground", "destructive", "border", "input", "ring", "sidebar",
   "sidebar-foreground", "sidebar-primary", "sidebar-primary-foreground",
   "sidebar-accent", "sidebar-accent-foreground", "sidebar-border",
-  "sidebar-ring", "tab-focus-indicator", "editor-background", "editor-foreground", "note-background", "note-foreground", "terminal-background",
+  "sidebar-ring", "tab-focus-indicator", "editor-background", "editor-foreground", "note-editor-background", "note-editor-foreground", "note-terminal-background", "note-terminal-foreground", "terminal-background",
   "terminal-foreground", "terminal-cursor", "terminal-cursor-accent",
   "terminal-selection", ...ANSI_NAMES.map((n) => `terminal-ansi-${n}`),
 ];
@@ -262,15 +262,17 @@ function sidebar(): HTMLElement {
     commit("Use saturated git colors", "#bb9af7"),
     commit("Darken foreground", "#9ece6a"),
     h("div", { class: "mb-1 mt-2 text-[10px] opacity-60" }, "Notes"),
-    h(
-      "div",
-      {
-        class: "rounded-lg border border-border px-2 py-1.5 text-[11px] shadow-xl",
-        style: "background:var(--note-background);color:var(--note-foreground)",
-        "data-surface": "note",
-      },
-      h("div", { class: "font-semibold" }, "Floating note"),
-      h("div", {}, "Remember to rebase before the release."),
+    ...(["editor", "terminal"] as const).map((kind) =>
+      h(
+        "div",
+        {
+          class: "mb-1 rounded-lg border border-border px-2 py-1.5 text-[11px] shadow-xl",
+          style: `background:var(--note-${kind}-background);color:var(--note-${kind}-foreground)`,
+          "data-surface": `note-${kind}`,
+        },
+        h("div", { class: "font-semibold" }, `Floating note over ${kind}`),
+        h("div", {}, "Remember to rebase before the release."),
+      ),
     ),
   );
 }

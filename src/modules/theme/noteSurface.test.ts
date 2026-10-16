@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { noteSurface, variantNoteSurface } from "./noteSurface";
+import { noteSurface, noteSurfaceKind, terminalNoteSurface, variantNoteSurface } from "./noteSurface";
 import { contrastRatio } from "./readableColors";
 import { listBuiltinThemes } from "./themes";
 
@@ -88,5 +88,25 @@ describe("variantNoteSurface", () => {
         );
       }
     }
+  });
+});
+
+describe("noteSurfaceKind", () => {
+  test("terminal tabs use the terminal surface and every other tab the editor one", () => {
+    expect(noteSurfaceKind({ kind: "terminal" })).toBe("terminal");
+    expect(noteSurfaceKind({ kind: "editor" })).toBe("editor");
+    expect(noteSurfaceKind({ kind: "browser" })).toBe("editor");
+    expect(noteSurfaceKind(undefined)).toBe("editor");
+  });
+});
+
+describe("terminalNoteSurface", () => {
+  test("follows the terminal palette, not the editor, so each can be in its own mode", () => {
+    const variant = { colors: { background: "#ffffff" }, terminal: { background: "#1a1b26", foreground: "#c0caf5" } };
+    const dark = terminalNoteSurface(variant)!;
+    const light = terminalNoteSurface(variant, { background: "#ffffff", foreground: "#000000" })!;
+    expect(contrastRatio(rgb(dark.background), [255, 255, 255])).toBeGreaterThan(
+      contrastRatio(rgb(light.background), [255, 255, 255]),
+    );
   });
 });

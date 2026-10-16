@@ -1,5 +1,5 @@
 import { contrastRatio } from "./readableColors";
-import type { EditorSurface, ThemeVariant } from "./types";
+import type { EditorSurface, TerminalPalette, ThemeVariant } from "./types";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const MIN_CONTRAST = 4.5;
@@ -71,7 +71,7 @@ export function noteSurface(
 // The note surface of a theme variant: its editor surface (or the UI colors
 // when the variant defines no editor) pushed toward yellow, with an optional
 // explicit editor surface winning over the variant's own. This is exactly what
-// applyTheme publishes as --note-background/--note-foreground, so every
+// applyTheme publishes as --note-editor-background/--note-editor-foreground, so every
 // consumer (the app, the Settings mini preview) shows the same colors.
 export function variantNoteSurface(variant: ThemeVariant, editorOverride?: EditorSurface): NoteSurface | null {
   const editor = editorOverride ?? variant.editor;
@@ -81,4 +81,23 @@ export function variantNoteSurface(variant: ThemeVariant, editorOverride?: Edito
     variant.noteStrong,
     variant.noteTint,
   );
+}
+
+// The same note over a terminal tab: the terminal's own surface, which can be in a different
+// mode than the editor's.
+export function terminalNoteSurface(variant: ThemeVariant, terminalOverride?: TerminalPalette): NoteSurface | null {
+  const terminal = terminalOverride ?? variant.terminal;
+  return noteSurface(
+    terminal?.background ?? variant.colors?.background ?? "",
+    terminal?.foreground ?? variant.colors?.foreground,
+    variant.noteStrong,
+    variant.noteTint,
+  );
+}
+
+export type NoteSurfaceKind = "editor" | "terminal";
+
+// A note takes the surface of the tab it is shown over, not the one of the tab it belongs to.
+export function noteSurfaceKind(tab: { kind: string } | undefined): NoteSurfaceKind {
+  return tab?.kind === "terminal" ? "terminal" : "editor";
 }

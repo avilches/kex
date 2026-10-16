@@ -109,9 +109,12 @@ ahí antes de tocar el código.
 
 **7. Color de las notas flotantes.** El fondo de una nota de tab no es el del editor: `noteSurface`
 (`modules/theme/noteSurface.ts`) mezcla el fondo del editor con un amarillo y `applyTheme` lo publica como
-`--note-background` y `--note-foreground` (el texto sube de contraste hasta 4.5:1). Por defecto es un amarillo
+`--note-editor-*` (sobre el fondo del editor) y `--note-terminal-*` (sobre el del terminal), con
+`-background` y `-foreground` cada uno (el texto sube de contraste hasta 4.5:1). La nota usa el par del tab
+sobre el que se dibuja (`noteSurfaceKind`: terminal o editor), no el de su propio tab, porque el editor y el
+terminal pueden estar en un modo distinto al de la app y entre sí. Por defecto es un amarillo
 cálido en claro y uno verdoso en oscuro (uno cálido sobre oscuro vira a marrón). Una variante puede fijar su
 propio tinte con `noteTint: { color, amount }` (`amount` de 0 a 1), o intensificar el de por defecto con
 `noteStrong: true`; hoy `noteTint` está en el modo oscuro de varios temas y `noteStrong` en Kanagawa claro.
-La vista `app` de `theme-preview.html` pinta una nota de muestra en el Sidebar, y la mini preview de temas
+La vista `app` de `theme-preview.html` pinta una nota de muestra por cada superficie en el Sidebar, y la mini preview de temas
 de Settings pinta una mininota con la misma superficie (ambas via `variantNoteSurface`).

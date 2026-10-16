@@ -23,6 +23,7 @@ import { useContextMenuCloseStore } from "@/modules/workspaces/lib/contextMenuCl
 import { type Tab, isAutofocusTab } from "@/modules/workspaces/lib/types";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme/ThemeProvider";
+import { noteSurfaceKind } from "@/modules/theme/noteSurface";
 import { tabGitColor } from "@/modules/workspaces/lib/tabGitColor";
 import { useTabTooltip } from "@/modules/workspaces/lib/useTabTooltip";
 import { useSidebarGit } from "@/modules/workspaces/SidebarGitContext";
@@ -541,6 +542,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               onDismiss={notePreview.close}
               onPointerEnter={() => notePreview.show(previewTab.id)}
               onPointerLeave={() => notePreview.leave(previewTab.id)}
+              surface={noteSurfaceKind(focusedTabId ? tabsById.get(focusedTabId) : undefined)}
             />
           </div>,
           document.body,
