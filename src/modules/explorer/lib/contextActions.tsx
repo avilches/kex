@@ -9,16 +9,17 @@ export const REVEAL_LABEL = IS_MAC
   ? "Reveal in Finder"
   : "Reveal in File Manager";
 
-export async function copyToClipboard(text: string, label?: string): Promise<void> {
+export async function copyToClipboard(text: string, label?: string): Promise<boolean> {
   if (!(await writeClipboardText(text))) {
     toast.error("Copy failed");
-    return;
+    return false;
   }
   if (label)
     toast.success(label, {
       description: text,
       icon: <HugeiconsIcon icon={ClipboardCopyIcon} size={16} strokeWidth={1.5} />,
     });
+  return true;
 }
 
 export function relativePath(rootPath: string, path: string): string {

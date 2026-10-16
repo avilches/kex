@@ -20,8 +20,10 @@ import {
   submitToLeaf,
   useTerminalSession,
 } from "./lib/useTerminalSession";
+import { pasteIntoLeaf } from "./lib/rendererPool";
 import { RestoreBlockedOverlay } from "./RestoreBlockedOverlay";
 import { ScratchpadBar } from "./ScratchpadBar";
+import { TerminalContextMenu } from "./TerminalContextMenu";
 
 // Lazy: ShellInput pulls the CodeMirror stack, which must stay out of the
 // eager startup bundle (see eager-budget.test.ts). It loads only when a block
@@ -132,23 +134,29 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
               session.scratchpadOpen && "opacity-50",
             )}
           >
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: terminal surface; pointer selects command blocks */}
-            <div
-              ref={containerRef}
-              className="absolute inset-0 z-0"
-              onFocus={() => setLeafTerminalFocused(tabId)}
-              onMouseDown={(e) => {
-                downYRef.current = e.clientY;
-              }}
-              onMouseUp={(e) => {
-                const moved =
-                  downYRef.current != null &&
-                  Math.abs(e.clientY - downYRef.current) > 4;
-                downYRef.current = null;
-                if (!moved) session.selectBlockAt(e.clientY);
-                if (session.blockMode === "prompt") focusLeafInput(tabId);
-              }}
-            />
+            <TerminalContextMenu
+              getSelection={session.getSelection}
+              onPaste={(text) => pasteIntoLeaf(tabId, text)}
+              onClosed={session.focus}
+            >
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: terminal surface; pointer selects command blocks */}
+              <div
+                ref={containerRef}
+                className="absolute inset-0 z-0"
+                onFocus={() => setLeafTerminalFocused(tabId)}
+                onMouseDown={(e) => {
+                  downYRef.current = e.clientY;
+                }}
+                onMouseUp={(e) => {
+                  const moved =
+                    downYRef.current != null &&
+                    Math.abs(e.clientY - downYRef.current) > 4;
+                  downYRef.current = null;
+                  if (!moved) session.selectBlockAt(e.clientY);
+                  if (session.blockMode === "prompt") focusLeafInput(tabId);
+                }}
+              />
+            </TerminalContextMenu>
             <BlockWatermark leafId={tabId} subscribe={session.subscribeBlocks} />
             <BlockOverlay
               subscribe={session.subscribeBlocks}
@@ -187,14 +195,20 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     return (
       <div className="zoom-exempt relative flex h-full w-full flex-col bg-[var(--terminal-background)]" style={hideStyle}>
-        <div
-          ref={containerRef}
-          className={cn(
-            "min-h-0 flex-1 transition-opacity",
-            session.scratchpadOpen && "opacity-50",
-          )}
-          onFocus={() => setLeafTerminalFocused(tabId)}
-        />
+        <TerminalContextMenu
+          getSelection={session.getSelection}
+          onPaste={(text) => pasteIntoLeaf(tabId, text)}
+          onClosed={session.focus}
+        >
+          <div
+            ref={containerRef}
+            className={cn(
+              "min-h-0 flex-1 transition-opacity",
+              session.scratchpadOpen && "opacity-50",
+            )}
+            onFocus={() => setLeafTerminalFocused(tabId)}
+          />
+        </TerminalContextMenu>
         {session.scratchpadOpen && focused && (
           <ScratchpadBar leafId={tabId} />
         )}

@@ -788,7 +788,7 @@ type CommitDetailProps = {
   commit: GitLogEntry;
   filesEntry: FilesEntry | null;
   remoteWeb: RemoteWebInfo | null;
-  onCopySha: (value: string) => Promise<void> | void;
+  onCopySha: (value: string) => Promise<boolean>;
   onOpenFile: (
     commit: GitLogEntry,
     file: GitCommitFileChange,
@@ -848,8 +848,9 @@ function CommitDetail({
             variant="ghost"
             className="h-6 gap-1.5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => {
-              void onCopySha(commit.sha);
-              setCopied(true);
+              void onCopySha(commit.sha).then((ok) => {
+                if (ok) setCopied(true);
+              });
             }}
           >
             <HugeiconsIcon icon={Copy01Icon} size={11} strokeWidth={1.9} />

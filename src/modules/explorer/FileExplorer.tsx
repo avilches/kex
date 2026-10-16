@@ -10,7 +10,6 @@ import {
   ArrowDown01Icon,
   ClipboardIcon,
   ComputerTerminal01Icon,
-  CopySlashIcon,
   CrosshairIcon,
   DashboardSquareAddIcon,
   FileAddIcon,
@@ -57,10 +56,10 @@ import {
   type RowActions,
 } from "./TreeRow";
 import {
-  copyToClipboard,
   REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
+import { CopyAbsolutePathItem } from "./lib/copyPathItems";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { dirname, useFileTree } from "./lib/useFileTree";
@@ -1553,13 +1552,7 @@ export const FileExplorer = memo(
                     Paste
                   </ContextMenuItem>
                   <ContextMenuSeparator />
-                  <ContextMenuItem
-                    className={COMPACT_ITEM}
-                    onSelect={() => void copyToClipboard(rootPath, "Copied absolute path")}
-                  >
-                    <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-                    Copy Absolute Path
-                  </ContextMenuItem>
+                  <CopyAbsolutePathItem path={rootPath} />
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => tree.refresh(rootPath)}
