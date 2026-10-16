@@ -7,6 +7,7 @@ export const jetbrainsClassic: Theme = {
   editorTheme: { dark: "darcula", light: "github-light" },
   variants: {
     dark: {
+      noteTint: { color: "#ebe150", amount: 0.72 },
       colors: {
         background: "#3c3f41",
         foreground: "#bbbbbb",

@@ -72,7 +72,7 @@ function makeFakeTerm() {
   };
 }
 
-describe("BlockDecorations — OSC 133 block lifecycle", () => {
+describe("BlockDecorations - OSC 133 block lifecycle", () => {
   it("creates a finished block on C..D with command, exit code and range", () => {
     const { term, emit, setLine } = makeFakeTerm();
     const deco = new BlockDecorations(term);
@@ -140,7 +140,7 @@ describe("BlockDecorations — OSC 133 block lifecycle", () => {
   });
 });
 
-describe("BlockDecorations — selection and navigation", () => {
+describe("BlockDecorations - selection and navigation", () => {
   function withBlocks(count: number) {
     const fake = makeFakeTerm();
     const deco = new BlockDecorations(fake.term);
@@ -193,7 +193,7 @@ describe("BlockDecorations — selection and navigation", () => {
   });
 });
 
-describe("BlockDecorations — hasAnyBlock", () => {
+describe("BlockDecorations - hasAnyBlock", () => {
   it("is false on a fresh terminal", () => {
     const { term } = makeFakeTerm();
     const deco = new BlockDecorations(term);

@@ -12,6 +12,7 @@ import {
 import { IS_MAC } from "@/lib/platform";
 import { autolinkHref, isExternalUrl, openExternalUrl } from "@/modules/markdown/codemirror/lib/externalUrl";
 import { frontmatterEnd } from "@/modules/markdown/codemirror/lib/frontmatterEnd";
+import { writeClipboardText } from "@/lib/clipboard";
 import { CHECK_ICON, COPY_ICON } from "@/modules/markdown/lib/codeCopyIcons";
 import {
   type ImageSpec,
@@ -104,17 +105,15 @@ class CodeHeaderWidget extends WidgetType {
     button.innerHTML = COPY_ICON;
     button.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      navigator.clipboard.writeText(this.code).then(
-        () => {
-          button.innerHTML = CHECK_ICON;
-          button.classList.add("copied");
-          setTimeout(() => {
-            button.innerHTML = COPY_ICON;
-            button.classList.remove("copied");
-          }, 1500);
-        },
-        () => {},
-      );
+      void writeClipboardText(this.code).then((ok) => {
+        if (!ok) return;
+        button.innerHTML = CHECK_ICON;
+        button.classList.add("copied");
+        setTimeout(() => {
+          button.innerHTML = COPY_ICON;
+          button.classList.remove("copied");
+        }, 1500);
+      });
     });
     header.appendChild(button);
     return header;

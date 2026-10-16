@@ -209,12 +209,7 @@ fn apply_common(
     }
     ensure_utf8_locale(cmd);
 
-    let resolved_cwd = cwd
-        .map(PathBuf::from)
-        .filter(|p| p.is_dir())
-        .or_else(|| workspace::launch_cwd_snapshot().filter(|p| p.is_dir()))
-        .or_else(|| dirs::home_dir().filter(|p| p.is_dir()));
-    if let Some(cwd) = resolved_cwd {
+    if let Some(cwd) = resolve_spawn_dir(cwd) {
         #[cfg(windows)]
         let cwd = PathBuf::from(cwd.to_string_lossy().replace('/', "\\"));
         log::info!("pty cwd: {}", cwd.display());
@@ -226,6 +221,32 @@ fn apply_common(
     } else {
         log::warn!("pty cwd: no usable directory, inheriting from process");
     }
+}
+
+/// The folder a spawned shell starts in on this machine: the given cwd when it
+/// is a directory, else the launch folder, else home. `apply_common` resolves
+/// through here, so this is the same chain the shell itself will follow.
+/// Non-WSL only; a WSL cwd is a path inside the distro, not a host path.
+pub(crate) fn resolve_spawn_dir(cwd: Option<String>) -> Option<PathBuf> {
+    cwd.map(PathBuf::from)
+        .filter(|p| p.is_dir())
+        .or_else(|| workspace::launch_cwd_snapshot().filter(|p| p.is_dir()))
+        .or_else(|| dirs::home_dir().filter(|p| p.is_dir()))
+}
+
+/// The same folder, in the forward-slash form the frontend keeps, to report
+/// back to the tab when the PTY opens. `None` when nothing can be reported
+/// (no folder given in a WSL workspace; the distro home has no host path).
+pub(crate) fn spawn_dir_report(cwd: Option<String>, workspace: &WorkspaceEnv) -> Option<String> {
+    if workspace.is_wsl() {
+        return cwd;
+    }
+    let dir = resolve_spawn_dir(cwd)?;
+    let s = dir.to_string_lossy().into_owned();
+    #[cfg(windows)]
+    return Some(s.replace('\\', "/"));
+    #[cfg(not(windows))]
+    Some(s)
 }
 
 #[cfg(unix)]
@@ -352,7 +373,7 @@ mod unix {
                         log::warn!("zsh shell integration disabled: {e}");
                     }
                 }
-                // Login shell so /etc/zprofile runs path_helper on macOS — without
+                // Login shell so /etc/zprofile runs path_helper on macOS - without
                 // this, GUI-launched apps get a minimal PATH missing Homebrew.
                 cmd.arg("-l");
             }
@@ -1055,7 +1076,10 @@ fn which_in_path(name: &str) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::sanitize_shell_override;
+    use std::path::Path;
+
+    use super::{resolve_spawn_dir, spawn_dir_report, sanitize_shell_override};
+    use crate::modules::workspace::WorkspaceEnv;
 
     #[test]
     fn rejects_non_enumerated_override() {
@@ -1070,5 +1094,58 @@ mod tests {
     fn empty_or_missing_override_is_none() {
         assert_eq!(sanitize_shell_override(Some("   ".into())), None);
         assert_eq!(sanitize_shell_override(None), None);
+    }
+
+    #[test]
+    fn resolve_spawn_dir_keeps_usable_given_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let resolved = resolve_spawn_dir(Some(dir.path().to_string_lossy().into_owned()));
+        assert_eq!(resolved.as_deref(), Some(dir.path()));
+    }
+
+    #[test]
+    fn resolve_spawn_dir_falls_back_to_home() {
+        // LAUNCH_CWD is unset in the test binary; the chain ends at home.
+        let home = dirs::home_dir().unwrap();
+        assert_eq!(resolve_spawn_dir(None).as_deref(), Some(home.as_path()));
+        assert_eq!(
+            resolve_spawn_dir(Some("/no/such/kex-dir".into())).as_deref(),
+            Some(home.as_path())
+        );
+    }
+
+    #[test]
+    fn spawn_dir_report_reports_local_folder_as_given() {
+        let dir = tempfile::tempdir().unwrap();
+        let report = spawn_dir_report(
+            Some(dir.path().to_string_lossy().into_owned()),
+            &WorkspaceEnv::Local,
+        )
+        .unwrap();
+        assert_eq!(Path::new(&report), dir.path());
+    }
+
+    #[test]
+    fn spawn_dir_report_passes_wsl_folder_through_and_skips_fallbacks() {
+        let wsl = WorkspaceEnv::Wsl { distro: "Ubuntu".into() };
+        assert_eq!(
+            spawn_dir_report(Some("/home/u/repo".into()), &wsl),
+            Some("/home/u/repo".into())
+        );
+        // The distro home the shell falls back to has no host path to report.
+        assert_eq!(spawn_dir_report(None, &wsl), None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn spawn_dir_report_uses_forward_slashes_on_windows() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            spawn_dir_report(
+                Some(dir.path().to_string_lossy().into_owned()),
+                &WorkspaceEnv::Local
+            ),
+            Some(dir.path().to_string_lossy().replace('\\', "/"))
+        );
     }
 }

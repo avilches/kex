@@ -59,7 +59,7 @@ describe("tab titles with templates", () => {
   });
 
   it("tabTitle falls back to the default when the template expands to nothing", () => {
-    expect(tabTitle(terminal({ cwd: "/a/b", title: "{branch}" }))).toBe("/a/b");
+    expect(tabTitle(terminal({ cwd: "/a/b", title: "{branch}" }))).toBe("b");
   });
 
   it("{tab} is not a tab variable and stays literal", () => {

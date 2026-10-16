@@ -837,7 +837,7 @@ export const SourceControlPanel = memo(
   const pullLabel = pullBusy
     ? "Pulling…"
     : isDiverged
-      ? "Branch diverged — resolve in terminal"
+      ? "Branch diverged - resolve in terminal"
       : !hasUpstream
         ? "No upstream configured"
         : (scm.status?.behind ?? 0) === 0

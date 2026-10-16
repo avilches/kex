@@ -13,7 +13,7 @@ export function terminalWordNavigationSequence(event: TerminalKeyEvent): string 
 }
 
 /** Cmd+Left/Right → readline line-start (Ctrl+A) / line-end (Ctrl+E).
- * macOS-only — Cmd doesn't exist as a navigation modifier elsewhere. */
+ * macOS-only - Cmd doesn't exist as a navigation modifier elsewhere. */
 export function terminalLineNavigationSequence(
   event: TerminalKeyEvent,
   opts: PlatformOpts,

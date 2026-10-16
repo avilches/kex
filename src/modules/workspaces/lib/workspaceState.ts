@@ -112,7 +112,7 @@ export function claimClose(): boolean {
   return true;
 }
 
-// Called on window close — cancels the debounce and saves immediately so
+// Called on window close - cancels the debounce and saves immediately so
 // pending workspace changes are not lost when the window closes.
 export async function flushWorkspaceState(): Promise<void> {
   await workspaceStateSave.flush();

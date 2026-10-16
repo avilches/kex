@@ -93,6 +93,44 @@ describe("conditional {?var text}", () => {
   });
 });
 
+describe("conditional on several variables {?a|b text}", () => {
+  it("shows the text when any of them has a value", () => {
+    const t = "{?cmd|osc [{cmd|osc}]}";
+    expect(expandTitle(t, { cmd: "ls", osc: "" })).toBe("[ls]");
+    expect(expandTitle(t, { cmd: "", osc: "vim" })).toBe("[vim]");
+    expect(expandTitle(t, { cmd: "", osc: "" })).toBe("");
+  });
+
+  it("stays literal when any of the names is not a variable of the scope", () => {
+    expect(expandTitle("{?cmd|nope x}", { cmd: "ls" })).toBe("{?cmd|nope x}");
+  });
+
+  it("counts a blank value as no value", () => {
+    expect(expandTitle("{?cmd|osc x}", { cmd: " ", osc: "  " })).toBe("");
+  });
+});
+
+describe("negated conditional {!a|b text}", () => {
+  it("shows the text only when none of them has a value", () => {
+    const t = "{?branch on {branch}}{!branch in {dir}}";
+    expect(expandTitle(t, { branch: "main", dir: "kex" })).toBe("on main");
+    expect(expandTitle(t, { branch: "", dir: "kex" })).toBe("in kex");
+  });
+
+  it("with several names it needs all of them empty", () => {
+    expect(expandTitle("{!cmd|osc idle}", { cmd: "", osc: "" })).toBe("idle");
+    expect(expandTitle("{!cmd|osc idle}", { cmd: "ls", osc: "" })).toBe("");
+  });
+
+  it("stays literal for an unknown variable", () => {
+    expect(expandTitle("{!nope x}", { dir: "d" })).toBe("{!nope x}");
+  });
+
+  it("is reported as used by every name it reads", () => {
+    expect([...titleVariablesUsed("{!branch|dir x {repo}}")].sort()).toEqual(["branch", "dir", "repo"]);
+  });
+});
+
 describe("hostile and malformed templates", () => {
   it("does not resolve inherited object properties as variables", () => {
     expect(expandTitle("{constructor}", { dir: "d" })).toBe("{constructor}");

@@ -11,7 +11,7 @@ use serde_json::Value;
 const INDEX_VERSION: u32 = 2;
 
 /// Size in PHYSICAL pixels (from `inner_size()`). Position is intentionally not
-/// persisted — reliable cross-monitor restore of position on macOS is unsolved.
+/// persisted - reliable cross-monitor restore of position on macOS is unsolved.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowGeometry {

@@ -76,7 +76,7 @@ fn signal_quit_request(app: &tauri::AppHandle) {
     if has_main {
         let _ = app.emit("kex:before-quit", ());
     } else {
-        // No windows to flush — exit immediately.
+        // No windows to flush - exit immediately.
         app.exit(0);
     }
 }
@@ -93,6 +93,8 @@ struct DynMenuItems {
     sidebar_side: tauri::menu::MenuItem<tauri::Wry>,
     dock_browser: tauri::menu::MenuItem<tauri::Wry>,
     dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
+    /// Items that act on tabs or on the Sidebar: greyed out while the active workspace sleeps.
+    tab_items: Vec<tauri::menu::MenuItem<tauri::Wry>>,
 }
 
 #[cfg(target_os = "macos")]
@@ -109,6 +111,7 @@ struct MenuState {
     active_view: String,
     sidebar_side: String,
     show_hidden: bool,
+    hibernated: bool,
 }
 
 #[tauri::command]
@@ -125,6 +128,13 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
         let _ = items.git.set_checked(on("git"));
         let _ = items.history.set_checked(on("history"));
         let _ = items.show_hidden.set_checked(state.show_hidden);
+        for item in &items.tab_items {
+            let _ = item.set_enabled(!state.hibernated);
+        }
+        for item in [&items.sidebar, &items.explorer, &items.git, &items.history, &items.show_hidden] {
+            let _ = item.set_enabled(!state.hibernated);
+        }
+        let _ = items.sidebar_side.set_enabled(!state.hibernated);
         let _ = items.sidebar_side.set_text(if state.sidebar_side == "left" {
             "Move Sidebar to Right"
         } else {
@@ -205,7 +215,7 @@ fn create_app_window(
         "[window] create_app_window: label={label} size={width}x{height} workspaces={ws_count}"
     );
 
-    // Size only in the builder — position is applied on first Focused(true) to work
+    // Size only in the builder - position is applied on first Focused(true) to work
     // around macOS cascade which overrides any position set before or at show().
     let builder =
         WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
@@ -238,7 +248,7 @@ fn create_app_window(
     let app_handle = app.clone();
     let win_label = label.clone();
     window.on_window_event(move |event| match event {
-        // Save size on focus and resize. Position is intentionally not persisted —
+        // Save size on focus and resize. Position is intentionally not persisted -
         // reliable cross-monitor restore on macOS is unsolved (see WORKSPACES_GOTCHAS.md).
         WindowEvent::Focused(true) | WindowEvent::Resized(_) => {
             let mgr = app_handle.state::<window_state::WindowStateManager>();
@@ -272,12 +282,12 @@ fn create_app_window(
                 .count();
             let mgr = app_handle.state::<window_state::WindowStateManager>();
             if live > 0 {
-                // User closed one window while others are open — remove from state.
+                // User closed one window while others are open - remove from state.
                 log::info!("[window] Destroyed {win_label}: {live} window(s) remain, removing from state");
                 mgr.remove_window(&win_label);
                 mgr.save();
             } else {
-                // Last window closed (app quit) — keep state to restore next launch.
+                // Last window closed (app quit) - keep state to restore next launch.
                 log::info!("[window] Destroyed {win_label}: last window, keeping state for restore");
                 if let Some(s) = app_handle.get_webview_window("settings") {
                     let _ = s.close();
@@ -460,7 +470,7 @@ fn window_save_groups(
 
 /// Called from main.tsx on startup (on_window_ready equivalent) to restore window size.
 /// Uses physical pixels from inner_size(), matching tauri-plugin-window-state behaviour.
-/// Position is not restored — see WORKSPACES_GOTCHAS.md for why.
+/// Position is not restored - see WORKSPACES_GOTCHAS.md for why.
 #[tauri::command]
 fn restore_window_geometry(webview_window: tauri::WebviewWindow, app: tauri::AppHandle) {
     let label = webview_window.label().to_string();
@@ -535,6 +545,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // macOS: the predefined Quit menu item (Cmd+Q) terminates natively and
@@ -679,6 +690,13 @@ pub fn run() {
                     sidebar_side,
                     dock_browser,
                     dock_all_browsers,
+                    tab_items: vec![
+                        new_terminal,
+                        new_browser,
+                        close_tab,
+                        close_others,
+                        close_all,
+                    ],
                 }))));
 
                 app.on_menu_event(|app, event| {
@@ -946,7 +964,7 @@ pub fn run() {
                     return;
                 }
                 // The frontend voluntarily closed the last window (last workspace
-                // removed). Stay alive in the background — macOS-style no-window mode.
+                // removed). Stay alive in the background - macOS-style no-window mode.
                 if guard.windowless_mode.swap(false, Ordering::SeqCst) {
                     api.prevent_exit();
                     return;

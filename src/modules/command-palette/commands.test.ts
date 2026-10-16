@@ -37,6 +37,7 @@ function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteAct
     clearTerminal: fn(),
     toggleZenMode: fn(),
     hasActiveTerminal: true,
+    hibernated: false,
     openWorkspaceProperties: fn(),
     openRunScriptConfiguration: fn(),
     shortcutHandlers: {},
@@ -121,5 +122,33 @@ describe("palette catalog", () => {
     const without = createCommandItems(ctx({ hasActiveTabNote: false })).find((i) => i.id === "tab.note.remove");
     expect(with_?.disabledReason).toBeUndefined();
     expect(without?.disabledReason).toBeTruthy();
+  });
+});
+
+describe("createCommandItems while the workspace is hibernated", () => {
+  const byId = (hibernated: boolean, over: Partial<CommandPaletteActionContext> = {}) =>
+    new Map(createCommandItems(ctx({ hibernated, ...over })).map((i) => [i.id, i]));
+
+  it("disables every command that acts on tabs, panes, git or the Sidebar", () => {
+    const items = byId(true);
+    for (const id of ["tab.new", "tab.newBrowser", "tab.close", "tab.reopenClosed", "terminal.clear", "pane.splitRight", "pane.splitDown", "git.graph", "git.source", "search.focus", "explorer.search", "sidebar.toggle", "history.open", "search.content", "workspace.runScripts"]) {
+      expect(items.get(id)?.disabledReason, id).toBe("Workspace hibernated");
+    }
+  });
+
+  it("also disables the generated rows of blocked shortcuts", () => {
+    const items = byId(true, { shortcutHandlers: { "tab.rename": vi.fn() } });
+    expect(items.get("tab.rename")?.disabledReason).toBe("Workspace hibernated");
+  });
+
+  it("leaves settings, new workspace, new window and workspace properties usable", () => {
+    const items = byId(true);
+    for (const id of ["settings.open", "workspace.new", "window.new", "workspace.properties", "settings.section.general"]) {
+      expect(items.get(id)?.disabledReason, id).toBeUndefined();
+    }
+  });
+
+  it("changes nothing for an awake workspace", () => {
+    expect(byId(false).get("tab.new")?.disabledReason).toBeUndefined();
   });
 });

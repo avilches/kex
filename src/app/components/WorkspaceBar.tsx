@@ -90,7 +90,8 @@ import {
 } from "@/modules/workspaces/lib/workspaceDetail";
 import { useDetailFilter } from "@/modules/workspaces/lib/useDetailFilter";
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
-import { TITLE_VARIABLES_HINT } from "@/modules/workspaces/lib/titleTemplate";
+import { titleVariablesHint } from "@/modules/workspaces/lib/titleTemplate";
+import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
 import { TitleVariablesHelp } from "@/modules/workspaces/TitleVariablesHelp";
 import { useWorkspaceTitle, workspaceTitleNow } from "@/modules/workspaces/lib/workspaceTitle";
 
@@ -104,6 +105,9 @@ type WorkspaceItem = {
   icon?: string;
   groupId?: string;
   tabs: Tab[];
+  // Tabs across all panes, independent of `tabs` (which is empty when the
+  // nested list is collapsed). Zero means the workspace has nothing to expand.
+  tabCount: number;
   focusedTabId: string | null;
   // The tab a templated title ({cwd}, {branch}...) is resolved against.
   focusedTab: Tab | null;
@@ -276,31 +280,34 @@ function SortableWorkspaceItem({
     clearRename();
   }
 
+  // The name being typed shows live in the bar and the header until the field closes.
+  useEffect(() => {
+    if (!isRenaming) return;
+    return () => clearTitleDraft(ws.id);
+  }, [isRenaming, ws.id]);
+
   const wokenAt = useJustWoken(ws.hibernated);
   const fresh = !!ws.hibernated && isFreshHibernate(ws.hibernatedAt);
   const chipFx = fresh ? "in" : wokenAt !== null ? "out" : null;
   const hibernatedLook = ws.hibernated ? (fresh ? "in" : "static") : chipFx;
   const compact = barWidth <= 80;
   const showDetail = !compact && hasDetail(detailFilter);
-  const expanded = showDetail && !!ws.detailExpanded && !ws.hibernated;
+  const expanded = showDetail && !!ws.detailExpanded;
   const agentCount = activeAgentCount(agentEntries);
 
   const sideControl =
     "absolute top-1/2 z-10 flex -translate-y-1/2 items-center justify-center rounded outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
   const detailSpacer = showDetail ? <span aria-hidden className="size-[14px] shrink-0" /> : null;
-  const detailToggle = showDetail ? (
+  // An empty workspace keeps its spacer (so the title does not jump when a
+  // tab appears) but has no chevron: `applyCloseTab` resets it to expanded.
+  const detailToggle = showDetail && ws.tabCount > 0 ? (
     <button
       type="button"
-      aria-expanded={ws.hibernated ? undefined : expanded}
-      aria-label={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
-      title={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
-      onClick={() => {
-        if (ws.hibernated) {
-          onSetDetailExpanded(ws.id, true);
-          onWake?.(ws.id);
-        } else onSetDetailExpanded(ws.id, !expanded);
-      }}
+      aria-expanded={expanded}
+      aria-label={expanded ? "Hide tabs" : "Show tabs"}
+      title={expanded ? "Hide tabs" : "Show tabs"}
+      onClick={() => onSetDetailExpanded(ws.id, !expanded)}
       className={cn(sideControl, "left-4 size-[14px] opacity-60 hover:opacity-100 focus-visible:opacity-100")}
     >
       <HugeiconsIcon
@@ -487,6 +494,8 @@ function SortableWorkspaceItem({
           focusedTabId={active ? ws.focusedTabId : null}
           color={displayColor}
           visibleTabIds={active ? ws.visibleTabIds : ""}
+          hibernated={ws.hibernated}
+          onWake={onWake ? () => onWake(ws.id) : undefined}
           onActivate={activateDetailTab}
         />
       </SlideReveal>
@@ -677,8 +686,9 @@ function SortableWorkspaceItem({
           ref={inputRef}
           type="text"
           defaultValue={ws.title}
+          onChange={(e) => setTitleDraft(ws.id, e.target.value)}
           placeholder={shownTitle || ws.kind}
-          title={TITLE_VARIABLES_HINT}
+          title={titleVariablesHint("workspace")}
           className="w-full rounded bg-transparent px-1.5 py-1 text-[12px] outline-none ring-1 ring-border focus:ring-primary"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -690,7 +700,7 @@ function SortableWorkspaceItem({
             }
           }}
         />
-        <TitleVariablesHelp scope="workspace" />
+        <TitleVariablesHelp subject="workspace" />
       </PopoverContent>
     </Popover>
   );

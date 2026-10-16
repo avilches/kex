@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { writeClipboardText } from "@/lib/clipboard";
 import { formatBytes } from "@/lib/formatBytes";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
@@ -54,14 +55,9 @@ export function UpdaterDialog() {
   const ready = status.kind === "ready";
 
   const copyCommand = async () => {
-    if (!navigator?.clipboard?.writeText) return;
-    try {
-      await navigator.clipboard.writeText(activeCommand);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore
-    }
+    if (!(await writeClipboardText(activeCommand))) return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
   const progress =
     downloading && status.contentLength
@@ -95,7 +91,7 @@ export function UpdaterDialog() {
               ? "Restart Kex to finish installing."
               : downloading
                 ? progress !== null
-                  ? `${progress.toFixed(0)}% — ${formatBytes(status.downloaded)}`
+                  ? `${progress.toFixed(0)}% - ${formatBytes(status.downloaded)}`
                   : formatBytes(status.downloaded)
                 : manual
                   ? `You're on v${manual.currentVersion}. Pick your distro and run the command, or grab the package from GitHub.`

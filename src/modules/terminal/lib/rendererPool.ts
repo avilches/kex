@@ -1,3 +1,4 @@
+import { writeClipboardText } from "@/lib/clipboard";
 import { resolveMonoFontFamily } from "@/lib/fonts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type {
@@ -228,6 +229,16 @@ function createSlot(): Slot {
   getRecycler().appendChild(host);
   term.open(host);
 
+  // An app that tracks the mouse (Claude Code) draws its own selection, so the
+  // word xterm would select under a right click is not what the user picked.
+  host.addEventListener(
+    "contextmenu",
+    () => {
+      term.options.rightClickSelectsWord = term.modes.mouseTrackingMode === "none";
+    },
+    true,
+  );
+
   const slot: Slot = {
     id: slots.length,
     term,
@@ -258,7 +269,7 @@ function createSlot(): Slot {
   term.attachCustomKeyEventHandler((event) => {
     // During IME composition the browser is assembling a multi-keystroke
     // character (Chinese pinyin → hanzi, Korean jamo → syllable, etc.).
-    // Raw keydown events — including the Enter that commits a candidate —
+    // Raw keydown events - including the Enter that commits a candidate -
     // must NOT be forwarded to the PTY; xterm will receive the final
     // composed string through its own compositionend handler instead.
     // keyCode 229 ("Process") is what Chromium reports for every key
@@ -297,7 +308,7 @@ function createSlot(): Slot {
     if (isTerminalCopy(event)) {
       if (event.type === "keydown" && slot.term.hasSelection()) {
         const sel = slot.term.getSelection();
-        if (sel) void navigator.clipboard.writeText(sel).catch(() => {});
+        if (sel) void writeClipboardText(sel);
       }
       event.preventDefault();
       return false;
@@ -432,7 +443,7 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
   if (p.altScreen) {
     // Discard the dormant ring. TUI output is incremental cursor-positioned
     // updates that can't be replayed coherently on top of a stale snapshot
-    // — see the SIGWINCH kick below, which makes the TUI redraw from scratch.
+    // - see the SIGWINCH kick below, which makes the TUI redraw from scratch.
     p.drainRing(() => {});
   } else {
     p.drainRing((bytes) => slot.term.write(bytes));

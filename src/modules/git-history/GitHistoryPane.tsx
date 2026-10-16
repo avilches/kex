@@ -19,6 +19,7 @@ import {
   type GitStatusCategory,
   normalizeGitStatusCode,
 } from "@/modules/explorer/lib/gitStatusUtils";
+import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   Copy01Icon,
@@ -482,14 +483,6 @@ export function GitHistoryPane({
     [onOpenCommitFile, repoRoot],
   );
 
-  const copyToClipboard = useCallback(async (value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      /* noop */
-    }
-  }, []);
-
   return (
     <TooltipProvider delayDuration={500} skipDelayDuration={200}>
       <div className="flex h-full min-h-0 flex-col bg-sidebar [contain:layout_style]">
@@ -784,7 +777,7 @@ const CommitRow = memo(function CommitRow({
             ) : null}
           </span>
         ) : commit.filesChanged === 0 ? (
-          <span className="text-muted-foreground/40">—</span>
+          <span className="text-muted-foreground/40">-</span>
         ) : null}
       </span>
     </button>
@@ -795,7 +788,7 @@ type CommitDetailProps = {
   commit: GitLogEntry;
   filesEntry: FilesEntry | null;
   remoteWeb: RemoteWebInfo | null;
-  onCopySha: (value: string) => Promise<void> | void;
+  onCopySha: (value: string) => Promise<boolean>;
   onOpenFile: (
     commit: GitLogEntry,
     file: GitCommitFileChange,
@@ -855,8 +848,9 @@ function CommitDetail({
             variant="ghost"
             className="h-6 gap-1.5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => {
-              void onCopySha(commit.sha);
-              setCopied(true);
+              void onCopySha(commit.sha).then((ok) => {
+                if (ok) setCopied(true);
+              });
             }}
           >
             <HugeiconsIcon icon={Copy01Icon} size={11} strokeWidth={1.9} />

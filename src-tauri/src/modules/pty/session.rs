@@ -52,16 +52,16 @@ const OVERFLOW_NOTICE: &[u8] =
 
 pub struct Session {
     // Field drop order is intentional. Rust drops fields top-to-bottom:
-    //   1. `_job` (Windows) — closing the Job HANDLE fires KILL_ON_JOB_CLOSE,
+    //   1. `_job` (Windows) - closing the Job HANDLE fires KILL_ON_JOB_CLOSE,
     //      terminating the pwsh tree before the master pipe drops. Without this,
     //      ClosePseudoConsole in `master`'s Drop can block waiting for conhost to
     //      drain pending output, freezing the Tauri worker thread that triggered the close.
-    //   2. `_ipc_guard` (Unix) — removes the socket file; the listener thread exits on
+    //   2. `_ipc_guard` (Unix) - removes the socket file; the listener thread exits on
     //      the next accept error.
-    //   3. `killer` — best-effort kill (redundant on Windows once Job closed, but
+    //   3. `killer` - best-effort kill (redundant on Windows once Job closed, but
     //      harmless and required on Unix where there is no Job).
-    //   4. `writer` — closes the input side of the master pipe.
-    //   5. `master` — last; ClosePseudoConsole on Windows. By now the child
+    //   4. `writer` - closes the input side of the master pipe.
+    //   5. `master` - last; ClosePseudoConsole on Windows. By now the child
     //      is dead and conhost has nothing left to drain.
     #[cfg(windows)]
     _job: Option<super::job::PtyJob>,

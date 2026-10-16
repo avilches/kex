@@ -1,8 +1,8 @@
-# Kex — Architecture and Technical Reference
+# Kex - Architecture and Technical Reference
 
 Kex is a lightweight, open-source terminal emulator. ~7-8 MB on disk. No telemetry. No account.
 
-This document is the canonical reference for understanding how Kex works — both technically and from the user's perspective. It covers architecture, feature semantics, known limitations, and technical decisions that have observable effects on usage.
+This document is the canonical reference for understanding how Kex works - both technically and from the user's perspective. It covers architecture, feature semantics, known limitations, and technical decisions that have observable effects on usage.
 
 ---
 
@@ -10,14 +10,14 @@ This document is the canonical reference for understanding how Kex works — bot
 
 1. [What Kex is and is not](#1-what-kex-is-and-is-not)
 2. [High-level architecture](#2-high-level-architecture)
-3. [Features — user perspective](#3-features--user-perspective)
+3. [Features - user perspective](#3-features--user-perspective)
 4. [Technical decisions with user-visible effects](#4-technical-decisions-with-user-visible-effects)
 5. [Known limitations](#5-known-limitations)
 6. [Technology stack](#6-technology-stack)
 7. [Frontend module map](#7-frontend-module-map)
 8. [Security model](#8-security-model)
 
-See also: [IPC.md](IPC.md) — Tauri command surface and agent notification protocol · [BUILD.md](BUILD.md) — build, packaging, and release
+See also: [IPC.md](IPC.md) - Tauri command surface and agent notification protocol · [BUILD.md](BUILD.md) - build, packaging, and release
 
 ---
 
@@ -35,33 +35,33 @@ See also: [IPC.md](IPC.md) — Tauri command surface and agent notification prot
 
 ## 2. High-level architecture
 
-Kex uses a strict **two-process model**. The Rust process owns all OS access. The WebView (React) never touches the filesystem, processes, shells, or the network directly — everything goes through typed IPC calls (`invoke()`) to Tauri commands registered in `src-tauri/src/lib.rs`.
+Kex uses a strict **two-process model**. The Rust process owns all OS access. The WebView (React) never touches the filesystem, processes, shells, or the network directly - everything goes through typed IPC calls (`invoke()`) to Tauri commands registered in `src-tauri/src/lib.rs`.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Tauri process (Rust)                                       │
 │                                                             │
-│  pty::*         — PTY sessions (portable-pty)               │
-│  fs::*          — Filesystem (read, write, search, watch)   │
-│  git::*         — Git operations (subprocess)               │
-│  shell::*       — Oneshot commands, persistent sessions,    │
+│  pty::*         - PTY sessions (portable-pty)               │
+│  fs::*          - Filesystem (read, write, search, watch)   │
+│  git::*         - Git operations (subprocess)               │
+│  shell::*       - Oneshot commands, persistent sessions,    │
 │                   background processes                      │
-│  workspace::*   — Auth registry + WSL bridge                │
-│  history::*     — Shell history (suggest, record, list)     │
-│  agent::*       — Claude hooks installer                    │
+│  workspace::*   - Auth registry + WSL bridge                │
+│  history::*     - Shell history (suggest, record, list)     │
+│  agent::*       - Claude hooks installer                    │
 │                                                             │
 └──────────────────────────┬──────────────────────────────────┘
                            │ invoke() / Tauri channels / events
 ┌──────────────────────────▼──────────────────────────────────┐
 │  WebView (React + TypeScript)                               │
 │                                                             │
-│  terminal/      — xterm.js (WebGL), PTY bridge, OSC parsing │
-│  editor/        — CodeMirror 6, diffs                       │
-│  explorer/      — File tree, fuzzy search                   │
-│  source-control/  — Git stage/commit/push UI                │
-│  git-history/   — Commit graph, per-file diffs              │
-│  theme/         — CSS variable engine, presets              │
-│  agents/        — Terminal agent notifications              │
+│  terminal/      - xterm.js (WebGL), PTY bridge, OSC parsing │
+│  editor/        - CodeMirror 6, diffs                       │
+│  explorer/      - File tree, fuzzy search                   │
+│  source-control/  - Git stage/commit/push UI                │
+│  git-history/   - Commit graph, per-file diffs              │
+│  theme/         - CSS variable engine, presets              │
+│  agents/        - Terminal agent notifications              │
 │  + tabs, header, sidebar, settings, preview…                │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -71,13 +71,13 @@ There are two separate WebView windows: the main window (`index.html`) and the s
 
 ---
 
-## 3. Features — user perspective
+## 3. Features - user perspective
 
 ### 3.1 Terminal
 
-**Workspace/Pane/Tab model.** The center area uses a three-level hierarchy: Workspaces (listed in a 52px vertical sidebar on the left) contain a binary pane tree; each pane holds a tab strip of tabs. Tabs are never unmounted when you switch between them — each PTY keeps receiving output in the background. Switching to a tab that has been running a command shows you the complete, up-to-date buffer instantly.
+**Workspace/Pane/Tab model.** The center area uses a three-level hierarchy: Workspaces (listed in a 52px vertical sidebar on the left) contain a binary pane tree; each pane holds a tab strip of tabs. Tabs are never unmounted when you switch between them - each PTY keeps receiving output in the background. Switching to a tab that has been running a command shows you the complete, up-to-date buffer instantly.
 
-A workspace can exist with no open tabs. Closing the last tab in the sole pane of a workspace empties that pane instead of destroying the workspace; the empty pane renders a welcome screen with quick actions (new terminal, open file). A workspace is removed only by an explicit close action (the dedicated `workspace.close` shortcut, the `tab.close` shortcut on an empty workspace, or the sidebar close button), routed through `requestCloseWorkspace`. The `tab.close` shortcut is contextual (it closes the focused tab or pane first, falling back to the workspace only when the pane is empty), whereas `workspace.close` always targets the active workspace. The close action reuses the hibernate dialog in `close` mode (`useCloseWorkspaceFlow`, `HibernateDialog`). The dialog opens only when something would be lost: the workspace has scripts with a command (it says how many will be deleted), documents with unsaved changes (each with its own Save button, plus Save all above two), agents or scripts still running, or terminals with a live foreground process (`collectRunningTerminals` + `leafHasForegroundProcess`, de-duplicated against agents and scripts). Otherwise the workspace closes directly, even when it has terminals. Confirming kills every terminal and discards any unsaved buffer without per-tab prompts, so the flow does not go through `closeTabs`. A hibernated workspace has no mounted editors, so its dialog lists the unsaved documents without Save buttons. When a Save fails (file changed on disk, file deleted, write error) the row shows the reason and offers "Go to tab", which closes the dialog and focuses the tab where the conflict overlay or the deleted-file screen already lives; while closing it also offers "Discard". The confirm button stays disabled until every failed document is fixed or discarded (`isBlockedByFailures`); hibernating has no Discard, so it requires the fix. `useDocument.save()` refuses to write a deleted file (`DELETED_SAVE_ERROR`); only `recreate` does. On unmount, an editor whose final autosave write fails, whose file was deleted or that is in conflict carries its buffer in memory (`unflushedBuffers`, process lifetime only) so hibernating does not lose it while Kex stays open. Hibernating on request saves every dirty document of the workspace first (`saveWorkspaceDocs`) whatever the `editorAutoSave` preference says, so the in-memory carry is only a fallback for a save that failed, and that document opens the dialog. The `warnOnCloseTabWithRunningProcess` preference no longer affects this path; it only governs closing a single terminal tab. Closing the last workspace quits the app. Panes inside a split still collapse when their last tab is closed - only the sole pane of a workspace stays empty.
+A workspace that reaches zero tabs folds away with its last tab, whatever the path: the tab close button or `tab.close`, the shell exiting on its own, moving or dragging the last tab to another workspace, and bulk closes such as Close All Tabs. The fold is a reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`) that closes the empty workspace on committed state, so batched closes inside one tick are covered too, and the active workspace selection is reused from `closeWorkspace`. Two exceptions keep the workspace with an empty sole pane, which renders a welcome screen with quick actions (new terminal, open file): the window's only workspace (folding it would close the window), and a workspace holding scripts with a command, whose deletion the close confirmation dialog still protects. A workspace is also removed by an explicit close action (the dedicated `workspace.close` shortcut, the `tab.close` shortcut on an empty workspace, or the sidebar close button), routed through `requestCloseWorkspace`. The `tab.close` shortcut is contextual (it closes the focused tab or pane first, falling back to the workspace only when the pane is empty), whereas `workspace.close` always targets the active workspace. The close action reuses the hibernate dialog in `close` mode (`useCloseWorkspaceFlow`, `HibernateDialog`). The dialog opens only when something would be lost: the workspace has scripts with a command (it says how many will be deleted), documents with unsaved changes (each with its own Save button, plus Save all above two), agents or scripts still running, or terminals with a live foreground process (`collectRunningTerminals` + `leafHasForegroundProcess`, de-duplicated against agents and scripts). Otherwise the workspace closes directly, even when it has terminals. Confirming kills every terminal and discards any unsaved buffer without per-tab prompts, so the flow does not go through `closeTabs`. A hibernated workspace has no mounted editors, so its dialog lists the unsaved documents without Save buttons. When a Save fails (file changed on disk, file deleted, write error) the row shows the reason and offers "Go to tab", which closes the dialog and focuses the tab where the conflict overlay or the deleted-file screen already lives; while closing it also offers "Discard". The confirm button stays disabled until every failed document is fixed or discarded (`isBlockedByFailures`); hibernating has no Discard, so it requires the fix. `useDocument.save()` refuses to write a deleted file (`DELETED_SAVE_ERROR`); only `recreate` does. On unmount, an editor whose final autosave write fails, whose file was deleted or that is in conflict carries its buffer in memory (`unflushedBuffers`, process lifetime only) so hibernating does not lose it while Kex stays open. Hibernating on request saves every dirty document of the workspace first (`saveWorkspaceDocs`) whatever the `editorAutoSave` preference says, so the in-memory carry is only a fallback for a save that failed, and that document opens the dialog. The `warnOnCloseTabWithRunningProcess` preference no longer affects this path; it only governs closing a single terminal tab. Closing the last workspace quits the app. Panes inside a split still collapse when their last tab is closed - only the sole pane of a workspace stays empty.
 
 **Native PTY via `portable-pty`.** Not a wrapper around `script` or `expect`. Kex spawns a real pseudo-terminal, so TUI apps (vim, htop, tmux, lazygit, etc.) work correctly, including mouse input and true color.
 
@@ -85,7 +85,7 @@ A workspace can exist with no open tabs. Closing the last tab in the sole pane o
 - The file explorer to follow the active terminal's working directory.
 - The optional **block terminal** mode (a panel with `blocks: true`): command output is grouped into blocks with per-block chrome (cwd, time, duration, exit badge on failure) and a hover toolbar (`Run again`, copy command/output, find in block). The shell's prompt is suppressed and input is driven by a host-rendered `ShellInput`. `Cmd+Up`/`Cmd+Down` navigate between command blocks.
 
-Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), PowerShell 5.1 (full), cmd.exe (no integration — basic terminal only).
+Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), PowerShell 5.1 (full), cmd.exe (no integration - basic terminal only).
 
 **Split panes.** Terminals can be split horizontally and vertically within a pane. Each panel is an independent PTY. Splitting a pane creates a second pane alongside it; each pane has its own panel tab strip. Two limits apply, both configurable in `settings-general.json`: `paneSplitLimit` (default `{ width: 250, height: 250 }`) blocks horizontal splits when the pane is too narrow and vertical splits when it is too short; `workspacePaneLimit` (default `8`) caps the total number of panes per workspace. Both keyboard shortcuts and drag-and-drop zones enforce these limits.
 
@@ -97,7 +97,7 @@ Supported shells: zsh (full), bash (full), fish (full), PowerShell 7+ (full), Po
 
 **True color and 256-color.** The xterm.js WebGL renderer supports the full color space. The terminal color palette is driven by the active app theme, not hardcoded.
 
-**WSL as a first-class workspace (Windows only).** Each tab can be set to run inside a specific WSL distro. The file explorer, git operations, and AI tools all operate inside that distro's filesystem — it is not a wrapped subprocess.
+**WSL as a first-class workspace (Windows only).** Each tab can be set to run inside a specific WSL distro. The file explorer, git operations, and AI tools all operate inside that distro's filesystem - it is not a wrapped subprocess.
 
 ### 3.2 Code editor
 
@@ -157,7 +157,7 @@ The shared cascade (`resolveSidebarTarget`, tested): given the panel's reference
 
 **Commit.** Type a commit message and commit with `Cmd+Enter` / `Ctrl+Enter`. No separate terminal command needed. A **Push** checkbox next to the Commit button, when checked, pushes to the remote right after a successful commit (the button label switches to "Commit & Push"). Both the draft commit message and the Push flag are git settings stored **per workspace** under the `git` section of `workspaces/<id>.json` (`{ commitMessage, pushOnCommit }`), so each workspace keeps its own in-progress message. The message edits live in panel-local state and are persisted to the workspace on a short debounce (and flushed on workspace switch and after a successful commit) to avoid re-rendering the app on every keystroke.
 
-**Push.** Push to the remote with upstream awareness — Kex tells you if you are ahead, behind, or diverged before you push.
+**Push.** Push to the remote with upstream awareness - Kex tells you if you are ahead, behind, or diverged before you push.
 
 **Branch display.** The current branch (or detached HEAD state) is shown in the header.
 
@@ -195,7 +195,7 @@ Hooks must be installed via "Set up Claude Code" (notification bell popover) for
 
 ### 3.7 Web preview
 
-**Auto-detected dev server.** When a localhost URL is detected in the terminal output (e.g., `http://localhost:5173`), a pill appears in the status bar offering to open a preview tab. The preview tab renders the URL in a native child webview — not an iframe inside the main webview.
+**Auto-detected dev server.** When a localhost URL is detected in the terminal output (e.g., `http://localhost:5173`), a pill appears in the status bar offering to open a preview tab. The preview tab renders the URL in a native child webview - not an iframe inside the main webview.
 
 **Image and PDF viewers.** The preview pane also handles images and PDFs opened from the file explorer.
 
@@ -225,11 +225,11 @@ Hooks must be installed via "Set up Claude Code" (notification bell popover) for
 
 ### 3.10 Settings
 
-Settings open in a separate window (not a panel in the main window). Deep-linking is supported — `openSettingsWindow("shortcuts")` opens directly to the Shortcuts section. The settings window is `always_on_top` relative to the main window.
+Settings open in a separate window (not a panel in the main window). Deep-linking is supported - `openSettingsWindow("shortcuts")` opens directly to the Shortcuts section. The settings window is `always_on_top` relative to the main window.
 
-Navigation is a left vertical sidebar. Sections: General, Workspaces, Editor, Terminal, Appearance, Themes, Shortcuts, About. General holds tabs, explorer, agents, and startup; Workspaces holds the global workspace status list (see below); Editor and Terminal each own their font, behavior, and cursor settings; Appearance holds zoom, the default tab and workspace title templates, and Git file colors; Themes holds the color mode, theme picker, and editor (syntax) theme. The sidebar dock side is no longer a global setting: it is per-window state (see below) flipped from each window's header toggle, since the standalone Settings window cannot target a specific main window.
+Navigation is a left vertical sidebar. Sections: General, Workspaces, Editor, Terminal, Appearance, Themes, Shortcuts, About. General holds tabs, explorer, agents, and startup; Workspaces holds workspace behavior such as auto-hibernate; Editor and Terminal each own their font, behavior, and cursor settings; Appearance holds zoom, the default tab and workspace title templates, and Git file colors; Themes holds the color mode, theme picker, and editor (syntax) theme. The sidebar dock side is no longer a global setting: it is per-window state (see below) flipped from each window's header toggle, since the standalone Settings window cannot target a specific main window.
 
-**Workspace statuses.** A global ordered list of named statuses (`WorkspaceStatus[]`, persisted in `settings-general.json` as `workspaceStatuses`). Each status has an immutable `id` (prefix `st-`, generated with `newStatusId()`) and a user-editable `label`. Defaults: Archived, Work in progress, On hold, Canceled, Completed. Managed in Settings > Workspaces via a drag-to-reorder, inline-rename, delete list. Each workspace can be assigned one status via a pill selector in its Properties dialog (Workspace Settings > Properties). The sidebar groups workspaces by status: workspaces with no status appear at the top; each status group with at least one member appears below, separated by a text label (expanded sidebar) or a thin divider (compact mode). Drag-and-drop in the sidebar is multi-container: dragging a workspace into a different group reassigns its status and repositions it. Groups that already have workspaces are not whole-group drop targets; only their items are, so a drag into such a group is just a drop between two workspaces. Statuses with no workspaces (and the no-status group when it is empty) are unreachable that way, so while a drag is active they appear as thin header drop targets rendered at the very end of the list (a "No status" header clears the status). Appending them at the end of the scrollable list keeps the existing items from shifting, so the drag overlay stays aligned with the pointer; these zones assign their status only on drop (reassigning mid-drag would fill the group and yank its header out from under the pointer). A custom collision strategy (`pointerWithin`, items first, group zones second) keeps in-group reordering precise while still letting the empty-group zones catch drops. The group list itself is a vertical scroll container (`flex-1 overflow-y-auto`, `thin-scrollbar`) with the "new workspace" button pinned below it, so many workspaces or many status groups scroll instead of overflowing the window (dnd-kit auto-scrolls the container while dragging). Workspaces whose `statusId` no longer matches a valid status are normalized to no-status on preferences hydration. Both the sidebar grouping and keyboard navigation derive their order from the pure helpers in `modules/workspaces/lib/workspaceOrder.ts` (`groupWorkspaces`, `groupWorkspacesForDrag`, `visibleWorkspaceOrder`), the single source of truth for visual order. A new workspace (`addWorkspace`, via `insertWorkspaceAfterActive`) is inserted right after the active one in the state array and inherits its `statusId`, so it lands immediately below the active workspace within the same status group (filtering preserves array order, so array adjacency equals in-group adjacency).
+**Workspace groups.** Workspaces can be organized into named groups in the WorkspaceBar. A group is `WorkspaceGroup { id, label }` (`modules/workspaces/lib/types.ts`, ids `grp-...` from `newGroupId()`) and a workspace joins one through its optional `groupId`. Groups belong to each window, not to the global preferences: `App.tsx` holds them in state and persists them through `window_save_groups` (`workspaceGroupsState.ts`, Rust `window_state`), and the collapsed ones through `window_save_collapsed_groups`. A group is created from a workspace (born with the label "Group"), can be renamed and reordered, and a group left with no members is pruned (`pruneEmptyGroups`). The sidebar order comes from the pure helpers in `modules/workspaces/lib/workspaceOrder.ts` (`groupWorkspaces`, `groupWorkspacesForDrag`, `visibleWorkspaceOrder`), the single source of truth for visual order, so navigation and rendering agree: workspaces with no valid group come first, then each non-empty group; while a drag is active every group is listed, even empty ones, so each is a drop target. A `groupId` that matches no group counts as no group. A new workspace (`addWorkspace`, via `insertWorkspaceAfterActive`) is inserted right after the active one in the state array and inherits its `groupId`.
 
 **State granularity (global vs per-window vs per-workspace).** Three tiers:
 
@@ -289,17 +289,17 @@ Every close path (tab close button, the close shortcut, and Close All / Close Ot
 
 Before any git or shell command can run against a directory, that directory must be in the `WorkspaceRegistry`. The registry is populated automatically when you open Kex in a directory (via CLI argument or the OS file manager context menu), and when you explicitly navigate to one via the terminal (`cd` triggers an OSC 7 event that registers the new cwd). `workspace_authorize` is the IPC command for explicit authorization.
 
-The registry lives in memory only — it does not persist across restarts. Each session builds it up as the user navigates.
+The registry lives in memory only - it does not persist across restarts. Each session builds it up as the user navigates.
 
 The practical effect: if you try a git operation in a directory you haven't navigated to in the terminal yet, the git-related features (diff decorations, source control panel) will fail with "path is outside the authorized workspace" until you `cd` there in a terminal first.
 
 **Subdirectory cwd and git repo root.** When the terminal cwd is a subdirectory of a git repo (e.g., cwd is `/proj/src`, git root is `/proj`), `resolve_repo_in_authorized` and `panel_snapshot` deliberately do NOT add the repo root to the registry -- doing so would silently escalate the authorization scope to the parent and grant access to sibling directories the user never navigated to. Instead, git commands use `has_child_authorized`: a repo root is considered authorized for git operations if any currently-authorized path is strictly under it. This keeps the registry tight while allowing the SCM panel and all git commands to work correctly from a subdirectory.
 
-**`fs_*` commands are not workspace-gated.** File read/write commands (`fs_read_file`, `fs_write_file`, `fs_stat`, `fs_create_*`, `fs_rename`, `fs_delete`, `fs_read_dir`, `fs_search`, `fs_grep`, etc.) accept any path the OS allows. This is a deliberate decision: the explorer only surfaces paths the user has explicitly navigated to, so there is no app-level vector for a user to accidentally open a path outside their workspace. Terminal commands can access arbitrary paths regardless of any app-level guard, so a gate here would only stop the app's own UI — not a shell running inside a pane. A deny-list for secret paths (`.ssh`, `.env`, `*.pem`, etc.) would be worthwhile if Kex ever runs autonomous agents that make IPC calls directly; the right insertion point is `guard_read`/`guard_write` helpers at the top of `fs/file.rs`, applied before `resolve_path`. Until then, `capabilities/default.json` is the real boundary: only code in the webview bundle can call these commands.
+**`fs_*` commands are not workspace-gated.** File read/write commands (`fs_read_file`, `fs_write_file`, `fs_stat`, `fs_create_*`, `fs_rename`, `fs_delete`, `fs_read_dir`, `fs_search`, `fs_grep`, etc.) accept any path the OS allows. This is a deliberate decision: the explorer only surfaces paths the user has explicitly navigated to, so there is no app-level vector for a user to accidentally open a path outside their workspace. Terminal commands can access arbitrary paths regardless of any app-level guard, so a gate here would only stop the app's own UI - not a shell running inside a pane. A deny-list for secret paths (`.ssh`, `.env`, `*.pem`, etc.) would be worthwhile if Kex ever runs autonomous agents that make IPC calls directly; the right insertion point is `guard_read`/`guard_write` helpers at the top of `fs/file.rs`, applied before `resolve_path`. Until then, `capabilities/default.json` is the real boundary: only code in the webview bundle can call these commands.
 
 ### 4.3 Windows: ConPTY spawn serialization
 
-On Windows, opening a new terminal tab serializes through a `SPAWN_LOCK` mutex. Concurrent ConPTY open calls leave one of the resulting PTYs with a stalled output pipe. This means: if you open several tabs very quickly on Windows, the tabs open in sequence rather than in parallel. The delay is typically under 200ms per tab and is only perceptible during rapid tab creation.
+On Windows, creating and closing a ConPTY session serializes through a `CONPTY_LIFECYCLE_LOCK` mutex (`pty/session.rs`). Overlapping pseudoconsole lifecycle calls corrupt the new console so its shell never pumps output. This means: if you open several tabs very quickly on Windows, the tabs open in sequence rather than in parallel. The delay is typically under 200ms per tab and is only perceptible during rapid tab creation.
 
 ### 4.4 Windows: Job Objects for process cleanup
 
@@ -311,24 +311,25 @@ Closing a tab from the UI (the explicit close button) also kills the immediate c
 
 Kex's shell integration emits and parses OSC 7 (cwd), OSC 133 (prompt/command boundaries), and OSC 0/2 (window/icon title). The cwd from OSC 7 updates the explorer root. OSC 0/2 title is written to `oscTitleStore` (in-memory, not persisted) and shown in the pane tab. This means a malicious command outputting a crafted OSC sequence could theoretically spoof the displayed cwd or tab title. The shell integration scripts are trusted; arbitrary terminal output from untrusted remote connections (SSH to untrusted hosts) is a trust boundary to be aware of.
 
-**Tab titles** (`tabTitle()` in `src/modules/workspaces/lib/tabTitle.tsx`). The title is, in order: the tab's own `title` (explicit user rename, a template; see Title templates), else the **default template of its kind**, else a fixed name when that template expands to nothing (`shell`, `Browser`, `Git History`, or the file name for file tabs). The default templates are configurable in Settings > Appearance > Tab and workspace titles (prefs `titleTemplateTerminal`, `...Agent`, `...File`, `...Browser`, `...GitHistory`, `...Workspace`; an empty pref means the factory default). `defaultTitles.ts` holds the factory ones, which reproduce what Kex showed before they were configurable:
+**Tab titles** (`tabTitle()` in `src/modules/workspaces/lib/tabTitle.tsx`). The title is, in order: the tab's own `title` (explicit user rename, a template; see Title templates), else the **default template of its kind**, else a fixed name when that template expands to nothing (`shell`, `Browser`, `Git History`, or the file name for file tabs). The default templates are configurable in Settings > Appearance > Tab and workspace titles (`TitleTemplatesBlock`: one `Label: [input]` row per kind, whose field always holds the template in force so the default itself can be edited in place; what is typed is saved after 250 ms of quiet (and on blur or when the section closes) because each save writes the file and notifies every window; the row remembers what it last sent and ignores the echoes of older writes while one is still on its way back, a value equal to the default or an empty one saves nothing so the default keeps following Kex, and a field being typed in is never overwritten by a change that arrives from the store; and a single table below the rows with every variable, an example value for each and the `{a|b}` / `{?var text}` syntax, grouped so the ones valid everywhere come first (`TITLE_VARIABLE_DOCS` carries the group and the example); prefs `titleTemplateTerminal`, `...Agent`, `...Editor` (editors and markdown), `...Diff` (git diffs and commit files), `...Browser`, `...GitHistory`, `...Workspace`; an empty pref means the factory default). `defaultTitles.ts` holds the factory ones, which reproduce what Kex showed before they were configurable except the git history, which now names its repository:
 
 | Kind | Factory default | Meaning |
 |---|---|---|
-| terminal | `{cmd\|osc\|cwd}` | foreground command (OSC 133 C), else the title the program set with OSC 0/2, else the cwd |
-| terminal with an agent | `{osc\|session\|{agent}{?dir · {dir}}}` | OSC title, else the agent session title, else `agent · dir` |
-| editor, markdown, diffs | `{file}` | file name |
+| terminal | `{?cmd\|osc {cmd\|osc} · }{branch\|dir}` | what is running (foreground command from OSC 133 C, else the title the program set with OSC 0/2) followed by where, which is the branch if there is one and else the folder: `npm run dev · main`; an idle shell shows just `main` or `kex` |
+| terminal with an agent | `{osc\|session\|{agent}} · {branch\|dir}` | OSC title, else the agent session title, else the agent name, followed by the branch or else the folder: `✳ Fix login · main`, `claude · kex` |
+| editor, markdown | `{file}` | file name |
+| git diff, commit file | `{file}` | file name |
 | browser | `{url}` | address |
-| git history | `Git History` | |
+| git history | `Git History{?dir · {dir}}` | `Git History · kex`; the folder is the repository root |
 | workspace | `{dir}` | name of the focused tab's directory |
 
-A terminal is an agent tab when `TitleSources.agent` is set (an agent session exists for it). The foreground command is deliberately not in the agent default: the shell reports it as literally `claude ...`, which would mask the live OSC title. Claude Code uses OSC 0/2 to propagate its AI-generated conversation title (`ai-title` field in the session JSONL); it emits `✳ Claude Code` on startup and `✳ <ai-title>` once generated, and spinner frames (`⠂ Claude Code`) are transient. `agentSession.meta.sessionTitle` is set once by the `SessionStart` hook payload, often empty and never updated, so it only fills the gap before the first OSC title.
+A terminal tab knows its folder from the moment it is created, not from the first OSC 7: every place that opens one passes `cwd`, and `resolveNewTerminalCwd` ends its fallback chain at the launch folder and then home, which is what the shell picks on its own; OSC 7 only follows later `cd`s. `pty_open` answers `{ id, cwd }`, the folder Rust resolved for the spawn (the given cwd when usable, else the launch folder, else home, in the same chain `apply_common` follows), and `applySpawnCwdReport` seeds `lastCwd` from it the moment the PTY opens, so a tab saved with a stale or deleted folder shows the folder the shell really opened in instead of waiting for the first OSC 7. That is why the defaults above can assume "where" exists and carry no guard for an empty folder. A terminal is an agent tab when `TitleSources.agent` is set (an agent session exists for it). The foreground command is deliberately not in the agent default: the shell reports it as literally `claude ...`, which would mask the live OSC title. Claude Code uses OSC 0/2 to propagate its AI-generated conversation title (`ai-title` field in the session JSONL); it emits `✳ Claude Code` on startup and `✳ <ai-title>` once generated, and spinner frames (`⠂ Claude Code`) are transient. `agentSession.meta.sessionTitle` is set once by the `SessionStart` hook payload, often empty and never updated, so it only fills the gap before the first OSC title.
 
 Both the tab bar (`PaneTabBar`) and the header (`WorkspaceTitle`) render this same value through the shared hook `useAgentTabTitle()` (`src/modules/workspaces/lib/useAgentTabTitle.ts`), so they cannot diverge. See `docs/WORKSPACES_GOTCHAS.md` Bug 9 for the investigation that led here (the header used to show only the agent name because it called the non-agent `tabTitle()` directly).
 
-**Title templates.** The name a user gives a tab (`Tab.title`) or a workspace (`Workspace.title`) may contain variables, which are expanded every time the title is rendered; the stored value is the raw template, and the rename fields show it raw (each lists the available variables with `TitleVariablesHelp`, fed by `TITLE_VARIABLE_DOCS`: a plain "You can use ..." line under the field in the tab and workspace rename popovers and under Name in the workspace Properties dialog). A title without braces is shown as typed, so nothing needed migrating. The pure expander is `expandTitle` in `workspaces/lib/titleTemplate.ts`: `{{` and `}}` give literal braces at the top level (inside a group every brace opens or closes), a variable that is not defined in that scope stays literal (so a typo is visible, and `{tab}` in a tab title is not a variable), and a result that is empty after trimming falls back to the default title. Two forms go beyond plain variables. `{a|b|c}` is a fallback: the first alternative whose value is not empty; an alternative with anything besides letters is itself a template (`{osc|{agent} · {dir}}`). `{?var text}` renders `text` (which may hold variables and further groups, and keeps its leading space) only when `var` is not empty, so `{dir}{?branch · {branch}}` shows no dangling separator outside a repo. The parser builds a small node tree once (`parse`), shared by `expandTitle` and `titleVariablesUsed`. Variables: `{cwd}` (home shown as `~`), `{dir}`, `{branch}` (empty on a detached HEAD or outside a repo), `{repo}` (name of the repo root), `{cmd}` (running command, terminals only), `{file}`, `{agent}`, `{host}`, `{osc}` (title set by the running program), `{session}` (the agent's session title), `{url}` (browser tabs), and for workspaces only `{tab}`.
+**Title templates.** The name a user gives a tab (`Tab.title`) or a workspace (`Workspace.title`) may contain variables, which are expanded every time the title is rendered; the stored value is the raw template, and the rename fields show it raw (each lists the variables the subject can have with `TitleVariablesHelp`, fed by `TITLE_VARIABLE_DOCS` and filtered by `titleVariableDocs(kind)`: a browser tab offers `{url}` and `{host}` but neither `{cmd}` nor the folder ones (`{cwd}`, `{dir}`, `{branch}`, `{repo}`, group `place`, which a browser has no value for), a terminal `{cmd}` but not `{url}` or `{file}`, a git history only the common ones, and a workspace all of them plus `{tab}`; shown as a plain "You can use ..." line under the field in the tab and workspace rename popovers and under Name in the workspace Properties dialog). A title without braces is shown as typed, so nothing needed migrating. The pure expander is `expandTitle` in `workspaces/lib/titleTemplate.ts`: `{{` and `}}` give literal braces at the top level (inside a group every brace opens or closes), a variable that is not defined in that scope stays literal (so a typo is visible, and `{tab}` in a tab title is not a variable), and a result that is empty after trimming falls back to the default title. Two forms go beyond plain variables. `{a|b|c}` is a fallback: the first alternative whose value is not empty; an alternative with anything besides letters is itself a template (`{osc|{agent} · {dir}}`). `{?a|b text}` renders `text` (which may hold variables and further groups, and keeps its leading space) only when `a` or `b` is not empty, so `{dir}{?branch · {branch}}` shows no dangling separator outside a repo; `{!a|b text}` is its negation, the text only when none has a value, which is the else (`{?branch on {branch}}{!branch in {dir}}`). Blank values count as empty and an unknown name leaves the whole group literal. The parser builds a small node tree once (`parse`), shared by `expandTitle` and `titleVariablesUsed`. Variables: `{cwd}` (home shown as `~`), `{dir}`, `{branch}` (empty on a detached HEAD or outside a repo), `{repo}` (name of the repo root), `{cmd}` (running command, terminals only), `{file}`, `{agent}`, `{host}`, `{osc}` (title set by the running program), `{session}` (the agent's session title), `{url}` (browser tabs), and for workspaces only `{tab}`.
 
-A workspace is created with an empty `title`, which means "use the workspace default template"; renaming to an empty name returns to it, and existing workspaces keep the text they have. The default of each kind also counts for the git demand below: a mounted title asks for the branch when its effective template (own or default) uses `{branch}` or `{repo}`. `titleVars.ts` derives them from a tab plus `TitleSources` (running command, git info, agent, home, host); a workspace has no location of its own, so `workspaceTitleVars` takes everything from its focused tab (active pane's active tab, `focusedTab()` in `splitNode.ts`), falls back to `cwd` or `workspaceRoot` when that tab has none (a browser), and `{tab}` is that tab's resolved display title. Tabs resolve through `tabTitle()` and `useAgentTabTitle` (so the pane tab, the header and the WorkspaceBar rows agree); workspaces through `useWorkspaceTitle` (WorkspaceBar, header, hibernated overlay) or its one-shot twin `workspaceTitleNow` (drag overlay, move-to menu, notifications). The branch comes from `dirGitStore.ts`, a per-directory cache over `git_resolve_repo`: a directory is only queried while a mounted title that uses `{branch}`, `{repo}` or a templated `{tab}` has asked for it (`useDirGit`), so without templates it costs nothing. Cached entries are refreshed on first demand, 400 ms after any terminal command finishes (a checkout does not change the cwd), and when the window regains focus; the listeners exist only while something is demanded. `{host}` and the home directory are read once by `systemInfoStore.ts`.
+While a rename field is open, what is being typed shows live in every place that title appears: the field writes it to `titleDraftStore.ts` (per tab or workspace id), `useAgentTabTitle` and `useWorkspaceTitle` read it in place of the saved title, and closing the field, saving or cancelling, clears it, so cancel just reverts. An emptied draft previews the default title. A workspace is created with an empty `title`, which means "use the workspace default template"; renaming to an empty name returns to it, and existing workspaces keep the text they have. The default of each kind also counts for the git demand below: a mounted title asks for the branch when its effective template (own or default) uses `{branch}` or `{repo}`. `titleVars.ts` derives them from a tab plus `TitleSources` (running command, git info, agent, home, host); a workspace has no location of its own, so `workspaceTitleVars` takes everything from its focused tab (active pane's active tab, `focusedTab()` in `splitNode.ts`), falls back to `cwd` or `workspaceRoot` when that tab has none (a browser), and `{tab}` is that tab's resolved display title. Tabs resolve through `tabTitle()` and `useAgentTabTitle` (so the pane tab, the header and the WorkspaceBar rows agree); workspaces through `useWorkspaceTitle` (WorkspaceBar, header, hibernated overlay) or its one-shot twin `workspaceTitleNow` (drag overlay, move-to menu, notifications). The branch comes from `dirGitStore.ts`, a per-directory cache over `git_resolve_repo`: a directory is only queried while a mounted title that uses `{branch}`, `{repo}` or a templated `{tab}` has asked for it (`useDirGit`). The factory terminal and agent defaults use `{branch}`, so every mounted terminal asks by default: one `git_resolve_repo` per distinct directory when a folder is first shown, then one for the folder of the terminal whose command just ended, so the steady cost follows the commands you run and not the number of open terminals; the other defaults ask for nothing. On a local workspace the branch, upstream and worktree flag come from `git/direct.rs`, which reads `.git` itself (HEAD, commondir and the config) without spawning a single git process; WSL workspaces and anything the direct read cannot answer (a `GIT_*` override, an unparsable HEAD, an include section, extensions, a non-default fetch refspec, reftable ref storage) fall back inside `resolve_repo_in_authorized` to the git-process path, which answers as before, so the workspace authorization checks never change. Titles only read the cache; a query happens on first demand of a folder, 400 ms after a command ENDS in a tab that shows git (`subscribeToCommandFinished` reports the tab id, and only the folders that tab asked for are queried, since a checkout does not change the cwd), and when the window regains focus (every demanded folder, to catch changes made outside Kex). A branch found to have changed in one folder is copied to every cached folder of the same repository root without another query, so an editor tab follows a checkout made in a terminal. Listeners are notified only when a branch really changed, and they exist only while something is demanded. `{host}` and the home directory are read once by `systemInfoStore.ts`.
 
 **Tab notes.** Any tab can carry a markdown note (`TabCommon.note`, persisted with the tab, no migration) that floats over its pane. The `tab.note` shortcut (Cmd+B by default) toggles it for the active tab: with no note it creates an empty one, open and focused (`tabNoteStore.focusTabId`, so switching to a tab that already has its note open never steals focus); with a hidden note it opens it; with an open note it hides it, and hiding a blank note drops `note`, `noteOpen` and `notePos` (pure `toggleTabNote` in `lib/tabNote.ts`). `noteOpen` is persisted too. The note is drawn by `FloatingTabNote` as an overlay rendered from `PaneView` inside the pane root (not in the tab bar, which scrolls horizontally), only for the pane's active tab, and it is edited in place with `CodeMirrorEditor` in Rich mode (Live Preview, `maxHeight` so it sizes to its content), lazy-loaded; typing stays in the editor and is written to the tab with `setTabNoteText` on a 300 ms debounce, because a workspaces state update per key re-renders the whole app; the editor is seeded once with the note text, and `flushTabNote(tabId)` (`tabNoteStore.ts`) forces the write before anything reads `tab.note` (the `tab.note` shortcut, blur, the close button, unmount). Its position is relative to the pane and always clamped (`lib/notePlacement.ts`): with no `notePos` it sits just under the tab bar aligned with its tab, so it follows tab-strip scroll and reorder; once dragged by its header strip (pointer capture, local state while dragging, a single `moveTabNote` commit on pointerup, none for a click without movement) it keeps a fixed `notePos`. Its size is also user-set: a grip in the bottom-right corner (same pointer-capture pattern, local state while resizing, a single `resizeTabNote` commit on pointerup that also makes the note sticky) stores `TabCommon.noteSize`, clamped by `clampNoteSize` to a minimum and to the pane's right and bottom edges from the note's top-left; with no `noteSize` the note keeps the default width and content-sized height, and a docked note (an inactive tab's, or one previewed from a WorkspaceBar row) ignores `notePos` but does use `noteSize`, capped to the pane. The note icon keeps its on/off colour while hovered (bright when the note is open, dim when not), so the hover never hides the toggle state. Measurements are refreshed from `ResizeObserver` (pane and note), the tab strip's scroll event and the tab id list, never per frame. The overlay root is `pointer-events-none`; the note carries `data-tab-note`, which `PaneView`'s mousedown capture ignores so clicking in the note does not refocus the terminal. The rename popover (`tab.rename`) edits only the title; a second press saves and closes it (`resolveRenameShortcut`, `requestSave`/`saveSeq`). Notes have two modes. A sticky note is the persisted `noteOpen` one of the active tab: it has a close button (`hideTabNote`: hides it, or drops it when blank) and stays until closed or toggled with the shortcut. Hovering the tab icon shows a transient hover note (`useNotePreview` in `lib/useNotePreview.ts`, owned by `PaneView`) even when the note is closed or its tab inactive; it has no close button and goes away by itself: when the pointer leaves the icon and the note (delayed so the pointer can reach it, and held while the editor has focus) or as soon as the editor loses focus, whatever was typed being kept. On the active tab it appears at its usual place and can be dragged, which makes it sticky (`moveTabNote` sets `noteOpen`); on another tab it is docked under that tab, ignoring `notePos`, and cannot be dragged. A blank note that loses focus is dropped (`dropBlankTabNote`). A tab with a note shows a `StickyNote03Icon` button after its title that toggles the note; the tab context menu has Add/Show/Hide Note and Remove Note. The WorkspaceBar rows (`WorkspaceDetailList`) show the same icon for a tab with a note, just before the close/status mark, and hovering it previews the note with the same rules: a tab that is the active one of a pane of the active workspace (`WorkspaceItem.visibleTabIds`) asks that pane to preview it at its own place and, once opened, makes it sticky with its close button (`tabNoteStore.sidebarHoverTabId`, read by `PaneView`, which feeds its `useNotePreview`), while any other tab's note is a `FloatingTabNote` with `dockTo="side-row"`, portaled to `document.body` and docked to the right of its row (`sideRowNotePos`), not draggable and not resizable. Clicking the icon of a docked tab toggles `noteOpen`: turning it on keeps the preview under the pointer, now with a close button (`closable`) that hides the note; turning it off also drops the preview. The body of that menu lives in `TabContextMenuItems.tsx` and the rename field in `TabRenamePopover.tsx`, both shared by the pane tab and the WorkspaceBar rows; the store records where a rename was started (`RenameOrigin`: `pane` or `sidebar`) and only the matching surface opens its field. The tab menu has no New entries: they live in the menu of the `+` button at the end of each pane tab strip (`NewTabMenuButton.tsx`): a click still opens a terminal tab, resting the pointer on it for `HOVER_SWITCH_DELAY_MS` (600 ms, the pure timer `createHoverSwitch` that also drives hovering a workspace while dragging a tab) or right-clicking opens a menu with New Terminal / Browser Tab, Split Right and Split Down. The menu is a controlled `DropdownMenu` whose trigger is an inert anchor, so Radix never toggles it from the button's own events; a click, leaving the button or a drag starting (`useWorkspaceDnd().draggingItem`) cancels the pending timer, and the hover is not armed while something is being dragged. The delay is not a setting.
 
@@ -360,7 +361,7 @@ The tab has three modes, chosen in the path bar and rotated by `editor.cycleView
 
 ### 4.10 Buffer ownership: `useDocument`
 
-The tab reads and writes its file through the same `useDocument` hook (`modules/editor/lib/useDocument.ts`) as a plain `editor` tab, so the CodeMirror document is the single source of truth for the text. `MarkdownTab` keeps only the text typed since the last load, tied to the `doc` it was typed against (a reload swaps `doc` and the stale edit is ignored), so Preview and Outline can read it and a remounted editor starts from it.
+The tab reads and writes its file through the same `useDocument` hook (`modules/editor/lib/useDocument.ts`) as a plain `editor` tab, so the CodeMirror document is the single source of truth for the text. `MarkdownTab` keeps only the text typed since the last load, tied to the `doc` it was typed against (a reload swaps `doc` and the stale edit is ignored), so Preview and Outline can read it and a remounted editor starts from it. The buffer a tab carries across an unmount (`unflushedBuffers` in `useDocument.ts`, for example when the tab is dragged to another pane) is keyed by tab id, not by path: the same file open in two tabs would otherwise let one tab's unmount overwrite or adopt the other's cache. `EditorPane` and `useDocument` therefore receive `tabId` as well as `path`. The conflict flag (`conflict` + `keepLocalChanges`) and the auto-save timer live in `useConflictFlag` / `useAutoSaveTimer` under `src/modules/editor/lib/`.
 
 ### 4.11 Save round-trip policy
 
@@ -372,7 +373,7 @@ Live Preview never converts the text: it hides and decorates syntax markers but 
 
 ### 5.1 No SSH support (yet)
 
-SSH is on the roadmap but not yet implemented. Kex does not manage SSH connections, key agents, or remote filesystems. You can of course `ssh user@host` in a terminal tab — the PTY runs it fine — but the editor, file explorer, and git panel all operate on the local filesystem (or the WSL filesystem on Windows). See ROADMAP.md.
+SSH is on the roadmap but not yet implemented. Kex does not manage SSH connections, key agents, or remote filesystems. You can of course `ssh user@host` in a terminal tab - the PTY runs it fine - but the editor, file explorer, and git panel all operate on the local filesystem (or the WSL filesystem on Windows). See ROADMAP.md.
 
 ### 5.2 No persistent terminal layout restore
 
@@ -436,7 +437,7 @@ A file opened in the editor from a directory the user has not navigated to in a 
 | `dirs` | `6` | Cross-platform home/cache directories |
 | `tempfile` | `3` | Temporary files for shell init scripts |
 
-Tauri plugins used: `store`, `updater`, `window-state`, `autostart`, `os`, `notification`, `log`, `opener`, `process`.
+Tauri plugins used: `store`, `updater`, `window-state`, `autostart`, `os`, `notification`, `log`, `opener`, `process`, `clipboard-manager` (the capability grants `allow-write-text` and `allow-read-text`; the read is only for the terminal context menu's Paste, because `navigator.clipboard.readText` outside a keyboard gesture makes WebKit show a system "Paste" bubble; `src/lib/clipboard.ts` is the single entry point for every clipboard write in the webview (tab ids, explorer, git history, Live Preview code blocks, terminal copy and OSC 52, block overlay, updater); pasting still uses `navigator.clipboard.readText`. It exists because `navigator.clipboard.writeText` was rejected by WebKit with `NotAllowedError`, see TASK-828).
 
 ### TypeScript frontend
 | Library | Version | Role |
@@ -465,29 +466,35 @@ All modules live under `src/modules/`. Each is self-contained, exports a thin ba
 ```
 src/
 ├── app/
-│   ├── App.tsx                    — Root coordinator, wires all modules
-│   ├── components/                — WorkspaceBar, Sidebar, WorkspaceInputBar, OsIcon…
-│   └── hooks/                     — useTabCloseGuards, useWorkspaceSwitcher
+│   ├── App.tsx                    - Root coordinator, wires all modules
+│   ├── components/                - WorkspaceBar, Sidebar, WorkspaceInputBar, OsIcon…
+│   └── hooks/                     - useTabCloseGuards, useWorkspaceSwitcher
 ├── components/
-│   └── ui/                        — shadcn primitives (do not hand-edit)
-│   └── WindowControls.tsx         — Custom title bar buttons (Linux, Windows)
-├── lib/                           — Global utils: platform, fonts, zoom, utils, native.ts
-├── settings/                      — Second window (SettingsApp.tsx + sections)
-├── styles/                        — globals.css, fonts.css, tokens, terminalTheme
+│   └── ui/                        - shadcn primitives (do not hand-edit)
+│   └── WindowControls.tsx         - Custom title bar buttons (Linux, Windows)
+├── lib/                           - Global utils: platform, fonts, zoom, utils, native.ts
+├── settings/                      - Second window (SettingsApp.tsx + sections)
+├── styles/                        - globals.css, fonts.css, tokens, terminalTheme
 └── modules/
-    ├── terminal/                  — xterm.js stack, PTY bridge, OSC parsing (7/133/0/2), blocks, oscTitleStore.
+    ├── terminal/                  - xterm.js stack, PTY bridge, OSC parsing (7/133/0/2), blocks, oscTitleStore.
     │   │                            `TerminalPathBar` renders as the first row of every terminal panel (h-6, mirrors
     │   │                            `EditorPathBar`). The cwd is rendered as a shared `PathBreadcrumb`
     │   │                            (`modules/workspaces/pathbar/`, fed by `buildCwdBreadcrumb`); each directory
     │   │                            segment has a right-click context menu (`DirSegmentContextMenu` /
     │   │                            `dirSegmentMenuItems`): Set as Workspace Root, New Workspace from Folder, Open in
     │   │                            Terminal, Reveal in Finder, Copy Relative/Absolute Path, Add to .gitignore.
+    │   │                            The copy items (`explorer/lib/copyPathItems.tsx`) print the path under the label;
+    │   │                            Copy Relative Path shows why it is disabled (no workspace root, or outside it).
+    │   │                            The terminal surface has a right-click menu (`TerminalContextMenu`): Copy (enabled
+    │   │                            only with a selection) and Paste. While an app tracks the mouse (Claude Code
+    │   │                            draws its own selection), a right click does not select the word under the
+    │   │                            cursor, so Copy only sees a real xterm selection (Shift-drag).
     │   │                            The right side shows `pid / process / CPU% / RAM`. `process` is the OSC-133
     │   │                            foreground command when one is running, or the shell name at rest. An
     │   │                            agent chip (status dot + model name) appears when an agent session is active.
     │   │                            A `[...]` DropdownMenu (`TerminalPathBarMenu`) holds: the tab id and, for agent
-    │   │                            sessions: session id (copy), transcript
-    │   │                            path (Reveal in Finder), started elapsed, and restore error if any.
+    │   │                            sessions: session id (copy), started elapsed, restore error if any, and the
+    │   │                            actions Open Transcript Folder (explorer focus) and Reveal Transcript in Finder.
     │   │                            Metrics come from the ephemeral `terminalMetricsStore`
     │   │                            (`useSyncExternalStore`, never persisted, outside the workspaces tree). A single
     │   │                            `useTerminalMetricsSampler` hook polls `pty_metrics` every 5 s
@@ -499,22 +506,22 @@ src/
     │   │                            The floating tab HoverCard was removed; tabs now carry only a native `title`
     │   │                            tooltip (cwd, or the agent worktree when it has one, then a bullet and the current branch, resolved
     │   │                            on hover). The tab rows under a workspace in the WorkspaceBar use the same tooltip.
-    │   └── block/                 — Block overlay, shell input, mode machine, history
-    ├── editor/                    — CodeMirror 6 stack, diffs. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter, indent size 1-12, indent with tabs) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. The per-extension settings are surfaced only in the editor overlay `[...]` menu. Global editor settings (scroll past end, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + blink rate + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences applied via CodeMirror compartments so they update live without rebuilding editor state; the global toggles appear in both the `[...]` menu and the Settings window. A few preferences are JSON-only (no UI). In `settings-general.json`: `workspacePaneLimit`, `paneSplitLimit`. In `settings-editor.json`: `editorHighlightActiveLine`,
+    │   └── block/                 - Block overlay, shell input, mode machine, history
+    ├── editor/                    - CodeMirror 6 stack, diffs. Per-extension view settings (`EditorViewSettings`: wrap, line numbers, whitespace, fold gutter, indent size 1-12, indent with tabs) are stored as `editorViewByExt` in the preferences store and resolved via `resolveEditorView` against prose defaults (wrap on, line numbers off) or code defaults (wrap off, line numbers on); both `EditorPane` and `GitDiffPane` read the same map so all three editor surfaces (file editor, markdown raw, git diff) share identical per-extension behavior. The per-extension settings are surfaced only in the editor overlay `[...]` menu. Global editor settings (scroll past end, bracket matching, close brackets, autocompletion) and cursor configuration (editor cursor blink + blink rate + style `bar`/`block`/`underline`, terminal cursor blink + style) live as top-level preferences applied via CodeMirror compartments so they update live without rebuilding editor state; the global toggles appear in both the `[...]` menu and the Settings window. A few preferences are JSON-only (no UI). In `settings-general.json`: `workspacePaneLimit`, `paneSplitLimit`. In `settings-editor.json`: `editorHighlightActiveLine`,
 `editorAutoSaveDelay`.
-    ├── agents/                    — Terminal agent notifications + session restore (Claude Code, etc.)
-    │   ├── components/            — NotificationBell
-    │   ├── lib/                   — route, notify, agentIcon, agentSessionRestore
-    │   └── store/                 — agentStore
-    ├── explorer/                  — File tree, fuzzy search, icons, inline rename, internal clipboard copy/cut/paste (copy reuses the duplicate background task, cut uses `fs_rename`/`git_mv`), background duplication with progress emitted as the global event `kex:duplicate-progress` (so every app window, including Settings, can render it) and a global floating progress bar (`DuplicateProgressBar`, bottom-left) with cancel support (cancel deletes the partial copy). Quitting (Cmd+Q) while a copy is running is intercepted by Rust, which defers the exit and emits `kex:duplicate-quit-prompt` to all windows; the resulting modal offers wait, keep-open (`cancel_quit`), or cancel-copy-and-quit.
-    ├── source-control/            — Git stage/commit/push panel. Supports a List/Tree view toggle (persisted as `scmViewMode` in settings); Tree mode keeps the Staged Changes / Changes roots and renders each as a directory tree with compacted single-child chains (explorer-style icons and spacing), built by the pure `scmTree.ts`.
-    ├── git-history/               — Commit graph, per-file diffs
-    ├── header/                    — Top bar, inline search, and the RunButton (0/1/2+ script variants).
+    ├── agents/                    - Terminal agent notifications + session restore (Claude Code, etc.)
+    │   ├── components/            - NotificationBell
+    │   ├── lib/                   - route, notify, agentIcon, agentSessionRestore
+    │   └── store/                 - agentStore
+    ├── explorer/                  - File tree, fuzzy search, icons, inline rename, internal clipboard copy/cut/paste (copy reuses the duplicate background task, cut uses `fs_rename`/`git_mv`), background duplication with progress emitted as the global event `kex:duplicate-progress` (so every app window, including Settings, can render it) and a global floating progress bar (`DuplicateProgressBar`, bottom-left) with cancel support (cancel deletes the partial copy). Quitting (Cmd+Q) while a copy is running is intercepted by Rust, which defers the exit and emits `kex:duplicate-quit-prompt` to all windows; the resulting modal offers wait, keep-open (`cancel_quit`), or cancel-copy-and-quit.
+    ├── source-control/            - Git stage/commit/push panel. Supports a List/Tree view toggle (persisted as `scmViewMode` in settings); Tree mode keeps the Staged Changes / Changes roots and renders each as a directory tree with compacted single-child chains (explorer-style icons and spacing), built by the pure `scmTree.ts`.
+    ├── git-history/               - Commit graph, per-file diffs
+    ├── header/                    - Top bar, inline search, and the RunButton (0/1/2+ script variants).
     │                                `RunButton` (in `src/app/components/RunButton.tsx`) reads the script
     │                                running state from `terminalEphemeralStore.scriptRunning`
     │                                (`useSyncExternalStore`) and renders as a muted "Run" placeholder (0 scripts),
     │                                a simple toggle (1 script), or a split selector+play/stop button (2+ scripts).
-    ├── workspaces/                — Workspace/Pane/Tab model; useWorkspaces (source of truth),
+    ├── workspaces/                - Workspace/Pane/Tab model; useWorkspaces (source of truth),
     │                                splitNode tree ops, WorkspaceView/SplitNodeView/PaneView/TabContent,
     │                                WorkspaceDndProvider (DndContext + file/tab drag handlers).
     │                                Workspace carries: color (accent color, hex or null), scripts (array of
@@ -545,8 +552,8 @@ src/
     │                                gets PowerShell syntax and the cd fails), and the frontend does not know
     │                                the user's shell, so fish before 4.1 (no `{ }` group) gets a syntax error
     │                                and the script does not run in a reused tab with a folder),
-    │                                activeScript (selected script id), and statusId (optional foreign key
-    │                                to a WorkspaceStatus id in the preferences store). See WORKSPACES.md for render
+    │                                activeScript (selected script id), and groupId (optional id of a
+    │                                window-level WorkspaceGroup). See WORKSPACES.md for render
     │                                tree details.
     │                                `terminalEphemeralStore` has a second section, `scriptRunning` (Map<tabId,
     │                                ScriptState>), tracking which terminal tabs are running a script command.
@@ -557,13 +564,9 @@ src/
     │                                the global handler toggles raw/overlay; on a `markdown` tab it calls the
     │                                tab's registered handle, which rotates Source/Rich/Preview
     │                                (`lib/viewCycle.ts`). `markdown.toggleOutline` and `editor.save` use the same handle. `editor.preview.toggleSplit` has no default binding.
-    ├── theme/                     — CSS variable engine, presets, custom themes, bg image
-    ├── settings/                  — Settings store, preferences, window opener.
-    │                                The `Preferences` type includes `workspaceStatuses: WorkspaceStatus[]`
-    │                                (the global ordered status list, key `workspaceStatuses` in
-    │                                `settings-general.json`, synced cross-window via `GENERAL_PREF_KEY_MAP`).
-    │                                `WorkspacesSection` in `src/settings/sections/` manages this list.
-    ├── browser/                   — Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
+    ├── theme/                     - CSS variable engine, presets, custom themes, bg image
+    ├── settings/                  - Settings store, preferences, window opener.
+    ├── browser/                   - Web browser pane (address bar; also dev-server preview). Browser tabs can be floated out into a native `WebviewUrl::External` window via the float-browser feature; the tab stays as a placeholder in its pane and docks back on close.
     ├── markdown/                  : Live Preview, the only markdown engine. Used by the `markdown` tab kind
     │   │                            and, through `MarkdownPreviewPane.tsx` (read-only Live Preview), by the
     │   │                            editor-tab overlay/split preview (`kind: "editor"` with
@@ -583,7 +586,7 @@ src/
     │   │                            block ends), `outline.ts` + `OutlinePanel.tsx` (`headingsFromMarkdown`, jump to a
     │   │                            heading by its 0-based `line`), `imageSrc.ts` (local image path resolution),
     │   │                            `codeCopyIcons.ts`, `viewCycle.ts` and `MarkdownDocFallback.tsx`.
-    ├── notes/                     — HelixNotes-style notes view for the Sidebar (visible only when the workspace
+    ├── notes/                     - HelixNotes-style notes view for the Sidebar (visible only when the workspace
     │                                defines a `workspaceRoot`). Two resizable columns: Quick Access (pinned notes, dnd-kit
     │                                reorder) plus folder tree, and a sortable note list (`modified | title | created | custom`,
     │                                optional date grouping). The view reads one directory level at a time through
@@ -595,9 +598,11 @@ src/
     │                                read-modify-write preserves foreign namespaces, no migrations: invalid file means defaults).
     │                                Kex never writes metadata into user `.md` files. Opening a note creates a `markdown`
     │                                tab, so it opens in Live Preview.
-    ├── workspace/                 — Local + WSL environment switching
-    ├── updater/                   — Auto-updater dialog
-    └── command-palette/           — Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, tiered ranking, note preview), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
+    ├── workspace/                 - Local + WSL environment switching
+    ├── external-editors/          - Detection and launch of external editors (`OpenInEditorButton`)
+    ├── html-preview/              - `HtmlPreviewPane`, preview of HTML files
+    ├── updater/                   - Auto-updater dialog
+    └── command-palette/           - Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, tiered ranking, note preview), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
 ```
 
 ### Tab kinds (tagged union)
@@ -613,13 +618,13 @@ A `browser` panel carries an optional `floating` flag. When set, the panel is sh
 
 ### `src/lib/native.ts`
 
-Contains typed wrappers for all Tauri `invoke()` calls (`native.readFile`, `native.gitCommit`, `native.workspaceAuthorize`, etc.). All modules import from `@/lib/native` — never use `invoke()` directly in components or hooks.
+Contains typed wrappers for all Tauri `invoke()` calls (`native.readFile`, `native.gitCommit`, `native.workspaceAuthorize`, etc.). All modules import from `@/lib/native` - never use `invoke()` directly in components or hooks.
 
 ---
 
 ## 8. Security model
 
-**IPC boundary.** The WebView cannot access the filesystem, spawn processes, or make outbound HTTP requests directly. Every OS operation is an explicit `invoke()` call to a named Tauri command. The `capabilities/default.json` file is the allowlist — only commands listed there are available to the webview.
+**IPC boundary.** The WebView cannot access the filesystem, spawn processes, or make outbound HTTP requests directly. Every OS operation is an explicit `invoke()` call to a named Tauri command. The `capabilities/default.json` file is the allowlist - only commands listed there are available to the webview.
 
 **Path authorization.** Git commands and shell operations require the target directory to be in the `WorkspaceRegistry`. The registry is populated by explicit user gestures (opening a directory, navigating there in a terminal) or by the CLI launch argument.
 

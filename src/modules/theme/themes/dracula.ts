@@ -7,6 +7,7 @@ export const dracula: Theme = {
   editorTheme: { dark: "dracula", light: "github-light" },
   variants: {
     dark: {
+      noteTint: { color: "#ad3e00", amount: 0.37 },
       colors: {
         background: "#282a36",
         foreground: "#f8f8f2",

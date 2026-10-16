@@ -36,7 +36,7 @@ DOM-blur-implies-closed shortcut that covers every case; see section 4.
 `Session.scratchpadOpen` for terminal tabs. It is written by `notifyScratchpadEnabled` inside
 `closeScratchpadState`/`openScratchpadState` on every open/close transition, delivered through the
 `onScratchpadEnabled` callback (`TabContent.tsx`'s `onScratchpadEnabled: (tabId, enabled) =>
-updateTabData(...)`) and persisted to `workspace-state.json` like the rest of the tab. Because a
+updateTabData(...)`) and persisted to `workspaces/<id>.json` like the rest of the tab. Because a
 leaf's scratchpad can only be open while that leaf is focused, and only one leaf in the whole app can
 be focused at a time (the active tab of the active pane of the active workspace), **at most the
 single tab that held the scratchpad focus at quit** has `scratchpadEnabled: true` on disk.

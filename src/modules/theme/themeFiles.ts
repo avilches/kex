@@ -49,7 +49,7 @@ export async function deleteThemeFile(id: string): Promise<void> {
     const path = await themeFilePath(id);
     await invoke("fs_delete", { path, workspace: currentWorkspaceEnv() });
   } catch {
-    /* file may not exist yet — nothing to clean up */
+    /* file may not exist yet - nothing to clean up */
   }
 }
 

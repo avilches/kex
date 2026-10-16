@@ -4,7 +4,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setDetectedEditors } from "@/modules/settings/store";
 import type { DetectedEditor } from "./types";
 
-// Module-level scanning state — not persisted; each webview tracks its own spinner.
+// Module-level scanning state - not persisted; each webview tracks its own spinner.
 let scanning = false;
 const scanListeners = new Set<() => void>();
 

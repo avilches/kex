@@ -3,10 +3,11 @@ import type { Theme } from "../types";
 export const caffeine: Theme = {
   id: "caffeine",
   name: "Caffeine",
-  description: "Warm coffee tones — cream and espresso.",
+  description: "Warm coffee tones - cream and espresso.",
   editorTheme: { dark: "copilot", light: "github-light" },
   variants: {
     dark: {
+      noteTint: { color: "#942192", amount: 0.23 },
       colors: {
         background: "#111111",
         foreground: "#eeeeee",

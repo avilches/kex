@@ -53,6 +53,7 @@ export type ThemeVariant = {
   terminal?: TerminalPalette;
   editor?: EditorSurface;
   noteStrong?: boolean;
+  noteTint?: { color: string; amount: number };
   inactivePaneDim?: Record<string, number>;
 };
 

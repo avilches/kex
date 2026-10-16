@@ -1,18 +1,30 @@
 import { contrastRatio } from "./readableColors";
+import type { EditorSurface, TerminalPalette, ThemeMode, ThemeVariant } from "./types";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const YELLOW: Rgb = [250, 204, 21];
 const MIN_CONTRAST = 4.5;
 
-const MIX = {
-  dark: { normal: 0.14, strong: 0.28 },
-  light: { normal: 0.2, strong: 0.4 },
+// A warm yellow darkened over a dark surface turns brown, so dark uses a
+// greener yellow that stays mustard-olive.
+const TINT = {
+  dark: { color: [235, 225, 80] as Rgb, normal: 0.3, strong: 0.42 },
+  light: { color: [250, 204, 21] as Rgb, normal: 0.2, strong: 0.4 },
 };
+
+export type NoteTint = { color: string; amount: number };
 
 type Rgb = [number, number, number];
 
-function toRgb(hex: string): Rgb {
-  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as Rgb;
+const FUNC = /^rgba?\(\s*(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)/i;
+
+// Theme files use #rrggbb, but colors read back from CodeMirror via
+// getComputedStyle arrive as rgb(...).
+function parseColor(value: string): Rgb | null {
+  if (HEX.test(value)) {
+    return [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16)) as Rgb;
+  }
+  const m = FUNC.exec(value.trim());
+  return m ? ([Number(m[1]), Number(m[2]), Number(m[3])] as Rgb) : null;
 }
 
 function toHex(c: Rgb): string {
@@ -34,17 +46,66 @@ export type NoteSurface = { background: string; foreground: string };
 // yellowish, where the normal amount would barely show.
 export function noteSurface(
   background: string,
-  foreground: string,
+  foreground: string | undefined,
   strong = false,
+  override?: NoteTint,
 ): NoteSurface | null {
-  if (!HEX.test(background) || !HEX.test(foreground)) return null;
-  const bg = toRgb(background);
-  const amount = MIX[isLight(bg) ? "light" : "dark"][strong ? "strong" : "normal"];
-  const tinted = mix(bg, YELLOW, amount);
+  const bg = parseColor(background);
+  if (!bg) return null;
+  const tint = TINT[isLight(bg) ? "light" : "dark"];
+  const tinted = override
+    ? mix(bg, parseColor(override.color) ?? tint.color, override.amount)
+    : mix(bg, tint.color, strong ? tint.strong : tint.normal);
   const target: Rgb = isLight(tinted) ? [0, 0, 0] : [255, 255, 255];
-  let fg = toRgb(foreground);
-  for (let t = 0.05; contrastRatio(fg, tinted) < MIN_CONTRAST && t <= 1; t += 0.05) {
-    fg = mix(toRgb(foreground), target, t);
+  // Some themes (Kex Default) leave the text color to the stylesheet.
+  const text = (foreground ? parseColor(foreground) : null) ?? target;
+  const round = (c: Rgb): Rgb => c.map(Math.round) as Rgb;
+  const bgRounded = round(tinted);
+  let fg = round(text);
+  for (let t = 0.05; contrastRatio(fg, bgRounded) < MIN_CONTRAST && t <= 1; t += 0.05) {
+    fg = round(mix(text, target, t));
   }
-  return { background: toHex(tinted), foreground: toHex(fg) };
+  return { background: toHex(bgRounded), foreground: toHex(fg) };
+}
+
+// The note surface of a theme variant: its editor surface (or the UI colors
+// when the variant defines no editor) pushed toward yellow, with an optional
+// explicit editor surface winning over the variant's own. This is exactly what
+// applyTheme publishes as --note-editor-background/--note-editor-foreground, so every
+// consumer (the app, the Settings mini preview) shows the same colors.
+export function variantNoteSurface(variant: ThemeVariant, editorOverride?: EditorSurface): NoteSurface | null {
+  const editor = editorOverride ?? variant.editor;
+  return noteSurface(
+    editor?.background ?? variant.colors?.background ?? "",
+    editor?.foreground ?? variant.colors?.foreground,
+    variant.noteStrong,
+    variant.noteTint,
+  );
+}
+
+// The same note over a terminal tab: the terminal's own surface, which can be in a different
+// mode than the editor's.
+export function terminalNoteSurface(variant: ThemeVariant, terminalOverride?: TerminalPalette): NoteSurface | null {
+  const terminal = terminalOverride ?? variant.terminal;
+  return noteSurface(
+    terminal?.background ?? variant.colors?.background ?? "",
+    terminal?.foreground ?? variant.colors?.foreground,
+    variant.noteStrong,
+    variant.noteTint,
+  );
+}
+
+export type NoteSurfaceKind = "editor" | "terminal";
+
+// A note takes the surface of the tab it is shown over, not the one of the tab it belongs to.
+export function noteSurfaceKind(tab: { kind: string } | undefined): NoteSurfaceKind {
+  return tab?.kind === "terminal" ? "terminal" : "editor";
+}
+
+// Whether a surface color is light or dark, so the editor theme drawn over it
+// (cursor, selection, syntax) can be the one of that mode.
+export function colorMode(color: string | undefined, fallback: ThemeMode): ThemeMode {
+  const rgb = color ? parseColor(color) : null;
+  if (!rgb) return fallback;
+  return isLight(rgb) ? "light" : "dark";
 }

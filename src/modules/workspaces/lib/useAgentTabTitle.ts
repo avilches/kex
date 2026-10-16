@@ -11,6 +11,7 @@ import { tabTitle } from "./tabTitle";
 import { useSystemInfo } from "./systemInfoStore";
 import { useTitleDefaults } from "./titleDefaultsPrefs";
 import { titleVariablesUsed } from "./titleTemplate";
+import { useTitleDraft, withTitleDraft } from "./titleDraftStore";
 import { tabDir, type TitleSources } from "./titleVars";
 import {
   getRunningCommand,
@@ -26,7 +27,10 @@ export type AgentTabTitleInfo = {
   agentSession: AgentSession | undefined;
 };
 
-export function useAgentTabTitle(tab: Tab | null): AgentTabTitleInfo | null {
+export function useAgentTabTitle(savedTab: Tab | null): AgentTabTitleInfo | null {
+  // While its rename field is open the tab shows what is being typed.
+  const draft = useTitleDraft(savedTab?.id);
+  const tab = savedTab && withTitleDraft(savedTab, draft);
   // Per-tab selectors: only this tab's entry re-renders the component, not
   // every terminal's running command / OSC title change.
   const runningCommand = useSyncExternalStore(
@@ -67,7 +71,7 @@ export function useTitleSources(
     !!tab &&
     (templateNeedsGit(effectiveTabTemplate(tab, hasAgent, defaults)) ||
       templateNeedsGit(defaults[defaultKindFor(tab, hasAgent)]));
-  const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined);
+  const git = useDirGit(needsGit && tab ? tabDir(tab) : undefined, tab?.id);
   return { git, agent: agentSession?.agent, home: sys.home, host: sys.host, defaults };
 }
 
@@ -79,15 +83,24 @@ export function resolveAgentTabTitle(
   sources?: TitleSources,
 ): AgentTabTitleInfo {
   const hasAgent = !!agentSession && tab.kind === "terminal";
+  // A sleeping tab has no process left to feed its template, so it keeps the name it had.
+  const frozen = tab.kind === "terminal" ? tab.hibernation?.title : undefined;
+  if (frozen !== undefined) {
+    return { displayTitle: frozen, isDescription: true, hasAgent, isRunning: false, agentSession };
+  }
   const sessionTitle = agentSession?.meta?.sessionTitle;
+  // After a wake or an app-restart restore the live OSC title is gone (the PTY was
+  // disposed) until the agent boots and sends a new one; the title it last sent is
+  // persisted on the tab, so the tab keeps its name through that window.
+  const osc = oscTitle ?? (tab.kind === "terminal" ? tab.agentTitle : undefined);
   // The agent name only reaches the sources of an agent tab, which is what selects its default.
   const src = {
     ...sources,
     agent: hasAgent ? (sources?.agent ?? agentSession?.agent) : undefined,
     session: sessionTitle,
   };
-  const displayTitle = tabTitle(tab, runningCommand, oscTitle, src);
-  const isDescription = !!(tab.title || oscTitle || sessionTitle);
+  const displayTitle = tabTitle(tab, runningCommand, osc, src);
+  const isDescription = !!(tab.title || osc || sessionTitle);
 
   return { displayTitle, isDescription, hasAgent, isRunning: !!runningCommand, agentSession };
 }

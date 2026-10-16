@@ -12,6 +12,8 @@ import {
 } from "@/modules/agents/lib/agentSessionRestore";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { ensureMonoFontsLoaded } from "@/lib/fonts";
+import { applyZoomToDom } from "@/lib/useZoom";
+import { applyZoomThenRefit } from "@/lib/zoomSync";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -37,6 +39,7 @@ import { IS_WINDOWS } from "@/lib/platform";
 import { isRunningAgentSession } from "@/modules/agents/lib/sessionEndPolicy";
 import { getPendingRestore, pendingRestoreLeafIds, setPendingRestore } from "./pendingRestore";
 import { openPty, type PtySession } from "./pty-bridge";
+import { spawnCwdUpdate } from "./spawnCwd";
 import { markShellReady, waitForShellReady } from "./shellReadyWaiter";
 import { withRestoreBusy } from "./restoreBusy";
 import {
@@ -528,7 +531,7 @@ export function setLeafScratchpadDraft(leafId: string, text: string): void {
 
 /**
  * Clear the scrollback and screen of the currently focused terminal, keeping
- * the active prompt line — macOS Terminal's ⌘K behaviour. Returns false when no
+ * the active prompt line - macOS Terminal's ⌘K behaviour. Returns false when no
  * focused terminal slot is bound (e.g. focus is in the editor or AI panel).
  */
 export function clearFocusedTerminal(): boolean {
@@ -633,7 +636,7 @@ configureRendererPool({
     if (!s) return null;
     return {
       writeToPty: (data) => {
-        // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) clear it —
+        // "working" (spinner): only bare ESC (\x1b, 1 byte) or CTRL+C (\x03) clear it -
         // these are explicit user interrupts. Multi-byte ESC sequences (xterm protocol
         // auto-responses like "\x1b[?1;2c") must NOT clear the spinner.
         // The attention dot ("attention") is cleared by focusing the tab, not by typing.
@@ -844,7 +847,7 @@ function bindLeafToSlot(leafId: string, s: Session): void {
           },
         ];
       }
-      // Shared in-command flag — see osc-handlers.ts. The prompt tracker
+      // Shared in-command flag - see osc-handlers.ts. The prompt tracker
       // flips it on OSC 133 B/C/D/A; the cwd handler reads it to ignore OSC
       // 7 emitted by untrusted command output (remote SSH, `cat` of an
       // attacker file, etc.).
@@ -995,6 +998,9 @@ async function startLeaf(leafId: string, s: Session, plain = false): Promise<voi
   if (!plain) setPendingRestore(leafId, null);
   if (s.restoreBlock) setRestoreBlock(leafId, s, null);
   s.pty = pty;
+  // The folder the shell actually started in, known before the first OSC 7;
+  // a stale saved folder gives way to it the moment the PTY opens.
+  applySpawnCwdReport(s, pty.cwd);
   if (s.pendingInput) {
     void pty.write(s.pendingInput);
     s.pendingInput = "";
@@ -1134,11 +1140,23 @@ export async function respawnSession(
     return;
   }
   s.pty = pty;
+  applySpawnCwdReport(s, pty.cwd);
   if (s.pendingInput) {
     void pty.write(s.pendingInput);
     s.pendingInput = "";
   }
   if (s.cols > 0 && s.rows > 0) pty.resize(s.cols, s.rows);
+}
+
+// The folder reported by pty_open seeds lastCwd and reaches the tab (and the
+// workspace cwd through it) without waiting for the shell's first OSC 7.
+// Unchanged folders and PTYs that had no folder to report leave the tab as it
+// was; the rebind path replays lastCwd as usual.
+function applySpawnCwdReport(s: Session, reported: string | null): void {
+  const next = spawnCwdUpdate(s.lastCwd, reported);
+  if (!next) return;
+  s.lastCwd = next;
+  s.callbacks.onCwd?.(next);
 }
 
 export async function leafHasForegroundProcess(leafId: string): Promise<string | null> {
@@ -1196,7 +1214,11 @@ function startPoolPreferencesSync(): void {
   let prev = usePreferencesStore.getState();
   usePreferencesStore.subscribe((state) => {
     if (state.terminalFontSize !== prev.terminalFontSize || state.zoomLevel !== prev.zoomLevel) {
-      applyFontSize(renderFontSize(state.terminalFontSize, state.zoomLevel));
+      applyZoomThenRefit(state.zoomLevel, state.hydrated, {
+        applyZoomToDom,
+        refitTerminals: () =>
+          applyFontSize(renderFontSize(state.terminalFontSize, state.zoomLevel)),
+      });
     }
     if (state.terminalFontFamily !== prev.terminalFontFamily) {
       applyFontFamily(state.terminalFontFamily);

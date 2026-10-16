@@ -3,7 +3,9 @@ import {
   applyHibernate,
   applyWake,
   blockedWhileHibernated,
+  commandBlockedWhileHibernated,
   editorTabIds,
+  menuBlockedWhileHibernated,
   isPendingStale,
   workspaceDialogPending,
   enableRunOnStart,
@@ -154,14 +156,50 @@ describe("strippedTree", () => {
 
 describe("blockedWhileHibernated", () => {
   it("blocks tab, pane, terminal, editor and script shortcuts", () => {
-    for (const id of ["tab.new", "tab.close", "pane.splitRight", "terminal.clear", "editor.save", "workspace.run", "search.focus"] as const) {
+    for (const id of ["tab.new", "tab.close", "tab.rename", "pane.splitRight", "terminal.clear", "editor.save", "workspace.run", "search.focus"] as const) {
       expect(blockedWhileHibernated(id)).toBe(true);
     }
+  });
+
+  it("blocks the Sidebar, explorer and zen shortcuts, which change state nobody can see", () => {
+    for (const id of ["sidebar.toggle", "sidebar.showGit", "explorer.search", "explorer.toggleHidden", "view.zenMode"] as const) {
+      expect(blockedWhileHibernated(id)).toBe(true);
+    }
+  });
+
+  it("lets workspace.close through: a sleeping workspace closes only with its own shortcut", () => {
+    expect(blockedWhileHibernated("workspace.close")).toBe(false);
   });
 
   it("lets workspace, window, view and settings shortcuts through", () => {
     for (const id of ["workspace.new", "workspace.next", "window.new", "view.zoomIn", "settings.open"] as const) {
       expect(blockedWhileHibernated(id)).toBe(false);
+    }
+  });
+});
+
+describe("menuBlockedWhileHibernated", () => {
+  it("blocks the tab and Sidebar menu items", () => {
+    for (const id of ["new_terminal", "new_browser", "close_tab", "close_others", "close_all", "toggle_sidebar", "toggle_git", "toggle_hidden", "toggle_sidebar_side"]) {
+      expect(menuBlockedWhileHibernated(id)).toBe(true);
+    }
+  });
+
+  it("lets the workspace, window and settings items through", () => {
+    for (const id of ["new_workspace", "settings", "toggle_autosave"]) expect(menuBlockedWhileHibernated(id)).toBe(false);
+  });
+});
+
+describe("commandBlockedWhileHibernated", () => {
+  it("blocks palette commands that act on tabs, panes, git or the Sidebar", () => {
+    for (const id of ["tab.new", "tab.close", "pane.splitRight", "terminal.clear", "view.zenMode", "sidebar.toggle", "git.graph", "git.source", "history.open", "workspace.runScripts"]) {
+      expect(commandBlockedWhileHibernated(id)).toBe(true);
+    }
+  });
+
+  it("keeps settings, new workspace, new window and workspace properties", () => {
+    for (const id of ["settings.open", "workspace.new", "window.new", "workspace.properties", "theme.pick"]) {
+      expect(commandBlockedWhileHibernated(id)).toBe(false);
     }
   });
 });

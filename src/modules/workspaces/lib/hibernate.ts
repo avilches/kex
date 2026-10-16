@@ -21,11 +21,41 @@ export function strippedTree(node: SplitNode): SplitNode {
 }
 
 // Shortcuts that act on tabs, terminals, editors or scripts have nothing to act
-// on while the workspace is asleep (its tabs are in the tree but not mounted).
-const BLOCKED_PREFIXES = ["tab.", "pane.", "terminal.", "editor.", "markdown.", "file.", "path."];
+// on while the workspace is asleep (its tabs are in the tree but not mounted), and
+// the Sidebar and the zen layout are not shown, so changing their state would only
+// surprise the user on wake. A sleeping workspace closes only through its own shortcut.
+const BLOCKED_PREFIXES = ["tab.", "pane.", "terminal.", "editor.", "markdown.", "file.", "path.", "sidebar.", "explorer."];
+const BLOCKED_IDS: readonly ShortcutId[] = ["search.focus", "workspace.run", "view.zenMode"];
 
 export function blockedWhileHibernated(id: ShortcutId): boolean {
-  return id === "search.focus" || id === "workspace.run" || BLOCKED_PREFIXES.some((p) => id.startsWith(p));
+  return BLOCKED_IDS.includes(id) || BLOCKED_PREFIXES.some((p) => id.startsWith(p));
+}
+
+// Native menu items (ids from the Rust menu) that act on tabs or on the Sidebar. The same
+// set is greyed out by `sync_menu` and ignored by the dispatcher while the workspace sleeps.
+const BLOCKED_MENU_IDS: readonly string[] = [
+  "new_terminal",
+  "new_browser",
+  "close_tab",
+  "close_others",
+  "close_all",
+  "toggle_sidebar",
+  "toggle_explorer",
+  "toggle_git",
+  "toggle_history",
+  "toggle_hidden",
+  "toggle_sidebar_side",
+];
+
+export function menuBlockedWhileHibernated(menuId: string): boolean {
+  return BLOCKED_MENU_IDS.includes(menuId);
+}
+
+// Palette commands share the shortcut ids; these have none (or act on what a sleeping workspace lacks).
+const BLOCKED_COMMAND_IDS: readonly string[] = ["git.graph", "git.source", "search.content", "history.open", "workspace.runScripts"];
+
+export function commandBlockedWhileHibernated(commandId: string): boolean {
+  return BLOCKED_COMMAND_IDS.includes(commandId) || blockedWhileHibernated(commandId as ShortcutId);
 }
 
 // Editors are about to be unmounted (their unsaved state goes with them) and a

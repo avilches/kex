@@ -45,6 +45,7 @@ trash = "5"
 notify = "8.2.0"
 url = "2"
 sysinfo = "0.39"
+tauri-plugin-clipboard-manager = "2"
 
 [dev-dependencies]
 proptest = "1"

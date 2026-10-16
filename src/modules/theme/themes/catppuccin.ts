@@ -3,10 +3,11 @@ import type { Theme } from "../types";
 export const catppuccin: Theme = {
   id: "catppuccin",
   name: "Catppuccin",
-  description: "Mocha + Latte — soothing pastel.",
+  description: "Mocha + Latte - soothing pastel.",
   editorTheme: { dark: "catppuccin-mocha", light: "catppuccin-latte" },
   variants: {
     dark: {
+      noteTint: { color: "#ebe150", amount: 0.38 },
       colors: {
         background: "#1e1e2e",
         foreground: "#cdd6f4",

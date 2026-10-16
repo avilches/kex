@@ -86,6 +86,13 @@ fn resolve_repo_in_authorized(
     registry: &WorkspaceRegistry,
     cwd: &ResolvedGitDirectory,
 ) -> Result<Option<GitRepoInfo>> {
+    // The .git directory answers a plain local repo without a single git
+    // process; the titles ask for the branch every time a command ends, so
+    // this is the cost each terminal pays in steady state. Anything the
+    // direct read cannot answer falls through to git here.
+    if let Some(info) = crate::modules::git::direct::resolve_repo_direct(registry, cwd) {
+        return Ok(Some(info));
+    }
     let Some(canonical_root) = resolve_repo_root(registry, cwd)? else {
         return Ok(None);
     };

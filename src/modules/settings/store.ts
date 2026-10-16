@@ -1,3 +1,4 @@
+import { DEFAULT_ZOOM, snapZoom } from "@/lib/zoomLevels";
 import type { KeyBinding, ShortcutId } from "@/modules/shortcuts/shortcuts";
 import {
   type EditorViewMap,
@@ -219,7 +220,8 @@ export type Preferences = {
   // Default title template for agent; "" means the factory default.
   titleTemplateAgent: string;
   // Default title template for file; "" means the factory default.
-  titleTemplateFile: string;
+  titleTemplateEditor: string;
+  titleTemplateDiff: string;
   // Default title template for browser; "" means the factory default.
   titleTemplateBrowser: string;
   // Default title template for gitHistory; "" means the factory default.
@@ -250,7 +252,8 @@ const KEY_LAST_WSL_DISTRO = "lastWslDistro";
 const KEY_UI_FONT = "uiFont";
 const KEY_TITLE_TEMPLATE_TERMINAL = "titleTemplateTerminal";
 const KEY_TITLE_TEMPLATE_AGENT = "titleTemplateAgent";
-const KEY_TITLE_TEMPLATE_FILE = "titleTemplateFile";
+const KEY_TITLE_TEMPLATE_EDITOR = "titleTemplateEditor";
+const KEY_TITLE_TEMPLATE_DIFF = "titleTemplateDiff";
 const KEY_TITLE_TEMPLATE_BROWSER = "titleTemplateBrowser";
 const KEY_TITLE_TEMPLATE_GIT_HISTORY = "titleTemplateGitHistory";
 const KEY_TITLE_TEMPLATE_WORKSPACE = "titleTemplateWorkspace";
@@ -267,7 +270,7 @@ const KEY_WORKSPACE_DETAIL_EDITORS = "workspaceDetailEditors";
 const KEY_WORKSPACE_DETAIL_BROWSERS = "workspaceDetailBrowsers";
 const KEY_WORKSPACE_DETAIL_GIT = "workspaceDetailGit";
 
-// Terminal store keys — no "terminal" prefix since the file is already settings-terminal.json
+// Terminal store keys - no "terminal" prefix since the file is already settings-terminal.json
 const KEY_WARN_ON_CLOSE_RUNNING = "warnOnCloseTabWithRunningProcess";
 const KEY_TERMINAL_WEBGL_ENABLED = "webglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "cursorBlink";
@@ -286,7 +289,7 @@ const KEY_TERMINAL_SCROLL_SENSITIVITY = "scrollSensitivity";
 const KEY_TERMINAL_NEW_FOLDER_MODE = "newFolderMode";
 const KEY_SCRATCHPAD_ENTER_SENDS = "scratchpadEnterSends";
 
-// Editor store keys — no "editor" prefix since the file is already settings-editor.json
+// Editor store keys - no "editor" prefix since the file is already settings-editor.json
 const KEY_EDITOR_THEME = "theme";
 const KEY_EDITOR_FONT_FAMILY = "fontFamily";
 const KEY_EDITOR_FONT_SIZE = "fontSize";
@@ -451,7 +454,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalScrollSensitivity: SCROLL_SENSITIVITY_DEFAULT,
   terminalNewFolderMode: "context",
   lastWslDistro: null,
-  zoomLevel: 1.0,
+  zoomLevel: DEFAULT_ZOOM,
   agentNotifications: true,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
@@ -482,7 +485,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   uiFont: "",
   titleTemplateTerminal: "",
   titleTemplateAgent: "",
-  titleTemplateFile: "",
+  titleTemplateEditor: "",
+  titleTemplateDiff: "",
   titleTemplateBrowser: "",
   titleTemplateGitHistory: "",
   titleTemplateWorkspace: "",
@@ -561,7 +565,7 @@ async function writeShortcutsPref(
 }
 
 export async function loadPreferences(): Promise<Preferences> {
-  // Fetch all stores in parallel — one IPC roundtrip per store.
+  // Fetch all stores in parallel - one IPC roundtrip per store.
   const [entries, terminalEntries, editorEntries, toolsEntries, shortcutsValue] = await Promise.all([
     store.entries(),
     terminalStore.entries(),
@@ -695,7 +699,7 @@ export async function loadPreferences(): Promise<Preferences> {
     lastWslDistro:
       getGeneral<string | null>(KEY_LAST_WSL_DISTRO) ??
       DEFAULT_PREFERENCES.lastWslDistro,
-    zoomLevel: getGeneral<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel,
+    zoomLevel: snapZoom(getGeneral<number>(KEY_ZOOM_LEVEL) ?? DEFAULT_PREFERENCES.zoomLevel),
     agentNotifications:
       getGeneral<boolean>(KEY_AGENT_NOTIFICATIONS) ??
       DEFAULT_PREFERENCES.agentNotifications,
@@ -807,9 +811,12 @@ export async function loadPreferences(): Promise<Preferences> {
     titleTemplateAgent:
       getGeneral<string>(KEY_TITLE_TEMPLATE_AGENT) ??
       DEFAULT_PREFERENCES.titleTemplateAgent,
-    titleTemplateFile:
-      getGeneral<string>(KEY_TITLE_TEMPLATE_FILE) ??
-      DEFAULT_PREFERENCES.titleTemplateFile,
+    titleTemplateEditor:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_EDITOR) ??
+      DEFAULT_PREFERENCES.titleTemplateEditor,
+    titleTemplateDiff:
+      getGeneral<string>(KEY_TITLE_TEMPLATE_DIFF) ??
+      DEFAULT_PREFERENCES.titleTemplateDiff,
     titleTemplateBrowser:
       getGeneral<string>(KEY_TITLE_TEMPLATE_BROWSER) ??
       DEFAULT_PREFERENCES.titleTemplateBrowser,
@@ -1169,7 +1176,7 @@ export async function setWorkspaceDetailGit(value: boolean): Promise<void> {
 }
 
 export async function setZoomLevel(value: number): Promise<void> {
-  await writePref(KEY_ZOOM_LEVEL, value);
+  await writePref(KEY_ZOOM_LEVEL, snapZoom(value));
 }
 
 export async function setUiFont(value: string): Promise<void> {
@@ -1179,7 +1186,8 @@ export async function setUiFont(value: string): Promise<void> {
 export type TitleTemplatePref =
   | "titleTemplateTerminal"
   | "titleTemplateAgent"
-  | "titleTemplateFile"
+  | "titleTemplateEditor"
+  | "titleTemplateDiff"
   | "titleTemplateBrowser"
   | "titleTemplateGitHistory"
   | "titleTemplateWorkspace";
@@ -1187,7 +1195,8 @@ export type TitleTemplatePref =
 const TITLE_TEMPLATE_KEYS: Record<TitleTemplatePref, string> = {
   titleTemplateTerminal: KEY_TITLE_TEMPLATE_TERMINAL,
   titleTemplateAgent: KEY_TITLE_TEMPLATE_AGENT,
-  titleTemplateFile: KEY_TITLE_TEMPLATE_FILE,
+  titleTemplateEditor: KEY_TITLE_TEMPLATE_EDITOR,
+  titleTemplateDiff: KEY_TITLE_TEMPLATE_DIFF,
   titleTemplateBrowser: KEY_TITLE_TEMPLATE_BROWSER,
   titleTemplateGitHistory: KEY_TITLE_TEMPLATE_GIT_HISTORY,
   titleTemplateWorkspace: KEY_TITLE_TEMPLATE_WORKSPACE,
@@ -1332,7 +1341,8 @@ const GENERAL_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_UI_FONT]: "uiFont",
   [KEY_TITLE_TEMPLATE_TERMINAL]: "titleTemplateTerminal",
   [KEY_TITLE_TEMPLATE_AGENT]: "titleTemplateAgent",
-  [KEY_TITLE_TEMPLATE_FILE]: "titleTemplateFile",
+  [KEY_TITLE_TEMPLATE_EDITOR]: "titleTemplateEditor",
+  [KEY_TITLE_TEMPLATE_DIFF]: "titleTemplateDiff",
   [KEY_TITLE_TEMPLATE_BROWSER]: "titleTemplateBrowser",
   [KEY_TITLE_TEMPLATE_GIT_HISTORY]: "titleTemplateGitHistory",
   [KEY_TITLE_TEMPLATE_WORKSPACE]: "titleTemplateWorkspace",
@@ -1390,7 +1400,7 @@ const SHORTCUTS_PREF_KEY_MAP: Record<string, PrefKey> = {
   [KEY_SHORTCUTS]: "shortcuts",
 };
 
-// Backwards-compat export used by tests — maps store keys from all stores
+// Backwards-compat export used by tests - maps store keys from all stores
 // except where terminal/editor keys collide. Non-colliding entries are correct.
 // Do NOT use this map inside onPreferencesChange; use the per-store maps instead.
 export const PREF_KEY_MAP: Record<string, PrefKey> = {

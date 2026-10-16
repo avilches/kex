@@ -1,12 +1,16 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import type React from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { TITLE_VARIABLES_HINT } from "./lib/titleTemplate";
+import { clearTitleDraft, setTitleDraft } from "./lib/titleDraftStore";
+import { titleVariablesHint } from "./lib/titleTemplate";
+import type { Tab } from "./lib/types";
 import { TitleVariablesHelp } from "./TitleVariablesHelp";
 import { type RenameOrigin, isRenamingAt, useTabRenameStore } from "./lib/tabRenameStore";
 
 type Props = {
   tabId: string;
+  // Decides which variables the field offers: a browser has {url}, a terminal {cmd}.
+  kind: Tab["kind"];
   origin: RenameOrigin;
   title: string | undefined;
   placeholder: string;
@@ -17,7 +21,7 @@ type Props = {
 
 // The rename field of a tab, shared by the pane tab and the sidebar row. Both
 // mount one; only the one whose origin matches the store opens.
-export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTab, children }: Props) {
+export function TabRenamePopover({ tabId, kind, origin, title, placeholder, onRenameTab, children }: Props) {
   const isRenaming = useTabRenameStore((s) => isRenamingAt(s, tabId, origin));
   const clearRename = useTabRenameStore((s) => s.clearRename);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +66,13 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
     });
   }, [isRenaming]);
 
+  // What is being typed shows live in every title of this tab until the field closes;
+  // cancelling just drops it.
+  useEffect(() => {
+    if (!isRenaming) return;
+    return () => clearTitleDraft(tabId);
+  }, [isRenaming, tabId]);
+
   // A row can unmount with its field open (collapsed list, detail filter,
   // compact bar); without this the store keeps pointing at it forever.
   useEffect(
@@ -103,8 +114,9 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
           }}
           onBlur={handleBlur}
           defaultValue={title ?? ""}
+          onChange={(e) => setTitleDraft(tabId, e.target.value)}
           placeholder={placeholder}
-          title={TITLE_VARIABLES_HINT}
+          title={titleVariablesHint(kind)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -114,7 +126,7 @@ export function TabRenamePopover({ tabId, origin, title, placeholder, onRenameTa
           onPointerDown={(e) => e.stopPropagation()}
           className="w-full rounded border border-input bg-transparent px-1.5 py-1 text-[12px] text-foreground outline-none focus:border-ring placeholder:text-muted-foreground/60"
         />
-        <TitleVariablesHelp scope="tab" />
+        <TitleVariablesHelp subject={kind} />
       </PopoverContent>
     </Popover>
   );

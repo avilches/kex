@@ -5,6 +5,7 @@ import {
   getRunningCommand,
   getRunningCommandsSnapshot,
   setRunningCommand,
+  subscribeToCommandFinished,
   subscribeToRunningCommands,
 } from "./terminalEphemeralStore";
 
@@ -12,6 +13,34 @@ beforeEach(() => {
   for (const tabId of Array.from(getRunningCommandsSnapshot().keys())) {
     clearRunningCommandEntry(tabId);
   }
+});
+
+describe("terminalEphemeralStore finished commands", () => {
+  it("reports the tab when its command ends, not when it starts or changes", () => {
+    const finished = vi.fn();
+    const off = subscribeToCommandFinished(finished);
+    setRunningCommand("tab-a", "git checkout x");
+    setRunningCommand("tab-a", "git checkout y");
+    expect(finished).not.toHaveBeenCalled();
+    setRunningCommand("tab-a", null);
+    expect(finished).toHaveBeenCalledExactlyOnceWith("tab-a");
+    off();
+  });
+
+  it("does not report a tab that had no command, and stops after unsubscribing", () => {
+    const finished = vi.fn();
+    const off = subscribeToCommandFinished(finished);
+    setRunningCommand("tab-a", null);
+    clearRunningCommandEntry("tab-a");
+    expect(finished).not.toHaveBeenCalled();
+    setRunningCommand("tab-a", "ls");
+    clearRunningCommandEntry("tab-a");
+    expect(finished).toHaveBeenCalledExactlyOnceWith("tab-a");
+    off();
+    setRunningCommand("tab-a", "ls");
+    setRunningCommand("tab-a", null);
+    expect(finished).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("terminalEphemeralStore running commands", () => {

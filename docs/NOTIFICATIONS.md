@@ -117,9 +117,9 @@ Los eventos de atención (`Notification`, `PermissionRequest`, `Stop`) se enruta
 
 ## Notification bell (una entrada por agente)
 
-`pushNotification` hace **upsert por `panelId`**: cada agente tiene como mucho una notificación, y un evento nuevo la reutiliza y la mueve al frente (en vez de apilar duplicados). `Stop` puede repetirse y Claude puede reenviar `idle_prompt`; el filtro de `idle_prompt` en Rust mas el upsert evitan que el final de turno genere varias filas.
+`pushNotification` hace **upsert por `tabId`**: cada agente tiene como mucho una notificación, y un evento nuevo la reutiliza y la mueve al frente (en vez de apilar duplicados). `Stop` puede repetirse y Claude puede reenviar `idle_prompt`; el filtro de `idle_prompt` en Rust mas el upsert evitan que el final de turno genere varias filas.
 
-`NotificationBell` colapsa sesiones vivas + notificaciones en una sola lista con `buildAgentEntries` (`lib/notificationList.ts`), una fila por `panelId`, y solo muestra lo accionable. Una sesión `idle` ya se ha visto, asi que se omite. El indicador de cada fila se deriva en vivo del estado de la sesión, asi que coincide siempre con el dot del tab:
+`NotificationBell` colapsa sesiones vivas + notificaciones en una sola lista con `buildAgentEntries` (`lib/notificationList.ts`), una fila por `tabId`, y solo muestra lo accionable. Una sesión `idle` ya se ha visto, asi que se omite. El indicador de cada fila se deriva en vivo del estado de la sesión, asi que coincide siempre con el dot del tab:
 
 | `visual` | Origen | Indicador |
 |---|---|---|
@@ -153,14 +153,14 @@ El dot naranja (status=attention) y el spinner (status=working) se limpian por m
 
 | Trigger | Aplica a | Mecanismo |
 |---|---|---|
-| Enfocar el panel del agente | Dot naranja | `markPanelSeen` desde el efecto de foco en `AgentNotificationsBridge` |
+| Enfocar el panel del agente | Dot naranja | `markTabSeen` desde el efecto de foco en `AgentNotificationsBridge` |
 | `Stop` con el panel ya enfocado | Spinner (pasa a `idle`, sin dot) | `setStatus("idle")` en `handleSignal` |
 | `UserPromptSubmit` hook | Dot y spinner pasa a spinner | `setStatus("working")` en `handleSignal` |
 | `Exited` / `SessionEnd` / `StopFailure` | Dot y spinner | `store.finish()` en `handleSignal` |
 | ESC (`\x1b` solo, 1 byte) | Spinner | `writeToPty` → `setStatus("idle")` |
 | CTRL+C (`\x03`) | Spinner | `writeToPty` → `setStatus("idle")` |
 
-El dot naranja es una señal de "atención no vista": se limpia al **mirar** el panel (panel activo + ventana enfocada), no al teclear. Por eso un `Notification`/`PermissionRequest`/`Stop` que llega mientras el panel ya está enfocado no llega a poner el dot (`isPanelSeen` lo descarta en `handleSignal`); cuando es un `Stop`, el spinner pasa directo a `idle`. Al mirar el panel con subagentes en segundo plano todavía vivos, el dot se limpia pero la sesión vuelve a `working` y no a `idle` (`markTabSeen`). Un `SessionEnd` (por ejemplo `/clear`) olvida los subagentes de la sesión y, si seguía en `working`, la pasa a `idle` (`forgetSubagents`).
+El dot naranja es una señal de "atención no vista": se limpia al **mirar** el panel (panel activo + ventana enfocada), no al teclear. Por eso un `Notification`/`PermissionRequest`/`Stop` que llega mientras el panel ya está enfocado no llega a poner el dot (`isTabSeen` lo descarta en `handleSignal`); cuando es un `Stop`, el spinner pasa directo a `idle`. Al mirar el panel con subagentes en segundo plano todavía vivos, el dot se limpia pero la sesión vuelve a `working` y no a `idle` (`markTabSeen`). Un `SessionEnd` (por ejemplo `/clear`) olvida los subagentes de la sesión y, si seguía en `working`, la pasa a `idle` (`forgetSubagents`).
 
 El spinner refleja estado real del agente, así que solo lo limpian las interrupciones explícitas (`\x03`, `\x1b` solo). Las respuestas automáticas de xterm a queries de terminal (`\x1b[?1;2c`, etc.) son secuencias multi-byte que no coinciden y no limpian el spinner accidentalmente.
 

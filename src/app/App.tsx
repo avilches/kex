@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/resizable";
 import { tabLocations, userTabTitles } from "@/modules/workspaces/lib/tabLocations";
 import {
+  menuBlockedWhileHibernated,
   workspaceDialogPending,
   editorTabIds,
   enableRunOnStart,
@@ -18,6 +19,7 @@ import { unmarkHibernating } from "@/modules/agents/lib/hibernatingTabs";
 import { useAutoHibernate } from "@/modules/workspaces/lib/useAutoHibernate";
 import { useHibernateFlow } from "@/modules/workspaces/lib/useHibernateFlow";
 import { useCloseWorkspaceFlow } from "@/modules/workspaces/lib/useCloseWorkspaceFlow";
+import { workspaceTabCount } from "@/modules/workspaces/lib/useWorkspaces";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -1401,6 +1403,7 @@ export default function App() {
           home: homeRef.current,
           lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          launchDir: getLaunchDir() ?? null,
         }),
       });
     },
@@ -1419,7 +1422,7 @@ export default function App() {
         : tabDisplayTitleNow(activeTab)
       : "";
     let title: string;
-    if (project && label && label !== project) title = `${project} — ${label}`;
+    if (project && label && label !== project) title = `${project} - ${label}`;
     else title = project || label || "Kex";
     document.title = title;
     void getCurrentWindow()
@@ -1865,6 +1868,7 @@ export default function App() {
           home: homeRef.current,
           lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          launchDir: getLaunchDir() ?? null,
         }),
       });
     },
@@ -1899,6 +1903,7 @@ export default function App() {
           home: homeRef.current,
           lastFolder: scriptFocusFolderRef.current ?? ws.cwd ?? null,
           workspaceRoot: ws.workspaceRoot ?? ws.fsRoot ?? null,
+          launchDir: getLaunchDir() ?? null,
         }),
       });
     },
@@ -2850,7 +2855,8 @@ export default function App() {
   }, [activeWorkspace?.activePaneId, zenPaneId]);
 
   const handleCloseActiveTab = useCallback(() => {
-    if (!activeWorkspace) return;
+    // The native menu reaches this without passing through `shortcutsDisabled`.
+    if (!activeWorkspace || activeWorkspace.hibernated) return;
     if (!activeTabId) {
       // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
       void requestCloseWorkspace(activeWorkspace.id);
@@ -3344,6 +3350,12 @@ export default function App() {
 
   const onActivateAgent = useCallback(
     (_storedWorkspaceId: string, tabId: string) => {
+      const asleep = workspacesRef.current.find((w) => w.hibernated && findTabPane(w.paneTree, tabId));
+      if (asleep) {
+        setActiveWorkspaceId(asleep.id);
+        onActivateTabStable(asleep.id, tabId);
+        return;
+      }
       const live = useAgentStore.getState().tabLocations?.[tabId];
       if (!live) return;
       setActiveWorkspaceId(live);
@@ -3376,6 +3388,7 @@ export default function App() {
   // same handlers the shortcuts use. Kept in a ref so the listener stays stable.
   const menuDispatchRef = useRef<(id: string) => void>(() => {});
   menuDispatchRef.current = (id: string) => {
+    if (activeWorkspace?.hibernated && menuBlockedWhileHibernated(id)) return;
     switch (id) {
       case "settings":
         void openSettingsWindow();
@@ -3448,9 +3461,10 @@ export default function App() {
         activeView: sidebarView,
         sidebarSide: sidebarSide,
         showHidden: activeShowHidden,
+        hibernated: !!activeWorkspace?.hibernated,
       },
     }).catch(() => {});
-  }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden]);
+  }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden, activeWorkspace?.hibernated]);
 
   // ── Command palette ───────────────────────────────────────────────────────
 
@@ -3519,6 +3533,7 @@ export default function App() {
               );
             },
             hasActiveTerminal: activeTab?.kind === "terminal",
+            hibernated: !!activeWorkspace?.hibernated,
             openWorkspaceProperties: () =>
               useWorkspaceSettingsStore
                 .getState()
@@ -3597,9 +3612,10 @@ export default function App() {
         icon: w.icon,
         groupId: w.groupId,
         focusedTab: focusedTab(w.paneTree, w.activePaneId),
-        tabs: w.detailExpanded && !w.hibernated
+        tabs: w.detailExpanded
           ? allPanes(w.paneTree).flatMap((p) => p.tabs)
           : NO_TABS,
+        tabCount: workspaceTabCount(w),
         focusedTabId: focusedTabId(w.paneTree, w.activePaneId),
         visibleTabIds: allPanes(w.paneTree)
           .map((p) => p.activeTabId)
@@ -3615,7 +3631,7 @@ export default function App() {
   const shell = (
     <ThemeProvider>
       <TooltipProvider>
-        <div className="zoom-content relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+        <div className="zoom-content relative flex h-[calc(100vh/var(--app-zoom))] flex-col overflow-hidden bg-background text-foreground">
           <Header
             onToggleSidebar={toggleSidebar}
             sidebarSide={sidebarSide}

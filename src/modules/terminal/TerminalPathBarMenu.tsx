@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -11,13 +12,24 @@ import {
   Copy01Icon,
   FolderOpenIcon,
   MoreHorizontalIcon,
+  Search01Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { warn as logWarn } from "@tauri-apps/plugin-log";
+import { writeClipboardText } from "@/lib/clipboard";
 import { native } from "@/lib/native";
-import { revealInFinder, REVEAL_LABEL } from "@/modules/explorer/lib/contextActions";
+import { IS_MAC } from "@/lib/platform";
+import { revealInFinder } from "@/modules/explorer/lib/contextActions";
 import type { AgentSession } from "@/modules/agents/lib/types";
+
+const REVEAL_TRANSCRIPT_LABEL = IS_MAC
+  ? "Reveal Transcript in Finder"
+  : "Reveal Transcript in File Manager";
+
+function parentDir(path: string): string {
+  const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return i > 0 ? path.slice(0, i) : path;
+}
 
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -28,40 +40,13 @@ function formatElapsed(ms: number): string {
   return `${h}h ${m % 60}m`;
 }
 
-function legacyCopy(value: string): boolean {
-  const ta = document.createElement("textarea");
-  ta.value = value;
-  ta.style.position = "fixed";
-  ta.style.opacity = "0";
-  document.body.appendChild(ta);
-  ta.select();
-  try {
-    return document.execCommand("copy");
-  } finally {
-    ta.remove();
-  }
-}
-
-async function writeClipboard(value: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(value);
-    return true;
-  } catch (err) {
-    const ok = legacyCopy(value);
-    void logWarn(
-      `[clipboard] writeText failed: ${String(err)} | hasFocus=${document.hasFocus()} | active=${document.activeElement?.tagName} | execCommand=${ok}`,
-    );
-    return ok;
-  }
-}
-
 function CopyIdButton({ value, label }: { value: string; label: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const copy = async () => {
-    const ok = await writeClipboard(value);
+    const ok = await writeClipboardText(value);
     setState(ok ? "copied" : "failed");
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setState("idle"), 1500);
@@ -92,11 +77,13 @@ function CopyIdButton({ value, label }: { value: string; label: string }) {
 type Props = {
   tabId: string;
   agentSession: AgentSession | null;
+  onReveal?: (path: string) => void;
 };
 
 export function TerminalPathBarMenu({
   tabId,
   agentSession,
+  onReveal,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [transcriptExists, setTranscriptExists] = useState<boolean | null>(null);
@@ -153,31 +140,6 @@ export function TerminalPathBarMenu({
                   </span>
                 </div>
               )}
-              {transcriptPath && (
-                <div className="flex items-center justify-between gap-1">
-                  <span className="shrink-0 text-muted-foreground">Transcript</span>
-                  <span className="flex min-w-0 items-center gap-1">
-                    {transcriptExists === false ? (
-                      <span className="italic text-muted-foreground">not created yet</span>
-                    ) : (
-                      <span className="max-w-[120px] truncate font-mono text-foreground">
-                        {transcriptPath.split(/[\\/]/).pop()}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      title={REVEAL_LABEL}
-                      disabled={transcriptExists === false}
-                      onClick={() => {
-                        if (transcriptExists !== false) void revealInFinder(transcriptPath);
-                      }}
-                      className="flex size-[20px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={1.9} />
-                    </button>
-                  </span>
-                </div>
-              )}
               <div className="flex items-center justify-between gap-1">
                 <span className="shrink-0 text-muted-foreground">Started</span>
                 <span className="text-foreground">{formatElapsed(Date.now() - agentSession.startedAt)} ago</span>
@@ -188,6 +150,27 @@ export function TerminalPathBarMenu({
                 </div>
               )}
             </div>
+            {transcriptPath && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={transcriptExists === false}
+                  onSelect={() => onReveal?.(parentDir(transcriptPath))}
+                  className="text-[12px]"
+                >
+                  <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={1.9} />
+                  Open Transcript Folder
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={transcriptExists === false}
+                  onSelect={() => void revealInFinder(transcriptPath)}
+                  className="text-[12px]"
+                >
+                  <HugeiconsIcon icon={Search01Icon} size={12} strokeWidth={1.9} />
+                  {REVEAL_TRANSCRIPT_LABEL}
+                </DropdownMenuItem>
+              </>
+            )}
           </>
         )}
       </DropdownMenuContent>

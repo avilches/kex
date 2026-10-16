@@ -30,30 +30,42 @@ describe("resolveNewTerminalCwd", () => {
     );
   });
 
-  it("returns undefined when the chosen source is unavailable", () => {
-    expect(
-      resolveNewTerminalCwd({
-        mode: "home",
-        home: null,
-        lastFolder: null,
-        workspaceRoot: null,
-      }),
-    ).toBeUndefined();
-    expect(
-      resolveNewTerminalCwd({
-        mode: "workspace",
-        home: "/Users/me",
-        lastFolder: null,
-        workspaceRoot: null,
-      }),
-    ).toBeUndefined();
-    expect(
-      resolveNewTerminalCwd({
-        mode: "context",
-        home: "/Users/me",
-        lastFolder: null,
-        workspaceRoot: "/Users/me/project",
-      }),
-    ).toBeUndefined();
+  describe("when the chosen source is unavailable", () => {
+    const none = { home: null, lastFolder: null, workspaceRoot: null, launchDir: null };
+
+    it("falls back to where Kex was launched, then to home, as the shell would", () => {
+      for (const mode of ["workspace", "context"] as const) {
+        expect(resolveNewTerminalCwd({ ...none, mode, launchDir: "/launch", home: "/Users/me" })).toBe(
+          "/launch",
+        );
+        expect(resolveNewTerminalCwd({ ...none, mode, home: "/Users/me" })).toBe("/Users/me");
+      }
+    });
+
+    it("home mode uses the launch folder only while home is not known yet", () => {
+      expect(resolveNewTerminalCwd({ ...none, mode: "home", launchDir: "/launch" })).toBe("/launch");
+    });
+
+    it("home mode prefers home over the launch folder", () => {
+      expect(
+        resolveNewTerminalCwd({ ...none, mode: "home", home: "/Users/me", launchDir: "/launch" }),
+      ).toBe("/Users/me");
+    });
+
+    it("keeps the chosen source when it is available", () => {
+      expect(
+        resolveNewTerminalCwd({
+          ...base,
+          mode: "context",
+          launchDir: "/launch",
+        }),
+      ).toBe("/Users/me/project/src");
+    });
+
+    it("returns undefined only when nothing at all is known", () => {
+      for (const mode of ["home", "workspace", "context"] as const) {
+        expect(resolveNewTerminalCwd({ ...none, mode })).toBeUndefined();
+      }
+    });
   });
 });

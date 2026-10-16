@@ -10,7 +10,6 @@ import {
   ArrowDown01Icon,
   ClipboardIcon,
   ComputerTerminal01Icon,
-  CopySlashIcon,
   CrosshairIcon,
   DashboardSquareAddIcon,
   FileAddIcon,
@@ -57,10 +56,10 @@ import {
   type RowActions,
 } from "./TreeRow";
 import {
-  copyToClipboard,
   REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
+import { CopyAbsolutePathItem } from "./lib/copyPathItems";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { dirname, useFileTree } from "./lib/useFileTree";
@@ -233,7 +232,7 @@ function buildRows(
     rows.push({ kind: "fs-up", key: "fs-up", path: pathDirname(rootPath) });
   }
   // A create-at-root pending sits below the synthetic header/".." rows, before
-  // the real entries — only when there is no afterPath (afterPath means the
+  // the real entries - only when there is no afterPath (afterPath means the
   // pending is inserted inline during walk(), right after the target sibling).
   if (
     tree.pendingCreate?.parentPath === rootPath &&
@@ -1553,13 +1552,7 @@ export const FileExplorer = memo(
                     Paste
                   </ContextMenuItem>
                   <ContextMenuSeparator />
-                  <ContextMenuItem
-                    className={COMPACT_ITEM}
-                    onSelect={() => void copyToClipboard(rootPath, "Copied absolute path")}
-                  >
-                    <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-                    Copy Absolute Path
-                  </ContextMenuItem>
+                  <CopyAbsolutePathItem path={rootPath} />
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     onSelect={() => tree.refresh(rootPath)}

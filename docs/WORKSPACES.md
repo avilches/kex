@@ -1,4 +1,4 @@
-# Workspaces — rendering, terminal pool, and lifecycle
+# Workspaces - rendering, terminal pool, and lifecycle
 
 This document covers the internal mechanics of the Workspace/Pane/Tab model: how the render tree
 is structured, how terminal slots are managed, and what happens when tabs are shown or hidden.
@@ -13,25 +13,25 @@ For the high-level user-facing overview, see [ARCHITECTURE.md](ARCHITECTURE.md) 
 Three levels of hierarchy, all owned by `useWorkspaces` in `src/modules/workspaces/lib/useWorkspaces.ts`:
 
 ```
-Workspace           — a named environment (local or WSL distro)
-  └── paneTree      — a binary split tree of SplitNode
-        ├── SplitNode (kind: "split") — horizontal or vertical split with a dividerPosition
+Workspace           - a named environment (local or WSL distro)
+  └── paneTree      - a binary split tree of SplitNode
+        ├── SplitNode (kind: "split") - horizontal or vertical split with a dividerPosition
         │     ├── first: SplitNode
         │     └── second: SplitNode
-        └── SplitNode (kind: "pane") — leaf; holds a tab strip
-              ├── tabs: Tab[]    — the tabs
-              └── activeTabId      — which tab is shown
+        └── SplitNode (kind: "pane") - leaf; holds a tab strip
+              ├── tabs: Tab[]    - the tabs
+              └── activeTabId      - which tab is shown
 ```
 
 **Workspace fields.** A `Workspace` carries additional configuration:
-- `color?: string | null` — optional workspace accent color (hex string or null)
-- `scripts?: Script[]` — list of saved scripts (command, name, `cwdMode` of `workspace` | `context` | `fixed`, `cwd` used only in `fixed` mode, optional tabId)
-- `activeScript?: string` — id of the currently selected script in the Run button
-- `explorerRootMode: "workspace" | "filesystem"` — which root the explorer displays. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
+- `color?: string | null` - optional workspace accent color (hex string or null)
+- `scripts?: Script[]` - list of saved scripts (command, name, `cwdMode` of `workspace` | `context` | `fixed`, `cwd` used only in `fixed` mode, optional tabId)
+- `activeScript?: string` - id of the currently selected script in the Run button
+- `explorerRootMode: "workspace" | "filesystem"` - which root the explorer displays. When `"workspace"`, the explorer shows the workspace root (set via folder context action); when `"filesystem"`, it shows a navigable filesystem root.
 
 **Script running state.** `terminalEphemeralStore` (`src/modules/workspaces/lib/terminalEphemeralStore.ts`) has two independent sections:
-- `runningCommands` (`Map<tabId, string>`) — foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a script is involved.
-- `scriptRunning` (`Map<tabId, ScriptState>`) — tracks which terminal tabs are currently executing a script command. Set by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
+- `runningCommands` (`Map<tabId, string>`) - foreground command name from OSC 133 C, for all terminal tabs. Set and cleared by every `onRunningCommand` callback regardless of whether a script is involved.
+- `scriptRunning` (`Map<tabId, ScriptState>`) - tracks which terminal tabs are currently executing a script command. Set by `runWorkspaceConfig` in App.tsx the moment the command is written; cleared when `onRunningCommand` fires with `cmd === null` (OSC 133 D) and the tab id is present in this map. Manual commands typed by the user do NOT set this flag. Never persisted. `RunButton` reads it via `useSyncExternalStore` to show the stop icon while the command is running.
 
 `runWorkspaceConfig`/`stopWorkspaceConfig` move focus to the script's tab (full activation) when it lives in a *different* workspace, or when its target pane is the user's own current pane (a pane shows exactly one tab, so revealing without stealing focus is impossible there). Otherwise, when the script's tab is in the current workspace but a different pane, they call `revealTab` (makes the tab active in its own pane, `activePaneId` untouched) and restore `requestLeafFocus` on the user's own leaf, so running or stopping a script never steals focus or closes the user's open scratchpad.
 
@@ -47,6 +47,19 @@ split pane, `applyCloseTab` (the pure entry point for tab close in `useWorkspace
 the empty half and promotes the sibling - only the root pane of a single-pane workspace is left
 empty, where it renders a welcome screen. This invariant is locked by a unit test in
 `workspaceState.test.ts`: `sanitizeWorkspace` must round-trip an empty pane without dropping it.
+
+**Fold on empty.** A workspace that reaches zero tabs closes with its last tab, through a
+reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`), whatever emptied it: the
+tab close button or `tab.close`, the shell exiting on its own, moving or dragging the last tab
+to another workspace, and bulk closes such as Close All Tabs (the fold decides on committed
+state, so batched closes inside one tick are covered too). Two exceptions keep the workspace
+with its empty pane: the window's only workspace (folding it would close the window), and one
+holding scripts with a command, whose deletion the close-workspace confirmation dialog still
+owns (`scriptsToDelete`). `applyCloseTab` also resets `detailExpanded` to true when it empties
+the sole pane, so an empty workspace shows no chevron in the WorkspaceBar while staying
+expanded: a tab opened into it appears in the nested list without touching anything. The
+nested list renders nothing with zero tabs, so the expanded state is invisible on the empty
+workspace itself.
 
 **Focus on close (per-pane MRU).** When the *active* tab of a pane with more than one tab closes,
 focus returns to the most-recently-used surviving tab, not the positional neighbour. Each pane
@@ -113,13 +126,13 @@ per workspace" of [ARCHITECTURE.md](ARCHITECTURE.md).
 ## Render tree
 
 ```
-WorkspaceDndProvider    — DndContext wrapper; owns all drag state, handlers, and DragOverlay
-  ├── Explorer panel    — TreeRow uses useDraggable for file and folder drag (files open editors, folders open terminals)
-  └── WorkspaceView     — one per active+inactive workspace (absolute inset-0)
-        └── SplitNodeView     — recursive: renders split groups as ResizablePanelGroup, leaves as PaneView
-              └── PaneView    — one pane: tab bar + panel content area + drag drop zones
-                    ├── PaneTabBar        — tab strip with DraggableTab per panel
-                    └── TabContent      — switches on tab.kind; mounts terminal, editor, etc.
+WorkspaceDndProvider    - DndContext wrapper; owns all drag state, handlers, and DragOverlay
+  ├── Explorer panel    - TreeRow uses useDraggable for file and folder drag (files open editors, folders open terminals)
+  └── WorkspaceView     - one per active+inactive workspace (absolute inset-0)
+        └── SplitNodeView     - recursive: renders split groups as ResizablePanelGroup, leaves as PaneView
+              └── PaneView    - one pane: tab bar + panel content area + drag drop zones
+                    ├── PaneTabBar        - tab strip with DraggableTab per panel
+                    └── TabContent      - switches on tab.kind; mounts terminal, editor, etc.
 ```
 
 A `browser` panel with `floating: true` is a special case: `TabContent` renders a placeholder
@@ -129,7 +142,7 @@ from `App.tsx` down through `WorkspaceView` → `SplitNodeView` → `PaneView` �
 `BrowserPane`; see `docs/FORK.md` (Floating browser windows).
 
 **All workspaces are always mounted.** Inactive workspaces are hidden with `opacity-0 invisible`
-CSS — they are never removed from the React tree. This is required to keep PTYs streaming and
+CSS - they are never removed from the React tree. This is required to keep PTYs streaming and
 editor state alive.
 
 **All tabs within a pane are always mounted.** Inactive tabs within a pane are hidden with
@@ -144,7 +157,7 @@ visible={tab.id === pane.activeTabId && isWorkspaceActive}
 
 Both conditions must be true. This drives whether the terminal session holds a renderer slot
 (see below). `isWorkspaceActive` was added to prevent inactive workspace tabs from keeping
-their WebGL contexts permanently — see [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md).
+their WebGL contexts permanently - see [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md).
 
 ---
 
@@ -185,7 +198,7 @@ When `visible` becomes **false**:
 - **Alt-screen or blocks mode**: `parkLeafSlot` → schedules the WebGL addon's disposal (see
   "WebGL context management" below), slot stays bound; the xterm instance keeps receiving data
   (TUI apps emit incremental cursor-positioned updates that can't be replayed coherently from a
-  snapshot — a SIGWINCH kick on re-show forces a full repaint)
+  snapshot - a SIGWINCH kick on re-show forces a full repaint)
 - **Normal mode**: `parkOrReleaseLeaf` (`useTerminalSession.ts`) → always parks first, the same cheap
   way as alt-screen/blocks (`parkLeafSlot`, `hasSlot` stays true, only the WebGL context is scheduled
   for disposal), and joins a recency-ordered `parkedLeaves` LRU (`parkedLeafOrder.ts`). It then calls
@@ -210,7 +223,7 @@ While a session has no slot, incoming PTY bytes go into `DormantRing` (256 chunk
 On slot re-acquisition, `drainRing` replays them into xterm. If the cap is exceeded, old chunks
 are dropped and the message `[kex: dropped output during hibernation]` is prepended on drain.
 
-The PTY process itself is never paused — the OS shell keeps running and output keeps arriving;
+The PTY process itself is never paused - the OS shell keeps running and output keeps arriving;
 only the rendering is deferred.
 
 ### Hibernated workspaces
@@ -220,7 +233,7 @@ has no mounted tabs at all. Its tabs stay in the persisted `paneTree`, but `Work
 `strippedTree(ws.paneTree)` (a memoized copy with every pane emptied) and passes `hibernated` down
 through `SplitNodeView` to `PaneView`, which returns a bordered empty box right before its main
 `return` (after the last hook). `HibernatedOverlay` (large sleeping icon, `WorkspaceMark` and name, "Hibernated for 3h 20m" from `Workspace.hibernatedAt` via `formatHibernatedFor`, and a primary Restore button with the undo icon; wired to
-`wakeWorkspace` through the `onWake` prop) covers the workspace. Under the name it lists every tab with its icon, title and, in monospace, the command the restore will run (the agent resume command or the run-on-start command). The title is `tab.title` (the user's rename), else `Tab.agentTitle`, the last name an agent sent through OSC or its hooks: `startAgentTitleSync` (`agentTitleSync.ts`) copies it into the tab through one shared 10 s window (the first change saves at once, later ones from any tab wait for the rest of the window and go out together; hibernation and window close flush it), so it survives a restart. The agent and the resume command die with the PTY, so `createHibernateFlow` captures them as `Tab.hibernation` (`TabHibernation`) before ending the agent sessions, `applyHibernate` stores them and `applyWake` drops them. A workspace hibernated at startup has no snapshot: the overlay asks `previewResumeCmd` for the same plan the wake uses. The Sidebar (explorer, source control) and its resize handle are not mounted while the active workspace sleeps, so the overlay is centered in the full width. Waking remounts the Sidebar, which gets its `Workspace.sidebar` (view, open folders, selection, scroll) back; hibernating flushes the pending Sidebar snapshots first. A workspace switch or a wake does not itself trigger the autofocus reveal (`autofocusDecision`), so the explorer does not jump away from the restored state; a later change inside the woken workspace does, such as focusing another tab or a resumed agent in the focused tab reporting the worktree it entered.
+`wakeWorkspace` through the `onWake` prop) covers the workspace. Under the name it lists every tab with its icon, title and, in monospace, the command the restore will run (the agent resume command or the run-on-start command). The title is `tab.title` (the user's rename), else `Tab.agentTitle`, the last name an agent sent through OSC or its hooks: `startAgentTitleSync` (`agentTitleSync.ts`) copies it into the tab through one shared 10 s window (the first change saves at once, later ones from any tab wait for the rest of the window and go out together; hibernation and window close flush it), so it survives a restart. The live OSC title dies with the PTY too, and the resumed agent sends no new one until it boots, so after a wake (and during the app-restart restore) `resolveAgentTabTitle` (`useAgentTabTitle.ts`) falls back to that same `Tab.agentTitle` until a live OSC title arrives; the live title always wins. The agent and the resume command die with the PTY, so `createHibernateFlow` captures them as `Tab.hibernation` (`TabHibernation`) before ending the agent sessions, together with `title`, the whole display title the tab shows at that instant (`tabDisplayTitleNow`, so `{cmd|osc} · {branch|dir}` keeps its command part); `resolveAgentTabTitle` returns it verbatim while the tab sleeps, in the overlay and in the WorkspaceBar rows alike. `applyHibernate` stores them and `applyWake` drops them. A workspace hibernated at startup has no snapshot: the overlay asks `previewResumeCmd` for the same plan the wake uses. The Sidebar (explorer, source control) and its resize handle are not mounted while the active workspace sleeps, so the overlay is centered in the full width. Waking remounts the Sidebar, which gets its `Workspace.sidebar` (view, open folders, selection, scroll) back; hibernating flushes the pending Sidebar snapshots first. A workspace switch or a wake does not itself trigger the autofocus reveal (`autofocusDecision`), so the explorer does not jump away from the restored state; a later change inside the woken workspace does, such as focusing another tab or a resumed agent in the focused tab reporting the worktree it entered.
 
 - The live-tab sweep in `App.tsx` skips hibernated workspaces, so their terminals leave the live
   set and are disposed by the normal path (PTY closed). That sweep now also calls
@@ -229,13 +242,13 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
   `leafIdForPty` returns `null`, so without it a phantom spinner would stay.
 - `wakeWorkspace` seeds the agent resume plans (`seedWakePlans`, same "Run on start" gate as the
   reopen flow), discards the carried unsaved editor buffers (`unflushedBuffers.ts`) and then clears
-  `hibernated`; the terminals mount again and resume through the normal restore path. `runOnce` keeps a map of in-flight wakes by workspace id: a second wake (double click, or `moveTabToWorkspace`) awaits the first one's promise, so it never proceeds before the resume plans are seeded. In the WorkspaceBar a hibernated item cannot be expanded (the nested tab list is empty): its chevron, its sleeping icon (which turns into the undo icon on hover) and a double click on it all wake the workspace, instead of opening its properties. The workspace keeps its `detailExpanded` flag while asleep, so waking by any gesture brings the chevron back as it was; only the chevron itself also expands it.
+  `hibernated`; the terminals mount again and resume through the normal restore path. `runOnce` keeps a map of in-flight wakes by workspace id: a second wake (double click, or `moveTabToWorkspace`) awaits the first one's promise, so it never proceeds before the resume plans are seeded. In the WorkspaceBar a hibernated item keeps its nested tab list: hibernating or waking never touches `detailExpanded`, and the chevron expands or collapses it as in an awake workspace. Clicking one of those tabs (`onActivateAgent`) selects the workspace and the tab without waking it, so the hibernated overlay is what shows (its rows are dimmed with `opacity-40`, like the veil over the workspace chip, and are inert: no drag, no drop target, no close, unlock, note or autofocus controls, and the context menu holds only "Restore Workspace" with the `workspace.hibernate` shortcut); the sleeping icon (which turns into the undo icon on hover) and a double click on the item still wake it.
 - A workspace with no tabs is never hibernated: `createHibernateFlow` (`request`, `requestAuto` and `perform`) checks `hasTabs` and the WorkspaceBar hides the Hibernate menu item.
 - Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
   `applyMoveTabToWorkspace` refuses it as a destination, so `moveTabToWorkspace` wakes it first (the menu lists it with a Zzz mark; drag and drop accepts its bar row and its overlay),
   `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`
-  blocks the shortcuts that need tabs (`blockedWhileHibernated`), `runWorkspaceConfig` does nothing,
-  `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is empty.
+  blocks the shortcuts that need tabs, the Sidebar, the explorer or the zen layout (`blockedWhileHibernated`), `tab.close` (Cmd+W, also from the native menu through `handleCloseActiveTab`) included: a sleeping workspace closes only with `workspace.close`. The native menu (`sync_menu` greys out the tab and Sidebar items, and the dispatcher ignores them anyway: `menuBlockedWhileHibernated`) and the command palette (`createCommandItems` disables the same actions with the reason "Workspace hibernated": `commandBlockedWhileHibernated`) follow the same rule. `runWorkspaceConfig` does nothing,
+  `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is dimmed and inert.
 
 #### Hibernate and wake flow
 
@@ -277,7 +290,8 @@ The `autoHibernate` preference (Settings > Workspaces: Never, 30 minutes, 4 hour
 hibernates idle workspaces. `useAutoHibernate` checks every minute, and once right at startup. A workspace is idle
 for the time since it was last the active one. That moment is kept in `activityStamps` (`workspaceState.ts`), a
 module-level map outside React state so the minutely renewal does not re-render the tree. `touchActivity` renews the
-awake active workspace each tick and gives a workspace without a stamp "now". A hibernated workspace is stamped only
+awake active workspace each tick, and also every awake workspace with a "working" agent (the spinner in the
+WorkspaceBar), so its countdown only runs while no agent is busy in it; it gives a workspace without a stamp "now". A hibernated workspace is stamped only
 when it changes state (hibernated, or woken), tracked with a set of the previously hibernated ids, so its persisted body
 does not change every minute while waking it still restarts its clock. The switch effect (`stampSwitch`) stamps the
 workspace being left and the one entered. Every tick schedules the normal debounced `saveWorkspaceState`, whose
@@ -359,21 +373,21 @@ when the slot is stale (`> SLOT_STALE_MS = 10s` since last use) or newly created
 WebGL is never disposed synchronously on an ordinary hide. `disposeSlotWebgl` calls the addon's
 own `dispose()`, and `@xterm/addon-webgl`'s `WebglAddon.dispose()` unconditionally rebuilds a full
 `DomRenderer` as its fallback-on-dispose contract (one DOM row element per visible row, its own
-width cache, a freshly injected stylesheet — confirmed unchanged through its latest beta as of
+width cache, a freshly injected stylesheet - confirmed unchanged through its latest beta as of
 2026-09). That cost is fixed per hide (proportional to `term.rows`, not scrollback) and is thrown
 away unused the instant the leaf is shown again and `attachWebgl` recreates a context. So both
 `parkLeafSlot` (visibility change, alt-screen/blocks or normal tabs) and `detachSlotFromLeaf` (a
 slot becoming fully idle) only *schedule* the dispose via `scheduleWebglReap`, at
 `WEBGL_REAP_GRACE_MS = 30s`. `refreshLeafSlot` (a parked leaf shown again) and `bindSlot`/
 `rewireSlot` (an idle slot reclaimed) call `cancelWebglReap` first, so a quick tab switch never
-pays that cost at all — only a leaf left hidden for the full grace window does. See
+pays that cost at all - only a leaf left hidden for the full grace window does. See
 [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md) for the full investigation.
 
 **Context limit.** WKWebView (Tauri/macOS) allows roughly 8-16 concurrent WebGL contexts. Exceeding
 the limit causes the browser to silently destroy the oldest context (`onContextLoss`). The pool
 enforces `WEBGL_MAX_CONTEXTS = 7` as a proactive guard: before calling `new WebglAddon()`, it
 checks the live context count and reaps the oldest slot with a pending `webglReapTimer` if needed
-— a fully idle slot and a parked-but-still-visible-later one are equally fair game, since both have
+- a fully idle slot and a parked-but-still-visible-later one are equally fair game, since both have
 already signaled "nobody needs this context right now". If all contexts are in slots without a
 pending reap (i.e. genuinely in front of the user), the attach is skipped (that slot falls back to
 the DOM renderer, which is slower but functionally equivalent).
@@ -449,8 +463,8 @@ type DraggingItem =
   and compared against `paneSplitLimit` (configurable in `settings-general.json`, default
   `{ width: 250, height: 250 }`):
   - **width < limit AND height < limit**: only `center`, covering the full pane (`inset-0`).
-  - **width < limit only**: `top`, `bottom`, `center` — horizontal splits disabled.
-  - **height < limit only**: `left`, `right`, `center` — vertical splits disabled.
+  - **width < limit only**: `top`, `bottom`, `center` - horizontal splits disabled.
+  - **height < limit only**: `left`, `right`, `center` - vertical splits disabled.
   - **both within limit**: full 5-zone layout (top, bottom, left, right, center).
   In all cases `center` expands its hit area to fill any gap left by absent directional zones.
   Each zone is two separate divs: an invisible hit area and a larger visual highlight
@@ -517,19 +531,19 @@ Two over id formats:
   places the tab in the new half; `null` when the target workspace already has `workspacePaneLimit`
   panes
 
-**File drag** — for a file, the handler checks whether an editor with that path is already open in
+**File drag** - for a file, the handler checks whether an editor with that path is already open in
 the active workspace. If it is, the existing panel is treated as a panel drag (move/reorder) so the
 tab moves to the drop location. Folder drags always open a fresh terminal (no reuse). When no panel
 is reused:
 
 | Drop target | Action |
 |---|---|
-| `zone:<paneId>:center` | `openPanel(wsId, paneId, panel)` — opens permanent tab right after the active one |
-| `tab-insert:<tabId>:before\|after` | `openPanel(wsId, paneId, panel, index)` — inserts at position |
+| `zone:<paneId>:center` | `openPanel(wsId, paneId, panel)` - opens permanent tab right after the active one |
+| `tab-insert:<tabId>:before\|after` | `openPanel(wsId, paneId, panel, index)` - inserts at position |
 
 `openPanel` without an explicit `index` (the common case: Cmd+T, opening an editor, reopening a closed
 tab) inserts the new tab right after the pane's active tab, not at the end (`tabInsertionIndex`).
-| `zone:<paneId>:top\|bottom\|left\|right` | `splitPaneAndOpenPanel(wsId, paneId, dir, panel)` — splits pane, opens panel in new sub-pane |
+| `zone:<paneId>:top\|bottom\|left\|right` | `splitPaneAndOpenPanel(wsId, paneId, dir, panel)` - splits pane, opens panel in new sub-pane |
 
 `panel` is the editor or terminal produced by `tabForDroppedPath`. Editor tabs have
 `preview: false` (permanent tab) because the drag is an explicit intent. `splitPaneAndOpenPanel`
@@ -573,7 +587,8 @@ placement: no pane is ever split, the tab goes into the rightmost pane (`rightmo
 side-by-side split, top half of a stacked one). The user stays in the current workspace, unless the
 moved tab was the current tab of its workspace (menu or drag): then the destination workspace is selected and the tab focused in it (`handleMoveTabFollowingFocus`, focus after 50 ms because the refs are only fresh after the commit). "New" creates a workspace right after the source (same group) whose
 only tab is the moved one, titled and rooted after the tab's cwd when it is a terminal. A source
-workspace that loses its last tab is not closed: it keeps an empty pane. `App.tsx` also calls
+workspace that loses its last tab folds away like any empty workspace (see Fold on empty).
+`App.tsx` also calls
 `useAgentStore.reassignTabWorkspace` so the agent session and its notifications point at the new
 workspace. Dragging uses the same operation, through `resolveTabDrop` (see Drag-and-drop).
 
@@ -587,6 +602,6 @@ panes.
 The horizontal separator is explicitly set to `h-[10px]` with a transparent background and a 1px
 visual line via `::after`. At exactly 10px, no expansion occurs and the hit region ends at the
 pane boundary. This prevents WebKit from suppressing `click` events on the tab bar of the pane
-below — the original root cause of intermittent tab clicks failing on bottom panes.
+below - the original root cause of intermittent tab clicks failing on bottom panes.
 
 See [WORKSPACES_GOTCHAS.md](WORKSPACES_GOTCHAS.md) for the full investigation.

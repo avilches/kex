@@ -16,6 +16,7 @@ import type { GitColorScheme } from "@/modules/settings/store";
 import { bulkClosableIds, otherBulkClosableIds } from "./lib/tabClose";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
+import { noteSurfaceKind } from "@/modules/theme/noteSurface";
 import { useWorkspaceDndInsert } from "./WorkspaceDndProvider";
 import { useTabFlash } from "./lib/tabFlashStore";
 import { FlashOverlay } from "@/components/FlashOverlay";
@@ -80,7 +81,7 @@ function DropZone({
 }
 
 // Reads tabInsertPaneId from context so PaneView (memoized) is not re-rendered
-// on every dragover — only this sub-component is.
+// on every dragover - only this sub-component is.
 function PaneDropOverlay({ paneId, tooNarrow, tooShort }: {
   paneId: string;
   tooNarrow: boolean;
@@ -319,6 +320,7 @@ export const PaneView = memo(function PaneView({
           onDismiss={notePreview.close}
           onPointerEnter={() => notePreview.show(activeTab.id)}
           onPointerLeave={() => notePreview.leave(activeTab.id)}
+          surface={noteSurfaceKind(activeTab)}
         />
       )}
       {previewTab && previewTab.id !== activeTab?.id && (
@@ -335,6 +337,7 @@ export const PaneView = memo(function PaneView({
           onDismiss={notePreview.close}
           onPointerEnter={() => notePreview.show(previewTab.id)}
           onPointerLeave={() => notePreview.leave(previewTab.id)}
+          surface={noteSurfaceKind(activeTab)}
         />
       )}
       <div ref={tabBarRef} className="relative shrink-0">
@@ -404,7 +407,7 @@ export const PaneView = memo(function PaneView({
           />
         )}
 
-        {/* drop overlay — only register/show for the active workspace */}
+        {/* drop overlay - only register/show for the active workspace */}
         {isDragging && isWorkspaceActive && !isDraggingOwnOnlyTab && (
           <PaneDropOverlay paneId={pane.id} tooNarrow={tooNarrow} tooShort={tooShort} />
         )}
