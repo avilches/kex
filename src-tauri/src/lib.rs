@@ -93,6 +93,8 @@ struct DynMenuItems {
     sidebar_side: tauri::menu::MenuItem<tauri::Wry>,
     dock_browser: tauri::menu::MenuItem<tauri::Wry>,
     dock_all_browsers: tauri::menu::MenuItem<tauri::Wry>,
+    /// Items that act on tabs or on the Sidebar: greyed out while the active workspace sleeps.
+    tab_items: Vec<tauri::menu::MenuItem<tauri::Wry>>,
 }
 
 #[cfg(target_os = "macos")]
@@ -109,6 +111,7 @@ struct MenuState {
     active_view: String,
     sidebar_side: String,
     show_hidden: bool,
+    hibernated: bool,
 }
 
 #[tauri::command]
@@ -125,6 +128,13 @@ fn sync_menu(app: tauri::AppHandle, state: MenuState) {
         let _ = items.git.set_checked(on("git"));
         let _ = items.history.set_checked(on("history"));
         let _ = items.show_hidden.set_checked(state.show_hidden);
+        for item in &items.tab_items {
+            let _ = item.set_enabled(!state.hibernated);
+        }
+        for item in [&items.sidebar, &items.explorer, &items.git, &items.history, &items.show_hidden] {
+            let _ = item.set_enabled(!state.hibernated);
+        }
+        let _ = items.sidebar_side.set_enabled(!state.hibernated);
         let _ = items.sidebar_side.set_text(if state.sidebar_side == "left" {
             "Move Sidebar to Right"
         } else {
@@ -680,6 +690,13 @@ pub fn run() {
                     sidebar_side,
                     dock_browser,
                     dock_all_browsers,
+                    tab_items: vec![
+                        new_terminal,
+                        new_browser,
+                        close_tab,
+                        close_others,
+                        close_all,
+                    ],
                 }))));
 
                 app.on_menu_event(|app, event| {

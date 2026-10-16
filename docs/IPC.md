@@ -165,7 +165,7 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `window_save_groups(label, groups)` | Persist the workspace groups (`WorkspaceGroup[]`) of a window |
 | `window_save_collapsed_groups(label, ids)` | Persist which workspace groups are collapsed in a window |
 | `restore_window_geometry` | Restore the window size on startup (physical pixels; position is not restored) |
-| `sync_menu(state)` | Sync the native menu with the frontend (`autosave`, `sidebarOpen`, `activeView`, `sidebarSide`, `showHidden`) |
+| `sync_menu(state)` | Sync the native menu with the frontend (`autosave`, `sidebarOpen`, `activeView`, `sidebarSide`, `showHidden`, `hibernated`); while the active workspace is hibernated the tab and Sidebar items are greyed out |
 | `confirm_quit` | Called once the frontend has flushed editors and workspace state after `kex:before-quit`, so the deferred quit proceeds |
 | `enter_windowless_mode` | Called before destroying the last window so the app stays alive in the Dock without windows (macOS) |
 | `agent_os_notify` | Send an OS notification `{ window_label, workspace_id, tab_id, title, body }`. On macOS a click on the notification (and only that) focuses the window and emits `kex:activate-tab` to it. |

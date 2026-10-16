@@ -20,6 +20,7 @@ import {
   TerminalIcon,
   UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
+import { commandBlockedWhileHibernated } from "@/modules/workspaces/lib/hibernate";
 import type { PaletteItem } from "./types";
 
 export const COMMAND_GROUPS = [
@@ -59,6 +60,7 @@ export type CommandPaletteActionContext = {
   clearTerminal: () => void;
   toggleZenMode: () => void;
   hasActiveTerminal: boolean;
+  hibernated: boolean;
   openWorkspaceProperties: () => void;
   openRunScriptConfiguration: () => void;
 };
@@ -78,7 +80,7 @@ export function createCommandItems(
   const closeDisabled =
     onlyOneWorkspace && activePaneCount < 2 ? "Last workspace" : undefined;
 
-  return [
+  const items: PaletteItem[] = [
     {
       id: "settings.open",
       title: "Open settings",
@@ -289,4 +291,8 @@ export function createCommandItems(
       run: ctx.openRunScriptConfiguration,
     },
   ];
+  if (!ctx.hibernated) return items;
+  return items.map((item) =>
+    commandBlockedWhileHibernated(item.id) ? { ...item, disabledReason: "Workspace hibernated" } : item,
+  );
 }

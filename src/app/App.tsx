@@ -6,6 +6,7 @@ import {
 import { tabLocations, userTabTitles } from "@/modules/workspaces/lib/tabLocations";
 import {
   blockedWhileHibernated,
+  menuBlockedWhileHibernated,
   workspaceDialogPending,
   editorTabIds,
   enableRunOnStart,
@@ -3375,6 +3376,7 @@ export default function App() {
   // same handlers the shortcuts use. Kept in a ref so the listener stays stable.
   const menuDispatchRef = useRef<(id: string) => void>(() => {});
   menuDispatchRef.current = (id: string) => {
+    if (activeWorkspace?.hibernated && menuBlockedWhileHibernated(id)) return;
     switch (id) {
       case "settings":
         void openSettingsWindow();
@@ -3447,9 +3449,10 @@ export default function App() {
         activeView: sidebarView,
         sidebarSide: sidebarSide,
         showHidden: activeShowHidden,
+        hibernated: !!activeWorkspace?.hibernated,
       },
     }).catch(() => {});
-  }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden]);
+  }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden, activeWorkspace?.hibernated]);
 
   // ── Command palette ───────────────────────────────────────────────────────
 
@@ -3492,6 +3495,7 @@ export default function App() {
               );
             },
             hasActiveTerminal: activeTab?.kind === "terminal",
+            hibernated: !!activeWorkspace?.hibernated,
             openWorkspaceProperties: () =>
               useWorkspaceSettingsStore
                 .getState()

@@ -31,6 +31,33 @@ export function blockedWhileHibernated(id: ShortcutId): boolean {
   return BLOCKED_IDS.includes(id) || BLOCKED_PREFIXES.some((p) => id.startsWith(p));
 }
 
+// Native menu items (ids from the Rust menu) that act on tabs or on the Sidebar. The same
+// set is greyed out by `sync_menu` and ignored by the dispatcher while the workspace sleeps.
+const BLOCKED_MENU_IDS: readonly string[] = [
+  "new_terminal",
+  "new_browser",
+  "close_tab",
+  "close_others",
+  "close_all",
+  "toggle_sidebar",
+  "toggle_explorer",
+  "toggle_git",
+  "toggle_history",
+  "toggle_hidden",
+  "toggle_sidebar_side",
+];
+
+export function menuBlockedWhileHibernated(menuId: string): boolean {
+  return BLOCKED_MENU_IDS.includes(menuId);
+}
+
+// Palette commands share the shortcut ids; these have none (or act on what a sleeping workspace lacks).
+const BLOCKED_COMMAND_IDS: readonly string[] = ["git.graph", "git.source", "search.content", "history.open", "workspace.runScripts"];
+
+export function commandBlockedWhileHibernated(commandId: string): boolean {
+  return BLOCKED_COMMAND_IDS.includes(commandId) || blockedWhileHibernated(commandId as ShortcutId);
+}
+
 // Editors are about to be unmounted (their unsaved state goes with them) and a
 // floating browser window is destroyed, so neither flag may outlive hibernation.
 function clearTransientTabState(node: SplitNode, snapshots: Readonly<Record<string, TabHibernation>>): SplitNode {
