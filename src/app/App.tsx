@@ -36,7 +36,17 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   loadRestorePlans,
 } from "@/modules/agents/lib/agentSessionRestore";
-import { CommandPalette, createCommandItems } from "@/modules/command-palette";
+import {
+  buildTabEntries,
+  buildWorkspaceEntries,
+  CommandPalette,
+  createCommandItems,
+  liveTabSources,
+  selectTab,
+  selectWorkspace,
+  type TabEntry,
+  type WorkspaceEntry,
+} from "@/modules/command-palette";
 import {
   NewEditorDialog,
   useEditorFileSync,
@@ -3461,6 +3471,32 @@ export default function App() {
 
   // ── Command palette ───────────────────────────────────────────────────────
 
+  const paletteSources = useMemo(
+    () => (commandPaletteOpen ? liveTabSources() : null),
+    // Read the stores once per open; workspaces is a dependency so a tab opened meanwhile shows up.
+    [commandPaletteOpen, workspaces],
+  );
+  const paletteTabEntries = useMemo(
+    () => (paletteSources ? buildTabEntries(workspaces, paletteSources) : []),
+    [paletteSources, workspaces],
+  );
+  const paletteWorkspaceEntries = useMemo(
+    () => (paletteSources ? buildWorkspaceEntries(workspaces, paletteSources) : []),
+    [paletteSources, workspaces],
+  );
+  const onPaletteSelectTab = useCallback(
+    (entry: TabEntry) => {
+      void selectTab(entry, { wake: wakeWorkspace, goToTab });
+    },
+    [wakeWorkspace, goToTab],
+  );
+  const onPaletteSelectWorkspace = useCallback(
+    (entry: WorkspaceEntry) => {
+      void selectWorkspace(entry, { wake: wakeWorkspace, activate: setActiveWorkspaceId });
+    },
+    [wakeWorkspace, setActiveWorkspaceId],
+  );
+
   const commandPaletteItems = useMemo(
     () =>
       commandPaletteOpen
@@ -3887,6 +3923,10 @@ export default function App() {
             workspaceRoot={explorerRoot}
             onOpenContentHit={openContentHit}
             insertCommand={insertHistoryCommand}
+            tabEntries={paletteTabEntries}
+            workspaceEntries={paletteWorkspaceEntries}
+            onSelectTab={onPaletteSelectTab}
+            onSelectWorkspace={onPaletteSelectWorkspace}
           />
 
           <NewEditorDialog

@@ -35,7 +35,11 @@ import {
 import { fuzzyBest, fuzzyBestLower } from "./lib/fuzzy";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruRank, mruSnapshot, recordUse } from "./lib/mru";
+import { duplicateTitleIds, type TabEntry, type WorkspaceEntry } from "./lib/tabEntries";
+import { rankTabEntries, rankWorkspaceEntries } from "./lib/tabRank";
+import { TabItem } from "./TabItem";
 import type { PaletteItem } from "./types";
+import { WorkspaceItem } from "./WorkspaceItem";
 
 type Props = {
   open: boolean;
@@ -45,6 +49,10 @@ type Props = {
   workspaceRoot: string | null;
   onOpenContentHit: (path: string, line: number) => void;
   insertCommand: ((cmd: string) => void) | null;
+  tabEntries: TabEntry[];
+  workspaceEntries: WorkspaceEntry[];
+  onSelectTab: (entry: TabEntry) => void;
+  onSelectWorkspace: (entry: WorkspaceEntry) => void;
 };
 
 const THEME_PREVIEW_DELAY_MS = 140;
@@ -57,6 +65,10 @@ export function CommandPalette({
   workspaceRoot,
   onOpenContentHit,
   insertCommand,
+  tabEntries,
+  workspaceEntries,
+  onSelectTab,
+  onSelectWorkspace,
 }: Props) {
   const [query, setQuery] = useState("");
   const [value, setValue] = useState("");
@@ -87,6 +99,17 @@ export function CommandPalette({
     if (inThemes || parsed.mode !== "commands") return [];
     return rankCommands(commandItems, searchBlobs, parsed.term, mru);
   }, [commandItems, searchBlobs, parsed.term, parsed.mode, inThemes, mru]);
+
+  const inCommands = !inThemes && parsed.mode === "commands";
+  const rankedTabs = useMemo(
+    () => (inCommands ? rankTabEntries(tabEntries, parsed.term) : []),
+    [inCommands, tabEntries, parsed.term],
+  );
+  const rankedWorkspaces = useMemo(
+    () => (inCommands ? rankWorkspaceEntries(workspaceEntries, parsed.term) : []),
+    [inCommands, workspaceEntries, parsed.term],
+  );
+  const ambiguous = useMemo(() => duplicateTitleIds(rankedTabs), [rankedTabs]);
 
   const themes = useMemo(() => {
     if (!inThemes) return [];
@@ -211,7 +234,7 @@ export function CommandPalette({
       ? "Find text in files..."
       : parsed.mode === "history"
         ? "Search command history..."
-        : "Type a command, > for history, # to find in files";
+        : "Type a command, tab or workspace, > for history, # to find in files";
 
   return (
     <CommandDialog
@@ -272,28 +295,55 @@ export function CommandPalette({
                 {themes.length === 0 ? <StatusItem label="No themes" /> : null}
               </CommandGroup>
             ) : parsed.mode === "commands" ? (
-              rankedCommands.length === 0 ? (
+              rankedCommands.length === 0 &&
+              rankedTabs.length === 0 &&
+              rankedWorkspaces.length === 0 ? (
                 <EmptyHint />
               ) : (
-                COMMAND_GROUPS.map((group) => {
-                  const rows = rankedCommands.filter((a) => a.group === group);
-                  if (rows.length === 0) return null;
-                  return (
-                    <CommandGroup key={group} heading={group}>
-                      {rows.map((item) => (
-                        <ActionItem
-                          key={item.id}
-                          item={item}
-                          shortcutLabel={formatShortcut(
-                            item.shortcutId,
-                            userShortcuts,
-                          )}
-                          onRun={() => runCommand(item)}
+                <>
+                  {rankedTabs.length > 0 ? (
+                    <CommandGroup heading={parsed.term ? "Tabs" : "Recent tabs"}>
+                      {rankedTabs.map((entry) => (
+                        <TabItem
+                          key={entry.tabId}
+                          entry={entry}
+                          ambiguous={ambiguous.has(entry.tabId)}
+                          onRun={() => runAfterClose(() => onSelectTab(entry))}
                         />
                       ))}
                     </CommandGroup>
-                  );
-                })
+                  ) : null}
+                  {rankedWorkspaces.length > 0 ? (
+                    <CommandGroup heading="Workspaces">
+                      {rankedWorkspaces.map((entry) => (
+                        <WorkspaceItem
+                          key={entry.workspaceId}
+                          entry={entry}
+                          onRun={() => runAfterClose(() => onSelectWorkspace(entry))}
+                        />
+                      ))}
+                    </CommandGroup>
+                  ) : null}
+                  {COMMAND_GROUPS.map((group) => {
+                    const rows = rankedCommands.filter((a) => a.group === group);
+                    if (rows.length === 0) return null;
+                    return (
+                      <CommandGroup key={group} heading={group}>
+                        {rows.map((item) => (
+                          <ActionItem
+                            key={item.id}
+                            item={item}
+                            shortcutLabel={formatShortcut(
+                              item.shortcutId,
+                              userShortcuts,
+                            )}
+                            onRun={() => runCommand(item)}
+                          />
+                        ))}
+                      </CommandGroup>
+                    );
+                  })}
+                </>
               )
             ) : parsed.mode === "content" ? (
               <CommandGroup heading="Contents">
