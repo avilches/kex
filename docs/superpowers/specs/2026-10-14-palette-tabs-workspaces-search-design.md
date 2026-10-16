@@ -56,14 +56,14 @@ type TabEntry = {
   worktree: string;       // "" si no esta en un worktree
   branch: string;
   process: string;        // comando en ejecucion o nombre del agente
-  indicator: TabStatusIndicator;
+  indicator: AgentEntryVisual | null;  // solo agentes accionables: working, attention, error
   lastUsedAt: number;     // 0 si nunca se uso
 };
 ```
 
 ### Seguimiento del ultimo uso
 
-Se sella `recordTabUse(tabId)` donde un tab pasa a ser el activo de su pane y su workspace es el activo. El punto unico es `activateTab` del hook de workspaces, mas el cambio de workspace activo (que activa su tab actual). No se escribe en el cuerpo del tab ni en el JSON del workspace: cambiar de tab no debe ensuciar lo persistido. Al cerrar el tab se poda con `pruneTabUse` desde las ids vivas.
+Se sella `recordTabUse(tabId)` desde un unico efecto en `App.tsx` que depende del id del tab activo y de si su workspace esta hibernado. Asi cubre clics, atajos, tabs nuevos, cambios de workspace y el arranque, sin tocar `activateTab`. No se escribe en el cuerpo del tab ni en el JSON del workspace: cambiar de tab no debe ensuciar lo persistido. La poda con `pruneTabUse` desde las ids vivas ocurre al abrir la paleta, no en cada cambio de workspaces.
 
 El mapa se lee una vez al abrir la paleta (mismo patron que `mruSnapshot`), no en cada tecla.
 
@@ -77,23 +77,22 @@ Un tab sin ningun uso registrado (recien restaurado) cuenta como `lastUsedAt = 0
 
 ### Orden al escribir
 
-Cada candidato recibe una puntuacion con campos pesados, no un blob unico:
+Cada tab entra en el nivel del mejor campo que coincide, y los niveles son estrictos: una coincidencia en un nivel siempre le gana a una en el siguiente, aunque la puntuacion del segundo sea mejor.
 
-| Campo | Peso |
-|---|---|
-| titulo del tab, nota | 100 |
-| nombre del workspace | 60 |
-| cwd, worktree, rama | 30 |
-| proceso / agente | 20 |
-| workspace como entidad propia (fila de workspace) | 80 |
+| Nivel | Campos | Como coincide |
+|---|---|---|
+| 0 | titulo del tab, nota | titulo difuso (fuzzy), nota por subcadena |
+| 1 | nombre del workspace | difuso |
+| 2 | cwd, worktree, rama | subcadena |
+| 3 | proceso / agente | subcadena |
 
-La puntuacion es la del mejor campo multiplicada por su peso (fuzzy normalizado a 0..1). Una coincidencia en titulo siempre le gana a una en cwd, aunque el fuzzy del cwd sea mejor. Desempates: workspace no hibernado primero, luego `lastUsedAt`. Las acciones y los settings entran en la misma lista con peso 70 para titulo y 40 para keywords, de modo que escribir "hibernate" muestre la accion antes que un tab cuyo cwd contiene esa palabra.
+Los campos largos (rutas, notas, comandos) usan subcadena porque un fuzzy sobre una ruta larga casa con casi cualquier consulta corta. Dentro de un nivel manda la puntuacion y despues `byRecency` (workspace no hibernado primero, luego `lastUsedAt`, luego actividad del workspace, luego orden en el arbol). Los workspaces se puntuan por titulo difuso.
 
-Las filas se agrupan con cabeceras en este orden fijo: Tabs, Workspaces, Actions (con sus grupos de siempre), Settings. Los grupos vacios no se pintan. Dentro de cada grupo manda la puntuacion. No se limita la lista mientras se escribe; el limite de 8 es solo para la caja vacia.
+Las filas se agrupan con cabeceras en orden fijo: Tabs, Workspaces, las acciones por sus grupos de siempre y Settings. Los grupos vacios no se pintan. No se limita la lista mientras se escribe; el limite de 8 es solo para la caja vacia.
 
 ### Filas
 
-- **Tab**: icono del tipo (o el `icon` propio del tab), titulo, y a la derecha el nombre del workspace en gris. Un tab de workspace hibernado lleva el icono de luna/zzz y texto atenuado. Spinner si `indicator === "working"`, punto amarillo si `"attention"`, y el icono de nota si `note !== null`. Sin icono de autofocus.
+- **Tab**: icono del tipo de tab, titulo, y a la derecha el nombre del workspace en gris. Un tab de workspace hibernado lleva el icono de luna/zzz y texto atenuado. Spinner si `indicator === "working"`, punto amarillo si `"attention"`, y el icono de nota si `note !== null`. Sin icono de autofocus.
 - **Workspace**: icono y color del workspace, titulo, numero de tabs. Elegirlo lo activa (despertandolo si hace falta).
 - **Accion / setting**: como hoy. Las filas de Settings llevan el icono de la seccion y la etiqueta "Settings".
 
@@ -105,11 +104,12 @@ La nota se renderiza con la pieza de `MarkdownPreviewPane` (misma que el preview
 
 ### Catalogo de acciones y settings
 
-- Cada entrada de `SHORTCUTS` se convierte en accion, con su `group`, `label` y `shortcutId`. Las que ya existen en `commands.ts` con `run` propio mantienen su implementacion; las demas necesitan un `run` en `CommandPaletteActionContext`.
-- Acciones sin atajo que reciben fila: hibernar/despertar el workspace activo (una sola fila toggle que dice "Restore" cuando esta hibernado), quitar la nota del tab (complemento de `tab.note`), devolver el tab a su titulo por defecto cuando tiene titulo propio, cerrar los otros tabs del pane, cerrar todos los tabs del pane, mover el tab activo a otro workspace (subpagina de workspaces, como la de temas) y split de browser a la derecha y abajo. Lo parametrico no recibe fila: renombrar grupos, mover un workspace a otro grupo, ejecutar un script concreto por nombre y los pickers de color e icono (el dialogo Properties ya los expone).
-- Settings: una fila por seccion. La lista sale de un modulo nuevo compartido y sin componentes, `src/modules/settings/sections.ts`, que exporta `{ id: SettingsSection; label: string; icon }[]` y lo consumen `SettingsApp.tsx` (que solo le anade su `component`) y la paleta. No se puede importar `SECTIONS` desde `SettingsApp.tsx` directamente: esa entrada es el webview `settings.html` y arrastraria el arbol completo de Settings al bundle de la ventana principal. `openSettingsWindow(section)` acepta el id. Ojo: `external-editors` se etiqueta "Tools" (el id no es el label) y `filetypes` admite el deep-link `filetypes:<ext>`.
-- Test de cobertura: recorre `SHORTCUTS` y `sections.ts` y falla si alguno no tiene fila en el catalogo. Excepciones explicitas con su motivo (inventario medido el 2026-10-14): `commandPalette.open` (ya se esta dentro de la paleta), `commandPalette.content` (lo cubre la fila existente `search.content` anadiendole su `shortcutId`), `file.copy`, `file.cut`, `file.paste`, `file.delete` (edicion in-situ sobre la seleccion local del explorer: la fila perderia el objetivo al cerrarse la paleta), `editor.undo`, `editor.redo` (transaccion del buffer del editor enfocado), `tab.next`, `tab.prev`, `pane.focusUp`, `pane.focusDown`, `pane.focusLeft`, `pane.focusRight`, `workspace.prev`, `workspace.next` (navegacion relativa sin objetivo seleccionable en una lista), `tab.selectByIndex`, `workspace.selectByIndex` (handler parametrizado por la tecla digito).
-- Grupos del catalogo: los 8 de `SHORTCUTS` (General, Sidebar, Explorer, Tabs, Panes, Terminal, View, Editor), los dos propios de la paleta (Git y Search) y uno nuevo, Settings. `COMMAND_GROUPS` pasa a ser esa lista, en el orden de pintado.
+- Cada entrada de `SHORTCUTS` se convierte en accion con su `group`, `label` y `shortcutId`, y su `run` llama al handler que `App.tsx` ya registra en `shortcutHandlers`. Si un atajo no tiene handler en ese mapa, la fila sale deshabilitada con "Not available here". Las acciones escritas a mano de `commands.ts` se mantienen y ganan sobre las generadas.
+- Acciones sin atajo que reciben fila: quitar la nota del tab (solo habilitada si el tab tiene nota) y partir el pane a la derecha o abajo con un browser. Los workspaces se hibernan y despiertan con el atajo existente `workspace.hibernate`.
+- Quedan para una entrega posterior: cerrar los otros tabs del pane, cerrar todos, mover el tab activo a otro workspace (subpagina como la de temas) y restablecer el titulo del tab. Necesitan funciones de pane que hoy no estan al alcance de la paleta. Lo parametrico no recibe fila: renombrar grupos, mover un workspace a otro grupo, ejecutar un script concreto por nombre y los pickers de color e icono.
+- Settings: una fila por seccion, a partir de `src/modules/settings/sections.ts` (`SETTINGS_SECTIONS`), que consumen `SettingsApp.tsx` (le anade su `component`) y la paleta. No se puede importar `SECTIONS` desde `SettingsApp.tsx`: arrastraria el arbol completo de Settings al bundle de la ventana principal. `external-editors` se etiqueta "Tools" y `filetypes` admite el deep-link `filetypes:<ext>`.
+- Test de cobertura (`commands.test.ts`): recorre `SHORTCUTS` y `SETTINGS_SECTIONS` y falla si alguno no tiene fila. Las excepciones viven en `UNLISTED_SHORTCUTS`, cada una con su motivo: `commandPalette.open`, `file.copy`, `file.cut`, `file.paste`, `file.delete`, `editor.undo`, `editor.redo`, `tab.next`, `tab.prev`, `pane.focusUp`, `pane.focusDown`, `pane.focusLeft`, `pane.focusRight`, `workspace.prev`, `workspace.next`, `tab.selectByIndex`, `workspace.selectByIndex`. `commandPalette.content` lo cubre la fila `search.content`. Otro test falla si una excepcion apunta a un atajo que ya no existe.
+- Grupos del catalogo (`COMMAND_GROUPS`, en orden de pintado): General, Tabs, Panes, Terminal, Editor, Sidebar, Explorer, View, Git, Search y Settings.
 
 ### Flujo al elegir una fila
 

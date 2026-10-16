@@ -452,6 +452,10 @@ A workspace can be hibernated (Cmd+Alt+Z, `workspace.hibernate`, or Hibernate / 
 
 At startup every workspace except the active one starts hibernated, unless the setting "Restore on startup" (Settings > Workspaces, "Only the active workspace" by default) is set to "All workspaces".
 
+### Command palette: tabs, workspaces and the full catalog
+
+The palette searches tabs and workspaces as well as actions. With an empty box it lists the 8 most recently used tabs (hibernated workspaces last); typing ranks by tab title and note first, then workspace name, then cwd, worktree and branch, then the running command or agent. Each tab row shows a spinner while its agent works and a note icon when it has a note, and selecting a row shows the note rendered, with the directory and branch, in a side panel. Choosing a tab of a hibernated workspace wakes it first. Every shortcut and every Settings section has a row (a test fails if one is missing); a Settings row opens the window on that section. Tab recency is kept in `localStorage` (`kex-tab-use`), not in the workspace JSON. Not present upstream.
+
 ---
 
 ## Roadmap (planned, not yet built)

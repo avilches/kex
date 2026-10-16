@@ -597,7 +597,7 @@ src/
     │                                tab, so it opens in Live Preview.
     ├── workspace/                 — Local + WSL environment switching
     ├── updater/                   — Auto-updater dialog
-    └── command-palette/           — Fuzzy command/file/search palette
+    └── command-palette/           — Fuzzy palette: actions, settings, tabs and workspaces (recent tabs when empty, tiered ranking, note preview), file and history search. Tab recency lives in workspaces/lib/tabUse.ts
 ```
 
 ### Tab kinds (tagged union)
