@@ -3336,6 +3336,12 @@ export default function App() {
 
   const onActivateAgent = useCallback(
     (_storedWorkspaceId: string, tabId: string) => {
+      const asleep = workspacesRef.current.find((w) => w.hibernated && findTabPane(w.paneTree, tabId));
+      if (asleep) {
+        setActiveWorkspaceId(asleep.id);
+        onActivateTabStable(asleep.id, tabId);
+        return;
+      }
       const live = useAgentStore.getState().tabLocations?.[tabId];
       if (!live) return;
       setActiveWorkspaceId(live);
@@ -3542,7 +3548,7 @@ export default function App() {
         icon: w.icon,
         groupId: w.groupId,
         focusedTab: focusedTab(w.paneTree, w.activePaneId),
-        tabs: w.detailExpanded && !w.hibernated
+        tabs: w.detailExpanded
           ? allPanes(w.paneTree).flatMap((p) => p.tabs)
           : NO_TABS,
         tabCount: workspaceTabCount(w),

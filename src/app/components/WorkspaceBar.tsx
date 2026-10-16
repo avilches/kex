@@ -292,7 +292,7 @@ function SortableWorkspaceItem({
   const hibernatedLook = ws.hibernated ? (fresh ? "in" : "static") : chipFx;
   const compact = barWidth <= 80;
   const showDetail = !compact && hasDetail(detailFilter);
-  const expanded = showDetail && !!ws.detailExpanded && !ws.hibernated;
+  const expanded = showDetail && !!ws.detailExpanded;
   const agentCount = activeAgentCount(agentEntries);
 
   const sideControl =
@@ -304,13 +304,10 @@ function SortableWorkspaceItem({
   const detailToggle = showDetail && ws.tabCount > 0 ? (
     <button
       type="button"
-      aria-expanded={ws.hibernated ? undefined : expanded}
-      aria-label={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
-      title={ws.hibernated ? "Restore" : expanded ? "Hide tabs" : "Show tabs"}
-      onClick={() => {
-        if (ws.hibernated) onWake?.(ws.id);
-        else onSetDetailExpanded(ws.id, !expanded);
-      }}
+      aria-expanded={expanded}
+      aria-label={expanded ? "Hide tabs" : "Show tabs"}
+      title={expanded ? "Hide tabs" : "Show tabs"}
+      onClick={() => onSetDetailExpanded(ws.id, !expanded)}
       className={cn(sideControl, "left-4 size-[14px] opacity-60 hover:opacity-100 focus-visible:opacity-100")}
     >
       <HugeiconsIcon
