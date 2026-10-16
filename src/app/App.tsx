@@ -2838,8 +2838,8 @@ export default function App() {
 
   const handleCloseActiveTab = useCallback(() => {
     if (!activeWorkspace) return;
-    if (!activeTabId) {
-      // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
+    if (!activeTabId || activeWorkspace.hibernated) {
+      // Empty pane (workspace with no tabs) or a sleeping workspace: Cmd+W closes the workspace.
       void requestCloseWorkspace(activeWorkspace.id);
       return;
     }

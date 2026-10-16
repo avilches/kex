@@ -247,8 +247,8 @@ through `SplitNodeView` to `PaneView`, which returns a bordered empty box right 
 - Guards: `openTab`, `replaceTab` and `splitPaneAndOpenTab` ignore a hibernated workspace,
   `applyMoveTabToWorkspace` refuses it as a destination, so `moveTabToWorkspace` wakes it first (the menu lists it with a Zzz mark; drag and drop accepts its bar row and its overlay),
   `findReopenTarget` skips it so a reopened tab is never lost, `shortcutsDisabled`
-  blocks the shortcuts that need tabs (`blockedWhileHibernated`), `runWorkspaceConfig` does nothing,
-  `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is empty.
+  blocks the shortcuts that need tabs, the Sidebar, the explorer or the zen layout (`blockedWhileHibernated`), except `tab.close`: Cmd+W on a sleeping workspace closes the workspace, as it does on an empty one. `runWorkspaceConfig` does nothing,
+  `setTabLocations` only receives awake workspaces and the WorkspaceBar nested list is dimmed and inert.
 
 #### Hibernate and wake flow
 

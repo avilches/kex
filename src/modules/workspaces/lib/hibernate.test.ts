@@ -154,9 +154,19 @@ describe("strippedTree", () => {
 
 describe("blockedWhileHibernated", () => {
   it("blocks tab, pane, terminal, editor and script shortcuts", () => {
-    for (const id of ["tab.new", "tab.close", "pane.splitRight", "terminal.clear", "editor.save", "workspace.run", "search.focus"] as const) {
+    for (const id of ["tab.new", "tab.rename", "pane.splitRight", "terminal.clear", "editor.save", "workspace.run", "search.focus"] as const) {
       expect(blockedWhileHibernated(id)).toBe(true);
     }
+  });
+
+  it("blocks the Sidebar, explorer and zen shortcuts, which change state nobody can see", () => {
+    for (const id of ["sidebar.toggle", "sidebar.showGit", "explorer.search", "explorer.toggleHidden", "view.zenMode"] as const) {
+      expect(blockedWhileHibernated(id)).toBe(true);
+    }
+  });
+
+  it("lets tab.close through: on a sleeping workspace it closes the workspace", () => {
+    expect(blockedWhileHibernated("tab.close")).toBe(false);
   });
 
   it("lets workspace, window, view and settings shortcuts through", () => {
