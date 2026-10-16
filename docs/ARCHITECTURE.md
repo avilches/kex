@@ -437,7 +437,7 @@ A file opened in the editor from a directory the user has not navigated to in a 
 | `dirs` | `6` | Cross-platform home/cache directories |
 | `tempfile` | `3` | Temporary files for shell init scripts |
 
-Tauri plugins used: `store`, `updater`, `window-state`, `autostart`, `os`, `notification`, `log`, `opener`, `process`, `clipboard-manager` (the capability grants only `allow-write-text`; `src/lib/clipboard.ts` is the single entry point for every clipboard write in the webview (tab ids, explorer, git history, Live Preview code blocks, terminal copy and OSC 52, block overlay, updater); pasting still uses `navigator.clipboard.readText`. It exists because `navigator.clipboard.writeText` was rejected by WebKit with `NotAllowedError`, see TASK-828).
+Tauri plugins used: `store`, `updater`, `window-state`, `autostart`, `os`, `notification`, `log`, `opener`, `process`, `clipboard-manager` (the capability grants `allow-write-text` and `allow-read-text`; the read is only for the terminal context menu's Paste, because `navigator.clipboard.readText` outside a keyboard gesture makes WebKit show a system "Paste" bubble; `src/lib/clipboard.ts` is the single entry point for every clipboard write in the webview (tab ids, explorer, git history, Live Preview code blocks, terminal copy and OSC 52, block overlay, updater); pasting still uses `navigator.clipboard.readText`. It exists because `navigator.clipboard.writeText` was rejected by WebKit with `NotAllowedError`, see TASK-828).
 
 ### TypeScript frontend
 | Library | Version | Role |
@@ -486,7 +486,9 @@ src/
     │   │                            The copy items (`explorer/lib/copyPathItems.tsx`) print the path under the label;
     │   │                            Copy Relative Path shows why it is disabled (no workspace root, or outside it).
     │   │                            The terminal surface has a right-click menu (`TerminalContextMenu`): Copy (enabled
-    │   │                            only with a selection) and Paste.
+    │   │                            only with a selection) and Paste. While an app tracks the mouse (Claude Code
+    │   │                            draws its own selection), a right click does not select the word under the
+    │   │                            cursor, so Copy only sees a real xterm selection (Shift-drag).
     │   │                            The right side shows `pid / process / CPU% / RAM`. `process` is the OSC-133
     │   │                            foreground command when one is running, or the shell name at rest. An
     │   │                            agent chip (status dot + model name) appears when an agent session is active.

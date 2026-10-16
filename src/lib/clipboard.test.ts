@@ -1,15 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const writeTextMock = vi.fn();
+const readTextMock = vi.fn();
 const warnMock = vi.fn();
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
   writeText: (...args: unknown[]) => writeTextMock(...args),
+  readText: (...args: unknown[]) => readTextMock(...args),
 }));
 vi.mock("@tauri-apps/plugin-log", () => ({
   warn: (...args: unknown[]) => warnMock(...args),
 }));
 
-import { writeClipboardText } from "./clipboard";
+import { readClipboardText, writeClipboardText } from "./clipboard";
+
+describe("readClipboardText", () => {
+  beforeEach(() => {
+    readTextMock.mockReset();
+    warnMock.mockReset();
+    warnMock.mockResolvedValue(undefined);
+  });
+
+  it("returns the native pasteboard text", async () => {
+    readTextMock.mockResolvedValue("hello");
+    await expect(readClipboardText()).resolves.toBe("hello");
+  });
+
+  it("returns null and logs when the native read fails", async () => {
+    readTextMock.mockRejectedValue(new Error("denied"));
+    await expect(readClipboardText()).resolves.toBeNull();
+    expect(String(warnMock.mock.calls[0][0])).toContain("denied");
+  });
+});
 
 describe("writeClipboardText", () => {
   beforeEach(() => {
