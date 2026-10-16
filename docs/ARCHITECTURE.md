@@ -483,6 +483,10 @@ src/
     │   │                            segment has a right-click context menu (`DirSegmentContextMenu` /
     │   │                            `dirSegmentMenuItems`): Set as Workspace Root, New Workspace from Folder, Open in
     │   │                            Terminal, Reveal in Finder, Copy Relative/Absolute Path, Add to .gitignore.
+    │   │                            The copy items (`explorer/lib/copyPathItems.tsx`) print the path under the label;
+    │   │                            Copy Relative Path shows why it is disabled (no workspace root, or outside it).
+    │   │                            The terminal surface has a right-click menu (`TerminalContextMenu`): Copy (enabled
+    │   │                            only with a selection) and Paste.
     │   │                            The right side shows `pid / process / CPU% / RAM`. `process` is the OSC-133
     │   │                            foreground command when one is running, or the shell name at rest. An
     │   │                            agent chip (status dot + model name) appears when an agent session is active.
