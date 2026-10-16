@@ -2837,9 +2837,10 @@ export default function App() {
   }, [activeWorkspace?.activePaneId, zenPaneId]);
 
   const handleCloseActiveTab = useCallback(() => {
-    if (!activeWorkspace) return;
-    if (!activeTabId || activeWorkspace.hibernated) {
-      // Empty pane (workspace with no tabs) or a sleeping workspace: Cmd+W closes the workspace.
+    // The native menu reaches this without passing through `shortcutsDisabled`.
+    if (!activeWorkspace || activeWorkspace.hibernated) return;
+    if (!activeTabId) {
+      // Empty pane (workspace with no tabs): Cmd+W closes the workspace.
       void requestCloseWorkspace(activeWorkspace.id);
       return;
     }

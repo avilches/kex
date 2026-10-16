@@ -23,12 +23,11 @@ export function strippedTree(node: SplitNode): SplitNode {
 // Shortcuts that act on tabs, terminals, editors or scripts have nothing to act
 // on while the workspace is asleep (its tabs are in the tree but not mounted), and
 // the Sidebar and the zen layout are not shown, so changing their state would only
-// surprise the user on wake. `tab.close` is the exception: it closes the workspace.
+// surprise the user on wake. A sleeping workspace closes only through its own shortcut.
 const BLOCKED_PREFIXES = ["tab.", "pane.", "terminal.", "editor.", "markdown.", "file.", "path.", "sidebar.", "explorer."];
 const BLOCKED_IDS: readonly ShortcutId[] = ["search.focus", "workspace.run", "view.zenMode"];
 
 export function blockedWhileHibernated(id: ShortcutId): boolean {
-  if (id === "tab.close") return false;
   return BLOCKED_IDS.includes(id) || BLOCKED_PREFIXES.some((p) => id.startsWith(p));
 }
 
