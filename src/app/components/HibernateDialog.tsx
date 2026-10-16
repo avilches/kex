@@ -32,13 +32,27 @@ import { scriptsToDelete, type Tab, type Workspace } from "@/modules/workspaces/
 function TabLabel({ tab, command }: { tab: Tab; command?: string }) {
   const info = useAgentTabTitle(tab);
   return (
-    <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
-      <span className="flex shrink-0 items-center">
-        {info?.agentSession && !tab.icon ? <AgentIcon agent={info.agentSession.agent} size={12} /> : tabIcon(tab, info?.isRunning)}
+    <>
+      <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
+        <span className="flex shrink-0 items-center">
+          {info?.agentSession && !tab.icon ? <AgentIcon agent={info.agentSession.agent} size={12} /> : tabIcon(tab, info?.isRunning)}
+        </span>
+        <span className="truncate">{info?.displayTitle}</span>
       </span>
-      <span className="shrink-[100] truncate">{info?.displayTitle}</span>
-      {command && <span className="truncate font-mono" title={command}>{command}</span>}
-    </span>
+      <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground" title={command}>{command}</span>
+    </>
+  );
+}
+
+// Tab, process and actions line up as table columns across the rows of a section.
+const ROW_GRID = "grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1";
+
+function CommandOnly({ command }: { command: string }) {
+  return (
+    <>
+      <span aria-hidden />
+      <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground" title={command}>{command}</span>
+    </>
   );
 }
 
@@ -143,17 +157,19 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
             <h3 className="text-[12px] font-medium">
               {closing ? "Agents that will be killed" : "Waiting for these agents to finish"}
             </h3>
+            <div className={ROW_GRID}>
             {agents.map((b) => (
-              <div key={b.tabId} className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-2">
-                  {tabs.get(b.tabId) ? (
-                    <TabLabel tab={tabs.get(b.tabId)!} command={commands.get(b.tabId)} />
-                  ) : (
-                    <span className="truncate text-[12px] text-muted-foreground">{b.name}</span>
-                  )}
+              <div key={b.tabId} className="contents">
+                {tabs.get(b.tabId) ? (
+                  <TabLabel tab={tabs.get(b.tabId)!} command={commands.get(b.tabId)} />
+                ) : (
+                  <>
+                    <span className="min-w-0 truncate text-[12px] text-muted-foreground">{b.name}</span>
+                    <span aria-hidden />
+                  </>
+                )}
+                <span className="flex items-center justify-end gap-2">
                   <Spinner size={11} />
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
                   {!closing && b.runOnStart && (
                     <Button
                       size="sm"
@@ -177,6 +193,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                 </span>
               </div>
             ))}
+            </div>
             {!closing && onlyAgentsPending && (
               <p className="text-[12px] text-muted-foreground">
                 The workspace will hibernate as soon as they are done.
@@ -187,29 +204,33 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
         {scripts.length > 0 && (
           <section className="flex flex-col gap-1">
             <h3 className="text-[12px] font-medium">Running scripts that will be stopped</h3>
+            <div className={ROW_GRID}>
             {scripts.map((b) => (
-              <div key={b.tabId} className="flex items-center justify-between gap-2">
+              <div key={b.tabId} className="contents">
                 <span className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground">
                   <HugeiconsIcon icon={PlayIcon} size={12} strokeWidth={2} className="shrink-0" />
-                  <span className="shrink-[100] truncate">{b.name}</span>
-                  {b.command && b.command !== b.name && (
-                    <span className="truncate font-mono" title={b.command}>{b.command}</span>
+                  <span className="truncate">{b.name}</span>
+                </span>
+                <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground" title={b.command}>
+                  {b.command && b.command !== b.name ? b.command : ""}
+                </span>
+                <span className="flex items-center justify-end">
+                  {!closing && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={b.stopping}
+                      title="Stop this script"
+                      onClick={() => onStopBusy(b)}
+                    >
+                      {b.stopping ? "Stopping" : "Stop"}
+                    </Button>
                   )}
                 </span>
-                {!closing && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    disabled={b.stopping}
-                    title="Stop this script"
-                    onClick={() => onStopBusy(b)}
-                  >
-                    {b.stopping ? "Stopping" : "Stop"}
-                  </Button>
-                )}
               </div>
             ))}
+            </div>
           </section>
         )}
         {review && review.docs.length > 0 && (
@@ -268,16 +289,16 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
         {closing && processes.length > 0 && (
           <section className="flex flex-col gap-1">
             <h3 className="text-[12px] font-medium">Running processes that will be killed</h3>
-            {processes.map((p) => {
-              const tab = tabs.get(p.tabId);
-              return tab ? (
-                <TabLabel key={p.tabId} tab={tab} command={p.label} />
-              ) : (
-                <span key={p.tabId} className="truncate font-mono text-[12px] text-muted-foreground" title={p.label}>
-                  {p.label}
-                </span>
-              );
-            })}
+            <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
+              {processes.map((p) => {
+                const tab = tabs.get(p.tabId);
+                return tab ? (
+                  <TabLabel key={p.tabId} tab={tab} command={p.label} />
+                ) : (
+                  <CommandOnly key={p.tabId} command={p.label} />
+                );
+              })}
+            </div>
           </section>
         )}
         {closing && deletedScripts > 0 && (
@@ -288,14 +309,13 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
         {!closing && review && review.commands.length > 0 && (
           <section className="flex flex-col gap-1">
             <h3 className="text-[12px] font-medium">Commands that will not come back</h3>
+            <div className={ROW_GRID}>
             {review.commands.map((c) => (
-              <div key={c.tabId} className="flex items-center justify-between gap-2">
+              <div key={c.tabId} className="contents">
                 {tabs.get(c.tabId) ? (
                   <TabLabel tab={tabs.get(c.tabId)!} command={c.command} />
                 ) : (
-                  <span className="truncate font-mono text-[12px] text-muted-foreground" title={c.command}>
-                    {c.command}
-                  </span>
+                  <CommandOnly command={c.command} />
                 )}
                 <Button
                   size="sm"
@@ -308,6 +328,7 @@ export function HibernateDialog({ workspace, groupLabel, mode = "hibernate", pro
                 </Button>
               </div>
             ))}
+            </div>
           </section>
         )}
         <AlertDialogFooter>
