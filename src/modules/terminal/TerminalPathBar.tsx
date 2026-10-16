@@ -108,6 +108,7 @@ export function TerminalPathBar({
         <TerminalPathBarMenu
           tabId={tabId}
           agentSession={agentSession}
+          onReveal={onReveal}
         />
       </div>
     </div>

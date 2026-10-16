@@ -330,7 +330,7 @@ the tree (nonce-guarded, fires once).
 
 The terminal path bar `[...]` DropdownMenu (`TerminalPathBarMenu`) surfaces session metadata that was previously in
 the floating tab HoverCard: run-on-start checkbox, persistent command input, and for agent sessions: session id
-(copy), transcript (Reveal in Finder), started elapsed, restore error. The floating tab HoverCard has been removed
+(copy), started elapsed, restore error, plus the actions Open Transcript Folder (focuses the folder in the explorer) and Reveal Transcript in Finder. The floating tab HoverCard has been removed
 entirely; tabs use a native `title` tooltip (cwd, agent model/sessionId). None of this surface exists in upstream
 Terax.
 

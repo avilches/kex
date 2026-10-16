@@ -487,8 +487,8 @@ src/
     │   │                            foreground command when one is running, or the shell name at rest. An
     │   │                            agent chip (status dot + model name) appears when an agent session is active.
     │   │                            A `[...]` DropdownMenu (`TerminalPathBarMenu`) holds: the tab id and, for agent
-    │   │                            sessions: session id (copy), transcript
-    │   │                            path (Reveal in Finder), started elapsed, and restore error if any.
+    │   │                            sessions: session id (copy), started elapsed, restore error if any, and the
+    │   │                            actions Open Transcript Folder (explorer focus) and Reveal Transcript in Finder.
     │   │                            Metrics come from the ephemeral `terminalMetricsStore`
     │   │                            (`useSyncExternalStore`, never persisted, outside the workspaces tree). A single
     │   │                            `useTerminalMetricsSampler` hook polls `pty_metrics` every 5 s
