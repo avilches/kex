@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p }));
 vi.mock("@/modules/editor/lib/useEditorThemeExt", () => ({ useEditorThemeExt: () => [] }));
 vi.mock("@/modules/theme/ThemeProvider", () => ({ useTheme: () => ({ resolvedMode: "dark" }) }));
+vi.mock("@/modules/theme/useTerminalSurfaceMode", () => ({ useTerminalSurfaceMode: () => "dark" }));
 
 import { FloatingTabNote } from "./FloatingTabNote";
 import { flushTabNote, useTabNoteStore } from "./lib/tabNoteStore";

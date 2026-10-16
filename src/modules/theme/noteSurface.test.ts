@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { noteSurface, noteSurfaceKind, terminalNoteSurface, variantNoteSurface } from "./noteSurface";
+import { colorMode, noteSurface, noteSurfaceKind, terminalNoteSurface, variantNoteSurface } from "./noteSurface";
 import { contrastRatio } from "./readableColors";
 import { listBuiltinThemes } from "./themes";
 
@@ -108,5 +108,18 @@ describe("terminalNoteSurface", () => {
     expect(contrastRatio(rgb(dark.background), [255, 255, 255])).toBeGreaterThan(
       contrastRatio(rgb(light.background), [255, 255, 255]),
     );
+  });
+});
+
+describe("colorMode", () => {
+  test("reads the mode of a surface color, in hex or rgb form", () => {
+    expect(colorMode("#ffffff", "dark")).toBe("light");
+    expect(colorMode("#1a1b26", "light")).toBe("dark");
+    expect(colorMode("rgb(250, 250, 250)", "dark")).toBe("light");
+  });
+
+  test("falls back when there is no usable color", () => {
+    expect(colorMode(undefined, "light")).toBe("light");
+    expect(colorMode("not a color", "dark")).toBe("dark");
   });
 });
