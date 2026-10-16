@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ClosedEntry, Tab, Script, SplitNode, Workspace } from "./types";
 import { applyWake } from "./hibernate";
-import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, emptyWorkspaceToClose, findReopenTarget, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
+import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, buildReopenedTab, captureClosedEntry, collectRunningTerminals, emptyWorkspaceToClose, pickReopen, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
 const ws = (over: Partial<Workspace> = {}): Workspace => ({
   id: "w1",
@@ -361,72 +361,66 @@ describe("captureClosedEntry", () => {
   });
 });
 
-describe("findReopenTarget", () => {
+describe("pickReopen", () => {
   const makeWs = (id: string, paneId: string): Workspace => ({
     id,
     title: "W",
     paneTree: { kind: "pane", id: paneId, tabs: [], activeTabId: null },
     activePaneId: paneId,
   });
-
-  it("returns the original workspace and pane when both exist", () => {
-    const workspaces = [makeWs("w1", "p1")];
-    const entry: ClosedEntry = {
-      tab: { id: "t1", kind: "terminal" },
-      paneId: "p1",
-      workspaceId: "w1",
-    };
-    expect(findReopenTarget(workspaces, "w1", entry)).toEqual({
-      workspaceId: "w1",
-      paneId: "p1",
-    });
+  const entry = (id: string, workspaceId: string, paneId: string): ClosedEntry => ({
+    tab: { id, kind: "terminal" },
+    paneId,
+    workspaceId,
   });
 
-  it("falls back to active pane when the original pane no longer exists", () => {
-    const workspaces = [makeWs("w1", "p2")]; // p1 was destroyed, now p2 is active
-    const entry: ClosedEntry = {
-      tab: { id: "t1", kind: "terminal" },
-      paneId: "p1",
-      workspaceId: "w1",
-    };
-    expect(findReopenTarget(workspaces, "w1", entry)).toEqual({
-      workspaceId: "w1",
-      paneId: "p2",
-    });
+  it("picks the newest entry in its original workspace and pane", () => {
+    const e1 = entry("t1", "w1", "p1");
+    const e2 = entry("t2", "w1", "p1");
+    const out = pickReopen([e2, e1], [makeWs("w1", "p1")]);
+    expect(out.picked).toEqual({ entry: e2, workspaceId: "w1", paneId: "p1" });
+    expect(out.remaining).toEqual([e1]);
   });
 
-  it("falls back to the active workspace when the original workspace was closed", () => {
-    const workspaces = [makeWs("w2", "p3")]; // w1 is gone
-    const entry: ClosedEntry = {
-      tab: { id: "t1", kind: "terminal" },
-      paneId: "p1",
-      workspaceId: "w1",
-    };
-    expect(findReopenTarget(workspaces, "w2", entry)).toEqual({
-      workspaceId: "w2",
-      paneId: "p3",
-    });
+  it("falls back to the workspace's active pane when the original pane no longer exists", () => {
+    const e = entry("t1", "w1", "p1");
+    const out = pickReopen([e], [makeWs("w1", "p2")]);
+    expect(out.picked).toEqual({ entry: e, workspaceId: "w1", paneId: "p2" });
   });
 
-  it("skips a hibernated original workspace and uses the active one", () => {
+  it("never reopens in another workspace: an entry of a closed workspace is dropped", () => {
+    const gone = entry("t1", "w1", "p1");
+    const out = pickReopen([gone], [makeWs("w2", "p3")]);
+    expect(out.picked).toBeNull();
+    expect(out.remaining).toEqual([]);
+  });
+
+  it("skips a hibernated entry, keeps it, and reopens the next one", () => {
+    const hib = entry("t2", "w1", "p1");
+    const awake = entry("t1", "w2", "p3");
     const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")];
-    const entry: ClosedEntry = { tab: { id: "t1", kind: "terminal" }, paneId: "p1", workspaceId: "w1" };
-    expect(findReopenTarget(workspaces, "w2", entry)).toEqual({ workspaceId: "w2", paneId: "p3" });
+    const out = pickReopen([hib, awake], workspaces);
+    expect(out.picked).toEqual({ entry: awake, workspaceId: "w2", paneId: "p3" });
+    expect(out.remaining).toEqual([hib]);
   });
 
-  it("returns null when the original and the active workspaces are both hibernated", () => {
-    const workspaces = [{ ...makeWs("w1", "p1"), hibernated: true }, { ...makeWs("w2", "p3"), hibernated: true }];
-    const entry: ClosedEntry = { tab: { id: "t1", kind: "terminal" }, paneId: "p1", workspaceId: "w1" };
-    expect(findReopenTarget(workspaces, "w2", entry)).toBeNull();
+  it("keeps hibernated entries and picks nothing when all are hibernated", () => {
+    const e = entry("t1", "w1", "p1");
+    const out = pickReopen([e], [{ ...makeWs("w1", "p1"), hibernated: true }]);
+    expect(out.picked).toBeNull();
+    expect(out.remaining).toEqual([e]);
   });
 
-  it("returns null when no workspaces exist", () => {
-    const entry: ClosedEntry = {
-      tab: { id: "t1", kind: "terminal" },
-      paneId: "p1",
-      workspaceId: "w1",
-    };
-    expect(findReopenTarget([], "w1", entry)).toBeNull();
+  it("picks the kept entry first once its workspace wakes up", () => {
+    const hib = entry("t2", "w1", "p1");
+    const older = entry("t1", "w2", "p3");
+    const first = pickReopen([hib, older], [{ ...makeWs("w1", "p1"), hibernated: true }, makeWs("w2", "p3")]);
+    const second = pickReopen(first.remaining, [makeWs("w1", "p1"), makeWs("w2", "p3")]);
+    expect(second.picked?.entry).toBe(hib);
+  });
+
+  it("returns nothing for an empty stack", () => {
+    expect(pickReopen([], [makeWs("w1", "p1")])).toEqual({ picked: null, remaining: [] });
   });
 });
 

@@ -414,6 +414,11 @@ the ones that were hibernated (manually or by auto-hibernate) stay hibernated, t
 `lastActiveAt` is seeded into `activityStamps`, so auto-hibernate keeps counting their inactivity from the
 last real activity instead of restarting the clock. Memory is controlled by auto-hibernate alone.
 
+Reopen Closed Tab (`reopenClosed`, `pickReopen`) only ever reopens a tab in the workspace it was closed in. An
+entry whose workspace was closed is dropped. An entry whose workspace is hibernated is skipped but kept in the
+stack, so undo continues with the older entries and, once the workspace wakes, that entry is the next one to be
+reopened.
+
 ### 5.8 Workspace authorization and file opening
 
 A file opened in the editor from a directory the user has not navigated to in a terminal tab will show git diff decorations only after the directory is authorized. The source control panel will similarly refuse to operate on that path. Navigate to the directory in a terminal tab first (`cd <path>`) to authorize it.
