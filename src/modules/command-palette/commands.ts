@@ -1,6 +1,10 @@
 import type { SearchTarget } from "@/modules/header";
-import { allPaneIds } from "@/modules/workspaces";
-import type { SplitNode } from "@/modules/workspaces";
+import type { SettingsSection } from "@/modules/settings/openSettingsWindow";
+import { SETTINGS_SECTIONS } from "@/modules/settings/sections";
+import type { ShortcutHandlers } from "@/modules/shortcuts";
+import { SHORTCUTS, type ShortcutId } from "@/modules/shortcuts/shortcuts";
+import { allPaneIds } from "@/modules/workspaces/lib/splitNode";
+import type { SplitNode } from "@/modules/workspaces/lib/types";
 import {
   ArrowReloadHorizontalIcon,
   Cancel01Icon,
@@ -26,12 +30,37 @@ export const COMMAND_GROUPS = [
   "General",
   "Tabs",
   "Panes",
+  "Terminal",
+  "Editor",
+  "Sidebar",
+  "Explorer",
+  "View",
   "Git",
   "Search",
-  "View",
+  "Settings",
 ] as const;
 
 const MAX_PANES_PER_WORKSPACE = 4;
+
+export const UNLISTED_SHORTCUTS: Readonly<Record<string, string>> = {
+  "commandPalette.open": "already inside the palette",
+  "file.copy": "acts on the explorer selection, which a closing palette loses",
+  "file.cut": "acts on the explorer selection, which a closing palette loses",
+  "file.paste": "acts on the explorer selection, which a closing palette loses",
+  "file.delete": "acts on the explorer selection, which a closing palette loses",
+  "editor.undo": "buffer transaction of the focused editor",
+  "editor.redo": "buffer transaction of the focused editor",
+  "tab.next": "relative navigation with no target to pick",
+  "tab.prev": "relative navigation with no target to pick",
+  "pane.focusUp": "relative navigation with no target to pick",
+  "pane.focusDown": "relative navigation with no target to pick",
+  "pane.focusLeft": "relative navigation with no target to pick",
+  "pane.focusRight": "relative navigation with no target to pick",
+  "workspace.prev": "relative navigation with no target to pick",
+  "workspace.next": "relative navigation with no target to pick",
+  "tab.selectByIndex": "handler is parametrised by the digit key",
+  "workspace.selectByIndex": "handler is parametrised by the digit key",
+};
 
 export type CommandPaletteActionContext = {
   activeWorkspacePaneTree: SplitNode | null;
@@ -61,6 +90,12 @@ export type CommandPaletteActionContext = {
   hasActiveTerminal: boolean;
   openWorkspaceProperties: () => void;
   openRunScriptConfiguration: () => void;
+  shortcutHandlers: ShortcutHandlers;
+  openSettingsSection: (section: SettingsSection) => void;
+  hasActiveTabNote: boolean;
+  removeActiveTabNote: () => void;
+  splitBrowserRight: () => void;
+  splitBrowserDown: () => void;
 };
 
 const noop = () => {};
@@ -78,7 +113,7 @@ export function createCommandItems(
   const closeDisabled =
     onlyOneWorkspace && activePaneCount < 2 ? "Last workspace" : undefined;
 
-  return [
+  const base: PaletteItem[] = [
     {
       id: "settings.open",
       title: "Open settings",
@@ -231,6 +266,7 @@ export function createCommandItems(
       group: "Search",
       keywords: ["grep", "ripgrep", "text", "contents", "search in files"],
       icon: FileSearchIcon,
+      shortcutId: "commandPalette.content",
       trailing: "#",
       run: noop,
     },
@@ -288,5 +324,59 @@ export function createCommandItems(
       icon: PlayIcon,
       run: ctx.openRunScriptConfiguration,
     },
+    {
+      id: "tab.note.remove",
+      title: "Remove tab note",
+      group: "Tabs",
+      keywords: ["note", "delete", "clear"],
+      icon: Cancel01Icon,
+      disabledReason: ctx.hasActiveTabNote ? undefined : "No note on this tab",
+      run: ctx.removeActiveTabNote,
+    },
+    {
+      id: "pane.splitBrowserRight",
+      title: "Split pane right with a browser",
+      group: "Panes",
+      keywords: ["browser", "web", "split", "right"],
+      icon: Globe02Icon,
+      disabledReason: splitDisabled,
+      run: ctx.splitBrowserRight,
+    },
+    {
+      id: "pane.splitBrowserDown",
+      title: "Split pane down with a browser",
+      group: "Panes",
+      keywords: ["browser", "web", "split", "down"],
+      icon: Globe02Icon,
+      disabledReason: splitDisabled,
+      run: ctx.splitBrowserDown,
+    },
   ];
+
+  const covered = new Set<string>(
+    base.map((i) => i.shortcutId).filter((id): id is ShortcutId => !!id),
+  );
+  const generated: PaletteItem[] = SHORTCUTS.filter(
+    (s) => !covered.has(s.id) && !(s.id in UNLISTED_SHORTCUTS),
+  ).map((s) => {
+    const handler = ctx.shortcutHandlers[s.id];
+    return {
+      id: s.id,
+      title: s.label,
+      group: s.group,
+      keywords: [s.id],
+      shortcutId: s.id,
+      disabledReason: handler ? undefined : "Not available here",
+      run: () => handler?.(new KeyboardEvent("keydown")),
+    };
+  });
+  const settings: PaletteItem[] = SETTINGS_SECTIONS.map((section) => ({
+    id: `settings.section.${section.id}`,
+    title: `${section.label} settings`,
+    group: "Settings",
+    keywords: ["settings", "preferences", "options", section.id],
+    icon: section.icon,
+    run: () => ctx.openSettingsSection(section.id),
+  }));
+  return [...base, ...generated, ...settings];
 }

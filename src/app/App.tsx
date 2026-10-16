@@ -191,7 +191,7 @@ import {
   type ExplorerSnapshot,
 } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
-import { isTabNoteOpen, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
+import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { pruneTabUse, recordTabUse } from "@/modules/workspaces/lib/tabUse";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
@@ -3508,6 +3508,21 @@ export default function App() {
               useWorkspaceSettingsStore
                 .getState()
                 .openSettings(activeWorkspaceId, "scripts"),
+            shortcutHandlers,
+            openSettingsSection: (section) => void openSettingsWindow(section),
+            hasActiveTabNote: !!activeTab && hasTabNote(activeTab),
+            removeActiveTabNote: () => {
+              if (activeTab && activeWorkspace)
+                updateTabData(activeWorkspace.id, activeTab.id, removeTabNote);
+            },
+            splitBrowserRight: () => {
+              if (activeWorkspace)
+                onSplitBrowserRightStable(activeWorkspace.id, activeWorkspace.activePaneId);
+            },
+            splitBrowserDown: () => {
+              if (activeWorkspace)
+                onSplitBrowserDownStable(activeWorkspace.id, activeWorkspace.activePaneId);
+            },
           })
         : [],
     [
@@ -3531,6 +3546,10 @@ export default function App() {
       clearFocusedTerminal,
       setZenPaneId,
       activeTab,
+      shortcutHandlers,
+      updateTabData,
+      onSplitBrowserRightStable,
+      onSplitBrowserDownStable,
     ],
   );
 
