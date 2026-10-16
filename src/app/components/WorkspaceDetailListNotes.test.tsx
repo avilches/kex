@@ -11,6 +11,7 @@ import { SidebarTabMenuProvider } from "@/modules/workspaces/SidebarTabMenuConte
 import { WorkspaceDetailList } from "./WorkspaceDetailList";
 
 vi.mock("@/modules/theme/ThemeProvider", () => ({ useTheme: () => ({ resolvedMode: "dark" }) }));
+vi.mock("@/modules/theme/useTerminalSurfaceMode", () => ({ useTerminalSurfaceMode: () => "dark" }));
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

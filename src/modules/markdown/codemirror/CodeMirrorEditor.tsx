@@ -8,6 +8,7 @@ import { useWikiLinkExtension } from "@/modules/markdown/codemirror/lib/useWikiL
 import { applyViewPosition, readViewPosition } from "@/modules/markdown/codemirror/lib/viewPosition";
 import type { ViewPosition } from "@/modules/markdown/lib/viewPosition";
 import { resolveMarkdownImageSrc } from "@/modules/markdown/lib/imageSrc";
+import type { ThemeMode } from "@/modules/theme/types";
 import { Compartment } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
@@ -41,12 +42,15 @@ type Props = {
   initialPosition?: ViewPosition | null;
   // Sizes to the content up to this CSS height instead of filling the parent.
   maxHeight?: string;
+  // Draws with the app theme's editor pairing for this mode instead of the editor preference,
+  // for a surface that is in a different mode than the editor.
+  themeMode?: ThemeMode;
 };
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, Props>(
-  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich", wikiLinks, initialPosition, maxHeight }, ref) {
+  function CodeMirrorEditor({ value, onChange, syncKey, path, mode = "rich", wikiLinks, initialPosition, maxHeight, themeMode }, ref) {
     const cmRef = useRef<ReactCodeMirrorRef>(null);
-    const themeExt = useEditorThemeExt();
+    const themeExt = useEditorThemeExt(themeMode);
     const pathRef = useRef(path);
     pathRef.current = path;
     const resolveImageSrc = useCallback(

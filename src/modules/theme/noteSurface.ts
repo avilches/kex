@@ -1,5 +1,5 @@
 import { contrastRatio } from "./readableColors";
-import type { EditorSurface, TerminalPalette, ThemeVariant } from "./types";
+import type { EditorSurface, TerminalPalette, ThemeMode, ThemeVariant } from "./types";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const MIN_CONTRAST = 4.5;
@@ -100,4 +100,12 @@ export type NoteSurfaceKind = "editor" | "terminal";
 // A note takes the surface of the tab it is shown over, not the one of the tab it belongs to.
 export function noteSurfaceKind(tab: { kind: string } | undefined): NoteSurfaceKind {
   return tab?.kind === "terminal" ? "terminal" : "editor";
+}
+
+// Whether a surface color is light or dark, so the editor theme drawn over it
+// (cursor, selection, syntax) can be the one of that mode.
+export function colorMode(color: string | undefined, fallback: ThemeMode): ThemeMode {
+  const rgb = color ? parseColor(color) : null;
+  if (!rgb) return fallback;
+  return isLight(rgb) ? "light" : "dark";
 }
