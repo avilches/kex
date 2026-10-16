@@ -3567,7 +3567,7 @@ export default function App() {
   const shell = (
     <ThemeProvider>
       <TooltipProvider>
-        <div className="zoom-content relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+        <div className="zoom-content relative flex h-[calc(100vh/var(--app-zoom))] flex-col overflow-hidden bg-background text-foreground">
           <Header
             onToggleSidebar={toggleSidebar}
             sidebarSide={sidebarSide}
