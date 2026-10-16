@@ -115,6 +115,17 @@ describe("buildTabEntries", () => {
     expect(e.title).toBe("");
   });
 
+  it("keeps the url of a browser tab and the cwd of everything else as detail", () => {
+    const list = [
+      workspace("ws-1", "One", [
+        { id: "tab-1", kind: "browser", url: "https://example.com/docs" },
+        term("tab-2", { cwd: "/p/Kex" }),
+      ]),
+    ];
+    const entries = buildTabEntries(list, sources());
+    expect(entries.map((e) => e.detail)).toEqual(["https://example.com/docs", "/p/Kex"]);
+  });
+
   it("carries last use, indicator and workspace activity", () => {
     const list = [workspace("ws-1", "One", [term("tab-1")])];
     const [e] = buildTabEntries(

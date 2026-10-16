@@ -51,6 +51,7 @@ type Props = {
   workspaceRoot: string | null;
   onOpenContentHit: (path: string, line: number) => void;
   insertCommand: ((cmd: string) => void) | null;
+  activeTabId: string | null;
   tabEntries: TabEntry[];
   workspaceEntries: WorkspaceEntry[];
   onSelectTab: (entry: TabEntry) => void;
@@ -67,6 +68,7 @@ export function CommandPalette({
   workspaceRoot,
   onOpenContentHit,
   insertCommand,
+  activeTabId,
   tabEntries,
   workspaceEntries,
   onSelectTab,
@@ -104,14 +106,14 @@ export function CommandPalette({
 
   const inCommands = !inThemes && parsed.mode === "commands";
   const rankedTabs = useMemo(
-    () => (inCommands ? rankTabEntries(tabEntries, parsed.term) : []),
-    [inCommands, tabEntries, parsed.term],
+    () => (inCommands ? rankTabEntries(tabEntries, parsed.term, activeTabId) : []),
+    [inCommands, tabEntries, parsed.term, activeTabId],
   );
   const rankedWorkspaces = useMemo(
     () => (inCommands ? rankWorkspaceEntries(workspaceEntries, parsed.term) : []),
     [inCommands, workspaceEntries, parsed.term],
   );
-  const ambiguous = useMemo(() => duplicateTitleIds(rankedTabs), [rankedTabs]);
+  const ambiguous = useMemo(() => duplicateTitleIds(tabEntries), [tabEntries]);
   const selectedTab = useMemo(
     () =>
       value.startsWith("tab:")
@@ -172,6 +174,8 @@ export function CommandPalette({
 
   const runAfterClose = useCallback(
     (fn: () => void) => {
+      // A handler that skips text inputs would otherwise see the palette input still focused.
+      (document.activeElement as HTMLElement | null)?.blur?.();
       handleOpenChange(false);
       window.setTimeout(fn, 0);
     },

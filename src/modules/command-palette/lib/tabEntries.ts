@@ -22,6 +22,8 @@ export type TabEntry = {
   title: string;
   note: string | null;
   cwd: string;
+  // What tells two same-titled tabs apart: the url of a browser tab, the cwd of the rest.
+  detail: string;
   worktree: string;
   branch: string;
   process: string;
@@ -71,6 +73,7 @@ export function buildTabEntries(workspaces: readonly Workspace[], src: TabSource
           title: src.displayTitle(tab),
           note: tab.note?.trim() ? tab.note : null,
           cwd,
+          detail: tab.kind === "browser" ? tab.url : cwd,
           worktree: worktreeName(git.repoRoot) || worktreeName(cwd),
           branch: git.branch,
           process: processOf(tab, src),

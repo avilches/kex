@@ -19,6 +19,7 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   title: "zsh",
   note: null,
   cwd: "",
+  detail: "",
   worktree: "",
   branch: "",
   process: "",

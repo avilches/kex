@@ -2,6 +2,8 @@ import { fuzzyScoreLower } from "./fuzzy";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 
 export const RECENT_LIMIT = 8;
+// Every row is a cmdk item registered on each keystroke, so typing cannot render a thousand of them.
+export const SEARCH_LIMIT = 40;
 
 // Best case for one query character in fuzzyScoreLower: 1 + boundary + consecutive.
 const MAX_PER_CHAR = 19;
@@ -18,8 +20,9 @@ export function byRecency(a: TabEntry, b: TabEntry): number {
   );
 }
 
-export function recentTabs(entries: readonly TabEntry[], limit = RECENT_LIMIT): TabEntry[] {
-  return [...entries].sort(byRecency).slice(0, limit);
+// The tab the user is on is never offered as a place to go: it would always be the first row.
+export function recentTabs(entries: readonly TabEntry[], limit = RECENT_LIMIT, activeTabId?: string | null): TabEntry[] {
+  return entries.filter((e) => e.tabId !== activeTabId).sort(byRecency).slice(0, limit);
 }
 
 function fuzzy(query: string, field: string): number | null {
@@ -53,16 +56,16 @@ function hitOf(e: TabEntry, q: string): Hit | null {
   return null;
 }
 
-export function rankTabEntries(entries: readonly TabEntry[], term: string): TabEntry[] {
+export function rankTabEntries(entries: readonly TabEntry[], term: string, activeTabId?: string | null): TabEntry[] {
   const q = term.trim().toLowerCase();
-  if (!q) return recentTabs(entries);
+  if (!q) return recentTabs(entries, RECENT_LIMIT, activeTabId);
   const hits: { entry: TabEntry; hit: Hit }[] = [];
   for (const entry of entries) {
     const hit = hitOf(entry, q);
     if (hit) hits.push({ entry, hit });
   }
   hits.sort((a, b) => a.hit.tier - b.hit.tier || b.hit.score - a.hit.score || byRecency(a.entry, b.entry));
-  return hits.map((h) => h.entry);
+  return hits.slice(0, SEARCH_LIMIT).map((h) => h.entry);
 }
 
 export function rankWorkspaceEntries(entries: readonly WorkspaceEntry[], term: string): WorkspaceEntry[] {

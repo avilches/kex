@@ -16,6 +16,7 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   title: "zsh",
   note: null,
   cwd: "/p/Kex",
+  detail: "",
   worktree: "",
   branch: "",
   process: "",
@@ -75,7 +76,12 @@ describe("TabItem", () => {
   });
 
   it("shows the short cwd under an ambiguous title", () => {
-    row(entry({ cwd: "/p/Kex/src" }), true);
+    row(entry({ cwd: "/p/Kex/src", detail: "/p/Kex/src" }), true);
     expect(screen.getByText("Kex/src")).toBeTruthy();
+  });
+
+  it("shows the url without protocol under an ambiguous browser title", () => {
+    row(entry({ kind: "browser", cwd: "", detail: "https://example.com/docs" }), true);
+    expect(screen.getByText("example.com/docs")).toBeTruthy();
   });
 });

@@ -91,6 +91,7 @@ export type CommandPaletteActionContext = {
   openWorkspaceProperties: () => void;
   openRunScriptConfiguration: () => void;
   shortcutHandlers: ShortcutHandlers;
+  isShortcutAvailable: (id: ShortcutId) => boolean;
   openSettingsSection: (section: SettingsSection) => void;
   hasActiveTabNote: boolean;
   removeActiveTabNote: () => void;
@@ -366,7 +367,7 @@ export function createCommandItems(
       group: s.group,
       keywords: [s.id],
       shortcutId: s.id,
-      disabledReason: handler ? undefined : "Not available here",
+      disabledReason: handler && ctx.isShortcutAvailable(s.id) ? undefined : "Not available here",
       run: () => handler?.(new KeyboardEvent("keydown")),
     };
   });

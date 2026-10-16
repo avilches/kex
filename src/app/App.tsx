@@ -5,7 +5,6 @@ import {
 } from "@/components/ui/resizable";
 import { tabLocations, userTabTitles } from "@/modules/workspaces/lib/tabLocations";
 import {
-  blockedWhileHibernated,
   workspaceDialogPending,
   editorTabIds,
   enableRunOnStart,
@@ -202,7 +201,8 @@ import {
 } from "@/modules/workspaces/lib/sidebarSnapshot";
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
-import { pruneTabUse, recordTabUse } from "@/modules/workspaces/lib/tabUse";
+import { paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
+import { recordTabUse } from "@/modules/workspaces/lib/tabUse";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
 import { useWorkspaceRenameStore } from "@/modules/workspaces/lib/workspaceRenameStore";
@@ -3293,11 +3293,21 @@ export default function App() {
     ],
   );
 
+  const shortcutContext = useMemo(
+    () => ({
+      hibernated: !!activeWorkspace?.hibernated,
+      activeTab,
+      hasWorkspaceRoot: !!activeWorkspace?.workspaceRoot,
+      scriptCount: activeWorkspace?.scripts?.length ?? 0,
+    }),
+    [activeWorkspace?.hibernated, activeWorkspace?.workspaceRoot, activeWorkspace?.scripts, activeTab],
+  );
+
   const shortcutsDisabled = useCallback(
     (id: ShortcutId, e: KeyboardEvent) => {
       // The global listener runs in capture phase before the Radix dialog, so a modal does not block it; without this a shortcut could switch or close the workspace, or retarget the dialog.
       if (workspaceDialogPending(hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id)) return true;
-      if (activeWorkspace?.hibernated && blockedWhileHibernated(id)) return true;
+      if (shortcutUnavailable(id, shortcutContext)) return true;
       if (
         id === "workspace.settings" &&
         !useWorkspaceSettingsStore.getState().open &&
@@ -3306,21 +3316,6 @@ export default function App() {
         )
       ) {
         return true;
-      }
-      if (id === "editor.undo" || id === "editor.redo") {
-        return activeTab?.kind !== "editor";
-      }
-      if (id === "editor.cycleView") {
-        return !(isPreviewableEditorTab(activeTab) || activeTab?.kind === "markdown");
-      }
-      if (id === "markdown.toggleOutline") {
-        return activeTab?.kind !== "markdown";
-      }
-      if (id === "editor.preview.toggleSplit") {
-        return !isPreviewableEditorTab(activeTab);
-      }
-      if (id === "editor.save") {
-        return activeTab?.kind !== "editor" && activeTab?.kind !== "markdown";
       }
       if (id === "terminal.clear") {
         const target =
@@ -3333,7 +3328,7 @@ export default function App() {
 
       return false;
     },
-    [activeTab, activeWorkspace?.hibernated, hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id],
+    [shortcutContext, hibernateFlow.pendingWorkspaceId, closeFlow.pending?.id],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
@@ -3457,18 +3452,6 @@ export default function App() {
     }).catch(() => {});
   }, [editorAutoSave, sidebarOpen, sidebarView, sidebarSide, activeShowHidden]);
 
-  useEffect(() => {
-    if (!commandPaletteOpen) return;
-    pruneTabUse(
-      new Set(
-        workspaces.flatMap((w) =>
-          allPanes(w.paneTree).flatMap((p) => p.tabs.map((t) => t.id)),
-        ),
-      ),
-    );
-    // Only on open: pruning on every workspace change would rewrite storage constantly.
-  }, [commandPaletteOpen]);
-
   // ── Command palette ───────────────────────────────────────────────────────
 
   const paletteSources = useMemo(
@@ -3545,6 +3528,7 @@ export default function App() {
                 .getState()
                 .openSettings(activeWorkspaceId, "scripts"),
             shortcutHandlers,
+            isShortcutAvailable: (id) => !paletteShortcutUnavailable(id, shortcutContext),
             openSettingsSection: (section) => void openSettingsWindow(section),
             hasActiveTabNote: !!activeTab && hasTabNote(activeTab),
             removeActiveTabNote: () => {
@@ -3583,6 +3567,7 @@ export default function App() {
       setZenPaneId,
       activeTab,
       shortcutHandlers,
+      shortcutContext,
       updateTabData,
       onSplitBrowserRightStable,
       onSplitBrowserDownStable,
@@ -3923,6 +3908,7 @@ export default function App() {
             workspaceRoot={explorerRoot}
             onOpenContentHit={openContentHit}
             insertCommand={insertHistoryCommand}
+            activeTabId={activeTabId}
             tabEntries={paletteTabEntries}
             workspaceEntries={paletteWorkspaceEntries}
             onSelectTab={onPaletteSelectTab}

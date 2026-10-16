@@ -53,6 +53,7 @@ type TabEntry = {
   title: string;          // titulo ya expandido, el que ve el usuario
   note: string | null;
   cwd: string;
+  detail: string;         // url de un tab browser, cwd del resto: lo que distingue dos tabs con el mismo titulo
   worktree: string;       // "" si no esta en un worktree
   branch: string;
   process: string;        // comando en ejecucion o nombre del agente
@@ -63,13 +64,13 @@ type TabEntry = {
 
 ### Seguimiento del ultimo uso
 
-Se sella `recordTabUse(tabId)` desde un unico efecto en `App.tsx` que depende del id del tab activo y de si su workspace esta hibernado. Asi cubre clics, atajos, tabs nuevos, cambios de workspace y el arranque, sin tocar `activateTab`. No se escribe en el cuerpo del tab ni en el JSON del workspace: cambiar de tab no debe ensuciar lo persistido. La poda con `pruneTabUse` desde las ids vivas ocurre al abrir la paleta, no en cada cambio de workspaces.
+Se sella `recordTabUse(tabId)` desde un unico efecto en `App.tsx` que depende del id del tab activo y de si su workspace esta hibernado. Asi cubre clics, atajos, tabs nuevos, cambios de workspace y el arranque, sin tocar `activateTab`. No se escribe en el cuerpo del tab ni en el JSON del workspace: cambiar de tab no debe ensuciar lo persistido. No hay poda contra los tabs de una ventana: todas las ventanas comparten el mapa y el tope de 300 entradas basta para acotarlo.
 
 El mapa se lee una vez al abrir la paleta (mismo patron que `mruSnapshot`), no en cada tecla.
 
 ### Orden con la caja vacia
 
-1. Los 8 `TabEntry` con mayor `lastUsedAt` cuyo workspace no esta hibernado.
+1. Los 8 `TabEntry` con mayor `lastUsedAt` cuyo workspace no esta hibernado, sin contar el tab activo (seria siempre la primera fila y Enter no haria nada).
 2. Si no llegan a 8, se completan con los de workspaces hibernados, tambien por `lastUsedAt`.
 3. Debajo, las acciones como hoy (ordenadas por su MRU).
 
@@ -88,7 +89,7 @@ Cada tab entra en el nivel del mejor campo que coincide, y los niveles son estri
 
 Los campos largos (rutas, notas, comandos) usan subcadena porque un fuzzy sobre una ruta larga casa con casi cualquier consulta corta. Dentro de un nivel manda la puntuacion y despues `byRecency` (workspace no hibernado primero, luego `lastUsedAt`, luego actividad del workspace, luego orden en el arbol). Los workspaces se puntuan por titulo difuso.
 
-Las filas se agrupan con cabeceras en orden fijo: Tabs, Workspaces, las acciones por sus grupos de siempre y Settings. Los grupos vacios no se pintan. No se limita la lista mientras se escribe; el limite de 8 es solo para la caja vacia.
+Las filas se agrupan con cabeceras en orden fijo: Tabs, Workspaces, las acciones por sus grupos de siempre y Settings. Los grupos vacios no se pintan. Los tabs mostrados al escribir se limitan a 40 (`SEARCH_LIMIT`): cada fila es un item de cmdk que se registra en cada pulsacion. El tab activo si aparece al buscar. El limite de 8 es solo para la caja vacia.
 
 ### Filas
 

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   TAB_USE_MAX_ENTRIES,
-  pruneTabUse,
   recordTabUse,
   tabUseSnapshot,
 } from "./tabUse";
@@ -50,13 +49,6 @@ describe("tabUse", () => {
     expect(snap[`tab-${TAB_USE_MAX_ENTRIES + 4}`]).toBe(TAB_USE_MAX_ENTRIES + 5);
   });
 
-  it("prunes ids that are no longer alive", () => {
-    recordTabUse("tab-a", 1);
-    recordTabUse("tab-b", 2);
-    pruneTabUse(new Set(["tab-b"]));
-    expect(tabUseSnapshot()).toEqual({ "tab-b": 2 });
-  });
-
   it("reads corrupt JSON as empty", () => {
     localStorage.setItem("kex-tab-use", "{not json");
     expect(tabUseSnapshot()).toEqual({});
@@ -76,6 +68,5 @@ describe("tabUse", () => {
     });
     expect(() => recordTabUse("tab-a", 1)).not.toThrow();
     expect(tabUseSnapshot()).toEqual({});
-    expect(() => pruneTabUse(new Set())).not.toThrow();
   });
 });

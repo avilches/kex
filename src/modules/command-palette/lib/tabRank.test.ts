@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TabEntry, WorkspaceEntry } from "./tabEntries";
 import {
   RECENT_LIMIT,
+  SEARCH_LIMIT,
   byRecency,
   rankTabEntries,
   rankWorkspaceEntries,
@@ -18,6 +19,7 @@ const entry = (over: Partial<TabEntry> = {}): TabEntry => ({
   title: "zsh",
   note: null,
   cwd: "",
+  detail: "",
   worktree: "",
   branch: "",
   process: "",
@@ -53,6 +55,26 @@ describe("recentTabs", () => {
       entry({ tabId: "c", workspaceActiveAt: 9 }),
     ];
     expect(ids(recentTabs(entries))).toEqual(["b", "c", "a"]);
+  });
+});
+
+describe("active tab", () => {
+  it("is left out of the recents so the first row is a different tab", () => {
+    const entries = [entry({ tabId: "current", lastUsedAt: 99 }), entry({ tabId: "previous", lastUsedAt: 50 })];
+    expect(ids(recentTabs(entries, RECENT_LIMIT, "current"))).toEqual(["previous"]);
+    expect(ids(rankTabEntries(entries, "", "current"))).toEqual(["previous"]);
+  });
+
+  it("is still found when typing", () => {
+    const entries = [entry({ tabId: "current", title: "build" })];
+    expect(ids(rankTabEntries(entries, "build", "current"))).toEqual(["current"]);
+  });
+});
+
+describe("search limit", () => {
+  it("caps the rows rendered while typing", () => {
+    const entries = Array.from({ length: SEARCH_LIMIT + 60 }, (_, i) => entry({ tabId: `t${i}`, title: `term ${i}` }));
+    expect(rankTabEntries(entries, "term")).toHaveLength(SEARCH_LIMIT);
   });
 });
 

@@ -33,8 +33,9 @@ const KIND_LABEL: Record<TabEntry["kind"], string> = {
   "git-commit-file": "Git commit file",
 };
 
-function shortCwd(cwd: string): string {
-  return cwd.split(/[\\/]/).filter(Boolean).slice(-2).join("/");
+function shortDetail(entry: TabEntry): string {
+  if (entry.kind === "browser") return entry.detail.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  return entry.detail.split(/[\\/]/).filter(Boolean).slice(-2).join("/");
 }
 
 export function TabItem({
@@ -60,9 +61,9 @@ export function TabItem({
       />
       <span className="min-w-0 flex-1 truncate">
         {entry.title || KIND_LABEL[entry.kind]}
-        {ambiguous && entry.cwd ? (
+        {ambiguous && entry.detail ? (
           <span className="ml-2 text-[11px] font-normal text-muted-foreground">
-            {shortCwd(entry.cwd)}
+            {shortDetail(entry)}
           </span>
         ) : null}
       </span>

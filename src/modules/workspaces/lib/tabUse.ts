@@ -1,5 +1,6 @@
 // Non-critical, shared-by-all-windows recency of each tab. localStorage keeps it out of
-// the workspace JSON: switching tabs must not make the persisted body dirty.
+// the workspace JSON: switching tabs must not make the persisted body dirty. Never pruned against
+// one window's tabs: every window shares the map, and the entry cap bounds its size.
 
 const KEY = "kex-tab-use";
 export const TAB_USE_MAX_ENTRIES = 300;
@@ -39,16 +40,4 @@ export function recordTabUse(tabId: string, now = Date.now()): void {
 
 export function tabUseSnapshot(): TabUseMap {
   return read();
-}
-
-export function pruneTabUse(liveIds: ReadonlySet<string>): void {
-  const map = read();
-  let changed = false;
-  for (const id of Object.keys(map)) {
-    if (!liveIds.has(id)) {
-      delete map[id];
-      changed = true;
-    }
-  }
-  if (changed) write(map);
 }

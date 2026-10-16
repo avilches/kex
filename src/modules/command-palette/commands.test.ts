@@ -40,6 +40,7 @@ function ctx(over: Partial<CommandPaletteActionContext> = {}): CommandPaletteAct
     openWorkspaceProperties: fn(),
     openRunScriptConfiguration: fn(),
     shortcutHandlers: {},
+    isShortcutAvailable: () => true,
     openSettingsSection: fn(),
     hasActiveTabNote: true,
     removeActiveTabNote: fn(),
@@ -102,6 +103,16 @@ describe("palette catalog", () => {
 
   it("disables a generated row with no handler", () => {
     const row = items.find((i) => i.shortcutId === "workspace.hibernate");
+    expect(row?.disabledReason).toBeTruthy();
+  });
+
+  it("disables a generated row whose context rule says it would do nothing", () => {
+    const row = createCommandItems(
+      ctx({
+        shortcutHandlers: { "editor.save": vi.fn() },
+        isShortcutAvailable: (id) => id !== "editor.save",
+      }),
+    ).find((i) => i.shortcutId === "editor.save");
     expect(row?.disabledReason).toBeTruthy();
   });
 
