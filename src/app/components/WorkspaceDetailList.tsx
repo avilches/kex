@@ -397,6 +397,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   focusedTabId,
   color = null,
   visibleTabIds = "",
+  hibernated = false,
   onActivate,
 }: {
   workspaceId: string;
@@ -406,6 +407,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
   focusedTabId: string | null;
   color?: string | null;
   visibleTabIds?: string;
+  hibernated?: boolean;
   onActivate: (tabId: string) => void;
 }) {
   const sessions = useAgentStore((s) => s.sessions);
@@ -495,6 +497,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               "group/block",
               subs.length > 0 && "rounded-md",
               subs.length > 0 && !focused && "hover:bg-foreground/[0.08]",
+              hibernated && "opacity-40",
             )}
             style={grouped ? focusChipStyle(color) : undefined}
           >
