@@ -229,6 +229,16 @@ function createSlot(): Slot {
   getRecycler().appendChild(host);
   term.open(host);
 
+  // An app that tracks the mouse (Claude Code) draws its own selection, so the
+  // word xterm would select under a right click is not what the user picked.
+  host.addEventListener(
+    "contextmenu",
+    () => {
+      term.options.rightClickSelectsWord = term.modes.mouseTrackingMode === "none";
+    },
+    true,
+  );
+
   const slot: Slot = {
     id: slots.length,
     term,

@@ -4,6 +4,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { readClipboardText } from "@/lib/clipboard";
 import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "@/modules/explorer/lib/menuItemClass";
 import { ClipboardIcon, Copy01Icon } from "@hugeicons/core-free-icons";
@@ -26,12 +27,9 @@ export function TerminalContextMenu({
   const [selection, setSelection] = useState<string | null>(null);
 
   const paste = () => {
-    void navigator.clipboard
-      .readText()
-      .then((text) => {
-        if (text) onPaste(text);
-      })
-      .catch(() => {});
+    void readClipboardText().then((text) => {
+      if (text) onPaste(text);
+    });
   };
 
   return (
