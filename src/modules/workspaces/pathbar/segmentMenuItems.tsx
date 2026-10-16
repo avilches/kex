@@ -4,78 +4,26 @@ import {
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 import {
-  copyToClipboard,
-  relativePath,
   REVEAL_LABEL,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
+import {
+  CopyAbsolutePathItem,
+  CopyRelativePathItem,
+} from "@/modules/explorer/lib/copyPathItems";
 import { gitignoreEntryFor } from "@/modules/explorer/lib/gitignore";
 import { COMPACT_ITEM } from "@/modules/explorer/lib/menuItemClass";
 import {
   ComputerTerminal01Icon,
   Copy02Icon,
-  CopySlashIcon,
   DashboardSquareAddIcon,
   Delete02Icon,
   FolderOpenIcon,
-  Link01Icon,
   PencilEdit01Icon,
   PinIcon,
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-
-function isInsideRoot(path: string, workspaceRoot: string | null): boolean {
-  return (
-    workspaceRoot != null &&
-    (path === workspaceRoot || path.startsWith(`${workspaceRoot}/`))
-  );
-}
-
-const SUBPATH_CLASS = "max-w-[240px] truncate text-[10px] text-muted-foreground";
-
-// Copy Relative Path: disabled (greyed) when the path is above the workspace
-// root or there is no root, since a relative path is meaningless there.
-function copyRelativeItem(path: string, workspaceRoot: string | null) {
-  const inRoot = isInsideRoot(path, workspaceRoot);
-  const relText = inRoot ? relativePath(workspaceRoot as string, path) : null;
-  return (
-    <ContextMenuItem
-      className={COMPACT_ITEM}
-      disabled={!inRoot}
-      onSelect={() => {
-        if (relText != null) void copyToClipboard(relText, "Copied relative path");
-      }}
-    >
-      <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-      <span className="flex min-w-0 flex-col">
-        <span>Copy Relative Path</span>
-        {relText != null && (
-          <span className={SUBPATH_CLASS} title={relText}>
-            {relText}
-          </span>
-        )}
-      </span>
-    </ContextMenuItem>
-  );
-}
-
-function copyAbsoluteItem(path: string) {
-  return (
-    <ContextMenuItem
-      className={COMPACT_ITEM}
-      onSelect={() => void copyToClipboard(path, "Copied absolute path")}
-    >
-      <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-      <span className="flex min-w-0 flex-col">
-        <span>Copy Absolute Path</span>
-        <span className={SUBPATH_CLASS} title={path}>
-          {path}
-        </span>
-      </span>
-    </ContextMenuItem>
-  );
-}
 
 export type DirSegmentMenuDeps = {
   path: string;
@@ -148,8 +96,8 @@ export function dirSegmentMenuItems(deps: DirSegmentMenuDeps): React.ReactNode {
         {REVEAL_LABEL}
       </ContextMenuItem>
       <ContextMenuSeparator />
-      {copyRelativeItem(path, workspaceRoot)}
-      {copyAbsoluteItem(path)}
+      <CopyRelativePathItem path={path} workspaceRoot={workspaceRoot} />
+      <CopyAbsolutePathItem path={path} />
       {gitignoreEntry && (
         <>
           <ContextMenuSeparator />
@@ -221,8 +169,8 @@ export function fileLeafMenuItems(deps: FileLeafMenuDeps): React.ReactNode {
         Duplicate
       </ContextMenuItem>
       <ContextMenuSeparator />
-      {copyAbsoluteItem(path)}
-      {copyRelativeItem(path, workspaceRoot)}
+      <CopyAbsolutePathItem path={path} />
+      <CopyRelativePathItem path={path} workspaceRoot={workspaceRoot} />
       {gitignoreEntry && (
         <>
           <ContextMenuSeparator />

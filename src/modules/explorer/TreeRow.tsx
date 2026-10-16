@@ -25,14 +25,12 @@ import {
   ComputerTerminal01Icon,
   Copy01Icon,
   Copy02Icon,
-  CopySlashIcon,
   DashboardSquareAddIcon,
   Delete02Icon,
   File01Icon,
   FileAddIcon,
   FolderAddIcon,
   FolderOpenIcon,
-  Link01Icon,
   LinkSquare02Icon,
   PencilEdit01Icon,
   PinIcon,
@@ -44,13 +42,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useEffect } from "react";
 import { InlineInput } from "./InlineInput";
 import {
-  copyToClipboard,
   OPEN_EXTERNAL_LABEL,
   openWithDefaultApp,
-  relativePath,
   REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
+import { CopyAbsolutePathItem, CopyRelativePathItem } from "./lib/copyPathItems";
 import { gitignoreEntryFor } from "./lib/gitignore";
 import { gitStatusHexColor } from "./lib/gitStatusColor";
 import { useTheme } from "@/modules/theme/ThemeProvider";
@@ -441,20 +438,8 @@ function EntryRowImpl(props: EntryRowProps) {
           Duplicate
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(relativePath(rootPath, path), "Copied relative path")}
-        >
-          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-          Copy Relative Path
-        </ContextMenuItem>
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(path, "Copied absolute path")}
-        >
-          <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-          Copy Absolute Path
-        </ContextMenuItem>
+        <CopyRelativePathItem path={path} workspaceRoot={rootPath} />
+        <CopyAbsolutePathItem path={path} />
         {gitRootPath &&
           onAddToGitignore &&
           gitignoreEntryFor(gitRootPath, path, isDir) && (
@@ -662,13 +647,7 @@ export function FsRootRow({
           <ShortcutHint id="file.paste" />
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(path, "Copied absolute path")}
-        >
-          <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-          Copy Absolute Path
-        </ContextMenuItem>
+        <CopyAbsolutePathItem path={path} />
         <ContextMenuItem
           className={COMPACT_ITEM}
           onSelect={() => onRefresh?.(path)}
@@ -745,13 +724,7 @@ export function FsUpRow({
           {REVEAL_LABEL}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(path, "Copied absolute path")}
-        >
-          <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-          Copy Absolute Path
-        </ContextMenuItem>
+        <CopyAbsolutePathItem path={path} />
         {onRefresh && (
           <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onRefresh()}>
             <HugeiconsIcon icon={Refresh01Icon} size={14} strokeWidth={2} />

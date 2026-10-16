@@ -11,14 +11,12 @@ import {
 import {
   Cancel01Icon,
   ComputerTerminal01Icon,
-  CopySlashIcon,
   DashboardSquareAddIcon,
   File01Icon,
   LinkSquare02Icon,
   Folder01Icon,
   FolderOpenIcon,
   HierarchyFilesIcon,
-  Link01Icon,
   PinIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
@@ -35,13 +33,13 @@ import {
 import { pathDirname } from "@/lib/pathUtils";
 import { fileIconUrl } from "./lib/iconResolver";
 import {
-  copyToClipboard,
   OPEN_EXTERNAL_LABEL,
   openWithDefaultApp,
   relativePath,
   REVEAL_LABEL,
   revealInFinder,
 } from "./lib/contextActions";
+import { CopyAbsolutePathItem, CopyRelativePathItem } from "./lib/copyPathItems";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { cn } from "@/lib/utils";
 
@@ -441,23 +439,12 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 {REVEAL_LABEL}
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() =>
-                  contextHit &&
-                  void copyToClipboard(relativePath(rootPath, contextHit.path), "Copied relative path")
-                }
-              >
-                <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-                Copy Relative Path
-              </ContextMenuItem>
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => contextHit && void copyToClipboard(contextHit.path, "Copied absolute path")}
-              >
-                <HugeiconsIcon icon={CopySlashIcon} size={14} strokeWidth={2} />
-                Copy Absolute Path
-              </ContextMenuItem>
+              {contextHit && (
+                <>
+                  <CopyRelativePathItem path={contextHit.path} workspaceRoot={rootPath} />
+                  <CopyAbsolutePathItem path={contextHit.path} />
+                </>
+              )}
             </ContextMenuContent>
           </ContextMenu>
         </ScrollArea>
