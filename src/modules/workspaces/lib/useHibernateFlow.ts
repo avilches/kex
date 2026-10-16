@@ -4,6 +4,7 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { previewResumeCmd } from "@/modules/agents/lib/agentSessionRestore";
 import { hasTabs, restoreCommandFor, terminalTabs } from "./hibernate";
 import { flushAgentTitles } from "./agentTitleSync";
+import { tabDisplayTitleNow } from "./tabTitleNow";
 import { flushSidebarSnapshots } from "./sidebarSnapshotSync";
 import { hibernateReview, isReviewEmpty, liveAgent, type HibernateLive } from "./hibernateReview";
 import { getRunningCommandsSnapshot, getScriptRunningSnapshot } from "./terminalEphemeralStore";
@@ -109,7 +110,7 @@ async function snapshotTerminalTabs(ws: Workspace): Promise<Record<string, TabHi
     terminalTabs(ws).map(async (tab): Promise<[string, TabHibernation]> => {
       const session = sessions[tab.id];
       const plan = session ? await previewResumeCmd(tab.id) : null;
-      return [tab.id, { agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan) }];
+      return [tab.id, { agent: session?.agent ?? plan?.agent, command: restoreCommandFor(tab, plan), title: tabDisplayTitleNow(tab) }];
     }),
   );
   return Object.fromEntries(entries);

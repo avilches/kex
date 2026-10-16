@@ -17,7 +17,8 @@ export type Script = {
 
 // What the sleeping overlay shows for a terminal tab besides its title: the agent and the
 // restore command are gone with the PTY, so they are captured when the workspace goes to sleep.
-export type TabHibernation = { agent?: string; command?: string };
+// `title` is the name the tab showed when it went to sleep, kept because the process that fed it is gone.
+export type TabHibernation = { agent?: string; command?: string; title?: string };
 
 // Common to every tab. `locked` (prevent close) applies to all kinds with no
 // exception. `autofocus` lives here too so any new path-bearing kind opts in

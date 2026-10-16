@@ -83,6 +83,11 @@ export function resolveAgentTabTitle(
   sources?: TitleSources,
 ): AgentTabTitleInfo {
   const hasAgent = !!agentSession && tab.kind === "terminal";
+  // A sleeping tab has no process left to feed its template, so it keeps the name it had.
+  const frozen = tab.kind === "terminal" ? tab.hibernation?.title : undefined;
+  if (frozen !== undefined) {
+    return { displayTitle: frozen, isDescription: true, hasAgent, isRunning: false, agentSession };
+  }
   const sessionTitle = agentSession?.meta?.sessionTitle;
   // After a wake or an app-restart restore the live OSC title is gone (the PTY was
   // disposed) until the agent boots and sends a new one; the title it last sent is

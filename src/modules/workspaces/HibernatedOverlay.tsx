@@ -56,7 +56,7 @@ function useSleepingSnapshot(tab: Tab): TabHibernation | undefined {
 function SleepingTabRow({ tab }: { tab: Tab }) {
   const info = useAgentTabTitle(tab);
   const snapshot = useSleepingSnapshot(tab);
-  const title = (tab.title && info?.displayTitle) || (tab.kind === "terminal" ? tab.agentTitle : undefined) || info?.displayTitle || tab.id;
+  const title = snapshot?.title || (tab.title && info?.displayTitle) || (tab.kind === "terminal" ? tab.agentTitle : undefined) || info?.displayTitle || tab.id;
   const agent = snapshot?.agent;
   const command = snapshot?.command;
   return (
