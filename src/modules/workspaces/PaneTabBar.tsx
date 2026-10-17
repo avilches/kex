@@ -285,7 +285,7 @@ function DraggableTab({
           "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
           !isDescription && tab.kind === "terminal" && !!runningCommand && "text-center",
           isRestoreError && "text-destructive/70",
-          (tab.kind === "editor" || tab.kind === "git-diff" || tab.kind === "git-commit-file") && tab.preview && "italic",
+          (tab.kind === "editor" || tab.kind === "markdown" || tab.kind === "git-diff" || tab.kind === "git-commit-file") && tab.preview && "italic",
         )}
         style={tabColor && !isRestoreError ? { color: tabColor } : undefined}
       >
