@@ -1128,6 +1128,77 @@ mod tests {
     }
 
     #[test]
+    fn a_pi_record_with_a_live_session_file_resumes_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("app");
+        std::fs::create_dir_all(&launch).unwrap();
+        let stale = dir.path().join("stale");
+        std::fs::create_dir_all(&stale).unwrap();
+        let jsonl = dir.path().join("2026-10-17T10_00_00Z_pi-abc.jsonl");
+        std::fs::write(
+            &jsonl,
+            format!(
+                "{{\"type\":\"session\",\"version\":3,\"id\":\"pi-abc\",\"cwd\":\"{}\"}}\n{{\"type\":\"message\"}}\n",
+                launch.display()
+            ),
+        )
+        .unwrap();
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("pi".to_string()),
+                session_id: "pi-abc".to_string(),
+                cwd_launch: stale.display().to_string(),
+                transcript_path: jsonl.display().to_string(),
+                launch_cmd: None,
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].agent, "pi");
+        assert_eq!(plans[0].resume_cmd, "pi --session 'pi-abc'");
+        assert_eq!(plans[0].cwd_launch, launch.display().to_string());
+    }
+
+    #[test]
+    fn a_pi_record_without_a_session_file_gets_no_plan_and_is_never_pruned() {
+        let dir = tempfile::tempdir().unwrap();
+        let launch = dir.path().join("app");
+        std::fs::create_dir_all(&launch).unwrap();
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            SessionRecord {
+                agent: Some("pi".to_string()),
+                session_id: "pi-abc".to_string(),
+                cwd_launch: launch.display().to_string(),
+                transcript_path: dir.path().join("missing.jsonl").display().to_string(),
+                launch_cmd: None,
+                title: None,
+                notification: None,
+                updated_at: 0,
+            },
+        );
+        let store_path = dir.path().join("agent-sessions.json");
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+
+        assert!(plans.is_empty());
+        let store: SessionStore =
+            serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"));
+    }
+
+    #[test]
     fn restore_uses_original_cwd_when_session_entered_a_worktree() {
         let dir = tempfile::tempdir().unwrap();
         let launch = dir.path().join("app");

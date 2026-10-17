@@ -1,8 +1,9 @@
-// kex-omp-v1
+// kex-agent-status-v1
 // Kex terminal integration. Loaded by OpenCode's plugin system or by OMP/Pi extension
 // discovery, it translates the runtime's lifecycle events into the same JSON frames the
 // Claude Code hooks emit on Kex's Unix socket (KEX_IPC). Without the per-terminal KEX_IPC
-// and KEX_TAB_ID variables the extension does nothing, so a bare `omp` run is untouched.
+// and KEX_TAB_ID variables the extension does nothing, so a bare `omp` or `pi` run is untouched.
+// The installer stamps the runtime name (omp or pi) into the agent constant below.
 
 // @ts-expect-error - the OMP/Pi extension host resolves node builtins.
 const net = require("node:net");
@@ -83,7 +84,7 @@ export default function (pi: KexRuntime): void {
   process.env.KEX_AGENT_STATUS_OWNED = selfPid;
 
   const cwd = process.cwd();
-  const agent = "omp";
+  const agent = "__KEX_AGENT__";
 
   pi.on("before_agent_start", (event, ctx) => {
     lastAssistantMessage = "";
@@ -137,6 +138,9 @@ export default function (pi: KexRuntime): void {
   });
 
   pi.on("agent_end", (event, ctx) => {
+    // Pi keeps working after agent_end (retries, compaction, queued work) and only
+    // agent_settled is final; OMP has no agent_settled and flags continuations itself.
+    if (agent === "pi") return;
     if ((event as { willContinue?: unknown })?.willContinue === true) return;
     postAgentEnd(ctx);
   });

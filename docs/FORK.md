@@ -207,12 +207,17 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
   (`SessionsSource::OmpSessions`: `<timestamp>_<id>.jsonl` scan under `~/.omp/agent/sessions/`, cwd read from the
   `session` header on JSONL line 2; `--resume <id>`; `ResumeAnyway`; empty whitelists). Its extension API is
   TypeScript files its own process loads from `~/.omp/agent/extensions/`: Kex ships `kex-agent-status.ts`
-  (`agent_setup_omp`, marker `kex-omp-v1`), which translates `before_agent_start`/`agent_start` (plus one
+  (`agent_setup_omp`, marker `kex-agent-status-v1`, shared with Pi), which translates `before_agent_start`/`agent_start` (plus one
   `SessionStart` per session id), `tool_approval_requested` and `agent_end`/`agent_settled` (armed on the cached
   assistant text) into the same IPC frames, gated on `KEX_IPC`/`KEX_TAB_ID` and inert outside them; a child process
   inheriting the parent's env cannot double-register (`KEX_AGENT_STATUS_OWNED` pid guard). The record carries the
   id and cwd straight from the extension's frame; `agent.db` is never read (it is only auth and history). Measured
   against omp 18.11.3 in the wild, not docs.
+- **Pi agent integration** (not present upstream): same shape as OMP. `pi` joins `DEFAULT_AGENTS`; its provider row
+  (`SessionsSource::PiSessions`, `~/.pi/agent/sessions`, header on JSONL line 1 via `CwdRead::HeaderLine(1)`, `--session <id>`,
+  `ResumeAnyway`) differs from OMP only in those measured facts (pi 1.3.0). The extension source is shared and stamped
+  with the runtime name on install (`agent_setup_pi` writes `~/.pi/agent/extensions/kex-agent-status.ts`), the Pi icon is
+  the monochrome mark of pi.dev drawn as an inline SVG (an `<img>` would not inherit `currentColor`), Pi ends a turn on `agent_settled` only, and Settings > General plus the bell popover gain a Pi row.
 
 - **OpenCode agent integration** (not present upstream): OpenCode joins `DEFAULT_AGENTS` (OSC 133 arm + launch-line
   capture) and gets a full provider row (`sessions: None`, `--session <id>` resume, `ResumeAnyway`, empty stripping

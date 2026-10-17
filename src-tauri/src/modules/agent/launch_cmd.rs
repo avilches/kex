@@ -13,7 +13,7 @@
 //! is flagged `complete: false`, so that its text is never replayed. Command substitutions and
 //! `${...}` are consumed whole, quotes inside them included, but never analysed.
 
-pub const DEFAULT_AGENTS: &[&str] = &["claude", "codex", "opencode", "omp"];
+pub const DEFAULT_AGENTS: &[&str] = &["claude", "codex", "opencode", "omp", "pi"];
 
 /// Longest line the shell scripts send; a line this long may have been cut.
 pub const MAX_LINE_CHARS: usize = 256;
@@ -487,6 +487,32 @@ mod tests {
 
     fn cmd(line: &str) -> Option<String> {
         find_agent_invocation(line, &agents()).map(|i| i.command())
+    }
+
+    fn defaults() -> Vec<String> {
+        DEFAULT_AGENTS.iter().map(|a| a.to_string()).collect()
+    }
+
+    #[test]
+    fn pi_is_detected_as_an_exact_executable_name() {
+        for line in ["pi", "pi --model m5", "/opt/homebrew/bin/pi"] {
+            assert!(
+                find_agent_invocation(line, &defaults()).is_some(),
+                "line: {line}"
+            );
+        }
+        for line in ["pip install x", "pipx run y", "ping host", "python -m pi"] {
+            assert!(
+                find_agent_invocation(line, &defaults()).is_none(),
+                "line: {line}"
+            );
+        }
+    }
+
+    #[test]
+    fn pi_print_mode_is_recognized() {
+        assert!(is_print_mode("pi -p hola", &defaults()));
+        assert!(!is_print_mode("pi --model m5", &defaults()));
     }
 
     fn same(line: &str) {

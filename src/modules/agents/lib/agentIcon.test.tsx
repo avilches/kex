@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StruckAgentIcon } from "./agentIcon";
+import { AgentIcon, StruckAgentIcon } from "./agentIcon";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -38,5 +38,19 @@ describe("StruckAgentIcon", () => {
     );
     expect(root.querySelector("img")).not.toBeNull();
     expect(root.querySelector("span.rotate-45")).not.toBeNull();
+  });
+});
+
+describe("AgentIcon", () => {
+  it("draws Pi as an inline svg so it follows the text color", () => {
+    const root = render(<AgentIcon agent="pi" size={14} />);
+    const svg = root.querySelector("svg");
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    expect(root.querySelector("img")).toBeNull();
+  });
+
+  it("keeps drawing the other known agents as images", () => {
+    const root = render(<AgentIcon agent="omp" size={14} />);
+    expect(root.querySelector("img")).not.toBeNull();
   });
 });
