@@ -64,7 +64,9 @@ function CustomTabIcon({ name, fallback }: { name: string; fallback: ReactNode }
   return icon ? <HugeiconsIcon icon={icon} size={13} strokeWidth={2} /> : fallback;
 }
 
-export function tabIcon(tab: Tab, running = false): ReactNode {
+// `tint` paints the tab color on the icon; the focused sidebar row turns it off
+// because its chip already carries the color.
+export function tabIcon(tab: Tab, running = false, tint = true): ReactNode {
   let base: ReactNode;
   if (tab.kind === "editor" || tab.kind === "markdown") {
     base = <img src={fileIconUrl(basename(tab.path))} alt="" className="size-3.5 shrink-0" />;
@@ -72,5 +74,12 @@ export function tabIcon(tab: Tab, running = false): ReactNode {
     const icon = tab.kind === "terminal" && running ? AppWindowMacIcon : TAB_ICONS[tab.kind];
     base = <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />;
   }
-  return tab.icon ? <CustomTabIcon name={tab.icon} fallback={base} /> : base;
+  const icon = tab.icon ? <CustomTabIcon name={tab.icon} fallback={base} /> : base;
+  return tint && tab.color ? (
+    <span className="contents" style={{ color: tab.color }}>
+      {icon}
+    </span>
+  ) : (
+    icon
+  );
 }

@@ -37,6 +37,8 @@ type TabCommon = {
   autofocus?: boolean;
   // Name from WORKSPACE_ICON_PALETTE that replaces the default icon of the kind.
   icon?: string;
+  // Hex color of the tab: tints its icon and side stripe, and its top line when the workspace has none.
+  color?: string;
 };
 
 export type Tab =

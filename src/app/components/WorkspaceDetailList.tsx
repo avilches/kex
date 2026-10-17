@@ -1,5 +1,6 @@
 import { Spinner } from "@/components/ui/spinner";
 import { chipColorOnWhite } from "@/modules/workspaces/lib/workspaceColor";
+import { sidebarChipColor } from "@/modules/workspaces/lib/tabColor";
 import { type DragMoveEvent, useDndMonitor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -287,7 +288,7 @@ function DetailTabRow({
                 }
               }}
               className={cn(
-                "flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
+                "relative flex h-6 w-full items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-[11.5px] transition-colors select-none",
                 isDragging && "opacity-40",
                 focused
                   ? "font-medium text-foreground"
@@ -305,13 +306,20 @@ function DetailTabRow({
                   : undefined
               }
             >
+              {!focused && tab.color && (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-1 left-0 w-0.5 rounded-full"
+                  style={{ backgroundColor: tab.color }}
+                />
+              )}
               <span className="flex size-3.5 shrink-0 items-center justify-center">
                 {agent && !tab.icon ? (
                   <AgentIcon agent={agent} size={12} />
                 ) : tab.kind === "browser" && tab.floating ? (
                   <HugeiconsIcon icon={LinkSquare02Icon} size={12} strokeWidth={1.75} className="opacity-60" />
                 ) : (
-                  tabIcon(tab, info?.isRunning)
+                  tabIcon(tab, info?.isRunning, !focused)
                 )}
               </span>
               <span
@@ -514,6 +522,8 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
         const subs = subagentRows(sessions[row.tabId]?.subagents);
         const focused = row.tabId === focusedTabId;
         const grouped = focused && subs.length > 0;
+        // A workspace color wins over the tab color while the row has focus.
+        const chipColor = sidebarChipColor(color, tab.color);
         return (
           <div
             key={row.tabId}
@@ -523,7 +533,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               subs.length > 0 && !focused && "hover:bg-foreground/[0.08]",
               hibernated && "opacity-40",
             )}
-            style={grouped ? focusChipStyle(color) : undefined}
+            style={grouped ? focusChipStyle(chipColor) : undefined}
           >
             <DetailTabRow
               tab={tab}
@@ -532,7 +542,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               focused={focused}
               grouped={grouped}
               hasSubagents={subs.length > 0}
-              color={color}
+              color={chipColor}
               prevTabId={rows[i - 1]?.tabId ?? null}
               insertSide={insert?.tabId === row.tabId ? insert.side : null}
               hibernated={hibernated}
@@ -545,7 +555,7 @@ export const WorkspaceDetailList = memo(function WorkspaceDetailList({
               <SubagentGroup
                 agent={sessions[row.tabId]?.agent}
                 rows={subs}
-                tone={!grouped ? "plain" : color !== null ? "chip-color" : "chip"}
+                tone={!grouped ? "plain" : chipColor !== null ? "chip-color" : "chip"}
               />
             )}
           </div>
