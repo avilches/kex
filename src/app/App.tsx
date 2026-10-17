@@ -43,6 +43,7 @@ import {
   CommandPalette,
   createCommandItems,
   liveTabSources,
+  usePaletteGit,
   selectTab,
   selectWorkspace,
   type TabEntry,
@@ -204,6 +205,7 @@ import {
 import { useSidebarState } from "@/modules/workspaces/lib/useSidebarState";
 import { hasTabNote, isTabNoteOpen, removeTabNote, toggleTabNote } from "@/modules/workspaces/lib/tabNote";
 import { paletteShortcutUnavailable, shortcutUnavailable } from "@/modules/workspaces/lib/shortcutContext";
+import { tabDir } from "@/modules/workspaces/lib/titleVars";
 import { recordTabUse } from "@/modules/workspaces/lib/tabUse";
 import { flushTabNote, useTabNoteStore } from "@/modules/workspaces/lib/tabNoteStore";
 import { resolveRenameShortcut, useTabRenameStore } from "@/modules/workspaces/lib/tabRenameStore";
@@ -3468,10 +3470,20 @@ export default function App() {
 
   // ── Command palette ───────────────────────────────────────────────────────
 
+  const paletteDirs = useMemo(
+    () =>
+      commandPaletteOpen
+        ? workspaces.flatMap((w) =>
+            allPanes(w.paneTree).flatMap((p) => p.tabs.map((t) => tabDir(t) ?? "")),
+          )
+        : [],
+    [commandPaletteOpen, workspaces],
+  );
+  const dirGitVersion = usePaletteGit(commandPaletteOpen, paletteDirs);
   const paletteSources = useMemo(
     () => (commandPaletteOpen ? liveTabSources() : null),
-    // Read the stores once per open; workspaces is a dependency so a tab opened meanwhile shows up.
-    [commandPaletteOpen, workspaces],
+    // dirGitVersion: branches arrive after the palette opens, and the entries must pick them up.
+    [commandPaletteOpen, workspaces, dirGitVersion],
   );
   const paletteTabEntries = useMemo(
     () => (paletteSources ? buildTabEntries(workspaces, paletteSources) : []),
@@ -3483,9 +3495,16 @@ export default function App() {
   );
   const onPaletteSelectTab = useCallback(
     (entry: TabEntry) => {
-      void selectTab(entry, { wake: wakeWorkspace, goToTab });
+      void selectTab(entry, {
+        wake: wakeWorkspace,
+        goToTab: (id) => {
+          goToTab(id);
+          // A woken tab is not mounted yet, so the focus the line above asked for found nothing.
+          setTimeout(() => focusTab(id), 50);
+        },
+      });
     },
-    [wakeWorkspace, goToTab],
+    [wakeWorkspace, goToTab, focusTab],
   );
   const onPaletteSelectWorkspace = useCallback(
     (entry: WorkspaceEntry) => {

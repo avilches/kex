@@ -117,6 +117,14 @@ describe("palette catalog", () => {
     expect(row?.disabledReason).toBeTruthy();
   });
 
+  it("gives generated rows a title that makes sense out of its group", () => {
+    const find = (id: string) => items.find((i) => i.id === id)?.title;
+    expect(find("explorer.viewFilesystem")).toBe("Explorer: File System");
+    expect(find("explorer.viewPinned")).toBe("Explorer: Workspace Root");
+    expect(find("sidebar.showGit")).toBe("Show Git Changes");
+    expect(find("sidebar.showExplorer")).toBe("Explorer (cycle root)");
+  });
+
   it("offers Remove note only when the tab has one", () => {
     const with_ = createCommandItems(ctx({ hasActiveTabNote: true })).find((i) => i.id === "tab.note.remove");
     const without = createCommandItems(ctx({ hasActiveTabNote: false })).find((i) => i.id === "tab.note.remove");

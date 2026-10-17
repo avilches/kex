@@ -43,6 +43,12 @@ export const COMMAND_GROUPS = [
 
 const MAX_PANES_PER_WORKSPACE = 4;
 
+// Explorer labels ("File System", "Workspace Root") only make sense under their group in the
+// shortcuts panel; in one flat list they get it back. Other groups already read on their own.
+export function paletteTitle(label: string, group: string): string {
+  return group === "Explorer" && !label.toLowerCase().includes("explorer") ? `Explorer: ${label}` : label;
+}
+
 export const UNLISTED_SHORTCUTS: Readonly<Record<string, string>> = {
   "commandPalette.open": "already inside the palette",
   "file.copy": "acts on the explorer selection, which a closing palette loses",
@@ -365,7 +371,7 @@ export function createCommandItems(
     const handler = ctx.shortcutHandlers[s.id];
     return {
       id: s.id,
-      title: s.label,
+      title: paletteTitle(s.label, s.group),
       group: s.group,
       keywords: [s.id],
       shortcutId: s.id,

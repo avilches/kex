@@ -12,3 +12,4 @@ export {
   type TabEntry,
   type WorkspaceEntry,
 } from "./lib/tabEntries";
+export { usePaletteGit } from "./hooks/usePaletteGit";
