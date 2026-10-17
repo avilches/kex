@@ -67,8 +67,21 @@ pub static PROVIDERS: &[Provider] = &[
         // with the file gone there is nothing reliable to resume and the record is kept but
         // never planned.
         sessions: Some(SessionsSource::OmpSessions),
-        cwd_read: CwdRead::HeaderLine,
+        cwd_read: CwdRead::HeaderLine(2),
         resume: ResumeSpec::Flag { flag: "--resume" },
+        missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
+        keep_flags: &[],
+        keep_with_value: &[],
+    },
+    Provider {
+        name: "pi",
+        // Pi shares the session layout with OMP but its header is line 1 (no intro `title`
+        // entry) and the file only appears once the session has a first turn, so sessions
+        // without any turn are naturally invisible to the lookup. Resume is `--session`
+        // (path or id); `--resume` there only opens a picker.
+        sessions: Some(SessionsSource::PiSessions),
+        cwd_read: CwdRead::HeaderLine(1),
+        resume: ResumeSpec::Flag { flag: "--session" },
         missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
         keep_flags: &[],
         keep_with_value: &[],
@@ -108,6 +121,7 @@ impl Provider {
 pub enum SessionsSource {
     ClaudeProjects,
     OmpSessions,
+    PiSessions,
 }
 
 impl SessionsSource {
@@ -115,7 +129,12 @@ impl SessionsSource {
     pub fn find(&self, session_id: &str, transcript_path: &str) -> Option<PathBuf> {
         match self {
             Self::ClaudeProjects => find_in_claude_projects(session_id, transcript_path),
-            Self::OmpSessions => find_in_omp_sessions(session_id, transcript_path),
+            Self::OmpSessions => {
+                find_in_agent_sessions(&omp_sessions_root(), session_id, transcript_path)
+            }
+            Self::PiSessions => {
+                find_in_agent_sessions(&pi_sessions_root(), session_id, transcript_path)
+            }
         }
     }
 }
@@ -149,11 +168,11 @@ fn find_in_claude_projects(session_id: &str, transcript_path: &str) -> Option<Pa
     None
 }
 
-fn find_in_omp_sessions(session_id: &str, transcript_path: &str) -> Option<PathBuf> {
+fn find_in_agent_sessions(root: &Path, session_id: &str, transcript_path: &str) -> Option<PathBuf> {
     if !transcript_path.is_empty() && Path::new(transcript_path).exists() {
         return Some(PathBuf::from(transcript_path));
     }
-    find_in_sessions_root(&omp_sessions_root(), session_id)
+    find_in_sessions_root(root, session_id)
 }
 
 fn find_in_sessions_root(root: &Path, session_id: &str) -> Option<PathBuf> {
@@ -200,14 +219,23 @@ fn omp_sessions_root() -> PathBuf {
         .join("sessions")
 }
 
+fn pi_sessions_root() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("/"))
+        .join(".pi")
+        .join("agent")
+        .join("sessions")
+}
+
 pub enum CwdRead {
     /// Walk the entries: `worktreeSession.originalCwd` wins (where the command was launched
     /// from while the session is inside a Kex worktree, which is often deleted later), else
     /// the first `cwd` entry.
     ScanEntries,
-    /// Read the `cwd` of the `session` header line (OMP: JSONL line 2, after an intro `title`
-    /// entry). The file is written when the session is created and the header never changes.
-    HeaderLine,
+    /// Read the `cwd` of the `session` header entry (`HeaderLine(n)`, n is the 1-based JSONL
+    /// line: OMP 2 after an intro `title`, Pi 1). The file is written when the session is
+    /// created and the header never changes.
+    HeaderLine(usize),
     /// Never consulted: only reachable when `sessions` is `None`.
     Unused,
 }
@@ -216,7 +244,7 @@ impl CwdRead {
     pub fn read_launch_cwd(&self, transcript: &Path) -> Option<String> {
         match self {
             Self::ScanEntries => scan_claude_entries(transcript),
-            Self::HeaderLine => scan_header_line(transcript),
+            Self::HeaderLine(n) => scan_header_line(transcript, *n),
             Self::Unused => None,
         }
     }
@@ -251,13 +279,11 @@ fn scan_claude_entries(jsonl: &Path) -> Option<String> {
     None
 }
 
-fn scan_header_line(jsonl: &Path) -> Option<String> {
+fn scan_header_line(jsonl: &Path, line_no: usize) -> Option<String> {
     let file = std::fs::File::open(jsonl).ok()?;
     let mut reader = std::io::BufReader::new(file);
     let mut line = String::new();
-    // Line 1 is a `title` entry; line 2 is the `session` header. Missing either means the
-    // file was not written by OMP.
-    for _ in 0..2 {
+    for _ in 0..line_no {
         line.clear();
         if reader.read_line(&mut line).ok()? == 0 {
             return None;
@@ -346,6 +372,17 @@ mod tests {
         for agent in DEFAULT_AGENTS {
             let provider = Provider::of(agent);
             assert!(provider.is_some(), "{agent} has no provider row");
+        }
+    }
+
+    #[test]
+    fn every_provider_row_is_a_default_agent() {
+        for provider in PROVIDERS {
+            assert!(
+                DEFAULT_AGENTS.contains(&provider.name),
+                "{} is not detected: add it to DEFAULT_AGENTS",
+                provider.name
+            );
         }
     }
 
@@ -458,7 +495,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(scan_header_line(&jsonl), Some(cwd.display().to_string()));
+        assert_eq!(scan_header_line(&jsonl, 2), Some(cwd.display().to_string()));
     }
 
     #[test]
@@ -466,7 +503,63 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let jsonl = dir.path().join("x.jsonl");
         std::fs::write(&jsonl, "{\"type\":\"title\"}\n").unwrap();
-        assert_eq!(scan_header_line(&jsonl), None);
+        assert_eq!(scan_header_line(&jsonl, 2), None);
+    }
+
+    #[test]
+    fn resume_cmd_pi() {
+        let provider = Provider::of("pi").unwrap();
+        assert_eq!(
+            provider.resume_cmd(None, "01a2-abc"),
+            "pi --session '01a2-abc'"
+        );
+        assert_eq!(
+            provider.resume_cmd(Some("pi --slow m5"), "01a2-abc"),
+            "pi --slow m5 --session '01a2-abc'"
+        );
+    }
+
+    #[test]
+    fn a_pi_record_finds_its_session_file_in_a_group_dir() {
+        let root = tempfile::tempdir().unwrap();
+        let group = root.path().join("--Users-avilches-Hub-Projects-Kex--");
+        std::fs::create_dir_all(&group).unwrap();
+        let name = "2026-10-17T14-56-17-163Z_01a14a5d-170a-746e-98f4-7498ceccd31b.jsonl";
+        std::fs::write(group.join(name), "{}\n").unwrap();
+
+        let found = find_in_agent_sessions(root.path(), "01a14a5d-170a-746e-98f4-7498ceccd31b", "");
+
+        assert_eq!(found, Some(group.join(name)));
+    }
+
+    #[test]
+    fn a_pi_record_reads_the_cwd_of_the_first_jsonl_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd = dir.path().join("proj");
+        std::fs::create_dir_all(&cwd).unwrap();
+        let jsonl = dir.path().join("x.jsonl");
+        std::fs::write(
+            &jsonl,
+            format!(
+                "{{\"type\":\"session\",\"version\":3,\"id\":\"s1\",\"cwd\":\"{}\"}}\n{{\"type\":\"message\"}}\n",
+                cwd.display()
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(scan_header_line(&jsonl, 1), Some(cwd.display().to_string()));
+    }
+
+    #[test]
+    fn a_pi_record_ignores_a_title_first_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let jsonl = dir.path().join("x.jsonl");
+        std::fs::write(
+            &jsonl,
+            "{\"type\":\"title\"}\n{\"type\":\"session\",\"cwd\":\"/tmp/p\"}\n",
+        )
+        .unwrap();
+        assert_eq!(scan_header_line(&jsonl, 1), None);
     }
 
     #[test]

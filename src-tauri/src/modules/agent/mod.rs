@@ -40,13 +40,16 @@ const SESSION_HOOK_SCRIPT: &str = include_str!("hooks/trigger-event.sh");
 
 // OpenCode loads every file in ~/.config/opencode/plugins/ into its own process, and OMP/Pi
 // every one in ~/.omp/agent/extensions/ and ~/.pi/agent/extensions/, so the analogue
-// integrations ship as static scripts instead of merged settings. agent_opencode_plugin_status
-// and agent_omp_extension_status grep the installed file for a version
-// marker so an outdated install can be detected (the updater only re-writes it).
+// integrations ship as static scripts instead of merged settings. The OpenCode status greps
+// the installed file for a version marker; the OMP and Pi statuses compare the whole file with
+// the script stamped for that runtime, so an outdated or wrongly stamped copy counts as not installed.
 const OPENCODE_PLUGIN_VERSION: &str = "kex-opencode-v1";
 const OPENCODE_PLUGIN_SCRIPT: &str = include_str!("plugins/opencode-session.js");
-const OMP_EXTENSION_VERSION: &str = "kex-omp-v1";
-const OMP_EXTENSION_SCRIPT: &str = include_str!("plugins/kex-agent-status.ts");
+const AGENT_EXTENSION_TEMPLATE: &str = include_str!("plugins/kex-agent-status.ts");
+
+fn agent_extension_script(agent: &str) -> String {
+    AGENT_EXTENSION_TEMPLATE.replace("__KEX_AGENT__", agent)
+}
 
 // All 10 events handled by trigger-event.sh in v7.
 const SESSION_HOOK_EVENTS: [&str; 10] = [
@@ -299,6 +302,10 @@ fn write_agent_file(
     })
 }
 
+fn agent_file_matches(path: std::path::PathBuf, script: &str) -> bool {
+    std::fs::read_to_string(path).is_ok_and(|content| content == script)
+}
+
 fn agent_file_has_version(path: std::path::PathBuf, version: &str) -> bool {
     std::fs::read_to_string(path).is_ok_and(|content| content.contains(version))
 }
@@ -315,9 +322,17 @@ fn opencode_plugin_path() -> Result<std::path::PathBuf, String> {
 }
 
 fn omp_extension_path() -> Result<std::path::PathBuf, String> {
+    pi_omp_extension_path(".omp")
+}
+
+fn pi_extension_path() -> Result<std::path::PathBuf, String> {
+    pi_omp_extension_path(".pi")
+}
+
+fn pi_omp_extension_path(dot_dir: &str) -> Result<std::path::PathBuf, String> {
     dirs::home_dir()
         .map(|home| {
-            home.join(".omp")
+            home.join(dot_dir)
                 .join("agent")
                 .join("extensions")
                 .join("kex-agent-status.ts")
@@ -346,7 +361,7 @@ pub fn agent_opencode_plugin_status() -> bool {
 pub fn agent_setup_omp() -> Result<(), String> {
     write_agent_file(
         omp_extension_path()?,
-        OMP_EXTENSION_SCRIPT,
+        &agent_extension_script("omp"),
         "omp extension",
         "ts.kex-tmp",
     )
@@ -356,7 +371,24 @@ pub fn agent_setup_omp() -> Result<(), String> {
 pub fn agent_omp_extension_status() -> bool {
     omp_extension_path()
         .ok()
-        .is_some_and(|p| agent_file_has_version(p, OMP_EXTENSION_VERSION))
+        .is_some_and(|p| agent_file_matches(p, &agent_extension_script("omp")))
+}
+
+#[tauri::command]
+pub fn agent_setup_pi() -> Result<(), String> {
+    write_agent_file(
+        pi_extension_path()?,
+        &agent_extension_script("pi"),
+        "pi extension",
+        "ts.kex-tmp",
+    )
+}
+
+#[tauri::command]
+pub fn agent_pi_extension_status() -> bool {
+    pi_extension_path()
+        .ok()
+        .is_some_and(|p| agent_file_matches(p, &agent_extension_script("pi")))
 }
 
 #[tauri::command]
@@ -581,5 +613,28 @@ mod tests {
                 "{event}: missing session hook marker"
             );
         }
+    }
+
+    #[test]
+    fn the_extension_script_is_stamped_with_each_runtime_name() {
+        let omp = agent_extension_script("omp");
+        let pi = agent_extension_script("pi");
+        assert!(omp.contains("const agent = \"omp\";"));
+        assert!(pi.contains("const agent = \"pi\";"));
+        assert!(!omp.contains("__KEX_AGENT__") && !pi.contains("__KEX_AGENT__"));
+        assert!(omp.starts_with("// kex-agent-status-v"));
+        assert!(pi.starts_with("// kex-agent-status-v"));
+    }
+
+    #[test]
+    fn an_extension_stamped_for_another_runtime_is_not_current() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("kex-agent-status.ts");
+        std::fs::write(&file, agent_extension_script("omp")).unwrap();
+        assert!(agent_file_matches(
+            file.clone(),
+            &agent_extension_script("omp")
+        ));
+        assert!(!agent_file_matches(file, &agent_extension_script("pi")));
     }
 }

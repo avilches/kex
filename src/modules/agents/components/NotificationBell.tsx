@@ -98,7 +98,10 @@ export function NotificationBell({ onActivate }: Props) {
   const [hooksReady, setHooksReady] = useState<boolean | null>(null);
   const [opencodeReady, setOpencodeReady] = useState<boolean | null>(null);
   const [ompReady, setOmpReady] = useState<boolean | null>(null);
-  const [installing, setInstalling] = useState<"claude" | "opencode" | "omp" | null>(null);
+  const [piReady, setPiReady] = useState<boolean | null>(null);
+  const [installing, setInstalling] = useState<
+    "claude" | "opencode" | "omp" | "pi" | null
+  >(null);
   const sessions = useAgentStore((s) => s.sessions);
   const notifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
@@ -140,6 +143,9 @@ export function NotificationBell({ onActivate }: Props) {
     invoke<boolean>("agent_omp_extension_status")
       .then(setOmpReady)
       .catch(() => setOmpReady(null));
+    invoke<boolean>("agent_pi_extension_status")
+      .then(setPiReady)
+      .catch(() => setPiReady(null));
   }, []);
 
   useEffect(() => {
@@ -190,6 +196,19 @@ export function NotificationBell({ onActivate }: Props) {
     } catch (e) {
       console.error("[kex] agent_setup_omp failed:", e);
       setOmpReady(false);
+    } finally {
+      setInstalling(null);
+    }
+  };
+
+  const setupPi = async () => {
+    setInstalling("pi");
+    try {
+      await invoke("agent_setup_pi");
+      setPiReady(true);
+    } catch (e) {
+      console.error("[kex] agent_setup_pi failed:", e);
+      setPiReady(false);
     } finally {
       setInstalling(null);
     }
@@ -365,6 +384,38 @@ export function NotificationBell({ onActivate }: Props) {
             {ompReady === false && installing === null ? (
               <p className="px-2 pt-1 text-[11px] text-destructive">
                 Could not write the OMP extension.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!piReady ? (
+          <div className="border-t border-border/60 p-1">
+            <button
+              type="button"
+              onClick={setupPi}
+              disabled={installing !== null}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+            >
+              {installing === "pi" ? (
+                <Spinner size={16} className="text-current" />
+              ) : (
+                <AgentIcon agent="pi" size={14} />
+              )}
+              <span className="text-left">
+                <span className="block font-medium">
+                  {installing === "pi"
+                    ? "Installing..."
+                    : "Install Pi integration"}
+                </span>
+                <span className="block text-[11px]">
+                  Session restore on close
+                </span>
+              </span>
+            </button>
+            {piReady === false && installing === null ? (
+              <p className="px-2 pt-1 text-[11px] text-destructive">
+                Could not write the Pi extension.
               </p>
             ) : null}
           </div>

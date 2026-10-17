@@ -157,8 +157,10 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
 | `agent_setup_opencode` | Atomically install the Kex session plugin into the OpenCode plugins dir (`~/.config/opencode/plugins/`, relocated by `OPENCODE_CONFIG_DIR`) (idempotent; no-op when the file already matches) |
 | `agent_opencode_plugin_status` | Query whether the OpenCode plugin is installed and current |
-| `agent_setup_omp` | Atomically install the Kex extension into `~/.omp/agent/extensions/kex-agent-status.ts` (idempotent; no-op when the file already matches, same file serves Pi under its own marker in that task) |
+| `agent_setup_omp` | Atomically install the Kex extension into `~/.omp/agent/extensions/kex-agent-status.ts` (idempotent; no-op when the file already matches, the same source is installed for Pi by `agent_setup_pi` with its own `agent` name) |
 | `agent_omp_extension_status` | Query whether the OMP extension is installed and current |
+| `agent_setup_pi` | Atomically install the Kex extension into `~/.pi/agent/extensions/kex-agent-status.ts` (idempotent), stamped with `agent: pi` |
+| `agent_pi_extension_status` | Query whether the Pi extension is installed and current |
 | `agent_session_restore_plan` | Return `Vec<RestorePlan>` - one entry per tab that had a running agent session at last close |
 | `agent_session_preview_cmd(tabId)` | Return `Option<RestorePlan>` for a single tab, computed live and read-only (never mutates `agent-sessions.json`). Used by the "Run on start" menu to preview the resume command that will actually run next launch, and by the blocked-start modal's "Try again" |
 | `check_launch_dir(path)` | Async (the filesystem checks run on `spawn_blocking`, so a slow mount does not stall the runtime). Return `Option<String>`: why `path` cannot be the working directory of a restored terminal (`Directory not found`, `Not a directory`, `Cannot access directory`), or `None` when it is fine |

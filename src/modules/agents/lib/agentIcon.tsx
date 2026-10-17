@@ -14,6 +14,24 @@ function svgUrlFor(agent: string): string | null {
   return null;
 }
 
+function PiMark({ size, className }: { size: number; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 560 560"
+      width={size}
+      height={size}
+      fill="currentColor"
+      aria-label="pi"
+      role="img"
+      className={className}
+    >
+      <path d="M420 280H280V140H0V0H420V280Z" />
+      <path d="M560 560H420V280H560V560Z" />
+      <path d="M140 560H0V140H140V280H280V420H140V560Z" />
+    </svg>
+  );
+}
+
 export function AgentIcon({
   agent,
   size = 15,
@@ -34,6 +52,10 @@ export function AgentIcon({
         style={{ width: size, height: size }}
       />
     );
+  }
+
+  if (agent.toLowerCase() === "pi") {
+    return <PiMark size={size} className={className} />;
   }
 
   const svgUrl = svgUrlFor(agent);

@@ -37,6 +37,8 @@ export function GeneralSection() {
   const [opencodeInstalling, setOpencodeInstalling] = useState(false);
   const [ompReady, setOmpReady] = useState<boolean | null>(null);
   const [ompInstalling, setOmpInstalling] = useState(false);
+  const [piReady, setPiReady] = useState<boolean | null>(null);
+  const [piInstalling, setPiInstalling] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -56,6 +58,9 @@ export function GeneralSection() {
     invoke<boolean>("agent_omp_extension_status")
       .then((on) => alive && setOmpReady(on))
       .catch(() => alive && setOmpReady(null));
+    invoke<boolean>("agent_pi_extension_status")
+      .then((on) => alive && setPiReady(on))
+      .catch(() => alive && setPiReady(null));
     return () => {
       alive = false;
     };
@@ -103,6 +108,19 @@ export function GeneralSection() {
       setOmpReady(false);
     } finally {
       setOmpInstalling(false);
+    }
+  };
+
+  const onInstallPi = async () => {
+    setPiInstalling(true);
+    try {
+      await invoke("agent_setup_pi");
+      setPiReady(true);
+    } catch (e) {
+      console.error("[kex] agent_setup_pi failed:", e);
+      setPiReady(false);
+    } finally {
+      setPiInstalling(false);
     }
   };
 
@@ -330,6 +348,48 @@ export function GeneralSection() {
         {ompReady === false && (
           <p className="text-[11px] text-destructive">
             Could not write the OMP extension.
+          </p>
+        )}
+        <SettingRow
+          title={
+            <span className="flex items-center gap-1.5">
+              Pi integration
+              {piReady !== null && (
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-[11px] font-normal",
+                    piReady ? "text-green-500" : "text-destructive",
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={piReady ? CheckmarkCircle02Icon : CancelCircleIcon}
+                    size={12}
+                    strokeWidth={2}
+                  />
+                  {piReady ? "Installed" : "Not installed"}
+                </span>
+              )}
+            </span>
+          }
+          description={
+            piReady
+              ? "The Kex extension is active: Kex restores your Pi sessions and notifies you in the tab bar when Pi needs input or finishes. File: ~/.pi/agent/extensions/kex-agent-status.ts."
+              : "Install the Kex extension so Pi reports its sessions to Kex: your Pi sessions are restored when you reopen it and the tab bar shows attention and finish signals. Writes ~/.pi/agent/extensions/kex-agent-status.ts."
+          }
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 text-[11px]"
+            disabled={piInstalling || piReady === null}
+            onClick={() => void onInstallPi()}
+          >
+            {piInstalling ? "Installing..." : piReady ? "Reinstall" : "Install"}
+          </Button>
+        </SettingRow>
+        {piReady === false && (
+          <p className="text-[11px] text-destructive">
+            Could not write the Pi extension.
           </p>
         )}
       </div>

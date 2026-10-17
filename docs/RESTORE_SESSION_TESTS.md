@@ -396,7 +396,7 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 ### G1 La extension carga sin config extra
 
 - [ ] Clicar el campanazo > "Install OMP integration"
-- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-omp-v1` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
+- [ ] Esperado en disco: `~/.omp/agent/extensions/kex-agent-status.ts` existe (y `cat` muestra `// kex-agent-status-v1` en la primera linea); los ficheros `orca-*` de la misma carpeta no se tocan
 - [ ] Lanzar `omp` desde un terminal de Kex: sin errores de compilacion de la extension en stderr, el TUI normal
 - [ ] Reiniciar: el campanazo ya no muestra el boton OMP (status via `agent_omp_extension_status`)
 
@@ -424,6 +424,35 @@ Todo este bloque usa la extension de Kex para OMP (TASK-759). Instalarla con el 
 - [ ] Quedar en un tab donde `omp` corre en modo no interactivo `omp -p "hola"` (print mode: no se graba)
 - [ ] Esperado: `agent-sessions.json` sin entrada para ese tab
 - [ ] Y: borrar a mano el `.jsonl` de una sesion grabada y reabrir Kex: el scan ya no encuentra fichero, no hay plan (nada que resumir) y la entrada del store sigue ahi (no se purga nunca)
+
+## Bloque H - Pi
+
+Todo este bloque usa la extension de Kex para Pi (TASK-842). Instalarla con el campanazo
+> "Install Pi integration" (o Settings > General > Pi integration) antes de empezar.
+
+### H1 La extension carga sin config extra
+
+- [ ] Clicar el campanazo > "Install Pi integration"
+- [ ] Esperado en disco: `~/.pi/agent/extensions/kex-agent-status.ts` existe, su primera linea es `// kex-agent-status-v1` y contiene `const agent = "pi";`; los ficheros `orca-*` y `dotfiles-context.ts` de la carpeta no se tocan
+- [ ] Lanzar `pi` desde un terminal de Kex: sin errores de la extension en stderr, el TUI normal
+- [ ] Reiniciar: el campanazo ya no muestra el boton Pi (status via `agent_pi_extension_status`)
+
+### H2 La sesion nueva se graba con agent pi
+
+- [ ] Lanzar `pi` en un terminal de Kex y escribir un prompt
+- [ ] `cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json`: entrada del tab con `agent: "pi"`, `session_id` UUID y `cwd_launch` el directorio de lanzamiento
+- [ ] El icono del tab es la letra pi (legible en tema oscuro y claro) y el spinner gira mientras trabaja; al terminar el turno el tab pasa a atencion una sola vez, sin un aviso prematuro a mitad de un reintento
+
+### H3 Restore del tab cerrado
+
+- [ ] Cerrar el tab de la sesion y reabrir Kex
+- [ ] Esperado: Kex escribe `pi --session '<uuid>'` en el directorio grabado; el preview "Run on start" del tab muestra el mismo comando
+
+### H4 Una sesion de Pi sin ningun turno
+
+- [ ] Lanzar `pi` en un tab y cerrarlo sin escribir ningun prompt
+- [ ] Esperado: `agent-sessions.json` sin entrada para ese tab y ningun `.jsonl` nuevo bajo `~/.pi/agent/sessions/` (Pi si deja un directorio de grupo vacio, medido en pi 1.3.0); al reabrir Kex no se restaura nada
+- [ ] Y: con `pi -p "hola"` (modo no interactivo) tampoco se graba nada
 
 ---
 
