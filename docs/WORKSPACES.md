@@ -52,10 +52,10 @@ empty, where it renders a welcome screen. This invariant is locked by a unit tes
 reconciliation effect in `useWorkspaces` (`emptyWorkspaceToClose`), whatever emptied it: the
 tab close button or `tab.close`, the shell exiting on its own, moving or dragging the last tab
 to another workspace, and bulk closes such as Close All Tabs (the fold decides on committed
-state, so batched closes inside one tick are covered too). Two exceptions keep the workspace
-with its empty pane: the window's only workspace (folding it would close the window), and one
-holding scripts with a command, whose deletion the close-workspace confirmation dialog still
-owns (`scriptsToDelete`). `applyCloseTab` also resets `detailExpanded` to true when it empties
+state, so batched closes inside one tick are covered too). Only a blank workspace folds
+(`isBlankWorkspace`: no name, color, icon, workspace root or scripts). Two exceptions keep the
+workspace with its empty pane: the window's only workspace (folding it would close the window),
+and any customized one, so a workspace someone set up is never lost by closing its last tab. `applyCloseTab` also resets `detailExpanded` to true when it empties
 the sole pane, so an empty workspace shows no chevron in the WorkspaceBar while staying
 expanded: a tab opened into it appears in the nested list without touching anything. The
 nested list renders nothing with zero tabs, so the expanded state is invisible on the empty

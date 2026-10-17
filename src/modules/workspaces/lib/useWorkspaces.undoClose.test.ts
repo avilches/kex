@@ -27,7 +27,7 @@ type Hook = ReturnType<typeof useWorkspaces>;
 const term = (id: string): Tab => ({ id, kind: "terminal" });
 const makeWs = (id: string, tabs: Tab[], over: Partial<Workspace> = {}): Workspace => ({
   id,
-  title: id,
+  title: "",
   paneTree: { kind: "pane", id: `p-${id}`, tabs, activeTabId: tabs[0]?.id ?? null },
   activePaneId: `p-${id}`,
   ...over,

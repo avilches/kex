@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Tab, Script, SplitNode, Workspace } from "./types";
+import type { Tab, Script, SplitNode, PaneNode, Workspace } from "./types";
 import { applyWake } from "./hibernate";
 import { applyCloseTab, applyMoveTabToWorkspace, applyExplorerRootMode, applyFsRoot, applyGitConfig, applyWorkspaceRoot, applyShowHidden, applyWorkspaceGroup, collectRunningTerminals, emptyWorkspaceToClose, runOnce, insertWorkspaceAfterActive, needsResumePlanLookup, planWake, seedWakePlans, tabInsertionIndex, pushMru, workspaceTabCount, MRU_HISTORY_LIMIT } from "./useWorkspaces";
 
@@ -220,6 +220,7 @@ describe("emptyWorkspaceToClose", () => {
   const withScripts = (command: string): Script => ({ id: "sc1", name: "run", command });
 
   const emptyWs = ws({
+    title: "",
     paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
     activePaneId: "p1",
   });
@@ -238,21 +239,27 @@ describe("emptyWorkspaceToClose", () => {
     expect(emptyWorkspaceToClose([fullWs])).toBeNull();
   });
 
-  it("skips workspaces holding scripts with a command", () => {
-    const scripted = ws({
-      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
-      activePaneId: "p1",
-      scripts: [withScripts("pnpm test")],
-    });
-    expect(emptyWorkspaceToClose([fullWs, scripted])).toBeNull();
+  const emptyTree: PaneNode = { kind: "pane", id: "p1", tabs: [], activeTabId: null };
+
+  it.each([
+    ["scripts with a command", { scripts: [withScripts("pnpm test")] }],
+    ["scripts with a blank command", { scripts: [withScripts("   ")] }],
+    ["a title", { title: "Backend" }],
+    ["a color", { color: "#ff0000" }],
+    ["an icon", { icon: "rocket" }],
+    ["a workspace root", { workspaceRoot: "/tmp/proj" }],
+  ])("keeps an empty workspace with %s", (_label, extra) => {
+    const custom = ws({ title: "", paneTree: emptyTree, activePaneId: "p1", ...extra });
+    expect(emptyWorkspaceToClose([fullWs, custom])).toBeNull();
   });
 
-  it("folds a workspace whose scripts are all blank commands", () => {
-    const blank = ws({
-      paneTree: { kind: "pane", id: "p1", tabs: [], activeTabId: null },
-      activePaneId: "p1",
-      scripts: [withScripts("   ")],
-    });
+  it("keeps the other customized workspaces untouched when only one is blank", () => {
+    const named = ws({ id: "w3", paneTree: emptyTree, activePaneId: "p1" });
+    expect(emptyWorkspaceToClose([fullWs, named])).toBeNull();
+  });
+
+  it("folds a workspace whose title is only whitespace", () => {
+    const blank = ws({ title: "  ", paneTree: emptyTree, activePaneId: "p1" });
     expect(emptyWorkspaceToClose([fullWs, blank])?.id).toBe("w1");
   });
 
