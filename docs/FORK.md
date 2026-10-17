@@ -203,6 +203,14 @@ show-hidden toggle were global preferences in `settings-general.json`, so every 
 
 ### Technical fixes and refactors
 
+- **Agent session restore split into a provider table** (not present upstream): all per-agent session knowledge
+  (transcript source and its `CLAUDE_CONFIG_DIR` root, cwd read-back strategy, resume/reattach command templates,
+  missing-transcript policy, launch-line whitelists) moved from `session_store.rs` hardcode into one
+  `Provider` table in `modules/agent/provider.rs`, shaped after Orca's `extractAgentProviderSession` /
+  `getAgentResumeArgv` so adding a second TUI agent (OMP, Pi) is a row addition. Behavior changes: codex records
+  always resume with `resume --last` on the stripped launch line (they used to build a broken `codex --resume <id>`
+  when a launch command was known) and their entries are never pruned; a record whose agent has no provider row no
+  longer restores with an empty command but produces no plan and is pruned once its directory is usable.
 - **WebGL canvas refresh** - after a workspace switch, the `opacity-0` CSS change does not trigger a WebGL repaint. A
   `useEffect` with `requestAnimationFrame` calls `refreshTerminalLeaf` on each visible panel to force the canvas to
   repaint.

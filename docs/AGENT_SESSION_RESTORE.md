@@ -190,7 +190,13 @@ never overwrites the stored one, because titles go empty while the app closes.
 
 Initialized via `session_store::init(data_dir)` in `lib.rs` `setup()` using a `OnceLock<PathBuf>`.
 
-Supported agent values: `"claude"`, `"codex"`, `"gemini"`. Unknown values produce an empty `resume_cmd`.
+Per-agent knowledge lives in one table: `src-tauri/src/modules/agent/provider.rs` (transcript source and scan root,
+how the launch cwd is read back from a transcript, resume and reattach templates, missing-transcript policy, and the
+stripping whitelists). `session_store.rs` stays agent-agnostic: it owns the store file, the print-mode gate (still
+driven by `DEFAULT_AGENTS`) and the launch-line recognizer, but builds no commands itself. Rows today: `"claude"`
+and `"codex"`. A record whose agent has no provider row emits no plan: the planner logs a warning and prunes the
+record once its launch directory is usable (kept otherwise), so the store cannot fill with entries nothing can
+ever resume.
 
 ---
 
@@ -202,31 +208,36 @@ Supported agent values: `"claude"`, `"codex"`, `"gemini"`. Unknown values produc
 
 For each session in the store:
 
-1. **Find the JSONL transcript.** Checks the stored `transcript_path` first, then globs
-   `~/.claude/projects/**/<sessionId>.jsonl` (or `CLAUDE_CONFIG_DIR`).
-2. **JSONL missing - reattach with `--session-id`.** If the transcript does not exist, the session was opened but
-   no message was ever sent (the JSONL is only created on the first exchange). Rather than silently discarding the
-   session, the plan is generated using `claude --session-id <id>`, which starts a *new* session that reuses the
-   same UUID - equivalent to what Claude would have done had the user run it again without `--resume`. The stale
-   store entry is removed now; if the session produces messages, hooks will re-record it with the new
-   `transcript_path`.
-3. **Read the launch cwd.** Opens the JSONL with `BufReader` and reads only as many lines as needed. If a
-   `worktree-state` entry with a non-null `worktreeSession` comes first (Claude Code writes it before the first entry
-   with a cwd), its `originalCwd` is used: it is where the command was launched from, while the `cwd` of the entries is
-   the worktree, which may be deleted by restore time. Otherwise the first `cwd` field is used, and `cwd_launch` from
-   the store if the transcript has none.
-4. **Verify the directory is usable** (`launch_dir_problem`: missing, not a folder, or unreadable). If it is not, the
-   plan carries a non-empty `error_reason`, an empty `resume_cmd`, and the command that would have run in
-   `attempted_cmd`. The terminal does not start: the tab is held on a modal (see "Blocked start" below). The store
-   entry is kept, including when the transcript is also missing (the `--session-id` entry is only dropped once the
-   directory check passes), so "Try again" can still find the session; it goes away when the agent exits, the tab is
-   closed, or the user cancels the restore.
-5. **Build the command.**
-   - JSONL found: if `launch_cmd` yields a base, `strip_for_resume_base(launch_cmd, agent) + --resume <id>`;
-     otherwise `claude --resume '<id>'` / `codex resume --last` / `gemini --resume '<id>'`
-   - JSONL missing (claude only): if `launch_cmd` yields a base, `strip_for_resume_base(launch_cmd, agent) + --session-id <id>`;
-     otherwise `claude --session-id '<id>'`
-   - others/unknown: empty string (tab shows restore error)
+1. **Resolve the provider row** (`provider::Provider::of`); `claude` and `codex` exist today. A record of an agent
+   with no row produces no plan and no command (see above).
+2. **Find the transcript.** Only providers with a sessions source do this; codex has none and jumps straight to
+   its resume template. Claude's source checks the stored `transcript_path` first, then scans
+   `$CLAUDE_CONFIG_DIR/projects/**/<sessionId>.jsonl` (or `~/.claude/projects` when the override is unset).
+3. **Transcript found - resume.** The launch cwd is read back with the row's cwd-read strategy (claude: if a
+   `worktree-state` entry with a non-null `worktreeSession` comes before the first entry carrying a `cwd`, its
+   `originalCwd` wins, because the entries' own `cwd` is the worktree and may be deleted by restore time; otherwise
+   the first `cwd` field, and `cwd_launch` from the store when the transcript has none). The command is the row's
+   resume template on top of the stripped launch line: `strip_for_resume_base(launch_cmd, agent) + --resume '<id>'`
+   (shell-quoted), or the plain `claude --resume '<id>'` when no launch command is known.
+4. **Transcript missing - the row's missing-transcript policy decides.**
+   - `Reattach` (claude): the session was opened but no message was ever sent (a transcript only appears on the
+     first exchange). The plan is `strip_for_resume_base(...) + --session-id '<id>'` (or the plain template), which
+     starts a new session reusing the same UUID, equivalent to rerunning the CLI with no `--resume`. The store
+     entry is pruned once the directory check passes; if the new session produces messages, hooks re-record it with
+     the new `transcript_path`.
+   - `ResumeAnyway` (codex, no transcript source at all): the plan is `resume --last` on the stripped launch line
+     (or `codex resume --last`); the record's session id is not part of the command and the entry is never pruned,
+     because nothing re-records codex sessions in this store yet.
+   - `Ignore` (reserved for providers whose sessions cannot be revived): no plan is emitted; the entry is pruned
+     once its directory is usable.
+5. **Verify the directory is usable** (`launch_dir_problem`: missing, not a folder, or unreadable) *before* any
+   pruning. If it is not, the plan carries a non-empty `error_reason`, an empty `resume_cmd`, and the command that
+   would have run in `attempted_cmd`. The terminal does not start: the tab is held on a modal (see "Blocked start"
+   below). The store entry is kept (even when the transcript is also missing), so "Try again" can still find the
+   session; it goes away when the agent exits, the tab is closed, or the user cancels the restore.
+
+`preview_resume_cmd` runs this same planner but passes no store path, so the preview can never mutate the file on
+disk.
 
 The PTY is spawned with `plan.cwdLaunch` as the initial working directory, so no `cd` prefix is needed in the command.
 
@@ -234,9 +245,11 @@ The PTY is spawned with `plan.cwdLaunch` as the initial working directory, so no
 
 `strip_for_resume_base(cmd, agent)` first runs `find_agent_invocation` again on the stored text, so a record written
 with a `cd dir && claude ...` prefix (the bug of TASK-826) is healed on read instead of restoring as `cd --resume`.
-It returns `None` when no agent is launched in the text, and the planner then uses the plain per-agent command. The
-launcher part (assignments, wrappers and the command word) is kept as typed; the arguments go through a
-whitelist-based filter. It keeps flags that remain meaningful for an
+It returns `None` when the agent has no provider row or no agent is launched in the text, and the planner then uses
+the plain per-agent template. The
+launcher part (assignments, wrappers and the command word) is kept as typed; the arguments go through the whitelist
+stored in the agent's provider row (`CLAUDE_KEEP_FLAGS` / `CLAUDE_KEEP_WITH_VALUE` in `provider.rs`). It keeps flags
+that remain meaningful for an
 interactive resume and drops one-time flags (e.g. `--worktree`, `--from-pr`, `--tmux`, `--model`, `--effort`).
 Redirections after the launcher (`2>/dev/null`, `> out.log`) are dropped and never consumed as a flag's value; `<(cmd)` and `>(cmd)` are values, not redirections, and are kept.
 

@@ -48,7 +48,8 @@ Kex uses a strict **two-process model**. The Rust process owns all OS access. Th
 │                   background processes                      │
 │  workspace::*   - Auth registry + WSL bridge                │
 │  history::*     - Shell history (suggest, record, list)     │
-│  agent::*       - Claude hooks installer                    │
+│  agent::*       - Claude hooks installer, session store +   │
+│                   per-provider restore table                 │
 │                                                             │
 └──────────────────────────┬──────────────────────────────────┘
                            │ invoke() / Tauri channels / events
@@ -191,7 +192,7 @@ The Unix socket (`kex-ipc-{pid}-{pty_id}.sock`, path in `KEX_IPC`; the Kex proce
 
 When an agent session is running at the time Kex closes, Kex offers to resume it automatically on the next launch. The tab showing a restored session displays `agentname · dirname` as its title, a `✦` icon, and a status indicator (spinner while working, amber dot while waiting for input, nothing when idle). If the resume command fails (missing transcript, deleted directory), the icon becomes `⚠` and the title turns red.
 
-Hooks must be installed via "Set up Claude Code" (notification bell popover) for this feature to work. See `docs/AGENT_SESSION_RESTORE.md` for the complete design and edge cases.
+Hooks must be installed via "Set up Claude Code" (notification bell popover) for this feature to work. All per-agent session knowledge (transcript source, cwd read-back, resume templates, missing-transcript policy, stripping whitelists) lives in one `Provider` table (`src-tauri/src/modules/agent/provider.rs`; `claude` and `codex` today), and `session_store.rs` consults it instead of hardcoding agents. See `docs/AGENT_SESSION_RESTORE.md` for the complete design and edge cases.
 
 ### 3.7 Web preview
 
