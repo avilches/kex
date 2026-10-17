@@ -458,8 +458,9 @@ writes a fresh record under the new tab id, and is cleaned up the same way any o
 ## Terminal path bar UI
 
 Session metadata that was previously accessible from the floating tab HoverCard (which has been removed) is now
-surfaced in the `[...]` DropdownMenu (`TerminalPathBarMenu`) in the right side of `TerminalPathBar` (tab id and agent
-session details). "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
+surfaced in the tab context menu (`TabCopyMenuItems`, rendered by `TabContextMenuItems`): Copy Tab ID for every tab, and
+for agent tabs Copy Session ID (only with a `sessionId`) plus Open Transcript Folder and Reveal Transcript in Finder (only
+with a `transcriptPath`). Each entry shows the value it acts on below its label. "Run on start" lives in the tab context menu (`RunOnStartMenu`, used by `TabContextMenuItems`), as a
 `Run on Start` submenu with an `Enabled` checkbox and the command field inline (no third submenu). The path bar has no run-on-start icon; while
 an agent is alive the agent icon of the tab (struck through when it is off) says it, and the path bar shows no status
 dot either, only the model name, because the tab icon already carries the working and attention states.

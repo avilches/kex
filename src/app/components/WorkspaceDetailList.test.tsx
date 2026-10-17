@@ -262,6 +262,7 @@ describe("WorkspaceDetailList context menu", () => {
     onRenameTab: vi.fn(),
     onUpdateTab: vi.fn(),
     onSaveTab: vi.fn(),
+    onRevealInExplorer: vi.fn(),
   };
 
   function mountWithMenu() {
@@ -353,6 +354,7 @@ describe("WorkspaceDetailList hibernated", () => {
               onRenameTab: vi.fn(),
               onUpdateTab: vi.fn(),
               onSaveTab: vi.fn(),
+              onRevealInExplorer: vi.fn(),
             },
           },
           createElement(WorkspaceDetailList, {
