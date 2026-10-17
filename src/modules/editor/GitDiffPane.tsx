@@ -119,8 +119,6 @@ function countDiffLines(patch: string): { added: number; removed: number } {
     if (c === 43 && patch.charCodeAt(i + 1) !== 43) added++;
     else if (c === 45 && patch.charCodeAt(i + 1) !== 45) removed++;
   }
-  if (patch.length > 0 && patch.charCodeAt(0) === 43) added++;
-  else if (patch.length > 0 && patch.charCodeAt(0) === 45) removed++;
   return { added, removed };
 }
 
