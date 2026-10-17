@@ -24,7 +24,6 @@ import {
 } from "@/modules/agents/lib/notificationList";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
-  Cancel01Icon,
   ChevronRightIcon,
   Delete02Icon,
   Folder01Icon,
@@ -43,10 +42,11 @@ import { cn } from "@/lib/utils";
 import {
   chipColorOnWhite,
   resolveWorkspaceColor,
-  WORKSPACE_COLOR_PALETTE,
 } from "@/modules/workspaces/lib/workspaceColor";
 import { IconPaletteGrid } from "@/modules/workspaces/IconPaletteGrid";
+import { ColorPaletteGrid } from "@/modules/workspaces/ColorPaletteGrid";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
+import { useIconCatalogVersion } from "@/modules/workspaces/lib/useIconCatalog";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
 import { SlideReveal } from "@/app/components/SlideReveal";
@@ -200,6 +200,7 @@ function SortableWorkspaceItem({
   hoverSwitch: HoverSwitch | null;
 }) {
   const shownTitle = useWorkspaceTitle(ws);
+  useIconCatalogVersion();
   const {
     attributes,
     listeners,
@@ -558,43 +559,16 @@ function SortableWorkspaceItem({
               <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={2} />
               Color
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className="p-2">
-              <div className="grid grid-cols-6 gap-1.5">
-                <button
-                  type="button"
-                  title="No color"
-                  onClick={() => {
-                    onSetColor(ws.id, null);
-                    setMenuOpen(false);
-                  }}
-                  className={cn(
-                    "flex size-6 items-center justify-center rounded-full border-2 bg-muted text-muted-foreground transition-colors",
-                    ws.color === null
-                      ? "border-foreground"
-                      : "border-transparent hover:border-muted-foreground/50",
-                  )}
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
-                </button>
-                {WORKSPACE_COLOR_PALETTE.map((hex) => (
-                  <button
-                    key={hex}
-                    type="button"
-                    title={hex}
-                    onClick={() => {
-                      onSetColor(ws.id, hex);
-                      setMenuOpen(false);
-                    }}
-                    className={cn(
-                      "size-6 rounded-full border-2 transition-colors",
-                      ws.color === hex
-                        ? "border-foreground"
-                        : "border-transparent hover:border-foreground/40",
-                    )}
-                    style={{ backgroundColor: hex }}
-                  />
-                ))}
-              </div>
+            <ContextMenuSubContent className="w-[232px] p-2">
+              <ColorPaletteGrid
+                value={ws.color}
+                displayColor={displayColor}
+                noneSelected={ws.color === null}
+                onSelect={(color) => {
+                  onSetColor(ws.id, color);
+                  setMenuOpen(false);
+                }}
+              />
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSub>

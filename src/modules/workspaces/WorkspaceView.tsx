@@ -1,3 +1,5 @@
+import { WorkspaceColorProvider } from "./lib/workspaceColorContext";
+import { resolveWorkspaceColor } from "./lib/workspaceColor";
 import { cn } from "@/lib/utils";
 import { refreshTerminalLeaf } from "@/modules/terminal";
 import { useEffect } from "react";
@@ -72,6 +74,7 @@ export function WorkspaceView({
             ws.id !== activeWorkspaceId && "opacity-0 invisible",
           )}
         >
+          <WorkspaceColorProvider value={resolveWorkspaceColor(ws.color, ws.id)}>
           <SplitNodeView
             node={ws.hibernated ? strippedTree(ws.paneTree) : ws.paneTree}
             hibernated={ws.hibernated}
@@ -100,6 +103,7 @@ export function WorkspaceView({
       onNavigateFloatBrowserTab={rest.onNavigateFloatBrowserTab}
             welcomeActions={rest.welcomeActions}
           />
+          </WorkspaceColorProvider>
           <WakeWash hibernated={ws.hibernated} />
           {ws.hibernated && (
             <HibernatedOverlay workspace={ws} active={ws.id === activeWorkspaceId} onWake={() => onWake(ws.id)} />

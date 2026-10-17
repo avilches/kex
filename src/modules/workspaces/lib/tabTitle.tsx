@@ -16,6 +16,7 @@ import { expandTitle } from "./titleTemplate";
 import { expandTabTitle, tabTitleVars, type TitleSources } from "./titleVars";
 import type { Tab } from "./types";
 import { getWorkspaceIcon } from "./workspaceIcon";
+import { useIconCatalogVersion } from "./useIconCatalog";
 
 export function basename(path: string): string {
   return pathBasename(path, { tolerateTrailingSlash: true });
@@ -55,12 +56,30 @@ const TAB_ICONS: Record<Exclude<Tab["kind"], "editor" | "markdown">, IconSvgElem
   "git-commit-file": GitCommitIcon,
 };
 
-export function tabIcon(tab: Tab, running = false): ReactNode {
-  const custom = tab.icon ? getWorkspaceIcon(tab.icon) : null;
-  if (custom) return <HugeiconsIcon icon={custom} size={13} strokeWidth={2} />;
+// Subscribes to the lazy icon catalog so a saved icon outside the built-in
+// palette appears once it has loaded.
+function CustomTabIcon({ name, fallback }: { name: string; fallback: ReactNode }) {
+  useIconCatalogVersion();
+  const icon = getWorkspaceIcon(name);
+  return icon ? <HugeiconsIcon icon={icon} size={13} strokeWidth={2} /> : fallback;
+}
+
+// `tint` paints the tab color on the icon; the focused sidebar row turns it off
+// because its chip already carries the color.
+export function tabIcon(tab: Tab, running = false, tint = true): ReactNode {
+  let base: ReactNode;
   if (tab.kind === "editor" || tab.kind === "markdown") {
-    return <img src={fileIconUrl(basename(tab.path))} alt="" className="size-3.5 shrink-0" />;
+    base = <img src={fileIconUrl(basename(tab.path))} alt="" className="size-3.5 shrink-0" />;
+  } else {
+    const icon = tab.kind === "terminal" && running ? AppWindowMacIcon : TAB_ICONS[tab.kind];
+    base = <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />;
   }
-  const icon = tab.kind === "terminal" && running ? AppWindowMacIcon : TAB_ICONS[tab.kind];
-  return <HugeiconsIcon icon={icon} size={13} strokeWidth={2} />;
+  const icon = tab.icon ? <CustomTabIcon name={tab.icon} fallback={base} /> : base;
+  return tint && tab.color ? (
+    <span className="contents" style={{ color: tab.color }}>
+      {icon}
+    </span>
+  ) : (
+    icon
+  );
 }

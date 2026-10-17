@@ -33,6 +33,8 @@ import { useTabTooltip } from "./lib/useTabTooltip";
 import { useTheme } from "@/modules/theme/ThemeProvider";
 import { NewTabMenuButton } from "./NewTabMenuButton";
 import { TabContextMenuItems } from "./TabContextMenuItems";
+import { tabTopLineColor } from "./lib/tabColor";
+import { useWorkspaceColor } from "./lib/workspaceColorContext";
 import { TabRenamePopover } from "./TabRenamePopover";
 
 type Props = {
@@ -153,6 +155,8 @@ function DraggableTab({
   const isRestoreError = agentSession?.restoreError ?? false;
   const iconMark = agentIconMark(tab, agentSession);
 
+  const workspaceColor = useWorkspaceColor();
+  const topLine = tabTopLineColor(tab.color, workspaceColor);
   const { resolvedMode } = useTheme();
   const tabColor = useMemo(
     () => tabGitColor(tab, gitStatusMap, gitStatus, gitColorScheme, resolvedMode),
@@ -246,9 +250,21 @@ function DraggableTab({
         <div className="pointer-events-none absolute inset-y-1 right-0 z-20 w-0.5 rounded-full bg-tab-focus-indicator" />
       )}
 
+      {tab.color && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-1/2 z-10 h-3 w-0.5 -translate-y-1/2 rounded-full"
+          style={{ backgroundColor: tab.color }}
+        />
+      )}
       {active && paneFocused && (
         <div
-          className={cn("absolute inset-x-0 top-0 bg-tab-focus-indicator", connected ? "h-[1.5px]" : "h-0.5 rounded-t")}
+          className={cn(
+            "absolute inset-x-0 top-0",
+            topLine === null && "bg-tab-focus-indicator",
+            connected ? "h-[1.5px]" : "h-0.5 rounded-t",
+          )}
+          style={topLine !== null ? { backgroundColor: topLine } : undefined}
         />
       )}
       <span className={cn("shrink-0", hasAgent && !tab.icon ? "opacity-100" : "opacity-70")}>
