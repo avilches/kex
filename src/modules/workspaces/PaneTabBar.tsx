@@ -253,7 +253,7 @@ function DraggableTab({
       {tab.color && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-1.5 left-0 z-10 w-0.5 rounded-full"
+          className="pointer-events-none absolute left-0 top-1/2 z-10 h-3 w-0.5 -translate-y-1/2 rounded-full"
           style={{ backgroundColor: tab.color }}
         />
       )}
