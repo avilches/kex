@@ -13,7 +13,6 @@ import type { AgentSession } from "@/modules/agents/lib/types";
 import { AppWindowMacIcon, ComputerTerminal01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatCpu, formatMem } from "./lib/metricsFormat";
-import { TerminalPathBarMenu } from "./TerminalPathBarMenu";
 
 function AgentChipIndicator({ session }: { session: AgentSession }) {
   return <span>{session.meta?.model ?? session.agent}</span>;
@@ -105,11 +104,6 @@ export function TerminalPathBar({
           </>
         )}
         {agentSession && <AgentChipIndicator session={agentSession} />}
-        <TerminalPathBarMenu
-          tabId={tabId}
-          agentSession={agentSession}
-          onReveal={onReveal}
-        />
       </div>
     </div>
   );

@@ -35,6 +35,7 @@ function mount(visibleTabIds: string, tabs: Tab[] = baseTabs) {
     onRenameTab: () => {},
     onUpdateTab,
     onSaveTab: () => {},
+    onRevealInExplorer: () => {},
   };
   const container = document.createElement("div");
   document.body.appendChild(container);

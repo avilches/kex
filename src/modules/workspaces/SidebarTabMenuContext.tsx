@@ -14,6 +14,7 @@ export type SidebarTabMenuActions = {
   onRenameTab: (tabId: string, title: string | undefined) => void;
   onUpdateTab: (tabId: string, updater: (p: Tab) => Tab) => void;
   onSaveTab: (tabId: string) => void;
+  onRevealInExplorer: (path: string) => void;
 };
 
 const noop = () => {};
@@ -26,6 +27,7 @@ const SidebarTabMenuContext = createContext<SidebarTabMenuActions>({
   onRenameTab: noop,
   onUpdateTab: noop,
   onSaveTab: noop,
+  onRevealInExplorer: noop,
 });
 
 export const SidebarTabMenuProvider = SidebarTabMenuContext.Provider;
@@ -41,6 +43,7 @@ type ActionSources = {
   tabCallbacksRef: RefObject<{
     onRenameTab?: SidebarTabMenuActions["onRenameTab"];
     onUpdateTab?: SidebarTabMenuActions["onUpdateTab"];
+    onFocusOnExplorer?: (path: string) => void;
   }>;
 };
 
@@ -65,6 +68,7 @@ export function useSidebarTabMenuActions({
       onSaveTab: (tabId) => void saveTabRef.current(tabId),
       onRenameTab: (tabId, title) => tabCallbacksRef.current.onRenameTab?.(tabId, title),
       onUpdateTab: (tabId, updater) => tabCallbacksRef.current.onUpdateTab?.(tabId, updater),
+      onRevealInExplorer: (path) => tabCallbacksRef.current.onFocusOnExplorer?.(path),
     };
   }, [workspacesRef, closeTabsRef, saveTabRef, tabCallbacksRef]);
 }

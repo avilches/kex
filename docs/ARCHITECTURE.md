@@ -521,9 +521,10 @@ src/
     │   │                            The right side shows `pid / process / CPU% / RAM`. `process` is the OSC-133
     │   │                            foreground command when one is running, or the shell name at rest. An
     │   │                            agent chip (status dot + model name) appears when an agent session is active.
-    │   │                            A `[...]` DropdownMenu (`TerminalPathBarMenu`) holds: the tab id and, for agent
-    │   │                            sessions: session id (copy), started elapsed, restore error if any, and the
-    │   │                            actions Open Transcript Folder (explorer focus) and Reveal Transcript in Finder.
+    │   │                            There is no `[...]` menu: copy tab id, and for agent tabs copy session id (when
+    │   │                            known) and the Open Transcript Folder / Reveal Transcript in Finder actions
+    │   │                            (when a transcript path is known), live in the tab context menu
+    │   │                            (`TabCopyMenuItems`), each showing the value it acts on below its label.
     │   │                            Metrics come from the ephemeral `terminalMetricsStore`
     │   │                            (`useSyncExternalStore`, never persisted, outside the workspaces tree). A single
     │   │                            `useTerminalMetricsSampler` hook polls `pty_metrics` every 5 s
