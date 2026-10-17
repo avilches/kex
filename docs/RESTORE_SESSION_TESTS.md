@@ -354,6 +354,42 @@ Este es un bug pendiente de corregir (ver `PaneTabBar.tsx:105-112` y `165-174`).
 
 ---
 
+## Bloque F - OpenCode
+
+Todo este bloque usa el plugin de Kex para OpenCode (TASK-758). Instalarlo con el campanazo
+> "Install OpenCode integration" antes de empezar.
+
+### F1 El plugin global carga sin config extra
+
+- [ ] Clicar el campanazo > "Install OpenCode integration"
+- [ ] Esperado en disco: `~/.config/opencode/plugins/opencode-session.js` existe (y `cat` muestra `// kex-opencode-v1` en la primera linea)
+- [ ] Lanzar `opencode --print-logs` desde un terminal de Kex y crear una sesion nueva: en el log no debe aparecer ningun error del plugin (la carga del directorio global es automatica en 1.19.x)
+- [ ] Reiniciar: el campanazo ya no muestra el boton OpenCode (status via `agent_opencode_plugin_status`)
+
+### F2 La sesion nueva se graba con agent opencode
+
+- [ ] Lanzar `opencode` en un terminal de Kex y escribir un prompt
+- [ ] `cat ~/Library/Application Support/app.betauer.kex/agent-sessions.json`: entrada del tab con `agent: "opencode"`, `session_id` tipo `ses_...`, `cwd_launch` el directorio de lanzamiento y `launch_cmd: "opencode"` (grabada por OSC 133;C)
+- [ ] El icono del tab aparece sin la strike de "launch unknown"
+
+### F3 Restore del tab cerrado
+
+- [ ] Cerrar el tab de la sesion y reabrir Kex
+- [ ] Esperado: Kex escribe `opencode --session '<ses_id>'` (o `opencode ... --session '<ses_id>'` con los flags conservados si el lanzamiento lo tenia) en el directorio grabado
+- [ ] El preview "Run on start" del tab muestra el mismo comando antes de cerrar
+
+### F4 Resume desde el picker del TUI
+
+- [ ] Lanzar `opencode` fresco en Kex, abrir el picker de sesiones del TUI y reanudar una sesion previa
+- [ ] Medir aqui si el plugin dispara `session.created` para esa sesion (el issue anomalyco/opencode#39711 solo menciona el flag `--session`): si dispara, el store deberia actualizar la entrada del tab; si no, es la misma limitacion documentada
+
+### F5 `--session` apuntando a otro directorio
+
+- [ ] Con una sesion grabada en `dir-a`, lanzar `opencode --session '<ses_id>'` desde `dir-b`
+- [ ] Esperado: el record de la sesion sigue intacto y la proxima restauracion usa el `cwd_launch` grabado (el plugin no sobreescribe: esta silencio por 39711)
+
+---
+
 ## Checklist de diagnostico rapido (en caso de que no restaure)
 
 ```
