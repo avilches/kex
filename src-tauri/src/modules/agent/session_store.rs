@@ -1420,6 +1420,72 @@ mod tests {
     }
 
     #[test]
+    fn an_opencode_record_resumes_its_session_id_and_survives_a_restore() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            record(Some("opencode"), &project, "/tmp/missing-opencode.jsonl", None),
+        );
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert_eq!(plans[0].resume_cmd, "opencode --session 'abc-123'");
+        assert!(plans[0].error_reason.is_empty());
+
+        // Never pruned: the plugin is silent on a resumed session, so nothing
+        // would re-record it if the entry were dropped.
+        let second = load_restore_plan_from_path(&store_path);
+        assert_eq!(second[0].resume_cmd, "opencode --session 'abc-123'");
+    }
+
+    #[test]
+    fn an_opencode_record_with_a_launch_cmd_resumes_on_the_stripped_base() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            record(
+                Some("opencode"),
+                &project,
+                "/tmp/missing-opencode.jsonl",
+                Some("opencode --model g5"),
+            ),
+        );
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+        // opencode has no known resume-safe flags, so the base collapses to the launcher.
+        assert_eq!(plans[0].resume_cmd, "opencode --session 'abc-123'");
+    }
+
+    #[test]
+    fn an_opencode_record_with_a_dead_launch_dir_errors_and_keeps_the_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let store_path = dir.path().join("agent-sessions.json");
+        let missing = dir.path().join("gone");
+        let mut tabs = HashMap::new();
+        tabs.insert(
+            "tab-1".to_string(),
+            record(Some("opencode"), &missing, "/tmp/missing-opencode.jsonl", None),
+        );
+        write_store(&store_path, tabs);
+
+        let plans = load_restore_plan_from_path(&store_path);
+        assert!(plans[0].resume_cmd.is_empty());
+        assert_eq!(plans[0].attempted_cmd, "opencode --session 'abc-123'");
+
+        let store: SessionStore = serde_json::from_str(&std::fs::read_to_string(&store_path).unwrap()).unwrap();
+        assert!(store.tabs.contains_key("tab-1"), "a blocked opencode entry stays for Try again");
+    }
+
+    #[test]
     fn a_record_without_a_provider_row_is_pruned_when_its_dir_is_viable() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("project");

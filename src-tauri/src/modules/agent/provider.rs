@@ -44,6 +44,19 @@ pub static PROVIDERS: &[Provider] = &[
         keep_flags: &[],
         keep_with_value: &[],
     },
+    Provider {
+        name: "opencode",
+        // opencode keeps its sessions in a SQLite database, so there is nothing to seek on
+        // disk; resume targets the recorded id directly (`--session <id>`). Sessions of an
+        // resumed TUI (`--session`) fire no plugin events (anomalyco/opencode#39711), so the
+        // plugin never re-records them and the record must never be pruned.
+        sessions: None,
+        cwd_read: CwdRead::Unused,
+        resume: ResumeSpec::Flag { flag: "--session" },
+        missing_transcript: MissingTranscriptPolicy::ResumeAnyway,
+        keep_flags: &[],
+        keep_with_value: &[],
+    },
 ];
 
 impl Provider {
@@ -254,6 +267,16 @@ mod tests {
         let provider = Provider::of("codex").unwrap();
         assert_eq!(provider.resume_cmd(None, "any"), "codex resume --last");
         assert_eq!(provider.resume_cmd(Some("codex-max"), "abc-123"), "codex-max resume --last");
+    }
+
+    #[test]
+    fn resume_cmd_opencode() {
+        let provider = Provider::of("opencode").unwrap();
+        assert_eq!(provider.resume_cmd(None, "ses_abc"), "opencode --session 'ses_abc'");
+        assert_eq!(
+            provider.resume_cmd(Some("opencode --model g5"), "ses_abc"),
+            "opencode --model g5 --session 'ses_abc'"
+        );
     }
 
     #[test]

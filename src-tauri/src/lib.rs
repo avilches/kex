@@ -925,6 +925,8 @@ pub fn run() {
             agent::agent_enable_claude_hooks,
             agent::agent_disable_claude_hooks,
             agent::agent_claude_hooks_status,
+            agent::agent_setup_opencode,
+            agent::agent_opencode_plugin_status,
             agent::agent_detach_session,
             agent::agent_session_set_snapshot,
             agent::os_notify::agent_os_notify,

@@ -9,6 +9,7 @@ import {
   Cancel01Icon,
   Notification01Icon,
   Notification03Icon,
+  PuzzleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -94,7 +95,8 @@ export function NotificationBell({ onActivate }: Props) {
   const open = useBellStore((s) => s.open);
   const setOpen = useBellStore((s) => s.setOpen);
   const [hooksReady, setHooksReady] = useState<boolean | null>(null);
-  const [installing, setInstalling] = useState(false);
+  const [opencodeReady, setOpencodeReady] = useState<boolean | null>(null);
+  const [installing, setInstalling] = useState<"claude" | "opencode" | null>(null);
   const sessions = useAgentStore((s) => s.sessions);
   const notifications = useAgentStore((s) => s.notifications);
   const tabLocations = useAgentStore((s) => s.tabLocations);
@@ -130,6 +132,9 @@ export function NotificationBell({ onActivate }: Props) {
     invoke<boolean>("agent_claude_hooks_status")
       .then(setHooksReady)
       .catch(() => setHooksReady(null));
+    invoke<boolean>("agent_opencode_plugin_status")
+      .then(setOpencodeReady)
+      .catch(() => setOpencodeReady(null));
   }, []);
 
   useEffect(() => {
@@ -146,7 +151,7 @@ export function NotificationBell({ onActivate }: Props) {
   }, [open, markAllRead, refreshHooks]);
 
   const enableClaudeHooks = async () => {
-    setInstalling(true);
+    setInstalling("claude");
     try {
       await invoke("agent_enable_claude_hooks");
       await setAgentNotifications(true);
@@ -155,7 +160,20 @@ export function NotificationBell({ onActivate }: Props) {
       console.error("[kex] agent_enable_claude_hooks failed:", e);
       setHooksReady(false);
     } finally {
-      setInstalling(false);
+      setInstalling(null);
+    }
+  };
+
+  const setupOpencode = async () => {
+    setInstalling("opencode");
+    try {
+      await invoke("agent_setup_opencode");
+      setOpencodeReady(true);
+    } catch (e) {
+      console.error("[kex] agent_setup_opencode failed:", e);
+      setOpencodeReady(false);
+    } finally {
+      setInstalling(null);
     }
   };
 
@@ -243,17 +261,17 @@ export function NotificationBell({ onActivate }: Props) {
             <button
               type="button"
               onClick={enableClaudeHooks}
-              disabled={installing}
+              disabled={installing !== null}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
             >
-              {installing ? (
+              {installing === "claude" ? (
                 <Spinner size={16} className="text-current" />
               ) : (
                 <HugeiconsIcon icon={Notification03Icon} size={14} strokeWidth={1.75} />
               )}
               <span className="text-left">
                 <span className="block font-medium">
-                  {installing
+                  {installing === "claude"
                     ? "Installing..."
                     : "Install Kex integration"}
                 </span>
@@ -262,9 +280,41 @@ export function NotificationBell({ onActivate }: Props) {
                 </span>
               </span>
             </button>
-            {hooksReady === false && !installing ? (
+            {hooksReady === false && installing === null ? (
               <p className="px-2 pt-1 text-[11px] text-destructive">
                 Could not update Claude Code config.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!opencodeReady ? (
+          <div className="border-t border-border/60 p-1">
+            <button
+              type="button"
+              onClick={setupOpencode}
+              disabled={installing !== null}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+            >
+              {installing === "opencode" ? (
+                <Spinner size={16} className="text-current" />
+              ) : (
+                <HugeiconsIcon icon={PuzzleIcon} size={14} strokeWidth={1.75} />
+              )}
+              <span className="text-left">
+                <span className="block font-medium">
+                  {installing === "opencode"
+                    ? "Installing..."
+                    : "Install OpenCode integration"}
+                </span>
+                <span className="block text-[11px]">
+                  Session restore on close
+                </span>
+              </span>
+            </button>
+            {opencodeReady === false && installing === null ? (
+              <p className="px-2 pt-1 text-[11px] text-destructive">
+                Could not write the OpenCode plugin.
               </p>
             ) : null}
           </div>

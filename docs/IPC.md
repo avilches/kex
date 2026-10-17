@@ -155,6 +155,8 @@ All git commands are gated on the `WorkspaceRegistry`. Git is invoked as a subpr
 | `agent_enable_claude_hooks` | Atomically install Claude Code terminal hooks (also installs session persistence hooks) |
 | `agent_disable_claude_hooks` | Remove Kex hooks from `~/.claude/settings.json` (inverse of enable; idempotent) |
 | `agent_claude_hooks_status` | Query whether hooks (notification + session) are installed |
+| `agent_setup_opencode` | Atomically install the Kex session plugin into the OpenCode plugins dir (`~/.config/opencode/plugins/`, relocated by `OPENCODE_CONFIG_DIR`) (idempotent; no-op when the file already matches) |
+| `agent_opencode_plugin_status` | Query whether the OpenCode plugin is installed and current |
 | `agent_session_restore_plan` | Return `Vec<RestorePlan>` - one entry per tab that had a running agent session at last close |
 | `agent_session_preview_cmd(tabId)` | Return `Option<RestorePlan>` for a single tab, computed live and read-only (never mutates `agent-sessions.json`). Used by the "Run on start" menu to preview the resume command that will actually run next launch, and by the blocked-start modal's "Try again" |
 | `check_launch_dir(path)` | Async (the filesystem checks run on `spawn_blocking`, so a slow mount does not stall the runtime). Return `Option<String>`: why `path` cannot be the working directory of a restored terminal (`Directory not found`, `Not a directory`, `Cannot access directory`), or `None` when it is fine |
@@ -196,7 +198,7 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 
 | Hook event | Tauri event | Notes |
 |---|---|---|
-| `SessionStart` | `kex:agent-session-meta` (does not arm the detector; the frontend creates the tab's session if missing) | Payload: `tabId`, `sessionId`, `cwdLaunch`, `sessionTitle`, `model`, `transcriptPath`, `launchKnown` |
+| `SessionStart` | `kex:agent-session-meta` (does not arm the detector; the frontend creates the tab's session if missing) | Payload: `tabId`, `sessionId`, `agent`, `cwdLaunch`, `sessionTitle`, `model`, `transcriptPath`, `launchKnown` |
 | `SessionEnd` | `kex:agent-signal` kind=`SessionEnd` | |
 | `UserPromptSubmit` | `kex:agent-signal` kind=`UserPromptSubmit` | Includes `prompt` |
 | `Notification` | `kex:agent-signal` kind=`Notification` | Includes `message` |
@@ -208,6 +210,8 @@ Kex monitors terminal panels for coding agents (Claude Code, Codex, etc.) via tw
 | `MessageDisplay` | `kex:agent-signal` kind=`MessageDisplay` | Only on `final: true` chunks; `delta` as `message` |
 
 Every hook event that carries a non-empty `cwd` (all but `SessionEnd`, `SubagentStart` and `SubagentStop`, whose `cwd` is not the main agent's) also emits `kex:agent-cwd` (`{ tabId, cwd }`). `AgentNotificationsBridge` resolves it with `git_resolve_repo`; when it is a linked worktree the root is stored in the session as `meta.worktreeCwd`. F4 and autofocus on that terminal tab then target the worktree instead of the shell cwd (which does not change when the agent enters a worktree), and fall back to the shell cwd when the agent leaves it or its session ends.
+
+**Optional `agent` field**: the JSON payload may carry an `agent` name used to record the session (`record_session`) and echoed in `kex:agent-session-meta`. Claude Code's hooks do not send it: `trigger-event.sh` v7 tags its own frames with `"agent": "claude"` after jq, and dispatcher-side a frame without the field is still treated as `claude`. OpenCode's plugin sends `"agent": "opencode"` on every `session.created` (see `AGENT_SESSION_RESTORE.md`).
 
 On every `Stop` (IPC socket and OSC path alike) `agent::live_model::emit_live_model` reads the last 256 KB of the hook's `transcript_path` on a blocking thread and emits `kex:agent-model` (`{ tabId, model }`) with the `message.model` of the newest main-thread assistant entry (sidechain and `<synthetic>` entries skipped). Nothing is emitted when none is found or the path is not an absolute `.jsonl`. The bridge stores it in `meta.model`, which is what the `{model}` title variable and the path-bar chip show, so a `/model` switch appears after the next answer. `SessionStart` seeds the same field, and an empty `model` from the OSC `UserPromptSubmit` path never overwrites it.
 

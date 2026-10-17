@@ -22,6 +22,7 @@ type Activate = (workspaceId: string, tabId: string) => void;
 type AgentSessionMetaPayload = {
   tabId: string;
   sessionId: string;
+  agent?: string;
   cwdLaunch: string;
   sessionTitle: string;
   model: string;
@@ -157,7 +158,7 @@ function ensureSessionIdle(tabId: string, ctx: Ctx, agent: string): boolean {
 // SessionStart reaches the tab even when the shell line named no known agent (a launcher
 // script of the user's), so the session is created here instead of waiting for the first prompt.
 export function handleSessionMeta(p: AgentSessionMetaPayload, ctx: Ctx): void {
-  ensureSessionIdle(p.tabId, ctx, "claude");
+  ensureSessionIdle(p.tabId, ctx, p.agent ?? "claude");
   useAgentStore.getState().setMeta(p.tabId, {
     sessionId: p.sessionId,
     cwdLaunch: p.cwdLaunch,
