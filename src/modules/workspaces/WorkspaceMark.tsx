@@ -2,6 +2,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { resolveWorkspaceColor } from "@/modules/workspaces/lib/workspaceColor";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
+import { useIconCatalogVersion } from "@/modules/workspaces/lib/useIconCatalog";
 
 type Props = {
   id: string;
@@ -14,6 +15,7 @@ type Props = {
 // The workspace identity outside the WorkspaceBar: its icon painted in its
 // color, or a color dot when it has no icon.
 export function WorkspaceMark({ id, color, icon, size = 14, className }: Props) {
+  useIconCatalogVersion();
   const resolved = resolveWorkspaceColor(color, id);
   const glyph = icon ? getWorkspaceIcon(icon) : undefined;
   const dot = Math.max(8, Math.round(size / 2));

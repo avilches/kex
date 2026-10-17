@@ -46,7 +46,8 @@ import {
   WORKSPACE_COLOR_PALETTE,
   resolveWorkspaceColor,
 } from "@/modules/workspaces/lib/workspaceColor";
-import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE, searchIcons, type IconSearchResult } from "@/modules/workspaces/lib/workspaceIcon";
+import { WORKSPACE_ICON_PALETTE, PALETTE_PAGE_SIZE } from "@/modules/workspaces/lib/workspaceIcon";
+import { useIconSearch } from "@/modules/workspaces/lib/useIconCatalog";
 import type { Workspace, Script, ScriptCwdMode } from "@/modules/workspaces/lib/types";
 import { focusedTab } from "@/modules/workspaces/lib/splitNode";
 import { clearTitleDraft, setTitleDraft } from "@/modules/workspaces/lib/titleDraftStore";
@@ -208,16 +209,13 @@ function IconPicker({
 }) {
   const currentEntry = WORKSPACE_ICON_PALETTE.find((e) => e.name === wsIcon);
   const [query, setQuery] = useState(currentEntry?.label ?? "");
-  const [filtered, setFiltered] = useState<IconSearchResult[]>([]);
   const [page, setPage] = useState(() => {
     if (!wsIcon) return 0;
     const idx = WORKSPACE_ICON_PALETTE.findIndex((e) => e.name === wsIcon);
     return idx === -1 ? 0 : Math.floor(idx / PALETTE_PAGE_SIZE);
   });
 
-  useEffect(() => {
-    setFiltered(searchIcons(query));
-  }, [query]);
+  const { results: filtered, loading: searchLoading } = useIconSearch(query, 60);
 
   function selectIcon(name: string | null) {
     onSetIcon(wsId, name);
@@ -274,7 +272,10 @@ function IconPicker({
               <HugeiconsIcon icon={entry.icon} size={17} strokeWidth={1.5} />
             </button>
           ))}
-          {query.trim() && filtered.length === 0 && (
+          {query.trim() && searchLoading && (
+            <span className="text-[11px] text-muted-foreground">Loading icons...</span>
+          )}
+          {query.trim() && !searchLoading && filtered.length === 0 && (
             <span className="text-[11px] text-muted-foreground">No icons found</span>
           )}
         </div>

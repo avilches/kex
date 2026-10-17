@@ -47,6 +47,7 @@ import {
 } from "@/modules/workspaces/lib/workspaceColor";
 import { IconPaletteGrid } from "@/modules/workspaces/IconPaletteGrid";
 import { getWorkspaceIcon } from "@/modules/workspaces/lib/workspaceIcon";
+import { useIconCatalogVersion } from "@/modules/workspaces/lib/useIconCatalog";
 import { createHoverSwitch, type HoverSwitch } from "@/modules/workspaces/lib/hoverSwitch";
 import { canDropTabOnWorkspace } from "@/modules/workspaces/lib/tabDrop";
 import { SlideReveal } from "@/app/components/SlideReveal";
@@ -200,6 +201,7 @@ function SortableWorkspaceItem({
   hoverSwitch: HoverSwitch | null;
 }) {
   const shownTitle = useWorkspaceTitle(ws);
+  useIconCatalogVersion();
   const {
     attributes,
     listeners,
