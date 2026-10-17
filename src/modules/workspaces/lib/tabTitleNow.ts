@@ -2,6 +2,7 @@ import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { getOscTitle } from "@/modules/terminal/lib/oscTitleStore";
 import { getDirGit } from "./dirGitStore";
 import { getSystemInfo } from "./systemInfoStore";
+import { getTabWorkspaceRoot } from "./tabWorkspaceRootStore";
 import { getRunningCommand } from "./terminalEphemeralStore";
 import { titleDefaultsNow } from "./titleDefaultsPrefs";
 import { expandTabTitle, tabDir } from "./titleVars";
@@ -18,6 +19,7 @@ export function tabTitleNow(tab: Tab): string {
     git: getDirGit(dir),
     home: sys.home,
     host: sys.host,
+    workspaceRoot: getTabWorkspaceRoot(tab.id),
   });
 }
 
@@ -30,6 +32,12 @@ export function tabDisplayTitleNow(tab: Tab): string {
     terminal ? getRunningCommand(tab.id) : null,
     terminal ? getOscTitle(tab.id) : undefined,
     useAgentStore.getState().sessions[tab.id],
-    { git: getDirGit(tabDir(tab)), home: sys.home, host: sys.host, defaults: titleDefaultsNow() },
+    {
+      git: getDirGit(tabDir(tab)),
+      home: sys.home,
+      host: sys.host,
+      defaults: titleDefaultsNow(),
+      workspaceRoot: getTabWorkspaceRoot(tab.id),
+    },
   ).displayTitle;
 }

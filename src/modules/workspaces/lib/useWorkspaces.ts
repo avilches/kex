@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { claimClose, flushWorkspaceState } from "./workspaceState";
 import { setRunningCommand } from "./terminalEphemeralStore";
+import { syncTabWorkspaceRoots } from "./tabWorkspaceRootStore";
 import { previewResumeCmd, seedRestorePlan, type RestorePlan } from "@/modules/agents/lib/agentSessionRestore";
 import { applyAgentTitles } from "./agentTitles";
 import { applyHibernate, applyWake, editorTabIds, terminalTabs } from "./hibernate";
@@ -405,6 +406,7 @@ export function useWorkspaces(initial?: { cwd?: string; initialWorkspaces?: Work
 
   const workspacesRef = useRef(workspaces);
   useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
+  useEffect(() => { syncTabWorkspaceRoots(workspaces); }, [workspaces]);
 
   const previousWorkspaceIdRef = useRef<string | null>(null);
   const closedTabsRef = useRef<ClosedEntry[]>([]);

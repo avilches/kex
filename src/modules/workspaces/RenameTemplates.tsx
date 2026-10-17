@@ -28,6 +28,7 @@ import {
 } from "@/modules/workspaces/lib/titleVariablesFor";
 import { useDirGit } from "@/modules/workspaces/lib/dirGitStore";
 import { useSystemInfo } from "@/modules/workspaces/lib/systemInfoStore";
+import { useTabWorkspaceRoot } from "@/modules/workspaces/lib/tabWorkspaceRootStore";
 import { useTitleDefaults } from "@/modules/workspaces/lib/titleDefaultsPrefs";
 
 type Props = {
@@ -150,6 +151,7 @@ function useVariableValues(tab: Tab | null, workspace?: Props["workspace"]): Rec
   const needsGit = tab !== null || templateNeedsGit(defaults.workspace);
   const dir = tab ? tabDir(tab) : workspace?.cwd || workspace?.workspaceRoot || undefined;
   const git = useDirGit(needsGit ? dir : undefined, tab?.id ?? workspace?.id);
+  const tabRoot = useTabWorkspaceRoot(tab?.id);
   const sources: TitleSources = {
     runningCommand,
     git,
@@ -159,6 +161,7 @@ function useVariableValues(tab: Tab | null, workspace?: Props["workspace"]): Rec
     home: sys.home,
     host: sys.host,
     fallbackDir: dir,
+    workspaceRoot: workspace ? workspace.workspaceRoot : tabRoot,
   };
   const vars = tabTitleVars(tab, sources);
   vars.tab = tab

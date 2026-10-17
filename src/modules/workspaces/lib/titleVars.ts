@@ -21,6 +21,8 @@ export type TitleSources = {
   host?: string;
   // Directory used when the tab has none of its own (a workspace falls back to its root).
   fallbackDir?: string;
+  // Root of the workspace the tab belongs to.
+  workspaceRoot?: string;
 };
 
 export function tabDir(tab: Tab): string | undefined {
@@ -49,6 +51,7 @@ export function tabTitleVars(tab: Tab | null, src: TitleSources = {}): TitleVars
     dir: base(dir),
     branch: src.git?.branch ?? "",
     repo: base(src.git?.repoRoot),
+    workspace: src.workspaceRoot ? withTilde(src.workspaceRoot, src.home) : "",
     cmd: (src.runningCommand ?? "").trim().replace(/\s+/g, " "),
     file: file ? base(file) : "",
     agent: src.agent ?? "",
@@ -74,7 +77,10 @@ export function workspaceTitleVars(
   src: TitleSources = {},
 ): TitleVars {
   const fallbackDir = ws.cwd || ws.workspaceRoot || undefined;
-  return { ...tabTitleVars(focused, { ...src, fallbackDir }), tab: focusedTitle };
+  return {
+    ...tabTitleVars(focused, { ...src, fallbackDir, workspaceRoot: ws.workspaceRoot }),
+    tab: focusedTitle,
+  };
 }
 
 export function workspaceDir(

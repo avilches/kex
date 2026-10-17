@@ -93,3 +93,16 @@ describe("workspace titles", () => {
     expect(expandWorkspaceTitle(ws, terminal({ cwd: "/a/b" }), "vim", { git })).toBe("kex - vim");
   });
 });
+
+describe("{workspace}", () => {
+  it("is the workspace root with home as ~, empty without one", () => {
+    const v = tabTitleVars(terminal(), { workspaceRoot: "/Users/me/code/kex", home: "/Users/me" });
+    expect(v.workspace).toBe("~/code/kex");
+    expect(tabTitleVars(terminal()).workspace).toBe("");
+  });
+
+  it("names the workspace root in a workspace title whatever the focused tab", () => {
+    const browser: Tab = { id: "b", kind: "browser", url: "http://x" };
+    expect(expandWorkspaceTitle({ title: "{workspace}", workspaceRoot: "/w/root" }, browser, "")).toBe("/w/root");
+  });
+});
