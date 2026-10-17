@@ -31,7 +31,9 @@ OpenCode is wired by `agent_setup_opencode` instead (bell popover, "Install Open
 static plugin script to `<opencode config dir>/plugins/opencode-session.js` (`~/.config/opencode/` normally, the
 `OPENCODE_CONFIG_DIR` directory when set), which OpenCode's own process loads. There
 is no Settings toggle and no uninstall: without Kex's per-terminal env vars the plugin does nothing. `agent_opencode_plugin_status`
-greps the installed file for a version marker so an outdated install offers the button again.
+greps the installed file for a version marker so an outdated install offers the button again. The same install button
+lives in Settings > General (OpenCode integration row), install-only: it reinstalls the current plugin file when the
+installed one is already current.
 
 ### KEX_TAB_ID
 

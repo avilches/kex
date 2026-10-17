@@ -33,12 +33,24 @@ export function GeneralSection() {
   const [hooksInstalled, setHooksInstalled] = useState<boolean | null>(null);
   const [agentNotifsInstalling, setAgentNotifsInstalling] = useState(false);
   const [agentNotifsError, setAgentNotifsError] = useState<string | null>(null);
+  const [opencodeReady, setOpencodeReady] = useState<boolean | null>(null);
+  const [opencodeInstalling, setOpencodeInstalling] = useState(false);
 
   useEffect(() => {
     let alive = true;
     invoke<boolean>("agent_claude_hooks_status")
       .then((on) => alive && setHooksInstalled(on))
       .catch(() => alive && setHooksInstalled(false));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    invoke<boolean>("agent_opencode_plugin_status")
+      .then((on) => alive && setOpencodeReady(on))
+      .catch(() => alive && setOpencodeReady(null));
     return () => {
       alive = false;
     };
@@ -60,6 +72,19 @@ export function GeneralSection() {
       console.error("[kex] agent hooks change failed:", e);
     } finally {
       setAgentNotifsInstalling(false);
+    }
+  };
+
+  const onInstallOpencode = async () => {
+    setOpencodeInstalling(true);
+    try {
+      await invoke("agent_setup_opencode");
+      setOpencodeReady(true);
+    } catch (e) {
+      console.error("[kex] agent_setup_opencode failed:", e);
+      setOpencodeReady(false);
+    } finally {
+      setOpencodeInstalling(false);
     }
   };
 
@@ -204,6 +229,48 @@ export function GeneralSection() {
         </SettingRow>
         {agentNotifsError && (
           <p className="text-[11px] text-destructive">{agentNotifsError}</p>
+        )}
+        <SettingRow
+          title={
+            <span className="flex items-center gap-1.5">
+              OpenCode integration
+              {opencodeReady !== null && (
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-[11px] font-normal",
+                    opencodeReady ? "text-green-500" : "text-destructive",
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={opencodeReady ? CheckmarkCircle02Icon : CancelCircleIcon}
+                    size={12}
+                    strokeWidth={2}
+                  />
+                  {opencodeReady ? "Installed" : "Not installed"}
+                </span>
+              )}
+            </span>
+          }
+          description={
+            opencodeReady
+              ? "The Kex plugin is active: Kex restores your OpenCode sessions and notifies you in the tab bar when OpenCode needs input or finishes. File: ~/.config/opencode/plugins/opencode-session.js."
+              : "Install the Kex plugin so OpenCode reports its sessions to Kex: your OpenCode sessions are restored when you reopen it and the tab bar shows attention and finish signals. Writes ~/.config/opencode/plugins/opencode-session.js."
+          }
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 text-[11px]"
+            disabled={opencodeInstalling || opencodeReady === null}
+            onClick={() => void onInstallOpencode()}
+          >
+            {opencodeInstalling ? "Installing..." : opencodeReady ? "Reinstall" : "Install"}
+          </Button>
+        </SettingRow>
+        {opencodeReady === false && (
+          <p className="text-[11px] text-destructive">
+            Could not write the OpenCode plugin.
+          </p>
         )}
       </div>
 
