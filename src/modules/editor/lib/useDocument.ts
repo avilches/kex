@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import { useAutoSaveTimer } from "@/modules/editor/lib/useAutoSaveTimer";
 import { useConflictFlag } from "@/modules/editor/lib/useConflictFlag";
 import { shouldApplyReload } from "@/modules/editor/lib/reloadPlan";
@@ -71,7 +70,6 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
   const conflictRef = useRef(false);
   conflictRef.current = conflict;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: autoSaveRef is a stable ref from useAutoSaveTimer, read fresh on each call
   const saveNow = useCallback(async () => {
     const content = bufferRef.current;
     await invoke("fs_write_file", {
@@ -82,10 +80,6 @@ export function useDocument({ path, tabId, onDirtyChange, visible = true }: Opti
     });
     savedRef.current = content;
     setDirty(false);
-    // TODO(debug): temporary autosave toast, remove once triggers are verified.
-    if (autoSaveRef.current.autoSave) {
-      toast.success(`Autosaved ${path.split(/[\\/]/).pop() || path}`);
-    }
   }, [path]);
 
   // Notify parent of dirty transitions.
