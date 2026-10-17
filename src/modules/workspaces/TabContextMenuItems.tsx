@@ -225,7 +225,7 @@ export function TabContextMenuItems({
             return {
               ...p,
               locked: newLocked,
-              ...(newLocked && (p.kind === "editor" || p.kind === "git-diff" || p.kind === "git-commit-file")
+              ...(newLocked && (p.kind === "editor" || p.kind === "markdown" || p.kind === "git-diff" || p.kind === "git-commit-file")
                 ? { preview: false }
                 : {}),
             };
